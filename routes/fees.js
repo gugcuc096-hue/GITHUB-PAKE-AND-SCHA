@@ -4,7 +4,8 @@ const { z } = require('zod');
 const { db } = require('../db');
 const { requireAuth, requireAdmin } = require('../auth');
 const { wrap, parseBody, idParam, FEE_CATEGORIES } = require('../helpers');
-const { feeRow } = require('../models');
+const { feeRow, logActivity } = require('../models');
+const money = (n) => `${Math.round(n).toLocaleString('de-DE')} $`;
 
 const ORDER = 'ORDER BY sort_order ASC, id ASC';
 
@@ -46,6 +47,7 @@ adminRouter.post(
     const info = db
       .prepare('INSERT INTO fees (category, name, description, price, in_calculator, active, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)')
       .run(d.category, d.name, d.description || '', d.price, d.inCalculator === false ? 0 : 1, d.active === false ? 0 : 1, d.sortOrder ?? maxOrder + 1);
+    logActivity(req.user, 'Leistung hinzugefügt', 'fee', Number(info.lastInsertRowid), `${d.name} (${money(d.price)})`);
     res.status(201).json({ fee: feeRow(load(Number(info.lastInsertRowid))) });
   })
 );
@@ -70,6 +72,7 @@ adminRouter.patch(
       d.sortOrder ?? f.sort_order,
       f.id
     );
+    if (d.price !== undefined && d.price !== f.price) logActivity(req.user, 'Preis geändert', 'fee', f.id, `${f.name}: ${money(f.price)} → ${money(d.price)}`);
     res.json({ fee: feeRow(load(f.id)) });
   })
 );
@@ -78,8 +81,10 @@ adminRouter.delete(
   '/:id',
   wrap(async (req, res) => {
     const id = idParam(req);
-    if (!id || !load(id)) return res.status(404).json({ error: 'Leistung nicht gefunden.' });
+    const f = id && load(id);
+    if (!f) return res.status(404).json({ error: 'Leistung nicht gefunden.' });
     db.prepare('DELETE FROM fees WHERE id = ?').run(id);
+    logActivity(req.user, 'Leistung gelöscht', 'fee', id, f.name);
     res.json({ success: true });
   })
 );

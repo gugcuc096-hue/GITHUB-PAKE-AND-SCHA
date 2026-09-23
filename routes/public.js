@@ -2,18 +2,33 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { z } = require('zod');
-const { db, tx, nextCaseNumber, randomPin } = require('../db');
+const { db, tx, nextCaseNumber, randomPin, getSetting } = require('../db');
 const { wrap, parseBody, AREAS, URGENCIES, STEPS, CASE_STATUS, truncate } = require('../helpers');
-const { addSystemNote, getCase } = require('../models');
+const { addSystemNote, getCase, onDutyMembers } = require('../models');
 const discord = require('../discord');
 
 const router = express.Router();
 
-const limit = (windowMs, max, message) =>
-  rateLimit({ windowMs, max, standardHeaders: true, legacyHeaders: false, handler: (req, res) => res.status(429).json({ error: message }) });
+const limit = (windowMs, max, message, skipFailedRequests = false) =>
+  rateLimit({
+    windowMs,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipFailedRequests,
+    handler: (req, res) => res.status(429).json({ error: message }),
+  });
 
 const statusLimiter = limit(15 * 60 * 1000, 15, 'Zu viele Versuche. Bitte in ein paar Minuten erneut versuchen.');
-const requestLimiter = limit(60 * 60 * 1000, 5, 'Sie haben bereits mehrere Anfragen gesendet. Bitte versuchen Sie es später erneut.');
+// Nur erfolgreich eingereichte Mandate zählen; Tippfehler im Formular verbrauchen kein Kontingent.
+const requestLimiter = limit(60 * 60 * 1000, 5, 'Sie haben bereits mehrere Anfragen gesendet. Bitte versuchen Sie es später erneut.', true);
+
+/* Eilnotdienst: Wer ist gerade im Dienst? (abschaltbar unter Einstellungen) */
+router.get('/on-duty', (req, res) => {
+  if (getSetting('show_duty_public', '1') !== '1') return res.json({ visible: false, count: null, members: [] });
+  const members = onDutyMembers().map((m) => ({ name: m.name, rank: m.rank, status: m.status, statusLabel: m.statusLabel }));
+  res.json({ visible: true, count: members.length, members });
+});
 
 /* Aktenstatus: Aktenzeichen + 6-stelliger Aktenpin (Aktenzeichen allein sind erratbar). */
 router.post(

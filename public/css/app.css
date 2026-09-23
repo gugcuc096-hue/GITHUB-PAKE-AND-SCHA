@@ -187,6 +187,8 @@ input[type="datetime-local"].field, input[type="date"].field { color-scheme: dar
 .tbl tr:last-child td { border-bottom: none; }
 .tbl tr.row { cursor: pointer; transition: background 0.15s ease; }
 .tbl tr.row:hover td { background: rgba(212, 175, 55, 0.05); }
+.tbl tr.is-selected td { background: rgba(212, 175, 55, 0.09); }
+.tbl tr.is-selected td:first-child { box-shadow: inset 3px 0 0 var(--gold-500); }
 .td-actions { text-align: right; white-space: nowrap; }
 .td-actions > * + * { margin-left: 0.35rem; }
 @media (max-width: 767px) {
@@ -202,6 +204,9 @@ input[type="datetime-local"].field, input[type="date"].field { color-scheme: dar
   .tbl-cards td.td-actions { justify-content: flex-end; flex-wrap: wrap; gap: 0.4rem; }
   .tbl-cards td.td-actions > * + * { margin-left: 0; }
   .tbl-cards tr.row:hover td { background: transparent; }
+  .tbl-cards tr.is-selected { border-color: var(--gold-500); }
+  .tbl-cards tr.is-selected td { background: transparent; }
+  .tbl-cards tr.is-selected td:first-child { box-shadow: none; }
 }
 
 /* ---------------------------------------------------------------- Aktenfortschritt */
@@ -521,6 +526,70 @@ details.edit-box[open] > summary::after { content: '–'; }
   .modal-title { font-size: 1.6rem; }
 }
 @keyframes sheet-in { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* ================================================================
+   Dienststatus, Profilbilder, Beweismittel, Bewerbungen
+   ================================================================ */
+.duty-dot { display: inline-block; width: 9px; height: 9px; border-radius: 999px; flex-shrink: 0; background: #64748b; }
+.duty-dot.s-dienst { background: #34d399; box-shadow: 0 0 10px rgba(52, 211, 153, 0.7); }
+.duty-dot.s-gericht { background: var(--gold-500); box-shadow: 0 0 10px rgba(212, 175, 55, 0.6); }
+.duty-dot.s-pause { background: var(--amber); }
+.duty-btn { display: inline-flex; align-items: center; gap: 0.5rem; height: 40px; padding: 0 0.85rem; border-radius: 999px; border: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.03); color: var(--text-muted); font-size: 0.8rem; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.2s ease; }
+.duty-btn:hover { border-color: var(--gold-hairline); color: #fff; }
+.duty-btn.on { border-color: rgba(52, 211, 153, 0.45); color: #a7f3d0; background: rgba(16, 185, 129, 0.08); }
+.duty-btn .lbl { display: none; }
+@media (min-width: 480px) { .duty-btn .lbl { display: inline; } }
+.pop-wrap { position: relative; }
+.pop { position: absolute; top: calc(100% + 8px); right: 0; z-index: 65; min-width: 240px; padding: 0.4rem; border-radius: 14px; background: rgba(8, 14, 32, 0.98); border: 1px solid var(--glass-border); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6); display: none; }
+.pop.open { display: block; animation: toast-in 0.15s ease; }
+.pop-item { display: flex; align-items: center; gap: 0.65rem; width: 100%; padding: 0.6rem 0.75rem; border-radius: 10px; border: 0; background: none; color: var(--text-muted); font-size: 0.875rem; text-align: left; cursor: pointer; }
+.pop-item:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+.pop-item.active { color: var(--gold-light); background: var(--gold-soft); }
+.pop-note { padding: 0.5rem 0.4rem 0.3rem; border-top: 1px solid var(--line); margin-top: 0.3rem; }
+
+.avatar-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
+.avatar-wrap .presence { position: absolute; right: -1px; bottom: -1px; width: 12px; height: 12px; border-radius: 999px; border: 2px solid var(--navy-950); background: #64748b; }
+.avatar-wrap .presence.s-dienst { background: #34d399; }
+.avatar-wrap .presence.s-gericht { background: var(--gold-500); }
+.avatar-wrap .presence.s-pause { background: var(--amber); }
+.avatar.xs { width: 28px; height: 28px; font-size: 0.7rem; }
+.avatar.sm { width: 32px; height: 32px; font-size: 0.78rem; }
+.avatar-edit { position: relative; display: inline-flex; flex-shrink: 0; }
+.avatar-edit .cam { position: absolute; right: -4px; bottom: -4px; width: 32px; height: 32px; border-radius: 999px; display: flex; align-items: center; justify-content: center; background: var(--gold-500); color: #02050e; border: 2px solid var(--navy-950); cursor: pointer; }
+.file-btn { position: relative; overflow: hidden; }
+.file-btn input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 0; }
+
+.duty-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; padding: 0.75rem 1rem; margin-bottom: 1.25rem; }
+.duty-chip { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.7rem 0.25rem 0.25rem; border-radius: 999px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--line); font-size: 0.8rem; }
+.duty-chip .st { font-size: 0.7rem; color: var(--text-dim); }
+.timer { font-family: 'JetBrains Mono', monospace; font-size: clamp(1.8rem, 6vw, 2.6rem); color: var(--gold-500); font-weight: 500; line-height: 1.1; }
+.duty-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+@media (min-width: 640px) { .duty-options { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.duty-opt { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.35rem; padding: 0.85rem 0.5rem; border-radius: 14px; border: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.02); color: var(--text-muted); font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+.duty-opt:hover { border-color: var(--gold-hairline); color: #fff; }
+.duty-opt.active { border-color: var(--gold-500); background: var(--gold-soft); color: var(--gold-light); }
+.duty-opt .duty-dot { width: 12px; height: 12px; }
+.week-nav { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.week-nav .lbl { font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; font-weight: 600; min-width: 11rem; text-align: center; }
+
+.att-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 0.6rem; }
+.att { position: relative; aspect-ratio: 1 / 1; border-radius: 12px; overflow: hidden; border: 1px solid var(--glass-border); background: #000; cursor: zoom-in; padding: 0; }
+.att img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.3s ease; }
+.att:hover img { transform: scale(1.05); }
+.att .tag { position: absolute; left: 6px; top: 6px; }
+.att .cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 0.3rem 0.45rem; font-size: 0.68rem; text-align: left; background: linear-gradient(transparent, rgba(0, 0, 0, 0.85)); color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.att-add { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.3rem; aspect-ratio: 1 / 1; border-radius: 12px; border: 1px dashed var(--gold-hairline); color: var(--gold-500); font-size: 0.75rem; font-weight: 600; background: rgba(212, 175, 55, 0.04); cursor: pointer; text-align: center; padding: 0.5rem; }
+.att-add:hover { background: rgba(212, 175, 55, 0.1); }
+.lightbox-img { width: 100%; max-height: 72vh; object-fit: contain; border-radius: 12px; background: #000; display: block; }
+
+.stars { display: inline-flex; gap: 2px; }
+.stars button { background: none; border: 0; padding: 2px; cursor: pointer; color: rgba(255, 255, 255, 0.2); font-size: 1.35rem; line-height: 1; transition: color 0.15s ease, transform 0.15s ease; }
+.stars button.on { color: var(--gold-500); }
+.stars button:hover { transform: scale(1.15); }
+.stars.readonly { font-size: 0.85rem; color: var(--gold-500); letter-spacing: 1px; }
+.qa { border-radius: 14px; border: 1px solid var(--line); padding: 0.85rem 1rem; background: rgba(15, 23, 42, 0.35); }
+.qa .q { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold-500); margin-bottom: 0.3rem; }
+.qa .a { white-space: pre-wrap; font-size: 0.9rem; line-height: 1.55; word-break: break-word; color: var(--text-muted); }
 
 /* Unterseiten (Login/Registrierung) */
 .subpage-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.9rem 1rem; }

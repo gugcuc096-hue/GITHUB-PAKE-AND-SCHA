@@ -1,7 +1,29 @@
 'use strict';
 const { db } = require('./db');
-const { isStaff } = require('./auth');
-const { STEPS, CASE_STATUS, EVENT_TYPES } = require('./helpers');
+const { isStaff, userAvatarUrl } = require('./auth');
+const { STEPS, CASE_STATUS, EVENT_TYPES, APPLICATION_STATUS, DUTY_STATUS, truncate } = require('./helpers');
+const { avatarUrl, teamPhotoUrl } = require('./uploads');
+
+/* ================================================================
+   Aktivitätsprotokoll
+   ================================================================ */
+/** Hält fest, wer was geändert hat (sichtbar für die Kanzleileitung). Fehler hier dürfen nie eine Aktion blockieren. */
+function logActivity(user, action, entity = '', entityId = null, details = '') {
+  try {
+    db.prepare('INSERT INTO audit_log (user_id, user_name, action, entity, entity_id, details) VALUES (?, ?, ?, ?, ?, ?)').run(
+      user ? user.id : null,
+      user ? user.display_name : 'System',
+      action,
+      entity,
+      entityId ?? null,
+      truncate(details, 500)
+    );
+    // Protokoll begrenzen: nur die letzten 5000 Einträge behalten.
+    if (Math.random() < 0.02) db.prepare('DELETE FROM audit_log WHERE id <= (SELECT MAX(id) FROM audit_log) - 5000').run();
+  } catch (err) {
+    console.warn('Protokoll-Eintrag fehlgeschlagen:', err.message);
+  }
+}
 
 /* ================================================================
    Akten
@@ -139,6 +161,7 @@ function apptRow(a, u) {
 const MESSAGE_SELECT = `
   SELECT m.*,
          s.display_name AS sender_name, s.role AS sender_role, s.rank AS sender_rank,
+         s.avatar AS sender_avatar, s.discord_id AS sender_discord_id, s.discord_avatar AS sender_discord_avatar,
          r.display_name AS recipient_name, r.role AS recipient_role,
          c.case_number, c.title AS case_title
   FROM messages m
@@ -153,6 +176,9 @@ function messageRow(m) {
     senderName: m.sender_name || 'Ehemaliges Mitglied',
     senderRole: m.sender_role || null,
     senderRank: m.sender_rank || null,
+    senderAvatar: m.sender_id
+      ? userAvatarUrl({ avatar: m.sender_avatar, discord_id: m.sender_discord_id, discord_avatar: m.sender_discord_avatar })
+      : null,
     recipientId: m.recipient_id,
     recipientName: m.recipient_name || '—',
     subject: m.subject || '',
@@ -210,6 +236,11 @@ function invoiceRow(i) {
 /* ================================================================
    Team, Honorarordnung, Pinnwand
    ================================================================ */
+const TEAM_SELECT = `
+  SELECT t.*, u.email AS user_email, u.role AS user_role, u.active AS user_active,
+         u.avatar AS user_avatar, u.duty_status AS user_duty_status
+  FROM team_members t LEFT JOIN users u ON u.id = t.user_id`;
+
 function teamRow(t, withAdminFields = false) {
   const row = {
     id: t.id,
@@ -219,8 +250,12 @@ function teamRow(t, withAdminFields = false) {
     initials: t.initials,
     tier: t.tier,
     sortOrder: t.sort_order,
+    // Eigenes Team-Foto hat Vorrang, sonst das Profilbild des verknüpften Kontos.
+    photoUrl: teamPhotoUrl(t.photo) || avatarUrl(t.user_avatar) || null,
+    duty: t.user_duty_status && t.user_duty_status !== 'off' && t.user_active !== 0 ? t.user_duty_status : null,
   };
   if (withAdminFields) {
+    row.hasOwnPhoto = !!t.photo;
     row.visible = !!t.visible;
     row.userId = t.user_id || null;
     row.userEmail = t.user_email || null;
@@ -257,7 +292,106 @@ function boardRow(n) {
   };
 }
 
+/* ================================================================
+   Beweismittel, Bewerbungen, Dienstzeiten
+   ================================================================ */
+function attachmentRow(a, caseId) {
+  return {
+    id: a.id,
+    caption: a.caption,
+    internal: !!a.internal,
+    mime: a.mime,
+    size: a.size,
+    uploaderId: a.uploader_id,
+    uploaderName: a.uploader_name,
+    createdAt: a.created_at,
+    url: `/api/cases/${caseId}/attachments/${a.id}/file`,
+  };
+}
+
+function positionRow(p) {
+  return {
+    id: p.id,
+    title: p.title,
+    description: p.description,
+    requirements: p.requirements,
+    active: !!p.active,
+    sortOrder: p.sort_order,
+  };
+}
+
+function applicationRow(a) {
+  return {
+    id: a.id,
+    number: a.number,
+    positionId: a.position_id,
+    positionTitle: a.position_title,
+    name: a.name,
+    age: a.age,
+    phone: a.phone,
+    email: a.email,
+    discord: a.discord,
+    experience: a.experience,
+    motivation: a.motivation,
+    availability: a.availability,
+    status: a.status,
+    statusLabel: APPLICATION_STATUS[a.status] || a.status,
+    rating: a.rating,
+    publicNote: a.public_note,
+    interviewAt: a.interview_at,
+    hiredUserId: a.hired_user_id,
+    createdAt: a.created_at,
+    updatedAt: a.updated_at,
+  };
+}
+
+const DUTY_SELECT = `
+  SELECT d.*, u.display_name AS user_name, u.rank AS user_rank
+  FROM duty_sessions d JOIN users u ON u.id = d.user_id`;
+
+function dutySessionRow(d) {
+  return {
+    id: d.id,
+    userId: d.user_id,
+    userName: d.user_name,
+    userRank: d.user_rank || null,
+    startedAt: d.started_at,
+    endedAt: d.ended_at,
+    note: d.note,
+    autoClosed: !!d.auto_closed,
+  };
+}
+
+/** Wer ist gerade im Dienst? (für Dashboard und Website) */
+function onDutyMembers() {
+  return db
+    .prepare(
+      `SELECT id, display_name, rank, role, avatar, discord_id, discord_avatar, duty_status, duty_note, duty_since
+       FROM users WHERE duty_status != 'off' AND active = 1 AND role IN ('anwalt','admin')
+       ORDER BY duty_since ASC`
+    )
+    .all()
+    .map((u) => ({
+      id: u.id,
+      name: u.display_name,
+      rank: u.rank || null,
+      status: u.duty_status,
+      statusLabel: DUTY_STATUS[u.duty_status] || u.duty_status,
+      note: u.duty_note,
+      since: u.duty_since,
+      avatarUrl: userAvatarUrl(u),
+    }));
+}
+
 module.exports = {
+  logActivity,
+  TEAM_SELECT,
+  attachmentRow,
+  positionRow,
+  applicationRow,
+  DUTY_SELECT,
+  dutySessionRow,
+  onDutyMembers,
   CASE_SELECT,
   getCase,
   caseAccess,

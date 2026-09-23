@@ -16,8 +16,13 @@ const {
   apptRow,
   INVOICE_SELECT,
   invoiceRow,
+  attachmentRow,
+  logActivity,
 } = require('../models');
 const discord = require('../discord');
+const { imageBody, saveImage, removeFile, evidencePath } = require('../uploads');
+
+const MAX_ATTACHMENTS_PER_CASE = 40;
 
 const router = express.Router();
 router.use(requireAuth);
@@ -127,6 +132,7 @@ router.post(
 
     const c = getCase(id);
     notifyCreated(c, u);
+    if (isStaff(u)) logActivity(u, 'Akte angelegt', 'case', id, `${c.case_number} – ${c.title}`);
     res.status(201).json({ case: caseRow(c, u) });
   })
 );
@@ -152,12 +158,17 @@ router.get(
       .all(c.id)
       .filter((a) => apptVisible(a, req.user));
     const invoices = db.prepare(`${INVOICE_SELECT} WHERE i.case_id = ? ORDER BY i.created_at DESC`).all(c.id);
+    const attachments = db
+      .prepare('SELECT * FROM case_attachments WHERE case_id = ? ORDER BY created_at ASC, id ASC')
+      .all(c.id)
+      .filter((a) => staff || !a.internal);
 
     res.json({
       case: { ...caseRow(c, req.user), ...access },
       notes: notes.map(noteRow),
       appointments: appointments.map((a) => apptRow(a, req.user)),
       invoices: invoices.map(invoiceRow),
+      attachments: attachments.map((a) => attachmentRow(a, c.id)),
     });
   })
 );
@@ -260,6 +271,7 @@ router.patch(
     });
 
     const updated = getCase(c.id);
+    if (history.length) logActivity(u, 'Akte geändert', 'case', c.id, `${c.case_number}: ${history.join(' · ')}`);
     if (newStatus && newStatus !== c.status) {
       discord.notify('case.status', {
         title: `${updated.case_number}: ${CASE_STATUS[newStatus]}`,
@@ -282,7 +294,76 @@ router.delete(
     const id = idParam(req);
     const c = id && getCase(id);
     if (!c) return res.status(404).json({ error: 'Akte nicht gefunden.' });
+    const files = db.prepare('SELECT file FROM case_attachments WHERE case_id = ?').all(c.id);
     db.prepare('DELETE FROM cases WHERE id = ?').run(c.id);
+    files.forEach((f) => removeFile('evidence', f.file));
+    logActivity(req.user, 'Akte gelöscht', 'case', c.id, `${c.case_number} – ${c.title}`);
+    res.json({ success: true });
+  })
+);
+
+/* ---------------------------------------------------------------- Beweismittel / Bildanhänge */
+router.post(
+  '/:id/attachments',
+  imageBody,
+  wrap(async (req, res) => {
+    const id = idParam(req);
+    const c = id && getCase(id);
+    if (!c || !caseAccess(c, req.user).canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
+    if (c.status === 'geschlossen' && !isStaff(req.user)) return res.status(403).json({ error: 'Die Akte ist geschlossen.' });
+    const count = db.prepare('SELECT COUNT(*) AS n FROM case_attachments WHERE case_id = ?').get(c.id).n;
+    if (count >= MAX_ATTACHMENTS_PER_CASE) {
+      return res.status(400).json({ error: `Pro Akte sind höchstens ${MAX_ATTACHMENTS_PER_CASE} Anhänge möglich.` });
+    }
+    const caption = String(req.query.caption || '').trim().slice(0, 200);
+    const internal = req.query.internal === '1' && isStaff(req.user);
+    const saved = saveImage(req, 'evidence');
+    const info = tx(() => {
+      const r = db
+        .prepare(
+          'INSERT INTO case_attachments (case_id, file, mime, size, caption, internal, uploader_id, uploader_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        )
+        .run(c.id, saved.file, saved.mime, saved.size, caption, internal ? 1 : 0, req.user.id, req.user.display_name);
+      addSystemNote(c.id, req.user, `Anhang hinzugefügt${caption ? ': ' + caption : ''}.`, internal);
+      db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(c.id);
+      return r;
+    });
+    const row = db.prepare('SELECT * FROM case_attachments WHERE id = ?').get(Number(info.lastInsertRowid));
+    res.status(201).json({ attachment: attachmentRow(row, c.id) });
+  })
+);
+
+router.get(
+  '/:id/attachments/:attId/file',
+  wrap(async (req, res) => {
+    const id = idParam(req);
+    const attId = idParam(req, 'attId');
+    const c = id && getCase(id);
+    if (!c || !caseAccess(c, req.user).canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
+    const a = attId && db.prepare('SELECT * FROM case_attachments WHERE id = ? AND case_id = ?').get(attId, c.id);
+    if (!a || (a.internal && !isStaff(req.user))) return res.status(404).json({ error: 'Anhang nicht gefunden.' });
+    res.set('Cache-Control', 'private, max-age=86400');
+    res.type(a.mime);
+    res.sendFile(evidencePath(a.file), (err) => {
+      if (err && !res.headersSent) res.status(404).json({ error: 'Datei nicht gefunden.' });
+    });
+  })
+);
+
+router.delete(
+  '/:id/attachments/:attId',
+  wrap(async (req, res) => {
+    const id = idParam(req);
+    const attId = idParam(req, 'attId');
+    const c = id && getCase(id);
+    if (!c || !caseAccess(c, req.user).canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
+    const a = attId && db.prepare('SELECT * FROM case_attachments WHERE id = ? AND case_id = ?').get(attId, c.id);
+    if (!a || (a.internal && !isStaff(req.user))) return res.status(404).json({ error: 'Anhang nicht gefunden.' });
+    if (a.uploader_id !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Nur die hochladende Person oder die Kanzleileitung kann den Anhang löschen.' });
+    }
+    db.prepare('DELETE FROM case_attachments WHERE id = ?').run(a.id);
+    removeFile('evidence', a.file);
     res.json({ success: true });
   })
 );

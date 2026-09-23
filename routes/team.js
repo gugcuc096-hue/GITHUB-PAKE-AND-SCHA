@@ -1,21 +1,26 @@
 'use strict';
 const express = require('express');
 const { z } = require('zod');
-const { db, tx } = require('../db');
+const { db, tx, getSetting } = require('../db');
 const { requireAuth, requireAdmin, hashPassword, generateTempPassword, destroyAllSessions } = require('../auth');
 const { wrap, parseBody, idParam, deriveInitials } = require('../helpers');
-const { teamRow } = require('../models');
+const { teamRow, TEAM_SELECT, logActivity } = require('../models');
+const { imageBody, saveImage, removeFile } = require('../uploads');
 
 const ORDER = 'ORDER BY t.sort_order ASC, t.id ASC';
-const ADMIN_SELECT = `
-  SELECT t.*, u.email AS user_email, u.role AS user_role, u.active AS user_active
-  FROM team_members t LEFT JOIN users u ON u.id = t.user_id`;
 
 /* Öffentlich: Team-Übersicht der Startseite (Änderungen sind sofort live) */
 const publicRouter = express.Router();
 publicRouter.get('/', (req, res) => {
-  const rows = db.prepare(`SELECT t.* FROM team_members t WHERE t.visible = 1 ${ORDER}`).all();
-  res.json({ team: rows.map((t) => teamRow(t)) });
+  const showDuty = getSetting('show_duty_public', '1') === '1';
+  const rows = db.prepare(`${TEAM_SELECT} WHERE t.visible = 1 ${ORDER}`).all();
+  res.json({
+    team: rows.map((t) => {
+      const row = teamRow(t);
+      if (!showDuty) row.duty = null;
+      return row;
+    }),
+  });
 });
 
 /* Kanzleileitung: Team verwalten */
@@ -38,7 +43,7 @@ const memberSchema = z.object({
 });
 
 function load(id) {
-  return db.prepare(`${ADMIN_SELECT} WHERE t.id = ?`).get(id) || null;
+  return db.prepare(`${TEAM_SELECT} WHERE t.id = ?`).get(id) || null;
 }
 
 /** Legt ein Login-Konto für ein Teammitglied an und liefert das Einmal-Passwort zurück. */
@@ -65,7 +70,7 @@ function checkLinkTarget(userId, memberId = null) {
 }
 
 adminRouter.get('/', (req, res) => {
-  const rows = db.prepare(`${ADMIN_SELECT} ${ORDER}`).all();
+  const rows = db.prepare(`${TEAM_SELECT} ${ORDER}`).all();
   res.json({ team: rows.map((t) => teamRow(t, true)) });
 });
 
@@ -99,6 +104,7 @@ adminRouter.post(
       return Number(info.lastInsertRowid);
     });
 
+    logActivity(req.user, 'Teammitglied hinzugefügt', 'team', id, `${d.name} (${d.roleTitle})${credentials ? ' inkl. Login-Konto' : ''}`);
     res.status(201).json({
       member: teamRow(load(id), true),
       credentials: credentials ? { email: credentials.email, password: credentials.password } : null,
@@ -146,6 +152,7 @@ adminRouter.patch(
       if (userId) db.prepare('UPDATE users SET display_name = ?, rank = ? WHERE id = ?').run(name, roleTitle.slice(0, 60), userId);
     });
 
+    logActivity(req.user, 'Teammitglied geändert', 'team', m.id, d.name && d.name !== m.name ? `${m.name} → ${d.name}` : m.name);
     res.json({
       member: teamRow(load(m.id), true),
       credentials: credentials ? { email: credentials.email, password: credentials.password } : null,
@@ -166,6 +173,34 @@ adminRouter.post(
   })
 );
 
+// Eigenes Foto für das Team-Profil (hat auf der Website Vorrang vor dem Profilbild des Kontos).
+adminRouter.post(
+  '/:id/photo',
+  imageBody,
+  wrap(async (req, res) => {
+    const id = idParam(req);
+    const m = id && load(id);
+    if (!m) return res.status(404).json({ error: 'Teammitglied nicht gefunden.' });
+    const saved = saveImage(req, 'team');
+    db.prepare('UPDATE team_members SET photo = ? WHERE id = ?').run(saved.file, m.id);
+    removeFile('team', m.photo);
+    logActivity(req.user, 'Team-Foto geändert', 'team', m.id, m.name);
+    res.json({ member: teamRow(load(m.id), true) });
+  })
+);
+
+adminRouter.delete(
+  '/:id/photo',
+  wrap(async (req, res) => {
+    const id = idParam(req);
+    const m = id && load(id);
+    if (!m) return res.status(404).json({ error: 'Teammitglied nicht gefunden.' });
+    db.prepare('UPDATE team_members SET photo = NULL WHERE id = ?').run(m.id);
+    removeFile('team', m.photo);
+    res.json({ member: teamRow(load(m.id), true) });
+  })
+);
+
 adminRouter.delete(
   '/:id',
   wrap(async (req, res) => {
@@ -176,10 +211,13 @@ adminRouter.delete(
     tx(() => {
       db.prepare('DELETE FROM team_members WHERE id = ?').run(m.id);
       if (lockAccount) {
-        db.prepare('UPDATE users SET active = 0 WHERE id = ?').run(m.user_id);
+        db.prepare("UPDATE users SET active = 0, duty_status = 'off', duty_since = NULL WHERE id = ?").run(m.user_id);
+        db.prepare("UPDATE duty_sessions SET ended_at = ? WHERE user_id = ? AND ended_at IS NULL").run(new Date().toISOString(), m.user_id);
         destroyAllSessions(m.user_id);
       }
     });
+    removeFile('team', m.photo);
+    logActivity(req.user, 'Teammitglied entfernt', 'team', m.id, `${m.name}${lockAccount ? ' (Konto gesperrt)' : ''}`);
     res.json({ success: true, accountLocked: !!lockAccount });
   })
 );

@@ -9,6 +9,13 @@
   const { api, esc, money, copy } = window.PS;
   let me = null;
 
+  // Dienststatus: [Beschriftung, Punktfarbe, Textfarbe]
+  const DUTY = {
+    dienst: ['Im Dienst', 'bg-emerald-400', 'text-emerald-300'],
+    gericht: ['Im Gericht', 'bg-[#d4af37]', 'text-[var(--gold-light)]'],
+    pause: ['Pause', 'bg-amber-400', 'text-amber-300'],
+  };
+
   const FEE_CATEGORIES = [
     ['rechtsberatung', 'Rechtsberatung'],
     ['strafrecht', 'Strafrecht & Haftvertretung'],
@@ -165,9 +172,15 @@
     grid.innerHTML = team
       .map((m) => {
         const lead = m.tier === 'leitung';
+        const duty = m.duty ? DUTY[m.duty] : null;
+        const portrait = m.photoUrl
+          ? `<img src="${esc(m.photoUrl)}" alt="${esc(m.name)}" loading="lazy" class="w-24 h-24 rounded-full object-cover ring-4 ring-[rgba(212,175,55,0.18)] ${lead ? 'shadow-[0_0_40px_rgba(212,175,55,0.35)]' : ''}">`
+          : `<div class="w-24 h-24 rounded-full ${lead ? 'bg-gradient-to-br from-[#d4af37] to-[#8f7322] text-[#02050e] shadow-[0_0_40px_rgba(212,175,55,0.35)]' : 'bg-gradient-to-br from-slate-600 to-slate-800 text-white'} flex items-center justify-center font-serif text-3xl font-bold ring-4 ring-[rgba(212,175,55,0.12)]">${esc(m.initials)}</div>`;
         return `
         <article class="glass-card team-card p-7 text-center">
-          <div class="w-24 h-24 mx-auto rounded-full ${lead ? 'bg-gradient-to-br from-[#d4af37] to-[#8f7322] text-[#02050e] shadow-[0_0_40px_rgba(212,175,55,0.35)]' : 'bg-gradient-to-br from-slate-600 to-slate-800 text-white'} flex items-center justify-center font-serif text-3xl font-bold mb-5 ring-4 ring-[rgba(212,175,55,0.12)]">${esc(m.initials)}</div>
+          <div class="relative w-24 h-24 mx-auto mb-5">${portrait}
+            ${duty ? `<span class="absolute bottom-1 right-1 w-5 h-5 rounded-full border-[3px] border-[#0a1228] ${duty[1]}" title="${esc(duty[0])}"></span>` : ''}</div>
+          ${duty ? `<div class="flex items-center justify-center gap-1.5 text-[0.7rem] ${duty[2]} mb-2"><span class="w-1.5 h-1.5 rounded-full ${duty[1]} animate-pulse"></span>${esc(duty[0])}</div>` : ''}
           <span class="inline-block text-[0.6rem] uppercase tracking-[0.22em] px-3 py-1 rounded-full mb-3 ${lead ? 'text-[var(--gold-light)] border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.08)]' : 'text-slate-300 border border-slate-600 bg-slate-800/40'}">${lead ? 'Board of Partners' : 'Associate Attorneys'}</span>
           <h3 class="font-serif text-2xl font-semibold text-white mb-1">${esc(m.name)}</h3>
           <div class="text-xs uppercase tracking-widest ${lead ? 'text-[var(--gold-500)]' : 'text-slate-300'} mb-4">${esc(m.roleTitle)}</div>
@@ -242,6 +255,40 @@
 
   api.get('/api/fees')
     .then((r) => renderFees(r.fees || []))
+    .catch(() => {});
+
+  /* ---------------------------------------------------------------- Eilnotdienst live */
+  function renderDuty(d) {
+    const label = document.getElementById('dutyLabel');
+    const dot = document.getElementById('dutyDot');
+    const wrap = document.getElementById('dutyStripText');
+    if (!label || !d || !d.visible) return; // Anzeige abgeschaltet: statischer Text bleibt
+    if (d.count > 0) {
+      label.textContent = `Eilnotdienst: ${d.count} ${d.count === 1 ? 'Anwalt' : 'Anwälte'} im Dienst`;
+      label.title = d.members.map((m) => `${m.name} – ${m.statusLabel}`).join('\n');
+      wrap.className = 'flex items-center gap-2 text-emerald-400 min-w-0';
+      dot.className = 'status-dot status-active animate-pulse shrink-0';
+    } else {
+      label.textContent = 'Eilnotdienst: Anfrage per Mandat-Ticket';
+      label.title = '';
+      wrap.className = 'flex items-center gap-2 text-amber-300 min-w-0';
+      dot.className = 'status-dot shrink-0 bg-amber-400';
+    }
+  }
+  const loadDuty = () => api.get('/api/public/on-duty').then(renderDuty).catch(() => {});
+  loadDuty();
+  setInterval(() => {
+    if (!document.hidden) loadDuty();
+  }, 60000);
+
+  /* ---------------------------------------------------------------- Karriere */
+  api.get('/api/public/positions')
+    .then(({ positions }) => {
+      const el = document.getElementById('careerCount');
+      if (!el || !positions.length) return;
+      el.textContent = `● ${positions.length} ${positions.length === 1 ? 'offene Stelle' : 'offene Stellen'}: ${positions.map((p) => p.title).join(' · ')}`;
+      el.classList.remove('hidden');
+    })
     .catch(() => {});
 
   ['caseInput', 'casePin'].forEach((id) => {

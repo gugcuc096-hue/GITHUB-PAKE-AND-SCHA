@@ -4,7 +4,7 @@ const { z } = require('zod');
 const { db, nextInvoiceNumber, getSetting } = require('../db');
 const { requireAuth, requireStaff, requireAdmin, isStaff } = require('../auth');
 const { wrap, parseBody, idParam, dateOnly, truncate } = require('../helpers');
-const { INVOICE_SELECT, invoiceRow, getCase, addSystemNote } = require('../models');
+const { INVOICE_SELECT, invoiceRow, getCase, addSystemNote, logActivity } = require('../models');
 const discord = require('../discord');
 
 const router = express.Router();
@@ -121,6 +121,7 @@ router.post(
 
     const label = d.kind === 'rechnung' ? 'Rechnung' : 'Honorarvereinbarung';
     if (c) addSystemNote(c.id, u, `${label} ${number} über ${money(t.total)} erstellt.`, true);
+    logActivity(u, `${label} erstellt`, 'invoice', Number(info.lastInsertRowid), `${number} · ${clientName} · ${money(t.total)}`);
     discord.notify('invoice.created', {
       title: `🧾 ${label} ${number}`,
       description: d.subject ? truncate(d.subject, 300) : undefined,
@@ -151,6 +152,7 @@ router.patch(
       d.status === 'bezahlt' ? new Date().toISOString() : null,
       inv.id
     );
+    if (d.status !== inv.status) logActivity(req.user, 'Rechnungsstatus geändert', 'invoice', inv.id, `${inv.number}: ${inv.status} → ${d.status}`);
     res.json({ invoice: invoiceRow(db.prepare(`${INVOICE_SELECT} WHERE i.id = ?`).get(inv.id)) });
   })
 );
@@ -160,9 +162,10 @@ router.delete(
   requireAdmin,
   wrap(async (req, res) => {
     const id = idParam(req);
-    const inv = id && db.prepare('SELECT id FROM invoices WHERE id = ?').get(id);
+    const inv = id && db.prepare('SELECT id, number FROM invoices WHERE id = ?').get(id);
     if (!inv) return res.status(404).json({ error: 'Dokument nicht gefunden.' });
     db.prepare('DELETE FROM invoices WHERE id = ?').run(inv.id);
+    logActivity(req.user, 'Rechnung gelöscht', 'invoice', inv.id, inv.number);
     res.json({ success: true });
   })
 );

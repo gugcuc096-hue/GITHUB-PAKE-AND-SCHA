@@ -17,6 +17,8 @@ const EVENTS = {
   'appointment.requested': 'Terminanfrage eines Mandanten',
   'invoice.created': 'Rechnung / Honorarvereinbarung erstellt',
   'message.broadcast': 'Rundschreiben an das Team',
+  'application.created': 'Neue Bewerbung',
+  'duty.changed': 'Dienstbeginn / Dienstende eines Anwalts',
 };
 
 function isValidWebhookUrl(url) {

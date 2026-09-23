@@ -5,13 +5,15 @@ const express = require('express');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 
-const { DB_PATH } = require('./db');
+const { DB_PATH, PUBLIC_MEDIA_DIR } = require('./db');
 const { loadUser } = require('./auth');
 const { runBootstrap } = require('./bootstrap');
 const calendarRoutes = require('./routes/calendar');
+const dutyRoutes = require('./routes/duty');
 const fees = require('./routes/fees');
 const team = require('./routes/team');
 const admin = require('./routes/admin');
+const applications = require('./routes/applications');
 
 const PORT = Number(process.env.PORT) || 3000;
 const app = express();
@@ -63,13 +65,25 @@ app.use('/api/invoices', require('./routes/invoices'));
 app.use('/api/fees', fees.publicRouter);
 app.use('/api/team', team.publicRouter);
 app.use('/api/directory', admin.directoryRouter);
+app.use('/api/duty', dutyRoutes);
 app.use('/api/admin/team', team.adminRouter);
 app.use('/api/admin/fees', fees.adminRouter);
+app.use('/api/admin/applications', applications.adminRouter);
+app.use('/api/admin/positions', applications.positionsRouter);
 app.use('/api/admin', admin.router);
 app.use('/api/discord', require('./routes/discord'));
 app.use('/api/public', require('./routes/public'));
+app.use('/api/public', applications.publicRouter);
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Schnittstelle nicht gefunden.' }));
+
+/* ---------------------------------------------------------------- Profilbilder & Team-Fotos */
+// Dateinamen sind zufällig und ändern sich bei jedem Upload -> lange Cache-Zeit ist unbedenklich.
+app.use(
+  '/media',
+  express.static(PUBLIC_MEDIA_DIR, { dotfiles: 'deny', index: false, maxAge: '30d', immutable: true }),
+  (req, res) => res.status(404).end()
+);
 
 /* ---------------------------------------------------------------- Frontend */
 app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
@@ -93,8 +107,9 @@ runBootstrap();
 const reminderTimer = setInterval(() => {
   try {
     calendarRoutes.sendDueReminders();
+    dutyRoutes.closeStaleSessions();
   } catch (err) {
-    console.warn('Fristen-Erinnerung fehlgeschlagen:', err.message);
+    console.warn('Hintergrundaufgabe fehlgeschlagen:', err.message);
   }
 }, 5 * 60 * 1000);
 reminderTimer.unref();

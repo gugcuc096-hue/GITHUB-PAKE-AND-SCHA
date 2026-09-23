@@ -4,7 +4,7 @@
  */
 (() => {
   'use strict';
-  const { api, esc, fmtDate, parseDate, money, copy, toast } = window.PS;
+  const { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage } = window.PS;
 
   /* ================================================================
      Konstanten
@@ -33,7 +33,20 @@
     session: ['Bitte zuerst anmelden.', 'error'],
   };
 
+  const DUTY = { dienst: 'Im Dienst', gericht: 'Im Gericht', pause: 'Pause', off: 'Außer Dienst' };
+  const APP_STATUS = {
+    eingegangen: ['Eingegangen', 'amber'],
+    in_pruefung: ['In Prüfung', 'sky'],
+    gespraech: ['Einladung zum Gespräch', 'gold'],
+    angenommen: ['Angenommen', 'emerald'],
+    abgelehnt: ['Abgelehnt', 'red'],
+  };
+
   const ICONS = {
+    camera: 'M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9zM15 13a3 3 0 11-6 0 3 3 0 016 0z',
+    download: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4',
+    userAdd: 'M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z',
+    list: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01',
     home: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
     folder: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z',
     calendar: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
@@ -78,9 +91,12 @@
     mail: { label: 'Kanzlei-Post', short: 'Post', icon: 'mail' },
     board: { label: 'Pinnwand', icon: 'pin', staff: true },
     invoices: { label: 'Rechnungen', icon: 'receipt' },
+    duty: { label: 'Dienstzeiten', icon: 'clock', staff: true },
     team: { label: 'Team', icon: 'users', admin: true, section: 'Kanzleileitung' },
+    applications: { label: 'Bewerbungen', icon: 'userAdd', admin: true, section: 'Kanzleileitung' },
     users: { label: 'Benutzer', icon: 'key', admin: true, section: 'Kanzleileitung' },
     fees: { label: 'Honorarordnung', icon: 'scale', admin: true, section: 'Kanzleileitung' },
+    audit: { label: 'Protokoll', icon: 'list', admin: true, section: 'Kanzleileitung' },
     settings: { label: 'Einstellungen', icon: 'cog', admin: true, section: 'Kanzleileitung' },
     profile: { label: 'Mein Profil', short: 'Profil', icon: 'user', section: 'Konto' },
     'invoice-new': { label: 'Neues Dokument', icon: 'receipt', staff: true, hidden: true },
@@ -120,6 +136,20 @@
     draft: null,
     modalCaseId: null,
     returnCase: null,
+    caseAttachments: [],
+    duty: null,
+    dutyWeek: null,
+    dutyData: null,
+    dutyUser: null,
+    applications: [],
+    positions: [],
+    appTab: 'bewerbungen',
+    appFilter: 'offen',
+    newApplications: 0,
+    modalAppId: null,
+    audit: [],
+    auditQuery: '',
+    auditHasMore: false,
   };
 
   const $ = (s, root = document) => root.querySelector(s);
@@ -160,8 +190,30 @@
     const words = String(name || '').replace(/\b(Dr|Prof|jur|med|rer|nat)\.\s*/gi, '').trim().split(/\s+/).filter(Boolean);
     return ((words[0]?.[0] || '') + (words.length > 1 ? words[words.length - 1][0] : '')).toUpperCase() || '?';
   }
+  function avatarImg(url, name) {
+    return url ? `<img src="${esc(url)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : esc(initials(name));
+  }
   function avatarInner(u) {
-    return u?.discord?.avatarUrl ? `<img src="${esc(u.discord.avatarUrl)}" alt="" referrerpolicy="no-referrer">` : esc(initials(u?.displayName));
+    return avatarImg(u?.avatarUrl, u?.displayName);
+  }
+  /** Profilbild mit optionalem Anwesenheitspunkt (Dienststatus). */
+  function avatarWrap(url, name, status, size = '') {
+    return `<span class="avatar-wrap"><span class="avatar ${size}">${avatarImg(url, name)}</span>${status ? `<span class="presence s-${esc(status)}"></span>` : ''}</span>`;
+  }
+  const fmtHM = (min) => `${Math.floor(min / 60)} Std ${pad(Math.round(min % 60))} Min`;
+  function fmtElapsed(ms) {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    return `${Math.floor(s / 3600)}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`;
+  }
+  function mondayOf(d) {
+    const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+    return x;
+  }
+  function isoWeek(d) {
+    const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+    return Math.ceil(((t - Date.UTC(t.getUTCFullYear(), 0, 1)) / 864e5 + 1) / 7);
   }
   function allowed(view) {
     const v = VIEWS[view];
@@ -205,6 +257,11 @@
       if (el.textContent !== c.text) el.textContent = c.text;
       el.className = `countdown ${c.cls}`;
     });
+    // Laufende Dienstzeit (Stempeluhr)
+    $$('[data-countup]').forEach((el) => {
+      const since = parseDate(el.dataset.countup);
+      if (since) el.textContent = fmtElapsed(Date.now() - since.getTime());
+    });
   }
   setInterval(tickCountdowns, 1000);
 
@@ -240,6 +297,19 @@
     async messages() {
       st.messages = (await api.get('/api/messages?box=' + st.mailBox)).messages;
     },
+    async duty() {
+      if (isStaff()) {
+        st.duty = await api.get('/api/duty');
+      } else {
+        const r = await api.get('/api/public/on-duty');
+        st.duty = { me: null, onDuty: r.members || [] };
+      }
+    },
+    async appCount() {
+      if (!isAdmin()) return;
+      const list = (await api.get('/api/admin/applications')).applications;
+      st.newApplications = list.filter((a) => a.status === 'eingegangen').length;
+    },
   };
 
   /* ================================================================
@@ -254,7 +324,7 @@
         section = v.section;
         html += `<div class="nav-section">${esc(section)}</div>`;
       }
-      const count = key === 'mail' ? st.unread : 0;
+      const count = key === 'mail' ? st.unread : key === 'applications' ? st.newApplications : 0;
       const active = st.view === key || (key === 'invoices' && st.view === 'invoice-new');
       html += `<a href="#${key}" class="nav-item ${active ? 'active' : ''}" ${active ? 'aria-current="page"' : ''}>${icon(v.icon)}<span>${esc(viewLabel(key))}</span>${count ? `<span class="nav-count">${count > 99 ? '99+' : count}</span>` : ''}</a>`;
     }
@@ -276,12 +346,57 @@
     document.title = `${viewLabel(st.view)} | Pake & Scha`;
   }
 
+  function myDutyStatus() {
+    return st.duty?.me?.status || 'off';
+  }
+
   function renderUser() {
     const u = st.user;
-    $('#userCard').innerHTML = `<span class="avatar">${avatarInner(u)}</span>
+    $('#userCard').innerHTML = `${avatarWrap(u.avatarUrl, u.displayName, isStaff() ? myDutyStatus() : null)}
       <div class="meta"><div class="name">${esc(u.displayName)}</div><div class="role">${esc(u.rank || ROLES[u.role] || '')}</div></div>
       <button class="icon-btn sm" data-action="logout" title="Abmelden" aria-label="Abmelden">${icon('logout', 'ico-sm')}</button>`;
     $('#topAvatar').innerHTML = avatarInner(u);
+    renderDutyBtn();
+  }
+
+  /* ---------------------------------------------------------------- Dienststatus (Kopfzeile) */
+  function renderDutyBtn() {
+    const wrap = $('#dutyWrap');
+    if (!isStaff()) {
+      wrap.classList.add('hidden');
+      return;
+    }
+    wrap.classList.remove('hidden');
+    const s = myDutyStatus();
+    const btn = $('#dutyBtn');
+    btn.classList.toggle('on', s !== 'off');
+    btn.innerHTML = `<span class="duty-dot s-${s}"></span><span class="lbl">${esc(DUTY[s])}</span>`;
+  }
+  function openDutyPop() {
+    const s = myDutyStatus();
+    $('#dutyPop').innerHTML =
+      Object.entries(DUTY)
+        .map(([k, l]) => `<button type="button" class="pop-item ${s === k ? 'active' : ''}" role="menuitem" data-action="duty-set" data-status="${k}"><span class="duty-dot s-${k}"></span>${esc(l)}${s === k ? '<span class="ml-auto text-xs">✓</span>' : ''}</button>`)
+        .join('') + '<div class="pop-note"><a href="#duty" class="text-xs text-gold hover:underline">Stempeluhr & Dienstzeiten →</a></div>';
+    $('#dutyPop').classList.add('open');
+    $('#dutyBtn').setAttribute('aria-expanded', 'true');
+  }
+  function closeDutyPop() {
+    $('#dutyPop').classList.remove('open');
+    $('#dutyBtn').setAttribute('aria-expanded', 'false');
+  }
+  async function setDutyStatus(status, note) {
+    const before = myDutyStatus();
+    const body = { status };
+    if (note !== undefined) body.note = note;
+    st.duty = await api.post('/api/duty', body);
+    closeDutyPop();
+    renderUser();
+    if (status === 'off') toast(before === 'off' ? 'Sie sind außer Dienst.' : 'Dienst beendet – gute Erholung!');
+    else if (before === 'off') toast(`Dienst begonnen – Status: ${DUTY[status]}.`);
+    else toast(`Status: ${DUTY[status]}`);
+    if (st.view === 'duty') await refreshBehind();
+    else if (st.view === 'overview') renderView();
   }
 
   function openSidebar() {
@@ -322,6 +437,7 @@
     $('#modalBody').innerHTML = '';
     document.body.classList.remove('modal-open');
     st.modalCaseId = null;
+    st.modalAppId = null;
   }
 
   const loadingHtml = () =>
@@ -351,6 +467,7 @@
     st.view = view;
     closeModal();
     closeSidebar();
+    closeDutyPop();
     renderNav();
     const content = $('#content');
     content.innerHTML = loadingHtml();
@@ -459,9 +576,27 @@
       <div class="kpi-sub">${esc(fmtDay(e.startsAt))}, ${esc(fmtTime(e.startsAt))} Uhr</div>${countdownHtml(e)}</button>`;
   }
 
+  function dutyStrip() {
+    const list = st.duty?.onDuty || [];
+    if (!isStaff()) {
+      return list.length
+        ? `<div class="banner banner-gold items-center"><span class="duty-dot s-dienst"></span><div>Die Kanzlei ist gerade erreichbar: <strong>${list.length} ${list.length === 1 ? 'Anwalt' : 'Anwälte'} im Dienst</strong>.</div></div>`
+        : '';
+    }
+    return `<section class="panel duty-strip">
+      <span class="text-[0.7rem] uppercase tracking-widest text-dim">Jetzt im Dienst</span>
+      ${list.length
+        ? list.map((m) => `<span class="duty-chip">${avatarWrap(m.avatarUrl, m.name, m.status, 'xs')}<span>${esc(m.name)}</span><span class="st">${esc(m.statusLabel)}</span></span>`).join('')
+        : '<span class="text-sm text-dim">Niemand – der Eilnotdienst ist gerade nicht besetzt.</span>'}
+      <span class="ml-auto flex gap-2">${myDutyStatus() === 'off'
+        ? `<button class="btn-gold btn-sm" data-action="duty-set" data-status="dienst"><span class="duty-dot s-dienst"></span><span>Dienst beginnen</span></button>`
+        : `<button class="btn-outline btn-sm" data-action="duty-set" data-status="off">Dienst beenden</button>`}</span>
+    </section>`;
+  }
+
   views.overview = {
     async load() {
-      await Promise.all([load.cases(), load.events(), load.invoices(), load.board(), load.unread()]);
+      await Promise.all([load.cases(), load.events(), load.invoices(), load.board(), load.unread(), load.duty()]);
     },
     render() {
       const u = st.user;
@@ -515,6 +650,7 @@
             <p class="page-sub">${esc(u.rank || ROLES[u.role])} · Pake &amp; Scha Legal Consulting</p></div>
           ${staff ? `<div class="page-actions"><button class="btn-outline btn-md" data-action="new-event">${icon('calendar', 'ico-sm')}<span>Frist / Termin</span></button><button class="btn-gold btn-md" data-action="new-case">${icon('plus')}<span>Neue Akte</span></button></div>` : ''}
         </div>
+        ${dutyStrip()}
         <div class="kpi-grid">${kpis.join('')}</div>`;
 
       if (!staff) return `${head}<div class="grid-2">${eventsPanel}${recentPanel}</div>`;
@@ -601,17 +737,44 @@
     await load.lawyers();
     const data = await api.get('/api/cases/' + id);
     (data.appointments || []).forEach((e) => st.eventCache.set(e.id, e));
+    st.caseAttachments = data.attachments || [];
     st.modalCaseId = id;
     openModal(caseDetail(data), { wide: true });
   }
   async function reloadCase(id) {
     const data = await api.get('/api/cases/' + id);
     (data.appointments || []).forEach((e) => st.eventCache.set(e.id, e));
+    st.caseAttachments = data.attachments || [];
     if (st.modalCaseId === id) replaceModal(caseDetail(data));
     refreshBehind();
   }
 
-  function caseDetail({ case: c, notes, appointments, invoices }) {
+  function attachmentsSection(c, attachments) {
+    const staff = isStaff();
+    const canUpload = staff || !c.closed;
+    return `<div class="section">
+      <h3 class="section-title">Beweismittel & Anhänge <span class="text-xs text-dim font-normal" style="font-family:Inter,sans-serif">${attachments.length} / 40</span></h3>
+      ${canUpload ? `<div class="flex flex-wrap items-center gap-3 mb-3">
+          <input id="attCaption" class="field" style="max-width:340px" maxlength="200" placeholder="Beschreibung für neue Bilder (optional)" aria-label="Beschreibung für neue Bilder">
+          ${staff ? '<label class="check"><input type="checkbox" id="attInternal" checked> Nur intern (für den Mandanten unsichtbar)</label>' : ''}
+        </div>` : ''}
+      <div class="att-grid">
+        ${attachments
+          .map(
+            (a, i) => `<button type="button" class="att" data-action="att-open" data-index="${i}" aria-label="${esc(a.caption || 'Anhang ansehen')}">
+              <img src="${esc(a.url)}" alt="${esc(a.caption)}" loading="lazy">
+              ${a.internal ? `<span class="tag">${badge('intern', 'amber')}</span>` : ''}${a.caption ? `<span class="cap">${esc(a.caption)}</span>` : ''}</button>`
+          )
+          .join('')}
+        ${canUpload && attachments.length < 40
+          ? `<label class="att-add file-btn">${icon('camera')}<span>Bilder hinzufügen</span><input type="file" accept="image/*" multiple data-upload="evidence" data-case-id="${c.id}" aria-label="Bilder hinzufügen"></label>`
+          : ''}
+      </div>
+      ${!attachments.length && !canUpload ? '<p class="text-sm text-dim">Keine Anhänge.</p>' : ''}
+    </div>`;
+  }
+
+  function caseDetail({ case: c, notes, appointments, invoices, attachments = [] }) {
     const staff = isStaff();
     const admin = isAdmin();
     const me = st.user.id;
@@ -728,6 +891,7 @@
       ${editForm}
       <div class="section"><h3 class="section-title">Sachverhalt</h3><p class="text-sm whitespace-pre-wrap text-muted">${esc(c.description || '—')}</p></div>
       ${c.publicNote ? `<div class="section"><h3 class="section-title">Statushinweis</h3><div class="banner banner-gold mb-0"><p class="text-sm whitespace-pre-wrap">${esc(c.publicNote)}</p></div></div>` : ''}
+      ${attachmentsSection(c, attachments)}
       <div class="section"><h3 class="section-title">Termine & Fristen</h3>${apptList}</div>
       ${invoiceList ? `<div class="section"><h3 class="section-title">Rechnungen & Honorare</h3>${invoiceList}</div>` : ''}
       <div class="section"><h3 class="section-title">Verlauf & Notizen</h3>
@@ -962,8 +1126,13 @@
     const who = inbox ? m.senderName : `An: ${m.recipientName}`;
     const unread = inbox && !m.isRead;
     return `<button type="button" class="mail-item ${unread ? 'unread' : ''} ${m.id === st.mailSel ? 'active' : ''}" data-action="mail-open" data-id="${m.id}">
-      <div class="from"><span>${m.priority ? '❗ ' : ''}${esc(who)}</span><span class="text-xs text-dim nowrap">${esc(shortDate(m.createdAt))}</span></div>
-      <div class="subj">${esc(m.subject || '(kein Betreff)')}${m.caseNumber ? ' · ' + esc(m.caseNumber) : ''}</div></button>`;
+      <div class="flex items-center gap-3">
+        ${inbox ? `<span class="avatar sm">${avatarImg(m.senderAvatar, m.senderName)}</span>` : ''}
+        <div class="min-w-0 flex-1">
+          <div class="from"><span>${m.priority ? '❗ ' : ''}${esc(who)}</span><span class="text-xs text-dim nowrap">${esc(shortDate(m.createdAt))}</span></div>
+          <div class="subj">${esc(m.subject || '(kein Betreff)')}${m.caseNumber ? ' · ' + esc(m.caseNumber) : ''}</div>
+        </div>
+      </div></button>`;
   }
   function mailReader(m) {
     const inbox = st.mailBox === 'inbox';
@@ -971,7 +1140,10 @@
       <button class="btn-ghost btn-sm mb-3 lg:hidden" data-action="mail-back">${icon('chevronLeft', 'ico-sm')}<span>Zurück</span></button>
       <div class="flex flex-wrap items-center gap-2 mb-2">${m.priority ? badge('Wichtig', 'red') : ''}${m.caseNumber ? `<button class="badge badge-gold" data-action="open-case" data-id="${m.caseId}">Akte ${esc(m.caseNumber)}</button>` : ''}</div>
       <h2 class="font-serif text-2xl md:text-3xl font-semibold leading-tight">${esc(m.subject || '(kein Betreff)')}</h2>
-      <div class="text-sm text-dim mt-2">Von <span class="text-muted">${esc(m.senderName)}</span>${m.senderRank ? ' (' + esc(m.senderRank) + ')' : ''} an <span class="text-muted">${esc(m.recipientName)}</span> · ${esc(fmtDate(m.createdAt))}</div>
+      <div class="flex items-center gap-3 mt-3">
+        <span class="avatar">${avatarImg(m.senderAvatar, m.senderName)}</span>
+        <div class="text-sm text-dim min-w-0">Von <span class="text-muted">${esc(m.senderName)}</span>${m.senderRank ? ' (' + esc(m.senderRank) + ')' : ''} an <span class="text-muted">${esc(m.recipientName)}</span><br>${esc(fmtDate(m.createdAt))}</div>
+      </div>
       <div class="mail-body">${esc(m.body)}</div>
       <div class="form-actions">
         ${inbox && m.senderId ? `<button class="btn-gold btn-md" data-action="mail-reply" data-id="${m.id}">${icon('reply', 'ico-sm')}<span>Antworten</span></button>` : ''}
@@ -1289,7 +1461,7 @@
       ? `${badge(m.userActive ? 'Login aktiv' : 'Login gesperrt', m.userActive ? 'emerald' : 'red')}<span class="text-xs text-dim">${esc(m.userEmail || '')} · ${esc(ROLES[m.userRole] || '')}</span>`
       : badge('Kein Login-Konto', 'slate');
     return `<div class="panel member-card">
-      <span class="avatar lg ${m.tier === 'leitung' ? '' : 'slate'}">${esc(m.initials)}</span>
+      <span class="avatar-wrap"><span class="avatar lg ${m.tier === 'leitung' ? '' : 'slate'}">${m.photoUrl ? avatarImg(m.photoUrl, m.name) : esc(m.initials)}</span>${m.duty ? `<span class="presence s-${esc(m.duty)}"></span>` : ''}</span>
       <div class="body">
         <div class="flex flex-wrap items-center gap-2"><h3 class="font-serif text-xl font-semibold">${esc(m.name)}</h3>${m.visible ? '' : badge('Auf Website ausgeblendet', 'amber')}</div>
         <div class="text-xs uppercase tracking-widest text-gold mt-0.5">${esc(m.roleTitle)} · ${m.tier === 'leitung' ? 'Board of Partners' : 'Associate Attorneys'}</div>
@@ -1302,6 +1474,14 @@
         <button class="btn-outline btn-sm" data-action="team-edit" data-id="${m.id}">${icon('edit', 'ico-sm')}<span>Bearbeiten</span></button>
         <button class="icon-btn sm" data-action="team-delete" data-id="${m.id}" aria-label="Entfernen">${icon('trash', 'ico-sm')}</button>
       </div></div>`;
+  }
+
+  function teamPhotoControls(m) {
+    return `<div class="flex flex-wrap gap-2">
+        <label class="btn-outline btn-sm file-btn">${icon('camera', 'ico-sm')}<span>Foto hochladen</span><input type="file" accept="image/*" data-upload="team" data-id="${m.id}" aria-label="Foto hochladen"></label>
+        ${m.hasOwnPhoto ? `<button type="button" class="btn-ghost btn-sm" data-action="team-photo-remove" data-id="${m.id}">Foto entfernen</button>` : ''}
+      </div>
+      <p class="form-hint">${m.hasOwnPhoto ? 'Eigenes Foto für die Website.' : 'Ohne eigenes Foto wird das Profilbild des verknüpften Kontos verwendet.'}</p>`;
   }
 
   function memberModal(m) {
@@ -1329,6 +1509,12 @@
       <h2 class="modal-title">${isNew ? 'Teammitglied hinzufügen' : 'Teammitglied bearbeiten'}</h2>
       <p class="modal-sub">Änderungen erscheinen sofort im Bereich „Unser Team“ auf der Website.</p>
       <form data-form="team" data-id="${m ? m.id : ''}" class="form-grid cols-2">
+        ${m
+          ? `<div class="span-2 flex flex-wrap items-center gap-4">
+              <span id="tmPhoto" class="avatar xl ${m.tier === 'leitung' ? '' : 'slate'}">${m.photoUrl ? avatarImg(m.photoUrl, m.name) : esc(m.initials)}</span>
+              <div id="tmPhotoCtl">${teamPhotoControls(m)}</div>
+            </div>`
+          : '<p class="span-2 form-hint">Ein Foto für die Website können Sie direkt nach dem Anlegen hinzufügen.</p>'}
         <div class="span-2"><label class="label" for="tmName">Name</label><input id="tmName" name="name" class="field" required minlength="2" maxlength="80" value="${esc(v.name || '')}" placeholder="z. B. Dr. jur. Damat Lex" autofocus></div>
         <div><label class="label" for="tmRank">Rang / Titel</label><input id="tmRank" name="roleTitle" class="field" list="rankList" required minlength="2" maxlength="80" value="${esc(v.roleTitle || '')}" placeholder="z. B. Senior Associate">
           <datalist id="rankList">${RANKS.map((r) => `<option value="${esc(r)}"></option>`).join('')}</datalist></div>
@@ -1375,8 +1561,9 @@
         .map((u) => {
           const self = u.id === st.user.id;
           return `<tr>
-            <td class="td-main"><div class="font-medium flex flex-wrap items-center gap-2">${esc(u.displayName)}${self ? badge('Sie', 'gold') : ''}${!u.active ? badge('Gesperrt', 'red') : ''}${u.mustChangePassword ? badge('Einmal-Passwort', 'amber') : ''}</div>
-              <div class="text-xs text-dim">${esc(u.email)}${u.phone ? ' · ' + esc(u.phone) : ''}</div></td>
+            <td class="td-main"><div class="flex items-center gap-3">${avatarWrap(u.avatarUrl, u.displayName, u.duty, 'sm')}<div class="min-w-0">
+              <div class="font-medium flex flex-wrap items-center gap-2">${esc(u.displayName)}${self ? badge('Sie', 'gold') : ''}${!u.active ? badge('Gesperrt', 'red') : ''}${u.mustChangePassword ? badge('Einmal-Passwort', 'amber') : ''}${u.dutyLabel ? badge(u.dutyLabel, 'emerald') : ''}</div>
+              <div class="text-xs text-dim break-all">${esc(u.email)}${u.phone ? ' · ' + esc(u.phone) : ''}</div></div></div></td>
             <td data-label="Rolle"><select class="field" style="min-width:150px" data-user-field="role" data-id="${u.id}" ${self ? 'disabled' : ''} aria-label="Rolle">${Object.entries(ROLES).map(([k, l]) => opt(k, l, u.role === k)).join('')}</select></td>
             <td data-label="Rang"><input class="field" style="min-width:150px" data-user-field="rank" data-id="${u.id}" maxlength="60" list="rankListUsers" value="${esc(u.rank || '')}" placeholder="—" aria-label="Rang"></td>
             <td data-label="Discord" class="text-sm">${u.discordUsername ? esc(u.discordUsername) : '<span class="text-dim">—</span>'}</td>
@@ -1506,6 +1693,13 @@
           </section>
           <div class="stack">
             <section class="panel panel-pad">
+              <div class="panel-head"><h2 class="panel-title">Website</h2></div>
+              <form data-form="settings-website" class="form-grid">
+                <label class="check"><input type="checkbox" name="showDutyPublic" ${s.showDutyPublic ? 'checked' : ''}> Dienststatus öffentlich anzeigen – „Eilnotdienst: 2 Anwälte im Dienst“ in der Kopfzeile und grüne Punkte bei den Teamkarten</label>
+                <div class="form-actions"><button type="submit" class="btn-outline btn-md">Speichern</button><a href="/karriere.html" target="_blank" rel="noopener" class="btn-ghost btn-md">${icon('globe', 'ico-sm')}<span>Karriereseite</span></a></div>
+              </form>
+            </section>
+            <section class="panel panel-pad">
               <div class="panel-head"><h2 class="panel-title">Discord-Login</h2>${s.discordOAuthConfigured ? badge('Eingerichtet', 'emerald') : badge('Nicht eingerichtet', 'slate')}</div>
               <p class="text-sm text-muted">Teammitglieder und Mandanten können ihr Discord-Konto im Profil verknüpfen und sich danach per Discord anmelden. Verknüpfte Anwälte werden bei Fristen und Zuweisungen im Kanal erwähnt.</p>
               ${s.discordOAuthConfigured ? '' : `<ol class="text-sm text-muted list-decimal pl-5 mt-3 space-y-1">
@@ -1554,8 +1748,15 @@
         <div class="page-head"><div><h1 class="page-title">Mein Profil</h1><p class="page-sub">Kontaktdaten, Passwort und Discord-Verknüpfung.</p></div></div>
         <div class="grid-2">
           <section class="panel panel-pad">
-            <div class="flex items-center gap-4 mb-5"><span class="avatar xl">${avatarInner(u)}</span>
-              <div class="min-w-0"><div class="font-serif text-2xl font-semibold">${esc(u.displayName)}</div><div class="text-sm text-gold">${esc(u.rank || ROLES[u.role])}</div><div class="text-xs text-dim break-all">${esc(u.email)}</div></div></div>
+            <div class="flex items-center gap-5 mb-5">
+              <span class="avatar-edit">
+                <span class="avatar xl">${avatarInner(u)}</span>
+                <label class="cam file-btn" title="Profilbild ändern">${icon('camera', 'ico-sm')}<input type="file" accept="image/*" data-upload="avatar" aria-label="Profilbild hochladen"></label>
+              </span>
+              <div class="min-w-0"><div class="font-serif text-2xl font-semibold">${esc(u.displayName)}</div><div class="text-sm text-gold">${esc(u.rank || ROLES[u.role])}</div><div class="text-xs text-dim break-all">${esc(u.email)}</div>
+                ${u.hasOwnAvatar
+                  ? '<button type="button" class="btn-ghost btn-sm mt-2 -ml-3" data-action="avatar-remove">Profilbild entfernen</button>'
+                  : '<p class="form-hint">Tippen Sie auf die Kamera, um ein Profilbild hochzuladen.</p>'}</div></div>
             <form data-form="profile" class="form-grid">
               ${u.role === 'mandant' ? `<div><label class="label">Name</label><input name="displayName" class="field" required minlength="2" maxlength="80" value="${esc(u.displayName)}"></div>` : ''}
               <div><label class="label">Telefon (im Spiel)</label><input name="phone" class="field" maxlength="40" value="${esc(u.phone || '')}" placeholder="555-0123"></div>
@@ -1576,6 +1777,383 @@
         </div>`;
     },
   };
+
+  /* ---------------------------------------------------------------- Dienstzeiten / Stempeluhr */
+  function weekRange() {
+    const from = st.dutyWeek;
+    const to = new Date(from.getFullYear(), from.getMonth(), from.getDate() + 7);
+    return { from, to };
+  }
+
+  views.duty = {
+    async load() {
+      if (!st.dutyWeek) st.dutyWeek = mondayOf(new Date());
+      const { from, to } = weekRange();
+      const [state, data] = await Promise.all([
+        api.get('/api/duty'),
+        api.get(`/api/duty/sessions?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`),
+      ]);
+      st.duty = state;
+      st.dutyData = data;
+      if (!st.dutyUser || !data.totals.some((t) => t.userId === st.dutyUser)) st.dutyUser = st.user.id;
+      renderUser();
+    },
+    render() {
+      const admin = isAdmin();
+      const me = st.duty.me;
+      const onDuty = st.duty.onDuty;
+      const { from, to } = weekRange();
+      const lastDay = new Date(to.getTime() - 864e5);
+      const weekLabel = `KW ${isoWeek(from)} · ${from.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}–${lastDay.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}`;
+      const totals = st.dutyData.totals;
+      const sumMinutes = totals.reduce((s, t) => s + t.minutes, 0);
+      const selected = totals.find((t) => t.userId === st.dutyUser) || totals[0];
+      const sessions = st.dutyData.sessions.filter((s) => selected && s.userId === selected.userId);
+      const isCurrentWeek = mondayOf(new Date()).getTime() === from.getTime();
+
+      const myCard = `
+        <section class="panel panel-pad">
+          <div class="panel-head"><h2 class="panel-title">Mein Dienst</h2>${me.status !== 'off' ? badge('Eingestempelt', 'emerald') : badge('Ausgestempelt', 'slate')}</div>
+          <div class="flex items-center gap-4 mb-4">
+            ${avatarWrap(st.user.avatarUrl, st.user.displayName, me.status, 'lg')}
+            <div>
+              <div class="text-sm text-muted">${esc(DUTY[me.status])}${me.note ? ' · ' + esc(me.note) : ''}</div>
+              ${me.status !== 'off' && me.since
+                ? `<div class="timer" data-countup="${esc(me.since)}">${esc(fmtElapsed(Date.now() - parseDate(me.since).getTime()))}</div><div class="text-xs text-dim">seit ${esc(fmtTime(me.since))} Uhr</div>`
+                : '<div class="timer" style="color:var(--text-dim)">0:00:00</div><div class="text-xs text-dim">Nicht im Dienst</div>'}
+            </div>
+          </div>
+          <div class="duty-options mb-4">${Object.entries(DUTY)
+            .map(([k, l]) => `<button type="button" class="duty-opt ${me.status === k ? 'active' : ''}" data-action="duty-set" data-status="${k}"><span class="duty-dot s-${k}"></span>${esc(k === 'off' && me.status !== 'off' ? 'Ausstempeln' : l)}</button>`)
+            .join('')}</div>
+          <form data-form="duty-note" class="flex flex-col sm:flex-row gap-2">
+            <input name="note" class="field" maxlength="120" value="${esc(me.note)}" placeholder="Wo sind Sie? z. B. Mission Row PD, Zelle 3" aria-label="Notiz zum Dienststatus">
+            <button type="submit" class="btn-outline btn-md" ${me.status === 'off' ? 'disabled' : ''}>Notiz speichern</button>
+          </form>
+          <p class="form-hint mt-2">Vergessenes Ausstempeln wird nach 12 Stunden automatisch beendet.</p>
+        </section>`;
+
+      const onDutyCard = `
+        <section class="panel panel-pad">
+          <div class="panel-head"><h2 class="panel-title">Jetzt im Dienst</h2>${badge(`${onDuty.length}`, onDuty.length ? 'emerald' : 'slate')}</div>
+          ${onDuty.length
+            ? onDuty
+                .map(
+                  (m) => `<div class="list-row wrap">
+                    ${avatarWrap(m.avatarUrl, m.name, m.status, 'sm')}
+                    <div class="main"><div class="title">${esc(m.name)}</div><div class="meta">${esc(m.statusLabel)}${m.note ? ' · ' + esc(m.note) : ''}</div></div>
+                    <div class="flex items-center gap-2 shrink-0"><span class="font-mono text-xs text-gold" data-countup="${esc(m.since)}">${esc(fmtElapsed(Date.now() - (parseDate(m.since)?.getTime() || Date.now())))}</span>
+                    ${admin && m.id !== st.user.id ? `<button class="btn-ghost btn-sm" data-action="duty-force-off" data-id="${m.id}" data-name="${esc(m.name)}">Ausstempeln</button>` : ''}</div>
+                  </div>`
+                )
+                .join('')
+            : empty('Gerade ist niemand im Dienst.', 'clock')}
+        </section>`;
+
+      const totalsTable = `
+        <div class="tbl-wrap"><table class="tbl tbl-cards">
+          <thead><tr><th>${admin ? 'Teammitglied' : 'Woche'}</th><th>Arbeitszeit</th><th>Schichten</th><th>Status</th></tr></thead>
+          <tbody>${totals
+            .map(
+              (t) => `<tr class="row ${selected && t.userId === selected.userId ? 'is-selected' : ''}" data-action="duty-select" data-id="${t.userId}">
+                <td class="td-main"><div class="flex items-center gap-3">${avatarWrap(t.avatarUrl, t.name, t.status !== 'off' ? t.status : null, 'sm')}<div><div class="font-medium">${esc(t.name)}</div><div class="text-xs text-dim">${esc(t.rank || '')}</div></div></div></td>
+                <td data-label="Arbeitszeit" class="font-mono nowrap">${esc(fmtHM(t.minutes))}</td>
+                <td data-label="Schichten">${t.sessions}</td>
+                <td data-label="Status">${t.status !== 'off' ? badge(DUTY[t.status], 'emerald') : '<span class="text-dim text-xs">außer Dienst</span>'}</td></tr>`
+            )
+            .join('')}</tbody></table></div>`;
+
+      const sessionList = sessions.length
+        ? sessions
+            .map((s) => {
+              const start = parseDate(s.startedAt);
+              const end = s.endedAt ? parseDate(s.endedAt) : null;
+              const dur = ((end ? end.getTime() : Date.now()) - start.getTime()) / 60000;
+              return `<div class="list-row wrap">
+                <div class="main"><div class="title">${esc(start.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }))} · ${esc(fmtTime(s.startedAt))} – ${end ? esc(fmtTime(s.endedAt)) : '<span class="text-emerald-300">läuft</span>'} Uhr</div>
+                  <div class="meta">${esc(fmtHM(dur))}${s.note ? ' · ' + esc(s.note) : ''}${s.autoClosed ? ' · automatisch beendet' : ''}</div></div>
+                ${admin ? `<div class="flex gap-1 shrink-0"><button class="icon-btn sm" data-action="duty-session-edit" data-id="${s.id}" aria-label="Schicht bearbeiten">${icon('edit', 'ico-sm')}</button><button class="icon-btn sm" data-action="duty-session-delete" data-id="${s.id}" aria-label="Schicht löschen">${icon('trash', 'ico-sm')}</button></div>` : ''}
+              </div>`;
+            })
+            .join('')
+        : empty('Keine Schichten in dieser Woche.', 'clock');
+
+      return `
+        <div class="page-head">
+          <div><h1 class="page-title">Stempeluhr & Dienstzeiten</h1><p class="page-sub">Dienst beginnen und beenden, Wochenstunden des Teams im Blick – ideal für Gehaltsabrechnung und Eilnotdienst.</p></div>
+          ${admin ? `<div class="page-actions"><button class="btn-outline btn-md" data-action="duty-session-new">${icon('plus', 'ico-sm')}<span>Schicht nachtragen</span></button></div>` : ''}
+        </div>
+        <div class="grid-2 mb-4 lg:mb-5">${myCard}${onDutyCard}</div>
+        <section class="panel panel-pad mb-4 lg:mb-5">
+          <div class="panel-head">
+            <div class="week-nav">
+              <button class="icon-btn" data-action="duty-week" data-dir="-1" aria-label="Vorherige Woche">${icon('chevronLeft')}</button>
+              <span class="lbl">${esc(weekLabel)}</span>
+              <button class="icon-btn" data-action="duty-week" data-dir="1" aria-label="Nächste Woche" ${isCurrentWeek ? 'disabled' : ''}>${icon('chevronRight')}</button>
+              ${isCurrentWeek ? '' : '<button class="btn-outline btn-sm" data-action="duty-week" data-dir="0">Diese Woche</button>'}
+            </div>
+            ${admin ? `<span class="text-sm text-muted">Team gesamt: <span class="font-mono text-gold">${esc(fmtHM(sumMinutes))}</span></span>` : ''}
+          </div>
+          ${totalsTable}
+        </section>
+        <section class="panel panel-pad">
+          <div class="panel-head"><h2 class="panel-title">Schichten${selected ? ' – ' + esc(selected.name) : ''}</h2></div>
+          ${sessionList}
+        </section>`;
+    },
+  };
+
+  function dutySessionModal(s) {
+    const isNew = !s;
+    const members = st.dutyData.totals;
+    openModal(`
+      <h2 class="modal-title">${isNew ? 'Schicht nachtragen' : 'Schicht bearbeiten'}</h2>
+      <p class="modal-sub">${isNew ? 'Zum Beispiel wenn jemand vergessen hat einzustempeln.' : esc(s.userName)}</p>
+      <form data-form="duty-session" data-id="${isNew ? '' : s.id}" class="form-grid cols-2">
+        ${isNew ? `<div class="span-2"><label class="label">Teammitglied</label><select name="userId" class="field">${members.map((m) => opt(m.userId, m.name, m.userId === st.dutyUser)).join('')}</select></div>` : ''}
+        <div><label class="label">Beginn</label><input name="startedAt" type="datetime-local" class="field" required value="${s ? toLocalInput(s.startedAt) : ''}"></div>
+        <div><label class="label">Ende</label><input name="endedAt" type="datetime-local" class="field" ${isNew ? 'required' : ''} value="${s && s.endedAt ? toLocalInput(s.endedAt) : ''}"></div>
+        <div class="span-2"><label class="label">Notiz</label><input name="note" class="field" maxlength="120" value="${esc(s ? s.note : '')}"></div>
+        <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button></div>
+      </form>`);
+  }
+
+  /* ---------------------------------------------------------------- Bewerbungen */
+  const OPEN_APP = ['eingegangen', 'in_pruefung', 'gespraech'];
+  const stars = (n) => `<span class="stars readonly" aria-label="${n} von 5 Sternen">${'★'.repeat(n)}${'<span style="opacity:.25">★</span>'.repeat(5 - n)}</span>`;
+
+  function appTable() {
+    const f = st.appFilter;
+    const rows = st.applications.filter((a) => f === 'alle' || (f === 'offen' ? OPEN_APP.includes(a.status) : a.status === f));
+    if (!rows.length) return empty(st.applications.length ? 'Keine Bewerbungen für diese Auswahl.' : 'Noch keine Bewerbungen eingegangen.', 'userAdd');
+    return `<div class="tbl-wrap"><table class="tbl tbl-cards">
+      <thead><tr><th>Bewerbung</th><th>Stelle</th><th>Eingang</th><th>Bewertung</th><th>Status</th></tr></thead>
+      <tbody>${rows
+        .map(
+          (a) => `<tr class="row" data-action="app-open" data-id="${a.id}">
+          <td class="td-main"><div class="font-mono text-gold text-xs">${esc(a.number)}</div><div class="font-medium">${esc(a.name)}${a.age ? ` <span class="text-dim text-xs">(${esc(a.age)})</span>` : ''}</div><div class="text-xs text-dim">Discord: ${esc(a.discord || '—')}</div></td>
+          <td data-label="Stelle">${esc(a.positionTitle)}</td>
+          <td data-label="Eingang" class="text-xs text-dim nowrap">${esc(fmtDate(a.createdAt))}</td>
+          <td data-label="Bewertung">${stars(a.rating)}</td>
+          <td data-label="Status">${statusBadge(APP_STATUS, a.status)}</td></tr>`
+        )
+        .join('')}</tbody></table></div>`;
+  }
+
+  function positionsPanel() {
+    return `<div class="panel panel-pad">
+      ${st.positions.length
+        ? st.positions
+            .map(
+              (p) => `<div class="list-row wrap">
+              <div class="main"><div class="title">${esc(p.title)} ${p.active ? badge('Ausgeschrieben', 'emerald') : badge('Pausiert', 'slate')}</div><div class="meta">${esc(p.description)}</div></div>
+              <div class="flex gap-1 shrink-0"><button class="icon-btn sm" data-action="position-edit" data-id="${p.id}" aria-label="Bearbeiten">${icon('edit', 'ico-sm')}</button><button class="icon-btn sm" data-action="position-delete" data-id="${p.id}" aria-label="Löschen">${icon('trash', 'ico-sm')}</button></div></div>`
+            )
+            .join('')
+        : empty('Keine Stellen ausgeschrieben. Initiativbewerbungen sind trotzdem möglich.', 'briefcase')}
+    </div>`;
+  }
+
+  views.applications = {
+    async load() {
+      const [a, p] = await Promise.all([api.get('/api/admin/applications'), api.get('/api/admin/positions')]);
+      st.applications = a.applications;
+      st.positions = p.positions;
+      st.newApplications = st.applications.filter((x) => x.status === 'eingegangen').length;
+    },
+    render() {
+      const count = (f) => st.applications.filter((a) => f === 'alle' || (f === 'offen' ? OPEN_APP.includes(a.status) : a.status === f)).length;
+      const filters = [['offen', 'Offen'], ...Object.entries(APP_STATUS).map(([k, [l]]) => [k, l]), ['alle', 'Alle']];
+      const tabBewerbungen = st.appTab === 'bewerbungen';
+      return `
+        <div class="page-head">
+          <div><h1 class="page-title">Bewerbungen</h1><p class="page-sub">Bewerbungen prüfen, bewerten, zum Gespräch einladen und mit einem Klick einstellen.</p></div>
+          <div class="page-actions">
+            <a href="/karriere.html" target="_blank" rel="noopener" class="btn-outline btn-md">${icon('globe', 'ico-sm')}<span>Karriereseite</span></a>
+            ${tabBewerbungen ? '' : `<button class="btn-gold btn-md" data-action="position-new">${icon('plus')}<span>Neue Stelle</span></button>`}
+          </div>
+        </div>
+        <div class="chip-row mb-4">
+          <button class="chip ${tabBewerbungen ? 'active' : ''}" data-action="app-tab" data-value="bewerbungen">${icon('userAdd', 'ico-sm')}Bewerbungen <span class="chip-count">${st.applications.length}</span></button>
+          <button class="chip ${!tabBewerbungen ? 'active' : ''}" data-action="app-tab" data-value="stellen">${icon('briefcase', 'ico-sm')}Stellenausschreibungen <span class="chip-count">${st.positions.filter((p) => p.active).length}</span></button>
+        </div>
+        ${tabBewerbungen
+          ? `<div class="chip-row mb-4">${filters.map(([k, l]) => `<button class="chip ${st.appFilter === k ? 'active' : ''}" data-action="app-filter" data-value="${k}">${esc(l)} <span class="chip-count">${count(k)}</span></button>`).join('')}</div>
+             <div class="panel p-2 md:p-3">${appTable()}</div>`
+          : positionsPanel()}`;
+    },
+  };
+
+  async function openApplication(id) {
+    const data = await api.get('/api/admin/applications/' + id);
+    st.modalAppId = id;
+    openModal(appDetail(data), { wide: true });
+  }
+  async function reloadApplication(data) {
+    if (st.modalAppId === data.application.id) replaceModal(appDetail(data));
+    refreshBehind();
+  }
+
+  function appDetail({ application: a, notes, hiredUser }) {
+    const cell = (k, v) => `<div><div class="k">${esc(k)}</div><div class="v">${esc(v || '—')}</div></div>`;
+    const qa = (q, text) => (text ? `<div class="qa"><div class="q">${esc(q)}</div><div class="a">${esc(text)}</div></div>` : '');
+    return `
+      <div class="flex flex-wrap items-start justify-between gap-3 mb-4 pr-12">
+        <div class="min-w-0"><div class="font-mono text-gold text-sm">${esc(a.number)}</div>
+          <h2 id="modalTitle" class="font-serif text-2xl md:text-3xl font-semibold leading-tight">${esc(a.name)}</h2>
+          <div class="text-sm text-muted">${esc(a.positionTitle)}</div></div>
+        ${statusBadge(APP_STATUS, a.status)}
+      </div>
+      <div class="flex flex-wrap items-center gap-3 mb-4">
+        <span class="text-xs uppercase tracking-widest text-dim">Bewertung</span>
+        <span class="stars" role="group" aria-label="Bewertung">${[1, 2, 3, 4, 5]
+          .map((n) => `<button type="button" class="${n <= a.rating ? 'on' : ''}" data-action="app-rate" data-id="${a.id}" data-value="${n === a.rating ? 0 : n}" aria-label="${n} Sterne">★</button>`)
+          .join('')}</span>
+      </div>
+      <div class="chip-row mb-5" role="group" aria-label="Status">${Object.entries(APP_STATUS)
+        .map(([k, [l]]) => `<button type="button" class="chip ${a.status === k ? 'active' : ''}" data-action="app-status" data-id="${a.id}" data-status="${k}">${esc(l)}</button>`)
+        .join('')}</div>
+      ${hiredUser ? `<div class="banner banner-gold">${icon('check')}<div>Eingestellt – Login-Konto <strong>${esc(hiredUser.email)}</strong> wurde angelegt.</div></div>` : ''}
+      <div class="info-grid mb-5">${cell('Alter', a.age ? String(a.age) : '')}${cell('Telefon', a.phone)}${cell('Discord', a.discord)}${cell('E-Mail', a.email)}${cell('Eingegangen', fmtDate(a.createdAt))}${cell('Gespräch', a.interviewAt ? fmtDate(a.interviewAt) : '')}</div>
+      <div class="stack">${qa('Motivation', a.motivation)}${qa('Erfahrung', a.experience)}${qa('Verfügbarkeit', a.availability)}</div>
+
+      <div class="grid-2 section">
+        <form data-form="app-interview" data-id="${a.id}" class="qa form-grid">
+          <div class="q">Zum Gespräch einladen</div>
+          <div><label class="label">Termin</label><input name="startsAt" type="datetime-local" class="field" required value="${a.interviewAt ? toLocalInput(a.interviewAt) : ''}"></div>
+          <div><label class="label">Ort</label><input name="location" class="field" maxlength="120" value="Kanzlei Würfelpark"></div>
+          <button type="submit" class="btn-outline btn-md">${icon('calendar', 'ico-sm')}<span>Gespräch planen</span></button>
+          <p class="form-hint">Setzt den Status auf „Einladung zum Gespräch“ und trägt den Termin in den Team-Kalender ein.</p>
+        </form>
+        <form data-form="app-public-note" data-id="${a.id}" class="qa form-grid">
+          <div class="q">Nachricht an den Bewerber</div>
+          <textarea name="publicNote" rows="4" maxlength="1000" class="field" placeholder="z. B. Vielen Dank! Wir melden uns bis Freitag.">${esc(a.publicNote)}</textarea>
+          <button type="submit" class="btn-outline btn-md">Speichern</button>
+          <p class="form-hint">Sichtbar in der Statusabfrage auf der Karriereseite.</p>
+        </form>
+      </div>
+
+      <div class="form-actions section">
+        ${!hiredUser ? `<button class="btn-gold btn-md" data-action="app-hire" data-id="${a.id}">${icon('userAdd', 'ico-sm')}<span>Einstellen & Konto anlegen</span></button>` : ''}
+        ${a.status !== 'abgelehnt' && !hiredUser ? `<button class="btn-outline btn-md" data-action="app-status" data-id="${a.id}" data-status="abgelehnt">Absagen</button>` : ''}
+        <button class="btn-danger btn-md" data-action="app-delete" data-id="${a.id}" data-number="${esc(a.number)}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>
+      </div>
+
+      <div class="section"><h3 class="section-title">Interne Notizen</h3>
+        ${notes.length ? `<div class="timeline">${notes.map((n) => `<div class="tl-item"><div class="tl-meta"><span class="text-muted font-medium">${esc(n.author)}</span><span>${esc(fmtDate(n.createdAt))}</span></div><div class="tl-body">${esc(n.body)}</div></div>`).join('')}</div>` : '<p class="text-sm text-dim">Noch keine Notizen.</p>'}
+        <form data-form="app-note" data-id="${a.id}" class="mt-3 space-y-3">
+          <textarea name="body" rows="2" maxlength="3000" required class="field" placeholder="Eindruck aus dem Gespräch, Rückfragen …" aria-label="Interne Notiz"></textarea>
+          <button type="submit" class="btn-outline btn-md">${icon('send', 'ico-sm')}<span>Notiz speichern</span></button>
+        </form>
+      </div>`;
+  }
+
+  function hireModal(a) {
+    const rank = a.positionTitle.replace(/\s*\(m\/w\/d\)\s*/i, '').replace('Initiativbewerbung', 'Junior Associate').split('/')[0].trim();
+    openModal(`
+      <h2 class="modal-title">${esc(a.name)} einstellen</h2>
+      <p class="modal-sub">Legt ein Login-Konto mit Einmal-Passwort an und auf Wunsch ein Profil im Bereich „Unser Team“ auf der Website.</p>
+      <form data-form="app-hire" data-id="${a.id}" class="form-grid cols-2">
+        <div class="span-2"><label class="label">E-Mail (Login)</label><input name="email" type="email" class="field" required maxlength="120" value="${esc(a.email)}" placeholder="vorname.nachname@pake-scha.ls" autofocus></div>
+        <div><label class="label">Rang</label><input name="rank" class="field" required minlength="2" maxlength="60" list="rankListHire" value="${esc(rank)}"><datalist id="rankListHire">${RANKS.map((r) => `<option value="${esc(r)}"></option>`).join('')}</datalist></div>
+        <div><label class="label">Rolle im Dashboard</label><select name="role" class="field">${opt('anwalt', 'Anwalt / Mitarbeiter', true)}${opt('admin', 'Kanzleileitung (Admin)')}</select></div>
+        <div class="span-2"><label class="label">Kurzbeschreibung für die Website (optional)</label><textarea name="description" rows="2" maxlength="400" class="field"></textarea></div>
+        <label class="check span-2"><input type="checkbox" name="createProfile" checked> Team-Profil anlegen</label>
+        <label class="check span-2"><input type="checkbox" name="visible" checked> Sofort auf der Website anzeigen</label>
+        <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Einstellen</span></button><button type="button" class="btn-ghost btn-md" data-action="app-back" data-id="${a.id}">Zurück</button></div>
+      </form>`);
+  }
+
+  function positionModal(p) {
+    const v = p || { active: true };
+    openModal(`
+      <h2 class="modal-title">${p ? 'Stelle bearbeiten' : 'Neue Stelle ausschreiben'}</h2>
+      <p class="modal-sub">Erscheint sofort auf der Karriereseite.</p>
+      <form data-form="position" data-id="${p ? p.id : ''}" class="form-grid">
+        <div><label class="label">Titel</label><input name="title" class="field" required minlength="2" maxlength="100" value="${esc(v.title || '')}" placeholder="z. B. Associate / Rechtsanwalt (m/w/d)" autofocus></div>
+        <div><label class="label">Aufgaben</label><textarea name="description" rows="4" maxlength="1500" class="field">${esc(v.description || '')}</textarea></div>
+        <div><label class="label">Anforderungen</label><textarea name="requirements" rows="3" maxlength="1500" class="field">${esc(v.requirements || '')}</textarea></div>
+        <label class="check"><input type="checkbox" name="active" ${v.active ? 'checked' : ''}> Ausgeschrieben (auf der Karriereseite sichtbar)</label>
+        <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button></div>
+      </form>`);
+  }
+
+  /* ---------------------------------------------------------------- Aktivitätsprotokoll */
+  function auditTable() {
+    if (!st.audit.length) return empty(st.auditQuery ? 'Keine Einträge gefunden.' : 'Noch keine Einträge.', 'list');
+    return `<div class="tbl-wrap"><table class="tbl tbl-cards">
+      <thead><tr><th>Zeitpunkt</th><th>Wer</th><th>Aktion</th><th>Details</th></tr></thead>
+      <tbody>${st.audit
+        .map(
+          (e) => `<tr>
+          <td class="td-main text-xs text-dim nowrap">${esc(fmtDate(e.createdAt))}</td>
+          <td data-label="Wer" class="font-medium">${esc(e.userName)}</td>
+          <td data-label="Aktion">${esc(e.action)}</td>
+          <td data-label="Details" class="text-sm text-muted" style="word-break:break-word">${esc(e.details || '—')}</td></tr>`
+        )
+        .join('')}</tbody></table></div>
+      ${st.auditHasMore ? '<div class="text-center pt-4"><button class="btn-outline btn-md" data-action="audit-more">Ältere Einträge laden</button></div>' : ''}`;
+  }
+  async function loadAudit(append = false) {
+    const params = new URLSearchParams();
+    if (st.auditQuery) params.set('q', st.auditQuery);
+    if (append && st.audit.length) params.set('before', st.audit[st.audit.length - 1].id);
+    const r = await api.get('/api/admin/audit?' + params);
+    st.audit = append ? st.audit.concat(r.entries) : r.entries;
+    st.auditHasMore = r.hasMore;
+  }
+  views.audit = {
+    async load() {
+      await loadAudit();
+    },
+    render() {
+      return `
+        <div class="page-head"><div><h1 class="page-title">Aktivitätsprotokoll</h1><p class="page-sub">Wer hat wann was geändert – Akten, Rechnungen, Konten, Team, Bewerbungen und Anmeldungen.</p></div></div>
+        <div class="toolbar"><label class="search">${icon('search')}<input id="auditSearch" class="field" type="search" placeholder="Name, Aktion oder Details …" value="${esc(st.auditQuery)}" aria-label="Protokoll durchsuchen"></label></div>
+        <div id="auditList" class="panel p-2 md:p-3">${auditTable()}</div>`;
+    },
+  };
+
+  /* ---------------------------------------------------------------- Bild-Uploads */
+  async function handleUpload(input) {
+    const files = [...(input.files || [])];
+    const kind = input.dataset.upload;
+    input.value = '';
+    if (!files.length) return;
+
+    if (kind === 'avatar') {
+      const blob = await resizeImage(files[0], { max: 512, square: true });
+      const res = await api.upload('/api/auth/avatar', blob);
+      st.user = res.user;
+      renderUser();
+      if (st.view === 'profile') renderView();
+      toast('Profilbild aktualisiert.');
+    } else if (kind === 'team') {
+      const id = Number(input.dataset.id);
+      const blob = await resizeImage(files[0], { max: 640, square: true });
+      const res = await api.upload(`/api/admin/team/${id}/photo`, blob);
+      const m = res.member;
+      const photo = $('#tmPhoto');
+      if (photo) photo.innerHTML = avatarImg(m.photoUrl, m.name);
+      const ctl = $('#tmPhotoCtl');
+      if (ctl) ctl.innerHTML = teamPhotoControls(m);
+      toast('Foto gespeichert – live auf der Website.');
+      await refreshBehind();
+    } else if (kind === 'evidence') {
+      const caseId = Number(input.dataset.caseId);
+      const caption = ($('#attCaption')?.value || '').trim();
+      const internal = $('#attInternal')?.checked ? '1' : '0';
+      const batch = files.slice(0, 10);
+      if (files.length > 10) toast('Es werden maximal 10 Bilder auf einmal hochgeladen.', 'error');
+      toast(batch.length === 1 ? 'Bild wird hochgeladen …' : `${batch.length} Bilder werden hochgeladen …`);
+      for (const f of batch) {
+        const blob = await resizeImage(f, { max: 1600 });
+        await api.upload(`/api/cases/${caseId}/attachments?caption=${encodeURIComponent(caption)}&internal=${internal}`, blob);
+      }
+      toast(batch.length === 1 ? 'Anhang gespeichert.' : `${batch.length} Anhänge gespeichert.`);
+      await reloadCase(caseId);
+    }
+  }
 
   /* ================================================================
      Aktionen (Klicks)
@@ -1880,6 +2458,128 @@
       await refreshBehind();
     },
 
+    // Dienststatus & Stempeluhr
+    'duty-menu': () => {
+      if ($('#dutyPop').classList.contains('open')) closeDutyPop();
+      else openDutyPop();
+    },
+    'duty-set': (el) => setDutyStatus(el.dataset.status),
+    'duty-force-off': async (el) => {
+      if (!confirm(`${el.dataset.name} jetzt ausstempeln?`)) return;
+      st.duty = await api.post('/api/duty/force-off/' + el.dataset.id);
+      toast(`${el.dataset.name} wurde ausgestempelt.`);
+      await refreshBehind();
+    },
+    'duty-week': async (el) => {
+      const dir = Number(el.dataset.dir);
+      const w = st.dutyWeek;
+      st.dutyWeek = dir === 0 ? mondayOf(new Date()) : new Date(w.getFullYear(), w.getMonth(), w.getDate() + dir * 7);
+      await refreshBehind();
+    },
+    'duty-select': (el) => {
+      st.dutyUser = Number(el.dataset.id);
+      renderView();
+    },
+    'duty-session-new': () => dutySessionModal(null),
+    'duty-session-edit': (el) => dutySessionModal(st.dutyData.sessions.find((s) => s.id === Number(el.dataset.id))),
+    'duty-session-delete': async (el) => {
+      if (!confirm('Diese Schicht löschen?')) return;
+      await api.del('/api/duty/sessions/' + el.dataset.id);
+      toast('Schicht gelöscht.');
+      await refreshBehind();
+    },
+
+    // Bilder
+    'avatar-remove': async () => {
+      const res = await api.del('/api/auth/avatar');
+      st.user = res.user;
+      renderUser();
+      renderView();
+      toast('Profilbild entfernt.');
+    },
+    'team-photo-remove': async (el) => {
+      const res = await api.del(`/api/admin/team/${el.dataset.id}/photo`);
+      const m = res.member;
+      const photo = $('#tmPhoto');
+      if (photo) photo.innerHTML = m.photoUrl ? avatarImg(m.photoUrl, m.name) : esc(m.initials);
+      const ctl = $('#tmPhotoCtl');
+      if (ctl) ctl.innerHTML = teamPhotoControls(m);
+      toast('Foto entfernt.');
+      await refreshBehind();
+    },
+    'att-open': (el) => {
+      const a = st.caseAttachments[Number(el.dataset.index)];
+      if (!a) return;
+      const caseId = st.modalCaseId;
+      st.returnCase = caseId;
+      const canDelete = a.uploaderId === st.user.id || isAdmin();
+      openModal(
+        `<h2 class="modal-title">${esc(a.caption || 'Anhang')}</h2>
+        <p class="modal-sub">${esc(a.uploaderName)} · ${esc(fmtDate(a.createdAt))} ${a.internal ? badge('nur intern', 'amber') : ''}</p>
+        <img class="lightbox-img mb-4" src="${esc(a.url)}" alt="${esc(a.caption)}">
+        <div class="form-actions">
+          <button class="btn-outline btn-md" data-action="back-to-case">${icon('chevronLeft', 'ico-sm')}<span>Zurück zur Akte</span></button>
+          <a class="btn-ghost btn-md" href="${esc(a.url)}" download>${icon('download', 'ico-sm')}<span>Herunterladen</span></a>
+          ${canDelete ? `<button class="btn-danger btn-md" data-action="att-delete" data-id="${a.id}" data-case-id="${caseId}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>` : ''}
+        </div>`,
+        { wide: true }
+      );
+    },
+    'att-delete': async (el) => {
+      if (!confirm('Diesen Anhang endgültig löschen?')) return;
+      await api.del(`/api/cases/${el.dataset.caseId}/attachments/${el.dataset.id}`);
+      toast('Anhang gelöscht.');
+      await returnOrClose();
+    },
+    'back-to-case': () => returnOrClose(),
+
+    // Bewerbungen
+    'app-tab': (el) => {
+      st.appTab = el.dataset.value;
+      renderView();
+    },
+    'app-filter': (el) => {
+      st.appFilter = el.dataset.value;
+      renderView();
+    },
+    'app-open': (el) => openApplication(Number(el.dataset.id)),
+    'app-back': (el) => openApplication(Number(el.dataset.id)),
+    'app-rate': async (el) => {
+      const data = await api.patch('/api/admin/applications/' + el.dataset.id, { rating: Number(el.dataset.value) });
+      await reloadApplication(data);
+    },
+    'app-status': async (el) => {
+      const data = await api.patch('/api/admin/applications/' + el.dataset.id, { status: el.dataset.status });
+      toast(`Status: ${APP_STATUS[el.dataset.status][0]}`);
+      await reloadApplication(data);
+    },
+    'app-hire': async (el) => {
+      const data = await api.get('/api/admin/applications/' + el.dataset.id);
+      hireModal(data.application);
+    },
+    'app-delete': async (el) => {
+      if (!confirm(`Bewerbung ${el.dataset.number} endgültig löschen?`)) return;
+      await api.del('/api/admin/applications/' + el.dataset.id);
+      toast('Bewerbung gelöscht.');
+      closeModal();
+      await refreshBehind();
+    },
+    'position-new': () => positionModal(null),
+    'position-edit': (el) => positionModal(st.positions.find((p) => p.id === Number(el.dataset.id))),
+    'position-delete': async (el) => {
+      const p = st.positions.find((x) => x.id === Number(el.dataset.id));
+      if (!p || !confirm(`Stelle „${p.title}“ löschen? Bestehende Bewerbungen bleiben erhalten.`)) return;
+      await api.del('/api/admin/positions/' + p.id);
+      toast('Stelle gelöscht.');
+      await refreshBehind();
+    },
+
+    // Protokoll
+    'audit-more': async () => {
+      await loadAudit(true);
+      $('#auditList').innerHTML = auditTable();
+    },
+
     // Einstellungen & Profil
     'discord-test': async () => {
       await api.post('/api/admin/discord/test');
@@ -2095,6 +2795,75 @@
       toast('Discord-Einstellungen gespeichert.');
       renderView();
     },
+    'settings-website': async (f) => {
+      const res = await api.patch('/api/admin/settings', { showDutyPublic: !!f.elements.showDutyPublic.checked });
+      st.settings = res.settings;
+      toast('Website-Einstellungen gespeichert.');
+    },
+    'duty-note': async (f) => {
+      await setDutyStatus(myDutyStatus(), val(new FormData(f), 'note'));
+    },
+    'duty-session': async (f) => {
+      const fd = new FormData(f);
+      const id = f.dataset.id ? Number(f.dataset.id) : null;
+      const iso = (k) => (fd.get(k) ? new Date(fd.get(k)).toISOString() : undefined);
+      if (id) {
+        const body = { startedAt: iso('startedAt'), note: val(fd, 'note') };
+        if (iso('endedAt')) body.endedAt = iso('endedAt');
+        await api.patch('/api/duty/sessions/' + id, body);
+      } else {
+        await api.post('/api/duty/sessions', { userId: Number(fd.get('userId')), startedAt: iso('startedAt'), endedAt: iso('endedAt'), note: val(fd, 'note') });
+      }
+      toast('Dienstzeit gespeichert.');
+      closeModal();
+      await refreshBehind();
+    },
+    'app-interview': async (f) => {
+      const fd = new FormData(f);
+      if (!fd.get('startsAt')) throw new Error('Bitte einen Termin wählen.');
+      const data = await api.post(`/api/admin/applications/${f.dataset.id}/interview`, {
+        startsAt: new Date(fd.get('startsAt')).toISOString(),
+        location: val(fd, 'location'),
+      });
+      toast('Gespräch geplant – der Termin steht im Kalender.');
+      await reloadApplication(data);
+    },
+    'app-public-note': async (f) => {
+      const data = await api.patch('/api/admin/applications/' + f.dataset.id, { publicNote: val(new FormData(f), 'publicNote') });
+      toast('Nachricht an den Bewerber gespeichert.');
+      await reloadApplication(data);
+    },
+    'app-note': async (f) => {
+      const data = await api.post(`/api/admin/applications/${f.dataset.id}/notes`, { body: val(new FormData(f), 'body') });
+      toast('Notiz gespeichert.');
+      await reloadApplication(data);
+    },
+    'app-hire': async (f) => {
+      const fd = new FormData(f);
+      const res = await api.post(`/api/admin/applications/${f.dataset.id}/hire`, {
+        email: val(fd, 'email'),
+        rank: val(fd, 'rank'),
+        role: val(fd, 'role'),
+        description: val(fd, 'description'),
+        createProfile: fd.get('createProfile') === 'on',
+        visible: fd.get('visible') === 'on',
+      });
+      st.lawyers = [];
+      st.contacts = null;
+      toast(`${res.application.name} wurde eingestellt.`);
+      showCredentials(res.credentials, res.application.name);
+      refreshBehind();
+    },
+    position: async (f) => {
+      const fd = new FormData(f);
+      const id = f.dataset.id ? Number(f.dataset.id) : null;
+      const body = { title: val(fd, 'title'), description: val(fd, 'description'), requirements: val(fd, 'requirements'), active: fd.get('active') === 'on' };
+      if (id) await api.patch('/api/admin/positions/' + id, body);
+      else await api.post('/api/admin/positions', body);
+      toast('Stelle gespeichert – live auf der Karriereseite.');
+      closeModal();
+      await refreshBehind();
+    },
     'settings-firm': async (f) => {
       const fd = new FormData(f);
       const res = await api.patch('/api/admin/settings', { firmAddress: val(fd, 'firmAddress'), firmPaymentInfo: val(fd, 'firmPaymentInfo'), firmContact: val(fd, 'firmContact') });
@@ -2124,6 +2893,7 @@
      Ereignisse
      ================================================================ */
   document.addEventListener('click', (e) => {
+    if (!e.target.closest('#dutyWrap')) closeDutyPop();
     if (e.target === $('#modal')) {
       closeModal();
       return;
@@ -2172,6 +2942,15 @@
     } else if (t.id === 'userSearch') {
       st.userQuery = t.value;
       $('#userList').innerHTML = userTable();
+    } else if (t.id === 'auditSearch') {
+      st.auditQuery = t.value.trim();
+      clearTimeout(st.auditTimer);
+      st.auditTimer = setTimeout(() => {
+        guard(async () => {
+          await loadAudit();
+          if (st.view === 'audit') $('#auditList').innerHTML = auditTable();
+        });
+      }, 300);
     } else if (t.closest('#invoiceForm') && t.type !== 'radio' && t.tagName !== 'SELECT') {
       onInvoiceInput(t);
     }
@@ -2179,6 +2958,10 @@
 
   document.addEventListener('change', (e) => {
     const t = e.target;
+    if (t.dataset.upload) {
+      guard(() => handleUpload(t));
+      return;
+    }
     if (t.closest('#invoiceForm')) {
       onInvoiceChange(t);
       return;
@@ -2196,14 +2979,20 @@
 
   window.addEventListener('hashchange', () => go(hashView()));
 
-  // Ungelesene Post regelmäßig aktualisieren (Badge in Navigation)
+  // Ungelesene Post, neue Bewerbungen und Dienststatus regelmäßig aktualisieren (Badges in der Navigation)
   setInterval(() => {
     if (document.hidden || !st.user) return;
-    load
-      .unread()
+    Promise.all([load.unread(), load.appCount()])
       .then(renderNav)
       .catch(() => {});
   }, 30000);
+  setInterval(() => {
+    if (document.hidden || !st.user || !isStaff() || st.view === 'duty') return;
+    load
+      .duty()
+      .then(() => renderUser())
+      .catch(() => {});
+  }, 60000);
 
   /* ================================================================
      Start
@@ -2224,9 +3013,10 @@
     if (discordState && DISCORD_MSG[discordState]) toast(...DISCORD_MSG[discordState]);
 
     try {
-      await load.unread();
+      await Promise.all([load.unread(), load.appCount(), load.duty()]);
+      renderUser();
     } catch {
-      /* Badge ist nicht kritisch */
+      /* Badges und Dienststatus sind nicht kritisch */
     }
     await go(hashView());
     if (Number.isInteger(caseParam) && caseParam > 0) guard(() => openCase(caseParam));

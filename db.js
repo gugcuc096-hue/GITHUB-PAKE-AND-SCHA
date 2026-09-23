@@ -12,6 +12,15 @@ const DB_PATH = process.env.DB_PATH
   : path.join(__dirname, 'data', 'pake-scha.db');
 fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 
+// Hochgeladene Dateien liegen neben der Datenbank (auf Render also ebenfalls auf der Disk).
+// public/ wird unter /media ausgeliefert (Profilbilder), evidence/ nur über die API mit Rechteprüfung.
+const UPLOAD_DIR = path.join(path.dirname(DB_PATH), 'uploads');
+const PUBLIC_MEDIA_DIR = path.join(UPLOAD_DIR, 'public');
+const EVIDENCE_DIR = path.join(UPLOAD_DIR, 'evidence');
+for (const dir of [path.join(PUBLIC_MEDIA_DIR, 'avatars'), path.join(PUBLIC_MEDIA_DIR, 'team'), EVIDENCE_DIR]) {
+  fs.mkdirSync(dir, { recursive: true });
+}
+
 const db = new DatabaseSync(DB_PATH);
 db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
 
@@ -197,6 +206,85 @@ db.exec(`
     created_at       TEXT NOT NULL DEFAULT (datetime('now')),
     paid_at          TEXT
   );
+
+  -- Stempeluhr: eine Zeile pro Dienstschicht (ended_at NULL = läuft noch).
+  CREATE TABLE IF NOT EXISTS duty_sessions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    started_at  TEXT NOT NULL,
+    ended_at    TEXT,
+    note        TEXT NOT NULL DEFAULT '',
+    auto_closed INTEGER NOT NULL DEFAULT 0
+  );
+
+  -- Bewerbungssystem
+  CREATE TABLE IF NOT EXISTS positions (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    title        TEXT NOT NULL,
+    description  TEXT NOT NULL DEFAULT '',
+    requirements TEXT NOT NULL DEFAULT '',
+    active       INTEGER NOT NULL DEFAULT 1,
+    sort_order   INTEGER NOT NULL DEFAULT 0,
+    created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS applications (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    number         TEXT NOT NULL UNIQUE,
+    access_code    TEXT NOT NULL,
+    position_id    INTEGER REFERENCES positions(id) ON DELETE SET NULL,
+    position_title TEXT NOT NULL,
+    name           TEXT NOT NULL,
+    age            INTEGER,
+    phone          TEXT NOT NULL DEFAULT '',
+    email          TEXT NOT NULL DEFAULT '',
+    discord        TEXT NOT NULL DEFAULT '',
+    experience     TEXT NOT NULL DEFAULT '',
+    motivation     TEXT NOT NULL,
+    availability   TEXT NOT NULL DEFAULT '',
+    status         TEXT NOT NULL DEFAULT 'eingegangen' CHECK (status IN ('eingegangen','in_pruefung','gespraech','angenommen','abgelehnt')),
+    rating         INTEGER NOT NULL DEFAULT 0,
+    public_note    TEXT NOT NULL DEFAULT '',
+    interview_at   TEXT,
+    hired_user_id  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS application_notes (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    application_id INTEGER NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+    author_id      INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    author_name    TEXT NOT NULL,
+    body           TEXT NOT NULL,
+    created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  -- Beweismittel / Bildanhänge zu Akten (Dateien in uploads/evidence)
+  CREATE TABLE IF NOT EXISTS case_attachments (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id       INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    file          TEXT NOT NULL,
+    mime          TEXT NOT NULL,
+    size          INTEGER NOT NULL,
+    caption       TEXT NOT NULL DEFAULT '',
+    internal      INTEGER NOT NULL DEFAULT 0,
+    uploader_id   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    uploader_name TEXT NOT NULL,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  -- Aktivitätsprotokoll für die Kanzleileitung
+  CREATE TABLE IF NOT EXISTS audit_log (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    user_name  TEXT NOT NULL DEFAULT 'System',
+    action     TEXT NOT NULL,
+    entity     TEXT NOT NULL DEFAULT '',
+    entity_id  INTEGER,
+    details    TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `);
 
 /* ================================================================
@@ -212,6 +300,11 @@ addColumn('team_members', 'visible', 'INTEGER NOT NULL DEFAULT 1');
 addColumn('messages', 'priority', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('messages', 'sender_deleted', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('messages', 'recipient_deleted', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('users', 'avatar', 'TEXT');
+addColumn('users', 'duty_status', "TEXT NOT NULL DEFAULT 'off'");
+addColumn('users', 'duty_note', "TEXT NOT NULL DEFAULT ''");
+addColumn('users', 'duty_since', 'TEXT');
+addColumn('team_members', 'photo', 'TEXT');
 
 // NOT NULL entfernen oder ON-DELETE-Regeln ändern geht in SQLite nur über
 // einen Neuaufbau der Tabelle (offizielles 12-Schritte-Verfahren). Vorher
@@ -309,6 +402,12 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id);
   CREATE INDEX IF NOT EXISTS idx_invoices_case ON invoices(case_id);
   CREATE UNIQUE INDEX IF NOT EXISTS idx_users_discord ON users(discord_id);
+  CREATE INDEX IF NOT EXISTS idx_duty_user ON duty_sessions(user_id, started_at);
+  CREATE INDEX IF NOT EXISTS idx_duty_open ON duty_sessions(ended_at);
+  CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status);
+  CREATE INDEX IF NOT EXISTS idx_app_notes ON application_notes(application_id);
+  CREATE INDEX IF NOT EXISTS idx_attachments_case ON case_attachments(case_id);
+  CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at);
 `);
 
 /* ================================================================
@@ -338,6 +437,7 @@ function nextNumber(prefix, table, column) {
 
 const nextCaseNumber = () => nextNumber('PS', 'cases', 'case_number');
 const nextInvoiceNumber = (kind) => nextNumber(kind === 'honorarvereinbarung' ? 'HV' : 'RE', 'invoices', 'number');
+const nextApplicationNumber = () => nextNumber('BW', 'applications', 'number');
 
 function randomPin() {
   return String(crypto.randomInt(0, 1000000)).padStart(6, '0');
@@ -351,4 +451,17 @@ function setSetting(key, value) {
   db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, String(value));
 }
 
-module.exports = { db, DB_PATH, tx, nextCaseNumber, nextInvoiceNumber, randomPin, getSetting, setSetting };
+module.exports = {
+  db,
+  DB_PATH,
+  UPLOAD_DIR,
+  PUBLIC_MEDIA_DIR,
+  EVIDENCE_DIR,
+  tx,
+  nextCaseNumber,
+  nextInvoiceNumber,
+  nextApplicationNumber,
+  randomPin,
+  getSetting,
+  setSetting,
+};

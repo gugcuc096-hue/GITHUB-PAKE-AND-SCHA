@@ -11,8 +11,11 @@ const {
   destroyOtherSessions,
   publicUser,
   requireAuth,
+  isStaff,
 } = require('../auth');
 const { wrap, parseBody } = require('../helpers');
+const { logActivity } = require('../models');
+const { imageBody, saveImage, removeFile } = require('../uploads');
 
 const router = express.Router();
 
@@ -71,6 +74,7 @@ router.post(
     }
     if (!user.active) return res.status(403).json({ error: 'Dieser Zugang wurde gesperrt. Bitte wenden Sie sich an die Kanzleileitung.' });
     createSession(res, user.id);
+    if (isStaff(user)) logActivity(user, 'Anmeldung', 'user', user.id);
     res.json({ success: true, user: publicUser(user) });
   })
 );
@@ -107,6 +111,25 @@ router.patch(
     res.json({ user: publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id)) });
   })
 );
+
+// Profilbild: der Browser schneidet quadratisch zu und verkleinert, der Server prüft das Format.
+router.post(
+  '/avatar',
+  requireAuth,
+  imageBody,
+  wrap(async (req, res) => {
+    const saved = saveImage(req, 'avatars');
+    db.prepare('UPDATE users SET avatar = ? WHERE id = ?').run(saved.file, req.user.id);
+    removeFile('avatars', req.user.avatar);
+    res.json({ user: publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id)) });
+  })
+);
+
+router.delete('/avatar', requireAuth, (req, res) => {
+  db.prepare('UPDATE users SET avatar = NULL WHERE id = ?').run(req.user.id);
+  removeFile('avatars', req.user.avatar);
+  res.json({ user: publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id)) });
+});
 
 router.post(
   '/change-password',

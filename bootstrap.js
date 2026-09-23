@@ -246,6 +246,36 @@ function ensureDefaultFees() {
   });
 }
 
+// Erste Stellenausschreibungen für die Karriereseite (im Dashboard änderbar).
+const DEFAULT_POSITIONS = [
+  [
+    'Associate / Rechtsanwalt (m/w/d)',
+    'Eigenständige Mandatsbearbeitung im Tagesgeschäft: Ticketbearbeitung, Beratungsgespräche, Vertretung bei Festnahmen und vor dem District Court.',
+    'Juristische Ausbildung oder vergleichbare Erfahrung (IC), sicheres Auftreten, Zuverlässigkeit und regelmäßige Aktivität.',
+  ],
+  [
+    'Junior Associate (m/w/d)',
+    'Einstieg in die Anwaltschaft mit Mentoring durch die Partner: Recherche, Akteneinsicht, Vorbereitung von Beweisanträgen und Begleitung zu Gerichtsterminen.',
+    'Interesse am Rechtssystem, Lernbereitschaft und Teamgeist. Vorerfahrung ist kein Muss.',
+  ],
+  [
+    'Kanzleiassistenz / Sekretariat (m/w/d)',
+    'Organisation der Kanzlei: Terminvergabe, Mandantenempfang, Pflege der Aktenverwaltung und Vorbereitung von Rechnungen.',
+    'Organisationstalent, freundliches Auftreten und gute Erreichbarkeit.',
+  ],
+];
+
+function ensureDefaultPositions() {
+  if (getSetting('seeded_positions')) return;
+  tx(() => {
+    if (db.prepare('SELECT COUNT(*) AS n FROM positions').get().n === 0) {
+      const insert = db.prepare('INSERT INTO positions (title, description, requirements, sort_order) VALUES (?, ?, ?, ?)');
+      DEFAULT_POSITIONS.forEach(([title, description, requirements], i) => insert.run(title, description, requirements, i + 1));
+    }
+    setSetting('seeded_positions', new Date().toISOString());
+  });
+}
+
 function runBootstrap() {
   migrateLegacyData();
   ensureTeamAccounts();
@@ -253,6 +283,7 @@ function runBootstrap() {
   ensureMainAdmin();
   applyEmergencyReset();
   ensureDefaultFees();
+  ensureDefaultPositions();
 }
 
 module.exports = { runBootstrap };

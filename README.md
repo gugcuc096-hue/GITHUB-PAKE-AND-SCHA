@@ -18,6 +18,11 @@ Premium-Webanwendung für die GTA-RP-Kanzlei **Pake & Scha Legal Consulting**: �
 | **Benutzer** (Admin) | Rollen, Ränge, Sperren, Löschen, **Passwort-Reset per Klick** |
 | **Honorarordnung** (Admin) | Preise/Leistungen pflegen → Website, Tarifrechner und Rechnungs-Generator |
 | **Discord** | Webhook für Kanzlei-Updates (mit Erwähnung verknüpfter Anwälte) · Konto verknüpfen · „Mit Discord anmelden“ |
+| **Profilbilder** | Jedes Konto kann ein Profilbild hochladen (im Browser zugeschnitten und verkleinert). Team-Profile können zusätzlich ein eigenes Foto für die Website bekommen. |
+| **Bewerbungssystem** | Karriereseite `/karriere.html` mit Stellen, Online-Bewerbung und Statusabfrage (Bewerbungsnummer + Zugangscode) · im Dashboard: Bewertung, interne Notizen, Nachricht an Bewerber, Gesprächstermin (landet im Kalender), **Einstellen per Klick** (Login-Konto + Team-Profil) · Stellenausschreibungen verwalten |
+| **Stempeluhr** | Dienststatus *Im Dienst / Im Gericht / Pause / Außer Dienst* in der Kopfzeile · Website zeigt live „Eilnotdienst: 2 Anwälte im Dienst“ und grüne Punkte bei den Teamkarten (abschaltbar) · Wochenstunden pro Teammitglied · Korrekturen durch die Leitung · automatisches Ausstempeln nach 12 h |
+| **Beweismittel** | Bilder/Screenshots an Akten hängen, auf Wunsch nur intern · Vorschau, Download, Löschen · nur mit Berechtigung abrufbar |
+| **Protokoll** (Admin) | Wer hat wann was geändert: Akten, Rechnungen, Konten, Team, Bewerbungen, Einstellungen, Anmeldungen des Teams |
 
 ## Feste Team-Besetzung
 
@@ -77,6 +82,10 @@ Beim ersten Start der neuen Version passiert automatisch:
 - Einmalige Korrektur „Dr. Alois Parker“ → „Dr. Alois Pake“: Die Login-E-Mail wird zu `alois.pake@pake-scha.ls`, das Passwort bleibt gleich
 - Der frühere Platzhalter „Martinez“ verschwindet von der Website. Sein Login-Konto bleibt bestehen und kann unter *Benutzer* gesperrt oder gelöscht werden.
 
+## Hochgeladene Dateien
+
+Profilbilder, Team-Fotos und Beweismittel liegen im Ordner `uploads/` **neben der Datenbank**, auf Render also automatisch auf der Disk (`/var/data/uploads`). Bilder werden vor dem Upload im Browser verkleinert und sind meist nur 50–300 KB groß, 1 GB Disk reicht damit für viele tausend Bilder. Beweismittel sind nie öffentlich, sondern nur über das Dashboard mit Berechtigungsprüfung abrufbar.
+
 ## Rollen und Rechte
 
 | | Mandant | Anwalt | Kanzleileitung (Admin) |
@@ -88,7 +97,9 @@ Beim ersten Start der neuen Version passiert automatisch:
 | Kalender | eigene Termine anfragen/absagen | alles | alles |
 | Kanzlei-Post | an die Kanzlei | an alle + Rundschreiben | an alle + Rundschreiben |
 | Rechnungen | eigene ansehen/drucken | erstellen, Status | erstellen, Status, löschen |
-| Team, Benutzer, Honorarordnung, Einstellungen | – | – | ja |
+| Beweismittel | eigene hochladen, öffentliche ansehen | alles (auch intern) | alles |
+| Stempeluhr | – | eigene Zeiten | alle Zeiten, Korrekturen |
+| Team, Bewerbungen, Benutzer, Honorarordnung, Protokoll, Einstellungen | – | – | ja |
 
 ## Sicherheit
 
@@ -107,8 +118,9 @@ db.js            SQLite-Schema, Migrationen, Helfer
 auth.js          Sessions, Passwörter, Rollen-Middleware
 bootstrap.js     Team-Seed, Notfall-Admin, Passwort-Reset, Datenmigration
 discord.js       Webhooks & OAuth2
+uploads.js       Bild-Uploads (Formatprüfung anhand der Dateisignatur)
 helpers.js       Konstanten, Validierung
-models.js        Datenabfragen, Zeilen-Mapping, Zugriffsregeln
-routes/          auth, cases, calendar, messages, board, invoices, fees, team, admin, discord, public
-public/          index.html, login.html, register.html, dashboard.html, invoice.html, css/, js/
+models.js        Datenabfragen, Zeilen-Mapping, Zugriffsregeln, Protokoll
+routes/          auth, cases, calendar, messages, board, invoices, fees, team, admin, discord, public, duty, applications
+public/          index.html, karriere.html, login.html, register.html, dashboard.html, invoice.html, css/, js/
 ```

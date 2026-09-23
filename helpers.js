@@ -7,6 +7,14 @@ const AREAS = ['strafrecht', 'zivilrecht', 'verfassungsrecht', 'vertragsrecht', 
 const URGENCIES = ['normal', 'eilig', 'notfall'];
 const EVENT_TYPES = { mandant: 'Mandantengespräch', gericht: 'Gerichtstermin', frist: 'Frist', intern: 'Intern' };
 const FEE_CATEGORIES = ['rechtsberatung', 'strafrecht', 'notfall', 'gericht', 'vertraege'];
+const DUTY_STATUS = { dienst: 'Im Dienst', gericht: 'Im Gericht', pause: 'Pause', off: 'Außer Dienst' };
+const APPLICATION_STATUS = {
+  eingegangen: 'Eingegangen',
+  in_pruefung: 'In Prüfung',
+  gespraech: 'Einladung zum Gespräch',
+  angenommen: 'Angenommen',
+  abgelehnt: 'Abgelehnt',
+};
 
 // Deutsche Feldnamen für Validierungsfehler
 const FIELD_LABELS = {
@@ -51,6 +59,20 @@ const FIELD_LABELS = {
   discordWebhookUrl: 'Discord-Webhook-URL',
   caseNumber: 'Aktenzeichen',
   pin: 'Aktenpin',
+  age: 'Alter',
+  discord: 'Discord-Name',
+  experience: 'Erfahrung',
+  motivation: 'Motivation',
+  availability: 'Verfügbarkeit',
+  positionId: 'Stelle',
+  rating: 'Bewertung',
+  requirements: 'Anforderungen',
+  interviewAt: 'Gesprächstermin',
+  startedAt: 'Dienstbeginn',
+  endedAt: 'Dienstende',
+  number: 'Bewerbungsnummer',
+  code: 'Zugangscode',
+  accept: 'Bestätigung',
 };
 
 /** Express 4 fängt Fehler aus async-Handlern nicht selbst ab. */
@@ -99,6 +121,8 @@ module.exports = {
   URGENCIES,
   EVENT_TYPES,
   FEE_CATEGORIES,
+  DUTY_STATUS,
+  APPLICATION_STATUS,
   wrap,
   parseBody,
   idParam,

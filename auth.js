@@ -2,6 +2,7 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { db } = require('./db');
+const { avatarUrl } = require('./uploads');
 
 const SESSION_COOKIE = 'sid';
 const SESSION_DAYS = 7;
@@ -63,7 +64,12 @@ function destroyAllSessions(userId) {
 
 function discordAvatarUrl(u) {
   if (!u.discord_id || !u.discord_avatar) return null;
-  return `https://cdn.discordapp.com/avatars/${u.discord_id}/${u.discord_avatar}.png?size=64`;
+  return `https://cdn.discordapp.com/avatars/${u.discord_id}/${u.discord_avatar}.png?size=128`;
+}
+
+/** Eigenes Profilbild hat Vorrang, sonst das Discord-Bild, sonst null (Initialen). */
+function userAvatarUrl(u) {
+  return avatarUrl(u.avatar) || discordAvatarUrl(u);
 }
 
 function publicUser(u) {
@@ -77,6 +83,9 @@ function publicUser(u) {
     rank: u.rank || null,
     active: !!u.active,
     mustChangePassword: !!u.must_change_password,
+    avatarUrl: userAvatarUrl(u),
+    hasOwnAvatar: !!u.avatar,
+    duty: { status: u.duty_status || 'off', note: u.duty_note || '', since: u.duty_since || null },
     discord: u.discord_id
       ? { id: u.discord_id, username: u.discord_username || null, avatarUrl: discordAvatarUrl(u) }
       : null,
@@ -129,6 +138,7 @@ module.exports = {
   destroySession,
   destroyOtherSessions,
   destroyAllSessions,
+  userAvatarUrl,
   publicUser,
   loadUser,
   requireAuth,

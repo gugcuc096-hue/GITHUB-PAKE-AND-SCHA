@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="de" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#02050e">
+    <title>Karriere | Pake & Scha Legal Consulting</title>
+    <meta name="description" content="Offene Stellen bei Pake & Scha Legal Consulting – jetzt online bewerben.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/app.css">
+    <style>
+        html { scroll-padding-top: 88px; }
+        .hero-title { font-size: clamp(2.5rem, 7vw, 4.75rem); line-height: 1.05; }
+        .pos-card { transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease; }
+        .pos-card:hover { transform: translateY(-3px); border-color: var(--gold-hairline); }
+        .counter { font-size: 0.72rem; color: var(--text-dim); text-align: right; margin-top: 0.25rem; }
+        .counter.ok { color: #6ee7b7; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+    <div class="ambient-bg"><div class="glow-orb orb-1"></div><div class="glow-orb orb-2"></div></div>
+
+    <header class="sticky top-0 z-40 glass-nav">
+        <div class="max-w-6xl mx-auto px-4 sm:px-8 h-[68px] flex items-center justify-between gap-3">
+            <a href="/" class="flex items-center gap-3 min-w-0">
+                <span class="brand-mark">P&amp;S</span>
+                <span class="min-w-0"><span class="brand-name block whitespace-nowrap">Pake &amp; Scha</span><span class="brand-sub hidden sm:block">Legal Consulting &amp; Advocacy</span></span>
+            </a>
+            <nav class="flex items-center gap-1 sm:gap-2" aria-label="Karriere-Navigation">
+                <a href="/" class="btn-ghost btn-sm hidden md:inline-flex">Startseite</a>
+                <a href="#stellen" class="btn-ghost btn-sm hidden sm:inline-flex">Stellen</a>
+                <a href="#status" class="btn-ghost btn-sm hidden sm:inline-flex">Bewerbungsstatus</a>
+                <a href="/login.html" data-auth-link class="btn-outline btn-sm" aria-label="Login">
+                    <svg class="ico-sm text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                    <span data-auth-label>Login</span>
+                </a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="flex-grow">
+        <!-- Hero -->
+        <section class="max-w-5xl mx-auto px-5 sm:px-6 pt-16 sm:pt-24 pb-14 text-center">
+            <span class="badge badge-gold mb-6 uppercase tracking-[0.2em] text-[0.65rem] px-4 py-1.5">Karriere bei Pake &amp; Scha</span>
+            <h1 class="hero-title font-serif font-normal mb-6">Recht mit Haltung.<br><span class="text-gold italic font-semibold">Karriere mit Perspektive.</span></h1>
+            <p class="text-muted text-base sm:text-lg max-w-3xl mx-auto mb-10 leading-relaxed">
+                Wir suchen Menschen, die Mandanten mit Präzision und Diskretion vertreten – vom Eilnotdienst bei Festnahmen bis zum Grundsatzverfahren vor dem Supreme Court. Bewerben Sie sich in wenigen Minuten online.
+            </p>
+            <div class="flex flex-col sm:flex-row justify-center gap-3">
+                <a href="#stellen" class="btn-gold btn-lg">Offene Stellen ansehen</a>
+                <a href="#bewerben" data-apply="" class="btn-outline btn-lg">Initiativ bewerben</a>
+            </div>
+        </section>
+
+        <!-- Vorteile -->
+        <section class="max-w-6xl mx-auto px-5 sm:px-6 pb-16">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+                <div class="glass-card p-6">
+                    <div class="text-gold font-mono text-2xl mb-2">01</div>
+                    <h2 class="font-serif text-2xl font-semibold mb-2">Mentoring durch die Partner</h2>
+                    <p class="text-sm text-muted leading-relaxed">Sie arbeiten direkt mit Dr. Alois Pake, Michael Scha und dem Senior-Team – mit klaren Aufstiegsstufen vom Junior Associate bis zum Partner.</p>
+                </div>
+                <div class="glass-card p-6">
+                    <div class="text-gold font-mono text-2xl mb-2">02</div>
+                    <h2 class="font-serif text-2xl font-semibold mb-2">Echte Mandate ab Tag eins</h2>
+                    <p class="text-sm text-muted leading-relaxed">Strafrecht, Zivilrecht, Verfassungsrecht und Verträge: Sie begleiten Verhöre, Haftprüfungen und Hauptverhandlungen im District Court.</p>
+                </div>
+                <div class="glass-card p-6">
+                    <div class="text-gold font-mono text-2xl mb-2">03</div>
+                    <h2 class="font-serif text-2xl font-semibold mb-2">Modernes Kanzlei-System</h2>
+                    <p class="text-sm text-muted leading-relaxed">Digitale Akten, Team-Kalender mit Fristen, Kanzlei-Post, Stempeluhr und Rechnungs-Generator – alles in einem Dashboard, auch am Handy.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Offene Stellen -->
+        <section id="stellen" class="max-w-6xl mx-auto px-5 sm:px-6 py-16 border-t border-[var(--glass-border)]">
+            <div class="text-center max-w-3xl mx-auto mb-10">
+                <p class="text-xs uppercase tracking-widest text-gold mb-2">Ausschreibungen</p>
+                <h2 class="font-serif text-4xl md:text-5xl font-semibold">Offene Stellen</h2>
+            </div>
+            <div id="positions" class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                <p class="md:col-span-2 text-center text-sm text-muted py-8">Stellen werden geladen …</p>
+            </div>
+        </section>
+
+        <!-- Bewerbungsformular -->
+        <section id="bewerben" class="max-w-3xl mx-auto px-5 sm:px-6 py-16 border-t border-[var(--glass-border)]">
+            <div class="text-center mb-10">
+                <p class="text-xs uppercase tracking-widest text-gold mb-2">Online-Bewerbung</p>
+                <h2 class="font-serif text-4xl md:text-5xl font-semibold mb-3">Jetzt bewerben</h2>
+                <p class="text-sm text-muted">Dauert etwa 5 Minuten. Sie erhalten sofort eine Bewerbungsnummer und einen Zugangscode, um den Stand Ihrer Bewerbung abzufragen.</p>
+            </div>
+
+            <div class="glass-card card-gold p-5 sm:p-8">
+                <form id="applyForm" class="form-grid cols-2" novalidate>
+                    <div class="span-2">
+                        <label class="label" for="apPosition">Stelle</label>
+                        <select id="apPosition" name="positionId" class="field"><option value="">Initiativbewerbung</option></select>
+                    </div>
+                    <div>
+                        <label class="label" for="apName">Vor- und Nachname (im Spiel)</label>
+                        <input id="apName" name="name" class="field" required minlength="2" maxlength="80" autocomplete="name" placeholder="z. B. Max Mustermann">
+                    </div>
+                    <div>
+                        <label class="label" for="apAge">Alter (im Spiel)</label>
+                        <input id="apAge" name="age" type="number" inputmode="numeric" min="16" max="99" class="field" placeholder="z. B. 29">
+                    </div>
+                    <div>
+                        <label class="label" for="apDiscord">Discord-Name</label>
+                        <input id="apDiscord" name="discord" class="field" required minlength="2" maxlength="60" placeholder="für Rückfragen, z. B. max.mustermann">
+                    </div>
+                    <div>
+                        <label class="label" for="apPhone">Telefon (im Spiel)</label>
+                        <input id="apPhone" name="phone" type="tel" class="field" maxlength="40" placeholder="optional, z. B. 555-0123">
+                    </div>
+                    <div class="span-2">
+                        <label class="label" for="apEmail">E-Mail (optional)</label>
+                        <input id="apEmail" name="email" type="email" class="field" maxlength="120" placeholder="wird bei einer Einstellung als Login vorgeschlagen">
+                    </div>
+                    <div class="span-2">
+                        <label class="label" for="apMotivation">Warum möchten Sie bei Pake &amp; Scha arbeiten?</label>
+                        <textarea id="apMotivation" name="motivation" rows="6" class="field" required minlength="50" maxlength="4000" placeholder="Erzählen Sie uns von sich, Ihrer Motivation und was Sie in die Kanzlei einbringen möchten."></textarea>
+                        <div id="motCounter" class="counter">0 / mind. 50 Zeichen</div>
+                    </div>
+                    <div class="span-2">
+                        <label class="label" for="apExperience">Bisherige Erfahrung</label>
+                        <textarea id="apExperience" name="experience" rows="4" class="field" maxlength="3000" placeholder="z. B. frühere Tätigkeit bei Justiz, Behörden oder einer Kanzlei – auch auf anderen Servern."></textarea>
+                    </div>
+                    <div class="span-2">
+                        <label class="label" for="apAvailability">Wann sind Sie meistens aktiv?</label>
+                        <input id="apAvailability" name="availability" class="field" maxlength="500" placeholder="z. B. werktags ab 18 Uhr, am Wochenende nachmittags">
+                    </div>
+                    <!-- Spam-Schutz: für Menschen unsichtbar -->
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+                    <label class="check span-2"><input type="checkbox" name="accept" required> Ich bestätige, dass meine Angaben im Rahmen des Roleplays (In-Character) wahrheitsgemäß sind und die Kanzlei mich über Discord kontaktieren darf.</label>
+                    <p id="applyError" class="form-error span-2" role="alert"></p>
+                    <div class="span-2"><button id="applyBtn" type="submit" class="btn-gold btn-lg btn-block">Bewerbung absenden</button></div>
+                </form>
+
+                <div id="applySuccess" class="hidden text-center" aria-live="polite"></div>
+            </div>
+        </section>
+
+        <!-- Statusabfrage -->
+        <section id="status" class="max-w-3xl mx-auto px-5 sm:px-6 py-16 border-t border-[var(--glass-border)]">
+            <div class="text-center mb-8">
+                <p class="text-xs uppercase tracking-widest text-gold mb-2">Bereits beworben?</p>
+                <h2 class="font-serif text-4xl md:text-5xl font-semibold">Bewerbungsstatus</h2>
+            </div>
+            <div class="glass-card p-5 sm:p-8">
+                <form id="statusForm" class="flex flex-col sm:flex-row gap-3" novalidate>
+                    <input id="stNumber" class="field font-mono" placeholder="Bewerbungsnummer, z. B. BW-2026-0001" autocapitalize="characters" aria-label="Bewerbungsnummer">
+                    <input id="stCode" class="field font-mono sm:w-48" inputmode="numeric" maxlength="6" placeholder="Zugangscode" aria-label="Zugangscode">
+                    <button type="submit" class="btn-gold btn-md">Prüfen</button>
+                </form>
+                <div id="statusResult" class="mt-6"></div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="border-t border-[var(--glass-border)] py-8 bg-[rgba(2,5,14,0.95)]">
+        <div class="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-muted">
+            <span>© <span id="year">2026</span> Pake &amp; Scha Legal Consulting</span>
+            <div class="flex flex-wrap justify-center gap-x-6 gap-y-2 uppercase tracking-wider text-[0.7rem]">
+                <a href="/" class="hover:text-[var(--gold-500)]">Startseite</a>
+                <a href="/#team" class="hover:text-[var(--gold-500)]">Team</a>
+                <a href="/#kontakt" class="hover:text-[var(--gold-500)]">Kontakt</a>
+                <a href="/login.html" class="text-gold">Mandantenportal</a>
+            </div>
+        </div>
+    </footer>
+
+    <script src="/js/api.js"></script>
+    <script>
+    (() => {
+        'use strict';
+        const { api, esc, fmtDate, copy, toast } = window.PS;
+        const STATUS_COLOR = { eingegangen: 'amber', in_pruefung: 'sky', gespraech: 'gold', angenommen: 'emerald', abgelehnt: 'red' };
+        const form = document.getElementById('applyForm');
+        const select = document.getElementById('apPosition');
+        document.getElementById('year').textContent = new Date().getFullYear();
+
+        // Login / Dashboard
+        api.get('/api/auth/session').then((r) => {
+            if (!r || !r.user) return;
+            document.querySelectorAll('[data-auth-link]').forEach((a) => (a.href = '/dashboard.html'));
+            document.querySelectorAll('[data-auth-label]').forEach((el) => (el.textContent = 'Dashboard'));
+        }).catch(() => {});
+
+        function choosePosition(id) {
+            select.value = id ? String(id) : '';
+            document.getElementById('bewerben').scrollIntoView({ behavior: 'smooth' });
+            setTimeout(() => document.getElementById('apName').focus({ preventScroll: true }), 500);
+        }
+        document.addEventListener('click', (e) => {
+            const el = e.target.closest('[data-apply]');
+            if (!el) return;
+            e.preventDefault();
+            choosePosition(el.dataset.apply);
+        });
+
+        // Offene Stellen
+        api.get('/api/public/positions').then(({ positions }) => {
+            const root = document.getElementById('positions');
+            select.innerHTML = positions.map((p) => `<option value="${p.id}">${esc(p.title)}</option>`).join('') + '<option value="">Initiativbewerbung</option>';
+            const wanted = Number(new URLSearchParams(location.search).get('stelle'));
+            if (wanted && positions.some((p) => p.id === wanted)) select.value = String(wanted);
+            if (!positions.length) {
+                root.innerHTML = `<div class="md:col-span-2 glass-card p-8 text-center"><p class="text-muted mb-4">Aktuell sind keine Stellen ausgeschrieben – wir freuen uns trotzdem über Ihre Initiativbewerbung.</p><button class="btn-gold btn-md" data-apply="">Initiativ bewerben</button></div>`;
+                return;
+            }
+            root.innerHTML = positions.map((p) => `
+                <article class="glass-card pos-card p-6 flex flex-col">
+                    <div class="flex items-start justify-between gap-3 mb-3"><h3 class="font-serif text-2xl font-semibold leading-tight">${esc(p.title)}</h3><span class="badge badge-emerald shrink-0">Offen</span></div>
+                    ${p.description ? `<p class="text-sm text-muted leading-relaxed mb-4">${esc(p.description)}</p>` : ''}
+                    ${p.requirements ? `<div class="qa mb-5"><div class="q">Das bringen Sie mit</div><div class="a">${esc(p.requirements)}</div></div>` : ''}
+                    <button type="button" class="btn-gold btn-md mt-auto self-start" data-apply="${p.id}">Jetzt bewerben</button>
+                </article>`).join('');
+        }).catch(() => {
+            document.getElementById('positions').innerHTML = '<p class="md:col-span-2 text-center text-sm text-muted py-8">Stellen konnten nicht geladen werden.</p>';
+        });
+
+        // Zeichenzähler Motivation
+        const mot = document.getElementById('apMotivation');
+        const counter = document.getElementById('motCounter');
+        mot.addEventListener('input', () => {
+            const n = mot.value.trim().length;
+            counter.textContent = n >= 50 ? `${n} Zeichen ✓` : `${n} / mind. 50 Zeichen`;
+            counter.classList.toggle('ok', n >= 50);
+        });
+
+        // Bewerbung absenden
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const err = document.getElementById('applyError');
+            const btn = document.getElementById('applyBtn');
+            err.textContent = '';
+            const f = form.elements;
+            const age = f.age.value.trim();
+            const body = {
+                positionId: f.positionId.value ? Number(f.positionId.value) : null,
+                name: f.name.value.trim(),
+                age: age ? Number(age) : null,
+                discord: f.discord.value.trim(),
+                phone: f.phone.value.trim(),
+                email: f.email.value.trim(),
+                motivation: f.motivation.value.trim(),
+                experience: f.experience.value.trim(),
+                availability: f.availability.value.trim(),
+                accept: f.accept.checked,
+                website: f.website.value,
+            };
+            if (body.name.length < 2) return (err.textContent = 'Bitte Ihren Namen angeben.');
+            if (age && (!Number.isInteger(body.age) || body.age < 16 || body.age > 99)) return (err.textContent = 'Bitte ein Alter zwischen 16 und 99 angeben.');
+            if (body.discord.length < 2) return (err.textContent = 'Bitte Ihren Discord-Namen angeben – so erreichen wir Sie.');
+            if (body.motivation.length < 50) return (err.textContent = 'Bitte schreiben Sie mindestens 50 Zeichen zu Ihrer Motivation.');
+            if (!body.accept) return (err.textContent = 'Bitte bestätigen Sie die Angaben.');
+
+            btn.disabled = true;
+            btn.textContent = 'Wird gesendet …';
+            try {
+                const res = await api.post('/api/public/applications', body);
+                form.classList.add('hidden');
+                const box = document.getElementById('applySuccess');
+                const text = `Bewerbungsnummer: ${res.number}\nZugangscode: ${res.code}`;
+                box.innerHTML = `
+                    <div class="w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg></div>
+                    <h3 class="font-serif text-3xl font-semibold mb-2">Vielen Dank für Ihre Bewerbung!</h3>
+                    <p class="text-sm text-muted mb-6">Ihre Bewerbung als <strong>${esc(res.positionTitle)}</strong> ist eingegangen. Die Kanzleileitung meldet sich über Discord bei Ihnen.</p>
+                    <div class="grid grid-cols-2 gap-3 mb-3 max-w-md mx-auto">
+                        <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3"><div class="text-[0.6rem] uppercase tracking-widest text-muted">Bewerbungsnummer</div><div class="font-mono text-lg text-[var(--gold-light)]">${esc(res.number)}</div></div>
+                        <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3"><div class="text-[0.6rem] uppercase tracking-widest text-muted">Zugangscode</div><div class="font-mono text-lg tracking-[0.2em] text-[var(--gold-light)]">${esc(res.code)}</div></div>
+                    </div>
+                    <p class="text-xs text-amber-300/90 mb-6">Bitte notieren Sie beide Angaben – damit sehen Sie jederzeit den Stand Ihrer Bewerbung.</p>
+                    <div class="flex flex-col sm:flex-row justify-center gap-2">
+                        <button type="button" id="copyApply" class="btn-outline btn-md">Daten kopieren</button>
+                        <a href="#status" id="checkApply" class="btn-gold btn-md">Status ansehen</a>
+                    </div>`;
+                box.classList.remove('hidden');
+                box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                document.getElementById('copyApply').addEventListener('click', async () => {
+                    toast((await copy(text)) ? 'Bewerbungsdaten kopiert.' : 'Bitte die Angaben notieren.');
+                });
+                document.getElementById('checkApply').addEventListener('click', () => {
+                    document.getElementById('stNumber').value = res.number;
+                    document.getElementById('stCode').value = res.code;
+                    checkStatus();
+                });
+            } catch (ex) {
+                err.textContent = ex.message;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Bewerbung absenden';
+            }
+        });
+
+        // Statusabfrage
+        async function checkStatus() {
+            const out = document.getElementById('statusResult');
+            const number = document.getElementById('stNumber').value.trim().toUpperCase();
+            const code = document.getElementById('stCode').value.trim();
+            if (!number || !code) {
+                out.innerHTML = '<p class="form-error">Bitte Bewerbungsnummer und Zugangscode eingeben.</p>';
+                return;
+            }
+            try {
+                const d = await api.post('/api/public/application-status', { number, code });
+                out.innerHTML = `
+                    <div class="flex flex-wrap items-center justify-between gap-3 pb-4 mb-4 border-b border-[var(--glass-border)]">
+                        <div><div class="text-xs uppercase tracking-widest text-dim">Bewerbung</div><div class="font-mono text-lg">${esc(d.number)}</div><div class="text-sm text-muted">${esc(d.positionTitle)}</div></div>
+                        <span class="badge badge-${STATUS_COLOR[d.status] || 'slate'} text-sm px-4 py-1">${esc(d.statusLabel)}</span>
+                    </div>
+                    ${d.interviewAt ? `<div class="banner banner-gold"><div><strong>Gesprächstermin:</strong> ${esc(fmtDate(d.interviewAt))} Uhr</div></div>` : ''}
+                    <div class="qa"><div class="q">Nachricht der Kanzlei</div><div class="a">${esc(d.publicNote || 'Ihre Bewerbung ist eingegangen und wird geprüft. Wir melden uns bei Ihnen.')}</div></div>
+                    <p class="text-xs text-dim mt-3">Zuletzt aktualisiert: ${esc(fmtDate(d.updatedAt))}</p>`;
+            } catch (ex) {
+                out.innerHTML = `<p class="form-error">${esc(ex.status === 429 ? ex.message : 'Keine Bewerbung mit diesen Angaben gefunden.')}</p>`;
+            }
+        }
+        document.getElementById('statusForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            checkStatus();
+        });
+    })();
+    </script>
+</body>
+</html>
