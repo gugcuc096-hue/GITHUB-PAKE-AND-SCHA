@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#02050e">
+    <title>Anmelden | Pake & Scha Legal Consulting</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="min-h-screen">
+    <div class="ambient-bg"><div class="glow-orb orb-1"></div><div class="glow-orb orb-2"></div></div>
+
+    <nav class="subpage-nav">
+        <a href="/" class="flex items-center gap-3">
+            <span class="brand-mark">P&amp;S</span>
+            <span class="hidden sm:block"><span class="brand-name block">Pake &amp; Scha</span><span class="brand-sub block">Legal Consulting &amp; Advocacy</span></span>
+        </a>
+        <a href="/" class="btn-ghost btn-sm">← Zur Website</a>
+    </nav>
+
+    <main class="min-h-screen flex items-center justify-center px-4 pt-24 pb-10">
+        <div class="glass-card card-gold w-full max-w-md p-6 sm:p-10">
+            <p class="text-xs uppercase tracking-[0.25em] text-gold mb-2">Mandantenportal &amp; Kanzlei-Dashboard</p>
+            <h1 class="font-serif text-4xl font-semibold mb-2">Anmelden</h1>
+            <p class="text-sm text-muted mb-6">Zugang zu Akten, Terminen, Kanzlei-Post und Rechnungen.</p>
+
+            <div id="notice" class="banner banner-amber hidden" role="alert"></div>
+
+            <form id="loginForm" class="space-y-4" novalidate>
+                <div>
+                    <label class="label" for="email">E-Mail-Adresse</label>
+                    <input id="email" name="email" type="email" autocomplete="username" required class="field" placeholder="vorname.nachname@pake-scha.ls">
+                </div>
+                <div>
+                    <div class="flex items-center justify-between"><label class="label" for="password">Passwort</label><button type="button" id="forgotBtn" class="text-xs text-gold hover:underline mb-1">Passwort vergessen?</button></div>
+                    <input id="password" name="password" type="password" autocomplete="current-password" required class="field">
+                </div>
+                <p id="forgotInfo" class="hidden text-sm text-muted rounded-xl p-3" style="background:rgba(212,175,55,.08);border:1px solid var(--gold-hairline)">
+                    Die Kanzleileitung kann Ihr Passwort im Dashboard unter „Benutzer“ mit einem Klick zurücksetzen und Ihnen ein Einmal-Passwort geben. Bitte wenden Sie sich an Dr. Alois Pake oder Michael Scha.
+                </p>
+                <p id="formError" class="form-error" role="alert"></p>
+                <button id="submitBtn" type="submit" class="btn-gold btn-lg btn-block">Anmelden</button>
+            </form>
+
+            <div id="discordBlock" class="hidden">
+                <div class="divider">oder</div>
+                <a href="/api/discord/login" class="btn-discord btn-lg btn-block">
+                    <svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.37a19.79 19.79 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.865-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.74 19.74 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.1 13.1 0 01-1.872-.892.077.077 0 01-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 01.078-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.009c.12.1.246.198.373.292a.077.077 0 01-.006.127 12.3 12.3 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.84 19.84 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+                    Mit Discord anmelden
+                </a>
+            </div>
+
+            <p class="text-sm text-muted mt-6">
+                Noch kein Konto? <a id="registerLink" href="/register.html" class="text-gold hover:underline">Als Mandant registrieren</a>
+            </p>
+        </div>
+    </main>
+
+    <script src="/js/api.js"></script>
+    <script>
+        (() => {
+            const { api } = window.PS;
+            const params = new URLSearchParams(location.search);
+            const DISCORD = {
+                notlinked: 'Dieses Discord-Konto ist noch mit keinem Website-Konto verbunden. Melden Sie sich einmal mit E-Mail und Passwort an und verbinden Sie Discord unter „Profil“.',
+                locked: 'Dieser Zugang wurde gesperrt. Bitte wenden Sie sich an die Kanzleileitung.',
+                denied: 'Die Anmeldung über Discord wurde abgebrochen.',
+                error: 'Die Anmeldung über Discord ist fehlgeschlagen. Bitte erneut versuchen.',
+                state: 'Sicherheitsprüfung fehlgeschlagen – bitte erneut versuchen.',
+                disabled: 'Die Discord-Anmeldung ist noch nicht eingerichtet.',
+                session: 'Bitte melden Sie sich zuerst an.',
+            };
+
+            // Nur interne Pfade zulassen (verhindert Open-Redirect über ?next=…)
+            function nextUrl() {
+                const n = params.get('next');
+                return n && /^\/[^/\\]/.test(n) ? n : '/dashboard.html';
+            }
+            document.getElementById('registerLink').href = '/register.html' + (params.get('next') ? '?next=' + encodeURIComponent(params.get('next')) : '');
+
+            const notice = document.getElementById('notice');
+            if (params.get('discord') && DISCORD[params.get('discord')]) {
+                notice.textContent = DISCORD[params.get('discord')];
+                notice.classList.remove('hidden');
+            }
+
+            // Bereits angemeldet? Direkt weiter.
+            api.get('/api/auth/session').then((r) => { if (r && r.user) location.replace(nextUrl()); }).catch(() => {});
+            api.get('/api/discord/status').then((s) => { if (s.oauth) document.getElementById('discordBlock').classList.remove('hidden'); }).catch(() => {});
+
+            document.getElementById('forgotBtn').addEventListener('click', () => document.getElementById('forgotInfo').classList.toggle('hidden'));
+
+            document.getElementById('loginForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const err = document.getElementById('formError');
+                const btn = document.getElementById('submitBtn');
+                err.textContent = '';
+                const email = document.getElementById('email').value.trim();
+                const password = document.getElementById('password').value;
+                if (!email || !password) { err.textContent = 'Bitte E-Mail-Adresse und Passwort eingeben.'; return; }
+                btn.disabled = true;
+                btn.textContent = 'Anmeldung läuft …';
+                try {
+                    await api.post('/api/auth/login', { email, password });
+                    location.replace(nextUrl());
+                } catch (ex) {
+                    err.textContent = ex.message;
+                    btn.disabled = false;
+                    btn.textContent = 'Anmelden';
+                }
+            });
+        })();
+    </script>
+</body>
+</html>

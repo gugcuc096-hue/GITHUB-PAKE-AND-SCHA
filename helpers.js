@@ -1,0 +1,110 @@
+'use strict';
+const { z } = require('zod');
+
+const STEPS = ['Eingang', 'Akteneinsicht', 'Strategie', 'Verhandlung'];
+const CASE_STATUS = { offen: 'Offen', in_bearbeitung: 'In Bearbeitung', geschlossen: 'Geschlossen' };
+const AREAS = ['strafrecht', 'zivilrecht', 'verfassungsrecht', 'vertragsrecht', 'sonstiges'];
+const URGENCIES = ['normal', 'eilig', 'notfall'];
+const EVENT_TYPES = { mandant: 'Mandantengespräch', gericht: 'Gerichtstermin', frist: 'Frist', intern: 'Intern' };
+const FEE_CATEGORIES = ['rechtsberatung', 'strafrecht', 'notfall', 'gericht', 'vertraege'];
+
+// Deutsche Feldnamen für Validierungsfehler
+const FIELD_LABELS = {
+  displayName: 'Name',
+  name: 'Name',
+  email: 'E-Mail-Adresse',
+  password: 'Passwort',
+  newPassword: 'Neues Passwort',
+  currentPassword: 'Aktuelles Passwort',
+  phone: 'Telefon',
+  title: 'Titel',
+  area: 'Rechtsgebiet',
+  urgency: 'Dringlichkeit',
+  description: 'Beschreibung',
+  clientEmail: 'E-Mail des Mandanten',
+  clientName: 'Mandant',
+  clientPhone: 'Telefon des Mandanten',
+  clientContact: 'Kontakt',
+  opponent: 'Gegenpartei',
+  courtRef: 'Gerichtsaktenzeichen',
+  publicNote: 'Statushinweis',
+  status: 'Status',
+  step: 'Verfahrensstand',
+  body: 'Text',
+  subject: 'Betreff',
+  recipientId: 'Empfänger',
+  startsAt: 'Beginn',
+  endsAt: 'Ende',
+  location: 'Ort',
+  note: 'Notiz',
+  type: 'Art',
+  roleTitle: 'Rang / Titel',
+  initials: 'Initialen',
+  role: 'Rolle',
+  rank: 'Rang',
+  items: 'Positionen',
+  discountPct: 'Rabatt',
+  surchargePct: 'Zuschlag',
+  dueDate: 'Fälligkeitsdatum',
+  price: 'Preis',
+  category: 'Kategorie',
+  discordWebhookUrl: 'Discord-Webhook-URL',
+  caseNumber: 'Aktenzeichen',
+  pin: 'Aktenpin',
+};
+
+/** Express 4 fängt Fehler aus async-Handlern nicht selbst ab. */
+function wrap(fn) {
+  return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+}
+
+/** Validiert req.body; bei Fehlern wird direkt mit 400 geantwortet und null zurückgegeben. */
+function parseBody(schema, req, res) {
+  const result = schema.safeParse(req.body ?? {});
+  if (result.success) return result.data;
+  const fields = [...new Set(result.error.issues.map((i) => FIELD_LABELS[i.path[0]] || i.path[0]).filter(Boolean))];
+  res.status(400).json({
+    error: fields.length ? `Bitte prüfen Sie folgende Angaben: ${fields.join(', ')}.` : 'Ungültige Angaben.',
+  });
+  return null;
+}
+
+function idParam(req, name = 'id') {
+  const n = Number(req.params[name]);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+const isoDateTime = z.string().refine((s) => !Number.isNaN(Date.parse(s)), 'Ungültiges Datum');
+const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const optText = (max) => z.string().trim().max(max).optional();
+
+/** Kürzt Text für Vorschauen und Discord-Nachrichten. */
+function truncate(text, max) {
+  const s = String(text ?? '');
+  return s.length > max ? s.slice(0, max - 1) + '…' : s;
+}
+
+function deriveInitials(name) {
+  const cleaned = String(name).replace(/\b(Dr|Prof|iur|med|jur|rer|nat)\.\s*/gi, '').trim();
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return (words[0][0] + '.' + words[words.length - 1][0] + '.').toUpperCase();
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return '??';
+}
+
+module.exports = {
+  STEPS,
+  CASE_STATUS,
+  AREAS,
+  URGENCIES,
+  EVENT_TYPES,
+  FEE_CATEGORIES,
+  wrap,
+  parseBody,
+  idParam,
+  isoDateTime,
+  dateOnly,
+  optText,
+  truncate,
+  deriveInitials,
+};

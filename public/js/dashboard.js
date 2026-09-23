@@ -1,0 +1,2234 @@
+/*
+ * Kanzlei-Dashboard (Single-Page): Navigation per #hash, Daten über /api/*.
+ * Alle Nutzertexte laufen vor der Ausgabe per innerHTML durch esc().
+ */
+(() => {
+  'use strict';
+  const { api, esc, fmtDate, parseDate, money, copy, toast } = window.PS;
+
+  /* ================================================================
+     Konstanten
+     ================================================================ */
+  const ROLES = { mandant: 'Mandant', anwalt: 'Anwalt', admin: 'Kanzleileitung' };
+  const STEPS = ['Eingang', 'Akteneinsicht', 'Strategie', 'Verhandlung'];
+  const AREAS = { strafrecht: 'Strafrecht', zivilrecht: 'Zivilrecht', verfassungsrecht: 'Verfassungsrecht', vertragsrecht: 'Vertragsrecht', sonstiges: 'Sonstiges' };
+  const URGENCY = { normal: ['Normal', 'slate'], eilig: ['Eilig', 'amber'], notfall: ['Notfall', 'red'] };
+  const CASE_STATUS = { offen: ['Offen', 'amber'], in_bearbeitung: ['In Bearbeitung', 'sky'], geschlossen: ['Geschlossen', 'slate'] };
+  const SOURCES = { portal: 'Mandantenportal', web: 'Website-Formular', kanzlei: 'Kanzlei' };
+  const EVENT_TYPES = { gericht: 'Gerichtstermin', frist: 'Frist', mandant: 'Mandantengespräch', intern: 'Intern' };
+  const EVENT_COLORS = { mandant: '#34d399', gericht: '#d4af37', frist: '#f87171', intern: '#7dd3fc' };
+  const EVENT_STATUS = { angefragt: ['Angefragt', 'amber'], bestaetigt: ['Bestätigt', 'emerald'], abgesagt: ['Abgesagt', 'slate'], erledigt: ['Erledigt', 'slate'] };
+  const INVOICE_STATUS = { offen: ['Offen', 'amber'], bezahlt: ['Bezahlt', 'emerald'], storniert: ['Storniert', 'slate'] };
+  const INVOICE_KIND = { rechnung: 'Rechnung', honorarvereinbarung: 'Honorarvereinbarung' };
+  const FEE_CATEGORIES = { rechtsberatung: 'Rechtsberatung', strafrecht: 'Strafrecht & Haftvertretung', notfall: 'Notfall & Sofortdienst', gericht: 'Gerichtsverfahren', vertraege: 'Verträge & Dokumente' };
+  const RANKS = ['Managing Partner', 'Managing Partner / Kanzleileitung', 'Founding Partner', 'Equity Partner', 'Partner', 'Senior Associate', 'Associate', 'Junior Associate'];
+  const NOTE_COLORS = { gold: '#d4af37', blue: '#60a5fa', green: '#34d399', red: '#f87171', slate: '#94a3b8' };
+  const DISCORD_MSG = {
+    linked: ['Discord-Konto erfolgreich verbunden.', 'ok'],
+    taken: ['Dieses Discord-Konto ist bereits mit einem anderen Website-Konto verbunden.', 'error'],
+    denied: ['Die Verbindung mit Discord wurde abgebrochen.', 'error'],
+    error: ['Die Discord-Verbindung ist fehlgeschlagen. Bitte erneut versuchen.', 'error'],
+    state: ['Sicherheitsprüfung fehlgeschlagen – bitte die Verbindung erneut starten.', 'error'],
+    disabled: ['Die Discord-Anbindung ist noch nicht eingerichtet.', 'error'],
+    session: ['Bitte zuerst anmelden.', 'error'],
+  };
+
+  const ICONS = {
+    home: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
+    folder: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z',
+    calendar: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+    mail: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
+    pin: 'M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z',
+    receipt: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+    users: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z',
+    key: 'M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z',
+    scale: 'M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3',
+    cog: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM15 12a3 3 0 11-6 0 3 3 0 016 0z',
+    user: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
+    x: 'M6 18L18 6M6 6l12 12',
+    plus: 'M12 4v16m8-8H4',
+    search: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z',
+    logout: 'M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1',
+    chevronLeft: 'M15 19l-7-7 7-7',
+    chevronRight: 'M9 5l7 7-7 7',
+    chevronUp: 'M5 15l7-7 7 7',
+    chevronDown: 'M19 9l-7 7-7-7',
+    clock: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+    more: 'M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z',
+    printer: 'M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z',
+    trash: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16',
+    edit: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z',
+    reply: 'M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6',
+    check: 'M5 13l4 4L19 7',
+    alert: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z',
+    copy: 'M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z',
+    briefcase: 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
+    globe: 'M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9',
+    send: 'M12 19l9 2-9-18-9 18 9-2zm0 0v-8',
+  };
+  const icon = (name, cls = 'ico') =>
+    `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[name] || ''}"/></svg>`;
+  const DISCORD_ICON =
+    '<svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.37a19.79 19.79 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.865-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.74 19.74 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.1 13.1 0 01-1.872-.892.077.077 0 01-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 01.078-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.009c.12.1.246.198.373.292a.077.077 0 01-.006.127 12.3 12.3 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.84 19.84 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>';
+
+  const VIEWS = {
+    overview: { label: 'Übersicht', icon: 'home' },
+    cases: { label: 'Akten', clientLabel: 'Meine Akten', icon: 'folder' },
+    calendar: { label: 'Kalender & Fristen', short: 'Kalender', clientLabel: 'Termine', icon: 'calendar' },
+    mail: { label: 'Kanzlei-Post', short: 'Post', icon: 'mail' },
+    board: { label: 'Pinnwand', icon: 'pin', staff: true },
+    invoices: { label: 'Rechnungen', icon: 'receipt' },
+    team: { label: 'Team', icon: 'users', admin: true, section: 'Kanzleileitung' },
+    users: { label: 'Benutzer', icon: 'key', admin: true, section: 'Kanzleileitung' },
+    fees: { label: 'Honorarordnung', icon: 'scale', admin: true, section: 'Kanzleileitung' },
+    settings: { label: 'Einstellungen', icon: 'cog', admin: true, section: 'Kanzleileitung' },
+    profile: { label: 'Mein Profil', short: 'Profil', icon: 'user', section: 'Konto' },
+    'invoice-new': { label: 'Neues Dokument', icon: 'receipt', staff: true, hidden: true },
+  };
+
+  /* ================================================================
+     Zustand & Helfer
+     ================================================================ */
+  const st = {
+    user: null,
+    view: 'overview',
+    navToken: 0,
+    cases: [],
+    events: [],
+    eventCache: new Map(),
+    invoices: [],
+    board: [],
+    fees: [],
+    adminFees: [],
+    team: [],
+    users: [],
+    lawyers: [],
+    contacts: null,
+    settings: null,
+    discordOAuth: false,
+    unread: 0,
+    messages: [],
+    mailBox: 'inbox',
+    mailSel: null,
+    caseFilter: 'aktiv',
+    caseQuery: '',
+    caseMine: false,
+    userFilter: 'alle',
+    userQuery: '',
+    invFilter: 'alle',
+    cal: { month: null, selected: null, types: { gericht: true, frist: true, mandant: true, intern: true } },
+    draft: null,
+    modalCaseId: null,
+    returnCase: null,
+  };
+
+  const $ = (s, root = document) => root.querySelector(s);
+  const $$ = (s, root = document) => [...root.querySelectorAll(s)];
+  const isStaff = () => !!st.user && (st.user.role === 'anwalt' || st.user.role === 'admin');
+  const isAdmin = () => !!st.user && st.user.role === 'admin';
+  const badge = (text, color = 'gold') => `<span class="badge badge-${color}">${esc(text)}</span>`;
+  const statusBadge = (map, key) => badge(...(map[key] || [key, 'slate']));
+  const opt = (value, label, selected = false) => `<option value="${esc(value)}" ${selected ? 'selected' : ''}>${esc(label)}</option>`;
+  const empty = (text, ico = 'folder') => `<div class="empty">${icon(ico, 'ico-lg')}<p>${esc(text)}</p></div>`;
+  const pad = (n) => String(n).padStart(2, '0');
+  const dayKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const byStart = (a, b) => parseDate(a.startsAt) - parseDate(b.startsAt);
+  const fmtPct = (n) => String(n).replace('.', ',');
+  const val = (fd, key) => String(fd.get(key) ?? '').trim();
+
+  function toLocalInput(iso) {
+    const d = parseDate(iso);
+    return d ? `${dayKey(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}` : '';
+  }
+  function fmtTime(iso) {
+    const d = parseDate(iso);
+    return d ? d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '';
+  }
+  function fmtDay(iso) {
+    const d = parseDate(iso);
+    return d ? d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
+  }
+  function fmtDateOnly(s) {
+    return s ? new Date(`${s}T12:00:00`).toLocaleDateString('de-DE') : '—';
+  }
+  function shortDate(v) {
+    const d = parseDate(v);
+    if (!d) return '';
+    return dayKey(d) === dayKey(new Date()) ? fmtTime(v) : d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+  }
+  function initials(name) {
+    const words = String(name || '').replace(/\b(Dr|Prof|jur|med|rer|nat)\.\s*/gi, '').trim().split(/\s+/).filter(Boolean);
+    return ((words[0]?.[0] || '') + (words.length > 1 ? words[words.length - 1][0] : '')).toUpperCase() || '?';
+  }
+  function avatarInner(u) {
+    return u?.discord?.avatarUrl ? `<img src="${esc(u.discord.avatarUrl)}" alt="" referrerpolicy="no-referrer">` : esc(initials(u?.displayName));
+  }
+  function allowed(view) {
+    const v = VIEWS[view];
+    if (!v) return false;
+    if (v.admin && !isAdmin()) return false;
+    if (v.staff && !isStaff()) return false;
+    return true;
+  }
+  function viewLabel(view, short = false) {
+    const v = VIEWS[view];
+    if (!v) return '';
+    if (!isStaff() && v.clientLabel) return v.clientLabel;
+    return (short && v.short) || v.label;
+  }
+
+  /* ---------------------------------------------------------------- Countdown */
+  function countdown(iso, overLabel) {
+    const t = parseDate(iso);
+    if (!t) return { text: '—', cls: 'cd-dim' };
+    const diff = t.getTime() - Date.now();
+    const abs = Math.abs(diff);
+    const totalMin = Math.floor(abs / 60000);
+    const h = Math.floor(totalMin / 60);
+    const d = Math.floor(h / 24);
+    let text;
+    if (d >= 2) text = `${d} Tage`;
+    else if (d === 1) text = `1 Tag ${h - 24} Std`;
+    else if (h >= 1) text = `${h} Std ${pad(totalMin % 60)} Min`;
+    else text = `${pad(totalMin)}:${pad(Math.floor(abs / 1000) % 60)} Min`;
+    if (diff < 0) return { text: `${overLabel} · ${text}`, cls: overLabel === 'überfällig' ? 'cd-over' : 'cd-dim' };
+    return { text: `in ${text}`, cls: diff < 864e5 ? 'cd-red' : diff < 3 * 864e5 ? 'cd-amber' : 'cd-green' };
+  }
+  function countdownHtml(e) {
+    const over = e.type === 'frist' ? 'überfällig' : 'vorbei';
+    const c = countdown(e.startsAt, over);
+    return `<span class="countdown ${c.cls}" data-countdown="${esc(e.startsAt)}" data-over="${over}">${esc(c.text)}</span>`;
+  }
+  function tickCountdowns() {
+    $$('[data-countdown]').forEach((el) => {
+      const c = countdown(el.dataset.countdown, el.dataset.over);
+      if (el.textContent !== c.text) el.textContent = c.text;
+      el.className = `countdown ${c.cls}`;
+    });
+  }
+  setInterval(tickCountdowns, 1000);
+
+  /* ================================================================
+     Daten laden
+     ================================================================ */
+  const load = {
+    async cases() {
+      st.cases = (await api.get('/api/cases')).cases;
+    },
+    async events() {
+      st.events = (await api.get('/api/calendar')).events;
+      st.events.forEach((e) => st.eventCache.set(e.id, e));
+    },
+    async invoices() {
+      st.invoices = (await api.get('/api/invoices')).invoices;
+    },
+    async board() {
+      if (isStaff()) st.board = (await api.get('/api/board')).notes;
+    },
+    async lawyers() {
+      if (isStaff() && !st.lawyers.length) st.lawyers = (await api.get('/api/directory')).lawyers;
+    },
+    async contacts() {
+      if (!st.contacts) st.contacts = (await api.get('/api/messages/contacts')).contacts;
+    },
+    async fees() {
+      st.fees = (await api.get('/api/fees')).fees;
+    },
+    async unread() {
+      st.unread = (await api.get('/api/messages/unread-count')).unread;
+    },
+    async messages() {
+      st.messages = (await api.get('/api/messages?box=' + st.mailBox)).messages;
+    },
+  };
+
+  /* ================================================================
+     Grundgerüst: Navigation, Dialog, Routing
+     ================================================================ */
+  function renderNav() {
+    let html = '';
+    let section = null;
+    for (const [key, v] of Object.entries(VIEWS)) {
+      if (v.hidden || !allowed(key)) continue;
+      if (v.section && v.section !== section) {
+        section = v.section;
+        html += `<div class="nav-section">${esc(section)}</div>`;
+      }
+      const count = key === 'mail' ? st.unread : 0;
+      const active = st.view === key || (key === 'invoices' && st.view === 'invoice-new');
+      html += `<a href="#${key}" class="nav-item ${active ? 'active' : ''}" ${active ? 'aria-current="page"' : ''}>${icon(v.icon)}<span>${esc(viewLabel(key))}</span>${count ? `<span class="nav-count">${count > 99 ? '99+' : count}</span>` : ''}</a>`;
+    }
+    $('#nav').innerHTML = html;
+
+    const bottom = ['overview', 'cases', 'calendar', 'mail'];
+    $('#bottomNav').innerHTML =
+      bottom
+        .map(
+          (k) =>
+            `<a href="#${k}" class="bn-item ${st.view === k ? 'active' : ''}">${icon(VIEWS[k].icon)}<span>${esc(viewLabel(k, true))}</span>${k === 'mail' && st.unread ? `<span class="dot-badge">${st.unread > 99 ? '99+' : st.unread}</span>` : ''}</a>`
+        )
+        .join('') + `<button type="button" class="bn-item" data-action="open-sidebar">${icon('more')}<span>Mehr</span></button>`;
+
+    const mailBadge = $('#topMailBadge');
+    mailBadge.textContent = st.unread > 99 ? '99+' : String(st.unread);
+    mailBadge.classList.toggle('hidden', !st.unread);
+    $('#pageTitle').textContent = viewLabel(st.view);
+    document.title = `${viewLabel(st.view)} | Pake & Scha`;
+  }
+
+  function renderUser() {
+    const u = st.user;
+    $('#userCard').innerHTML = `<span class="avatar">${avatarInner(u)}</span>
+      <div class="meta"><div class="name">${esc(u.displayName)}</div><div class="role">${esc(u.rank || ROLES[u.role] || '')}</div></div>
+      <button class="icon-btn sm" data-action="logout" title="Abmelden" aria-label="Abmelden">${icon('logout', 'ico-sm')}</button>`;
+    $('#topAvatar').innerHTML = avatarInner(u);
+  }
+
+  function openSidebar() {
+    $('#sidebar').classList.add('open');
+    $('#sidebarBackdrop').classList.add('show');
+  }
+  function closeSidebar() {
+    $('#sidebar').classList.remove('open');
+    $('#sidebarBackdrop').classList.remove('show');
+  }
+
+  function openModal(html, { wide = false } = {}) {
+    $('#modalBody').innerHTML = html;
+    $('#modalCard').classList.toggle('wide', wide);
+    const modal = $('#modal');
+    modal.classList.add('open');
+    modal.scrollTop = 0;
+    $('#modalBody').scrollTop = 0;
+    document.body.classList.add('modal-open');
+    tickCountdowns();
+    const focusTarget = $('#modalBody [autofocus]');
+    if (focusTarget && window.matchMedia('(min-width: 768px)').matches) focusTarget.focus();
+  }
+  function replaceModal(html) {
+    const body = $('#modalBody');
+    const modal = $('#modal');
+    const y1 = body.scrollTop;
+    const y2 = modal.scrollTop;
+    body.innerHTML = html;
+    body.scrollTop = y1;
+    modal.scrollTop = y2;
+    tickCountdowns();
+  }
+  function closeModal() {
+    const modal = $('#modal');
+    if (!modal.classList.contains('open')) return;
+    modal.classList.remove('open');
+    $('#modalBody').innerHTML = '';
+    document.body.classList.remove('modal-open');
+    st.modalCaseId = null;
+  }
+
+  const loadingHtml = () =>
+    `<div class="stack">${'<div class="panel panel-pad"><div class="skeleton" style="width:40%"></div><div class="skeleton mt-4"></div><div class="skeleton mt-3" style="width:70%"></div></div>'.repeat(2)}</div>`;
+  const errorHtml = (msg) =>
+    `<div class="panel">${empty(msg || 'Daten konnten nicht geladen werden.', 'alert')}<div class="text-center pb-6"><button class="btn-outline btn-md" data-action="reload-view">Erneut versuchen</button></div></div>`;
+
+  function handleError(e) {
+    if (e && e.status === 401) {
+      location.href = '/login.html?next=' + encodeURIComponent('/dashboard.html' + location.hash);
+      return;
+    }
+    toast(e?.message || 'Unbekannter Fehler.', 'error');
+  }
+  async function guard(fn) {
+    try {
+      await fn();
+    } catch (e) {
+      handleError(e);
+    }
+  }
+
+  const hashView = () => decodeURIComponent(location.hash.slice(1)) || 'overview';
+
+  async function go(view) {
+    if (!allowed(view)) view = 'overview';
+    st.view = view;
+    closeModal();
+    closeSidebar();
+    renderNav();
+    const content = $('#content');
+    content.innerHTML = loadingHtml();
+    window.scrollTo(0, 0);
+    const token = ++st.navToken;
+    try {
+      if (views[view].load) await views[view].load();
+    } catch (e) {
+      if (token !== st.navToken) return;
+      handleError(e);
+      content.innerHTML = errorHtml(e.message);
+      return;
+    }
+    if (token !== st.navToken) return;
+    renderView();
+  }
+  function renderView() {
+    $('#content').innerHTML = views[st.view].render();
+    renderNav();
+    tickCountdowns();
+  }
+  function navigate(view) {
+    if (location.hash !== '#' + view) history.pushState(null, '', '#' + view);
+    return go(view);
+  }
+  /** Lädt die Daten der aktuellen Ansicht neu, ohne einen offenen Dialog zu schließen. */
+  async function refreshBehind() {
+    try {
+      if (views[st.view].load) await views[st.view].load();
+      renderView();
+    } catch (e) {
+      handleError(e);
+    }
+  }
+  /** Nach Unterdialogen aus einer Akte heraus zurück zur Akte springen. */
+  async function returnOrClose() {
+    const caseId = st.returnCase;
+    st.returnCase = null;
+    if (caseId) await openCase(caseId);
+    else closeModal();
+    refreshBehind();
+  }
+
+  function showCredentials(cred, name) {
+    const text = `Login: ${location.origin}/login.html\nE-Mail: ${cred.email}\nEinmal-Passwort: ${cred.password}`;
+    openModal(`
+      <h2 class="modal-title">Zugangsdaten${name ? ' für ' + esc(name) : ''}</h2>
+      <p class="modal-sub">Das Einmal-Passwort wird <strong>nur jetzt</strong> angezeigt. Bitte sicher weitergeben (z. B. per Discord-Direktnachricht). Beim ersten Login wird zum Ändern aufgefordert.</p>
+      <div class="form-grid">
+        <div><div class="label">E-Mail / Login</div><div class="secret-box">${esc(cred.email)}</div></div>
+        <div><div class="label">Einmal-Passwort</div><div class="secret-box">${esc(cred.password)}</div></div>
+        <div class="form-actions">
+          <button class="btn-gold btn-md" data-action="copy" data-text="${esc(text)}">${icon('copy')}<span>Zugangsdaten kopieren</span></button>
+          <button class="btn-ghost btn-md" data-action="close-modal">Fertig</button>
+        </div>
+      </div>`);
+  }
+
+  /* ================================================================
+     Ansichten
+     ================================================================ */
+  const views = {};
+
+  /* ---------------------------------------------------------------- Übersicht */
+  function upcomingEvents(limit = 6) {
+    const cutoff = Date.now() - 60 * 60 * 1000;
+    return st.events
+      .filter((e) => (e.status === 'bestaetigt' || e.status === 'angefragt') && (e.type === 'frist' || parseDate(e.startsAt) >= cutoff))
+      .sort(byStart)
+      .slice(0, limit);
+  }
+
+  function eventRow(e, { date = true } = {}) {
+    const closed = e.status === 'erledigt' || e.status === 'abgesagt';
+    const side = closed ? statusBadge(EVENT_STATUS, e.status) : `${e.status === 'angefragt' ? badge('Anfrage', 'amber') : ''}${countdownHtml(e)}`;
+    const meta = [EVENT_TYPES[e.type], `${date ? fmtDay(e.startsAt) + ', ' : ''}${fmtTime(e.startsAt)} Uhr`, e.caseNumber, isStaff() ? e.assignedName : null]
+      .filter(Boolean)
+      .map(esc)
+      .join(' · ');
+    return `<button type="button" class="ev-row ${closed ? 'ev-done' : ''}" data-action="open-event" data-id="${e.id}">
+      <span class="ev-bar ev-bg-${esc(e.type)}"></span>
+      <span class="ev-main"><span class="ev-title">${esc(e.title)}</span><span class="ev-meta">${meta}</span></span>
+      <span class="ev-side">${side}</span></button>`;
+  }
+
+  function caseListRow(c, extra = '') {
+    return `<div class="list-row" data-action="open-case" data-id="${c.id}" role="button" tabindex="0">
+      <div class="main"><div class="title">${esc(c.title)}</div>
+        <div class="meta"><span class="font-mono text-gold">${esc(c.caseNumber)}</span> · ${esc(c.clientName)}${c.urgency !== 'normal' ? ' · ' + esc(URGENCY[c.urgency][0]) : ''}</div></div>
+      <div class="flex items-center gap-2 shrink-0">${extra || statusBadge(CASE_STATUS, c.status)}</div></div>`;
+  }
+
+  function kpi(label, value, sub, ico, href) {
+    return `<a href="${href}" class="panel kpi block">
+      <div class="kpi-label">${icon(ico, 'ico-sm')}${esc(label)}</div>
+      <div class="kpi-value">${esc(value)}</div><div class="kpi-sub">${esc(sub)}</div></a>`;
+  }
+  function kpiEvent(label, e) {
+    if (!e) {
+      return `<a href="#calendar" class="panel kpi block"><div class="kpi-label">${icon('clock', 'ico-sm')}${esc(label)}</div>
+        <div class="kpi-value" style="color:var(--text-dim)">—</div><div class="kpi-sub">Nichts geplant</div></a>`;
+    }
+    return `<button type="button" class="panel kpi block w-full text-left" data-action="open-event" data-id="${e.id}">
+      <div class="kpi-label">${icon('clock', 'ico-sm')}${esc(label)}</div>
+      <div class="kpi-value" style="font-size:clamp(1.15rem,3.4vw,1.55rem)">${esc(e.title)}</div>
+      <div class="kpi-sub">${esc(fmtDay(e.startsAt))}, ${esc(fmtTime(e.startsAt))} Uhr</div>${countdownHtml(e)}</button>`;
+  }
+
+  views.overview = {
+    async load() {
+      await Promise.all([load.cases(), load.events(), load.invoices(), load.board(), load.unread()]);
+    },
+    render() {
+      const u = st.user;
+      const staff = isStaff();
+      const hour = new Date().getHours();
+      const greet = hour < 11 ? 'Guten Morgen' : hour < 18 ? 'Guten Tag' : 'Guten Abend';
+      const today = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      const active = st.cases.filter((c) => c.status !== 'geschlossen');
+      const upcoming = upcomingEvents(6);
+      const nextDeadline = upcomingEvents(50).find((e) => e.status === 'bestaetigt' && (e.type === 'frist' || e.type === 'gericht'));
+      const openInvoices = st.invoices.filter((i) => i.status === 'offen');
+      const openSum = openInvoices.reduce((s, i) => s + i.total, 0);
+
+      const banner = u.mustChangePassword
+        ? `<div class="banner banner-amber">${icon('alert')}<div><strong>Bitte eigenes Passwort festlegen.</strong> Sie nutzen ein automatisch erzeugtes oder zurückgesetztes Passwort. <a href="#profile" class="underline">Jetzt ändern</a></div></div>`
+        : '';
+
+      const kpis = staff
+        ? [
+            kpi('Neue Anfragen', active.filter((c) => c.status === 'offen').length, `${active.filter((c) => !c.lawyerId).length} ohne Anwalt`, 'folder', '#cases'),
+            kpi('In Bearbeitung', active.filter((c) => c.status === 'in_bearbeitung').length, `${active.filter((c) => c.lawyerId === u.id).length} davon bei Ihnen`, 'briefcase', '#cases'),
+            kpiEvent('Nächste Frist / Termin', nextDeadline),
+            kpi('Kanzlei-Post', st.unread, st.unread === 1 ? 'ungelesene Nachricht' : 'ungelesene Nachrichten', 'mail', '#mail'),
+          ]
+        : [
+            kpi('Meine Akten', active.length, 'laufende Mandate', 'folder', '#cases'),
+            kpiEvent('Nächster Termin', upcoming[0]),
+            kpi('Kanzlei-Post', st.unread, 'ungelesen', 'mail', '#mail'),
+            kpi('Offene Rechnungen', money(openSum), `${openInvoices.length} Dokument(e)`, 'receipt', '#invoices'),
+          ];
+
+      const eventsPanel = `
+        <section class="panel panel-pad">
+          <div class="panel-head"><h2 class="panel-title">${staff ? 'Fristen & Termine' : 'Ihre Termine'}</h2><a href="#calendar" class="btn-ghost btn-sm">Alle anzeigen</a></div>
+          ${upcoming.length ? upcoming.map((e) => eventRow(e)).join('') : empty('Keine anstehenden Termine.', 'calendar')}
+        </section>`;
+
+      const recent = st.cases.slice(0, 5);
+      const recentPanel = `
+        <section class="panel panel-pad">
+          <div class="panel-head"><h2 class="panel-title">${staff ? 'Zuletzt bearbeitet' : 'Meine Akten'}</h2><a href="#cases" class="btn-ghost btn-sm">Alle Akten</a></div>
+          ${recent.length ? recent.map((c) => caseListRow(c)).join('') : empty(staff ? 'Noch keine Akten.' : 'Sie haben noch kein Mandat eingereicht.', 'folder')}
+          ${!staff ? `<div class="form-actions mt-4"><button class="btn-gold btn-md" data-action="new-case">${icon('plus')}<span>Mandat einreichen</span></button><button class="btn-outline btn-md" data-action="new-event">${icon('calendar', 'ico-sm')}<span>Termin anfragen</span></button><button class="btn-outline btn-md" data-action="compose">${icon('mail', 'ico-sm')}<span>Nachricht an die Kanzlei</span></button></div>` : ''}
+        </section>`;
+
+      const head = `
+        ${banner}
+        <div class="page-head">
+          <div><p class="text-xs uppercase tracking-[0.2em] text-gold mb-1">${esc(today)}</p>
+            <h1 class="page-title">${esc(greet)}, ${esc(u.displayName)}</h1>
+            <p class="page-sub">${esc(u.rank || ROLES[u.role])} · Pake &amp; Scha Legal Consulting</p></div>
+          ${staff ? `<div class="page-actions"><button class="btn-outline btn-md" data-action="new-event">${icon('calendar', 'ico-sm')}<span>Frist / Termin</span></button><button class="btn-gold btn-md" data-action="new-case">${icon('plus')}<span>Neue Akte</span></button></div>` : ''}
+        </div>
+        <div class="kpi-grid">${kpis.join('')}</div>`;
+
+      if (!staff) return `${head}<div class="grid-2">${eventsPanel}${recentPanel}</div>`;
+
+      const unassigned = active.filter((c) => !c.lawyerId).slice(0, 5);
+      const pinned = st.board.filter((n) => n.pinned).slice(0, 3);
+      const requestsPanel = `
+        <section class="panel panel-pad">
+          <div class="panel-head"><h2 class="panel-title">Neue Mandatsanfragen</h2>${unassigned.length ? badge(`${unassigned.length} offen`, 'amber') : ''}</div>
+          ${unassigned.length ? unassigned.map((c) => caseListRow(c, `<button class="btn-gold btn-sm" data-action="claim-case" data-id="${c.id}">Übernehmen</button>`)).join('') : empty('Alle Anfragen sind vergeben.', 'check')}
+        </section>`;
+      const boardPanel = `
+        <section class="panel panel-pad">
+          <div class="panel-head"><h2 class="panel-title">Pinnwand</h2><a href="#board" class="btn-ghost btn-sm">Zur Pinnwand</a></div>
+          ${pinned.length ? pinned.map((n) => `<div class="tl-item mb-2" style="border-left:3px solid ${NOTE_COLORS[n.color] || NOTE_COLORS.gold}"><div class="tl-meta"><strong class="text-muted">${esc(n.title || 'Notiz')}</strong> · ${esc(n.authorName)}</div><div class="tl-body">${esc(n.body.length > 220 ? n.body.slice(0, 220) + '…' : n.body)}</div></div>`).join('') : empty('Keine angehefteten Notizen.', 'pin')}
+        </section>`;
+
+      return `${head}
+        <div class="grid-2">${eventsPanel}${requestsPanel}</div>
+        <div class="grid-2 mt-4 lg:mt-5">${recentPanel}${boardPanel}</div>`;
+    },
+  };
+
+  /* ---------------------------------------------------------------- Akten */
+  function filteredCases() {
+    const q = st.caseQuery.trim().toLowerCase();
+    return st.cases.filter((c) => {
+      const f = st.caseFilter;
+      const stateOk = f === 'alle' || (f === 'aktiv' ? c.status !== 'geschlossen' : c.status === f);
+      const mineOk = !st.caseMine || c.lawyerId === st.user.id;
+      const textOk = !q || [c.caseNumber, c.title, c.clientName, c.lawyerName, c.courtRef, c.opponent].join(' ').toLowerCase().includes(q);
+      return stateOk && mineOk && textOk;
+    });
+  }
+  function caseCount(f) {
+    return st.cases.filter((c) => f === 'alle' || (f === 'aktiv' ? c.status !== 'geschlossen' : c.status === f)).length;
+  }
+  function caseTable() {
+    const rows = filteredCases();
+    const staff = isStaff();
+    if (!rows.length) {
+      return empty(st.cases.length ? 'Keine Akten für diese Auswahl.' : staff ? 'Noch keine Akten angelegt.' : 'Sie haben noch kein Mandat eingereicht.', 'folder');
+    }
+    return `<div class="tbl-wrap"><table class="tbl tbl-cards">
+      <thead><tr><th>Akte</th>${staff ? '<th>Mandant</th>' : ''}<th>Zuständig</th><th>Status</th><th>Aktualisiert</th></tr></thead>
+      <tbody>${rows
+        .map(
+          (c) => `<tr class="row" data-action="open-case" data-id="${c.id}">
+          <td class="td-main"><div class="font-mono text-gold text-xs">${esc(c.caseNumber)}</div><div class="font-medium">${esc(c.title)}</div>
+            <div class="text-xs text-dim mt-1 flex flex-wrap items-center gap-2">${esc(AREAS[c.area] || c.area)}${c.urgency !== 'normal' ? badge(...URGENCY[c.urgency]) : ''}</div></td>
+          ${staff ? `<td data-label="Mandant">${esc(c.clientName)}</td>` : ''}
+          <td data-label="Zuständig">${c.lawyerName ? esc(c.lawyerName) : badge('Unbesetzt', 'amber')}</td>
+          <td data-label="Status">${statusBadge(CASE_STATUS, c.status)}</td>
+          <td data-label="Aktualisiert" class="text-dim text-xs nowrap">${esc(fmtDate(c.updatedAt))}</td></tr>`
+        )
+        .join('')}</tbody></table></div>`;
+  }
+
+  views.cases = {
+    async load() {
+      await Promise.all([load.cases(), load.lawyers()]);
+    },
+    render() {
+      const staff = isStaff();
+      const filters = [['aktiv', 'Aktiv'], ['offen', 'Offen'], ['in_bearbeitung', 'In Bearbeitung'], ['geschlossen', 'Geschlossen'], ['alle', 'Alle']];
+      return `
+        <div class="page-head">
+          <div><h1 class="page-title">${staff ? 'Aktenverwaltung' : 'Meine Akten'}</h1>
+            <p class="page-sub">${staff ? 'Alle Mandate der Kanzlei – Aktenzeichen, Mandanten, Status, Notizen und Verlauf.' : 'Ihre Mandate bei Pake & Scha. Tippen Sie auf eine Akte für Details.'}</p></div>
+          <div class="page-actions"><button class="btn-gold btn-md" data-action="new-case">${icon('plus')}<span>${staff ? 'Neue Akte' : 'Mandat einreichen'}</span></button></div>
+        </div>
+        <div class="toolbar">
+          <label class="search">${icon('search')}<input id="caseSearch" class="field" type="search" placeholder="Aktenzeichen, Titel, Mandant …" value="${esc(st.caseQuery)}" aria-label="Akten durchsuchen"></label>
+          <div class="chip-row">
+            ${filters.map(([k, l]) => `<button class="chip ${st.caseFilter === k ? 'active' : ''}" data-action="case-filter" data-value="${k}">${l} <span class="chip-count">${caseCount(k)}</span></button>`).join('')}
+            ${staff ? `<button class="chip ${st.caseMine ? 'active' : ''}" data-action="case-mine">${icon('user', 'ico-sm')}Nur meine</button>` : ''}
+          </div>
+        </div>
+        <div id="caseList" class="panel p-2 md:p-3">${caseTable()}</div>`;
+    },
+  };
+
+  async function openCase(id) {
+    await load.lawyers();
+    const data = await api.get('/api/cases/' + id);
+    (data.appointments || []).forEach((e) => st.eventCache.set(e.id, e));
+    st.modalCaseId = id;
+    openModal(caseDetail(data), { wide: true });
+  }
+  async function reloadCase(id) {
+    const data = await api.get('/api/cases/' + id);
+    (data.appointments || []).forEach((e) => st.eventCache.set(e.id, e));
+    if (st.modalCaseId === id) replaceModal(caseDetail(data));
+    refreshBehind();
+  }
+
+  function caseDetail({ case: c, notes, appointments, invoices }) {
+    const staff = isStaff();
+    const admin = isAdmin();
+    const me = st.user.id;
+    const ratio = c.closed ? 1 : c.step / 3;
+
+    const track = `
+      <div class="track-line mb-6"><div class="track-fill" style="width:${ratio * 75}%"></div>
+        <div class="grid grid-cols-4">${STEPS.map((s, i) => {
+          const done = c.closed || i < c.step;
+          const cur = !c.closed && i === c.step;
+          return `<div class="flex flex-col items-center gap-2"><div class="track-node ${done ? 'done' : cur ? 'current' : ''}">${done ? '✓' : i + 1}</div><span class="text-[0.7rem] sm:text-xs text-muted text-center">${s}</span></div>`;
+        }).join('')}</div></div>`;
+
+    const info = [
+      ['Mandant', c.clientName + (staff && !c.hasClientAccount ? ' (ohne Konto)' : '')],
+      staff ? ['Kontakt', [c.clientPhone, c.clientEmail].filter(Boolean).join(' · ') || '—'] : null,
+      ['Zuständig', c.lawyerName || 'Noch nicht zugewiesen'],
+      ['Rechtsgebiet', AREAS[c.area] || c.area],
+      ['Dringlichkeit', (URGENCY[c.urgency] || [c.urgency])[0]],
+      c.opponent ? ['Gegenpartei', c.opponent] : null,
+      c.courtRef ? ['Gerichtsaktenzeichen', c.courtRef] : null,
+      ['Eröffnet', fmtDate(c.createdAt)],
+      staff ? ['Eingang über', SOURCES[c.source] || c.source] : null,
+    ]
+      .filter(Boolean)
+      .map(([k, v]) => `<div><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`)
+      .join('');
+
+    const pin = c.accessPin
+      ? `<div class="banner banner-gold items-center justify-between flex-wrap">
+          <div><div class="text-xs uppercase tracking-widest opacity-80">Aktenpin für die Statusabfrage</div><div class="text-sm text-muted">Aktenzeichen + Pin auf der Startseite unter „Aktenstatus“ eingeben.</div></div>
+          <div class="flex items-center gap-2"><span class="font-mono text-2xl tracking-[0.25em] text-gold">${esc(c.accessPin)}</span>
+          <button class="icon-btn sm" data-action="copy" data-text="${esc(`Aktenzeichen: ${c.caseNumber}\nAktenpin: ${c.accessPin}`)}" aria-label="Kopieren">${icon('copy', 'ico-sm')}</button></div></div>`
+      : '';
+
+    const statusSeg = c.canEdit
+      ? `<div class="chip-row mb-5" role="group" aria-label="Status ändern">${Object.entries(CASE_STATUS)
+          .map(([k, [l]]) => `<button type="button" class="chip ${c.status === k ? 'active' : ''}" data-action="case-status" data-id="${c.id}" data-status="${k}">${esc(l)}</button>`)
+          .join('')}</div>`
+      : '';
+
+    const claim = c.canClaim
+      ? `<div class="banner banner-amber items-center justify-between flex-wrap"><div>${icon('alert')} Diese Akte hat noch keinen zuständigen Anwalt.</div><button class="btn-gold btn-sm" data-action="claim-case" data-id="${c.id}">Akte übernehmen</button></div>`
+      : '';
+
+    const quick = [];
+    if (staff) {
+      quick.push(`<button class="btn-outline btn-sm" data-action="new-event" data-case-id="${c.id}" data-return-case="${c.id}">${icon('calendar', 'ico-sm')}<span>Frist / Termin</span></button>`);
+      quick.push(`<button class="btn-outline btn-sm" data-action="new-invoice" data-case-id="${c.id}">${icon('receipt', 'ico-sm')}<span>Rechnung</span></button>`);
+      if (c.clientId) quick.push(`<button class="btn-outline btn-sm" data-action="compose" data-recipient="${c.clientId}" data-case-id="${c.id}" data-return-case="${c.id}">${icon('mail', 'ico-sm')}<span>Mandant anschreiben</span></button>`);
+      if (c.lawyerId === me) quick.push(`<button class="btn-ghost btn-sm" data-action="release-case" data-id="${c.id}">Akte abgeben</button>`);
+      if (admin) quick.push(`<button class="btn-danger btn-sm" data-action="delete-case" data-id="${c.id}" data-number="${esc(c.caseNumber)}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>`);
+    } else {
+      if (!c.closed) quick.push(`<button class="btn-outline btn-sm" data-action="new-event" data-case-id="${c.id}" data-return-case="${c.id}">${icon('calendar', 'ico-sm')}<span>Termin anfragen</span></button>`);
+      quick.push(`<button class="btn-outline btn-sm" data-action="compose" ${c.lawyerId ? `data-recipient="${c.lawyerId}"` : ''} data-case-id="${c.id}" data-return-case="${c.id}">${icon('mail', 'ico-sm')}<span>Nachricht zur Akte</span></button>`);
+    }
+
+    const editForm = c.canEdit
+      ? `<details class="edit-box section">
+          <summary>Akte bearbeiten</summary>
+          <form data-form="case-edit" data-id="${c.id}" class="form-grid cols-2">
+            <div class="span-2"><label class="label">Titel</label><input name="title" class="field" required minlength="3" maxlength="120" value="${esc(c.title)}"></div>
+            <div><label class="label">Rechtsgebiet</label><select name="area" class="field">${Object.entries(AREAS).map(([k, l]) => opt(k, l, c.area === k)).join('')}</select></div>
+            <div><label class="label">Dringlichkeit</label><select name="urgency" class="field">${Object.entries(URGENCY).map(([k, [l]]) => opt(k, l, c.urgency === k)).join('')}</select></div>
+            <div><label class="label">Verfahrensstand</label><select name="step" class="field">${STEPS.map((s, i) => opt(i, s, c.step === i)).join('')}</select></div>
+            ${admin ? `<div><label class="label">Zuständiger Anwalt</label><select name="lawyerId" class="field"><option value="">Nicht zugewiesen</option>${st.lawyers.map((l) => opt(l.id, l.displayName, c.lawyerId === l.id)).join('')}</select></div>` : '<div></div>'}
+            ${!c.hasClientAccount ? `<div><label class="label">Mandant</label><input name="clientName" class="field" maxlength="80" value="${esc(c.clientName === '—' ? '' : c.clientName)}"></div>` : ''}
+            <div><label class="label">Telefon Mandant</label><input name="clientPhone" class="field" maxlength="40" value="${esc(c.clientPhone || '')}"></div>
+            <div><label class="label">Gegenpartei</label><input name="opponent" class="field" maxlength="120" value="${esc(c.opponent)}"></div>
+            <div><label class="label">Gerichtsaktenzeichen</label><input name="courtRef" class="field" maxlength="60" value="${esc(c.courtRef)}"></div>
+            <div class="span-2"><label class="label">Sachverhalt</label><textarea name="description" rows="5" maxlength="4000" class="field">${esc(c.description)}</textarea></div>
+            <div class="span-2"><label class="label">Statushinweis (sichtbar für den Mandanten und in der öffentlichen Abfrage)</label><textarea name="publicNote" rows="2" maxlength="500" class="field">${esc(c.publicNote)}</textarea></div>
+            <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Änderungen speichern</span></button></div>
+          </form></details>`
+      : '';
+
+    const apptList = appointments.length
+      ? appointments.map((e) => eventRow(e)).join('')
+      : '<p class="text-sm text-dim">Keine Termine oder Fristen zu dieser Akte.</p>';
+
+    const invoiceList = invoices.length
+      ? invoices
+          .map(
+            (i) => `<div class="list-row wrap"><div class="main"><div class="title"><span class="font-mono text-gold">${esc(i.number)}</span> · ${esc(INVOICE_KIND[i.kind])}</div><div class="meta">${esc(fmtDate(i.createdAt))} · ${esc(i.issuerName)}</div></div>
+            <div class="flex items-center gap-2 shrink-0"><span class="font-mono nowrap">${money(i.total)}</span>${statusBadge(INVOICE_STATUS, i.status)}<a class="icon-btn sm" href="/invoice.html?id=${i.id}" target="_blank" rel="noopener" aria-label="Drucken / PDF">${icon('printer', 'ico-sm')}</a></div></div>`
+          )
+          .join('')
+      : '';
+
+    const noteList = notes.length
+      ? `<div class="timeline">${notes
+          .map((n) => {
+            const canDelete = !n.system && (n.authorId === me || admin);
+            return `<div class="tl-item ${n.internal ? 'tl-internal' : ''} ${n.system ? 'tl-system' : ''}">
+              <div class="tl-meta"><span class="text-muted font-medium">${esc(n.author)}</span>${n.authorRole && ROLES[n.authorRole] ? `<span>${esc(ROLES[n.authorRole])}</span>` : ''}<span>${esc(fmtDate(n.createdAt))}</span>${n.internal ? badge('intern', 'amber') : ''}
+              ${canDelete ? `<button class="ml-auto text-dim hover:text-red-300" data-action="delete-note" data-case-id="${c.id}" data-id="${n.id}" aria-label="Notiz löschen">${icon('trash', 'ico-sm')}</button>` : ''}</div>
+              <div class="tl-body">${esc(n.body)}</div></div>`;
+          })
+          .join('')}</div>`
+      : '<p class="text-sm text-dim">Noch keine Einträge.</p>';
+
+    return `
+      <div class="flex flex-wrap items-start justify-between gap-3 mb-5 pr-12">
+        <div class="min-w-0"><div class="font-mono text-gold text-sm">${esc(c.caseNumber)}</div>
+          <h2 id="modalTitle" class="font-serif text-2xl md:text-3xl font-semibold leading-tight">${esc(c.title)}</h2></div>
+        <div class="flex flex-wrap gap-2">${statusBadge(CASE_STATUS, c.status)}${c.urgency !== 'normal' ? badge(...URGENCY[c.urgency]) : ''}</div>
+      </div>
+      ${statusSeg}
+      ${track}
+      ${claim}
+      <div class="info-grid mb-5">${info}</div>
+      ${pin}
+      ${quick.length ? `<div class="form-actions mb-2">${quick.join('')}</div>` : ''}
+      ${editForm}
+      <div class="section"><h3 class="section-title">Sachverhalt</h3><p class="text-sm whitespace-pre-wrap text-muted">${esc(c.description || '—')}</p></div>
+      ${c.publicNote ? `<div class="section"><h3 class="section-title">Statushinweis</h3><div class="banner banner-gold mb-0"><p class="text-sm whitespace-pre-wrap">${esc(c.publicNote)}</p></div></div>` : ''}
+      <div class="section"><h3 class="section-title">Termine & Fristen</h3>${apptList}</div>
+      ${invoiceList ? `<div class="section"><h3 class="section-title">Rechnungen & Honorare</h3>${invoiceList}</div>` : ''}
+      <div class="section"><h3 class="section-title">Verlauf & Notizen</h3>
+        ${noteList}
+        <form data-form="add-note" data-id="${c.id}" class="mt-4 space-y-3">
+          <textarea name="body" rows="3" maxlength="4000" required class="field" placeholder="${staff ? 'Notiz, Telefonat, Beweismittel, nächster Schritt …' : 'Nachricht oder Ergänzung zu Ihrer Akte …'}" aria-label="Neue Notiz"></textarea>
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            ${staff ? '<label class="check"><input type="checkbox" name="internal" checked> Nur intern (für den Mandanten unsichtbar)</label>' : '<span></span>'}
+            <button type="submit" class="btn-outline btn-md">${icon('send', 'ico-sm')}<span>Speichern</span></button>
+          </div>
+        </form>
+      </div>`;
+  }
+
+  async function newCaseModal() {
+    const staff = isStaff();
+    if (staff) await load.lawyers();
+    openModal(`
+      <h2 class="modal-title">${staff ? 'Neue Akte anlegen' : 'Mandat einreichen'}</h2>
+      <p class="modal-sub">${staff ? 'Mandanten ohne Website-Konto einfach per Name erfassen. Die Akte wird Ihnen direkt zugewiesen.' : 'Schildern Sie Ihr Anliegen – ein Anwalt der Kanzlei meldet sich umgehend.'}</p>
+      <form data-form="new-case" class="form-grid cols-2">
+        ${staff ? `
+          <div><label class="label" for="ncName">Mandant (Name)</label><input id="ncName" name="clientName" class="field" maxlength="80" placeholder="z. B. John Doe" autofocus></div>
+          <div><label class="label" for="ncPhone">Telefon (im Spiel)</label><input id="ncPhone" name="clientPhone" class="field" maxlength="40" placeholder="555-0123"></div>
+          <div class="span-2"><label class="label" for="ncEmail">…oder E-Mail eines registrierten Mandanten (optional)</label><input id="ncEmail" name="clientEmail" type="email" class="field" placeholder="verknüpft die Akte mit dem Mandantenkonto"></div>` : ''}
+        <div class="span-2"><label class="label" for="ncTitle">Titel</label><input id="ncTitle" name="title" class="field" required minlength="3" maxlength="120" placeholder="z. B. Festnahme am Legion Square" ${staff ? '' : 'autofocus'}></div>
+        <div><label class="label">Rechtsgebiet</label><select name="area" class="field">${Object.entries(AREAS).map(([k, l]) => opt(k, l)).join('')}</select></div>
+        <div><label class="label">Dringlichkeit</label><select name="urgency" class="field">${Object.entries(URGENCY).map(([k, [l]]) => opt(k, l)).join('')}</select></div>
+        ${staff ? `<div><label class="label">Gegenpartei</label><input name="opponent" class="field" maxlength="120" placeholder="optional"></div>
+          <div><label class="label">Gerichtsaktenzeichen</label><input name="courtRef" class="field" maxlength="60" placeholder="optional"></div>` : ''}
+        ${isAdmin() ? `<div class="span-2"><label class="label">Zuständiger Anwalt</label><select name="lawyerId" class="field"><option value="">Noch niemand (offene Anfrage)</option>${st.lawyers.map((l) => opt(l.id, l.displayName + (l.rank ? ' · ' + l.rank : ''), l.id === st.user.id)).join('')}</select></div>` : ''}
+        <div class="span-2"><label class="label">Sachverhalt</label><textarea name="description" rows="5" class="field" ${staff ? '' : 'required minlength="10"'} maxlength="4000" placeholder="Was ist passiert? Wer ist beteiligt? Gibt es bereits Fristen oder Termine?"></textarea></div>
+        <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>${staff ? 'Akte anlegen' : 'Mandat einreichen'}</span></button></div>
+      </form>`);
+  }
+
+  /* ---------------------------------------------------------------- Kalender */
+  function monthStart(d) {
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  }
+
+  function calendarStaff() {
+    const m = st.cal.month;
+    const y = m.getFullYear();
+    const mo = m.getMonth();
+    const offset = (new Date(y, mo, 1).getDay() + 6) % 7; // Montag zuerst
+    const daysInMonth = new Date(y, mo + 1, 0).getDate();
+    const cells = Math.ceil((offset + daysInMonth) / 7) * 7;
+
+    const byDay = new Map();
+    st.events
+      .filter((e) => st.cal.types[e.type] && e.status !== 'abgesagt')
+      .forEach((e) => {
+        const d = parseDate(e.startsAt);
+        if (!d) return;
+        const k = dayKey(d);
+        if (!byDay.has(k)) byDay.set(k, []);
+        byDay.get(k).push(e);
+      });
+    byDay.forEach((list) => list.sort(byStart));
+
+    const todayKey = dayKey(new Date());
+    let grid = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((d) => `<div class="cal-dow">${d}</div>`).join('');
+    for (let i = 0; i < cells; i++) {
+      const d = new Date(y, mo, 1 - offset + i);
+      const k = dayKey(d);
+      const evs = byDay.get(k) || [];
+      const label = d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }) + (evs.length ? `, ${evs.length} Einträge` : '');
+      grid += `<button type="button" class="cal-day ${d.getMonth() !== mo ? 'muted' : ''} ${k === todayKey ? 'today' : ''} ${k === st.cal.selected ? 'selected' : ''}" data-action="cal-select" data-day="${k}" aria-label="${esc(label)}">
+        <span class="cal-num">${d.getDate()}</span>
+        ${evs.slice(0, 3).map((e) => `<span class="cal-ev t-${esc(e.type)} ${e.status === 'erledigt' ? 'line-through opacity-60' : ''}">${esc(fmtTime(e.startsAt))} ${esc(e.title)}</span>`).join('')}
+        ${evs.length > 3 ? `<span class="cal-more">+${evs.length - 3} weitere</span>` : ''}
+        ${evs.length ? `<span class="cal-dots">${evs.slice(0, 4).map((e) => `<i class="cal-dot" style="background:${EVENT_COLORS[e.type]}"></i>`).join('')}</span>` : ''}
+      </button>`;
+    }
+
+    const selected = byDay.get(st.cal.selected) || [];
+    const selDate = new Date(`${st.cal.selected}T12:00:00`);
+    const deadlines = st.events.filter((e) => e.type === 'frist' && e.status === 'bestaetigt').sort(byStart).slice(0, 8);
+    const requests = st.events.filter((e) => e.status === 'angefragt').sort(byStart);
+
+    return `
+      <div class="page-head">
+        <div><h1 class="page-title">Kalender & Fristen</h1><p class="page-sub">Gerichtstermine, Mandantengespräche und Fristen des ganzen Teams – mit Live-Countdown.</p></div>
+        <div class="page-actions"><button class="btn-gold btn-md" data-action="new-event" data-day="${st.cal.selected}">${icon('plus')}<span>Neuer Eintrag</span></button></div>
+      </div>
+      ${requests.length ? `<section class="panel panel-pad mb-4"><div class="panel-head"><h2 class="panel-title">Terminanfragen von Mandanten</h2>${badge(`${requests.length} offen`, 'amber')}</div>${requests.map((e) => eventRow(e)).join('')}</section>` : ''}
+      <div class="cal-layout">
+        <section class="panel panel-pad">
+          <div class="cal-toolbar">
+            <button class="icon-btn" data-action="cal-nav" data-dir="-1" aria-label="Vorheriger Monat">${icon('chevronLeft')}</button>
+            <div class="cal-month">${esc(m.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' }))}</div>
+            <button class="icon-btn" data-action="cal-nav" data-dir="1" aria-label="Nächster Monat">${icon('chevronRight')}</button>
+            <button class="btn-outline btn-sm" data-action="cal-today">Heute</button>
+          </div>
+          <div class="cal-grid">${grid}</div>
+          <div class="chip-row mt-3">${Object.entries(EVENT_TYPES)
+            .map(([k, l]) => `<button class="chip ${st.cal.types[k] ? 'active' : ''}" data-action="cal-type" data-type="${k}" aria-pressed="${st.cal.types[k]}"><i class="cal-dot" style="background:${EVENT_COLORS[k]}"></i>${esc(l)}</button>`)
+            .join('')}</div>
+        </section>
+        <aside class="stack">
+          <section id="dayAgenda" class="panel panel-pad">
+            <div class="panel-head"><h2 class="panel-title">${esc(selDate.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }))}</h2>
+              <button class="btn-outline btn-sm" data-action="new-event" data-day="${st.cal.selected}">${icon('plus', 'ico-sm')}<span>Eintrag</span></button></div>
+            ${selected.length ? selected.map((e) => eventRow(e, { date: false })).join('') : empty('Keine Einträge an diesem Tag.', 'calendar')}
+          </section>
+          <section class="panel panel-pad">
+            <div class="panel-head"><h2 class="panel-title">Offene Fristen</h2></div>
+            ${deadlines.length ? deadlines.map((e) => eventRow(e)).join('') : empty('Keine offenen Fristen.', 'clock')}
+          </section>
+        </aside>
+      </div>`;
+  }
+
+  function calendarClient() {
+    const cutoff = Date.now() - 60 * 60 * 1000;
+    const upcoming = st.events.filter((e) => parseDate(e.startsAt) >= cutoff && e.status !== 'abgesagt').sort(byStart);
+    const past = st.events.filter((e) => !upcoming.includes(e)).sort((a, b) => byStart(b, a)).slice(0, 15);
+    return `
+      <div class="page-head">
+        <div><h1 class="page-title">Termine</h1><p class="page-sub">Ihre Termine mit der Kanzlei und bei Gericht.</p></div>
+        <div class="page-actions"><button class="btn-gold btn-md" data-action="new-event">${icon('plus')}<span>Termin anfragen</span></button></div>
+      </div>
+      <section class="panel panel-pad mb-4"><div class="panel-head"><h2 class="panel-title">Anstehend</h2></div>
+        ${upcoming.length ? upcoming.map((e) => eventRow(e)).join('') : empty('Keine anstehenden Termine.', 'calendar')}</section>
+      ${past.length ? `<details class="edit-box"><summary>Vergangene & abgesagte Termine (${past.length})</summary>${past.map((e) => eventRow(e)).join('')}</details>` : ''}`;
+  }
+
+  views.calendar = {
+    async load() {
+      await Promise.all([load.events(), isStaff() ? load.cases() : null, load.lawyers()]);
+      if (!st.cal.month) st.cal.month = monthStart(new Date());
+      if (!st.cal.selected) st.cal.selected = dayKey(new Date());
+    },
+    render() {
+      return isStaff() ? calendarStaff() : calendarClient();
+    },
+  };
+
+  function eventForm(e, preset = {}) {
+    const isNew = !e;
+    const v = e || {};
+    const type = v.type || preset.type || 'gericht';
+    const start = v.startsAt ? toLocalInput(v.startsAt) : preset.day ? `${preset.day}T10:00` : '';
+    const caseId = v.caseId ?? preset.caseId ?? null;
+    const assigned = isNew ? st.user.id : v.assignedTo;
+    const visible = isNew ? ['mandant', 'gericht'].includes(type) : v.clientVisible;
+    const caseOpts = st.cases
+      .filter((c) => c.status !== 'geschlossen' || c.id === caseId)
+      .map((c) => opt(c.id, `${c.caseNumber} – ${c.title}`, c.id === caseId))
+      .join('');
+
+    const statusBtns = isNew
+      ? ''
+      : [
+          v.status === 'angefragt' ? `<button type="button" class="btn-gold btn-md" data-action="event-status" data-id="${v.id}" data-status="bestaetigt">${icon('check')}<span>Anfrage bestätigen</span></button>` : '',
+          v.type === 'frist' && v.status === 'bestaetigt' ? `<button type="button" class="btn-gold btn-md" data-action="event-status" data-id="${v.id}" data-status="erledigt">${icon('check')}<span>Frist erledigt</span></button>` : '',
+          ['abgesagt', 'erledigt'].includes(v.status)
+            ? `<button type="button" class="btn-outline btn-md" data-action="event-status" data-id="${v.id}" data-status="bestaetigt">Wieder aktivieren</button>`
+            : `<button type="button" class="btn-outline btn-md" data-action="event-status" data-id="${v.id}" data-status="abgesagt">Absagen</button>`,
+          `<button type="button" class="btn-danger btn-md" data-action="event-delete" data-id="${v.id}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>`,
+        ].join('');
+
+    return `
+      <h2 id="modalTitle" class="modal-title">${isNew ? 'Neuer Kalendereintrag' : esc(v.title)}</h2>
+      <p class="modal-sub">${isNew ? 'Gerichtstermine, Fristen, Mandantengespräche und interne Termine – mit Countdown im Dashboard und Discord-Erinnerung 24 h vorher.' : `${esc(EVENT_TYPES[v.type] || v.type)} · ${statusBadge(EVENT_STATUS, v.status)}${v.creatorName ? ' · angelegt von ' + esc(v.creatorName) : ''}${v.clientName ? ' · Mandant: ' + esc(v.clientName) : ''}`}</p>
+      ${!isNew && !['abgesagt', 'erledigt'].includes(v.status) ? `<div class="mb-4">${countdownHtml(v)}</div>` : ''}
+      <form data-form="event" data-id="${isNew ? '' : v.id}" class="form-grid cols-2">
+        <div class="span-2"><span class="label">Art</span><div class="seg">${Object.entries(EVENT_TYPES)
+          .map(([k, l]) => `<label class="seg-opt"><input type="radio" name="type" value="${k}" ${type === k ? 'checked' : ''}><span><i class="cal-dot" style="background:${EVENT_COLORS[k]}"></i>${esc(l)}</span></label>`)
+          .join('')}</div></div>
+        <div class="span-2"><label class="label" for="evTitle">Titel</label><input id="evTitle" name="title" class="field" required minlength="2" maxlength="120" value="${esc(v.title || '')}" placeholder="z. B. Hauptverhandlung Strafsache Doe" autofocus></div>
+        <div><label class="label" for="evStart">Beginn / Fälligkeit</label><input id="evStart" name="startsAt" type="datetime-local" class="field" required value="${start}"></div>
+        <div><label class="label" for="evEnd">Ende (optional)</label><input id="evEnd" name="endsAt" type="datetime-local" class="field" value="${v.endsAt ? toLocalInput(v.endsAt) : ''}"></div>
+        <div><label class="label">Akte (optional)</label><select name="caseId" class="field"><option value="">Keine Akte</option>${caseOpts}</select></div>
+        <div><label class="label">Zuständig</label><select name="assignedTo" class="field"><option value="">Niemand</option>${st.lawyers.map((l) => opt(l.id, l.displayName, l.id === assigned)).join('')}</select></div>
+        <div class="span-2"><label class="label">Ort</label><input name="location" class="field" maxlength="120" value="${esc(v.location ?? (type === 'frist' ? '' : 'Kanzlei Würfelpark'))}" placeholder="z. B. District Court, Saal 2"></div>
+        <div class="span-2"><label class="label">Notiz</label><textarea name="note" rows="3" class="field" maxlength="1000" placeholder="Vorbereitung, Unterlagen, Hinweise …">${esc(v.note || '')}</textarea></div>
+        <label class="check span-2"><input type="checkbox" name="clientVisible" ${visible ? 'checked' : ''}> Für den Mandanten im Portal sichtbar</label>
+        <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>${isNew ? 'Eintrag anlegen' : 'Speichern'}</span></button></div>
+      </form>
+      ${statusBtns ? `<div class="form-actions mt-5 pt-5" style="border-top:1px solid var(--line)">${statusBtns}</div>` : ''}`;
+  }
+
+  function eventRequestForm(caseId) {
+    const own = st.cases.filter((c) => c.status !== 'geschlossen');
+    const min = toLocalInput(new Date(Date.now() + 15 * 60 * 1000).toISOString());
+    return `
+      <h2 class="modal-title">Termin anfragen</h2>
+      <p class="modal-sub">Nennen Sie Ihren Wunschtermin – die Kanzlei bestätigt ihn oder schlägt eine Alternative vor.</p>
+      <form data-form="event-request" class="form-grid cols-2">
+        <div class="span-2"><label class="label">Anliegen</label><input name="title" class="field" required minlength="2" maxlength="120" placeholder="z. B. Beratungsgespräch" autofocus></div>
+        <div><label class="label">Wunschtermin</label><input name="startsAt" type="datetime-local" class="field" required min="${min}"></div>
+        <div><label class="label">Akte</label><select name="caseId" class="field"><option value="">Allgemeine Beratung</option>${own.map((c) => opt(c.id, `${c.caseNumber} – ${c.title}`, c.id === caseId)).join('')}</select></div>
+        <div class="span-2"><label class="label">Ort</label><input name="location" class="field" maxlength="120" value="Kanzlei Würfelpark"></div>
+        <div class="span-2"><label class="label">Notiz (optional)</label><textarea name="note" rows="3" class="field" maxlength="1000"></textarea></div>
+        <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('send', 'ico-sm')}<span>Anfrage senden</span></button></div>
+      </form>`;
+  }
+
+  function eventDetailClient(e) {
+    const canCancel = e.clientId === st.user.id && !['abgesagt', 'erledigt'].includes(e.status) && parseDate(e.startsAt) > Date.now();
+    const cell = (k, v) => `<div><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`;
+    return `
+      <h2 id="modalTitle" class="modal-title">${esc(e.title)}</h2>
+      <p class="modal-sub">${esc(EVENT_TYPES[e.type] || e.type)} · ${statusBadge(EVENT_STATUS, e.status)}</p>
+      <div class="info-grid mb-4">${cell('Datum', fmtDay(e.startsAt))}${cell('Uhrzeit', fmtTime(e.startsAt) + ' Uhr')}${cell('Ort', e.location || '—')}${e.caseNumber ? cell('Akte', e.caseNumber) : ''}${e.assignedName ? cell('Ansprechpartner', e.assignedName) : ''}</div>
+      ${!['abgesagt', 'erledigt'].includes(e.status) ? `<div class="mb-4">${countdownHtml(e)}</div>` : ''}
+      ${e.note ? `<div class="tl-item mb-4"><div class="tl-body">${esc(e.note)}</div></div>` : ''}
+      ${canCancel ? `<button class="btn-danger btn-md" data-action="event-status" data-id="${e.id}" data-status="abgesagt">Termin absagen</button>` : ''}`;
+  }
+
+  async function openEvent(id, returnCase = null) {
+    let e = st.eventCache.get(id);
+    if (!e) {
+      await load.events();
+      e = st.eventCache.get(id);
+    }
+    if (!e) throw new Error('Termin nicht gefunden.');
+    st.returnCase = returnCase;
+    if (isStaff()) {
+      await Promise.all([load.cases(), load.lawyers()]);
+      openModal(eventForm(e));
+    } else {
+      openModal(eventDetailClient(e));
+    }
+  }
+
+  /* ---------------------------------------------------------------- Kanzlei-Post */
+  function mailItem(m) {
+    const inbox = st.mailBox === 'inbox';
+    const who = inbox ? m.senderName : `An: ${m.recipientName}`;
+    const unread = inbox && !m.isRead;
+    return `<button type="button" class="mail-item ${unread ? 'unread' : ''} ${m.id === st.mailSel ? 'active' : ''}" data-action="mail-open" data-id="${m.id}">
+      <div class="from"><span>${m.priority ? '❗ ' : ''}${esc(who)}</span><span class="text-xs text-dim nowrap">${esc(shortDate(m.createdAt))}</span></div>
+      <div class="subj">${esc(m.subject || '(kein Betreff)')}${m.caseNumber ? ' · ' + esc(m.caseNumber) : ''}</div></button>`;
+  }
+  function mailReader(m) {
+    const inbox = st.mailBox === 'inbox';
+    return `
+      <button class="btn-ghost btn-sm mb-3 lg:hidden" data-action="mail-back">${icon('chevronLeft', 'ico-sm')}<span>Zurück</span></button>
+      <div class="flex flex-wrap items-center gap-2 mb-2">${m.priority ? badge('Wichtig', 'red') : ''}${m.caseNumber ? `<button class="badge badge-gold" data-action="open-case" data-id="${m.caseId}">Akte ${esc(m.caseNumber)}</button>` : ''}</div>
+      <h2 class="font-serif text-2xl md:text-3xl font-semibold leading-tight">${esc(m.subject || '(kein Betreff)')}</h2>
+      <div class="text-sm text-dim mt-2">Von <span class="text-muted">${esc(m.senderName)}</span>${m.senderRank ? ' (' + esc(m.senderRank) + ')' : ''} an <span class="text-muted">${esc(m.recipientName)}</span> · ${esc(fmtDate(m.createdAt))}</div>
+      <div class="mail-body">${esc(m.body)}</div>
+      <div class="form-actions">
+        ${inbox && m.senderId ? `<button class="btn-gold btn-md" data-action="mail-reply" data-id="${m.id}">${icon('reply', 'ico-sm')}<span>Antworten</span></button>` : ''}
+        ${inbox ? `<button class="btn-outline btn-md" data-action="mail-unread" data-id="${m.id}">Als ungelesen</button>` : ''}
+        <button class="btn-danger btn-md" data-action="mail-delete" data-id="${m.id}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>
+      </div>`;
+  }
+
+  views.mail = {
+    async load() {
+      await Promise.all([load.messages(), load.unread()]);
+    },
+    render() {
+      const inbox = st.mailBox === 'inbox';
+      const sel = st.messages.find((m) => m.id === st.mailSel) || null;
+      return `
+        <div class="page-head">
+          <div><h1 class="page-title">Kanzlei-Post</h1><p class="page-sub">${isStaff() ? 'Interne Nachrichten, Notizen und Rundschreiben im Team – und Post von Mandanten.' : 'Ihre direkte und vertrauliche Verbindung zur Kanzlei.'}</p></div>
+          <div class="page-actions">
+            ${inbox && st.unread ? `<button class="btn-outline btn-md" data-action="mail-read-all">${icon('check', 'ico-sm')}<span>Alle gelesen</span></button>` : ''}
+            <button class="btn-gold btn-md" data-action="compose">${icon('edit', 'ico-sm')}<span>Neue Nachricht</span></button>
+          </div>
+        </div>
+        <div class="chip-row mb-4">
+          <button class="chip ${inbox ? 'active' : ''}" data-action="mail-box" data-value="inbox">Posteingang${st.unread ? ` <span class="chip-count">${st.unread}</span>` : ''}</button>
+          <button class="chip ${!inbox ? 'active' : ''}" data-action="mail-box" data-value="sent">Gesendet</button>
+        </div>
+        <div class="mail-layout ${sel ? 'has-sel' : ''}">
+          <div class="panel mail-list">${st.messages.length ? st.messages.map(mailItem).join('') : empty(inbox ? 'Ihr Posteingang ist leer.' : 'Noch keine gesendeten Nachrichten.', 'mail')}</div>
+          <div class="panel mail-read">${sel ? mailReader(sel) : `<div class="empty">${icon('mail', 'ico-lg')}<p>Wählen Sie eine Nachricht aus.</p></div>`}</div>
+        </div>`;
+    },
+  };
+
+  async function composeModal(preset = {}) {
+    await Promise.all([load.contacts(), load.cases()]);
+    const staff = isStaff();
+    const team = st.contacts.filter((c) => c.role !== 'mandant');
+    const clients = st.contacts.filter((c) => c.role === 'mandant');
+    const label = (c) => c.displayName + (c.rank ? ' · ' + c.rank : c.role === 'admin' ? ' · Kanzleileitung' : '');
+    const cases = st.cases.filter((c) => c.status !== 'geschlossen' || c.id === preset.caseId);
+    openModal(`
+      <h2 class="modal-title">${preset.reply ? 'Antworten' : 'Neue Nachricht'}</h2>
+      <p class="modal-sub">${staff ? 'Nachrichten sind nur für Absender und Empfänger sichtbar. Rundschreiben gehen an alle aktiven Teammitglieder.' : 'Ihre Nachricht geht direkt an das ausgewählte Kanzleimitglied.'}</p>
+      <form data-form="compose" class="form-grid">
+        <div><label class="label" for="cmpTo">Empfänger</label>
+          <select id="cmpTo" name="recipient" class="field" required>
+            <option value="">Bitte auswählen …</option>
+            ${staff ? '<option value="broadcast">📢 Rundschreiben an das ganze Team</option>' : ''}
+            ${team.length ? `<optgroup label="Kanzlei">${team.map((c) => opt(c.id, label(c), c.id === preset.recipientId)).join('')}</optgroup>` : ''}
+            ${clients.length ? `<optgroup label="Mandanten">${clients.map((c) => opt(c.id, c.displayName, c.id === preset.recipientId)).join('')}</optgroup>` : ''}
+          </select></div>
+        <div><label class="label" for="cmpSubject">Betreff</label><input id="cmpSubject" name="subject" class="field" maxlength="150" value="${esc(preset.subject || '')}"></div>
+        <div><label class="label">Bezug zur Akte (optional)</label><select name="caseId" class="field"><option value="">Kein Aktenbezug</option>${cases.map((c) => opt(c.id, `${c.caseNumber} – ${c.title}`, c.id === preset.caseId)).join('')}</select></div>
+        <div><label class="label" for="cmpBody">Nachricht</label><textarea id="cmpBody" name="body" rows="7" class="field" required maxlength="5000" autofocus></textarea></div>
+        <label class="check"><input type="checkbox" name="priority"> Als wichtig markieren</label>
+        <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('send', 'ico-sm')}<span>Senden</span></button></div>
+      </form>`);
+  }
+
+  /* ---------------------------------------------------------------- Pinnwand */
+  function noteCard(n) {
+    const own = n.authorId === st.user.id || isAdmin();
+    return `<article class="panel board-note" style="--note:${NOTE_COLORS[n.color] || NOTE_COLORS.gold}">
+      <div class="flex items-start justify-between gap-2">
+        <h3 class="font-semibold leading-snug">${n.pinned ? '📌 ' : ''}${esc(n.title || 'Notiz')}</h3>
+        <div class="flex gap-1 shrink-0">
+          <button class="icon-btn sm" data-action="board-pin" data-id="${n.id}" title="${n.pinned ? 'Lösen' : 'Anheften'}" aria-label="${n.pinned ? 'Lösen' : 'Anheften'}" ${n.pinned ? 'style="color:var(--gold-500)"' : ''}>${icon('pin', 'ico-sm')}</button>
+          ${own ? `<button class="icon-btn sm" data-action="board-edit" data-id="${n.id}" aria-label="Bearbeiten">${icon('edit', 'ico-sm')}</button><button class="icon-btn sm" data-action="board-delete" data-id="${n.id}" aria-label="Löschen">${icon('trash', 'ico-sm')}</button>` : ''}
+        </div></div>
+      <div class="body">${esc(n.body)}</div>
+      <div class="foot"><span>${esc(n.authorName)}</span><span>${esc(fmtDate(n.updatedAt))}</span></div></article>`;
+  }
+  function noteModal(n) {
+    const v = n || { color: 'gold', pinned: false };
+    openModal(`
+      <h2 class="modal-title">${n ? 'Notiz bearbeiten' : 'Neue Notiz'}</h2>
+      <p class="modal-sub">Für das ganze Team sichtbar – ideal für Hinweise, Übergaben und To-dos.</p>
+      <form data-form="board" data-id="${n ? n.id : ''}" class="form-grid">
+        <div><label class="label">Überschrift</label><input name="title" class="field" maxlength="120" value="${esc(v.title || '')}" placeholder="z. B. Übergabe Wochenende" autofocus></div>
+        <div><label class="label">Text</label><textarea name="body" rows="6" class="field" required maxlength="4000">${esc(v.body || '')}</textarea></div>
+        <div><span class="label">Farbe</span><div class="flex gap-3">${Object.entries(NOTE_COLORS)
+          .map(([k, c]) => `<label class="color-opt" title="${k}"><input type="radio" name="color" value="${k}" ${v.color === k ? 'checked' : ''}><span class="color-dot" style="background:${c}"></span></label>`)
+          .join('')}</div></div>
+        <label class="check"><input type="checkbox" name="pinned" ${v.pinned ? 'checked' : ''}> Oben anheften (erscheint auch in der Übersicht)</label>
+        <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button></div>
+      </form>`);
+  }
+  views.board = {
+    async load() {
+      await load.board();
+    },
+    render() {
+      return `
+        <div class="page-head">
+          <div><h1 class="page-title">Team-Pinnwand</h1><p class="page-sub">Interne Notizen, Übergaben und Hinweise für die ganze Kanzlei.</p></div>
+          <div class="page-actions"><button class="btn-gold btn-md" data-action="board-new">${icon('plus')}<span>Neue Notiz</span></button></div>
+        </div>
+        ${st.board.length ? `<div class="board-grid">${st.board.map(noteCard).join('')}</div>` : `<div class="panel">${empty('Noch keine Notizen. Heften Sie die erste an!', 'pin')}</div>`}`;
+    },
+  };
+
+  /* ---------------------------------------------------------------- Rechnungen */
+  function invoiceTable(rows) {
+    const staff = isStaff();
+    if (!rows.length) return empty(st.invoices.length ? 'Keine Dokumente für diese Auswahl.' : staff ? 'Noch keine Rechnungen erstellt.' : 'Es liegen keine Rechnungen vor.', 'receipt');
+    return `<div class="tbl-wrap"><table class="tbl tbl-cards">
+      <thead><tr><th>Dokument</th><th>Empfänger</th><th>Akte</th><th style="text-align:right">Betrag</th><th>Status</th><th>Datum</th><th></th></tr></thead>
+      <tbody>${rows
+        .map(
+          (i) => `<tr>
+          <td class="td-main"><div class="font-mono text-gold text-sm">${esc(i.number)}</div><div class="text-xs text-dim">${esc(INVOICE_KIND[i.kind])}${i.subject ? ' · ' + esc(i.subject) : ''}</div></td>
+          <td data-label="Empfänger">${esc(i.clientName)}</td>
+          <td data-label="Akte">${i.caseNumber ? `<button class="text-gold font-mono text-xs hover:underline" data-action="open-case" data-id="${i.caseId}">${esc(i.caseNumber)}</button>` : '—'}</td>
+          <td data-label="Betrag" class="font-mono nowrap" style="text-align:right">${money(i.total)}</td>
+          <td data-label="Status">${statusBadge(INVOICE_STATUS, i.status)}</td>
+          <td data-label="Datum" class="text-xs text-dim nowrap">${esc(fmtDate(i.createdAt))}${i.dueDate && i.status === 'offen' ? `<div>fällig ${esc(fmtDateOnly(i.dueDate))}</div>` : ''}</td>
+          <td class="td-actions">
+            <a class="btn-outline btn-sm" href="/invoice.html?id=${i.id}" target="_blank" rel="noopener">${icon('printer', 'ico-sm')}<span>PDF / Druck</span></a>
+            ${staff && i.status === 'offen' ? `<button class="btn-gold btn-sm" data-action="inv-status" data-id="${i.id}" data-status="bezahlt">Bezahlt</button><button class="btn-ghost btn-sm" data-action="inv-status" data-id="${i.id}" data-status="storniert">Storno</button>` : ''}
+            ${staff && i.status !== 'offen' ? `<button class="btn-ghost btn-sm" data-action="inv-status" data-id="${i.id}" data-status="offen">Wieder offen</button>` : ''}
+            ${isAdmin() ? `<button class="icon-btn sm" data-action="inv-delete" data-id="${i.id}" data-number="${esc(i.number)}" aria-label="Löschen">${icon('trash', 'ico-sm')}</button>` : ''}
+          </td></tr>`
+        )
+        .join('')}</tbody></table></div>`;
+  }
+
+  views.invoices = {
+    async load() {
+      await load.invoices();
+    },
+    render() {
+      const staff = isStaff();
+      const f = st.invFilter;
+      const rows = st.invoices.filter((i) => f === 'alle' || i.status === f);
+      const sum = (s) => st.invoices.filter((i) => i.status === s).reduce((a, i) => a + i.total, 0);
+      const count = (s) => st.invoices.filter((i) => s === 'alle' || i.status === s).length;
+      return `
+        <div class="page-head">
+          <div><h1 class="page-title">${staff ? 'Rechnungen & Honorare' : 'Meine Rechnungen'}</h1>
+            <p class="page-sub">${staff ? 'Offizielle Rechnungen und Honorarvereinbarungen – als PDF speichern oder drucken.' : 'Rechnungen und Honorarvereinbarungen zu Ihren Mandaten.'}</p></div>
+          ${staff ? `<div class="page-actions"><button class="btn-gold btn-md" data-action="new-invoice">${icon('plus')}<span>Neues Dokument</span></button></div>` : ''}
+        </div>
+        ${staff ? `<div class="kpi-grid">
+          <div class="panel kpi"><div class="kpi-label">${icon('clock', 'ico-sm')}Offene Forderungen</div><div class="kpi-value">${money(sum('offen'))}</div><div class="kpi-sub">${count('offen')} offen</div></div>
+          <div class="panel kpi"><div class="kpi-label">${icon('check', 'ico-sm')}Bezahlt</div><div class="kpi-value">${money(sum('bezahlt'))}</div><div class="kpi-sub">${count('bezahlt')} Dokument(e)</div></div>
+        </div>` : ''}
+        <div class="chip-row mb-4">${[['alle', 'Alle'], ['offen', 'Offen'], ['bezahlt', 'Bezahlt'], ['storniert', 'Storniert']]
+          .map(([k, l]) => `<button class="chip ${f === k ? 'active' : ''}" data-action="inv-filter" data-value="${k}">${l} <span class="chip-count">${count(k)}</span></button>`)
+          .join('')}</div>
+        <div class="panel p-2 md:p-3">${invoiceTable(rows)}</div>`;
+    },
+  };
+
+  /* ---------------------------------------------------------------- Rechnungs-/Honorar-Generator */
+  function newDraft(caseId = null) {
+    const d = {
+      kind: 'rechnung',
+      caseId,
+      clientName: '',
+      clientContact: '',
+      subject: '',
+      items: [],
+      discountPct: 0,
+      surchargePct: 0,
+      dueDate: dayKey(new Date(Date.now() + 7 * 864e5)),
+      notes: '',
+    };
+    applyCaseToDraft(d, caseId, true);
+    return d;
+  }
+  function applyCaseToDraft(d, caseId, force = false) {
+    const c = caseId ? st.cases.find((x) => x.id === caseId) : null;
+    if (!c) return;
+    if (force || !d.clientName) d.clientName = c.clientName === '—' ? '' : c.clientName;
+    if (force || !d.clientContact) d.clientContact = c.clientPhone || c.clientEmail || '';
+    if (force || !d.subject) d.subject = `Mandat ${c.caseNumber} – ${c.title}`.slice(0, 200);
+  }
+  function clampPct(n) {
+    const v = Number(n);
+    return Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : 0;
+  }
+  function draftTotals(d) {
+    const subtotal = d.items.reduce((s, it) => s + (Math.max(1, Math.round(Number(it.quantity) || 1))) * Math.max(0, Math.round(Number(it.unitPrice) || 0)), 0);
+    const dp = clampPct(d.discountPct);
+    const sp = clampPct(d.surchargePct);
+    const discount = Math.round((subtotal * dp) / 100);
+    const surcharge = Math.round(((subtotal - discount) * sp) / 100);
+    return { subtotal, discount, surcharge, total: subtotal - discount + surcharge, dp, sp };
+  }
+  function itemRowHtml(it, i) {
+    return `<div class="item-row">
+      <input class="field item-desc" data-item="description" data-index="${i}" value="${esc(it.description)}" placeholder="Leistung / Beschreibung" maxlength="200" aria-label="Leistung">
+      <input class="field item-qty" data-item="quantity" data-index="${i}" type="number" inputmode="numeric" min="1" max="999" step="1" value="${esc(it.quantity)}" aria-label="Menge">
+      <input class="field item-price" data-item="unitPrice" data-index="${i}" type="number" inputmode="numeric" min="0" step="1" value="${esc(it.unitPrice)}" aria-label="Einzelpreis in Dollar">
+      <div class="item-total" data-item-total="${i}">${money((Number(it.quantity) || 0) * (Number(it.unitPrice) || 0))}</div>
+      <button type="button" class="icon-btn sm item-remove" data-action="inv-remove-item" data-index="${i}" aria-label="Position entfernen">${icon('x', 'ico-sm')}</button></div>`;
+  }
+  function summaryHtml() {
+    const d = st.draft;
+    const t = draftTotals(d);
+    return `
+      <h2 class="panel-title mb-3">${esc(INVOICE_KIND[d.kind])}</h2>
+      <div class="sum-row"><span class="text-muted">Positionen</span><span class="v">${d.items.length}</span></div>
+      <div class="sum-row"><span class="text-muted">Zwischensumme</span><span class="v">${money(t.subtotal)}</span></div>
+      ${t.dp ? `<div class="sum-row" style="color:#6ee7b7"><span>Rabatt (${fmtPct(t.dp)} %)</span><span class="v">− ${money(t.discount)}</span></div>` : ''}
+      ${t.sp ? `<div class="sum-row" style="color:#fcd34d"><span>Zuschlag (${fmtPct(t.sp)} %)</span><span class="v">+ ${money(t.surcharge)}</span></div>` : ''}
+      <div class="sum-row sum-total"><span class="font-semibold">Gesamtbetrag</span><span class="v">${money(t.total)}</span></div>
+      <p class="form-hint mb-4">Nach dem Erstellen öffnet sich die Druckansicht – dort „Als PDF speichern“ wählen.</p>
+      <button type="submit" class="btn-gold btn-lg btn-block">${icon('check')}<span>Dokument erstellen</span></button>
+      <a href="#invoices" class="btn-ghost btn-md btn-block mt-2">Abbrechen</a>`;
+  }
+  function updateInvoiceSummary() {
+    const box = $('#invSummary');
+    if (box) box.innerHTML = summaryHtml();
+    st.draft.items.forEach((it, i) => {
+      const el = $(`[data-item-total="${i}"]`);
+      if (el) el.textContent = money((Number(it.quantity) || 0) * (Number(it.unitPrice) || 0));
+    });
+  }
+
+  views['invoice-new'] = {
+    async load() {
+      await Promise.all([load.fees(), load.cases()]);
+      if (!st.draft) st.draft = newDraft();
+    },
+    render() {
+      const d = st.draft;
+      const feeOpts = Object.entries(FEE_CATEGORIES)
+        .map(([cat, label]) => {
+          const list = st.fees.filter((f) => f.category === cat);
+          return list.length ? `<optgroup label="${esc(label)}">${list.map((f) => opt(f.id, `${f.name} – ${money(f.price)}`)).join('')}</optgroup>` : '';
+        })
+        .join('');
+      const hv = d.kind === 'honorarvereinbarung';
+      return `
+        <div class="page-head">
+          <div><a href="#invoices" class="text-sm text-dim hover:text-white inline-flex items-center gap-1">${icon('chevronLeft', 'ico-sm')}Rechnungen</a>
+            <h1 class="page-title mt-1">Rechnung / Honorar erstellen</h1>
+            <p class="page-sub">Positionen aus der Honorarordnung übernehmen oder frei erfassen – Summen werden live berechnet.</p></div>
+        </div>
+        <form id="invoiceForm" data-form="invoice" class="inv-layout" novalidate>
+          <div class="stack">
+            <section class="panel panel-pad">
+              <div class="seg mb-4">
+                <label class="seg-opt"><input type="radio" name="kind" value="rechnung" ${!hv ? 'checked' : ''}><span>${icon('receipt', 'ico-sm')}Rechnung</span></label>
+                <label class="seg-opt"><input type="radio" name="kind" value="honorarvereinbarung" ${hv ? 'checked' : ''}><span>${icon('scale', 'ico-sm')}Honorarvereinbarung</span></label>
+              </div>
+              <div class="form-grid cols-2">
+                <div class="span-2"><label class="label">Akte (optional)</label><select name="caseId" class="field"><option value="">Ohne Aktenbezug</option>${st.cases.map((c) => opt(c.id, `${c.caseNumber} – ${c.title}`, c.id === d.caseId)).join('')}</select></div>
+                <div><label class="label">Empfänger / Mandant</label><input name="clientName" class="field" required maxlength="120" value="${esc(d.clientName)}" placeholder="Name des Mandanten"></div>
+                <div><label class="label">Kontakt (Telefon / E-Mail)</label><input name="clientContact" class="field" maxlength="120" value="${esc(d.clientContact)}" placeholder="optional"></div>
+                <div class="span-2"><label class="label">Betreff / Leistungsgegenstand</label><input name="subject" class="field" maxlength="200" value="${esc(d.subject)}" placeholder="z. B. Strafverteidigung – Verfahren wegen …"></div>
+              </div>
+            </section>
+            <section class="panel panel-pad">
+              <div class="panel-head"><h2 class="panel-title">Positionen</h2></div>
+              <div class="flex flex-col sm:flex-row gap-2 mb-4">
+                <select id="feePicker" class="field" aria-label="Leistung aus der Honorarordnung">${feeOpts || '<option value="">Honorarordnung ist leer</option>'}</select>
+                <button type="button" class="btn-outline btn-md" data-action="inv-add-fee">${icon('plus', 'ico-sm')}<span>Übernehmen</span></button>
+                <button type="button" class="btn-ghost btn-md" data-action="inv-add-item">${icon('edit', 'ico-sm')}<span>Freie Position</span></button>
+              </div>
+              <div class="item-head"><span>Leistung</span><span>Menge</span><span>Einzelpreis ($)</span><span style="text-align:right">Summe</span><span></span></div>
+              <div id="invItems">${d.items.length ? d.items.map(itemRowHtml).join('') : '<p class="text-sm text-dim py-4">Noch keine Positionen – übernehmen Sie eine Leistung aus der Honorarordnung.</p>'}</div>
+            </section>
+            <section class="panel panel-pad">
+              <div class="form-grid cols-2">
+                <div><label class="label">Rabatt in %</label><input name="discountPct" type="number" inputmode="decimal" min="0" max="100" step="0.5" class="field" value="${esc(d.discountPct)}">
+                  <div class="chip-row mt-2"><button type="button" class="chip" data-action="inv-preset" data-field="discountPct" data-value="10">Mandatsbündel 10 %</button><button type="button" class="chip" data-action="inv-preset" data-field="discountPct" data-value="0">Kein Rabatt</button></div></div>
+                <div><label class="label">Zuschlag in %</label><input name="surchargePct" type="number" inputmode="decimal" min="0" max="100" step="0.5" class="field" value="${esc(d.surchargePct)}">
+                  <div class="chip-row mt-2"><button type="button" class="chip" data-action="inv-preset" data-field="surchargePct" data-value="15">Priorisiert +15 %</button><button type="button" class="chip" data-action="inv-preset" data-field="surchargePct" data-value="0">Kein Zuschlag</button></div></div>
+                <div><label class="label">Zahlbar bis</label><input name="dueDate" type="date" class="field" value="${esc(d.dueDate || '')}"></div>
+                <div class="span-2"><label class="label">${hv ? 'Vereinbarungstext / Bedingungen' : 'Anmerkungen'}</label>
+                  <textarea name="notes" rows="4" class="field" maxlength="3000" placeholder="${hv ? 'z. B. Die Vergütung ist als Vorschuss vor Aufnahme der Tätigkeit fällig. Zusätzliche Termine werden gesondert berechnet.' : 'z. B. Vielen Dank für Ihr Vertrauen.'}">${esc(d.notes)}</textarea></div>
+              </div>
+            </section>
+          </div>
+          <aside id="invSummary" class="panel panel-pad inv-summary">${summaryHtml()}</aside>
+        </form>`;
+    },
+  };
+
+  function onInvoiceInput(t) {
+    const d = st.draft;
+    if (!d) return;
+    if (t.dataset.item) {
+      const it = d.items[Number(t.dataset.index)];
+      if (!it) return;
+      it[t.dataset.item] = t.dataset.item === 'description' ? t.value : t.value === '' ? '' : Number(t.value);
+    } else if (['clientName', 'clientContact', 'subject', 'notes', 'dueDate'].includes(t.name)) {
+      d[t.name] = t.value;
+    } else if (t.name === 'discountPct' || t.name === 'surchargePct') {
+      d[t.name] = t.value === '' ? 0 : Number(t.value);
+    }
+    updateInvoiceSummary();
+  }
+  function onInvoiceChange(t) {
+    const d = st.draft;
+    if (!d) return;
+    if (t.name === 'kind') {
+      d.kind = t.value;
+      renderView();
+    } else if (t.name === 'caseId') {
+      d.caseId = t.value ? Number(t.value) : null;
+      applyCaseToDraft(d, d.caseId);
+      renderView();
+    } else {
+      onInvoiceInput(t);
+    }
+  }
+
+  /* ---------------------------------------------------------------- Team-Verwaltung */
+  function memberCard(m, i, total) {
+    const account = m.userId
+      ? `${badge(m.userActive ? 'Login aktiv' : 'Login gesperrt', m.userActive ? 'emerald' : 'red')}<span class="text-xs text-dim">${esc(m.userEmail || '')} · ${esc(ROLES[m.userRole] || '')}</span>`
+      : badge('Kein Login-Konto', 'slate');
+    return `<div class="panel member-card">
+      <span class="avatar lg ${m.tier === 'leitung' ? '' : 'slate'}">${esc(m.initials)}</span>
+      <div class="body">
+        <div class="flex flex-wrap items-center gap-2"><h3 class="font-serif text-xl font-semibold">${esc(m.name)}</h3>${m.visible ? '' : badge('Auf Website ausgeblendet', 'amber')}</div>
+        <div class="text-xs uppercase tracking-widest text-gold mt-0.5">${esc(m.roleTitle)} · ${m.tier === 'leitung' ? 'Board of Partners' : 'Associate Attorneys'}</div>
+        ${m.description ? `<p class="text-sm text-muted mt-2">${esc(m.description)}</p>` : ''}
+        <div class="flex flex-wrap items-center gap-2 mt-3">${account}</div>
+      </div>
+      <div class="actions">
+        <button class="icon-btn sm" data-action="team-move" data-id="${m.id}" data-dir="-1" ${i === 0 ? 'disabled' : ''} aria-label="Nach oben">${icon('chevronUp', 'ico-sm')}</button>
+        <button class="icon-btn sm" data-action="team-move" data-id="${m.id}" data-dir="1" ${i === total - 1 ? 'disabled' : ''} aria-label="Nach unten">${icon('chevronDown', 'ico-sm')}</button>
+        <button class="btn-outline btn-sm" data-action="team-edit" data-id="${m.id}">${icon('edit', 'ico-sm')}<span>Bearbeiten</span></button>
+        <button class="icon-btn sm" data-action="team-delete" data-id="${m.id}" aria-label="Entfernen">${icon('trash', 'ico-sm')}</button>
+      </div></div>`;
+  }
+
+  function memberModal(m) {
+    const isNew = !m;
+    const v = m || { tier: 'anwalt', visible: true };
+    const linkable = st.users.filter((u) => u.role !== 'mandant' && !st.team.some((t) => t.userId === u.id));
+    const accountBlock =
+      m && m.userId
+        ? `<p class="text-sm mb-3">Verknüpft mit <strong>${esc(m.userEmail)}</strong> (${esc(ROLES[m.userRole] || '')}). Name und Rang werden automatisch ins Konto übernommen.</p>
+           <label class="check"><input type="checkbox" name="unlink"> Verknüpfung lösen (das Login-Konto selbst bleibt bestehen)</label>`
+        : `<div class="seg mb-3">
+             <label class="seg-opt"><input type="radio" name="accountMode" value="none" checked><span>Kein Konto</span></label>
+             ${linkable.length ? '<label class="seg-opt"><input type="radio" name="accountMode" value="link"><span>Bestehendes verknüpfen</span></label>' : ''}
+             <label class="seg-opt"><input type="radio" name="accountMode" value="create"><span>Neues Login-Konto</span></label>
+           </div>
+           <div data-account-pane="link" class="hidden"><select name="userId" class="field"><option value="">Konto wählen …</option>${linkable.map((u) => opt(u.id, `${u.displayName} (${u.email})`)).join('')}</select></div>
+           <div data-account-pane="create" class="hidden">
+             <div class="form-grid cols-2">
+               <div><label class="label">E-Mail (Login)</label><input name="accountEmail" type="email" class="field" placeholder="vorname.nachname@pake-scha.ls"></div>
+               <div><label class="label">Rolle</label><select name="accountRole" class="field">${opt('anwalt', 'Anwalt')}${opt('admin', 'Kanzleileitung (Admin)')}</select></div>
+             </div>
+             <p class="form-hint">Es wird ein Einmal-Passwort erzeugt und nach dem Speichern angezeigt.</p>
+           </div>`;
+    openModal(`
+      <h2 class="modal-title">${isNew ? 'Teammitglied hinzufügen' : 'Teammitglied bearbeiten'}</h2>
+      <p class="modal-sub">Änderungen erscheinen sofort im Bereich „Unser Team“ auf der Website.</p>
+      <form data-form="team" data-id="${m ? m.id : ''}" class="form-grid cols-2">
+        <div class="span-2"><label class="label" for="tmName">Name</label><input id="tmName" name="name" class="field" required minlength="2" maxlength="80" value="${esc(v.name || '')}" placeholder="z. B. Dr. jur. Damat Lex" autofocus></div>
+        <div><label class="label" for="tmRank">Rang / Titel</label><input id="tmRank" name="roleTitle" class="field" list="rankList" required minlength="2" maxlength="80" value="${esc(v.roleTitle || '')}" placeholder="z. B. Senior Associate">
+          <datalist id="rankList">${RANKS.map((r) => `<option value="${esc(r)}"></option>`).join('')}</datalist></div>
+        <div><label class="label" for="tmTier">Ebene auf der Website</label><select id="tmTier" name="tier" class="field">${opt('leitung', 'Board of Partners (gold)', v.tier === 'leitung')}${opt('anwalt', 'Associate Attorneys', v.tier !== 'leitung')}</select></div>
+        <div class="span-2"><label class="label" for="tmDesc">Kurzbeschreibung</label><textarea id="tmDesc" name="description" class="field" rows="3" maxlength="400" placeholder="Schwerpunkte, Zuständigkeiten …">${esc(v.description || '')}</textarea></div>
+        <div><label class="label" for="tmInit">Initialen</label><input id="tmInit" name="initials" class="field" maxlength="5" value="${esc(v.initials || '')}" placeholder="automatisch"></div>
+        <div class="flex items-end pb-2"><label class="check"><input type="checkbox" name="visible" ${v.visible ? 'checked' : ''}> Auf der Website anzeigen</label></div>
+        <fieldset class="span-2 rounded-2xl p-4" style="border:1px solid var(--glass-border);background:rgba(15,23,42,.35)">
+          <legend class="label px-1 mb-0">Login-Konto fürs Dashboard</legend>${accountBlock}
+        </fieldset>
+        <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>${isNew ? 'Hinzufügen' : 'Speichern'}</span></button><button type="button" class="btn-ghost btn-md" data-action="close-modal">Abbrechen</button></div>
+      </form>`);
+  }
+
+  views.team = {
+    async load() {
+      const [t, u] = await Promise.all([api.get('/api/admin/team'), api.get('/api/admin/users')]);
+      st.team = t.team;
+      st.users = u.users;
+    },
+    render() {
+      return `
+        <div class="page-head">
+          <div><h1 class="page-title">Team-Verwaltung</h1><p class="page-sub">Teammitglieder hinzufügen, umbenennen, Ränge ändern oder entfernen – live auf der Website.</p></div>
+          <div class="page-actions"><a href="/#team" target="_blank" rel="noopener" class="btn-outline btn-md">${icon('globe', 'ico-sm')}<span>Website ansehen</span></a><button class="btn-gold btn-md" data-action="team-new">${icon('plus')}<span>Mitglied hinzufügen</span></button></div>
+        </div>
+        ${st.team.length ? `<div class="stack">${st.team.map((m, i) => memberCard(m, i, st.team.length)).join('')}</div>` : `<div class="panel">${empty('Noch keine Teammitglieder.', 'users')}</div>`}`;
+    },
+  };
+
+  /* ---------------------------------------------------------------- Benutzer */
+  function userTable() {
+    const q = st.userQuery.trim().toLowerCase();
+    const f = st.userFilter;
+    const rows = st.users.filter(
+      (u) =>
+        (f === 'alle' || (f === 'team' ? u.role !== 'mandant' : f === 'mandanten' ? u.role === 'mandant' : !u.active)) &&
+        (!q || `${u.displayName} ${u.email} ${u.rank || ''}`.toLowerCase().includes(q))
+    );
+    if (!rows.length) return empty('Keine Benutzer gefunden.', 'users');
+    return `<div class="tbl-wrap"><table class="tbl tbl-cards">
+      <thead><tr><th>Name</th><th>Rolle</th><th>Rang</th><th>Discord</th><th>Letzter Login</th><th></th></tr></thead>
+      <tbody>${rows
+        .map((u) => {
+          const self = u.id === st.user.id;
+          return `<tr>
+            <td class="td-main"><div class="font-medium flex flex-wrap items-center gap-2">${esc(u.displayName)}${self ? badge('Sie', 'gold') : ''}${!u.active ? badge('Gesperrt', 'red') : ''}${u.mustChangePassword ? badge('Einmal-Passwort', 'amber') : ''}</div>
+              <div class="text-xs text-dim">${esc(u.email)}${u.phone ? ' · ' + esc(u.phone) : ''}</div></td>
+            <td data-label="Rolle"><select class="field" style="min-width:150px" data-user-field="role" data-id="${u.id}" ${self ? 'disabled' : ''} aria-label="Rolle">${Object.entries(ROLES).map(([k, l]) => opt(k, l, u.role === k)).join('')}</select></td>
+            <td data-label="Rang"><input class="field" style="min-width:150px" data-user-field="rank" data-id="${u.id}" maxlength="60" list="rankListUsers" value="${esc(u.rank || '')}" placeholder="—" aria-label="Rang"></td>
+            <td data-label="Discord" class="text-sm">${u.discordUsername ? esc(u.discordUsername) : '<span class="text-dim">—</span>'}</td>
+            <td data-label="Letzter Login" class="text-xs text-dim nowrap">${esc(fmtDate(u.lastLoginAt))}</td>
+            <td class="td-actions">${
+              self
+                ? ''
+                : `<button class="btn-outline btn-sm" data-action="user-reset" data-id="${u.id}" title="Einmal-Passwort erzeugen">${icon('key', 'ico-sm')}<span>Passwort</span></button>
+                   <button class="btn-ghost btn-sm" data-action="user-toggle" data-id="${u.id}">${u.active ? 'Sperren' : 'Entsperren'}</button>
+                   <button class="icon-btn sm" data-action="user-delete" data-id="${u.id}" aria-label="Löschen">${icon('trash', 'ico-sm')}</button>`
+            }</td></tr>`;
+        })
+        .join('')}</tbody></table></div>
+      <datalist id="rankListUsers">${RANKS.map((r) => `<option value="${esc(r)}"></option>`).join('')}</datalist>`;
+  }
+
+  views.users = {
+    async load() {
+      st.users = (await api.get('/api/admin/users')).users;
+    },
+    render() {
+      const count = (f) => st.users.filter((u) => f === 'alle' || (f === 'team' ? u.role !== 'mandant' : f === 'mandanten' ? u.role === 'mandant' : !u.active)).length;
+      return `
+        <div class="page-head">
+          <div><h1 class="page-title">Benutzer & Zugänge</h1><p class="page-sub">Rollen vergeben, Konten sperren und vergessene Passwörter per Klick zurücksetzen – ganz ohne Shell.</p></div>
+          <div class="page-actions"><button class="btn-gold btn-md" data-action="user-new">${icon('plus')}<span>Konto anlegen</span></button></div>
+        </div>
+        <div class="toolbar">
+          <label class="search">${icon('search')}<input id="userSearch" class="field" type="search" placeholder="Name oder E-Mail …" value="${esc(st.userQuery)}" aria-label="Benutzer suchen"></label>
+          <div class="chip-row">${[['alle', 'Alle'], ['team', 'Team'], ['mandanten', 'Mandanten'], ['gesperrt', 'Gesperrt']]
+            .map(([k, l]) => `<button class="chip ${st.userFilter === k ? 'active' : ''}" data-action="user-filter" data-value="${k}">${l} <span class="chip-count">${count(k)}</span></button>`)
+            .join('')}</div>
+        </div>
+        <div id="userList" class="panel p-2 md:p-3">${userTable()}</div>`;
+    },
+  };
+
+  async function updateUserField(t) {
+    const id = Number(t.dataset.id);
+    const field = t.dataset.userField;
+    const value = field === 'rank' ? t.value.trim() || null : t.value;
+    if (field === 'role' && !confirm(`Rolle wirklich auf „${ROLES[value]}“ ändern? Das Konto wird dabei abgemeldet.`)) {
+      $('#userList').innerHTML = userTable();
+      return;
+    }
+    try {
+      await api.patch('/api/admin/users/' + id, { [field]: value });
+      toast('Gespeichert.');
+    } finally {
+      await views.users.load();
+      if (st.view === 'users') $('#userList').innerHTML = userTable();
+    }
+  }
+
+  /* ---------------------------------------------------------------- Honorarordnung */
+  function feeModal(f, category) {
+    const v = f || { category: category || 'rechtsberatung', inCalculator: true, active: true, price: 0 };
+    openModal(`
+      <h2 class="modal-title">${f ? 'Leistung bearbeiten' : 'Neue Leistung'}</h2>
+      <p class="modal-sub">Erscheint sofort in der Honorarordnung, im Tarifrechner der Website und im Rechnungs-Generator.</p>
+      <form data-form="fee" data-id="${f ? f.id : ''}" class="form-grid cols-2">
+        <div class="span-2"><label class="label">Bezeichnung</label><input name="name" class="field" required minlength="2" maxlength="120" value="${esc(v.name || '')}" autofocus></div>
+        <div><label class="label">Kategorie</label><select name="category" class="field">${Object.entries(FEE_CATEGORIES).map(([k, l]) => opt(k, l, v.category === k)).join('')}</select></div>
+        <div><label class="label">Preis ($)</label><input name="price" type="number" inputmode="numeric" min="0" step="1" required class="field" value="${esc(v.price)}"></div>
+        <div class="span-2"><label class="label">Beschreibung</label><textarea name="description" rows="3" maxlength="400" class="field">${esc(v.description || '')}</textarea></div>
+        <div><label class="label">Reihenfolge</label><input name="sortOrder" type="number" min="0" step="1" class="field" value="${esc(v.sortOrder ?? '')}" placeholder="automatisch"></div>
+        <div class="flex flex-col justify-end gap-2 pb-1">
+          <label class="check"><input type="checkbox" name="inCalculator" ${v.inCalculator ? 'checked' : ''}> Im Tarifrechner anbieten</label>
+          <label class="check"><input type="checkbox" name="active" ${v.active ? 'checked' : ''}> Auf der Website anzeigen</label>
+        </div>
+        <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button></div>
+      </form>`);
+  }
+  views.fees = {
+    async load() {
+      st.adminFees = (await api.get('/api/admin/fees')).fees;
+    },
+    render() {
+      return `
+        <div class="page-head">
+          <div><h1 class="page-title">Honorarordnung</h1><p class="page-sub">Preise und Leistungen pflegen – die Website und der Tarifrechner übernehmen Änderungen sofort.</p></div>
+          <div class="page-actions"><a href="/#honorar" target="_blank" rel="noopener" class="btn-outline btn-md">${icon('globe', 'ico-sm')}<span>Website ansehen</span></a><button class="btn-gold btn-md" data-action="fee-new">${icon('plus')}<span>Leistung hinzufügen</span></button></div>
+        </div>
+        ${Object.entries(FEE_CATEGORIES)
+          .map(([cat, label]) => {
+            const rows = st.adminFees.filter((f) => f.category === cat);
+            return `<section class="panel panel-pad mb-4">
+              <div class="panel-head"><h2 class="panel-title">${esc(label)}</h2><button class="btn-ghost btn-sm" data-action="fee-new" data-category="${cat}">${icon('plus', 'ico-sm')}<span>Leistung</span></button></div>
+              ${rows.length
+                ? rows
+                    .map(
+                      (f) => `<div class="list-row wrap"><div class="main"><div class="title">${esc(f.name)} ${!f.active ? badge('Ausgeblendet', 'slate') : ''} ${f.inCalculator ? badge('Tarifrechner', 'sky') : ''}</div><div class="meta">${esc(f.description)}</div></div>
+                      <div class="flex items-center gap-2 shrink-0"><span class="font-mono text-gold nowrap">${money(f.price)}</span>
+                      <button class="icon-btn sm" data-action="fee-edit" data-id="${f.id}" aria-label="Bearbeiten">${icon('edit', 'ico-sm')}</button>
+                      <button class="icon-btn sm" data-action="fee-delete" data-id="${f.id}" aria-label="Löschen">${icon('trash', 'ico-sm')}</button></div></div>`
+                    )
+                    .join('')
+                : '<p class="text-sm text-dim py-2">Keine Leistungen in dieser Kategorie.</p>'}
+            </section>`;
+          })
+          .join('')}`;
+    },
+  };
+
+  /* ---------------------------------------------------------------- Einstellungen */
+  views.settings = {
+    async load() {
+      st.settings = (await api.get('/api/admin/settings')).settings;
+    },
+    render() {
+      const s = st.settings;
+      return `
+        <div class="page-head"><div><h1 class="page-title">Einstellungen</h1><p class="page-sub">Discord-Anbindung, Rechnungsdaten und Notfall-Zugang.</p></div></div>
+        <div class="grid-2">
+          <section class="panel panel-pad">
+            <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${DISCORD_ICON} Discord-Webhook</h2>${s.discordWebhookActive ? badge('Aktiv', 'emerald') : badge('Nicht verbunden', 'slate')}</div>
+            <p class="text-sm text-muted mb-4">Wichtige Kanzlei-Updates (neue Mandate, Fristen, Terminanfragen …) automatisch in einen Discord-Kanal senden. In Discord: Kanal → Einstellungen → Integrationen → Webhooks → „Neuer Webhook“ → URL kopieren.</p>
+            <form data-form="settings-discord" class="form-grid">
+              <div><label class="label">Webhook-URL</label><input name="webhook" class="field font-mono text-xs" value="${esc(s.discordWebhookUrl)}" placeholder="https://discord.com/api/webhooks/…" autocomplete="off">
+                ${s.discordWebhookFromEnv ? '<p class="form-hint">Aktuell wird die URL aus der Umgebungsvariable DISCORD_WEBHOOK_URL verwendet.</p>' : ''}</div>
+              <div><span class="label">Ereignisse</span><div>${Object.entries(s.availableEvents)
+                .map(([k, l]) => `<label class="check mb-2"><input type="checkbox" name="events" value="${esc(k)}" ${s.discordEvents.includes(k) ? 'checked' : ''}> ${esc(l)}</label>`)
+                .join('')}</div></div>
+              <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button>
+                <button type="button" class="btn-outline btn-md" data-action="discord-test" ${s.discordWebhookActive ? '' : 'disabled'}>${icon('send', 'ico-sm')}<span>Testnachricht</span></button></div>
+            </form>
+          </section>
+          <div class="stack">
+            <section class="panel panel-pad">
+              <div class="panel-head"><h2 class="panel-title">Discord-Login</h2>${s.discordOAuthConfigured ? badge('Eingerichtet', 'emerald') : badge('Nicht eingerichtet', 'slate')}</div>
+              <p class="text-sm text-muted">Teammitglieder und Mandanten können ihr Discord-Konto im Profil verknüpfen und sich danach per Discord anmelden. Verknüpfte Anwälte werden bei Fristen und Zuweisungen im Kanal erwähnt.</p>
+              ${s.discordOAuthConfigured ? '' : `<ol class="text-sm text-muted list-decimal pl-5 mt-3 space-y-1">
+                <li>discord.com/developers/applications → „New Application“</li>
+                <li>OAuth2 → Redirect hinzufügen: <code class="font-mono text-gold text-xs break-all">${esc(location.origin)}/api/discord/callback</code></li>
+                <li>In Render unter „Environment“ setzen: <code class="font-mono text-xs">DISCORD_CLIENT_ID</code>, <code class="font-mono text-xs">DISCORD_CLIENT_SECRET</code> – danach neu deployen.</li></ol>`}
+            </section>
+            <section class="panel panel-pad">
+              <div class="panel-head"><h2 class="panel-title">Notfall-Zugang</h2></div>
+              <p class="text-sm text-muted">Passwort vergessen und kein Admin mehr erreichbar? In Render unter „Environment“ die Variable <code class="font-mono text-gold text-xs">ADMIN_RESET_PASSWORD</code> (mind. 10 Zeichen) setzen und neu deployen. Das Konto der Kanzleileitung erhält dieses Passwort. Danach die Variable wieder entfernen.</p>
+              <p class="text-sm text-muted mt-2">Gibt es gar keinen aktiven Admin mehr, stellt der Server das Konto von Dr. Alois Pake beim Start automatisch wieder her (Passwort im Render-Log bzw. aus <code class="font-mono text-xs">ADMIN_PASSWORD</code>).</p>
+            </section>
+          </div>
+        </div>
+        <section class="panel panel-pad mt-4 lg:mt-5">
+          <div class="panel-head"><h2 class="panel-title">Rechnungsdaten der Kanzlei</h2></div>
+          <form data-form="settings-firm" class="form-grid cols-2">
+            <div><label class="label">Anschrift (Briefkopf)</label><textarea name="firmAddress" rows="3" maxlength="300" class="field">${esc(s.firmAddress)}</textarea></div>
+            <div><label class="label">Zahlungshinweis</label><textarea name="firmPaymentInfo" rows="3" maxlength="300" class="field">${esc(s.firmPaymentInfo)}</textarea></div>
+            <div><label class="label">Kontakt</label><input name="firmContact" maxlength="120" class="field" value="${esc(s.firmContact)}"></div>
+            <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button></div>
+          </form>
+        </section>`;
+    },
+  };
+
+  /* ---------------------------------------------------------------- Profil */
+  views.profile = {
+    async load() {
+      const [me, ds] = await Promise.all([api.get('/api/auth/me'), api.get('/api/discord/status')]);
+      st.user = me.user;
+      st.discordOAuth = ds.oauth;
+      renderUser();
+    },
+    render() {
+      const u = st.user;
+      const discord = u.discord
+        ? `<div class="flex items-center gap-3 mb-4"><span class="avatar lg">${avatarInner(u)}</span><div><div class="font-semibold">${esc(u.discord.username || 'Discord-Konto')}</div><div class="text-xs text-dim">Verbunden · Anmeldung per Discord möglich</div></div></div>
+           <button class="btn-outline btn-md" data-action="discord-unlink">Verbindung trennen</button>`
+        : st.discordOAuth
+          ? `<p class="text-sm text-muted mb-4">Verbinden Sie Ihr Discord-Konto, um sich künftig mit einem Klick anzumelden${isStaff() ? ' und bei Fristen oder neuen Akten im Kanzlei-Discord erwähnt zu werden' : ''}.</p>
+             <a class="btn-discord btn-md" href="/api/discord/connect">${DISCORD_ICON}<span>Mit Discord verbinden</span></a>`
+          : '<p class="text-sm text-muted">Die Kanzleileitung hat die Discord-Anmeldung noch nicht eingerichtet.</p>';
+      return `
+        ${u.mustChangePassword ? `<div class="banner banner-amber">${icon('alert')}<div><strong>Bitte jetzt ein eigenes Passwort festlegen.</strong> Ihr aktuelles Passwort wurde automatisch erzeugt oder von der Kanzleileitung zurückgesetzt.</div></div>` : ''}
+        <div class="page-head"><div><h1 class="page-title">Mein Profil</h1><p class="page-sub">Kontaktdaten, Passwort und Discord-Verknüpfung.</p></div></div>
+        <div class="grid-2">
+          <section class="panel panel-pad">
+            <div class="flex items-center gap-4 mb-5"><span class="avatar xl">${avatarInner(u)}</span>
+              <div class="min-w-0"><div class="font-serif text-2xl font-semibold">${esc(u.displayName)}</div><div class="text-sm text-gold">${esc(u.rank || ROLES[u.role])}</div><div class="text-xs text-dim break-all">${esc(u.email)}</div></div></div>
+            <form data-form="profile" class="form-grid">
+              ${u.role === 'mandant' ? `<div><label class="label">Name</label><input name="displayName" class="field" required minlength="2" maxlength="80" value="${esc(u.displayName)}"></div>` : ''}
+              <div><label class="label">Telefon (im Spiel)</label><input name="phone" class="field" maxlength="40" value="${esc(u.phone || '')}" placeholder="555-0123"></div>
+              <div class="form-actions"><button type="submit" class="btn-outline btn-md">Speichern</button></div>
+            </form>
+          </section>
+          <form data-form="password" class="panel panel-pad form-grid" ${u.mustChangePassword ? 'style="border-color:rgba(245,158,11,.5)"' : ''}>
+            <h2 class="panel-title">Passwort ändern</h2>
+            <div><label class="label" for="pwOld">Aktuelles Passwort</label><input id="pwOld" name="currentPassword" type="password" autocomplete="current-password" required class="field"></div>
+            <div><label class="label" for="pwNew">Neues Passwort (mind. 10 Zeichen)</label><input id="pwNew" name="newPassword" type="password" autocomplete="new-password" minlength="10" required class="field"></div>
+            <div><label class="label" for="pwNew2">Neues Passwort wiederholen</label><input id="pwNew2" name="newPassword2" type="password" autocomplete="new-password" required class="field"></div>
+            <div class="form-actions"><button class="btn-gold btn-md" type="submit">${icon('key', 'ico-sm')}<span>Passwort speichern</span></button></div>
+          </form>
+          <section class="panel panel-pad">
+            <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${DISCORD_ICON} Discord</h2>${u.discord ? badge('Verbunden', 'emerald') : ''}</div>
+            ${discord}
+          </section>
+        </div>`;
+    },
+  };
+
+  /* ================================================================
+     Aktionen (Klicks)
+     ================================================================ */
+  const actions = {
+    'open-sidebar': openSidebar,
+    'close-sidebar': closeSidebar,
+    'close-modal': closeModal,
+    'reload-view': () => go(st.view),
+    logout: async () => {
+      await api.post('/api/auth/logout');
+      location.href = '/login.html';
+    },
+    copy: async (el) => {
+      const ok = await copy(el.dataset.text || '');
+      toast(ok ? 'In die Zwischenablage kopiert.' : 'Kopieren nicht möglich – bitte manuell markieren.', ok ? 'ok' : 'error');
+    },
+
+    // Akten
+    'case-filter': (el) => {
+      st.caseFilter = el.dataset.value;
+      renderView();
+    },
+    'case-mine': () => {
+      st.caseMine = !st.caseMine;
+      renderView();
+    },
+    'new-case': newCaseModal,
+    'open-case': (el) => openCase(Number(el.dataset.id)),
+    'case-status': async (el) => {
+      const id = Number(el.dataset.id);
+      await api.patch('/api/cases/' + id, { status: el.dataset.status });
+      toast(`Status: ${CASE_STATUS[el.dataset.status][0]}`);
+      await reloadCase(id);
+    },
+    'claim-case': async (el) => {
+      const id = Number(el.dataset.id);
+      await api.patch('/api/cases/' + id, { lawyerId: st.user.id });
+      toast('Akte übernommen – sie liegt jetzt bei Ihnen.');
+      if (st.modalCaseId === id) await reloadCase(id);
+      else await refreshBehind();
+    },
+    'release-case': async (el) => {
+      if (!confirm('Möchten Sie diese Akte wirklich abgeben? Sie erscheint dann wieder als offene Anfrage.')) return;
+      const id = Number(el.dataset.id);
+      await api.patch('/api/cases/' + id, { lawyerId: null });
+      toast('Akte abgegeben.');
+      await reloadCase(id);
+    },
+    'delete-case': async (el) => {
+      if (!confirm(`Akte ${el.dataset.number} endgültig löschen? Notizen werden mitgelöscht, Termine und Rechnungen verlieren den Aktenbezug.`)) return;
+      await api.del('/api/cases/' + el.dataset.id);
+      toast('Akte gelöscht.');
+      closeModal();
+      await refreshBehind();
+    },
+    'delete-note': async (el) => {
+      if (!confirm('Diese Notiz löschen?')) return;
+      const caseId = Number(el.dataset.caseId);
+      await api.del(`/api/cases/${caseId}/notes/${el.dataset.id}`);
+      await reloadCase(caseId);
+    },
+
+    // Kalender
+    'new-event': async (el) => {
+      st.returnCase = el.dataset.returnCase ? Number(el.dataset.returnCase) : null;
+      const caseId = el.dataset.caseId ? Number(el.dataset.caseId) : null;
+      await load.cases();
+      if (isStaff()) {
+        await load.lawyers();
+        openModal(eventForm(null, { caseId, day: el.dataset.day || null }));
+      } else {
+        openModal(eventRequestForm(caseId));
+      }
+    },
+    'open-event': (el) => openEvent(Number(el.dataset.id), st.modalCaseId),
+    'event-status': async (el) => {
+      await api.patch('/api/calendar/' + el.dataset.id, { status: el.dataset.status });
+      toast({ bestaetigt: 'Termin bestätigt.', abgesagt: 'Termin abgesagt.', erledigt: 'Frist als erledigt markiert.' }[el.dataset.status] || 'Gespeichert.');
+      await returnOrClose();
+    },
+    'event-delete': async (el) => {
+      if (!confirm('Diesen Eintrag endgültig löschen?')) return;
+      await api.del('/api/calendar/' + el.dataset.id);
+      st.eventCache.delete(Number(el.dataset.id));
+      toast('Eintrag gelöscht.');
+      await returnOrClose();
+    },
+    'cal-nav': (el) => {
+      const m = st.cal.month;
+      st.cal.month = new Date(m.getFullYear(), m.getMonth() + Number(el.dataset.dir), 1);
+      renderView();
+    },
+    'cal-today': () => {
+      st.cal.month = monthStart(new Date());
+      st.cal.selected = dayKey(new Date());
+      renderView();
+    },
+    'cal-select': (el) => {
+      st.cal.selected = el.dataset.day;
+      const d = new Date(`${el.dataset.day}T12:00:00`);
+      if (d.getMonth() !== st.cal.month.getMonth()) st.cal.month = monthStart(d);
+      renderView();
+      if (window.matchMedia('(max-width: 1279px)').matches) $('#dayAgenda')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    },
+    'cal-type': (el) => {
+      st.cal.types[el.dataset.type] = !st.cal.types[el.dataset.type];
+      renderView();
+    },
+
+    // Kanzlei-Post
+    compose: async (el) => {
+      st.returnCase = el.dataset.returnCase ? Number(el.dataset.returnCase) : null;
+      await composeModal({
+        recipientId: el.dataset.recipient ? Number(el.dataset.recipient) : null,
+        caseId: el.dataset.caseId ? Number(el.dataset.caseId) : null,
+      });
+    },
+    'mail-box': async (el) => {
+      st.mailBox = el.dataset.value;
+      st.mailSel = null;
+      await load.messages();
+      renderView();
+    },
+    'mail-open': async (el) => {
+      const m = st.messages.find((x) => x.id === Number(el.dataset.id));
+      if (!m) return;
+      st.mailSel = m.id;
+      if (st.mailBox === 'inbox' && !m.isRead) {
+        m.isRead = true;
+        st.unread = Math.max(0, st.unread - 1);
+        api.patch('/api/messages/' + m.id, { isRead: true }).catch(() => {});
+      }
+      renderView();
+      if (window.matchMedia('(max-width: 1023px)').matches) window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    'mail-back': () => {
+      st.mailSel = null;
+      renderView();
+    },
+    'mail-reply': async (el) => {
+      const m = st.messages.find((x) => x.id === Number(el.dataset.id));
+      if (!m) return;
+      st.returnCase = null;
+      await composeModal({ recipientId: m.senderId, caseId: m.caseId, subject: m.subject.startsWith('Re:') ? m.subject : `Re: ${m.subject}`.trim(), reply: true });
+    },
+    'mail-unread': async (el) => {
+      const m = st.messages.find((x) => x.id === Number(el.dataset.id));
+      await api.patch('/api/messages/' + el.dataset.id, { isRead: false });
+      if (m) m.isRead = false;
+      st.unread += 1;
+      st.mailSel = null;
+      renderView();
+    },
+    'mail-delete': async (el) => {
+      if (!confirm('Diese Nachricht löschen?')) return;
+      await api.del('/api/messages/' + el.dataset.id);
+      st.mailSel = null;
+      toast('Nachricht gelöscht.');
+      await refreshBehind();
+    },
+    'mail-read-all': async () => {
+      await api.post('/api/messages/read-all');
+      await refreshBehind();
+    },
+
+    // Pinnwand
+    'board-new': () => noteModal(null),
+    'board-edit': (el) => noteModal(st.board.find((n) => n.id === Number(el.dataset.id))),
+    'board-pin': async (el) => {
+      const n = st.board.find((x) => x.id === Number(el.dataset.id));
+      if (!n) return;
+      await api.patch('/api/board/' + n.id, { pinned: !n.pinned });
+      await refreshBehind();
+    },
+    'board-delete': async (el) => {
+      if (!confirm('Diese Notiz von der Pinnwand entfernen?')) return;
+      await api.del('/api/board/' + el.dataset.id);
+      toast('Notiz entfernt.');
+      await refreshBehind();
+    },
+
+    // Rechnungen
+    'inv-filter': (el) => {
+      st.invFilter = el.dataset.value;
+      renderView();
+    },
+    'new-invoice': async (el) => {
+      await load.cases();
+      st.draft = newDraft(el.dataset.caseId ? Number(el.dataset.caseId) : null);
+      await navigate('invoice-new');
+    },
+    'inv-add-fee': () => {
+      const id = Number($('#feePicker')?.value);
+      const fee = st.fees.find((f) => f.id === id);
+      if (!fee) return;
+      st.draft.items.push({ description: fee.name, quantity: 1, unitPrice: fee.price });
+      renderView();
+    },
+    'inv-add-item': () => {
+      st.draft.items.push({ description: '', quantity: 1, unitPrice: 0 });
+      renderView();
+      const inputs = $$('.item-desc');
+      inputs[inputs.length - 1]?.focus();
+    },
+    'inv-remove-item': (el) => {
+      st.draft.items.splice(Number(el.dataset.index), 1);
+      renderView();
+    },
+    'inv-preset': (el) => {
+      st.draft[el.dataset.field] = Number(el.dataset.value);
+      const input = $(`#invoiceForm [name="${el.dataset.field}"]`);
+      if (input) input.value = el.dataset.value;
+      updateInvoiceSummary();
+    },
+    'inv-status': async (el) => {
+      await api.patch('/api/invoices/' + el.dataset.id, { status: el.dataset.status });
+      toast({ bezahlt: 'Als bezahlt markiert.', storniert: 'Dokument storniert.', offen: 'Wieder als offen markiert.' }[el.dataset.status]);
+      await refreshBehind();
+    },
+    'inv-delete': async (el) => {
+      if (!confirm(`Dokument ${el.dataset.number} endgültig löschen? (Stornieren ist meist die bessere Wahl.)`)) return;
+      await api.del('/api/invoices/' + el.dataset.id);
+      toast('Dokument gelöscht.');
+      await refreshBehind();
+    },
+
+    // Team
+    'team-new': () => memberModal(null),
+    'team-edit': (el) => memberModal(st.team.find((m) => m.id === Number(el.dataset.id))),
+    'team-move': async (el) => {
+      const ids = st.team.map((t) => t.id);
+      const i = ids.indexOf(Number(el.dataset.id));
+      const j = i + Number(el.dataset.dir);
+      if (i < 0 || j < 0 || j >= ids.length) return;
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+      await api.post('/api/admin/team/reorder', { ids });
+      await refreshBehind();
+    },
+    'team-delete': (el) => {
+      const m = st.team.find((x) => x.id === Number(el.dataset.id));
+      if (!m) return;
+      const canLock = m.userId && m.userId !== st.user.id && m.userActive;
+      openModal(`
+        <h2 class="modal-title">Profil entfernen?</h2>
+        <p class="modal-sub"><strong>${esc(m.name)}</strong> wird sofort aus dem Bereich „Unser Team“ der Website entfernt.</p>
+        <form data-form="team-delete" data-id="${m.id}" class="form-grid">
+          ${canLock ? `<label class="check"><input type="checkbox" name="lock"> Zugehöriges Login-Konto (${esc(m.userEmail)}) ebenfalls sperren</label>` : ''}
+          <div class="form-actions"><button type="submit" class="btn-danger btn-md">${icon('trash', 'ico-sm')}<span>Endgültig entfernen</span></button><button type="button" class="btn-ghost btn-md" data-action="close-modal">Abbrechen</button></div>
+        </form>`);
+    },
+
+    // Benutzer
+    'user-filter': (el) => {
+      st.userFilter = el.dataset.value;
+      renderView();
+    },
+    'user-new': () => {
+      openModal(`
+        <h2 class="modal-title">Konto anlegen</h2>
+        <p class="modal-sub">Es wird ein Einmal-Passwort erzeugt. Für Teammitglieder mit Website-Profil besser unter „Team“ anlegen.</p>
+        <form data-form="user-new" class="form-grid cols-2">
+          <div class="span-2"><label class="label">Name</label><input name="displayName" class="field" required minlength="2" maxlength="80" autofocus></div>
+          <div class="span-2"><label class="label">E-Mail (Login)</label><input name="email" type="email" class="field" required maxlength="120"></div>
+          <div><label class="label">Rolle</label><select name="role" class="field">${Object.entries(ROLES).map(([k, l]) => opt(k, l, k === 'anwalt')).join('')}</select></div>
+          <div><label class="label">Rang (optional)</label><input name="rank" class="field" maxlength="60" list="rankListNew"><datalist id="rankListNew">${RANKS.map((r) => `<option value="${esc(r)}"></option>`).join('')}</datalist></div>
+          <div class="span-2"><label class="label">Telefon (optional)</label><input name="phone" class="field" maxlength="40"></div>
+          <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Konto anlegen</span></button></div>
+        </form>`);
+    },
+    'user-reset': async (el) => {
+      const u = st.users.find((x) => x.id === Number(el.dataset.id));
+      if (!u || !confirm(`Neues Einmal-Passwort für ${u.displayName} erzeugen? Das bisherige Passwort wird sofort ungültig.`)) return;
+      const res = await api.post(`/api/admin/users/${u.id}/reset-password`);
+      showCredentials(res.credentials, u.displayName);
+      refreshBehind();
+    },
+    'user-toggle': async (el) => {
+      const u = st.users.find((x) => x.id === Number(el.dataset.id));
+      if (!u) return;
+      if (u.active && !confirm(`${u.displayName} sperren? Das Konto wird sofort abgemeldet.`)) return;
+      await api.patch('/api/admin/users/' + u.id, { active: !u.active });
+      toast(u.active ? 'Konto gesperrt.' : 'Konto entsperrt.');
+      await refreshBehind();
+    },
+    'user-delete': async (el) => {
+      const u = st.users.find((x) => x.id === Number(el.dataset.id));
+      if (!u || !confirm(`Konto von ${u.displayName} endgültig löschen? Akten bleiben erhalten, das Konto verschwindet.`)) return;
+      await api.del('/api/admin/users/' + u.id);
+      toast('Konto gelöscht.');
+      await refreshBehind();
+    },
+
+    // Honorarordnung
+    'fee-new': (el) => feeModal(null, el.dataset.category),
+    'fee-edit': (el) => feeModal(st.adminFees.find((f) => f.id === Number(el.dataset.id))),
+    'fee-delete': async (el) => {
+      const f = st.adminFees.find((x) => x.id === Number(el.dataset.id));
+      if (!f || !confirm(`„${f.name}“ aus der Honorarordnung löschen?`)) return;
+      await api.del('/api/admin/fees/' + f.id);
+      toast('Leistung gelöscht.');
+      await refreshBehind();
+    },
+
+    // Einstellungen & Profil
+    'discord-test': async () => {
+      await api.post('/api/admin/discord/test');
+      toast('Testnachricht an Discord gesendet.');
+    },
+    'discord-unlink': async () => {
+      if (!confirm('Discord-Verbindung wirklich trennen?')) return;
+      const res = await api.post('/api/discord/unlink');
+      st.user = res.user;
+      renderUser();
+      renderView();
+      toast('Discord-Verbindung getrennt.');
+    },
+  };
+
+  /* ================================================================
+     Formulare
+     ================================================================ */
+  const forms = {
+    'new-case': async (f) => {
+      const fd = new FormData(f);
+      const body = { title: val(fd, 'title'), area: val(fd, 'area'), urgency: val(fd, 'urgency'), description: val(fd, 'description') };
+      if (isStaff()) {
+        if (val(fd, 'clientEmail')) body.clientEmail = val(fd, 'clientEmail');
+        else if (!val(fd, 'clientName')) throw new Error('Bitte den Namen des Mandanten oder die E-Mail eines Mandantenkontos angeben.');
+        ['clientName', 'clientPhone', 'opponent', 'courtRef'].forEach((k) => {
+          if (val(fd, k)) body[k] = val(fd, k);
+        });
+        if (f.elements.lawyerId) body.lawyerId = val(fd, 'lawyerId') ? Number(val(fd, 'lawyerId')) : null;
+      }
+      const res = await api.post('/api/cases', body);
+      toast(`Akte ${res.case.caseNumber} angelegt.`);
+      st.caseFilter = 'aktiv';
+      await navigate('cases');
+      await openCase(res.case.id);
+    },
+    'case-edit': async (f) => {
+      const fd = new FormData(f);
+      const id = Number(f.dataset.id);
+      const body = {};
+      ['title', 'area', 'urgency', 'clientName', 'clientPhone', 'opponent', 'courtRef', 'description', 'publicNote'].forEach((k) => {
+        if (f.elements[k]) body[k] = val(fd, k);
+      });
+      if (f.elements.step) body.step = Number(fd.get('step'));
+      if (f.elements.lawyerId) body.lawyerId = fd.get('lawyerId') ? Number(fd.get('lawyerId')) : null;
+      await api.patch('/api/cases/' + id, body);
+      toast('Akte gespeichert.');
+      await reloadCase(id);
+    },
+    'add-note': async (f) => {
+      const fd = new FormData(f);
+      const id = Number(f.dataset.id);
+      await api.post(`/api/cases/${id}/notes`, { body: val(fd, 'body'), internal: fd.get('internal') === 'on' });
+      toast('Eintrag gespeichert.');
+      await reloadCase(id);
+    },
+    event: async (f) => {
+      const fd = new FormData(f);
+      const id = f.dataset.id ? Number(f.dataset.id) : null;
+      if (!fd.get('startsAt')) throw new Error('Bitte Datum und Uhrzeit angeben.');
+      const body = {
+        type: val(fd, 'type'),
+        title: val(fd, 'title'),
+        startsAt: new Date(fd.get('startsAt')).toISOString(),
+        endsAt: fd.get('endsAt') ? new Date(fd.get('endsAt')).toISOString() : null,
+        location: val(fd, 'location'),
+        note: val(fd, 'note'),
+        caseId: fd.get('caseId') ? Number(fd.get('caseId')) : null,
+        assignedTo: fd.get('assignedTo') ? Number(fd.get('assignedTo')) : null,
+        clientVisible: fd.get('clientVisible') === 'on',
+      };
+      if (id) await api.patch('/api/calendar/' + id, body);
+      else await api.post('/api/calendar', body);
+      toast(id ? 'Eintrag gespeichert.' : 'Eintrag angelegt.');
+      await returnOrClose();
+    },
+    'event-request': async (f) => {
+      const fd = new FormData(f);
+      if (!fd.get('startsAt')) throw new Error('Bitte einen Wunschtermin angeben.');
+      const body = { title: val(fd, 'title'), startsAt: new Date(fd.get('startsAt')).toISOString(), location: val(fd, 'location'), note: val(fd, 'note') };
+      if (fd.get('caseId')) body.caseId = Number(fd.get('caseId'));
+      await api.post('/api/calendar', body);
+      toast('Terminanfrage gesendet – die Kanzlei bestätigt Ihren Termin.');
+      await returnOrClose();
+    },
+    compose: async (f) => {
+      const fd = new FormData(f);
+      const recipient = val(fd, 'recipient');
+      if (!recipient) throw new Error('Bitte einen Empfänger auswählen.');
+      const body = { subject: val(fd, 'subject'), body: val(fd, 'body'), priority: fd.get('priority') === 'on' };
+      if (recipient === 'broadcast') body.broadcast = true;
+      else body.recipientId = Number(recipient);
+      if (fd.get('caseId')) body.caseId = Number(fd.get('caseId'));
+      const res = await api.post('/api/messages', body);
+      toast(res.sent > 1 ? `Rundschreiben an ${res.sent} Teammitglieder versendet.` : 'Nachricht gesendet.');
+      if (st.view === 'mail' && !st.returnCase) {
+        st.mailBox = 'sent';
+        st.mailSel = null;
+      }
+      await returnOrClose();
+    },
+    board: async (f) => {
+      const fd = new FormData(f);
+      const id = f.dataset.id ? Number(f.dataset.id) : null;
+      const body = { title: val(fd, 'title'), body: val(fd, 'body'), color: val(fd, 'color') || 'gold', pinned: fd.get('pinned') === 'on' };
+      if (id) await api.patch('/api/board/' + id, body);
+      else await api.post('/api/board', body);
+      toast('Notiz gespeichert.');
+      closeModal();
+      await refreshBehind();
+    },
+    invoice: async () => {
+      const d = st.draft;
+      const items = d.items
+        .map((it) => ({ description: String(it.description || '').trim(), quantity: Math.max(1, Math.round(Number(it.quantity) || 1)), unitPrice: Math.max(0, Math.round(Number(it.unitPrice) || 0)) }))
+        .filter((it) => it.description);
+      if (!items.length) throw new Error('Bitte mindestens eine Position mit Bezeichnung erfassen.');
+      if (!d.clientName.trim()) throw new Error('Bitte den Empfänger angeben.');
+      const res = await api.post('/api/invoices', {
+        kind: d.kind,
+        caseId: d.caseId || null,
+        clientName: d.clientName.trim(),
+        clientContact: d.clientContact.trim(),
+        subject: d.subject.trim(),
+        items,
+        discountPct: clampPct(d.discountPct),
+        surchargePct: clampPct(d.surchargePct),
+        dueDate: d.dueDate || null,
+        notes: d.notes.trim(),
+      });
+      st.draft = null;
+      const inv = res.invoice;
+      await navigate('invoices');
+      openModal(`
+        <h2 class="modal-title">${esc(INVOICE_KIND[inv.kind])} erstellt</h2>
+        <p class="modal-sub">Nummer <span class="font-mono text-gold">${esc(inv.number)}</span> über <strong>${money(inv.total)}</strong> an ${esc(inv.clientName)}.</p>
+        <div class="form-actions">
+          <a class="btn-gold btn-md" href="/invoice.html?id=${inv.id}" target="_blank" rel="noopener">${icon('printer', 'ico-sm')}<span>Drucken / Als PDF speichern</span></a>
+          <button class="btn-ghost btn-md" data-action="close-modal">Schließen</button>
+        </div>`);
+    },
+    team: async (f) => {
+      const fd = new FormData(f);
+      const id = f.dataset.id ? Number(f.dataset.id) : null;
+      const body = {
+        name: val(fd, 'name'),
+        roleTitle: val(fd, 'roleTitle'),
+        tier: val(fd, 'tier'),
+        description: val(fd, 'description'),
+        initials: val(fd, 'initials'),
+        visible: fd.get('visible') === 'on',
+      };
+      const mode = fd.get('accountMode');
+      if (mode === 'link') {
+        const userId = Number(fd.get('userId'));
+        if (!userId) throw new Error('Bitte ein Konto zum Verknüpfen auswählen.');
+        body.userId = userId;
+      } else if (mode === 'create') {
+        const email = val(fd, 'accountEmail');
+        if (!email) throw new Error('Bitte eine E-Mail-Adresse für das Login-Konto angeben.');
+        body.createAccount = { email, role: val(fd, 'accountRole') };
+      }
+      if (fd.get('unlink') === 'on') body.userId = null;
+      const res = id ? await api.patch('/api/admin/team/' + id, body) : await api.post('/api/admin/team', body);
+      toast(id ? 'Gespeichert – live auf der Website.' : 'Hinzugefügt – live auf der Website.');
+      st.lawyers = [];
+      st.contacts = null;
+      if (res.credentials) showCredentials(res.credentials, body.name);
+      else closeModal();
+      await refreshBehind();
+    },
+    'team-delete': async (f) => {
+      const fd = new FormData(f);
+      const res = await api.del(`/api/admin/team/${f.dataset.id}${fd.get('lock') === 'on' ? '?lockAccount=1' : ''}`);
+      toast(res.accountLocked ? 'Profil entfernt und Login-Konto gesperrt.' : 'Profil entfernt.');
+      closeModal();
+      await refreshBehind();
+    },
+    'user-new': async (f) => {
+      const fd = new FormData(f);
+      const body = { displayName: val(fd, 'displayName'), email: val(fd, 'email'), role: val(fd, 'role') };
+      if (val(fd, 'rank')) body.rank = val(fd, 'rank');
+      if (val(fd, 'phone')) body.phone = val(fd, 'phone');
+      const res = await api.post('/api/admin/users', body);
+      st.lawyers = [];
+      st.contacts = null;
+      showCredentials(res.credentials, body.displayName);
+      await refreshBehind();
+    },
+    fee: async (f) => {
+      const fd = new FormData(f);
+      const id = f.dataset.id ? Number(f.dataset.id) : null;
+      const body = {
+        name: val(fd, 'name'),
+        category: val(fd, 'category'),
+        price: Math.max(0, Math.round(Number(fd.get('price')) || 0)),
+        description: val(fd, 'description'),
+        inCalculator: fd.get('inCalculator') === 'on',
+        active: fd.get('active') === 'on',
+      };
+      if (val(fd, 'sortOrder') !== '') body.sortOrder = Math.max(0, Math.round(Number(fd.get('sortOrder')) || 0));
+      if (id) await api.patch('/api/admin/fees/' + id, body);
+      else await api.post('/api/admin/fees', body);
+      toast('Honorarordnung aktualisiert – live auf der Website.');
+      closeModal();
+      await refreshBehind();
+    },
+    'settings-discord': async (f) => {
+      const fd = new FormData(f);
+      const events = $$('input[name="events"]:checked', f).map((i) => i.value);
+      const res = await api.patch('/api/admin/settings', { discordWebhookUrl: val(fd, 'webhook'), discordEvents: events });
+      st.settings = res.settings;
+      toast('Discord-Einstellungen gespeichert.');
+      renderView();
+    },
+    'settings-firm': async (f) => {
+      const fd = new FormData(f);
+      const res = await api.patch('/api/admin/settings', { firmAddress: val(fd, 'firmAddress'), firmPaymentInfo: val(fd, 'firmPaymentInfo'), firmContact: val(fd, 'firmContact') });
+      st.settings = res.settings;
+      toast('Rechnungsdaten gespeichert.');
+    },
+    profile: async (f) => {
+      const fd = new FormData(f);
+      const body = { phone: val(fd, 'phone') };
+      if (f.elements.displayName) body.displayName = val(fd, 'displayName');
+      const res = await api.patch('/api/auth/profile', body);
+      st.user = res.user;
+      renderUser();
+      toast('Profil gespeichert.');
+    },
+    password: async (f) => {
+      const fd = new FormData(f);
+      if (fd.get('newPassword') !== fd.get('newPassword2')) throw new Error('Die beiden neuen Passwörter stimmen nicht überein.');
+      await api.post('/api/auth/change-password', { currentPassword: fd.get('currentPassword'), newPassword: fd.get('newPassword') });
+      st.user.mustChangePassword = false;
+      toast('Passwort geändert. Andere Geräte wurden abgemeldet.');
+      renderView();
+    },
+  };
+
+  /* ================================================================
+     Ereignisse
+     ================================================================ */
+  document.addEventListener('click', (e) => {
+    if (e.target === $('#modal')) {
+      closeModal();
+      return;
+    }
+    const link = e.target.closest('a[href^="#"]');
+    if (link && !link.dataset.action && link.getAttribute('href') === location.hash) {
+      e.preventDefault();
+      go(hashView());
+      return;
+    }
+    const el = e.target.closest('[data-action]');
+    if (!el || el.disabled) return;
+    const fn = actions[el.dataset.action];
+    if (!fn) return;
+    e.preventDefault();
+    guard(() => fn(el, e));
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if ($('#modal').classList.contains('open')) closeModal();
+      else closeSidebar();
+    }
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[role="button"][data-action]')) {
+      e.preventDefault();
+      e.target.click();
+    }
+    // Enter in einem Eingabefeld des Generators soll nicht versehentlich die Rechnung erstellen.
+    if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.closest('#invoiceForm')) e.preventDefault();
+  });
+
+  document.addEventListener('submit', (e) => {
+    const f = e.target.closest('form[data-form]');
+    if (!f || !forms[f.dataset.form]) return;
+    e.preventDefault();
+    const buttons = $$('button[type="submit"]', f);
+    buttons.forEach((b) => (b.disabled = true));
+    guard(() => forms[f.dataset.form](f)).finally(() => buttons.forEach((b) => b.isConnected && (b.disabled = false)));
+  });
+
+  document.addEventListener('input', (e) => {
+    const t = e.target;
+    if (t.id === 'caseSearch') {
+      st.caseQuery = t.value;
+      $('#caseList').innerHTML = caseTable();
+    } else if (t.id === 'userSearch') {
+      st.userQuery = t.value;
+      $('#userList').innerHTML = userTable();
+    } else if (t.closest('#invoiceForm') && t.type !== 'radio' && t.tagName !== 'SELECT') {
+      onInvoiceInput(t);
+    }
+  });
+
+  document.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t.closest('#invoiceForm')) {
+      onInvoiceChange(t);
+      return;
+    }
+    if (t.name === 'accountMode') {
+      $$('[data-account-pane]').forEach((p) => p.classList.toggle('hidden', p.dataset.accountPane !== t.value));
+      return;
+    }
+    if (t.name === 'type' && t.form && t.form.dataset.form === 'event' && !t.form.dataset.id && t.form.elements.clientVisible) {
+      t.form.elements.clientVisible.checked = ['mandant', 'gericht'].includes(t.value);
+      return;
+    }
+    if (t.dataset.userField) guard(() => updateUserField(t));
+  });
+
+  window.addEventListener('hashchange', () => go(hashView()));
+
+  // Ungelesene Post regelmäßig aktualisieren (Badge in Navigation)
+  setInterval(() => {
+    if (document.hidden || !st.user) return;
+    load
+      .unread()
+      .then(renderNav)
+      .catch(() => {});
+  }, 30000);
+
+  /* ================================================================
+     Start
+     ================================================================ */
+  (async function start() {
+    try {
+      st.user = (await api.get('/api/auth/me')).user;
+    } catch {
+      location.href = '/login.html?next=' + encodeURIComponent('/dashboard.html' + location.hash);
+      return;
+    }
+    renderUser();
+
+    const params = new URLSearchParams(location.search);
+    const discordState = params.get('discord');
+    const caseParam = Number(params.get('case'));
+    if (discordState || params.has('case')) history.replaceState(null, '', location.pathname + location.hash);
+    if (discordState && DISCORD_MSG[discordState]) toast(...DISCORD_MSG[discordState]);
+
+    try {
+      await load.unread();
+    } catch {
+      /* Badge ist nicht kritisch */
+    }
+    await go(hashView());
+    if (Number.isInteger(caseParam) && caseParam > 0) guard(() => openCase(caseParam));
+  })();
+})();

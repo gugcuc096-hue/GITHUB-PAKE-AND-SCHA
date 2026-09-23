@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dokument | Pake & Scha Legal Consulting</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root { --gold: #b8962e; --ink: #0f172a; --muted: #55607a; --line: #e5e1d3; }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: #02050e; color: var(--ink); font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+        .toolbar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background: rgba(2, 5, 14, 0.95); border-bottom: 1px solid rgba(255, 255, 255, 0.12); color: #f8fafc; }
+        .toolbar .hint { font-size: 0.8rem; color: #8a96b3; }
+        .toolbar .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .btn { display: inline-flex; align-items: center; gap: 0.4rem; border-radius: 999px; padding: 0.6rem 1.1rem; font: 600 0.85rem 'Inter', sans-serif; cursor: pointer; text-decoration: none; border: 1px solid rgba(212, 175, 55, 0.45); color: #f8fafc; background: rgba(255, 255, 255, 0.05); }
+        .btn.gold { background: linear-gradient(135deg, #d4af37, #b8962e); color: #02050e; border: 0; }
+        .wrap { padding: 1.5rem 0.75rem 3rem; }
+        .paper { background: #fff; max-width: 210mm; margin: 0 auto; padding: 18mm 16mm; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6); border-radius: 4px; position: relative; overflow: hidden; }
+        .paper::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 5px; background: linear-gradient(90deg, #d4af37, #b8962e); }
+        .head { display: flex; justify-content: space-between; gap: 1.5rem; align-items: flex-start; border-bottom: 1px solid var(--line); padding-bottom: 1.25rem; }
+        .brand { display: flex; gap: 0.85rem; align-items: center; }
+        .mark { width: 54px; height: 54px; border: 1.5px solid var(--gold); border-radius: 12px; display: flex; align-items: center; justify-content: center; font: 700 1.35rem 'Cormorant Garamond', serif; color: var(--gold); }
+        .firm { font: 600 1.6rem 'Cormorant Garamond', serif; line-height: 1.1; }
+        .tag { font-size: 0.62rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); margin-top: 2px; }
+        .addr { font-size: 0.78rem; color: var(--muted); text-align: right; white-space: pre-line; line-height: 1.5; }
+        .title { margin: 1.75rem 0 1.25rem; display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; flex-wrap: wrap; }
+        .title h1 { font: 600 2.1rem 'Cormorant Garamond', serif; margin: 0; letter-spacing: 0.02em; }
+        .meta { display: grid; grid-template-columns: auto auto; gap: 0.15rem 1rem; font-size: 0.82rem; }
+        .meta span:nth-child(odd) { color: var(--muted); }
+        .meta span:nth-child(even) { font-family: 'JetBrains Mono', monospace; text-align: right; }
+        .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+        .label { font-size: 0.64rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); margin-bottom: 0.35rem; font-weight: 600; }
+        .party { font-size: 0.9rem; line-height: 1.5; }
+        .party strong { font-size: 1rem; }
+        .subject { background: #faf8f1; border-left: 3px solid var(--gold); padding: 0.7rem 0.9rem; font-size: 0.9rem; margin-bottom: 1.25rem; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+        th { text-align: left; font-size: 0.66rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); border-bottom: 1.5px solid var(--ink); padding: 0.5rem 0.4rem; font-weight: 600; }
+        td { padding: 0.65rem 0.4rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+        .num { text-align: right; font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
+        .totals { margin-left: auto; width: min(100%, 300px); margin-top: 1rem; font-size: 0.88rem; }
+        .totals div { display: flex; justify-content: space-between; padding: 0.3rem 0; }
+        .totals .grand { border-top: 1.5px solid var(--ink); margin-top: 0.35rem; padding-top: 0.6rem; font-size: 1.15rem; font-weight: 600; }
+        .totals .grand span:last-child { color: var(--gold); font-family: 'JetBrains Mono', monospace; }
+        .notes { margin-top: 1.5rem; font-size: 0.86rem; white-space: pre-wrap; line-height: 1.55; }
+        .pay { margin-top: 1.25rem; font-size: 0.82rem; color: var(--muted); white-space: pre-line; }
+        .sign { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5rem; margin-top: 3rem; font-size: 0.78rem; color: var(--muted); }
+        .sign div { border-top: 1px solid var(--ink); padding-top: 0.4rem; }
+        .issuer { margin-top: 2rem; font-size: 0.86rem; }
+        .issuer .name { font: 600 1.25rem 'Cormorant Garamond', serif; }
+        .foot { margin-top: 2.5rem; padding-top: 0.75rem; border-top: 1px solid var(--line); font-size: 0.7rem; color: var(--muted); display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+        .stamp { position: absolute; top: 34mm; right: 16mm; transform: rotate(-12deg); border: 3px solid; border-radius: 8px; padding: 0.3rem 0.9rem; font: 700 1.3rem 'Inter', sans-serif; letter-spacing: 0.15em; opacity: 0.8; }
+        .stamp.paid { color: #047857; border-color: #047857; }
+        .stamp.void { color: #b91c1c; border-color: #b91c1c; }
+        .message { max-width: 560px; margin: 4rem auto; text-align: center; color: #cbd5e1; font-size: 0.95rem; }
+        .message a { color: #d4af37; }
+        @media (max-width: 640px) {
+            .paper { padding: 10mm 6mm; }
+            .head { flex-direction: column; }
+            .addr { text-align: left; }
+            .parties, .sign { grid-template-columns: 1fr; gap: 1rem; }
+            .title h1 { font-size: 1.7rem; }
+            .stamp { top: auto; bottom: 20mm; }
+            th:nth-child(2), td:nth-child(2) { display: none; }
+        }
+        @page { size: A4; margin: 0; }
+        @media print {
+            body { background: #fff; }
+            .toolbar { display: none; }
+            .wrap { padding: 0; }
+            .paper { box-shadow: none; border-radius: 0; max-width: none; min-height: 297mm; padding: 16mm 16mm; }
+            th:nth-child(2), td:nth-child(2) { display: table-cell; }
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <span class="hint">Tipp: Im Druckdialog „Als PDF speichern“ wählen.</span>
+        <div class="actions">
+            <a class="btn" href="/dashboard.html#invoices">← Dashboard</a>
+            <button class="btn gold" type="button" onclick="window.print()">Drucken / PDF</button>
+        </div>
+    </div>
+    <div class="wrap"><div id="doc" class="message">Dokument wird geladen …</div></div>
+
+    <script src="/js/api.js"></script>
+    <script>
+    (() => {
+        'use strict';
+        const { api, esc, money, parseDate } = window.PS;
+        const KIND = { rechnung: 'Rechnung', honorarvereinbarung: 'Honorarvereinbarung' };
+        const dateDe = (v) => { const d = parseDate(v); return d ? d.toLocaleDateString('de-DE') : '—'; };
+        const dayDe = (s) => (s ? new Date(s + 'T12:00:00').toLocaleDateString('de-DE') : '—');
+        const pct = (n) => String(n).replace('.', ',');
+        const root = document.getElementById('doc');
+        const id = Number(new URLSearchParams(location.search).get('id'));
+
+        function render(inv, firm) {
+            const hv = inv.kind === 'honorarvereinbarung';
+            document.title = `${KIND[inv.kind]} ${inv.number} | Pake & Scha`;
+            root.className = 'paper';
+            root.innerHTML = `
+                ${inv.status === 'bezahlt' ? '<div class="stamp paid">BEZAHLT</div>' : ''}
+                ${inv.status === 'storniert' ? '<div class="stamp void">STORNIERT</div>' : ''}
+                <div class="head">
+                    <div class="brand"><div class="mark">P&amp;S</div><div><div class="firm">Pake &amp; Scha</div><div class="tag">Legal Consulting &amp; Advocacy</div></div></div>
+                    <div class="addr">${esc(firm.address)}${firm.contact ? '\n' + esc(firm.contact) : ''}</div>
+                </div>
+                <div class="title">
+                    <h1>${esc(KIND[inv.kind])}</h1>
+                    <div class="meta">
+                        <span>Nummer</span><span>${esc(inv.number)}</span>
+                        <span>Datum</span><span>${esc(dateDe(inv.createdAt))}</span>
+                        ${inv.caseNumber ? `<span>Aktenzeichen</span><span>${esc(inv.caseNumber)}</span>` : ''}
+                        ${inv.dueDate && !hv ? `<span>Zahlbar bis</span><span>${esc(dayDe(inv.dueDate))}</span>` : ''}
+                        ${inv.dueDate && hv ? `<span>Vorschuss fällig</span><span>${esc(dayDe(inv.dueDate))}</span>` : ''}
+                    </div>
+                </div>
+                <div class="parties">
+                    <div><div class="label">${hv ? 'Mandant' : 'Rechnungsempfänger'}</div><div class="party"><strong>${esc(inv.clientName)}</strong>${inv.clientContact ? '<br>' + esc(inv.clientContact) : ''}</div></div>
+                    <div><div class="label">${hv ? 'Beauftragte Kanzlei' : 'Bearbeitet von'}</div><div class="party"><strong>${esc(inv.issuerName || 'Pake & Scha')}</strong>${inv.issuerRank ? '<br>' + esc(inv.issuerRank) : ''}<br>Pake &amp; Scha Legal Consulting</div></div>
+                </div>
+                ${inv.subject ? `<div class="subject"><strong>${hv ? 'Gegenstand der Vereinbarung' : 'Betreff'}:</strong> ${esc(inv.subject)}</div>` : ''}
+                ${hv ? '<p style="font-size:.86rem;line-height:1.55;margin:0 0 1rem">Zwischen dem oben genannten Mandanten und der Kanzlei Pake &amp; Scha Legal Consulting wird für die anwaltliche Tätigkeit folgende Vergütung vereinbart:</p>' : ''}
+                <table>
+                    <thead><tr><th>Leistung</th><th class="num">Menge</th><th class="num">Einzelpreis</th><th class="num">Betrag</th></tr></thead>
+                    <tbody>${inv.items.map((it) => `<tr><td>${esc(it.description)}</td><td class="num">${esc(it.quantity)}</td><td class="num">${money(it.unitPrice)}</td><td class="num">${money(it.quantity * it.unitPrice)}</td></tr>`).join('')}</tbody>
+                </table>
+                <div class="totals">
+                    <div><span>Zwischensumme</span><span class="num">${money(inv.subtotal)}</span></div>
+                    ${inv.discountAmount ? `<div><span>Rabatt (${pct(inv.discountPct)} %)</span><span class="num">− ${money(inv.discountAmount)}</span></div>` : ''}
+                    ${inv.surchargeAmount ? `<div><span>Zuschlag (${pct(inv.surchargePct)} %)</span><span class="num">+ ${money(inv.surchargeAmount)}</span></div>` : ''}
+                    <div class="grand"><span>${hv ? 'Vereinbartes Honorar' : 'Gesamtbetrag'}</span><span>${money(inv.total)}</span></div>
+                </div>
+                ${inv.notes ? `<div class="notes">${esc(inv.notes)}</div>` : ''}
+                ${!hv && firm.paymentInfo ? `<div class="pay">${esc(firm.paymentInfo)}</div>` : ''}
+                ${hv
+                    ? `<div class="sign"><div>Ort, Datum · Unterschrift Mandant</div><div>Ort, Datum · Pake &amp; Scha Legal Consulting</div></div>`
+                    : `<div class="issuer">Mit freundlichen Grüßen<div class="name">${esc(inv.issuerName || 'Pake & Scha')}</div>${inv.issuerRank ? esc(inv.issuerRank) + ' · ' : ''}Pake &amp; Scha Legal Consulting</div>`}
+                <div class="foot"><span>Pake &amp; Scha Legal Consulting · Würfelpark, Los Santos</span><span>${esc(inv.number)}</span></div>`;
+            if (new URLSearchParams(location.search).get('print') === '1') setTimeout(() => window.print(), 400);
+        }
+
+        if (!Number.isInteger(id) || id <= 0) {
+            root.innerHTML = 'Kein Dokument angegeben. <a href="/dashboard.html#invoices">Zum Dashboard</a>';
+            return;
+        }
+        api.get('/api/invoices/' + id)
+            .then(({ invoice, firm }) => render(invoice, firm))
+            .catch((err) => {
+                if (err.status === 401) {
+                    location.href = '/login.html?next=' + encodeURIComponent(location.pathname + location.search);
+                    return;
+                }
+                root.innerHTML = `${esc(err.message)}<br><br><a href="/dashboard.html#invoices">Zum Dashboard</a>`;
+            });
+    })();
+    </script>
+</body>
+</html>

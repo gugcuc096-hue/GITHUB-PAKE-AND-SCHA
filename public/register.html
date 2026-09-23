@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#02050e">
+    <title>Konto erstellen | Pake & Scha Legal Consulting</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="min-h-screen">
+    <div class="ambient-bg"><div class="glow-orb orb-1"></div><div class="glow-orb orb-2"></div></div>
+
+    <nav class="subpage-nav">
+        <a href="/" class="flex items-center gap-3">
+            <span class="brand-mark">P&amp;S</span>
+            <span class="hidden sm:block"><span class="brand-name block">Pake &amp; Scha</span><span class="brand-sub block">Legal Consulting &amp; Advocacy</span></span>
+        </a>
+        <a href="/" class="btn-ghost btn-sm">← Zur Website</a>
+    </nav>
+
+    <main class="min-h-screen flex items-center justify-center px-4 pt-24 pb-10">
+        <div class="glass-card card-gold w-full max-w-lg p-6 sm:p-10">
+            <p class="text-xs uppercase tracking-[0.25em] text-gold mb-2">Mandantenportal</p>
+            <h1 class="font-serif text-4xl font-semibold mb-2">Konto erstellen</h1>
+            <p class="text-sm text-muted mb-6">Als Mandant reichen Sie Mandate ein, verfolgen Ihre Akten, fragen Termine an und schreiben der Kanzlei direkt. Zugänge für das Kanzleiteam vergibt die Kanzleileitung.</p>
+
+            <form id="registerForm" class="space-y-4" novalidate>
+                <div>
+                    <label class="label" for="displayName">Vor- und Nachname (im Spiel)</label>
+                    <input id="displayName" name="displayName" type="text" autocomplete="name" required class="field" placeholder="Max Mustermann">
+                </div>
+                <div class="grid sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="label" for="email">E-Mail-Adresse</label>
+                        <input id="email" name="email" type="email" autocomplete="username" required class="field" placeholder="max.mustermann@mail.ls">
+                    </div>
+                    <div>
+                        <label class="label" for="phone">Telefon (optional)</label>
+                        <input id="phone" name="phone" type="tel" autocomplete="tel" class="field" placeholder="555-0123">
+                    </div>
+                </div>
+                <div class="grid sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="label" for="password">Passwort (mind. 10 Zeichen)</label>
+                        <input id="password" name="password" type="password" autocomplete="new-password" required minlength="10" class="field">
+                    </div>
+                    <div>
+                        <label class="label" for="password2">Passwort wiederholen</label>
+                        <input id="password2" name="password2" type="password" autocomplete="new-password" required class="field">
+                    </div>
+                </div>
+                <p class="form-hint">Bitte nur In-Character-Daten verwenden und kein Passwort, das Sie woanders nutzen.</p>
+                <p id="formError" class="form-error" role="alert"></p>
+                <button id="submitBtn" type="submit" class="btn-gold btn-lg btn-block">Konto erstellen</button>
+            </form>
+
+            <p class="text-sm text-muted mt-6">
+                Bereits registriert? <a id="loginLink" href="/login.html" class="text-gold hover:underline">Anmelden</a>
+            </p>
+        </div>
+    </main>
+
+    <script src="/js/api.js"></script>
+    <script>
+        (() => {
+            const { api } = window.PS;
+            const form = document.getElementById('registerForm');
+            const params = new URLSearchParams(location.search);
+
+            function nextUrl() {
+                const n = params.get('next');
+                return n && /^\/[^/\\]/.test(n) ? n : '/dashboard.html';
+            }
+            document.getElementById('loginLink').href = '/login.html' + (params.get('next') ? '?next=' + encodeURIComponent(params.get('next')) : '');
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const err = document.getElementById('formError');
+                const btn = document.getElementById('submitBtn');
+                err.textContent = '';
+
+                const displayName = form.elements.displayName.value.trim();
+                const email = form.elements.email.value.trim();
+                const password = form.elements.password.value;
+                if (displayName.length < 2) { err.textContent = 'Bitte Ihren Namen angeben.'; return; }
+                if (!email) { err.textContent = 'Bitte eine E-Mail-Adresse angeben.'; return; }
+                if (password.length < 10) { err.textContent = 'Das Passwort muss mindestens 10 Zeichen lang sein.'; return; }
+                if (password !== form.elements.password2.value) { err.textContent = 'Die beiden Passwörter stimmen nicht überein.'; return; }
+
+                const body = { displayName, email, password };
+                if (form.elements.phone.value.trim()) body.phone = form.elements.phone.value.trim();
+
+                btn.disabled = true;
+                try {
+                    await api.post('/api/auth/register', body);
+                    location.replace(nextUrl());
+                } catch (ex) {
+                    err.textContent = ex.message;
+                    btn.disabled = false;
+                }
+            });
+        })();
+    </script>
+</body>
+</html>

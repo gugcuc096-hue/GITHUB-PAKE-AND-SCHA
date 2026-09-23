@@ -1,0 +1,28 @@
+Ich möchte meine Node.js/Express-Kanzlei-Website (Pake & Scha Legal Consulting) mit SQLite-Datenbank auf Render in eine absolute Premium-Webanwendung verwandeln. Sie soll komplett dynamisch, extrem praktisch für unseren GTA-RP-Alltag und perfekt auf Smartphones und PCs optimiert sein.
+
+Bitte passe den Code (`server.js`, `db.js`, `auth.js`, CSS-Styles und die Frontend-Dateien im `public/`-Ordner) umfassend an folgende Anforderungen an:
+
+1. **Login-Button, Navigation & Mobile Optimierung:**
+   - Integriere im Header/Navbar der Hauptseite (und auf allen Unterseiten) einen gut sichtbaren, modernen "Login"- bzw. "Dashboard"-Button.
+   - **Responsive / Mobile Design:** Optimiere alle Seiten, Tabellen, das Dashboard und die Formulare per CSS so, dass sie auf Smartphones und Tablets absolut perfekt, übersichtlich und fehlerfrei bedienbar sind.
+
+2. **Notfall-Admin & Passwort-Reset (Kein Shell-Zwang):**
+   - Da Render keine Shell hat und man Logins vergessen kann, baue eine robuste Logik in den Server ein: Beim Start wird geprüft, ob ein Admin existiert. Falls nicht, wird automatisch der Haupt-Admin-Account für Dr. Alois Pake mit einem sicheren Standard-Passwort initialisiert.
+
+3. **Feste Team-Besetzung & Live-Verwaltung über das Dashboard:**
+   - Initialisiere das System beim Start mit folgenden echten Teammitgliedern und Rängen:
+     - **Dr. Alois Pake** (Managing Partner / Kanzleileitung)
+     - **Michael Scha** (Managing Partner)
+     - **Dr. jur. Damat Lex** (Senior Associate)
+   - Erweitere das Admin-Dashboard um eine vollständige Team-Verwaltung. Als Kanzleileitung möchte ich direkt über die Weboberfläche Teammitglieder hinzufügen, umbenennen, Ränge ändern, Beschreibungen anpassen oder Profile löschen können. Die Änderungen müssen sofort live auf der Website sichtbar sein und persistent in SQLite gespeichert werden.
+
+4. **Kanzlei-Features & Nützliche Erweiterungen (High-End RP-Funktionen):**
+   - **Interne Kanzlei-Post:** Ein voll funktionsfähiges internes Nachrichtensystem im Dashboard, mit dem sich das Team Nachrichten und Notizen senden kann.
+   - **Kanzlei-Kalender & Fristen:** Ein Team-Kalender im Dashboard für Gerichtstermine, Mandantengespräche und Fristen mit Countdown-Anzeige.
+   - **Digitale Aktenverwaltung (Case Files):** Eine strukturierte Aktenübersicht im Dashboard, in der Anwälte laufende Fälle, Mandanten, Aktenzeichen, Status (Offen/In Bearbeitung/Geschlossen) und Notizen anlegen und verwalten können.
+   - **Rechnungs- / Honorar-Generator:** Ein kleiner Rechner/Generator im Dashboard, mit dem Anwälte offizielle Rechnungen oder Honorarvereinbarungen für Mandanten erstellen und als PDF/Druckansicht exportieren können.
+
+5. **Discord-Verbindung:**
+   - Eine saubere Verknüpfung, um Discord-Benutzerkonten mit der Website zu verbinden oder Webhooks für wichtige Kanzlei-Updates zu nutzen.
+
+Bitte liefere mir den vollständigen, sauberen und fehlerfreien Code für alle Module, damit ich ihn direkt in mein Projekt einpflegen kann.

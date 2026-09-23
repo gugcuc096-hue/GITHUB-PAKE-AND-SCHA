@@ -1,0 +1,258 @@
+'use strict';
+/*
+ * Start-Routinen, die bei JEDEM Serverstart laufen. Render (Free/Starter) bietet
+ * keine Shell -- alles, was man sonst per Kommandozeile erledigen würde
+ * (ersten Admin anlegen, vergessenes Passwort zurücksetzen), passiert hier
+ * automatisch und wird über Umgebungsvariablen gesteuert.
+ */
+const { db, tx, getSetting, setSetting } = require('./db');
+const { hashPassword, generateStrongPassword, destroyAllSessions } = require('./auth');
+const { deriveInitials } = require('./helpers');
+
+const DEFAULT_ADMIN_EMAIL = 'alois.pake@pake-scha.ls';
+
+// Feste Team-Besetzung der Kanzlei (Login-Konten + öffentliche Team-Profile).
+const TEAM = [
+  {
+    key: 'PAKE',
+    name: 'Dr. Alois Pake',
+    email: DEFAULT_ADMIN_EMAIL,
+    role: 'admin',
+    rank: 'Managing Partner',
+    roleTitle: 'Managing Partner / Kanzleileitung',
+    tier: 'leitung',
+    description: 'Kanzleileitung. Verfassungsrecht, Grundsatzverfahren und strategische Gesamtverantwortung für alle Mandate.',
+  },
+  {
+    key: 'SCHA',
+    name: 'Michael Scha',
+    email: 'michael.scha@pake-scha.ls',
+    role: 'admin',
+    rank: 'Managing Partner',
+    roleTitle: 'Managing Partner',
+    tier: 'leitung',
+    description: 'Wirtschafts- und Strafrecht, Vertretung von Unternehmen und Organisationen.',
+  },
+  {
+    key: 'LEX',
+    name: 'Dr. jur. Damat Lex',
+    email: 'damat.lex@pake-scha.ls',
+    role: 'anwalt',
+    rank: 'Senior Associate',
+    roleTitle: 'Senior Associate',
+    tier: 'anwalt',
+    description: 'Mandatsbearbeitung erfahrener Fälle, Haftprüfungen und juristische Grundsatzberatung.',
+  },
+];
+
+// Startinhalt der Honorarordnung (entspricht der bisherigen Startseite).
+const DEFAULT_FEES = [
+  ['rechtsberatung', 'Rechtliche Beratung per Ticket', 'Beantwortung rechtlicher Fragen über das Ticketsystem und grundlegende Einschätzung des Sachverhalts.', 15000, 1],
+  ['rechtsberatung', 'Persönliche Rechtsberatung', 'Persönliches Beratungsgespräch inklusive rechtlicher Einschätzung und Handlungsempfehlungen.', 25000, 1],
+  ['rechtsberatung', 'Erweiterte Fallanalyse', 'Detaillierte Prüfung eines komplexeren Sachverhalts einschließlich vorhandener Akten und Beweise.', 40000, 0],
+  ['strafrecht', 'Strafrechtliche Vertretung', 'Umfassende anwaltliche Betreuung und Vertretung des Mandanten in einem strafrechtlichen Verfahren.', 60000, 1],
+  ['strafrecht', 'U-Haft-Vertretung vor Ort', 'Unverzügliches Erscheinen bei Festnahme, Wahrnehmung der Beschuldigtenrechte und Vertretung im Verhör.', 50000, 1],
+  ['strafrecht', 'Akteneinsicht & Strafantragsprüfung', 'Anforderung und Auswertung behördlicher Ermittlungsakten zur Vorbereitung der Verteidigung.', 30000, 0],
+  ['notfall', '24/7 Eilnotdiensteinsatz (Nacht/Feiertag)', 'Sofortige Begleitung bei Durchsuchungen, Beschlagnahmen oder vorläufigen Festnahmen außerhalb der regulären Zeiten.', 75000, 1],
+  ['gericht', 'Vertretung Hauptverhandlung (US District Court)', 'Vollständige Vertretung inklusive Plädoyer, Beweisanträgen und Zeugenbefragung vor Gericht.', 100000, 1],
+  ['gericht', 'Verfassungsbeschwerde / Grundsatzverfahren', 'Ausarbeitung und Prozessführung bei Grundrechtsverletzungen oder verfassungsrechtlichen Streitfragen.', 150000, 0],
+  ['vertraege', 'Vertragsentwurf (Standard)', 'Erstellung rechtssicherer Standardverträge (Kaufvertrag, Arbeitsvertrag, Dienstleistung).', 35000, 1],
+  ['vertraege', 'Vertragsprüfung & Überarbeitung', 'Rechtliche Analyse fremder Verträge auf Haftungsrisiken und unwirksame Klauseln.', 25000, 0],
+];
+
+const adminEmail = () => (process.env.ADMIN_EMAIL || DEFAULT_ADMIN_EMAIL).trim().toLowerCase();
+
+function envFor(seed) {
+  if (seed.key === 'PAKE') {
+    return { email: adminEmail(), password: process.env.ADMIN_PASSWORD || '' };
+  }
+  return {
+    email: (process.env[`SEED_${seed.key}_EMAIL`] || seed.email).trim().toLowerCase(),
+    password: process.env[`SEED_${seed.key}_PASSWORD`] || '',
+  };
+}
+
+function logCredentials(title, entries, hint) {
+  const line = '================================================================';
+  console.log(line);
+  console.log(` ${title}`);
+  console.log('');
+  for (const e of entries) {
+    console.log(` ${e.name}`);
+    console.log(`   E-Mail:   ${e.email}`);
+    console.log(`   Passwort: ${e.password}${e.generated ? '   (automatisch erzeugt)' : '   (aus Umgebungsvariable)'}`);
+    console.log('');
+  }
+  if (hint) hint.forEach((h) => console.log(` ${h}`));
+  console.log(line);
+}
+
+/* ---------------------------------------------------------------- */
+/** Einmalige Datenkorrektur älterer Installationen ("Dr. Alois Parker" -> "Dr. Alois Pake"). */
+function migrateLegacyData() {
+  if (getSetting('migration_v3_team')) return;
+
+  tx(() => {
+    const parker = db
+      .prepare("SELECT * FROM users WHERE lower(email) = 'alois.parker@pake-scha.ls' OR display_name = 'Dr. Alois Parker'")
+      .get();
+    if (parker) {
+      const target = adminEmail();
+      const clash = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(target, parker.id);
+      const email = clash ? parker.email : target;
+      db.prepare("UPDATE users SET display_name = 'Dr. Alois Pake', rank = 'Managing Partner', email = ? WHERE id = ?").run(email, parker.id);
+      console.log(`Migration: Konto "Dr. Alois Parker" heißt jetzt "Dr. Alois Pake" (Login-E-Mail: ${email}, Passwort unverändert).`);
+    }
+    db.prepare("UPDATE users SET rank = 'Managing Partner' WHERE rank = 'founding_partner'").run();
+    db.prepare("UPDATE users SET rank = 'Senior Associate' WHERE rank = 'senior_associate'").run();
+
+    db.prepare(
+      "UPDATE team_members SET name = 'Dr. Alois Pake', role_title = 'Managing Partner / Kanzleileitung', initials = 'A.P.' WHERE name = 'Dr. Alois Parker'"
+    ).run();
+    db.prepare("UPDATE team_members SET role_title = 'Managing Partner' WHERE name = 'Michael Scha' AND role_title = 'Founding Partner'").run();
+    // Früherer Platzhalter-Eintrag der Startseite (nicht Teil der festen Besetzung).
+    db.prepare("DELETE FROM team_members WHERE name = 'Martinez' AND role_title = 'Rechtsanwalt / Mitarbeiter'").run();
+    db.prepare("UPDATE team_members SET tier = 'anwalt' WHERE tier NOT IN ('leitung','anwalt')").run();
+
+    // Profile ohne Verknüpfung per Namensgleichheit mit Login-Konten verbinden.
+    db.prepare(
+      `UPDATE team_members SET user_id = (SELECT u.id FROM users u WHERE u.display_name = team_members.name AND u.role IN ('anwalt','admin') LIMIT 1)
+       WHERE user_id IS NULL`
+    ).run();
+
+    setSetting('migration_v3_team', new Date().toISOString());
+  });
+}
+
+/** Erststart: Login-Konten der festen Team-Besetzung anlegen. */
+function ensureTeamAccounts() {
+  if (getSetting('seeded_team_accounts')) return;
+
+  const created = [];
+  tx(() => {
+    const insert = db.prepare(
+      'INSERT INTO users (email, password_hash, display_name, role, rank, must_change_password) VALUES (?, ?, ?, ?, ?, ?)'
+    );
+    for (const seed of TEAM) {
+      const env = envFor(seed);
+      const exists = db.prepare('SELECT id FROM users WHERE email = ? OR display_name = ?').get(env.email, seed.name);
+      if (exists) continue;
+      const password = env.password || generateStrongPassword();
+      insert.run(env.email, hashPassword(password), seed.name, seed.role, seed.rank, env.password ? 0 : 1);
+      created.push({ name: seed.name, email: env.email, password, generated: !env.password });
+    }
+    setSetting('seeded_team_accounts', new Date().toISOString());
+  });
+
+  if (created.length) {
+    logCredentials('Erststart: Team-Konten wurden angelegt', created, [
+      'Bitte nach dem ersten Login unter "Profil" ein eigenes Passwort setzen.',
+      'Feste Start-Passwörter: ADMIN_PASSWORD, SEED_SCHA_PASSWORD, SEED_LEX_PASSWORD',
+      'als Umgebungsvariablen setzen (Render → Environment).',
+    ]);
+  }
+}
+
+/** Erststart: öffentliche Team-Profile der Startseite anlegen. */
+function ensureTeamProfiles() {
+  if (getSetting('seeded_team_profiles')) return;
+
+  tx(() => {
+    const insert = db.prepare(
+      'INSERT INTO team_members (name, role_title, description, initials, tier, sort_order, user_id, visible) VALUES (?, ?, ?, ?, ?, ?, ?, 1)'
+    );
+    TEAM.forEach((seed, i) => {
+      if (db.prepare('SELECT id FROM team_members WHERE name = ?').get(seed.name)) return;
+      const user = db.prepare('SELECT id FROM users WHERE display_name = ?').get(seed.name);
+      insert.run(seed.name, seed.roleTitle, seed.description, deriveInitials(seed.name), seed.tier, i + 1, user ? user.id : null);
+    });
+    setSetting('seeded_team_profiles', new Date().toISOString());
+  });
+}
+
+/**
+ * Notfall-Admin: Existiert kein aktiver Admin mehr (z. B. alle gesperrt oder
+ * gelöscht), wird das Konto von Dr. Alois Pake automatisch wiederhergestellt.
+ */
+function ensureMainAdmin() {
+  const admins = db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'admin' AND active = 1").get().n;
+  if (admins > 0) return;
+
+  const email = adminEmail();
+  const envPassword = process.env.ADMIN_PASSWORD || '';
+  const password = envPassword || generateStrongPassword();
+  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+
+  if (existing) {
+    db.prepare(
+      "UPDATE users SET role = 'admin', active = 1, password_hash = ?, must_change_password = ? WHERE id = ?"
+    ).run(hashPassword(password), envPassword ? 0 : 1, existing.id);
+    destroyAllSessions(existing.id);
+  } else {
+    db.prepare(
+      "INSERT INTO users (email, password_hash, display_name, role, rank, must_change_password) VALUES (?, ?, 'Dr. Alois Pake', 'admin', 'Managing Partner', ?)"
+    ).run(email, hashPassword(password), envPassword ? 0 : 1);
+  }
+
+  logCredentials('Kein aktiver Admin gefunden – Haupt-Admin wurde (wieder)hergestellt', [
+    { name: 'Dr. Alois Pake (Kanzleileitung)', email, password, generated: !envPassword },
+  ]);
+}
+
+/**
+ * Passwort vergessen, ohne Shell: ADMIN_RESET_PASSWORD in Render setzen,
+ * neu deployen, einloggen -- danach die Variable wieder entfernen.
+ */
+function applyEmergencyReset() {
+  const newPassword = process.env.ADMIN_RESET_PASSWORD;
+  if (!newPassword) return;
+  if (newPassword.length < 10) {
+    console.warn('ADMIN_RESET_PASSWORD ignoriert: mindestens 10 Zeichen erforderlich.');
+    return;
+  }
+
+  const email = adminEmail();
+  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+  if (existing) {
+    db.prepare(
+      "UPDATE users SET role = 'admin', active = 1, password_hash = ?, must_change_password = 0 WHERE id = ?"
+    ).run(hashPassword(newPassword), existing.id);
+    destroyAllSessions(existing.id);
+  } else {
+    db.prepare(
+      "INSERT INTO users (email, password_hash, display_name, role, rank) VALUES (?, ?, 'Dr. Alois Pake', 'admin', 'Managing Partner')"
+    ).run(email, hashPassword(newPassword));
+  }
+
+  console.warn('================================================================');
+  console.warn(` NOTFALL-RESET: Passwort für ${email} wurde auf den Wert`);
+  console.warn(' von ADMIN_RESET_PASSWORD gesetzt, Konto ist aktiv und Admin.');
+  console.warn(' Bitte ADMIN_RESET_PASSWORD jetzt in Render wieder ENTFERNEN,');
+  console.warn(' sonst wird das Passwort bei jedem Neustart erneut überschrieben.');
+  console.warn('================================================================');
+}
+
+function ensureDefaultFees() {
+  if (getSetting('seeded_fees')) return;
+  tx(() => {
+    const count = db.prepare('SELECT COUNT(*) AS n FROM fees').get().n;
+    if (count === 0) {
+      const insert = db.prepare(
+        'INSERT INTO fees (category, name, description, price, in_calculator, sort_order) VALUES (?, ?, ?, ?, ?, ?)'
+      );
+      DEFAULT_FEES.forEach(([category, name, description, price, calc], i) => insert.run(category, name, description, price, calc, i + 1));
+    }
+    setSetting('seeded_fees', new Date().toISOString());
+  });
+}
+
+function runBootstrap() {
+  migrateLegacyData();
+  ensureTeamAccounts();
+  ensureTeamProfiles();
+  ensureMainAdmin();
+  applyEmergencyReset();
+  ensureDefaultFees();
+}
+
+module.exports = { runBootstrap };
