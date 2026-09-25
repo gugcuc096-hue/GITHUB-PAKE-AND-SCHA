@@ -25,7 +25,7 @@
         .paper::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 5px; background: linear-gradient(90deg, #d4af37, #b8962e); }
         .head { display: flex; justify-content: space-between; gap: 1.5rem; align-items: flex-start; border-bottom: 1px solid var(--line); padding-bottom: 1.25rem; }
         .brand { display: flex; gap: 0.85rem; align-items: center; }
-        .mark { width: 54px; height: 54px; border: 1.5px solid var(--gold); border-radius: 12px; display: flex; align-items: center; justify-content: center; font: 700 1.35rem 'Cormorant Garamond', serif; color: var(--gold); }
+        .mark { height: 54px; width: auto; display: block; flex-shrink: 0; }
         .firm { font: 600 1.6rem 'Cormorant Garamond', serif; line-height: 1.1; }
         .tag { font-size: 0.62rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); margin-top: 2px; }
         .addr { font-size: 0.78rem; color: var(--muted); text-align: right; white-space: pre-line; line-height: 1.5; }
@@ -108,7 +108,7 @@
                 ${inv.status === 'bezahlt' ? '<div class="stamp paid">BEZAHLT</div>' : ''}
                 ${inv.status === 'storniert' ? '<div class="stamp void">STORNIERT</div>' : ''}
                 <div class="head">
-                    <div class="brand"><div class="mark">P&amp;S</div><div><div class="firm">Pake &amp; Scha</div><div class="tag">Legal Consulting &amp; Advocacy</div></div></div>
+                    <div class="brand"><img class="mark" src="/img/monogram-print-54.png" srcset="/img/monogram-print-54.png 43w, /img/monogram-print-108.png 85w, /img/monogram-print-162.png 128w" sizes="43px" width="43" height="54" alt="Pake &amp; Scha"><div><div class="firm">Pake &amp; Scha</div><div class="tag">Legal Consulting &amp; Advocacy</div></div></div>
                     <div class="addr">${esc(firm.address)}${firm.contact ? '\n' + esc(firm.contact) : ''}</div>
                 </div>
                 <div class="title">
