@@ -125,7 +125,11 @@ async function fetchDocument(ref) {
       },
     });
   } catch (err) {
-    if (err.status === 401 || err.status === 403) throw new Error(NOT_SHARED);
+    if (err.status === 401 || err.status === 403) {
+      throw new Error(
+        `Google Docs verweigert den Zugriff (${err.status}). Meist ist das Dokument nicht öffentlich freigegeben – oder der Besitzer hat „Herunterladen, Drucken und Kopieren“ für Betrachter deaktiviert. Freigabe prüfen oder den Inhalt kopieren und unten einfügen.`
+      );
+    }
     if (err.status === 404) throw new Error('Google Docs findet dieses Dokument nicht – bitte den Link prüfen.');
     if (err.status === 429) throw new Error('Google Docs hat die Anfrage vorübergehend abgelehnt. Bitte gleich noch einmal versuchen – oder den Inhalt kopieren und einfügen.');
     throw err;
