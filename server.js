@@ -64,6 +64,7 @@ app.use('/api/cases/:id/fivenet', externalRoutes.caseRouter); // ältere Adresse
 app.use('/api/cases', require('./routes/cases'));
 app.use('/api/fivenet', fivenetRoutes.router);
 app.use('/api/gdocs', externalRoutes.gdocsRouter);
+app.use('/api/gsheets', externalRoutes.gsheetsRouter);
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/messages', require('./routes/messages'));

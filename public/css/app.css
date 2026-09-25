@@ -612,6 +612,11 @@ details.edit-box[open] > summary::after { content: '–'; }
 .fn-head { display: flex; align-items: flex-start; gap: 0.75rem; }
 .fn-badge { flex-shrink: 0; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 0.2rem 0.5rem; border-radius: 6px; color: #c7d2fe; background: rgba(99, 102, 241, 0.16); border: 1px solid rgba(129, 140, 248, 0.4); margin-top: 2px; }
 .fn-main { flex: 1; min-width: 0; }
+/* Schmale Bildschirme: Quelle und „intern“ in die erste Zeile, der Titel darunter in voller Breite. */
+@media (max-width: 520px) {
+  .fn-head { flex-wrap: wrap; row-gap: 0.4rem; }
+  .fn-head .fn-main { order: 1; flex-basis: 100%; }
+}
 .fn-title { font-weight: 600; word-break: break-word; }
 .fn-line { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .fn-line .push { margin-left: auto; }
@@ -691,6 +696,17 @@ details.edit-box[open] > summary::after { content: '–'; }
 .ext-add { display: inline-flex; flex-wrap: wrap; gap: 0.4rem; }
 .fn-badge.gd { color: #bfdbfe; background: rgba(66, 133, 244, 0.16); border-color: rgba(96, 165, 250, 0.45); }
 .fn-doc.is-gdocs { border-left-color: #60a5fa; }
+.fn-badge.gs { color: #bbf7d0; background: rgba(52, 168, 83, 0.16); border-color: rgba(74, 222, 128, 0.45); }
+.fn-doc.is-gsheets { border-left-color: #4ade80; }
+/* Google-Sheets-Abschrift als Tabelle */
+.fn-table-wrap { max-height: 420px; overflow: auto; margin: 0.75rem; border: 1px solid var(--line); border-radius: 10px; }
+.fn-table { border-collapse: collapse; font-size: 0.8rem; line-height: 1.45; color: var(--text-muted); min-width: 100%; }
+.fn-table th, .fn-table td { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 0.35rem 0.6rem; text-align: left; vertical-align: top; max-width: 320px; overflow-wrap: break-word; }
+.fn-table th:last-child, .fn-table td:last-child { border-right: 0; }
+.fn-table thead th { position: sticky; top: 0; z-index: 1; background: #141b2e; color: var(--text-main); font-weight: 600; white-space: nowrap; }
+.fn-table tbody tr:nth-child(even) td { background: rgba(255, 255, 255, 0.02); }
+.fn-table tr.gap td { padding: 0.2rem; background: transparent; }
+.fn-content.is-sheet { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.8rem; tab-size: 16; white-space: pre; overflow-x: auto; }
 .fn-check.hidden { display: none; }
 
 /* Bestätigungsdialog (ersetzt window.confirm) */

@@ -50,7 +50,12 @@ function parseDocumentRef(input) {
     if (url.username || url.password) return { ok: false, error: 'Der Link darf keine Zugangsdaten enthalten.' };
     if (url.hostname.toLowerCase() !== HOST || url.port) return { ok: false, error: `Das ist kein Google-Docs-Link (${HOST}).` };
     if (/^\/(spreadsheets|presentation|forms|drawings)\//.test(url.pathname)) {
-      return { ok: false, error: 'Möglich sind nur Google-Docs-Textdokumente – keine Tabellen, Präsentationen oder Formulare.' };
+      return {
+        ok: false,
+        error: url.pathname.startsWith('/spreadsheets/')
+          ? 'Das ist eine Google-Sheets-Tabelle – bitte über „Google-Sheets-Tabelle“ hinzufügen.'
+          : 'Möglich sind nur Google-Docs-Textdokumente – keine Präsentationen oder Formulare.',
+      };
     }
     const pub = url.pathname.match(/^\/document\/(?:u\/\d+\/)?d\/e\/([^/]+)(?:\/(?:pub|pubhtml)?)?\/?$/);
     const doc = url.pathname.match(/^\/document\/(?:u\/\d+\/)?d\/([^/]+)(?:\/.*)?$/);
@@ -169,4 +174,4 @@ async function fetchImage(url) {
   return buffer;
 }
 
-module.exports = { HOST, parseDocumentRef, fetchDocument, imageUrlFor, fetchImage, NOT_SHARED };
+module.exports = { HOST, DOC_ID, PUB_ID, parseDocumentRef, fetchDocument, imageUrlFor, fetchImage, titleFrom, isGoogleContent, isLogin, NOT_SHARED };
