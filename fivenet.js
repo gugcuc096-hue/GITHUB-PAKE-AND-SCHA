@@ -24,6 +24,7 @@
  * CAPABILITIES umgestellt.
  */
 const { getSetting } = require('./db');
+const { fetchLimited } = require('./remote');
 
 const DEFAULT_URL = 'https://fivenet.modernv.net';
 const INT64_MAX = 9223372036854775807n;
@@ -110,6 +111,9 @@ const DOC_TYPES = [
   'Gutachten',
   'Vertrag',
   'Lizenz / Genehmigung',
+  'Schriftsatz',
+  'Vollmacht',
+  'Gesprächsprotokoll',
   'Sonstiges',
 ];
 
@@ -251,32 +255,12 @@ function imageUrlFor(raw, host) {
 
 /** Lädt ein Bild (ohne Weiterleitungen, mit Zeit- und Größengrenze). Wirft Fehler mit deutscher Meldung. */
 async function fetchImage(url) {
-  let res;
-  try {
-    res = await fetch(url, {
-      headers: { Accept: 'image/avif,image/webp,image/png,image/jpeg,*/*;q=0.5', 'User-Agent': 'PakeScha-Kanzlei/1.0 (+Bildübernahme)' },
-      redirect: 'manual',
-      signal: AbortSignal.timeout(8000),
-    });
-  } catch (err) {
-    throw new Error(err?.name === 'TimeoutError' ? 'Zeitüberschreitung' : 'FiveNet nicht erreichbar');
-  }
-  if (res.status !== 200) {
-    res.body?.cancel().catch(() => {});
-    throw new Error(`FiveNet antwortet mit ${res.status}`);
-  }
-  if (Number(res.headers.get('content-length') || 0) > MAX_IMPORT_BYTES) {
-    res.body?.cancel().catch(() => {});
-    throw new Error('Bild größer als 5 MB');
-  }
-  const chunks = [];
-  let size = 0;
-  for await (const chunk of res.body) {
-    size += chunk.length;
-    if (size > MAX_IMPORT_BYTES) throw new Error('Bild größer als 5 MB');
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks);
+  const { buffer } = await fetchLimited(url, {
+    maxBytes: MAX_IMPORT_BYTES,
+    accept: 'image/avif,image/webp,image/png,image/jpeg,*/*;q=0.5',
+    sourceLabel: 'FiveNet',
+  });
+  return buffer;
 }
 
 module.exports = {

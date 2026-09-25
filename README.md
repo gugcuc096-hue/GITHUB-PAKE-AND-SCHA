@@ -23,6 +23,7 @@ Premium-Webanwendung für die GTA-RP-Kanzlei **Pake & Scha Legal Consulting**: �
 | **Stempeluhr** | Dienststatus *Im Dienst / Im Gericht / Pause / Außer Dienst* in der Kopfzeile · Website zeigt live „Eilnotdienst: 2 Anwälte im Dienst“ und grüne Punkte bei den Teamkarten (abschaltbar) · Wochenstunden pro Teammitglied · Korrekturen durch die Leitung · automatisches Ausstempeln nach 12 h |
 | **Beweismittel** | Bilder/Screenshots an Akten hängen, auf Wunsch nur intern · Vorschau, Download, Löschen · nur mit Berechtigung abrufbar |
 | **FiveNet-Dokumente** | In der Akte „FiveNet-Dokument hinzufügen“ → Link einfügen → Dokument-ID wird live erkannt · Warnung bei Dubletten, Querverweis „auch verknüpft mit PS-…“ · Titel, Dokumentart (u. a. „Strafakte (LSPD)“), Erstellungsdatum, Verfasser, Kurzinhalt · **Text & Bilder übernehmen:** Inhalt in FiveNet kopieren und einfügen → Abschrift in der Akte (auch als Textdatei), Bilder automatisch als Anhang · intern oder für den Mandanten sichtbar · „In FiveNet öffnen“ und „Zitat kopieren“ · Aktensuche per FiveNet-Link oder Dokument-ID (siehe [FiveNet-Integration](#fivenet-integration)) |
+| **Google-Docs-Dokumente** | In der Akte „Google-Docs-Dokument“ → Link einfügen → bei Freigabe „Jeder, der über den Link verfügt“ (oder „Im Web veröffentlicht“) lädt die Kanzlei **Text und Bilder automatisch** · „Aktualisieren“ holt den neuesten Stand ohne doppelte Bilder · nicht freigegebene Dokumente: klare Anleitung oder Inhalt kopieren/einfügen · gleiche Funktionen wie bei FiveNet (Abschrift, Textdatei, Zitat, Sichtbarkeit, Querverweise, Aktensuche per Link) (siehe [Google-Docs-Integration](#google-docs-integration)) |
 | **Aufgaben & Wiedervorlagen** | Aufgaben mit Fälligkeitsdatum, Zuständigkeit und Notiz – mit oder ohne Aktenbezug · Checklisten je Rechtsgebiet per Klick in die Akte übernehmen · Erledigt-Vermerk im Aktenverlauf · Zähler fälliger Aufgaben in der Navigation · Discord-Erwähnung bei Zuweisung |
 | **Aktenübersicht & Handlungsbedarf** | Kennzahlen im Aktenkopf (nächste Frist, offene/überfällige Aufgaben, FiveNet-Dokumente, Beweismittel, letzte Aktivität) · Übersicht zeigt überfällige und heute fällige Aufgaben sowie eigene Akten ohne Bewegung seit 7 Tagen |
 | **Protokoll** (Admin) | Wer hat wann was geändert: Akten, Rechnungen, Konten, Team, Bewerbungen, Einstellungen, Anmeldungen des Teams |
@@ -122,6 +123,23 @@ Weil FiveNet keine delegierte Freigabe für Drittanwendungen anbietet, speichert
 
 Adresse der Instanz: Dashboard → *Einstellungen* → *FiveNet* (oder Umgebungsvariable `FIVENET_URL`, Standard `https://fivenet.modernv.net`). Dort lässt sich auch die Erreichbarkeit prüfen. Bietet FiveNet später eine offizielle, delegierte Anmeldung an, wird sie in `fivenet.js` ergänzt (dort steht auch die vollständige Prüfung).
 
+## Google-Docs-Integration
+
+Google-Docs-Dokumente werden genauso wie FiveNet-Dokumente im Abschnitt **„Externe Dokumente“** einer Akte verknüpft – mit dem Unterschied, dass die Kanzlei den Inhalt selbst laden kann:
+
+| Freigabe in Google Docs | Was passiert |
+|---|---|
+| „Jeder, der über den Link verfügt“ (Betrachter) | Link einfügen → Titel, Text und Bilder werden automatisch geladen. Später mit „Aktualisieren“ den neuen Stand holen. |
+| „Datei → Freigeben → Im Web veröffentlichen“ | wie oben (Link `…/document/d/e/…/pub`) |
+| Eingeschränkt (nur bestimmte Personen) | Die Kanzlei erkennt das und zeigt, wie man die Freigabe setzt. Alternativ in Google Docs Strg+A, Strg+C und im Feld „Inhalt aus Google Docs“ Strg+V – Text und Bilder werden übernommen. |
+
+So funktioniert es technisch (`gdocs.js`): Für freigegebene Dokumente stellt Google ohne Anmeldung einen HTML-Export bereit (`docs.google.com/document/d/<ID>/export?format=html`). Die Kanzlei nutzt **kein Google-Konto, keine Passwörter, keine Cookies**; es wird keine Einrichtung in der Google Cloud benötigt. Sicherheitsgrenzen:
+
+- Aufgerufen wird nur `docs.google.com` mit der Dokument-ID aus dem Link; Weiterleitungen nur zu Google-Inhaltsservern (`*.googleusercontent.com`). Eine Weiterleitung zur Google-Anmeldung wird als „nicht freigegeben“ erkannt und nicht verfolgt.
+- Höchstens 3 MB pro Dokument und 5 MB pro Bild, höchstens 10 Bilder je Vorgang, nur echte JPG-/PNG-/WebP-Dateien. Bilder werden am Inhalt erkannt, damit „Aktualisieren“ keine Dubletten erzeugt.
+- Das geladene HTML wird im Browser nur gelesen (Text und Bildadressen), nie als HTML angezeigt; Skripte und Stile werden schon auf dem Server entfernt.
+- Nur Textdokumente – keine Tabellen, Präsentationen oder Formulare. Höchstens 60 Abrufe pro 10 Minuten.
+
 ## Rollen und Rechte
 
 | | Mandant | Anwalt | Kanzleileitung (Admin) |
@@ -134,7 +152,7 @@ Adresse der Instanz: Dashboard → *Einstellungen* → *FiveNet* (oder Umgebungs
 | Kanzlei-Post | an die Kanzlei | an alle + Rundschreiben | an alle + Rundschreiben |
 | Rechnungen | eigene ansehen/drucken | erstellen, Status | erstellen, Status, löschen |
 | Beweismittel | eigene hochladen, öffentliche ansehen | alles (auch intern) | alles |
-| FiveNet-Dokumente | freigegebene ansehen | verknüpfen; eigene bzw. in zugewiesenen Akten bearbeiten/entfernen | alles |
+| Externe Dokumente (FiveNet, Google Docs) | freigegebene ansehen, Abschrift herunterladen | verknüpfen, Bilder übernehmen; eigene bzw. in zugewiesenen Akten bearbeiten/entfernen | alles |
 | Aufgaben & Wiedervorlagen | – | alle ansehen, anlegen, abhaken; eigene/zugewiesene löschen | alles |
 | Stempeluhr | – | eigene Zeiten | alle Zeiten, Korrekturen |
 | Team, Bewerbungen, Benutzer, Honorarordnung, Protokoll, Einstellungen | – | – | ja |
@@ -158,9 +176,11 @@ auth.js          Sessions, Passwörter, Rollen-Middleware
 bootstrap.js     Team-Seed, Notfall-Admin, Passwort-Reset, Datenmigration
 discord.js       Webhooks & OAuth2
 fivenet.js       FiveNet: Schnittstellenprüfung, Link-Erkennung, Instanz-Einstellung
+gdocs.js         Google Docs: Link-Erkennung, Export freigegebener Dokumente, Bildadressen
+remote.js        Abrufe externer Quellen mit Zeit-, Größen- und Weiterleitungsgrenzen
 uploads.js       Bild-Uploads (Formatprüfung anhand der Dateisignatur)
 helpers.js       Konstanten, Validierung
 models.js        Datenabfragen, Zeilen-Mapping, Zugriffsregeln, Protokoll
-routes/          auth, cases, calendar, messages, board, invoices, fees, team, admin, discord, public, duty, applications, fivenet, tasks
+routes/          auth, cases, calendar, messages, board, invoices, fees, team, admin, discord, public, duty, applications, fivenet, external, tasks
 public/          index.html, karriere.html, login.html, register.html, dashboard.html, invoice.html, css/, js/
 ```

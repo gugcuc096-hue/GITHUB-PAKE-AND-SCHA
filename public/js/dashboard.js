@@ -272,9 +272,15 @@
     if (diff === 1) return 'gestern';
     return `vor ${diff} Tagen`;
   }
-  /** Dokument-ID aus einem FiveNet-Link (…/documents/1234) oder einer reinen Zahl – für die Aktensuche. */
-  function fivenetIdFrom(q) {
-    const m = String(q).match(/\/documents\/(\d{1,19})(?:[/?#]|$)/) || String(q).trim().match(/^#?(\d{1,19})$/);
+  /**
+   * Dokument-ID aus einem FiveNet-Link (…/documents/1234), einer reinen Zahl oder einem
+   * Google-Docs-Link (…/document/d/<ID>, …/document/d/e/<ID>) – für die Aktensuche.
+   */
+  function externalIdFrom(q) {
+    const s = String(q).trim();
+    const g = s.match(/\/document\/(?:u\/\d+\/)?d\/(e\/)?([A-Za-z0-9_-]{20,200})/i);
+    if (g) return (g[1] ? 'e/' : '') + g[2];
+    const m = s.match(/\/documents\/(\d{1,19})(?:[/?#]|$)/) || s.match(/^#?(\d{1,19})$/);
     return m ? m[1].replace(/^0+(?=\d)/, '') : null;
   }
 
@@ -761,8 +767,8 @@
   /* ---------------------------------------------------------------- Akten */
   function filteredCases() {
     const q = st.caseQuery.trim().toLowerCase();
-    // Ein eingefügter FiveNet-Link oder eine Dokument-ID findet die Akten, mit denen das Dokument verknüpft ist.
-    const fnId = q ? fivenetIdFrom(q) : null;
+    // Ein eingefügter FiveNet-/Google-Docs-Link oder eine Dokument-ID findet die Akten, mit denen das Dokument verknüpft ist.
+    const extId = q ? externalIdFrom(st.caseQuery) : null;
     return st.cases.filter((c) => {
       const f = st.caseFilter;
       const stateOk = f === 'alle' || (f === 'aktiv' ? c.status !== 'geschlossen' : c.status === f);
@@ -770,7 +776,7 @@
       const textOk =
         !q ||
         [c.caseNumber, c.title, c.clientName, c.lawyerName, c.courtRef, c.opponent].join(' ').toLowerCase().includes(q) ||
-        (!!fnId && (c.fivenetIds || []).includes(fnId));
+        (!!extId && (c.externalDocIds || []).includes(extId));
       return stateOk && mineOk && textOk;
     });
   }
@@ -812,7 +818,7 @@
           <div class="page-actions"><button class="btn-gold btn-md" data-action="new-case">${icon('plus')}<span>${staff ? 'Neue Akte' : 'Mandat einreichen'}</span></button></div>
         </div>
         <div class="toolbar">
-          <label class="search">${icon('search')}<input id="caseSearch" class="field" type="search" placeholder="${staff ? 'Aktenzeichen, Mandant, FiveNet-Link …' : 'Aktenzeichen, Titel …'}" value="${esc(st.caseQuery)}" aria-label="Akten durchsuchen"></label>
+          <label class="search">${icon('search')}<input id="caseSearch" class="field" type="search" placeholder="${staff ? 'Aktenzeichen, Mandant, FiveNet-/Docs-Link …' : 'Aktenzeichen, Titel …'}" value="${esc(st.caseQuery)}" aria-label="Akten durchsuchen"></label>
           <div class="chip-row">
             ${filters.map(([k, l]) => `<button class="chip ${st.caseFilter === k ? 'active' : ''}" data-action="case-filter" data-value="${k}">${l} <span class="chip-count">${caseCount(k)}</span></button>`).join('')}
             ${staff ? `<button class="chip ${st.caseMine ? 'active' : ''}" data-action="case-mine">${icon('user', 'ico-sm')}Nur meine</button>` : ''}
@@ -914,7 +920,7 @@
           .map(
             (a, i) => `<button type="button" class="att" data-action="att-open" data-index="${i}" aria-label="${esc(a.caption || 'Anhang ansehen')}">
               <img src="${esc(a.url)}" alt="${esc(a.caption)}" loading="lazy">
-              <span class="tag">${a.internal ? badge('intern', 'amber') : ''}${a.externalDocId ? badge('FiveNet', 'sky') : ''}</span>${a.caption ? `<span class="cap">${esc(a.caption)}</span>` : ''}</button>`
+              <span class="tag">${a.internal ? badge('intern', 'amber') : ''}${a.externalDocId ? badge(st.caseDocs.find((d) => d.id === a.externalDocId)?.provider === 'gdocs' ? 'Google Docs' : 'FiveNet', 'sky') : ''}</span>${a.caption ? `<span class="cap">${esc(a.caption)}</span>` : ''}</button>`
           )
           .join('')}
         ${canUpload && attachments.length < 40
@@ -938,27 +944,41 @@
     return `<div class="case-stats mb-5">
       ${pill('Nächste Frist / Termin', next ? esc(next.title) : '<span class="text-dim">keine</span>', 'secEvents', next ? countdownHtml(next) : '')}
       ${pill('Aufgaben', open.length ? `${open.length} offen` : '<span class="text-dim">keine offen</span>', 'secTasks', overdue ? `<span class="countdown cd-over">${overdue} überfällig</span>` : '')}
-      ${pill('FiveNet-Dokumente', String(externalDocs.length), 'secFivenet')}
+      ${pill('Externe Dokumente', String(externalDocs.length), 'secExternal')}
       ${pill('Beweismittel', String(attachments.length), 'secEvidence')}
       ${pill('Letzte Aktivität', esc(relDays(c.updatedAt)), 'secNotes')}
     </div>`;
   }
 
-  /* ---------------------------------------------------------------- FiveNet-Dokumente in der Akte */
-  function fivenetDocCard(d, c) {
+  /* ---------------------------------------------------------------- Externe Dokumente (FiveNet & Google Docs) */
+  const EXT = {
+    fivenet: { name: 'FiveNet', noun: 'FiveNet-Dokument', badgeCls: 'fn-badge', inputId: 'fnInput' },
+    gdocs: { name: 'Google Docs', noun: 'Google-Docs-Dokument', badgeCls: 'fn-badge gd', inputId: 'gdInput' },
+  };
+  const extOf = (d) => EXT[d.provider] || EXT.fivenet;
+  const extUrl = (caseId, linkId = null, suffix = '') => `/api/cases/${caseId}/external${linkId ? '/' + linkId : ''}${suffix}`;
+
+  function externalDocCard(d, c) {
     const staff = isStaff();
+    const p = extOf(d);
+    const gd = d.provider === 'gdocs';
     const canManage = staff && (d.linkedById === st.user.id || c.canEdit);
-    const meta = [d.docType, `Dokument-ID ${d.documentId}`, d.docDate ? `erstellt ${fmtDateOnly(d.docDate)}` : null, d.docAuthor || null]
+    const meta = [
+      d.docType,
+      gd ? (d.documentId.startsWith('e/') ? 'im Web veröffentlicht' : null) : `Dokument-ID ${d.documentId}`,
+      d.docDate ? `erstellt ${fmtDateOnly(d.docDate)}` : null,
+      d.docAuthor || null,
+    ]
       .filter(Boolean)
       .map(esc)
       .join(' · ');
     const images = st.caseAttachments.map((a, i) => ({ a, i })).filter(({ a }) => a.externalDocId === d.id);
     const content = d.contentText
-      ? `<details class="fn-text"><summary>${icon('doc', 'ico-sm')}<span>Abschrift anzeigen</span><span class="text-dim text-xs">${d.contentText.length.toLocaleString('de-DE')} Zeichen · übernommen ${esc(fmtDate(d.contentAt))}${d.contentByName ? ' von ' + esc(d.contentByName) : ''}</span></summary>
+      ? `<details class="fn-text"><summary>${icon('doc', 'ico-sm')}<span>Abschrift anzeigen</span><span class="text-dim text-xs">${d.contentText.length.toLocaleString('de-DE')} Zeichen · Stand ${esc(fmtDate(d.contentAt))}${d.contentByName ? ' · ' + esc(d.contentByName) : ''}</span></summary>
           <div class="fn-pre">${esc(d.contentText)}</div>
           <div class="fn-actions"><button type="button" class="btn-ghost btn-sm" data-action="fn-copy-text" data-id="${d.id}">${icon('copy', 'ico-sm')}<span>Text kopieren</span></button>
-            <a class="btn-ghost btn-sm" href="/api/cases/${c.id}/fivenet/${d.id}/text" download>${icon('download', 'ico-sm')}<span>Als Textdatei</span></a></div>
-          <p class="form-hint">Abschrift – maßgeblich ist das Original in FiveNet; spätere Änderungen dort sind hier nicht enthalten.</p></details>`
+            <a class="btn-ghost btn-sm" href="${extUrl(c.id, d.id, '/text')}" download>${icon('download', 'ico-sm')}<span>Als Textdatei</span></a></div>
+          <p class="form-hint">Abschrift – maßgeblich ist das Original in ${esc(p.name)}; spätere Änderungen dort sind hier erst nach „Aktualisieren“ enthalten.</p></details>`
       : '';
     const gallery = images.length
       ? `<div class="att-grid fn-gallery">${images
@@ -970,68 +990,86 @@
           .map((o) => `<button type="button" class="link-btn font-mono" data-action="open-case" data-id="${o.id}" title="${esc(o.title)}">${esc(o.caseNumber)}</button>`)
           .join(', ')}</div>`
       : '';
-    return `<div class="fn-doc">
+    const linkedOn = esc(parseDate(d.linkedAt)?.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) || '—');
+    return `<div class="fn-doc ${gd ? 'is-gdocs' : ''}">
       <div class="fn-head">
-        <span class="fn-badge">FiveNet</span>
-        <div class="fn-main"><div class="fn-title">${esc(d.title || `FiveNet-Dokument ${d.documentId}`)}</div><div class="fn-meta">${meta}</div></div>
+        <span class="${p.badgeCls}">${esc(p.name)}</span>
+        <div class="fn-main"><div class="fn-title">${esc(d.title || `${p.noun}${gd ? '' : ' ' + d.documentId}`)}</div><div class="fn-meta">${meta}</div></div>
         ${staff && d.internal ? badge('intern', 'amber') : ''}
       </div>
       ${d.summary ? `<p class="fn-summary">${esc(d.summary)}</p>` : ''}
       ${content}
       ${gallery}
-      <div class="fn-foot">Quelle: FiveNet (${esc(d.host)}) · Verknüpft von ${esc(d.linkedByName)} am ${esc(parseDate(d.linkedAt)?.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) || '—')}${staff && d.viewedAs ? ` · eingesehen als „${esc(d.viewedAs)}“` : ''}</div>
+      <div class="fn-foot">Quelle: ${esc(p.name)} (${esc(d.host)}) · Verknüpft von ${esc(d.linkedByName)} am ${linkedOn}${staff && d.viewedAs ? ` · eingesehen als „${esc(d.viewedAs)}“` : ''}</div>
       ${also}
       <div class="fn-actions">
-        <a class="btn-outline btn-sm" href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">${icon('external', 'ico-sm')}<span>In FiveNet öffnen</span></a>
+        <a class="btn-outline btn-sm" href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">${icon('external', 'ico-sm')}<span>In ${esc(p.name)} öffnen</span></a>
         ${staff ? `<button type="button" class="btn-ghost btn-sm" data-action="fn-cite" data-id="${d.id}">${icon('copy', 'ico-sm')}<span>Zitat kopieren</span></button>` : ''}
-        ${staff && !d.contentText ? `<button type="button" class="btn-ghost btn-sm" data-action="fn-edit" data-id="${d.id}" data-focus="fnContent">${icon('doc', 'ico-sm')}<span>Text & Bilder übernehmen</span></button>` : ''}
-        ${staff && st.caseAttachments.length < 40 ? `<label class="btn-ghost btn-sm file-btn">${icon('camera', 'ico-sm')}<span>Bild anhängen</span><input type="file" accept="image/*" multiple data-upload="fivenet-img" data-case-id="${c.id}" data-doc-id="${d.id}" aria-label="Bilder zum FiveNet-Dokument hinzufügen"></label>` : ''}
+        ${staff && gd ? `<button type="button" class="btn-ghost btn-sm" data-action="fn-edit" data-id="${d.id}" data-reload="1">${icon('download', 'ico-sm')}<span>${d.contentText ? 'Aktualisieren' : 'Inhalt laden'}</span></button>` : ''}
+        ${staff && !gd && !d.contentText ? `<button type="button" class="btn-ghost btn-sm" data-action="fn-edit" data-id="${d.id}" data-focus="fnContent">${icon('doc', 'ico-sm')}<span>Text & Bilder übernehmen</span></button>` : ''}
+        ${staff && st.caseAttachments.length < 40 ? `<label class="btn-ghost btn-sm file-btn">${icon('camera', 'ico-sm')}<span>Bild anhängen</span><input type="file" accept="image/*" multiple data-upload="fivenet-img" data-case-id="${c.id}" data-doc-id="${d.id}" aria-label="Bilder zum Dokument hinzufügen"></label>` : ''}
         ${canManage ? `<button type="button" class="btn-ghost btn-sm" data-action="fn-edit" data-id="${d.id}">${icon('edit', 'ico-sm')}<span>Bearbeiten</span></button>
           <button type="button" class="btn-ghost btn-sm fn-danger" data-action="fn-delete" data-id="${d.id}" data-case-id="${c.id}">${icon('trash', 'ico-sm')}<span>Entfernen</span></button>` : ''}
       </div>
     </div>`;
   }
 
-  function fivenetSection(c, docs) {
+  function externalSection(c, docs) {
     const staff = isStaff();
     if (!staff && !docs.length) return '';
-    return `<div class="section" id="secFivenet">
-      <h3 class="section-title">FiveNet-Dokumente <span class="flex items-center gap-2">${staff ? `<button type="button" class="btn-outline btn-sm" data-action="fn-add" data-case-id="${c.id}">${icon('link', 'ico-sm')}<span>FiveNet-Dokument hinzufügen</span></button>` : ''}</span></h3>
+    return `<div class="section" id="secExternal">
+      <h3 class="section-title">Externe Dokumente ${staff ? `<span class="ext-add">
+        <button type="button" class="btn-outline btn-sm" data-action="fn-add">${icon('link', 'ico-sm')}<span>FiveNet-Dokument</span></button>
+        <button type="button" class="btn-outline btn-sm" data-action="gd-add">${icon('doc', 'ico-sm')}<span>Google-Docs-Dokument</span></button></span>` : ''}</h3>
       ${docs.length
-        ? `<div class="stack">${docs.map((d) => fivenetDocCard(d, c)).join('')}</div>`
-        : '<p class="text-sm text-dim">Noch keine FiveNet-Dokumente. Polizeiberichte, Urteile oder Verträge aus FiveNet lassen sich per Link mit der Akte verknüpfen – ohne sie zu kopieren.</p>'}
-      ${!staff ? '<p class="form-hint">Öffnen ist nur mit einer Berechtigung in FiveNet möglich.</p>' : ''}
+        ? `<div class="stack">${docs.map((d) => externalDocCard(d, c)).join('')}</div>`
+        : '<p class="text-sm text-dim">Noch keine externen Dokumente. Polizeiberichte und Strafakten aus FiveNet oder Verträge und Schriftsätze aus Google Docs lassen sich per Link mit der Akte verknüpfen – mit Abschrift und Bildern.</p>'}
+      ${!staff ? '<p class="form-hint">Öffnen im Original ist nur mit einer Berechtigung in FiveNet bzw. Google Docs möglich.</p>' : ''}
     </div>`;
   }
 
-  function fivenetCitation(d) {
+  function externalCitation(d) {
     const parts = [d.docType, d.docDate ? fmtDateOnly(d.docDate) : null].filter(Boolean).join(', ');
-    return `FiveNet-Dokument Nr. ${d.documentId}${d.title ? ` „${d.title}“` : ''}${parts ? ` (${parts})` : ''}, ${d.url}`;
+    const head = d.provider === 'gdocs' ? 'Google-Docs-Dokument' : `FiveNet-Dokument Nr. ${d.documentId}`;
+    return `${head}${d.title ? ` „${d.title}“` : ''}${parts ? ` (${parts})` : ''}, ${d.url}`;
   }
 
-  /** Dialog: Dokument verknüpfen (d = null) oder Angaben bearbeiten. */
-  function fivenetForm(d, c) {
+  /** Dialog: Dokument verknüpfen (d = null) oder Angaben bearbeiten – für FiveNet und Google Docs. */
+  function externalForm(provider, d, c) {
     const fn = st.fivenet || { instance: { url: 'https://fivenet.modernv.net', host: 'fivenet.modernv.net' }, docTypes: [], lastViewedAs: '' };
+    const p = EXT[provider];
+    const gd = provider === 'gdocs';
     const editing = !!d;
-    const v = d || { title: '', docType: '', docDate: '', docAuthor: '', summary: '', viewedAs: fn.lastViewedAs || '', internal: true };
+    const v = d || { title: '', docType: '', docDate: '', docAuthor: '', summary: '', viewedAs: gd ? '' : fn.lastViewedAs || '', internal: true };
+    const inputBox = gd
+      ? `<div class="span-2"><label class="label" for="gdInput">Link zum Google-Docs-Dokument</label>
+          <input id="gdInput" name="input" class="field font-mono text-sm" required maxlength="600" autocomplete="off" spellcheck="false" autofocus placeholder="https://docs.google.com/document/d/…/edit">
+          <div id="gdCheck" class="fn-check" aria-live="polite"><span class="text-dim">Link einfügen – bei „Jeder, der über den Link verfügt“ werden Text und Bilder automatisch geladen.</span></div></div>`
+      : `<div class="span-2"><label class="label" for="fnInput">Link zum FiveNet-Dokument</label>
+          <input id="fnInput" name="input" class="field font-mono text-sm" required maxlength="500" autocomplete="off" spellcheck="false" autofocus placeholder="${esc(fn.instance.url)}/documents/1234">
+          <div id="fnCheck" class="fn-check" aria-live="polite"><span class="text-dim">Adresse aus FiveNet einfügen – die Dokument-ID wird automatisch erkannt.</span></div></div>`;
+    const known = editing
+      ? `<div class="span-2"><div class="label">${esc(p.noun)}</div><div class="fn-check ok"><div class="fn-line">${icon('check', 'ico-sm')}<span>${gd ? esc(d.host) : `Dokument-ID <strong>${esc(d.documentId)}</strong> · ${esc(d.host)}`}</span><a class="link-btn push" href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">In ${esc(p.name)} öffnen ↗</a></div></div>
+          ${gd ? '<div id="gdCheck" class="fn-check hidden" aria-live="polite"></div>' : ''}</div>`
+      : inputBox;
+    const contentHint = gd
+      ? 'Wird bei freigegebenen Dokumenten automatisch gefüllt. Sonst: in Google Docs Strg+A, Strg+C – hier Strg+V.'
+      : 'Im FiveNet-Dokument den Inhalt mit der Maus markieren → Strg+C, dann hier Strg+V. Text wird als Abschrift gespeichert, enthaltene Bilder werden automatisch übernommen.';
     return `
-      <h2 id="modalTitle" class="modal-title">${editing ? 'FiveNet-Dokument bearbeiten' : 'FiveNet-Dokument hinzufügen'}</h2>
+      <h2 id="modalTitle" class="modal-title">${editing ? `${esc(p.noun)} bearbeiten` : `${esc(p.noun)} hinzufügen`}</h2>
       <p class="modal-sub"><span class="font-mono text-gold">${esc(c.caseNumber)}</span> · ${esc(c.title)}</p>
-      <form data-form="${editing ? 'fivenet-edit' : 'fivenet-link'}" data-case-id="${c.id}" ${editing ? `data-id="${d.id}"` : ''} class="form-grid cols-2">
-        ${editing
-          ? `<div class="span-2"><div class="label">FiveNet-Dokument</div><div class="fn-check ok"><div class="fn-line">${icon('check', 'ico-sm')}<span>Dokument-ID <strong>${esc(d.documentId)}</strong> · ${esc(d.host)}</span><a class="link-btn push" href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">In FiveNet öffnen ↗</a></div></div></div>`
-          : `<div class="span-2"><label class="label" for="fnInput">Link zum FiveNet-Dokument</label>
-              <input id="fnInput" name="input" class="field font-mono text-sm" required maxlength="500" autocomplete="off" spellcheck="false" autofocus placeholder="${esc(fn.instance.url)}/documents/1234">
-              <div id="fnCheck" class="fn-check" aria-live="polite"><span class="text-dim">Adresse aus FiveNet einfügen – die Dokument-ID wird automatisch erkannt.</span></div></div>`}
-        <div class="span-2"><label class="label" for="fnTitle">Titel</label><input id="fnTitle" name="title" class="field" maxlength="300" value="${esc(v.title)}" placeholder="z. B. Polizeibericht – Verkehrskontrolle"></div>
-        <div><label class="label">Dokumentart</label><input name="docType" class="field" maxlength="60" list="fnTypes" value="${esc(v.docType)}" placeholder="z. B. Polizeibericht"><datalist id="fnTypes">${(fn.docTypes || []).map((t) => `<option value="${esc(t)}"></option>`).join('')}</datalist></div>
-        <div><label class="label">Erstellt am (laut FiveNet)</label><input name="docDate" type="date" class="field" value="${esc(v.docDate || '')}"></div>
-        <div><label class="label">Verfasser / Behörde</label><input name="docAuthor" class="field" maxlength="120" value="${esc(v.docAuthor)}" placeholder="z. B. LSPD, Officer J. Miller"></div>
-        <div><label class="label">Eingesehen als (FiveNet-Charakter)</label><input name="viewedAs" class="field" maxlength="80" value="${esc(v.viewedAs || '')}" placeholder="eigene Angabe, optional"></div>
+      <form data-form="${editing ? 'ext-edit' : 'ext-link'}" data-provider="${provider}" data-case-id="${c.id}" ${editing ? `data-id="${d.id}"` : ''} class="form-grid cols-2">
+        ${known}
+        <div class="span-2"><label class="label" for="fnTitle">Titel</label><input id="fnTitle" name="title" class="field" maxlength="300" value="${esc(v.title)}" placeholder="${gd ? 'z. B. Kaufvertrag Autohaus' : 'z. B. Polizeibericht – Verkehrskontrolle'}"></div>
+        <div><label class="label">Dokumentart</label><input name="docType" class="field" maxlength="60" list="fnTypes" value="${esc(v.docType)}" placeholder="${gd ? 'z. B. Vertrag' : 'z. B. Polizeibericht'}"><datalist id="fnTypes">${(fn.docTypes || []).map((t) => `<option value="${esc(t)}"></option>`).join('')}</datalist></div>
+        <div><label class="label">Erstellt am</label><input name="docDate" type="date" class="field" value="${esc(v.docDate || '')}"></div>
+        <div class="${gd ? 'span-2' : ''}"><label class="label">Verfasser / Behörde</label><input name="docAuthor" class="field" maxlength="120" value="${esc(v.docAuthor)}" placeholder="${gd ? 'z. B. Autohaus Premium Deluxe' : 'z. B. LSPD, Officer J. Miller'}"></div>
+        ${gd ? '' : `<div><label class="label">Eingesehen als (FiveNet-Charakter)</label><input name="viewedAs" class="field" maxlength="80" value="${esc(v.viewedAs || '')}" placeholder="eigene Angabe, optional"></div>`}
         <div class="span-2"><label class="label">Kurzinhalt / Relevanz für die Akte</label><textarea name="summary" rows="3" maxlength="2000" class="field" placeholder="Was steht drin, warum ist es wichtig?">${esc(v.summary)}</textarea></div>
         <div class="span-2 fn-content-box">
-          <label class="label" for="fnContent">Inhalt aus FiveNet – Text & Bilder (optional)</label>
-          <textarea id="fnContent" name="contentText" rows="7" maxlength="60000" class="field fn-content" placeholder="Im FiveNet-Dokument den Inhalt mit der Maus markieren → Strg+C, dann hier Strg+V. Text wird als Abschrift gespeichert, enthaltene Bilder werden automatisch übernommen.">${esc(v.contentText || '')}</textarea>
+          <div class="fn-line"><label class="label" for="fnContent">Inhalt aus ${esc(p.name)} – Text & Bilder (optional)</label>
+            ${gd && editing ? `<button type="button" class="btn-ghost btn-sm push" data-action="gd-reload" data-url="${esc(d.url)}">${icon('download', 'ico-sm')}<span>Neu aus Google Docs laden</span></button>` : ''}</div>
+          <textarea id="fnContent" name="contentText" rows="7" maxlength="60000" class="field fn-content" placeholder="${esc(contentHint)}">${esc(v.contentText || '')}</textarea>
           <div id="fnPending" class="fn-pending"></div>
           <div class="fn-line mt-2">
             <label class="btn-ghost btn-sm file-btn">${icon('camera', 'ico-sm')}<span>Bilder / Screenshots wählen</span><input type="file" accept="image/*" multiple data-upload="fn-pending" aria-label="Bilder auswählen"></label>
@@ -1039,8 +1077,9 @@
           </div>
         </div>
         <label class="check span-2"><input type="checkbox" name="clientVisible" ${v.internal ? '' : 'checked'}> Für den Mandanten sichtbar (sonst nur intern) – gilt auch für Abschrift und Bilder</label>
-        ${editing ? '' : `<label class="check span-2 fn-attest"><input type="checkbox" name="attest" required> Ich habe dieses Dokument in FiveNet mit meinem eigenen Charakter geöffnet und darf es einsehen und für die Akte übernehmen.</label>
+        ${editing || gd ? '' : `<label class="check span-2 fn-attest"><input type="checkbox" name="attest" required> Ich habe dieses Dokument in FiveNet mit meinem eigenen Charakter geöffnet und darf es einsehen und für die Akte übernehmen.</label>
           <div class="span-2 banner banner-gold mb-0">${icon('shield')}<div>FiveNet bietet externen Anwendungen keine Schnittstelle (kein OAuth2). Die Kanzlei ruft das Dokument deshalb nicht selbst ab und fragt nie nach Ihrem FiveNet-Passwort. Übernommen wird nur, was Sie hier einfügen – Bilder daraus lädt der Server direkt aus dem FiveNet-Dateispeicher.</div></div>`}
+        ${gd && !editing ? `<div class="span-2 banner banner-gold mb-0">${icon('shield')}<div>Die Kanzlei nutzt kein Google-Konto und fragt nie nach Passwörtern. Geladen werden nur Dokumente, die per Link freigegeben oder im Web veröffentlicht sind – genau so, wie sie jeder mit dem Link sehen kann.</div></div>` : ''}
         <div class="span-2 form-actions">
           <button type="submit" class="btn-gold btn-md">${icon(editing ? 'check' : 'link', 'ico-sm')}<span>${editing ? 'Speichern' : 'Mit Akte verknüpfen'}</span></button>
           <button type="button" class="btn-ghost btn-md" data-action="back-to-case">Abbrechen</button>
@@ -1048,13 +1087,13 @@
       </form>`;
   }
 
-  /** Live-Prüfung des eingefügten Links (Dokument-ID, Dubletten, Querverweise). */
+  /** Live-Prüfung des eingefügten FiveNet-Links (Dokument-ID, Dubletten, Querverweise). */
   async function checkFivenetInput(input) {
     const box = $('#fnCheck');
     if (!box) return;
     const token = ++st.fnCheckToken;
     const value = input.value.trim();
-    const submit = $('form[data-form="fivenet-link"] button[type="submit"]');
+    const submit = $('form[data-form="ext-link"] button[type="submit"]');
     if (submit) submit.disabled = false;
     if (!value) {
       box.className = 'fn-check';
@@ -1086,6 +1125,64 @@
     box.className = `fn-check ${r.linkedHere ? 'warn' : 'ok'}`;
     box.innerHTML = lines.join('');
     if (submit) submit.disabled = !!r.linkedHere;
+  }
+
+  /**
+   * Google Docs: Link erkennen und – falls freigegeben – Text und Bilder automatisch übernehmen.
+   * replace = true: vorhandene Abschrift ersetzen (Aktualisieren im Bearbeiten-Dialog).
+   */
+  async function loadGoogleDoc(value, { replace = false } = {}) {
+    const box = $('#gdCheck');
+    if (!box) return;
+    const token = ++st.fnCheckToken;
+    const submit = $('form[data-form="ext-link"] button[type="submit"]');
+    if (submit) submit.disabled = false;
+    box.classList.remove('hidden');
+    if (!value) {
+      box.className = 'fn-check';
+      box.innerHTML = '<span class="text-dim">Link einfügen – bei „Jeder, der über den Link verfügt“ werden Text und Bilder automatisch geladen.</span>';
+      return;
+    }
+    box.className = 'fn-check';
+    box.innerHTML = '<span class="text-dim">Google Docs wird geladen …</span>';
+    let r;
+    try {
+      r = await api.post('/api/gdocs/fetch', { input: value, caseId: st.modalCaseId || undefined });
+    } catch (e) {
+      if (token !== st.fnCheckToken || !box.isConnected) return;
+      box.className = 'fn-check bad';
+      box.innerHTML = `${icon('x', 'ico-sm')}<span>${esc(e.message)}</span>`;
+      return;
+    }
+    if (token !== st.fnCheckToken || !box.isConnected) return;
+    const lines = [];
+    const openLink = `<a class="link-btn push" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">In Google Docs öffnen ↗</a>`;
+    if (r.html) {
+      const { text, images } = parsePastedHtml(r.html);
+      const urls = images.map((src) => externalImageUrl('gdocs', src)).filter(Boolean);
+      const area = $('#fnContent');
+      if (area && (replace || !area.value.trim() || area.dataset.auto === '1')) {
+        area.value = text.length > 60000 ? text.slice(0, 60000) : text;
+        area.dataset.auto = '1';
+        if (text.length > 60000) toast('Das Dokument ist sehr lang – die Abschrift wurde auf 60.000 Zeichen gekürzt.', 'error');
+      }
+      st.fnPending.urls = [];
+      addPendingImages({ urls });
+      const title = $('#fnTitle');
+      if (title && !title.value && (r.title || r.suggestedTitle)) title.value = r.title || r.suggestedTitle;
+      lines.push(
+        `<div class="fn-line">${icon('check', 'ico-sm')}<span>${r.title ? `„${esc(r.title)}“ ` : 'Dokument '}geladen · ${text.length.toLocaleString('de-DE')} Zeichen · ${urls.length} Bild${urls.length === 1 ? '' : 'er'}${r.published ? ' · im Web veröffentlicht' : ''}</span>${openLink}</div>`
+      );
+    } else {
+      lines.push(`<div class="fn-line">${icon('check', 'ico-sm')}<span>Google-Docs-Link erkannt</span>${openLink}</div>`);
+      lines.push(`<div class="fn-warn">${esc(r.contentError || 'Der Inhalt konnte nicht geladen werden.')}</div>`);
+    }
+    if (r.linkedHere && !replace) lines.push(`<div class="fn-warn">Bereits mit dieser Akte verknüpft (von ${esc(r.linkedHere.linkedByName)}).</div>`);
+    if (r.otherCases.length) lines.push(`<div class="text-xs text-muted">Auch verknüpft mit: ${r.otherCases.map((o) => `<span class="font-mono">${esc(o.caseNumber)}</span>`).join(', ')}</div>`);
+    box.className = `fn-check ${r.html && !(r.linkedHere && !replace) ? 'ok' : 'warn'}`;
+    box.innerHTML = lines.join('');
+    if (submit) submit.disabled = !!r.linkedHere;
+    if (replace && r.html) toast('Neuer Stand geladen – mit „Speichern“ übernehmen.');
   }
 
   function fivenetBody(f) {
@@ -1123,7 +1220,8 @@
       img.replaceWith(marker);
     });
     const out = [];
-    const walk = (node) => {
+    // inCell: innerhalb einer Tabellenzelle bleiben Absätze in einer Zeile (Google Docs setzt <p> in jede Zelle).
+    const walk = (node, inCell = false) => {
       for (const n of node.childNodes) {
         if (n.nodeType === 3) {
           out.push(n.nodeValue.replace(/\s+/g, ' '));
@@ -1139,18 +1237,21 @@
           out.push('\n————————\n');
           continue;
         }
-        const block = FN_BLOCK.has(tag);
+        const cell = tag === 'TD' || tag === 'TH';
+        const block = FN_BLOCK.has(tag) && !inCell;
         // Listenpunkte und Tabellenzeilen ohne Leerzeile untereinander, Absätze mit Leerzeile.
         const tight = tag === 'LI' || tag === 'TR' || tag === 'DT' || tag === 'DD';
         if (block) out.push('\n');
+        else if (inCell && FN_BLOCK.has(tag)) out.push(' ');
         if (tag === 'LI') out.push('• ');
-        if ((tag === 'TD' || tag === 'TH') && n.previousElementSibling) out.push(' | ');
-        walk(n);
+        if (cell && n.previousElementSibling) out.push(' | ');
+        walk(n, inCell || cell);
         if (block && !tight) out.push('\n');
         if (/^H[1-6]$/.test(tag)) out.push('\n');
       }
     };
-    walk(doc.body);
+    // Im Web veröffentlichte Google-Docs-Seiten tragen den Inhalt in #contents.
+    walk(doc.querySelector('#contents') || doc.body);
     const text = out
       .join('')
       .split('\n')
@@ -1161,8 +1262,21 @@
     return { text, images };
   }
 
-  /** Nur Bilder aus dem Dateispeicher / Bild-Proxy der FiveNet-Instanz werden übernommen. */
-  function fivenetImageUrl(src) {
+  /**
+   * Übernommen werden nur Bilder der jeweiligen Quelle: FiveNet-Dateispeicher / Bild-Proxy
+   * bzw. Google-Inhaltsserver (*.googleusercontent.com). Der Server prüft dasselbe noch einmal.
+   */
+  function externalImageUrl(provider, src) {
+    if (provider === 'gdocs') {
+      try {
+        const u = new URL(src);
+        if (u.protocol !== 'https:' || u.port || !u.hostname.endsWith('.googleusercontent.com')) return null;
+        u.hash = '';
+        return u.toString();
+      } catch {
+        return null;
+      }
+    }
     const base = st.fivenet?.instance?.url || 'https://fivenet.modernv.net';
     try {
       const u = new URL(src, base);
@@ -1209,8 +1323,9 @@
     if (!box) return;
     (st.fnPending.previews || []).forEach((u) => URL.revokeObjectURL(u));
     st.fnPending.previews = st.fnPending.blobs.map((b) => URL.createObjectURL(b));
+    const source = EXT[box.closest('form')?.dataset.provider]?.name || 'Quelle';
     const items = [
-      ...st.fnPending.urls.map((u, i) => ({ src: u, kind: 'url', i, label: 'aus FiveNet' })),
+      ...st.fnPending.urls.map((u, i) => ({ src: u, kind: 'url', i, label: `aus ${source}` })),
       ...st.fnPending.blobs.map((b, i) => ({ src: st.fnPending.previews[i], kind: 'blob', i, label: 'eingefügt' })),
     ];
     box.innerHTML = items.length
@@ -1238,8 +1353,8 @@
     el.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
-  /** Einfügen im FiveNet-Dialog: HTML → Text + Bildadressen, Bilddateien aus der Zwischenablage → Anhänge. */
-  function onFivenetPaste(e) {
+  /** Einfügen im Dokument-Dialog: HTML → Text + Bildadressen, Bilddateien aus der Zwischenablage → Anhänge. */
+  function onExternalPaste(e, provider) {
     const cd = e.clipboardData;
     if (!cd) return;
     const files = [...(cd.files || [])].filter((f) => /^image\/(png|jpeg|webp|gif|bmp)$/.test(f.type));
@@ -1256,13 +1371,13 @@
         const blob = src.startsWith('data:') ? dataUrlToBlob(src) : null;
         if (blob) blobs.push(blob);
         else {
-          const u = fivenetImageUrl(src);
+          const u = externalImageUrl(provider, src);
           if (u) urls.push(u);
           else external += 1;
         }
       }
       if (urls.length || blobs.length) addPendingImages({ urls, blobs });
-      if (external) toast(`${external} Bild${external === 1 ? '' : 'er'} liegt nicht im FiveNet-Dateispeicher – bitte als Screenshot einfügen.`, 'error');
+      if (external) toast(`${external} Bild${external === 1 ? '' : 'er'} liegt nicht bei ${EXT[provider].name} – bitte als Screenshot einfügen.`, 'error');
       if (text) {
         e.preventDefault();
         insertAtCursor(e.target, text);
@@ -1278,13 +1393,14 @@
   /** Nach dem Speichern: vorgemerkte Bilder als Anhänge zum FiveNet-Dokument übernehmen. */
   async function importPendingImages(caseId, doc) {
     const pending = st.fnPending;
-    const result = { ok: 0, failed: 0, errors: [] };
+    const result = { ok: 0, failed: 0, skipped: 0, errors: [] };
     if (!pending.urls.length && !pending.blobs.length) return result;
     toast('Bilder werden übernommen …');
     if (pending.urls.length) {
       try {
-        const r = await api.post(`/api/cases/${caseId}/fivenet/${doc.id}/images`, { urls: pending.urls });
+        const r = await api.post(extUrl(caseId, doc.id, '/images'), { urls: pending.urls });
         result.ok += r.imported;
+        result.skipped += r.skipped;
         result.failed += r.failed.length;
         result.errors.push(...r.failed.map((f) => f.error));
       } catch (e) {
@@ -1292,7 +1408,7 @@
         result.errors.push(e.message);
       }
     }
-    const caption = `FiveNet ${doc.documentId}${doc.title ? ' – ' + doc.title : ''}`.slice(0, 180);
+    const caption = (doc.provider === 'gdocs' ? `Google Docs${doc.title ? ' – ' + doc.title : ''}` : `FiveNet ${doc.documentId}${doc.title ? ' – ' + doc.title : ''}`).slice(0, 180);
     for (const b of pending.blobs) {
       try {
         const blob = await resizeImage(b, { max: 1600 });
@@ -1309,6 +1425,7 @@
 
   function reportImport(r) {
     if (r.ok) toast(`${r.ok} Bild${r.ok === 1 ? '' : 'er'} als Anhang übernommen.`);
+    if (r.skipped && !r.ok && !r.failed) toast('Die Bilder sind bereits in der Akte – nichts Neues.');
     if (r.failed) toast(`${r.failed} Bild${r.failed === 1 ? '' : 'er'} nicht übernommen (${[...new Set(r.errors)].slice(0, 2).join('; ')}). Tipp: als Screenshot mit Strg+V einfügen.`, 'error');
   }
 
@@ -1493,7 +1610,7 @@
       ${editForm}
       <div class="section"><h3 class="section-title">Sachverhalt</h3><p class="text-sm whitespace-pre-wrap text-muted">${esc(c.description || '—')}</p></div>
       ${c.publicNote ? `<div class="section"><h3 class="section-title">Statushinweis</h3><div class="banner banner-gold mb-0"><p class="text-sm whitespace-pre-wrap">${esc(c.publicNote)}</p></div></div>` : ''}
-      ${fivenetSection(c, externalDocs)}
+      ${externalSection(c, externalDocs)}
       ${attachmentsSection(c, attachments)}
       <div class="section" id="secEvents"><h3 class="section-title">Termine & Fristen</h3>${apptList}</div>
       ${staff ? caseTasksSection(c, tasks) : ''}
@@ -3215,7 +3332,14 @@
       st.returnCase = st.caseInfo.id;
       await load.fivenet();
       resetPending();
-      openModal(fivenetForm(null, st.caseInfo));
+      openModal(externalForm('fivenet', null, st.caseInfo));
+    },
+    'gd-add': async () => {
+      if (!st.caseInfo) return;
+      st.returnCase = st.caseInfo.id;
+      await load.fivenet(); // Vorschläge für Dokumentarten
+      resetPending();
+      openModal(externalForm('gdocs', null, st.caseInfo));
     },
     'fn-edit': async (el) => {
       const d = st.caseDocs.find((x) => x.id === Number(el.dataset.id));
@@ -3223,13 +3347,15 @@
       st.returnCase = st.caseInfo.id;
       await load.fivenet();
       resetPending();
-      openModal(fivenetForm(d, st.caseInfo));
+      openModal(externalForm(d.provider === 'gdocs' ? 'gdocs' : 'fivenet', d, st.caseInfo));
       if (el.dataset.focus) {
         const target = $('#' + el.dataset.focus);
         target?.scrollIntoView({ block: 'center' });
         target?.focus();
       }
+      if (el.dataset.reload && d.provider === 'gdocs') await loadGoogleDoc(d.url, { replace: true });
     },
+    'gd-reload': (el) => loadGoogleDoc(el.dataset.url, { replace: true }),
     'fn-img-remove': (el) => {
       const i = Number(el.dataset.index);
       if (el.dataset.kind === 'url') st.fnPending.urls.splice(i, 1);
@@ -3244,16 +3370,16 @@
     },
     'fn-delete': async (el) => {
       const d = st.caseDocs.find((x) => x.id === Number(el.dataset.id));
-      if (!d || !confirm(`Verknüpfung mit FiveNet-Dokument ${d.documentId} aus der Akte entfernen? Das Dokument in FiveNet bleibt unverändert, übernommene Bilder bleiben als Beweismittel in der Akte.`)) return;
+      if (!d || !confirm(`Verknüpfung mit ${extOf(d).noun}${d.title ? ` „${d.title}“` : ''} aus der Akte entfernen? Das Original bleibt unverändert, übernommene Bilder bleiben als Beweismittel in der Akte.`)) return;
       const caseId = Number(el.dataset.caseId);
-      await api.del(`/api/cases/${caseId}/fivenet/${d.id}`);
+      await api.del(extUrl(caseId, d.id));
       toast('Verknüpfung entfernt.');
       await reloadCase(caseId);
     },
     'fn-cite': async (el) => {
       const d = st.caseDocs.find((x) => x.id === Number(el.dataset.id));
       if (!d) return;
-      const ok = await copy(fivenetCitation(d));
+      const ok = await copy(externalCitation(d));
       toast(ok ? 'Zitat kopiert – z. B. für Schriftsätze oder Nachrichten.' : 'Kopieren nicht möglich.', ok ? 'ok' : 'error');
     },
     'fn-check': async () => {
@@ -3647,17 +3773,18 @@
       closeModal();
       await refreshBehind();
     },
-    'fivenet-link': async (f) => {
+    'ext-link': async (f) => {
       const fd = new FormData(f);
-      if (fd.get('attest') !== 'on') throw new Error('Bitte bestätigen Sie, dass Sie das Dokument in FiveNet selbst einsehen dürfen.');
-      const res = await api.post(`/api/cases/${f.dataset.caseId}/fivenet`, { input: val(fd, 'input'), attest: true, ...fivenetBody(f) });
+      const provider = f.dataset.provider;
+      if (provider === 'fivenet' && fd.get('attest') !== 'on') throw new Error('Bitte bestätigen Sie, dass Sie das Dokument in FiveNet selbst einsehen dürfen.');
+      const res = await api.post(extUrl(f.dataset.caseId), { provider, input: val(fd, 'input'), attest: provider === 'fivenet', ...fivenetBody(f) });
       st.fivenet = null; // Vorschläge (Dokumentarten, Charakter) neu laden
-      toast('FiveNet-Dokument mit der Akte verknüpft.');
+      toast(`${EXT[provider].noun} mit der Akte verknüpft.`);
       reportImport(await importPendingImages(Number(f.dataset.caseId), res.document));
       await returnOrClose();
     },
-    'fivenet-edit': async (f) => {
-      const res = await api.patch(`/api/cases/${f.dataset.caseId}/fivenet/${f.dataset.id}`, fivenetBody(f));
+    'ext-edit': async (f) => {
+      const res = await api.patch(extUrl(f.dataset.caseId, f.dataset.id), fivenetBody(f));
       st.fivenet = null;
       toast('Angaben gespeichert.');
       reportImport(await importPendingImages(Number(f.dataset.caseId), res.document));
@@ -3768,7 +3895,8 @@
   });
 
   document.addEventListener('paste', (e) => {
-    if (e.target && e.target.closest && e.target.closest('form[data-form="fivenet-link"], form[data-form="fivenet-edit"]')) onFivenetPaste(e);
+    const form = e.target && e.target.closest ? e.target.closest('form[data-form="ext-link"], form[data-form="ext-edit"]') : null;
+    if (form) onExternalPaste(e, form.dataset.provider);
   });
 
   document.addEventListener('input', (e) => {
@@ -3779,6 +3907,11 @@
     } else if (t.id === 'fnInput') {
       clearTimeout(st.fnTimer);
       st.fnTimer = setTimeout(() => checkFivenetInput(t), 300);
+    } else if (t.id === 'gdInput') {
+      clearTimeout(st.fnTimer);
+      st.fnTimer = setTimeout(() => loadGoogleDoc(t.value.trim()), 400);
+    } else if (t.id === 'fnContent') {
+      t.dataset.auto = '0'; // von Hand geändert – beim nächsten automatischen Laden nicht überschreiben
     } else if (t.id === 'taskSearch') {
       st.taskQuery = t.value;
       $('#taskList').innerHTML = taskList();
