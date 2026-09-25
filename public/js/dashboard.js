@@ -85,6 +85,7 @@
     external: 'M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14',
     shield: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
     tasks: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4',
+    table: 'M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z',
     doc: 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z',
   };
   const icon = (name, cls = 'ico') =>
@@ -277,11 +278,11 @@
   }
   /**
    * Dokument-ID aus einem FiveNet-Link (…/documents/1234), einer reinen Zahl oder einem
-   * Google-Docs-Link (…/document/d/<ID>, …/document/d/e/<ID>) – für die Aktensuche.
+   * Google-Docs-/Sheets-Link (…/document/d/<ID>, …/spreadsheets/d/e/<ID>) – für die Aktensuche.
    */
   function externalIdFrom(q) {
     const s = String(q).trim();
-    const g = s.match(/\/document\/(?:u\/\d+\/)?d\/(e\/)?([A-Za-z0-9_-]{20,200})/i);
+    const g = s.match(/\/(?:document|spreadsheets)\/(?:u\/\d+\/)?d\/(e\/)?([A-Za-z0-9_-]{20,200})/i);
     if (g) return (g[1] ? 'e/' : '') + g[2];
     const m = s.match(/\/documents\/(\d{1,19})(?:[/?#]|$)/) || s.match(/^#?(\d{1,19})$/);
     return m ? m[1].replace(/^0+(?=\d)/, '') : null;
@@ -779,7 +780,8 @@
       const textOk =
         !q ||
         [c.caseNumber, c.title, c.clientName, c.lawyerName, c.courtRef, c.opponent].join(' ').toLowerCase().includes(q) ||
-        (!!extId && (c.externalDocIds || []).includes(extId));
+        // Google-Sheets-IDs tragen ggf. das Tabellenblatt (#gid=…) – gefunden wird jede Verknüpfung der Tabelle.
+        (!!extId && (c.externalDocIds || []).some((x) => x.split('#')[0] === extId));
       return stateOk && mineOk && textOk;
     });
   }
@@ -923,7 +925,7 @@
           .map(
             (a, i) => `<button type="button" class="att" data-action="att-open" data-index="${i}" aria-label="${esc(a.caption || 'Anhang ansehen')}">
               <img src="${esc(a.url)}" alt="${esc(a.caption)}" loading="lazy">
-              <span class="tag">${a.internal ? badge('intern', 'amber') : ''}${a.externalDocId ? badge(st.caseDocs.find((d) => d.id === a.externalDocId)?.provider === 'gdocs' ? 'Google Docs' : 'FiveNet', 'sky') : ''}</span>${a.caption ? `<span class="cap">${esc(a.caption)}</span>` : ''}</button>`
+              <span class="tag">${a.internal ? badge('intern', 'amber') : ''}${a.externalDocId ? badge(extOf(st.caseDocs.find((d) => d.id === a.externalDocId) || {}).name, 'sky') : ''}</span>${a.caption ? `<span class="cap">${esc(a.caption)}</span>` : ''}</button>`
           )
           .join('')}
         ${canUpload && attachments.length < 40
@@ -953,10 +955,11 @@
     </div>`;
   }
 
-  /* ---------------------------------------------------------------- Externe Dokumente (FiveNet & Google Docs) */
+  /* ---------------------------------------------------------------- Externe Dokumente (FiveNet, Google Docs & Google Sheets) */
   const EXT = {
     fivenet: { name: 'FiveNet', noun: 'FiveNet-Dokument', badgeCls: 'fn-badge', inputId: 'fnInput' },
-    gdocs: { name: 'Google Docs', noun: 'Google-Docs-Dokument', badgeCls: 'fn-badge gd', inputId: 'gdInput' },
+    gdocs: { name: 'Google Docs', noun: 'Google-Docs-Dokument', badgeCls: 'fn-badge gd', inputId: 'gdInput', google: true },
+    gsheets: { name: 'Google Sheets', noun: 'Google-Sheets-Tabelle', badgeCls: 'fn-badge gs', inputId: 'gdInput', google: true },
   };
   const extOf = (d) => EXT[d.provider] || EXT.fivenet;
   const extUrl = (caseId, linkId = null, suffix = '') => `/api/cases/${caseId}/external${linkId ? '/' + linkId : ''}${suffix}`;
@@ -964,10 +967,13 @@
   function externalDocCard(d, c) {
     const staff = isStaff();
     const p = extOf(d);
-    const gd = d.provider === 'gdocs';
+    const gd = !!p.google;
+    const sheet = d.provider === 'gsheets';
+    const gid = sheet && d.documentId.includes('#gid=') ? d.documentId.split('#gid=')[1] : '';
     const canManage = staff && (d.linkedById === st.user.id || c.canEdit);
     const meta = [
       d.docType,
+      sheet ? (gid ? `Tabellenblatt-ID ${gid}` : 'erstes Tabellenblatt') : null,
       gd ? (d.documentId.startsWith('e/') ? 'im Web veröffentlicht' : null) : `Dokument-ID ${d.documentId}`,
       d.docDate ? `erstellt ${fmtDateOnly(d.docDate)}` : null,
       d.docAuthor || null,
@@ -976,10 +982,11 @@
       .map(esc)
       .join(' · ');
     const images = st.caseAttachments.map((a, i) => ({ a, i })).filter(({ a }) => a.externalDocId === d.id);
+    const rows = sheet && d.contentText ? d.contentText.split('\n').filter(Boolean).length : 0;
     const content = d.contentText
-      ? `<details class="fn-text"><summary>${icon('doc', 'ico-sm')}<span>Abschrift anzeigen</span><span class="text-dim text-xs">${d.contentText.length.toLocaleString('de-DE')} Zeichen · Stand ${esc(fmtDate(d.contentAt))}${d.contentByName ? ' · ' + esc(d.contentByName) : ''}</span></summary>
-          <div class="fn-pre">${esc(d.contentText)}</div>
-          <div class="fn-actions"><button type="button" class="btn-ghost btn-sm" data-action="fn-copy-text" data-id="${d.id}">${icon('copy', 'ico-sm')}<span>Text kopieren</span></button>
+      ? `<details class="fn-text"><summary>${icon(sheet ? 'table' : 'doc', 'ico-sm')}<span>${sheet ? 'Tabelle anzeigen' : 'Abschrift anzeigen'}</span><span class="text-dim text-xs">${sheet ? `${rows.toLocaleString('de-DE')} Zeile${rows === 1 ? '' : 'n'}` : `${d.contentText.length.toLocaleString('de-DE')} Zeichen`} · Stand ${esc(fmtDate(d.contentAt))}${d.contentByName ? ' · ' + esc(d.contentByName) : ''}</span></summary>
+          ${sheet ? sheetTable(d.contentText) : `<div class="fn-pre">${esc(d.contentText)}</div>`}
+          <div class="fn-actions"><button type="button" class="btn-ghost btn-sm" data-action="fn-copy-text" data-id="${d.id}">${icon('copy', 'ico-sm')}<span>${sheet ? 'Tabelle kopieren (für Excel/Sheets)' : 'Text kopieren'}</span></button>
             <a class="btn-ghost btn-sm" href="${extUrl(c.id, d.id, '/text')}" download>${icon('download', 'ico-sm')}<span>Als Textdatei</span></a></div>
           <p class="form-hint">Abschrift – maßgeblich ist das Original in ${esc(p.name)}; spätere Änderungen dort sind hier erst nach „Aktualisieren“ enthalten.</p></details>`
       : '';
@@ -994,7 +1001,7 @@
           .join(', ')}</div>`
       : '';
     const linkedOn = esc(parseDate(d.linkedAt)?.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) || '—');
-    return `<div class="fn-doc ${gd ? 'is-gdocs' : ''}">
+    return `<div class="fn-doc ${gd ? `is-${esc(d.provider)}` : ''}">
       <div class="fn-head">
         <span class="${p.badgeCls}">${esc(p.name)}</span>
         <div class="fn-main"><div class="fn-title">${esc(d.title || `${p.noun}${gd ? '' : ' ' + d.documentId}`)}</div><div class="fn-meta">${meta}</div></div>
@@ -1017,37 +1024,58 @@
     </div>`;
   }
 
+  /** Abschrift einer Google-Sheets-Tabelle (tabulatorgetrennt) als Tabelle; die erste Zeile gilt als Kopfzeile. */
+  function sheetTable(text) {
+    const rows = String(text).split('\n').map((l) => l.split('\t'));
+    const cols = rows.reduce((n, r) => Math.max(n, r.length), 0);
+    const cells = (r, tag) => Array.from({ length: cols }, (_, i) => `<${tag}>${esc(r[i] || '')}</${tag}>`).join('');
+    return `<div class="fn-table-wrap"><table class="fn-table">
+      <thead><tr>${cells(rows[0], 'th')}</tr></thead>
+      <tbody>${rows
+        .slice(1)
+        .map((r) => (r.length === 1 && !r[0] ? `<tr class="gap"><td colspan="${cols}"></td></tr>` : `<tr>${cells(r, 'td')}</tr>`))
+        .join('')}</tbody></table></div>`;
+  }
+
   function externalSection(c, docs) {
     const staff = isStaff();
     if (!staff && !docs.length) return '';
     return `<div class="section" id="secExternal">
       <h3 class="section-title">Externe Dokumente ${staff ? `<span class="ext-add">
         <button type="button" class="btn-outline btn-sm" data-action="fn-add">${icon('link', 'ico-sm')}<span>FiveNet-Dokument</span></button>
-        <button type="button" class="btn-outline btn-sm" data-action="gd-add">${icon('doc', 'ico-sm')}<span>Google-Docs-Dokument</span></button></span>` : ''}</h3>
+        <button type="button" class="btn-outline btn-sm" data-action="gd-add" data-provider="gdocs">${icon('doc', 'ico-sm')}<span>Google-Docs-Dokument</span></button>
+        <button type="button" class="btn-outline btn-sm" data-action="gd-add" data-provider="gsheets">${icon('table', 'ico-sm')}<span>Google-Sheets-Tabelle</span></button></span>` : ''}</h3>
       ${docs.length
         ? `<div class="stack">${docs.map((d) => externalDocCard(d, c)).join('')}</div>`
-        : '<p class="text-sm text-dim">Noch keine externen Dokumente. Polizeiberichte und Strafakten aus FiveNet oder Verträge und Schriftsätze aus Google Docs lassen sich per Link mit der Akte verknüpfen – mit Abschrift und Bildern.</p>'}
-      ${!staff ? '<p class="form-hint">Öffnen im Original ist nur mit einer Berechtigung in FiveNet bzw. Google Docs möglich.</p>' : ''}
+        : '<p class="text-sm text-dim">Noch keine externen Dokumente. Polizeiberichte und Strafakten aus FiveNet, Verträge und Schriftsätze aus Google Docs oder Aufstellungen aus Google Sheets lassen sich per Link mit der Akte verknüpfen – mit Abschrift und Bildern.</p>'}
+      ${!staff ? '<p class="form-hint">Öffnen im Original ist nur mit einer Berechtigung in FiveNet bzw. bei Google möglich.</p>' : ''}
     </div>`;
   }
 
   function externalCitation(d) {
     const parts = [d.docType, d.docDate ? fmtDateOnly(d.docDate) : null].filter(Boolean).join(', ');
-    const head = d.provider === 'gdocs' ? 'Google-Docs-Dokument' : `FiveNet-Dokument Nr. ${d.documentId}`;
+    const head = extOf(d).google ? extOf(d).noun : `FiveNet-Dokument Nr. ${d.documentId}`;
     return `${head}${d.title ? ` „${d.title}“` : ''}${parts ? ` (${parts})` : ''}, ${d.url}`;
   }
 
-  /** Dialog: Dokument verknüpfen (d = null) oder Angaben bearbeiten – für FiveNet und Google Docs. */
+  /** Hinweis unter dem Link-Feld, solange noch nichts geladen ist. */
+  const googleIdleHint = (provider) =>
+    provider === 'gsheets'
+      ? 'Link einfügen – bei „Jeder, der über den Link verfügt“ wird das Tabellenblatt automatisch geladen.'
+      : 'Link einfügen – bei „Jeder, der über den Link verfügt“ werden Text und Bilder automatisch geladen.';
+
+  /** Dialog: Dokument verknüpfen (d = null) oder Angaben bearbeiten – für FiveNet, Google Docs und Google Sheets. */
   function externalForm(provider, d, c) {
     const fn = st.fivenet || { instance: { url: 'https://fivenet.modernv.net', host: 'fivenet.modernv.net' }, docTypes: [], lastViewedAs: '' };
     const p = EXT[provider];
-    const gd = provider === 'gdocs';
+    const gd = !!p.google;
+    const sheet = provider === 'gsheets';
     const editing = !!d;
     const v = d || { title: '', docType: '', docDate: '', docAuthor: '', summary: '', viewedAs: gd ? '' : fn.lastViewedAs || '', internal: true };
     const inputBox = gd
-      ? `<div class="span-2"><label class="label" for="gdInput">Link zum Google-Docs-Dokument</label>
-          <input id="gdInput" name="input" class="field font-mono text-sm" required maxlength="600" autocomplete="off" spellcheck="false" autofocus placeholder="https://docs.google.com/document/d/…/edit">
-          <div id="gdCheck" class="fn-check" aria-live="polite"><span class="text-dim">Link einfügen – bei „Jeder, der über den Link verfügt“ werden Text und Bilder automatisch geladen.</span></div></div>`
+      ? `<div class="span-2"><label class="label" for="gdInput">${sheet ? 'Link zur Google-Sheets-Tabelle' : 'Link zum Google-Docs-Dokument'}</label>
+          <input id="gdInput" name="input" class="field font-mono text-sm" required maxlength="600" autocomplete="off" spellcheck="false" autofocus placeholder="https://docs.google.com/${sheet ? 'spreadsheets' : 'document'}/d/…/edit">
+          <div id="gdCheck" class="fn-check" aria-live="polite"><span class="text-dim">${esc(googleIdleHint(provider))}</span></div></div>`
       : `<div class="span-2"><label class="label" for="fnInput">Link zum FiveNet-Dokument</label>
           <input id="fnInput" name="input" class="field font-mono text-sm" required maxlength="500" autocomplete="off" spellcheck="false" autofocus placeholder="${esc(fn.instance.url)}/documents/1234">
           <div id="fnCheck" class="fn-check" aria-live="polite"><span class="text-dim">Adresse aus FiveNet einfügen – die Dokument-ID wird automatisch erkannt.</span></div></div>`;
@@ -1055,7 +1083,9 @@
       ? `<div class="span-2"><div class="label">${esc(p.noun)}</div><div class="fn-check ok"><div class="fn-line">${icon('check', 'ico-sm')}<span>${gd ? esc(d.host) : `Dokument-ID <strong>${esc(d.documentId)}</strong> · ${esc(d.host)}`}</span><a class="link-btn push" href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">In ${esc(p.name)} öffnen ↗</a></div></div>
           ${gd ? '<div id="gdCheck" class="fn-check hidden" aria-live="polite"></div>' : ''}</div>`
       : inputBox;
-    const contentHint = gd
+    const contentHint = sheet
+      ? 'Wird bei freigegebenen Tabellen automatisch gefüllt. Sonst: in Google Sheets die Zellen markieren (Strg+A), Strg+C – hier Strg+V.'
+      : gd
       ? 'Wird bei freigegebenen Dokumenten automatisch gefüllt. Sonst: in Google Docs Strg+A, Strg+C – hier Strg+V.'
       : 'Im FiveNet-Dokument den Inhalt mit der Maus markieren → Strg+C, dann hier Strg+V. Text wird als Abschrift gespeichert, enthaltene Bilder werden automatisch übernommen.';
     return `
@@ -1063,16 +1093,16 @@
       <p class="modal-sub"><span class="font-mono text-gold">${esc(c.caseNumber)}</span> · ${esc(c.title)}</p>
       <form data-form="${editing ? 'ext-edit' : 'ext-link'}" data-provider="${provider}" data-case-id="${c.id}" ${editing ? `data-id="${d.id}"` : ''} class="form-grid cols-2">
         ${known}
-        <div class="span-2"><label class="label" for="fnTitle">Titel</label><input id="fnTitle" name="title" class="field" maxlength="300" value="${esc(v.title)}" placeholder="${gd ? 'z. B. Kaufvertrag Autohaus' : 'z. B. Polizeibericht – Verkehrskontrolle'}"></div>
-        <div><label class="label">Dokumentart</label><input name="docType" class="field" maxlength="60" list="fnTypes" value="${esc(v.docType)}" placeholder="${gd ? 'z. B. Vertrag' : 'z. B. Polizeibericht'}"><datalist id="fnTypes">${(fn.docTypes || []).map((t) => `<option value="${esc(t)}"></option>`).join('')}</datalist></div>
+        <div class="span-2"><label class="label" for="fnTitle">Titel</label><input id="fnTitle" name="title" class="field" maxlength="300" value="${esc(v.title)}" placeholder="${sheet ? 'z. B. Beweismittelliste' : gd ? 'z. B. Kaufvertrag Autohaus' : 'z. B. Polizeibericht – Verkehrskontrolle'}"></div>
+        <div><label class="label">Dokumentart</label><input name="docType" class="field" maxlength="60" list="fnTypes" value="${esc(v.docType)}" placeholder="${sheet ? 'z. B. Aufstellung' : gd ? 'z. B. Vertrag' : 'z. B. Polizeibericht'}"><datalist id="fnTypes">${(fn.docTypes || []).map((t) => `<option value="${esc(t)}"></option>`).join('')}</datalist></div>
         <div><label class="label">Erstellt am</label><input name="docDate" type="date" class="field" value="${esc(v.docDate || '')}"></div>
-        <div class="${gd ? 'span-2' : ''}"><label class="label">Verfasser / Behörde</label><input name="docAuthor" class="field" maxlength="120" value="${esc(v.docAuthor)}" placeholder="${gd ? 'z. B. Autohaus Premium Deluxe' : 'z. B. LSPD, Officer J. Miller'}"></div>
+        <div class="${gd ? 'span-2' : ''}"><label class="label">Verfasser / Behörde</label><input name="docAuthor" class="field" maxlength="120" value="${esc(v.docAuthor)}" placeholder="${sheet ? 'z. B. LSPD Asservatenkammer' : gd ? 'z. B. Autohaus Premium Deluxe' : 'z. B. LSPD, Officer J. Miller'}"></div>
         ${gd ? '' : `<div><label class="label">Eingesehen als (FiveNet-Charakter)</label><input name="viewedAs" class="field" maxlength="80" value="${esc(v.viewedAs || '')}" placeholder="eigene Angabe, optional"></div>`}
         <div class="span-2"><label class="label">Kurzinhalt / Relevanz für die Akte</label><textarea name="summary" rows="3" maxlength="2000" class="field" placeholder="Was steht drin, warum ist es wichtig?">${esc(v.summary)}</textarea></div>
         <div class="span-2 fn-content-box">
-          <div class="fn-line"><label class="label" for="fnContent">Inhalt aus ${esc(p.name)} – Text & Bilder (optional)</label>
-            ${gd && editing ? `<button type="button" class="btn-ghost btn-sm push" data-action="gd-reload" data-url="${esc(d.url)}">${icon('download', 'ico-sm')}<span>Neu aus Google Docs laden</span></button>` : ''}</div>
-          <textarea id="fnContent" name="contentText" rows="7" maxlength="60000" class="field fn-content" placeholder="${esc(contentHint)}">${esc(v.contentText || '')}</textarea>
+          <div class="fn-line"><label class="label" for="fnContent">Inhalt aus ${esc(p.name)} – ${sheet ? 'Tabelle' : 'Text & Bilder'} (optional)</label>
+            ${gd && editing ? `<button type="button" class="btn-ghost btn-sm push" data-action="gd-reload" data-url="${esc(d.url)}">${icon('download', 'ico-sm')}<span>Neu aus ${esc(p.name)} laden</span></button>` : ''}</div>
+          <textarea id="fnContent" name="contentText" rows="7" maxlength="60000" class="field fn-content${sheet ? ' is-sheet' : ''}" ${sheet ? 'wrap="off"' : ''} placeholder="${esc(contentHint)}">${esc(v.contentText || '')}</textarea>
           <div id="fnPending" class="fn-pending"></div>
           <div class="fn-line mt-2">
             <label class="btn-ghost btn-sm file-btn">${icon('camera', 'ico-sm')}<span>Bilder / Screenshots wählen</span><input type="file" accept="image/*" multiple data-upload="fn-pending" aria-label="Bilder auswählen"></label>
@@ -1082,7 +1112,7 @@
         <label class="check span-2"><input type="checkbox" name="clientVisible" ${v.internal ? '' : 'checked'}> Für den Mandanten sichtbar (sonst nur intern) – gilt auch für Abschrift und Bilder</label>
         ${editing || gd ? '' : `<label class="check span-2 fn-attest"><input type="checkbox" name="attest" required> Ich habe dieses Dokument in FiveNet mit meinem eigenen Charakter geöffnet und darf es einsehen und für die Akte übernehmen.</label>
           <div class="span-2 banner banner-gold mb-0">${icon('shield')}<div>FiveNet bietet externen Anwendungen keine Schnittstelle (kein OAuth2). Die Kanzlei ruft das Dokument deshalb nicht selbst ab und fragt nie nach Ihrem FiveNet-Passwort. Übernommen wird nur, was Sie hier einfügen – Bilder daraus lädt der Server direkt aus dem FiveNet-Dateispeicher.</div></div>`}
-        ${gd && !editing ? `<div class="span-2 banner banner-gold mb-0">${icon('shield')}<div>Die Kanzlei nutzt kein Google-Konto und fragt nie nach Passwörtern. Geladen werden nur Dokumente, die per Link freigegeben oder im Web veröffentlicht sind – genau so, wie sie jeder mit dem Link sehen kann.</div></div>` : ''}
+        ${gd && !editing ? `<div class="span-2 banner banner-gold mb-0">${icon('shield')}<div>Die Kanzlei nutzt kein Google-Konto und fragt nie nach Passwörtern. Geladen werden nur ${sheet ? 'Tabellen' : 'Dokumente'}, die per Link freigegeben oder im Web veröffentlicht sind – genau so, wie sie jeder mit dem Link sehen kann.${sheet ? ' Übernommen wird das Tabellenblatt aus dem Link (sonst das erste Blatt).' : ''}</div></div>` : ''}
         <div class="span-2 form-actions">
           <button type="submit" class="btn-gold btn-md">${icon(editing ? 'check' : 'link', 'ico-sm')}<span>${editing ? 'Speichern' : 'Mit Akte verknüpfen'}</span></button>
           <button type="button" class="btn-ghost btn-md" data-action="back-to-case">Abbrechen</button>
@@ -1130,27 +1160,39 @@
     if (submit) submit.disabled = !!r.linkedHere;
   }
 
+  /** Setzt automatisch geladenen Inhalt in das Abschrift-Feld (nicht über eigene Änderungen hinweg). */
+  function fillContent(text, replace) {
+    const area = $('#fnContent');
+    if (!area || !(replace || !area.value.trim() || area.dataset.auto === '1')) return;
+    area.value = text.length > 60000 ? text.slice(0, 60000) : text;
+    area.dataset.auto = '1';
+    if (text.length > 60000) toast('Der Inhalt ist sehr lang – die Abschrift wurde auf 60.000 Zeichen gekürzt.', 'error');
+  }
+
   /**
-   * Google Docs: Link erkennen und – falls freigegeben – Text und Bilder automatisch übernehmen.
+   * Google Docs / Google Sheets: Link erkennen und – falls freigegeben – den Inhalt automatisch übernehmen
+   * (Docs: Text und Bilder, Sheets: das Tabellenblatt als Tabelle).
    * replace = true: vorhandene Abschrift ersetzen (Aktualisieren im Bearbeiten-Dialog).
    */
   async function loadGoogleDoc(value, { replace = false } = {}) {
     const box = $('#gdCheck');
     if (!box) return;
+    const provider = box.closest('form')?.dataset.provider === 'gsheets' ? 'gsheets' : 'gdocs';
+    const p = EXT[provider];
     const token = ++st.fnCheckToken;
     const submit = $('form[data-form="ext-link"] button[type="submit"]');
     if (submit) submit.disabled = false;
     box.classList.remove('hidden');
     if (!value) {
       box.className = 'fn-check';
-      box.innerHTML = '<span class="text-dim">Link einfügen – bei „Jeder, der über den Link verfügt“ werden Text und Bilder automatisch geladen.</span>';
+      box.innerHTML = `<span class="text-dim">${esc(googleIdleHint(provider))}</span>`;
       return;
     }
     box.className = 'fn-check';
-    box.innerHTML = '<span class="text-dim">Google Docs wird geladen …</span>';
+    box.innerHTML = `<span class="text-dim">${esc(p.name)} wird geladen …</span>`;
     let r;
     try {
-      r = await api.post('/api/gdocs/fetch', { input: value, caseId: st.modalCaseId || undefined });
+      r = await api.post(`/api/${provider}/fetch`, { input: value, caseId: st.modalCaseId || undefined });
     } catch (e) {
       if (token !== st.fnCheckToken || !box.isConnected) return;
       box.className = 'fn-check bad';
@@ -1159,33 +1201,41 @@
     }
     if (token !== st.fnCheckToken || !box.isConnected) return;
     const lines = [];
-    const openLink = `<a class="link-btn push" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">In Google Docs öffnen ↗</a>`;
-    if (r.html) {
+    const openLink = `<a class="link-btn push" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">In ${esc(p.name)} öffnen ↗</a>`;
+    const loaded = provider === 'gsheets' ? typeof r.text === 'string' : !!r.html;
+    const title = $('#fnTitle');
+    if (loaded && title && !title.value && (r.title || r.suggestedTitle)) title.value = r.title || r.suggestedTitle;
+    const name = r.title ? `„${esc(r.title)}“ ` : '';
+    if (loaded && provider === 'gsheets') {
+      fillContent(r.text, replace);
+      st.fnPending.urls = [];
+      renderPending();
+      const rows = r.rows.toLocaleString('de-DE');
+      lines.push(
+        `<div class="fn-line">${icon('check', 'ico-sm')}<span>${name || 'Tabelle '}geladen · ${r.rows ? `${rows} Zeile${r.rows === 1 ? '' : 'n'}` : 'das Tabellenblatt ist leer'}${r.published ? ' · im Web veröffentlicht' : ''}</span>${openLink}</div>`
+      );
+      if (r.truncated) lines.push(`<div class="fn-warn">Die Tabelle ist sehr groß – übernommen wurden die ersten ${rows} von ${r.totalRows.toLocaleString('de-DE')} Zeilen (höchstens 60.000 Zeichen).</div>`);
+      if (r.columnsCut) lines.push('<div class="fn-warn">Übernommen wurden nur die ersten 50 Spalten.</div>');
+      if (!r.gid) lines.push('<div class="text-xs text-dim">Übernommen wurde das erste Tabellenblatt. Für ein anderes Blatt dieses in Google Sheets öffnen und die Adresse aus der Adresszeile einfügen.</div>');
+    } else if (loaded) {
       const { text, images } = parsePastedHtml(r.html);
       const urls = images.map((src) => externalImageUrl('gdocs', src)).filter(Boolean);
-      const area = $('#fnContent');
-      if (area && (replace || !area.value.trim() || area.dataset.auto === '1')) {
-        area.value = text.length > 60000 ? text.slice(0, 60000) : text;
-        area.dataset.auto = '1';
-        if (text.length > 60000) toast('Das Dokument ist sehr lang – die Abschrift wurde auf 60.000 Zeichen gekürzt.', 'error');
-      }
+      fillContent(text, replace);
       st.fnPending.urls = [];
       addPendingImages({ urls });
-      const title = $('#fnTitle');
-      if (title && !title.value && (r.title || r.suggestedTitle)) title.value = r.title || r.suggestedTitle;
       lines.push(
-        `<div class="fn-line">${icon('check', 'ico-sm')}<span>${r.title ? `„${esc(r.title)}“ ` : 'Dokument '}geladen · ${text.length.toLocaleString('de-DE')} Zeichen · ${urls.length} Bild${urls.length === 1 ? '' : 'er'}${r.published ? ' · im Web veröffentlicht' : ''}</span>${openLink}</div>`
+        `<div class="fn-line">${icon('check', 'ico-sm')}<span>${name || 'Dokument '}geladen · ${text.length.toLocaleString('de-DE')} Zeichen · ${urls.length} Bild${urls.length === 1 ? '' : 'er'}${r.published ? ' · im Web veröffentlicht' : ''}</span>${openLink}</div>`
       );
     } else {
-      lines.push(`<div class="fn-line">${icon('check', 'ico-sm')}<span>Google-Docs-Link erkannt</span>${openLink}</div>`);
+      lines.push(`<div class="fn-line">${icon('check', 'ico-sm')}<span>${esc(p.name.replace(' ', '-'))}-Link erkannt</span>${openLink}</div>`);
       lines.push(`<div class="fn-warn">${esc(r.contentError || 'Der Inhalt konnte nicht geladen werden.')}</div>`);
     }
     if (r.linkedHere && !replace) lines.push(`<div class="fn-warn">Bereits mit dieser Akte verknüpft (von ${esc(r.linkedHere.linkedByName)}).</div>`);
     if (r.otherCases.length) lines.push(`<div class="text-xs text-muted">Auch verknüpft mit: ${r.otherCases.map((o) => `<span class="font-mono">${esc(o.caseNumber)}</span>`).join(', ')}</div>`);
-    box.className = `fn-check ${r.html && !(r.linkedHere && !replace) ? 'ok' : 'warn'}`;
+    box.className = `fn-check ${loaded && !(r.linkedHere && !replace) ? 'ok' : 'warn'}`;
     box.innerHTML = lines.join('');
     if (submit) submit.disabled = !!r.linkedHere;
-    if (replace && r.html) toast('Neuer Stand geladen – mit „Speichern“ übernehmen.');
+    if (replace && loaded) toast('Neuer Stand geladen – mit „Speichern“ übernehmen.');
   }
 
   function fivenetBody(f) {
@@ -1270,7 +1320,7 @@
    * bzw. Google-Inhaltsserver (*.googleusercontent.com). Der Server prüft dasselbe noch einmal.
    */
   function externalImageUrl(provider, src) {
-    if (provider === 'gdocs') {
+    if (EXT[provider]?.google) {
       try {
         const u = new URL(src);
         if (u.protocol !== 'https:' || u.port || !u.hostname.endsWith('.googleusercontent.com')) return null;
@@ -1356,6 +1406,25 @@
     el.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
+  /**
+   * Aus Google Sheets kopierte Zellen (HTML-Tabelle) → tabulatorgetrennter Text, eine Zeile je Tabellenzeile.
+   * Zeilenumbrüche in Zellen werden zu „ / “, wie beim automatischen Laden.
+   */
+  function tableToTsv(html) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const trs = [...doc.querySelectorAll('tr')];
+    if (!trs.length) return '';
+    doc.querySelectorAll('br').forEach((b) => b.replaceWith('\n'));
+    doc.querySelectorAll('script, style').forEach((n) => n.remove());
+    const cell = (td) => (td.textContent || '').replace(/\s*\n\s*/g, ' / ').replace(/[\t\u00a0]+/g, ' ').replace(/ {2,}/g, ' ').trim();
+    const lines = trs.map((tr) => {
+      const cells = [...tr.children].filter((c) => c.tagName === 'TD' || c.tagName === 'TH').map(cell);
+      while (cells.length && !cells[cells.length - 1]) cells.pop();
+      return cells.join('\t');
+    });
+    return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
   /** Einfügen im Dokument-Dialog: HTML → Text + Bildadressen, Bilddateien aus der Zwischenablage → Anhänge. */
   function onExternalPaste(e, provider) {
     const cd = e.clipboardData;
@@ -1365,6 +1434,13 @@
     const plain = cd.getData('text/plain');
     const inContent = e.target && e.target.id === 'fnContent';
     if (files.length) addPendingImages({ blobs: files });
+    // Google Sheets: kopierte Zellen als Tabelle übernehmen (Tabulator zwischen den Spalten).
+    const tsv = provider === 'gsheets' && inContent && html ? tableToTsv(html) : '';
+    if (tsv) {
+      e.preventDefault();
+      insertAtCursor(e.target, tsv);
+      return;
+    }
     if (html && inContent) {
       const { text, images } = parsePastedHtml(html);
       const urls = [];
@@ -1411,7 +1487,7 @@
         result.errors.push(e.message);
       }
     }
-    const caption = (doc.provider === 'gdocs' ? `Google Docs${doc.title ? ' – ' + doc.title : ''}` : `FiveNet ${doc.documentId}${doc.title ? ' – ' + doc.title : ''}`).slice(0, 180);
+    const caption = (extOf(doc).google ? `${extOf(doc).name}${doc.title ? ' – ' + doc.title : ''}` : `FiveNet ${doc.documentId}${doc.title ? ' – ' + doc.title : ''}`).slice(0, 180);
     for (const b of pending.blobs) {
       try {
         const blob = await resizeImage(b, { max: 1600 });
@@ -2450,6 +2526,33 @@
     </section>`;
   }
 
+  /** Prüfbericht Discord-Login: was der laufende Server in Render findet (nur Namen, keine Werte). */
+  function discordOAuthCheck(d) {
+    if (!d) return '';
+    const TEXT = {
+      DISCORD_CLIENT_ID: { missing: 'fehlt – in Render unter „Environment“ anlegen', empty: 'ist leer', invalid: 'sollte nur aus Ziffern bestehen – bitte die „Client ID“ kopieren, nicht Name oder Secret' },
+      DISCORD_CLIENT_SECRET: { missing: 'fehlt – in Render unter „Environment“ anlegen', empty: 'ist leer', invalid: 'wirkt unvollständig – im Developer Portal „Reset Secret“ und neu kopieren' },
+      PUBLIC_URL: { missing: 'fehlt (optional) – empfohlen: ' + location.origin, empty: 'ist leer (optional)', invalid: 'muss mit https:// beginnen, z. B. ' + location.origin },
+    };
+    const rows = d.vars
+      .map((v) => {
+        const ok = v.status === 'ok';
+        const optional = v.name === 'PUBLIC_URL';
+        const cls = ok ? 'text-emerald-300' : optional ? 'text-amber-300' : 'text-red-300';
+        const msg = ok ? 'gefunden' : TEXT[v.name][v.status];
+        return `<div class="oauth-row"><code class="font-mono text-xs">${esc(v.name)}</code><span class="${cls} text-xs">${ok ? '✓' : optional ? '!' : '✕'} ${esc(msg)}${v.nameFixed ? ' · Name enthält Leerzeichen/Kleinbuchstaben – wird erkannt, bitte in Render korrigieren' : ''}</span></div>`;
+      })
+      .join('');
+    const started = parseDate(d.serverStartedAt);
+    return `<div class="oauth-check mt-4">
+      <div class="label">Prüfung: Was der Server gerade sieht</div>
+      ${rows}
+      ${d.similarNames.length ? `<p class="form-hint text-amber-300">Ähnliche Namen gefunden: ${d.similarNames.map((n) => `<code class="font-mono">${esc(n)}</code>`).join(', ')} – vermutlich vertippt.</p>` : ''}
+      <p class="form-hint">Server gestartet: ${esc(started ? started.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : '—')}${d.commit ? ` · Version ${esc(d.commit)}` : ''}. Wurden die Variablen in Render danach geändert, ist ein Neustart nötig: „Manual Deploy“ → „Deploy latest commit“.</p>
+      <p class="form-hint">Redirect in Discord (OAuth2 → Redirects): <code class="font-mono text-gold break-all">${esc(d.redirectUri || location.origin + '/api/discord/callback')}</code></p>
+    </div>`;
+  }
+
   views.settings = {
     async load() {
       const [r] = await Promise.all([api.get('/api/admin/settings'), load.fivenet(true)]);
@@ -2503,8 +2606,9 @@
               <p class="text-sm text-muted">Teammitglieder und Mandanten können ihr Discord-Konto im Profil verknüpfen und sich danach per Discord anmelden. Verknüpfte Anwälte werden bei Fristen und Zuweisungen im Kanal erwähnt.</p>
               ${s.discordOAuthConfigured ? '' : `<ol class="text-sm text-muted list-decimal pl-5 mt-3 space-y-1">
                 <li>discord.com/developers/applications → „New Application“</li>
-                <li>OAuth2 → Redirect hinzufügen: <code class="font-mono text-gold text-xs break-all">${esc(location.origin)}/api/discord/callback</code></li>
-                <li>In Render unter „Environment“ setzen: <code class="font-mono text-xs">DISCORD_CLIENT_ID</code>, <code class="font-mono text-xs">DISCORD_CLIENT_SECRET</code> – danach neu deployen.</li></ol>`}
+                <li>OAuth2 → Redirect hinzufügen: <code class="font-mono text-gold text-xs break-all">${esc((s.discordOAuth && s.discordOAuth.redirectUri) || location.origin + '/api/discord/callback')}</code></li>
+                <li>In Render unter „Environment“ setzen: <code class="font-mono text-xs">DISCORD_CLIENT_ID</code>, <code class="font-mono text-xs">DISCORD_CLIENT_SECRET</code>, <code class="font-mono text-xs">PUBLIC_URL</code> – danach „Manual Deploy“ → „Deploy latest commit“.</li></ol>`}
+              ${discordOAuthCheck(s.discordOAuth)}
             </section>
             <section class="panel panel-pad">
               <div class="panel-head"><h2 class="panel-title">Notfall-Zugang</h2></div>
@@ -2542,7 +2646,7 @@
         : st.discordOAuth
           ? `<p class="text-sm text-muted mb-4">Verbinden Sie Ihr Discord-Konto, um sich künftig mit einem Klick anzumelden${isStaff() ? ' und bei Fristen oder neuen Akten im Kanzlei-Discord erwähnt zu werden' : ''}.</p>
              <a class="btn-discord btn-md" href="/api/discord/connect">${DISCORD_ICON}<span>Mit Discord verbinden</span></a>`
-          : '<p class="text-sm text-muted">Die Kanzleileitung hat die Discord-Anmeldung noch nicht eingerichtet.</p>';
+          : `<p class="text-sm text-muted">Die Kanzleileitung hat die Discord-Anmeldung noch nicht eingerichtet.${isAdmin() ? ' <a href="#settings" class="text-gold underline">Einstellungen → Discord-Login</a> zeigt, was fehlt.' : ''}</p>`;
       return `
         ${u.mustChangePassword ? `<div class="banner banner-amber">${icon('alert')}<div><strong>Bitte jetzt ein eigenes Passwort festlegen.</strong> Ihr aktuelles Passwort wurde automatisch erzeugt oder von der Kanzleileitung zurückgesetzt.</div></div>` : ''}
         <div class="page-head"><div><h1 class="page-title">Mein Profil</h1><p class="page-sub">Kontaktdaten, Passwort, Discord${isStaff() ? ' und FiveNet' : ''}.</p></div></div>
@@ -3354,12 +3458,12 @@
       resetPending();
       openModal(externalForm('fivenet', null, st.caseInfo));
     },
-    'gd-add': async () => {
+    'gd-add': async (el) => {
       if (!st.caseInfo) return;
       st.returnCase = st.caseInfo.id;
       await load.fivenet(); // Vorschläge für Dokumentarten
       resetPending();
-      openModal(externalForm('gdocs', null, st.caseInfo));
+      openModal(externalForm(el.dataset.provider === 'gsheets' ? 'gsheets' : 'gdocs', null, st.caseInfo));
     },
     'fn-edit': async (el) => {
       const d = st.caseDocs.find((x) => x.id === Number(el.dataset.id));
@@ -3367,13 +3471,13 @@
       st.returnCase = st.caseInfo.id;
       await load.fivenet();
       resetPending();
-      openModal(externalForm(d.provider === 'gdocs' ? 'gdocs' : 'fivenet', d, st.caseInfo));
+      openModal(externalForm(EXT[d.provider] ? d.provider : 'fivenet', d, st.caseInfo));
       if (el.dataset.focus) {
         const target = $('#' + el.dataset.focus);
         target?.scrollIntoView({ block: 'center' });
         target?.focus();
       }
-      if (el.dataset.reload && d.provider === 'gdocs') await loadGoogleDoc(d.url, { replace: true });
+      if (el.dataset.reload && extOf(d).google) await loadGoogleDoc(d.url, { replace: true });
     },
     'gd-reload': (el) => loadGoogleDoc(el.dataset.url, { replace: true }),
     'fn-img-remove': (el) => {

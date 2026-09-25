@@ -1,15 +1,17 @@
 'use strict';
 /*
- * Externe Dokumente in Akten: FiveNet und Google Docs.
+ * Externe Dokumente in Akten: FiveNet, Google Docs und Google Sheets.
  *
  * - FiveNet: geprüfte Referenz; Text und Bilder übernimmt der Anwalt per Kopieren/Einfügen
  *   (FiveNet bietet keine Schnittstelle für Drittanwendungen, siehe fivenet.js).
  * - Google Docs: per Link freigegebene Dokumente lädt der Server selbst (Text + Bilder),
  *   nicht freigegebene lassen sich ebenfalls per Kopieren/Einfügen übernehmen (siehe gdocs.js).
+ * - Google Sheets: gleiche Regeln; übernommen wird das Tabellenblatt aus dem Link (siehe gsheets.js).
  *
  * /api/cases/:id/external         – verknüpfen, bearbeiten, entfernen, Bilder, Textdatei
  * /api/cases/:id/fivenet          – gleicher Router (ältere Adresse, bleibt gültig)
  * /api/gdocs/fetch                – Google-Docs-Link erkennen und freigegebenen Inhalt laden
+ * /api/gsheets/fetch              – Google-Sheets-Link erkennen und freigegebenes Tabellenblatt laden
  */
 const crypto = require('crypto');
 const express = require('express');
@@ -22,6 +24,7 @@ const { getCase, caseAccess, addSystemNote, externalDocRow, logActivity } = requ
 const { saveImageBuffer } = require('../uploads');
 const fivenet = require('../fivenet');
 const gdocs = require('../gdocs');
+const gsheets = require('../gsheets');
 
 const MAX_DOCS_PER_CASE = 100;
 const MAX_IMAGES_PER_IMPORT = 10;
@@ -30,6 +33,7 @@ const MAX_IMAGES_PER_IMPORT = 10;
 const PROVIDERS = {
   fivenet: {
     noun: 'FiveNet-Dokument',
+    this: 'Dieses',
     attest: true,
     parse: (input) => fivenet.parseDocumentRef(input),
     imageUrl: (raw, link) => fivenet.imageUrlFor(raw, link.host),
@@ -41,6 +45,7 @@ const PROVIDERS = {
   },
   gdocs: {
     noun: 'Google-Docs-Dokument',
+    this: 'Dieses',
     attest: false,
     parse: (input) => gdocs.parseDocumentRef(input),
     imageUrl: (raw) => gdocs.imageUrlFor(raw),
@@ -49,6 +54,20 @@ const PROVIDERS = {
     fileName: (id) => `GoogleDocs-${id.replace(/^e\//, '').slice(0, 16)}`,
     heading: (id, title) => `Google-Docs-Dokument${title ? ' „' + title + '“' : ''}`,
     imageHint: 'Kein Bild aus Google Docs',
+  },
+  gsheets: {
+    noun: 'Google-Sheets-Tabelle',
+    this: 'Diese',
+    attest: false,
+    parse: (input) => gsheets.parseSheetRef(input),
+    imageUrl: (raw) => gdocs.imageUrlFor(raw),
+    fetchImage: (url) => gdocs.fetchImage(url),
+    label: (id, title) => (title ? `„${truncate(title, 120)}“` : 'ohne Titel'),
+    fileName: (id) => `GoogleSheets-${id.replace(/^e\//, '').slice(0, 16)}${id.includes('#gid=') ? '-Blatt' + id.split('#gid=')[1] : ''}`,
+    heading: (id, title) => `Google-Sheets-Tabelle${title ? ' „' + title + '“' : ''}`,
+    imageHint: 'Kein Bild von Google',
+    // Abschrift ist tabulatorgetrennt – in der Textdatei als ausgerichtete Tabelle.
+    formatText: (text) => gsheets.formatTable(text),
   },
 };
 const providerOf = (link) => PROVIDERS[link.provider] || PROVIDERS.fivenet;
@@ -81,12 +100,13 @@ function linkSummary(links, caseId) {
 const gdocsRouter = express.Router();
 gdocsRouter.use(requireAuth, requireStaff);
 
+// Gemeinsame Grenze für Google Docs und Google Sheets.
 const gdocsLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
-  handler: (req, res) => res.status(429).json({ error: 'Zu viele Abrufe bei Google Docs. Bitte in ein paar Minuten erneut versuchen.' }),
+  handler: (req, res) => res.status(429).json({ error: 'Zu viele Abrufe bei Google. Bitte in ein paar Minuten erneut versuchen.' }),
 });
 
 /**
@@ -115,6 +135,43 @@ gdocsRouter.post(
       const doc = await gdocs.fetchDocument(ref);
       body.title = doc.title;
       body.html = doc.html;
+    } catch (err) {
+      body.contentError = err.message;
+    }
+    res.json(body);
+  })
+);
+
+/* ---------------------------------------------------------------- /api/gsheets */
+const gsheetsRouter = express.Router();
+gsheetsRouter.use(requireAuth, requireStaff);
+
+/** Erkennt einen Google-Sheets-Link und lädt – falls freigegeben – das Tabellenblatt als Text. */
+gsheetsRouter.post(
+  '/fetch',
+  gdocsLimiter,
+  wrap(async (req, res) => {
+    const d = parseBody(z.object({ input: z.string().max(600), caseId: z.number().int().positive().optional() }), req, res);
+    if (!d) return;
+    const ref = gsheets.parseSheetRef(d.input);
+    if (!ref.ok) return res.status(400).json({ error: ref.error });
+    const body = {
+      documentId: ref.documentId,
+      url: ref.canonicalUrl,
+      host: ref.host,
+      published: ref.published,
+      gid: ref.gid,
+      ...linkSummary(linksTo('gsheets', ref.documentId), d.caseId),
+      title: '',
+      text: null,
+      rows: 0,
+      totalRows: 0,
+      truncated: false,
+      columnsCut: false,
+      contentError: null,
+    };
+    try {
+      Object.assign(body, await gsheets.fetchSheet(ref));
     } catch (err) {
       body.contentError = err.message;
     }
@@ -160,8 +217,13 @@ const metaFields = {
   summary: z.string().trim().max(2000).optional(),
   viewedAs: z.string().trim().max(80).optional(),
   internal: z.boolean().optional(),
-  // Abschrift des Dokumenttexts (kopiert bzw. aus Google Docs geladen)
-  contentText: z.string().trim().max(60000).optional(),
+  // Abschrift des Dokumenttexts (kopiert bzw. aus Google geladen). Führende Tabulatoren bleiben erhalten:
+  // Bei Google-Sheets-Tabellen stehen sie für leere Zellen am Zeilenanfang.
+  contentText: z
+    .string()
+    .max(60000)
+    .transform((v) => v.replace(/^(?:[ \t]*\r?\n)+/, '').replace(/^ +/, '').replace(/\s+$/, ''))
+    .optional(),
 };
 
 caseRouter.post(
@@ -186,7 +248,7 @@ caseRouter.post(
       .prepare('SELECT * FROM case_external_docs WHERE case_id = ? AND provider = ? AND external_id = ?')
       .get(c.id, d.provider, ref.documentId);
     if (existing) {
-      return res.status(409).json({ error: `Dieses ${p.noun} ist bereits mit der Akte verknüpft (von ${existing.linked_by_name}).`, linkId: existing.id });
+      return res.status(409).json({ error: `${p.this} ${p.noun} ist bereits mit der Akte verknüpft (von ${existing.linked_by_name}).`, linkId: existing.id });
     }
     const count = db.prepare('SELECT COUNT(*) AS n FROM case_external_docs WHERE case_id = ?').get(c.id).n;
     if (count >= MAX_DOCS_PER_CASE) return res.status(400).json({ error: `Pro Akte sind höchstens ${MAX_DOCS_PER_CASE} externe Dokumente möglich.` });
@@ -229,7 +291,7 @@ caseRouter.post(
       });
     } catch (err) {
       // Gleichzeitiges Doppel-Verknüpfen: die UNIQUE-Regel der Tabelle greift.
-      if (String(err?.message || '').includes('UNIQUE')) return res.status(409).json({ error: `Dieses ${p.noun} ist bereits mit der Akte verknüpft.` });
+      if (String(err?.message || '').includes('UNIQUE')) return res.status(409).json({ error: `${p.this} ${p.noun} ist bereits mit der Akte verknüpft.` });
       throw err;
     }
     logActivity(req.user, `${p.noun} verknüpft`, 'case', c.id, `${c.case_number}: ${p.label(ref.documentId, d.title)}`);
@@ -404,8 +466,9 @@ caseRouter.get(
     ].filter(Boolean);
     res.set('Content-Type', 'text/plain; charset=utf-8');
     res.set('Content-Disposition', `attachment; filename="${p.fileName(link.external_id)}.txt"`);
-    res.send(`${head.join('\r\n')}\r\n\r\n${link.content_text.replace(/\r?\n/g, '\r\n')}\r\n`);
+    const body = p.formatText ? p.formatText(link.content_text) : link.content_text;
+    res.send(`${head.join('\r\n')}\r\n\r\n${body.replace(/\r?\n/g, '\r\n')}\r\n`);
   })
 );
 
-module.exports = { caseRouter, gdocsRouter, PROVIDERS };
+module.exports = { caseRouter, gdocsRouter, gsheetsRouter, PROVIDERS };
