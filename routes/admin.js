@@ -227,7 +227,7 @@ function settingsPayload() {
   const dbUrl = getSetting('discord_webhook_url', '');
   return {
     discordWebhookUrl: dbUrl,
-    discordWebhookFromEnv: !dbUrl && discord.isValidWebhookUrl(process.env.DISCORD_WEBHOOK_URL),
+    discordWebhookFromEnv: !dbUrl && discord.isValidWebhookUrl(discord.envValue('DISCORD_WEBHOOK_URL')),
     discordWebhookActive: !!discord.webhookUrl() || Object.keys(discord.eventWebhooks()).length > 0,
     discordEventWebhooks: discord.eventWebhooks(),
     discordEventRoles: discord.eventRoles(),
@@ -235,7 +235,8 @@ function settingsPayload() {
     availableEvents: discord.EVENTS,
     discordPingRole: discord.pingRole(),
     discordPingEvents: discord.pingEvents(),
-    discordOAuthConfigured: !!(process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_SECRET),
+    discordOAuthConfigured: discord.oauthConfigured(),
+    discordOAuth: discord.oauthDiagnostics(),
     firmAddress: getSetting('firm_address', 'Pake & Scha Legal Consulting\nWürfelpark\nLos Santos, San Andreas'),
     firmPaymentInfo: getSetting('firm_payment_info', 'Zahlbar per Überweisung an Pake & Scha Legal Consulting (Maze Bank).'),
     firmContact: getSetting('firm_contact', 'kontakt@pake-scha.ls'),

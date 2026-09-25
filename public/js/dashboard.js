@@ -2450,6 +2450,33 @@
     </section>`;
   }
 
+  /** Prüfbericht Discord-Login: was der laufende Server in Render findet (nur Namen, keine Werte). */
+  function discordOAuthCheck(d) {
+    if (!d) return '';
+    const TEXT = {
+      DISCORD_CLIENT_ID: { missing: 'fehlt – in Render unter „Environment“ anlegen', empty: 'ist leer', invalid: 'sollte nur aus Ziffern bestehen – bitte die „Client ID“ kopieren, nicht Name oder Secret' },
+      DISCORD_CLIENT_SECRET: { missing: 'fehlt – in Render unter „Environment“ anlegen', empty: 'ist leer', invalid: 'wirkt unvollständig – im Developer Portal „Reset Secret“ und neu kopieren' },
+      PUBLIC_URL: { missing: 'fehlt (optional) – empfohlen: ' + location.origin, empty: 'ist leer (optional)', invalid: 'muss mit https:// beginnen, z. B. ' + location.origin },
+    };
+    const rows = d.vars
+      .map((v) => {
+        const ok = v.status === 'ok';
+        const optional = v.name === 'PUBLIC_URL';
+        const cls = ok ? 'text-emerald-300' : optional ? 'text-amber-300' : 'text-red-300';
+        const msg = ok ? 'gefunden' : TEXT[v.name][v.status];
+        return `<div class="oauth-row"><code class="font-mono text-xs">${esc(v.name)}</code><span class="${cls} text-xs">${ok ? '✓' : optional ? '!' : '✕'} ${esc(msg)}${v.nameFixed ? ' · Name enthält Leerzeichen/Kleinbuchstaben – wird erkannt, bitte in Render korrigieren' : ''}</span></div>`;
+      })
+      .join('');
+    const started = parseDate(d.serverStartedAt);
+    return `<div class="oauth-check mt-4">
+      <div class="label">Prüfung: Was der Server gerade sieht</div>
+      ${rows}
+      ${d.similarNames.length ? `<p class="form-hint text-amber-300">Ähnliche Namen gefunden: ${d.similarNames.map((n) => `<code class="font-mono">${esc(n)}</code>`).join(', ')} – vermutlich vertippt.</p>` : ''}
+      <p class="form-hint">Server gestartet: ${esc(started ? started.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : '—')}${d.commit ? ` · Version ${esc(d.commit)}` : ''}. Wurden die Variablen in Render danach geändert, ist ein Neustart nötig: „Manual Deploy“ → „Deploy latest commit“.</p>
+      <p class="form-hint">Redirect in Discord (OAuth2 → Redirects): <code class="font-mono text-gold break-all">${esc(d.redirectUri || location.origin + '/api/discord/callback')}</code></p>
+    </div>`;
+  }
+
   views.settings = {
     async load() {
       const [r] = await Promise.all([api.get('/api/admin/settings'), load.fivenet(true)]);
@@ -2503,8 +2530,9 @@
               <p class="text-sm text-muted">Teammitglieder und Mandanten können ihr Discord-Konto im Profil verknüpfen und sich danach per Discord anmelden. Verknüpfte Anwälte werden bei Fristen und Zuweisungen im Kanal erwähnt.</p>
               ${s.discordOAuthConfigured ? '' : `<ol class="text-sm text-muted list-decimal pl-5 mt-3 space-y-1">
                 <li>discord.com/developers/applications → „New Application“</li>
-                <li>OAuth2 → Redirect hinzufügen: <code class="font-mono text-gold text-xs break-all">${esc(location.origin)}/api/discord/callback</code></li>
-                <li>In Render unter „Environment“ setzen: <code class="font-mono text-xs">DISCORD_CLIENT_ID</code>, <code class="font-mono text-xs">DISCORD_CLIENT_SECRET</code> – danach neu deployen.</li></ol>`}
+                <li>OAuth2 → Redirect hinzufügen: <code class="font-mono text-gold text-xs break-all">${esc((s.discordOAuth && s.discordOAuth.redirectUri) || location.origin + '/api/discord/callback')}</code></li>
+                <li>In Render unter „Environment“ setzen: <code class="font-mono text-xs">DISCORD_CLIENT_ID</code>, <code class="font-mono text-xs">DISCORD_CLIENT_SECRET</code>, <code class="font-mono text-xs">PUBLIC_URL</code> – danach „Manual Deploy“ → „Deploy latest commit“.</li></ol>`}
+              ${discordOAuthCheck(s.discordOAuth)}
             </section>
             <section class="panel panel-pad">
               <div class="panel-head"><h2 class="panel-title">Notfall-Zugang</h2></div>
@@ -2542,7 +2570,7 @@
         : st.discordOAuth
           ? `<p class="text-sm text-muted mb-4">Verbinden Sie Ihr Discord-Konto, um sich künftig mit einem Klick anzumelden${isStaff() ? ' und bei Fristen oder neuen Akten im Kanzlei-Discord erwähnt zu werden' : ''}.</p>
              <a class="btn-discord btn-md" href="/api/discord/connect">${DISCORD_ICON}<span>Mit Discord verbinden</span></a>`
-          : '<p class="text-sm text-muted">Die Kanzleileitung hat die Discord-Anmeldung noch nicht eingerichtet.</p>';
+          : `<p class="text-sm text-muted">Die Kanzleileitung hat die Discord-Anmeldung noch nicht eingerichtet.${isAdmin() ? ' <a href="#settings" class="text-gold underline">Einstellungen → Discord-Login</a> zeigt, was fehlt.' : ''}</p>`;
       return `
         ${u.mustChangePassword ? `<div class="banner banner-amber">${icon('alert')}<div><strong>Bitte jetzt ein eigenes Passwort festlegen.</strong> Ihr aktuelles Passwort wurde automatisch erzeugt oder von der Kanzleileitung zurückgesetzt.</div></div>` : ''}
         <div class="page-head"><div><h1 class="page-title">Mein Profil</h1><p class="page-sub">Kontaktdaten, Passwort, Discord${isStaff() ? ' und FiveNet' : ''}.</p></div></div>

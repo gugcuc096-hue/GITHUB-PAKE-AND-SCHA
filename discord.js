@@ -2,6 +2,20 @@
 const { getSetting } = require('./db');
 const { truncate } = require('./helpers');
 
+/**
+ * Liest eine Umgebungsvariable fehlertolerant: Leerzeichen/Zeilenumbrüche um den Wert werden
+ * entfernt, und ein versehentlich mit Leerzeichen oder Kleinbuchstaben angelegter Name
+ * (z. B. "DISCORD_CLIENT_ID ") wird ebenfalls gefunden.
+ */
+function envValue(name) {
+  const direct = process.env[name];
+  if (typeof direct === 'string' && direct.trim()) return direct.trim();
+  const key = Object.keys(process.env).find((k) => k !== name && k.trim().toUpperCase() === name);
+  return key ? String(process.env[key] || '').trim() : '';
+}
+
+const SERVER_STARTED_AT = new Date().toISOString();
+
 const GOLD = 0xd4af37;
 const RED = 0xef4444;
 
@@ -28,7 +42,7 @@ function isValidWebhookUrl(url) {
 
 function webhookUrl() {
   const fromDb = getSetting('discord_webhook_url', '');
-  const url = fromDb || process.env.DISCORD_WEBHOOK_URL || '';
+  const url = fromDb || envValue('DISCORD_WEBHOOK_URL');
   return isValidWebhookUrl(url) ? url.trim() : '';
 }
 
@@ -81,7 +95,7 @@ function parseRoleId(input) {
 }
 
 function pingRole() {
-  return parseRoleId(getSetting('discord_ping_role', '') || process.env.DISCORD_PING_ROLE || '') || '';
+  return parseRoleId(getSetting('discord_ping_role', '') || envValue('DISCORD_PING_ROLE')) || '';
 }
 
 function pingEvents() {
@@ -119,7 +133,7 @@ function rolesFor(event) {
 }
 
 function publicUrl(pathname = '/dashboard.html') {
-  const base = (process.env.PUBLIC_URL || '').replace(/\/+$/, '');
+  const base = envValue('PUBLIC_URL').replace(/\/+$/, '');
   return /^https?:\/\//.test(base) ? base + pathname : undefined;
 }
 
@@ -225,18 +239,55 @@ async function sendTestAll(userName) {
    OAuth2 (Discord-Konto mit Website-Konto verknüpfen / Discord-Login)
    ================================================================ */
 function publicBase(req) {
-  const fromEnv = (process.env.PUBLIC_URL || '').replace(/\/+$/, '');
+  const fromEnv = envValue('PUBLIC_URL').replace(/\/+$/, '');
   return /^https?:\/\//.test(fromEnv) ? fromEnv : `${req.protocol}://${req.get('host')}`;
 }
 
+function oauthConfigured() {
+  return !!(envValue('DISCORD_CLIENT_ID') && envValue('DISCORD_CLIENT_SECRET'));
+}
+
 function oauthConfig(req) {
-  const clientId = process.env.DISCORD_CLIENT_ID;
-  const clientSecret = process.env.DISCORD_CLIENT_SECRET;
+  const clientId = envValue('DISCORD_CLIENT_ID');
+  const clientSecret = envValue('DISCORD_CLIENT_SECRET');
   if (!clientId || !clientSecret) return null;
   return {
     clientId,
     clientSecret,
-    redirectUri: process.env.DISCORD_REDIRECT_URI || `${publicBase(req)}/api/discord/callback`,
+    redirectUri: envValue('DISCORD_REDIRECT_URI') || `${publicBase(req)}/api/discord/callback`,
+  };
+}
+
+const KNOWN_ENV = ['DISCORD_CLIENT_ID', 'DISCORD_CLIENT_SECRET', 'DISCORD_REDIRECT_URI', 'DISCORD_WEBHOOK_URL', 'DISCORD_PING_ROLE', 'PUBLIC_URL'];
+
+/**
+ * Prüfbericht für die Kanzleileitung: Welche Variablen findet der laufende Server?
+ * Enthält nur Namen und einen Status – niemals die Werte selbst.
+ */
+function oauthDiagnostics(origin) {
+  const keys = Object.keys(process.env);
+  const check = (name, looksValid) => {
+    const exact = Object.prototype.hasOwnProperty.call(process.env, name);
+    const fuzzy = keys.some((k) => k !== name && k.trim().toUpperCase() === name);
+    const value = envValue(name);
+    let status = 'ok';
+    if (!exact && !fuzzy) status = 'missing';
+    else if (!value) status = 'empty';
+    else if (!looksValid(value)) status = 'invalid';
+    return { name, status, nameFixed: !exact && fuzzy };
+  };
+  const base = envValue('PUBLIC_URL').replace(/\/+$/, '') || origin || '';
+  return {
+    vars: [
+      check('DISCORD_CLIENT_ID', (v) => /^\d{15,25}$/.test(v)),
+      check('DISCORD_CLIENT_SECRET', (v) => v.length >= 20 && !/\s/.test(v)),
+      check('PUBLIC_URL', (v) => /^https:\/\/[^\s/]+\.[^\s/]+/.test(v)),
+    ],
+    // Vermutlich vertippte Namen (nur die Namen, keine Werte)
+    similarNames: keys.filter((k) => /DISCORD|PUBLIC.?URL/i.test(k) && !KNOWN_ENV.includes(k.trim().toUpperCase())),
+    redirectUri: envValue('DISCORD_REDIRECT_URI') || (base ? `${base}/api/discord/callback` : ''),
+    serverStartedAt: SERVER_STARTED_AT,
+    commit: (process.env.RENDER_GIT_COMMIT || '').slice(0, 7) || null,
   };
 }
 
@@ -294,6 +345,9 @@ module.exports = {
   rolesFor,
   notify,
   sendTestAll,
+  envValue,
+  oauthConfigured,
+  oauthDiagnostics,
   oauthConfig,
   authorizeUrl,
   fetchDiscordUser,

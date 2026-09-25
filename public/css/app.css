@@ -716,3 +716,8 @@ body.ps-dialog-open { overflow: hidden; }
 .ev-top .check { margin: 0; font-size: 0.8rem; }
 .ev-fields { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 0.5rem; margin-top: 0.5rem; }
 @media (max-width: 560px) { .ev-fields { grid-template-columns: minmax(0, 1fr); } }
+
+/* Discord-Login: Prüfbericht */
+.oauth-check { border: 1px solid var(--line); border-radius: 12px; padding: 0.7rem 0.85rem; background: rgba(255, 255, 255, 0.02); }
+.oauth-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.25rem 0.75rem; padding: 0.3rem 0; border-bottom: 1px solid var(--line); }
+.oauth-row:last-of-type { border-bottom: 0; }
