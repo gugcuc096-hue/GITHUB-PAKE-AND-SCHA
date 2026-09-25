@@ -2466,9 +2466,14 @@
             <form data-form="settings-discord" class="form-grid">
               <div><label class="label">Webhook-URL</label><input name="webhook" class="field font-mono text-xs" value="${esc(s.discordWebhookUrl)}" placeholder="https://discord.com/api/webhooks/…" autocomplete="off">
                 ${s.discordWebhookFromEnv ? '<p class="form-hint">Aktuell wird die URL aus der Umgebungsvariable DISCORD_WEBHOOK_URL verwendet.</p>' : ''}</div>
-              <div><span class="label">Ereignisse</span><div>${Object.entries(s.availableEvents)
-                .map(([k, l]) => `<label class="check mb-2"><input type="checkbox" name="events" value="${esc(k)}" ${s.discordEvents.includes(k) ? 'checked' : ''}> ${esc(l)}</label>`)
-                .join('')}</div></div>
+              <div><label class="label" for="pingRole">Rolle pingen (Rollen-ID)</label><input id="pingRole" name="pingRole" class="field font-mono text-xs" value="${esc(s.discordPingRole)}" placeholder="z. B. 1546979799820537986" inputmode="numeric" autocomplete="off">
+                <p class="form-hint">Diese Rolle wird bei den unten markierten Ereignissen im Kanal erwähnt – z. B. die Anwälte bei jeder neuen Mandatsanfrage. Rollen-ID in Discord: Einstellungen → Erweitert → Entwicklermodus an, dann Servereinstellungen → Rollen → Rechtsklick auf die Rolle → „Rollen-ID kopieren“. @everyone/@here werden nie gepingt.</p></div>
+              <div><div class="ev-grid"><span class="label">Ereignis</span><span class="label">Nachricht</span><span class="label">Rolle pingen</span>
+                ${Object.entries(s.availableEvents)
+                  .map(([k, l]) => `<span class="text-sm">${esc(l)}</span>
+                    <input type="checkbox" name="events" value="${esc(k)}" ${s.discordEvents.includes(k) ? 'checked' : ''} aria-label="Nachricht bei: ${esc(l)}">
+                    <input type="checkbox" name="pingEvents" value="${esc(k)}" ${s.discordPingEvents.includes(k) ? 'checked' : ''} aria-label="Rolle pingen bei: ${esc(l)}">`)
+                  .join('')}</div></div>
               <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button>
                 <button type="button" class="btn-outline btn-md" data-action="discord-test" ${s.discordWebhookActive ? '' : 'disabled'}>${icon('send', 'ico-sm')}<span>Testnachricht</span></button></div>
             </form>
@@ -3702,7 +3707,8 @@
     'settings-discord': async (f) => {
       const fd = new FormData(f);
       const events = $$('input[name="events"]:checked', f).map((i) => i.value);
-      const res = await api.patch('/api/admin/settings', { discordWebhookUrl: val(fd, 'webhook'), discordEvents: events });
+      const pingEvents = $$('input[name="pingEvents"]:checked', f).map((i) => i.value);
+      const res = await api.patch('/api/admin/settings', { discordWebhookUrl: val(fd, 'webhook'), discordEvents: events, discordPingRole: val(fd, 'pingRole'), discordPingEvents: pingEvents });
       st.settings = res.settings;
       toast('Discord-Einstellungen gespeichert.');
       renderView();

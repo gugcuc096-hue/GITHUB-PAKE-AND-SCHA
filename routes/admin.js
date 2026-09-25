@@ -231,6 +231,8 @@ function settingsPayload() {
     discordWebhookActive: !!discord.webhookUrl(),
     discordEvents: discord.enabledEvents(),
     availableEvents: discord.EVENTS,
+    discordPingRole: discord.pingRole(),
+    discordPingEvents: discord.pingEvents(),
     discordOAuthConfigured: !!(process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_SECRET),
     firmAddress: getSetting('firm_address', 'Pake & Scha Legal Consulting\nWürfelpark\nLos Santos, San Andreas'),
     firmPaymentInfo: getSetting('firm_payment_info', 'Zahlbar per Überweisung an Pake & Scha Legal Consulting (Maze Bank).'),
@@ -251,6 +253,8 @@ router.patch(
     const schema = z.object({
       discordWebhookUrl: z.string().trim().max(300).optional(),
       discordEvents: z.array(z.string()).max(20).optional(),
+      discordPingRole: z.string().trim().max(40).optional(),
+      discordPingEvents: z.array(z.string()).max(20).optional(),
       firmAddress: z.string().trim().max(300).optional(),
       firmPaymentInfo: z.string().trim().max(300).optional(),
       firmContact: z.string().trim().max(120).optional(),
@@ -264,6 +268,11 @@ router.patch(
       if (!parsed.ok) return res.status(400).json({ error: parsed.error });
       d.fivenetUrl = parsed.url;
     }
+    if (d.discordPingRole !== undefined) {
+      const role = discord.parseRoleId(d.discordPingRole);
+      if (role === null) return res.status(400).json({ error: 'Die Rollen-ID besteht nur aus Ziffern (z. B. 1546979799820537986).' });
+      d.discordPingRole = role;
+    }
     if (d.discordWebhookUrl && !discord.isValidWebhookUrl(d.discordWebhookUrl)) {
       return res.status(400).json({ error: 'Das ist keine gültige Discord-Webhook-URL (https://discord.com/api/webhooks/…).' });
     }
@@ -272,6 +281,8 @@ router.patch(
       if (d.showDutyPublic !== undefined) setSetting('show_duty_public', d.showDutyPublic ? '1' : '0');
       if (d.discordWebhookUrl !== undefined) setSetting('discord_webhook_url', d.discordWebhookUrl);
       if (d.discordEvents !== undefined) setSetting('discord_events', JSON.stringify(d.discordEvents.filter((e) => discord.EVENTS[e])));
+      if (d.discordPingRole !== undefined) setSetting('discord_ping_role', d.discordPingRole);
+      if (d.discordPingEvents !== undefined) setSetting('discord_ping_events', JSON.stringify(d.discordPingEvents.filter((e) => discord.EVENTS[e])));
       if (d.firmAddress !== undefined) setSetting('firm_address', d.firmAddress);
       if (d.firmPaymentInfo !== undefined) setSetting('firm_payment_info', d.firmPaymentInfo);
       if (d.firmContact !== undefined) setSetting('firm_contact', d.firmContact);

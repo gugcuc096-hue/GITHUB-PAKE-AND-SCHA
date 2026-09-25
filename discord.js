@@ -43,18 +43,48 @@ function enabledEvents() {
   }
 }
 
+/* ---------------------------------------------------------------- Rollen-Ping */
+// Eine Discord-Rolle (z. B. die Anwälte) wird bei ausgewählten Ereignissen erwähnt.
+// @everyone/@here bleiben ausgeschlossen – gepingt wird nur genau diese Rolle.
+const DEFAULT_PING_EVENTS = ['case.created'];
+
+/** Akzeptiert die Rollen-ID oder die Erwähnung <@&ID>; liefert '' (leer), die ID oder null (ungültig). */
+function parseRoleId(input) {
+  const s = String(input ?? '').trim();
+  if (!s) return '';
+  const m = s.match(/^<@&(\d{15,25})>$/) || s.match(/^(\d{15,25})$/);
+  return m ? m[1] : null;
+}
+
+function pingRole() {
+  return parseRoleId(getSetting('discord_ping_role', '') || process.env.DISCORD_PING_ROLE || '') || '';
+}
+
+function pingEvents() {
+  const raw = getSetting('discord_ping_events', null);
+  if (!raw) return DEFAULT_PING_EVENTS;
+  try {
+    const list = JSON.parse(raw);
+    return Array.isArray(list) ? list.filter((e) => EVENTS[e]) : DEFAULT_PING_EVENTS;
+  } catch {
+    return DEFAULT_PING_EVENTS;
+  }
+}
+
 function publicUrl(pathname = '/dashboard.html') {
   const base = (process.env.PUBLIC_URL || '').replace(/\/+$/, '');
   return /^https?:\/\//.test(base) ? base + pathname : undefined;
 }
 
-function buildPayload({ title, description, fields = [], color = GOLD, mentionIds = [], link }) {
+function buildPayload({ title, description, fields = [], color = GOLD, mentionIds = [], roleIds = [], link }) {
   const mentions = [...new Set(mentionIds.filter((id) => /^\d{5,25}$/.test(String(id))))].map(String);
+  const roles = [...new Set(roleIds.filter((id) => /^\d{15,25}$/.test(String(id))))].map(String);
+  const content = [...roles.map((id) => `<@&${id}>`), ...mentions.map((id) => `<@${id}>`)].join(' ');
   return {
     username: 'Pake & Scha Kanzlei',
-    content: mentions.length ? mentions.map((id) => `<@${id}>`).join(' ') : undefined,
-    // Nur ausdrücklich genannte Nutzer pingen -- nie @everyone/@here aus Nutzertexten.
-    allowed_mentions: { parse: [], users: mentions },
+    content: content || undefined,
+    // Nur ausdrücklich genannte Nutzer und die eingestellte Rolle pingen -- nie @everyone/@here aus Nutzertexten.
+    allowed_mentions: { parse: [], users: mentions, roles },
     embeds: [
       {
         title: truncate(title, 256),
@@ -92,7 +122,9 @@ async function postWebhook(url, payload) {
 function notify(event, message) {
   const url = webhookUrl();
   if (!url || !enabledEvents().includes(event)) return;
-  const payload = buildPayload({ link: publicUrl(), ...message });
+  const role = pingRole();
+  const roleIds = role && pingEvents().includes(event) ? [role] : [];
+  const payload = buildPayload({ link: publicUrl(), ...message, roleIds });
   postWebhook(url, payload).catch((err) => console.warn(`Discord-Webhook (${event}) fehlgeschlagen: ${err.message}`));
 }
 
@@ -101,8 +133,9 @@ async function sendTest(url, userName) {
     url,
     buildPayload({
       title: 'Verbindung hergestellt',
-      description: `Der Discord-Webhook der Kanzlei ist aktiv. Getestet von ${userName}.`,
+      description: `Der Discord-Webhook der Kanzlei ist aktiv. Getestet von ${userName}.${pingRole() ? ' Die eingestellte Rolle wird mit dieser Nachricht gepingt.' : ''}`,
       link: publicUrl(),
+      roleIds: pingRole() ? [pingRole()] : [],
     })
   );
 }
@@ -170,6 +203,10 @@ module.exports = {
   isValidWebhookUrl,
   webhookUrl,
   enabledEvents,
+  DEFAULT_PING_EVENTS,
+  parseRoleId,
+  pingRole,
+  pingEvents,
   notify,
   sendTest,
   oauthConfig,
