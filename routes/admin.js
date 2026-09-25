@@ -7,6 +7,7 @@ const { wrap, parseBody, idParam, DUTY_STATUS } = require('../helpers');
 const { logActivity } = require('../models');
 const { removeFile } = require('../uploads');
 const discord = require('../discord');
+const fivenet = require('../fivenet');
 
 const ROLE_LABEL = { mandant: 'Mandant', anwalt: 'Anwalt', admin: 'Kanzleileitung' };
 
@@ -235,6 +236,10 @@ function settingsPayload() {
     firmPaymentInfo: getSetting('firm_payment_info', 'Zahlbar per Überweisung an Pake & Scha Legal Consulting (Maze Bank).'),
     firmContact: getSetting('firm_contact', 'kontakt@pake-scha.ls'),
     showDutyPublic: getSetting('show_duty_public', '1') === '1',
+    fivenetUrl: getSetting('fivenet_url', ''),
+    fivenetInstance: fivenet.instance(),
+    fivenetEnvUrl: process.env.FIVENET_URL || '',
+    fivenetDefaultUrl: fivenet.DEFAULT_URL,
   };
 }
 
@@ -250,9 +255,15 @@ router.patch(
       firmPaymentInfo: z.string().trim().max(300).optional(),
       firmContact: z.string().trim().max(120).optional(),
       showDutyPublic: z.boolean().optional(),
+      fivenetUrl: z.string().trim().max(200).optional(),
     });
     const d = parseBody(schema, req, res);
     if (!d) return;
+    if (d.fivenetUrl) {
+      const parsed = fivenet.normalizeBaseUrl(d.fivenetUrl);
+      if (!parsed.ok) return res.status(400).json({ error: parsed.error });
+      d.fivenetUrl = parsed.url;
+    }
     if (d.discordWebhookUrl && !discord.isValidWebhookUrl(d.discordWebhookUrl)) {
       return res.status(400).json({ error: 'Das ist keine gültige Discord-Webhook-URL (https://discord.com/api/webhooks/…).' });
     }
@@ -264,6 +275,7 @@ router.patch(
       if (d.firmAddress !== undefined) setSetting('firm_address', d.firmAddress);
       if (d.firmPaymentInfo !== undefined) setSetting('firm_payment_info', d.firmPaymentInfo);
       if (d.firmContact !== undefined) setSetting('firm_contact', d.firmContact);
+      if (d.fivenetUrl !== undefined) setSetting('fivenet_url', d.fivenetUrl);
     });
     res.json({ settings: settingsPayload() });
   })

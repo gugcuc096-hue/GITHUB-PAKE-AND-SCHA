@@ -19,6 +19,7 @@ const EVENTS = {
   'message.broadcast': 'Rundschreiben an das Team',
   'application.created': 'Neue Bewerbung',
   'duty.changed': 'Dienstbeginn / Dienstende eines Anwalts',
+  'task.assigned': 'Aufgabe einem anderen Teammitglied zugewiesen',
 };
 
 function isValidWebhookUrl(url) {

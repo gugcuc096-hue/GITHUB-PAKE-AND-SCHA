@@ -73,6 +73,54 @@ const FIELD_LABELS = {
   number: 'Bewerbungsnummer',
   code: 'Zugangscode',
   accept: 'Bestätigung',
+  input: 'FiveNet-Adresse',
+  docType: 'Dokumentart',
+  docDate: 'Erstellungsdatum',
+  docAuthor: 'Verfasser / Behörde',
+  summary: 'Kurzinhalt',
+  viewedAs: 'FiveNet-Charakter',
+  attest: 'Bestätigung der Einsicht',
+  assignedTo: 'Zuständig',
+  caseId: 'Akte',
+  done: 'Erledigt',
+  fivenetUrl: 'FiveNet-Adresse',
+};
+
+// Checklisten-Vorlagen je Rechtsgebiet (werden auf Wunsch als Aufgaben in eine Akte übernommen).
+const CHECKLISTS = {
+  strafrecht: [
+    'Mandantengespräch führen und Sachverhalt aufnehmen',
+    'Vollmacht / Honorarvereinbarung erstellen',
+    'Akteneinsicht: Polizeibericht aus FiveNet verknüpfen',
+    'Beweismittel sichten und sichern',
+    'Verteidigungsstrategie festlegen',
+    'Hauptverhandlung vorbereiten',
+  ],
+  zivilrecht: [
+    'Mandantengespräch führen und Unterlagen anfordern',
+    'Honorarvereinbarung erstellen',
+    'Anspruch prüfen',
+    'Schreiben an die Gegenseite aufsetzen',
+    'Antwortfrist der Gegenseite im Kalender eintragen',
+    'Klage oder Vergleich vorbereiten',
+  ],
+  vertragsrecht: [
+    'Anforderungen des Mandanten aufnehmen',
+    'Honorarvereinbarung erstellen',
+    'Vertragsentwurf erstellen',
+    'Entwurf mit dem Mandanten abstimmen',
+    'Unterzeichnung organisieren',
+    'Unterzeichneten Vertrag ablegen (FiveNet-Dokument oder Anhang)',
+  ],
+  verfassungsrecht: [
+    'Mandantengespräch führen',
+    'Honorarvereinbarung erstellen',
+    'Zulässigkeit und Fristen prüfen',
+    'Schriftsatz entwerfen',
+    'Schriftsatz bei Gericht einreichen',
+    'Mündliche Verhandlung vorbereiten',
+  ],
+  sonstiges: ['Mandantengespräch führen', 'Honorarvereinbarung erstellen', 'Nächste Schritte festlegen'],
 };
 
 /** Express 4 fängt Fehler aus async-Handlern nicht selbst ab. */
@@ -123,6 +171,7 @@ module.exports = {
   FEE_CATEGORIES,
   DUTY_STATUS,
   APPLICATION_STATUS,
+  CHECKLISTS,
   wrap,
   parseBody,
   idParam,

@@ -17,6 +17,9 @@ const {
   INVOICE_SELECT,
   invoiceRow,
   attachmentRow,
+  externalDocsForCase,
+  TASK_SELECT,
+  taskRow,
   logActivity,
 } = require('../models');
 const discord = require('../discord');
@@ -163,12 +166,18 @@ router.get(
       .all(c.id)
       .filter((a) => staff || !a.internal);
 
+    const tasks = staff
+      ? db.prepare(`${TASK_SELECT} WHERE t.case_id = ? ORDER BY t.done ASC, t.due_date IS NULL, t.due_date ASC, t.id ASC`).all(c.id)
+      : [];
+
     res.json({
       case: { ...caseRow(c, req.user), ...access },
       notes: notes.map(noteRow),
       appointments: appointments.map((a) => apptRow(a, req.user)),
       invoices: invoices.map(invoiceRow),
       attachments: attachments.map((a) => attachmentRow(a, c.id)),
+      externalDocs: externalDocsForCase(c.id, req.user),
+      tasks: staff ? tasks.map(taskRow) : undefined,
     });
   })
 );
