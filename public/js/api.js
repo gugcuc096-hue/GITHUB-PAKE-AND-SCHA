@@ -1,4 +1,4 @@
-/* Gemeinsame Helfer für alle Seiten: window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage } */
+/* Gemeinsame Helfer für alle Seiten: window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm } */
 (() => {
   'use strict';
 
@@ -132,5 +132,71 @@
     setTimeout(() => el.remove(), type === 'error' ? 6000 : 3500);
   }
 
-  window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage };
+  /**
+   * Bestätigungsdialog im Design der Kanzlei (ersetzt das graue Browser-Fenster von window.confirm).
+   * Liefert ein Promise<boolean>. Optionen: title, confirmText, cancelText, danger (roter Knopf).
+   * Texte werden nur per textContent gesetzt – Nutzereingaben können kein HTML einschleusen.
+   */
+  function confirmDialog(message, { title = 'Bitte bestätigen', confirmText = 'OK', cancelText = 'Abbrechen', danger = false } = {}) {
+    return new Promise((resolve) => {
+      const previous = document.activeElement;
+      const root = document.createElement('div');
+      root.className = 'ps-dialog-root';
+      root.innerHTML = `
+        <div class="ps-dialog${danger ? ' is-danger' : ''}" role="alertdialog" aria-modal="true" aria-labelledby="psDialogTitle" aria-describedby="psDialogText">
+          <div class="ps-dialog-mark" aria-hidden="true"><img src="/apple-touch-icon.png" alt=""></div>
+          <h2 id="psDialogTitle" class="ps-dialog-title"></h2>
+          <p id="psDialogText" class="ps-dialog-text"></p>
+          <div class="ps-dialog-actions">
+            <button type="button" class="btn-ghost btn-md" data-ps-dialog="cancel"></button>
+            <button type="button" class="${danger ? 'btn-danger' : 'btn-gold'} btn-md" data-ps-dialog="ok"></button>
+          </div>
+        </div>`;
+      root.querySelector('.ps-dialog-title').textContent = title;
+      root.querySelector('.ps-dialog-text').textContent = message || '';
+      const ok = root.querySelector('[data-ps-dialog="ok"]');
+      const cancel = root.querySelector('[data-ps-dialog="cancel"]');
+      ok.textContent = confirmText;
+      cancel.textContent = cancelText;
+      document.body.appendChild(root);
+      document.body.classList.add('ps-dialog-open');
+      requestAnimationFrame(() => root.classList.add('open'));
+      // Bei riskanten Aktionen liegt der Fokus zuerst auf „Abbrechen“ – Enter löscht nicht versehentlich.
+      (danger ? cancel : ok).focus();
+
+      let done = false;
+      const close = (result) => {
+        if (done) return;
+        done = true;
+        document.removeEventListener('keydown', onKey, true);
+        root.classList.remove('open');
+        if (!document.querySelector('.ps-dialog-root.open')) document.body.classList.remove('ps-dialog-open');
+        setTimeout(() => root.remove(), 180);
+        if (previous && previous.isConnected && typeof previous.focus === 'function') previous.focus({ preventScroll: true });
+        resolve(result);
+      };
+      // Tastatur wird abgefangen, bevor andere Handler (z. B. Esc schließt die Akte) sie sehen.
+      const onKey = (e) => {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          close(false);
+        } else if (e.key === 'Tab') {
+          e.preventDefault();
+          (document.activeElement === ok ? cancel : ok).focus();
+        } else if (e.key === 'Enter' && e.target !== ok && e.target !== cancel) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      };
+      document.addEventListener('keydown', onKey, true);
+      ok.addEventListener('click', () => close(true));
+      cancel.addEventListener('click', () => close(false));
+      root.addEventListener('click', (e) => {
+        if (e.target === root) close(false);
+      });
+    });
+  }
+
+  window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog };
 })();
