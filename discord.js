@@ -32,6 +32,30 @@ function webhookUrl() {
   return isValidWebhookUrl(url) ? url.trim() : '';
 }
 
+/**
+ * Eigener Kanal je Ereignis: Ein Discord-Webhook gehört immer zu genau einem Kanal.
+ * Für verschiedene Kanäle wird deshalb je Kanal ein Webhook angelegt und hier dem
+ * Ereignis zugeordnet. Ereignisse ohne Eintrag gehen an den Standard-Webhook.
+ */
+function eventWebhooks() {
+  const raw = getSetting('discord_event_webhooks', null);
+  if (!raw) return {};
+  try {
+    const map = JSON.parse(raw);
+    const out = {};
+    for (const [event, url] of Object.entries(map || {})) {
+      if (EVENTS[event] && isValidWebhookUrl(url)) out[event] = String(url).trim();
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function webhookFor(event) {
+  return eventWebhooks()[event] || webhookUrl();
+}
+
 function enabledEvents() {
   const raw = getSetting('discord_events', null);
   if (!raw) return Object.keys(EVENTS);
@@ -120,7 +144,7 @@ async function postWebhook(url, payload) {
  * Ereignis aktiviert ist. Blockiert nie die eigentliche Anfrage; Fehler landen im Log.
  */
 function notify(event, message) {
-  const url = webhookUrl();
+  const url = webhookFor(event);
   if (!url || !enabledEvents().includes(event)) return;
   const role = pingRole();
   const roleIds = role && pingEvents().includes(event) ? [role] : [];
@@ -128,16 +152,44 @@ function notify(event, message) {
   postWebhook(url, payload).catch((err) => console.warn(`Discord-Webhook (${event}) fehlgeschlagen: ${err.message}`));
 }
 
-async function sendTest(url, userName) {
-  await postWebhook(
-    url,
-    buildPayload({
-      title: 'Verbindung hergestellt',
-      description: `Der Discord-Webhook der Kanzlei ist aktiv. Getestet von ${userName}.${pingRole() ? ' Die eingestellte Rolle wird mit dieser Nachricht gepingt.' : ''}`,
-      link: publicUrl(),
-      roleIds: pingRole() ? [pingRole()] : [],
-    })
-  );
+/**
+ * Testnachricht an jeden eingerichteten Kanal. Jede Nachricht nennt die Ereignisse,
+ * die in diesem Kanal ankommen – so lässt sich die Zuordnung direkt in Discord prüfen.
+ * Liefert { sent, failed: [{ events, error }] }.
+ */
+async function sendTestAll(userName) {
+  const enabled = enabledEvents();
+  const channels = new Map();
+  const standard = webhookUrl();
+  if (standard) channels.set(standard, []);
+  for (const event of Object.keys(EVENTS)) {
+    const url = webhookFor(event);
+    if (!url) continue;
+    if (!channels.has(url)) channels.set(url, []);
+    if (enabled.includes(event)) channels.get(url).push(event);
+  }
+  const role = pingRole();
+  const pings = pingEvents();
+  const result = { sent: 0, failed: [] };
+  for (const [url, events] of channels) {
+    const list = events.length ? events.map((e) => `• ${EVENTS[e]}${role && pings.includes(e) ? ' (mit Ping)' : ''}`).join('\n') : '• (keine Ereignisse eingeschaltet)';
+    const standardNote = url === standard ? '\n\nDas ist der Standard-Kanal: Ereignisse ohne eigenen Kanal landen hier.' : '';
+    try {
+      await postWebhook(
+        url,
+        buildPayload({
+          title: 'Verbindung hergestellt',
+          description: `Getestet von ${userName}. In diesem Kanal kommen an:\n${list}${standardNote}`,
+          link: publicUrl(),
+          roleIds: role && events.some((e) => pings.includes(e)) ? [role] : [],
+        })
+      );
+      result.sent += 1;
+    } catch (err) {
+      result.failed.push({ events: events.map((e) => EVENTS[e]), error: err.message });
+    }
+  }
+  return result;
 }
 
 /* ================================================================
@@ -202,13 +254,15 @@ module.exports = {
   EVENTS,
   isValidWebhookUrl,
   webhookUrl,
+  eventWebhooks,
+  webhookFor,
   enabledEvents,
   DEFAULT_PING_EVENTS,
   parseRoleId,
   pingRole,
   pingEvents,
   notify,
-  sendTest,
+  sendTestAll,
   oauthConfig,
   authorizeUrl,
   fetchDiscordUser,

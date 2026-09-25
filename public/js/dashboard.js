@@ -2462,9 +2462,9 @@
         <div class="grid-2">
           <section class="panel panel-pad">
             <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${DISCORD_ICON} Discord-Webhook</h2>${s.discordWebhookActive ? badge('Aktiv', 'emerald') : badge('Nicht verbunden', 'slate')}</div>
-            <p class="text-sm text-muted mb-4">Wichtige Kanzlei-Updates (neue Mandate, Fristen, Terminanfragen …) automatisch in einen Discord-Kanal senden. In Discord: Kanal → Einstellungen → Integrationen → Webhooks → „Neuer Webhook“ → URL kopieren.</p>
+            <p class="text-sm text-muted mb-4">Wichtige Kanzlei-Updates (neue Mandate, Fristen, Terminanfragen …) automatisch nach Discord senden – auf Wunsch je Ereignis in einen eigenen Kanal. In Discord: Kanal → Einstellungen → Integrationen → Webhooks → „Neuer Webhook“ → URL kopieren.</p>
             <form data-form="settings-discord" class="form-grid">
-              <div><label class="label">Webhook-URL</label><input name="webhook" class="field font-mono text-xs" value="${esc(s.discordWebhookUrl)}" placeholder="https://discord.com/api/webhooks/…" autocomplete="off">
+              <div><label class="label">Webhook-URL (Standard-Kanal)</label><input name="webhook" class="field font-mono text-xs" value="${esc(s.discordWebhookUrl)}" placeholder="https://discord.com/api/webhooks/…" autocomplete="off">
                 ${s.discordWebhookFromEnv ? '<p class="form-hint">Aktuell wird die URL aus der Umgebungsvariable DISCORD_WEBHOOK_URL verwendet.</p>' : ''}</div>
               <div><label class="label" for="pingRole">Rolle pingen (Rollen-ID)</label><input id="pingRole" name="pingRole" class="field font-mono text-xs" value="${esc(s.discordPingRole)}" placeholder="z. B. 1546979799820537986" inputmode="numeric" autocomplete="off">
                 <p class="form-hint">Diese Rolle wird bei den unten markierten Ereignissen im Kanal erwähnt – z. B. die Anwälte bei jeder neuen Mandatsanfrage. Rollen-ID in Discord: Einstellungen → Erweitert → Entwicklermodus an, dann Servereinstellungen → Rollen → Rechtsklick auf die Rolle → „Rollen-ID kopieren“. @everyone/@here werden nie gepingt.</p></div>
@@ -2474,6 +2474,13 @@
                     <input type="checkbox" name="events" value="${esc(k)}" ${s.discordEvents.includes(k) ? 'checked' : ''} aria-label="Nachricht bei: ${esc(l)}">
                     <input type="checkbox" name="pingEvents" value="${esc(k)}" ${s.discordPingEvents.includes(k) ? 'checked' : ''} aria-label="Rolle pingen bei: ${esc(l)}">`)
                   .join('')}</div></div>
+              <details class="edit-box" ${Object.keys(s.discordEventWebhooks || {}).length ? 'open' : ''}>
+                <summary>Eigene Kanäle je Ereignis ${Object.keys(s.discordEventWebhooks || {}).length ? `(${Object.keys(s.discordEventWebhooks).length} eingerichtet)` : '(optional)'}</summary>
+                <p class="form-hint mb-3">Ein Webhook gehört immer zu genau einem Discord-Kanal. Für jeden weiteren Kanal dort einen eigenen Webhook anlegen und die URL hier beim Ereignis eintragen. Leer = Standard-Kanal (Webhook-URL oben).</p>
+                <div class="form-grid">${Object.entries(s.availableEvents)
+                  .map(([k, l]) => `<div><label class="label" for="wh-${esc(k)}">${esc(l)}</label><input id="wh-${esc(k)}" name="eventWebhook" data-event="${esc(k)}" class="field font-mono text-xs" value="${esc((s.discordEventWebhooks || {})[k] || '')}" placeholder="Standard-Kanal" autocomplete="off"></div>`)
+                  .join('')}</div>
+              </details>
               <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button>
                 <button type="button" class="btn-outline btn-md" data-action="discord-test" ${s.discordWebhookActive ? '' : 'disabled'}>${icon('send', 'ico-sm')}<span>Testnachricht</span></button></div>
             </form>
@@ -3499,8 +3506,8 @@
 
     // Einstellungen & Profil
     'discord-test': async () => {
-      await api.post('/api/admin/discord/test');
-      toast('Testnachricht an Discord gesendet.');
+      const r = await api.post('/api/admin/discord/test');
+      toast(r.sent > 1 ? `Testnachricht an ${r.sent} Kanäle gesendet – jede nennt die Ereignisse für ihren Kanal.` : 'Testnachricht an Discord gesendet.');
     },
     'discord-unlink': async () => {
       if (!(await ask('Die Anmeldung per Discord ist danach nicht mehr möglich, bis Sie das Konto erneut verbinden.', { title: 'Discord-Verbindung trennen?', confirmText: 'Trennen' }))) return;
@@ -3708,7 +3715,17 @@
       const fd = new FormData(f);
       const events = $$('input[name="events"]:checked', f).map((i) => i.value);
       const pingEvents = $$('input[name="pingEvents"]:checked', f).map((i) => i.value);
-      const res = await api.patch('/api/admin/settings', { discordWebhookUrl: val(fd, 'webhook'), discordEvents: events, discordPingRole: val(fd, 'pingRole'), discordPingEvents: pingEvents });
+      const eventWebhooks = {};
+      $$('input[name="eventWebhook"]', f).forEach((i) => {
+        if (i.value.trim()) eventWebhooks[i.dataset.event] = i.value.trim();
+      });
+      const res = await api.patch('/api/admin/settings', {
+        discordWebhookUrl: val(fd, 'webhook'),
+        discordEvents: events,
+        discordPingRole: val(fd, 'pingRole'),
+        discordPingEvents: pingEvents,
+        discordEventWebhooks: eventWebhooks,
+      });
       st.settings = res.settings;
       toast('Discord-Einstellungen gespeichert.');
       renderView();

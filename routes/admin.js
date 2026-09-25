@@ -228,7 +228,8 @@ function settingsPayload() {
   return {
     discordWebhookUrl: dbUrl,
     discordWebhookFromEnv: !dbUrl && discord.isValidWebhookUrl(process.env.DISCORD_WEBHOOK_URL),
-    discordWebhookActive: !!discord.webhookUrl(),
+    discordWebhookActive: !!discord.webhookUrl() || Object.keys(discord.eventWebhooks()).length > 0,
+    discordEventWebhooks: discord.eventWebhooks(),
     discordEvents: discord.enabledEvents(),
     availableEvents: discord.EVENTS,
     discordPingRole: discord.pingRole(),
@@ -255,6 +256,7 @@ router.patch(
       discordEvents: z.array(z.string()).max(20).optional(),
       discordPingRole: z.string().trim().max(40).optional(),
       discordPingEvents: z.array(z.string()).max(20).optional(),
+      discordEventWebhooks: z.record(z.string().trim().max(300)).optional(),
       firmAddress: z.string().trim().max(300).optional(),
       firmPaymentInfo: z.string().trim().max(300).optional(),
       firmContact: z.string().trim().max(120).optional(),
@@ -273,6 +275,17 @@ router.patch(
       if (role === null) return res.status(400).json({ error: 'Die Rollen-ID besteht nur aus Ziffern (z. B. 1546979799820537986).' });
       d.discordPingRole = role;
     }
+    if (d.discordEventWebhooks !== undefined) {
+      const clean = {};
+      for (const [event, url] of Object.entries(d.discordEventWebhooks)) {
+        if (!discord.EVENTS[event] || !url) continue;
+        if (!discord.isValidWebhookUrl(url)) {
+          return res.status(400).json({ error: `Keine gültige Discord-Webhook-URL bei „${discord.EVENTS[event]}“ (https://discord.com/api/webhooks/…).` });
+        }
+        clean[event] = url;
+      }
+      d.discordEventWebhooks = clean;
+    }
     if (d.discordWebhookUrl && !discord.isValidWebhookUrl(d.discordWebhookUrl)) {
       return res.status(400).json({ error: 'Das ist keine gültige Discord-Webhook-URL (https://discord.com/api/webhooks/…).' });
     }
@@ -282,6 +295,7 @@ router.patch(
       if (d.discordWebhookUrl !== undefined) setSetting('discord_webhook_url', d.discordWebhookUrl);
       if (d.discordEvents !== undefined) setSetting('discord_events', JSON.stringify(d.discordEvents.filter((e) => discord.EVENTS[e])));
       if (d.discordPingRole !== undefined) setSetting('discord_ping_role', d.discordPingRole);
+      if (d.discordEventWebhooks !== undefined) setSetting('discord_event_webhooks', JSON.stringify(d.discordEventWebhooks));
       if (d.discordPingEvents !== undefined) setSetting('discord_ping_events', JSON.stringify(d.discordPingEvents.filter((e) => discord.EVENTS[e])));
       if (d.firmAddress !== undefined) setSetting('firm_address', d.firmAddress);
       if (d.firmPaymentInfo !== undefined) setSetting('firm_payment_info', d.firmPaymentInfo);
@@ -295,14 +309,18 @@ router.patch(
 router.post(
   '/discord/test',
   wrap(async (req, res) => {
-    const url = discord.webhookUrl();
-    if (!url) return res.status(400).json({ error: 'Es ist noch kein Discord-Webhook hinterlegt.' });
-    try {
-      await discord.sendTest(url, req.user.display_name);
-    } catch (err) {
-      return res.status(502).json({ error: `Discord hat die Nachricht abgelehnt: ${err.message}` });
+    if (!discord.webhookUrl() && !Object.keys(discord.eventWebhooks()).length) {
+      return res.status(400).json({ error: 'Es ist noch kein Discord-Webhook hinterlegt.' });
     }
-    res.json({ success: true });
+    const result = await discord.sendTestAll(req.user.display_name);
+    if (result.failed.length) {
+      const f = result.failed[0];
+      return res.status(502).json({
+        error: `Discord hat die Testnachricht für den Kanal mit „${f.events.join(', ') || 'Standard'}“ abgelehnt: ${f.error}`,
+        sent: result.sent,
+      });
+    }
+    res.json({ success: true, sent: result.sent });
   })
 );
 
