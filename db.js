@@ -352,6 +352,7 @@ addColumn('case_external_docs', 'content_at', 'TEXT');
 addColumn('case_external_docs', 'content_by_name', "TEXT NOT NULL DEFAULT ''");
 addColumn('case_attachments', 'external_doc_id', 'INTEGER REFERENCES case_external_docs(id) ON DELETE SET NULL');
 addColumn('case_attachments', 'source_url', 'TEXT');
+addColumn('case_attachments', 'content_hash', 'TEXT');
 
 // NOT NULL entfernen oder ON-DELETE-Regeln ändern geht in SQLite nur über
 // einen Neuaufbau der Tabelle (offizielles 12-Schritte-Verfahren). Vorher

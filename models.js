@@ -80,8 +80,8 @@ function caseRow(c, u) {
     closed: c.status === 'geschlossen',
     publicNote: c.public_note,
     source: c.source,
-    // Für die Aktensuche per FiveNet-Link oder Dokument-ID (nur Team).
-    fivenetIds: staff ? String(c.external_doc_ids || '').split(' ').filter(Boolean) : undefined,
+    // Für die Aktensuche per FiveNet-/Google-Docs-Link oder Dokument-ID (nur Team).
+    externalDocIds: staff ? String(c.external_doc_ids || '').split(' ').filter(Boolean) : undefined,
     createdAt: c.created_at,
     updatedAt: c.updated_at,
   };
@@ -157,17 +157,18 @@ function externalDocsForCase(caseId, u) {
   if (staff && rows.length) {
     const ids = [...new Set(rows.map((d) => d.external_id))];
     db.prepare(
-      `SELECT e.external_id, c.id, c.case_number, c.title FROM case_external_docs e JOIN cases c ON c.id = e.case_id
-       WHERE e.provider = 'fivenet' AND e.case_id != ? AND e.external_id IN (${ids.map(() => '?').join(',')})
+      `SELECT e.provider, e.external_id, c.id, c.case_number, c.title FROM case_external_docs e JOIN cases c ON c.id = e.case_id
+       WHERE e.case_id != ? AND e.external_id IN (${ids.map(() => '?').join(',')})
        ORDER BY c.case_number`
     )
       .all(caseId, ...ids)
       .forEach((r) => {
-        if (!others.has(r.external_id)) others.set(r.external_id, []);
-        others.get(r.external_id).push({ id: r.id, caseNumber: r.case_number, title: r.title });
+        const key = `${r.provider}:${r.external_id}`;
+        if (!others.has(key)) others.set(key, []);
+        others.get(key).push({ id: r.id, caseNumber: r.case_number, title: r.title });
       });
   }
-  return rows.map((d) => externalDocRow(d, u, others.get(d.external_id) || []));
+  return rows.map((d) => externalDocRow(d, u, others.get(`${d.provider}:${d.external_id}`) || []));
 }
 
 /* ================================================================

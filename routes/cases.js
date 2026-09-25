@@ -1,4 +1,5 @@
 'use strict';
+const crypto = require('crypto');
 const express = require('express');
 const { z } = require('zod');
 const { db, tx, nextCaseNumber, randomPin } = require('../db');
@@ -324,21 +325,32 @@ router.post(
     }
     const caption = String(req.query.caption || '').trim().slice(0, 200);
     const internal = req.query.internal === '1' && isStaff(req.user);
-    // Bild gehört zu einem verknüpften FiveNet-Dokument dieser Akte (nur Team).
+    // Bild gehört zu einem verknüpften externen Dokument (FiveNet / Google Docs) dieser Akte (nur Team).
     let externalDocId = null;
     if (req.query.fivenetDoc && isStaff(req.user)) {
       const link = db.prepare('SELECT id FROM case_external_docs WHERE id = ? AND case_id = ?').get(Number(req.query.fivenetDoc) || 0, c.id);
-      if (!link) return res.status(404).json({ error: 'Das FiveNet-Dokument ist nicht mit dieser Akte verknüpft.' });
+      if (!link) return res.status(404).json({ error: 'Das Dokument ist nicht mit dieser Akte verknüpft.' });
       externalDocId = link.id;
     }
     const saved = saveImage(req, 'evidence');
     const info = tx(() => {
       const r = db
         .prepare(
-          `INSERT INTO case_attachments (case_id, file, mime, size, caption, internal, uploader_id, uploader_name, external_doc_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO case_attachments (case_id, file, mime, size, caption, internal, uploader_id, uploader_name, external_doc_id, content_hash)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
-        .run(c.id, saved.file, saved.mime, saved.size, caption, internal ? 1 : 0, req.user.id, req.user.display_name, externalDocId);
+        .run(
+          c.id,
+          saved.file,
+          saved.mime,
+          saved.size,
+          caption,
+          internal ? 1 : 0,
+          req.user.id,
+          req.user.display_name,
+          externalDocId,
+          crypto.createHash('sha256').update(req.body).digest('hex')
+        );
       addSystemNote(c.id, req.user, `Anhang hinzugefügt${caption ? ': ' + caption : ''}.`, internal);
       db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(c.id);
       return r;
