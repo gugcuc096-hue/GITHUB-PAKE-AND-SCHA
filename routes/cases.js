@@ -3,7 +3,7 @@ const express = require('express');
 const { z } = require('zod');
 const { db, tx, nextCaseNumber, randomPin } = require('../db');
 const { requireAuth, requireAdmin, isStaff } = require('../auth');
-const { wrap, parseBody, idParam, AREAS, URGENCIES, CASE_STATUS, STEPS, truncate } = require('../helpers');
+const { wrap, parseBody, idParam, AREAS, URGENCIES, CASE_STATUS, STEPS, truncate, MAX_ATTACHMENTS_PER_CASE } = require('../helpers');
 const {
   CASE_SELECT,
   getCase,
@@ -24,8 +24,6 @@ const {
 } = require('../models');
 const discord = require('../discord');
 const { imageBody, saveImage, removeFile, evidencePath } = require('../uploads');
-
-const MAX_ATTACHMENTS_PER_CASE = 40;
 
 const router = express.Router();
 router.use(requireAuth);
@@ -326,13 +324,21 @@ router.post(
     }
     const caption = String(req.query.caption || '').trim().slice(0, 200);
     const internal = req.query.internal === '1' && isStaff(req.user);
+    // Bild gehört zu einem verknüpften FiveNet-Dokument dieser Akte (nur Team).
+    let externalDocId = null;
+    if (req.query.fivenetDoc && isStaff(req.user)) {
+      const link = db.prepare('SELECT id FROM case_external_docs WHERE id = ? AND case_id = ?').get(Number(req.query.fivenetDoc) || 0, c.id);
+      if (!link) return res.status(404).json({ error: 'Das FiveNet-Dokument ist nicht mit dieser Akte verknüpft.' });
+      externalDocId = link.id;
+    }
     const saved = saveImage(req, 'evidence');
     const info = tx(() => {
       const r = db
         .prepare(
-          'INSERT INTO case_attachments (case_id, file, mime, size, caption, internal, uploader_id, uploader_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+          `INSERT INTO case_attachments (case_id, file, mime, size, caption, internal, uploader_id, uploader_name, external_doc_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
-        .run(c.id, saved.file, saved.mime, saved.size, caption, internal ? 1 : 0, req.user.id, req.user.display_name);
+        .run(c.id, saved.file, saved.mime, saved.size, caption, internal ? 1 : 0, req.user.id, req.user.display_name, externalDocId);
       addSystemNote(c.id, req.user, `Anhang hinzugefügt${caption ? ': ' + caption : ''}.`, internal);
       db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(c.id);
       return r;

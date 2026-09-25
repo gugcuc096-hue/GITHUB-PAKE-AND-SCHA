@@ -12,11 +12,16 @@
  *   Passwort; sie gelten 4 Tage und sind nicht auf einzelne Rechte beschränkbar.
  * - Die Sync-API (SyncService) nutzt statische Server-Tokens für das Spielserver-Plugin.
  *   Sie arbeitet instanzweit ohne Charakter-Berechtigungen und ist für uns tabu.
- * - Ohne Anmeldung erreichbar sind nur /api/ping, /api/version und /api/config.
+ * - Ohne Anmeldung erreichbar sind /api/ping, /api/version, /api/config sowie Dateien im
+ *   Dateispeicher (/api/filestore/…) und über den Bild-Proxy (/api/image_proxy/…). Deren
+ *   Adressen sind zufällig und stehen nur im Dokument selbst.
  *
  * Folge: keine Passwörter, keine Sitzungs-Tokens, kein Scraping. FiveNet-Dokumente werden
- * als geprüfte externe Referenz gespeichert. Bietet FiveNet später eine offizielle,
- * delegierte Freigabe an, wird sie hier ergänzt und CAPABILITIES umgestellt.
+ * als geprüfte externe Referenz gespeichert. Text und Bilder übernimmt der Anwalt, indem er
+ * den Inhalt in FiveNet kopiert und in der Akte einfügt; der Server lädt dann nur die Bilder,
+ * deren Adressen in diesem eingefügten Inhalt standen – er sucht oder errät keine Adressen.
+ * Bietet FiveNet später eine offizielle, delegierte Freigabe an, wird sie hier ergänzt und
+ * CAPABILITIES umgestellt.
  */
 const { getSetting } = require('./db');
 
@@ -75,6 +80,12 @@ const INTERFACES = [
     note: 'FiveNet gibt Dokumente pro Job/Rang und Person frei. Die Kanzlei greift nie selbst zu; der Anwalt bestätigt, das Dokument mit eigenem Charakter geöffnet zu haben.',
   },
   {
+    key: 'filestore',
+    label: 'Dateispeicher (Bilder)',
+    status: 'used',
+    note: 'Bilder in Dokumenten liegen unter /api/filestore bzw. /api/image_proxy mit zufälligen Adressen und sind ohne Anmeldung abrufbar. Übernommen werden nur Bilder, deren Adresse ein berechtigter Anwalt mit dem Dokumentinhalt eingefügt hat.',
+  },
+  {
     key: 'public',
     label: 'Öffentliche Endpunkte',
     status: 'used',
@@ -84,6 +95,7 @@ const INTERFACES = [
 
 // Häufige Dokumentarten im RP-Alltag (FiveNet-Kategorien sind je Server frei wählbar).
 const DOC_TYPES = [
+  'Strafakte (LSPD)',
   'Polizeibericht',
   'Strafanzeige',
   'Haftbefehl',
@@ -213,6 +225,60 @@ async function checkInstance(inst = instance()) {
   }
 }
 
+/* ---------------------------------------------------------------- Bilder aus dem Dateispeicher */
+// Nur Pfade, aus denen auch FiveNet selbst Bilder in Dokumenten anzeigt (app/utils/url.ts: safeImagePaths).
+const IMAGE_PATHS = ['/api/filestore/', '/api/image_proxy/'];
+const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
+
+/**
+ * Prüft eine Bildadresse aus eingefügtem Dokumentinhalt: nur https, nur der Host des
+ * verknüpften Dokuments, nur Dateispeicher/Bild-Proxy. Liefert die bereinigte Adresse oder null.
+ */
+function imageUrlFor(raw, host) {
+  let url;
+  try {
+    url = new URL(String(raw || '').trim(), `https://${host}`);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' || url.username || url.password) return null;
+  const expected = new URL(`https://${host}`);
+  if (stripWww(url.hostname.toLowerCase()) !== stripWww(expected.hostname) || url.port !== expected.port) return null;
+  if (!IMAGE_PATHS.some((p) => url.pathname.startsWith(p)) || url.pathname.includes('..')) return null;
+  url.hash = '';
+  return url.toString();
+}
+
+/** Lädt ein Bild (ohne Weiterleitungen, mit Zeit- und Größengrenze). Wirft Fehler mit deutscher Meldung. */
+async function fetchImage(url) {
+  let res;
+  try {
+    res = await fetch(url, {
+      headers: { Accept: 'image/avif,image/webp,image/png,image/jpeg,*/*;q=0.5', 'User-Agent': 'PakeScha-Kanzlei/1.0 (+Bildübernahme)' },
+      redirect: 'manual',
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch (err) {
+    throw new Error(err?.name === 'TimeoutError' ? 'Zeitüberschreitung' : 'FiveNet nicht erreichbar');
+  }
+  if (res.status !== 200) {
+    res.body?.cancel().catch(() => {});
+    throw new Error(`FiveNet antwortet mit ${res.status}`);
+  }
+  if (Number(res.headers.get('content-length') || 0) > MAX_IMPORT_BYTES) {
+    res.body?.cancel().catch(() => {});
+    throw new Error('Bild größer als 5 MB');
+  }
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of res.body) {
+    size += chunk.length;
+    if (size > MAX_IMPORT_BYTES) throw new Error('Bild größer als 5 MB');
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+}
+
 module.exports = {
   DEFAULT_URL,
   CAPABILITIES,
@@ -222,4 +288,6 @@ module.exports = {
   instance,
   parseDocumentRef,
   checkInstance,
+  imageUrlFor,
+  fetchImage,
 };

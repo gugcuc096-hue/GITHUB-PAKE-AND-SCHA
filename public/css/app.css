@@ -667,3 +667,24 @@ details.edit-box[open] > summary::after { content: '–'; }
   .task-row .side { flex-direction: row; align-items: center; justify-content: space-between; width: 100%; padding-left: 36px; }
   .task-row .side:not(:has(.countdown)) { justify-content: flex-end; }
 }
+
+/* FiveNet: Abschrift & übernommene Bilder */
+.att .tag { display: flex; gap: 4px; flex-wrap: wrap; }
+.fn-text { margin-top: 0.6rem; border: 1px solid var(--line); border-radius: 12px; background: rgba(2, 5, 14, 0.35); }
+.fn-text > summary { cursor: pointer; list-style: none; display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem 0.6rem; padding: 0.55rem 0.75rem; font-size: 0.85rem; font-weight: 600; color: var(--gold-light); }
+.fn-text > summary::-webkit-details-marker { display: none; }
+.fn-text[open] > summary { border-bottom: 1px solid var(--line); }
+.fn-text > .fn-actions, .fn-text > .form-hint { padding: 0 0.75rem; }
+.fn-text > .form-hint { padding-bottom: 0.6rem; }
+.fn-pre { white-space: pre-wrap; word-break: break-word; font-size: 0.85rem; line-height: 1.6; color: var(--text-muted); max-height: 420px; overflow: auto; padding: 0.75rem; }
+.fn-gallery { grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); margin-top: 0.6rem; }
+.fn-content { font-size: 0.85rem; line-height: 1.55; }
+.fn-content-box { padding: 0.8rem; border-radius: 14px; border: 1px solid rgba(129, 140, 248, 0.35); background: rgba(99, 102, 241, 0.06); }
+.fn-line .form-hint { margin: 0; }
+.fn-pending:not(:empty) { margin-top: 0.6rem; }
+.fn-thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 0.5rem; }
+.fn-thumb { position: relative; aspect-ratio: 1 / 1; border-radius: 10px; overflow: hidden; border: 1px solid var(--glass-border); background: #000; }
+.fn-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.fn-thumb .lbl { position: absolute; left: 0; right: 0; bottom: 0; font-size: 0.6rem; padding: 0.15rem 0.3rem; background: linear-gradient(transparent, rgba(0, 0, 0, 0.85)); color: #e2e8f0; }
+.fn-thumb .rm { position: absolute; right: 4px; top: 4px; width: 24px; height: 24px; border-radius: 999px; border: 0; background: rgba(2, 5, 14, 0.8); color: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.fn-thumb .rm:hover { background: rgba(239, 68, 68, 0.85); }
