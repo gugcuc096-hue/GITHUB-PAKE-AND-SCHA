@@ -285,6 +285,47 @@ db.exec(`
     details    TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
+
+  -- Externe Dokumente (derzeit FiveNet) als Referenz an einer Akte. Der Inhalt
+  -- bleibt in FiveNet; gespeichert werden Adresse, Dokument-ID und die vom
+  -- Anwalt erfassten Metadaten. external_id ist TEXT, weil FiveNet int64 nutzt.
+  CREATE TABLE IF NOT EXISTS case_external_docs (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id        INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    provider       TEXT NOT NULL DEFAULT 'fivenet',
+    external_id    TEXT NOT NULL,
+    original_url   TEXT NOT NULL,
+    canonical_url  TEXT NOT NULL,
+    host           TEXT NOT NULL,
+    title          TEXT NOT NULL DEFAULT '',
+    doc_type       TEXT NOT NULL DEFAULT '',
+    doc_date       TEXT,
+    doc_author     TEXT NOT NULL DEFAULT '',
+    summary        TEXT NOT NULL DEFAULT '',
+    viewed_as      TEXT NOT NULL DEFAULT '',
+    internal       INTEGER NOT NULL DEFAULT 1,
+    attested       INTEGER NOT NULL DEFAULT 0,
+    linked_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    linked_by_name TEXT NOT NULL,
+    linked_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at     TEXT,
+    UNIQUE (case_id, provider, external_id)
+  );
+
+  -- Aufgaben & Wiedervorlagen (mit oder ohne Aktenbezug, nur für das Team)
+  CREATE TABLE IF NOT EXISTS tasks (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id     INTEGER REFERENCES cases(id) ON DELETE CASCADE,
+    title       TEXT NOT NULL,
+    note        TEXT NOT NULL DEFAULT '',
+    due_date    TEXT,
+    assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    done        INTEGER NOT NULL DEFAULT 0,
+    done_at     TEXT,
+    done_by     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `);
 
 /* ================================================================
@@ -408,6 +449,10 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_app_notes ON application_notes(application_id);
   CREATE INDEX IF NOT EXISTS idx_attachments_case ON case_attachments(case_id);
   CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at);
+  CREATE INDEX IF NOT EXISTS idx_extdocs_case ON case_external_docs(case_id);
+  CREATE INDEX IF NOT EXISTS idx_extdocs_ref ON case_external_docs(provider, external_id);
+  CREATE INDEX IF NOT EXISTS idx_tasks_case ON tasks(case_id);
+  CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON tasks(assigned_to, done, due_date);
 `);
 
 /* ================================================================

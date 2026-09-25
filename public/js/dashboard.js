@@ -78,6 +78,11 @@
     briefcase: 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
     globe: 'M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9',
     send: 'M12 19l9 2-9-18-9 18 9-2zm0 0v-8',
+    link: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1',
+    external: 'M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14',
+    shield: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
+    tasks: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4',
+    doc: 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z',
   };
   const icon = (name, cls = 'ico') =>
     `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[name] || ''}"/></svg>`;
@@ -87,6 +92,7 @@
   const VIEWS = {
     overview: { label: 'Übersicht', icon: 'home' },
     cases: { label: 'Akten', clientLabel: 'Meine Akten', icon: 'folder' },
+    tasks: { label: 'Aufgaben', icon: 'tasks', staff: true },
     calendar: { label: 'Kalender & Fristen', short: 'Kalender', clientLabel: 'Termine', icon: 'calendar' },
     mail: { label: 'Kanzlei-Post', short: 'Post', icon: 'mail' },
     board: { label: 'Pinnwand', icon: 'pin', staff: true },
@@ -150,6 +156,19 @@
     audit: [],
     auditQuery: '',
     auditHasMore: false,
+    // Aufgaben & Wiedervorlagen
+    tasks: [],
+    myTasks: [],
+    caseTasks: [],
+    taskScope: 'mine',
+    taskState: 'open',
+    taskQuery: '',
+    dueTasks: 0,
+    // FiveNet
+    fivenet: null,
+    caseDocs: [],
+    caseInfo: null,
+    fnCheckToken: 0,
   };
 
   const $ = (s, root = document) => root.querySelector(s);
@@ -227,6 +246,35 @@
     if (!v) return '';
     if (!isStaff() && v.clientLabel) return v.clientLabel;
     return (short && v.short) || v.label;
+  }
+  /** Tage zwischen heute und einem Datum "YYYY-MM-DD" (negativ = Vergangenheit). */
+  function daysUntil(dateStr) {
+    return Math.round((new Date(`${dateStr}T12:00:00`) - new Date(`${dayKey(new Date())}T12:00:00`)) / 864e5);
+  }
+  /** Fälligkeit einer Aufgabe / Wiedervorlage als farbiger Hinweis. */
+  function dueInfo(dateStr, done = false) {
+    if (!dateStr) return null;
+    if (done) return { text: fmtDateOnly(dateStr), cls: 'cd-dim' };
+    const diff = daysUntil(dateStr);
+    if (diff < 0) return { text: diff === -1 ? 'seit gestern fällig' : `seit ${-diff} Tagen fällig`, cls: 'cd-over' };
+    if (diff === 0) return { text: 'heute fällig', cls: 'cd-amber' };
+    if (diff === 1) return { text: 'morgen', cls: 'cd-green' };
+    if (diff < 7) return { text: `in ${diff} Tagen`, cls: 'cd-green' };
+    return { text: fmtDateOnly(dateStr), cls: 'cd-dim' };
+  }
+  /** "heute", "gestern", "vor 5 Tagen" */
+  function relDays(value) {
+    const d = parseDate(value);
+    if (!d) return '—';
+    const diff = -daysUntil(dayKey(d));
+    if (diff <= 0) return 'heute';
+    if (diff === 1) return 'gestern';
+    return `vor ${diff} Tagen`;
+  }
+  /** Dokument-ID aus einem FiveNet-Link (…/documents/1234) oder einer reinen Zahl – für die Aktensuche. */
+  function fivenetIdFrom(q) {
+    const m = String(q).match(/\/documents\/(\d{1,19})(?:[/?#]|$)/) || String(q).trim().match(/^#?(\d{1,19})$/);
+    return m ? m[1].replace(/^0+(?=\d)/, '') : null;
   }
 
   /* ---------------------------------------------------------------- Countdown */
@@ -310,6 +358,18 @@
       const list = (await api.get('/api/admin/applications')).applications;
       st.newApplications = list.filter((a) => a.status === 'eingegangen').length;
     },
+    async tasks() {
+      st.tasks = (await api.get(`/api/tasks?scope=${st.taskScope}&state=${st.taskState}`)).tasks;
+    },
+    async myTasks() {
+      if (isStaff()) st.myTasks = (await api.get('/api/tasks?scope=mine')).tasks;
+    },
+    async dueTasks() {
+      if (isStaff()) st.dueTasks = (await api.get('/api/tasks/due-count?today=' + dayKey(new Date()))).due;
+    },
+    async fivenet(force = false) {
+      if (isStaff() && (force || !st.fivenet)) st.fivenet = await api.get('/api/fivenet/status');
+    },
   };
 
   /* ================================================================
@@ -324,7 +384,7 @@
         section = v.section;
         html += `<div class="nav-section">${esc(section)}</div>`;
       }
-      const count = key === 'mail' ? st.unread : key === 'applications' ? st.newApplications : 0;
+      const count = key === 'mail' ? st.unread : key === 'applications' ? st.newApplications : key === 'tasks' ? st.dueTasks : 0;
       const active = st.view === key || (key === 'invoices' && st.view === 'invoice-new');
       html += `<a href="#${key}" class="nav-item ${active ? 'active' : ''}" ${active ? 'aria-current="page"' : ''}>${icon(v.icon)}<span>${esc(viewLabel(key))}</span>${count ? `<span class="nav-count">${count > 99 ? '99+' : count}</span>` : ''}</a>`;
     }
@@ -594,9 +654,31 @@
     </section>`;
   }
 
+  /** Überfällige/heute fällige eigene Aufgaben und eigene Akten ohne Bewegung – nur wenn es etwas zu tun gibt. */
+  const STALE_DAYS = 7;
+  function attentionPanel() {
+    const me = st.user.id;
+    const overdue = st.myTasks.filter((t) => t.dueDate && daysUntil(t.dueDate) < 0);
+    const today = st.myTasks.filter((t) => t.dueDate && daysUntil(t.dueDate) === 0);
+    const stale = st.cases.filter((c) => {
+      const d = parseDate(c.updatedAt);
+      return c.status === 'in_bearbeitung' && c.lawyerId === me && d && -daysUntil(dayKey(d)) >= STALE_DAYS;
+    });
+    if (!overdue.length && !today.length && !stale.length) return '';
+    const due = [...overdue, ...today];
+    return `<section class="panel panel-pad attention mb-4 lg:mb-5">
+      <div class="panel-head"><h2 class="panel-title">Handlungsbedarf</h2>
+        <div class="flex flex-wrap gap-2">${overdue.length ? badge(`${overdue.length} überfällig`, 'red') : ''}${today.length ? badge(`${today.length} heute fällig`, 'amber') : ''}${stale.length ? badge(`${stale.length} ruhende Akte${stale.length === 1 ? '' : 'n'}`, 'slate') : ''}</div></div>
+      ${due.length ? `<div class="task-list">${due.slice(0, 5).map((t) => taskItem(t)).join('')}</div>` : ''}
+      ${due.length > 5 ? `<a href="#tasks" class="btn-ghost btn-sm mt-2">Alle ${due.length} fälligen Aufgaben anzeigen</a>` : ''}
+      ${stale.length ? `<div class="${due.length ? 'mt-4' : ''}"><div class="text-xs uppercase tracking-widest text-dim mb-1">Ihre Akten seit ${STALE_DAYS}+ Tagen ohne Bewegung</div>
+        ${stale.slice(0, 4).map((c) => caseListRow(c, badge(relDays(c.updatedAt), 'slate'))).join('')}</div>` : ''}
+    </section>`;
+  }
+
   views.overview = {
     async load() {
-      await Promise.all([load.cases(), load.events(), load.invoices(), load.board(), load.unread(), load.duty()]);
+      await Promise.all([load.cases(), load.events(), load.invoices(), load.board(), load.unread(), load.duty(), load.myTasks()]);
     },
     render() {
       const u = st.user;
@@ -669,6 +751,7 @@
         </section>`;
 
       return `${head}
+        ${attentionPanel()}
         <div class="grid-2">${eventsPanel}${requestsPanel}</div>
         <div class="grid-2 mt-4 lg:mt-5">${recentPanel}${boardPanel}</div>`;
     },
@@ -677,11 +760,16 @@
   /* ---------------------------------------------------------------- Akten */
   function filteredCases() {
     const q = st.caseQuery.trim().toLowerCase();
+    // Ein eingefügter FiveNet-Link oder eine Dokument-ID findet die Akten, mit denen das Dokument verknüpft ist.
+    const fnId = q ? fivenetIdFrom(q) : null;
     return st.cases.filter((c) => {
       const f = st.caseFilter;
       const stateOk = f === 'alle' || (f === 'aktiv' ? c.status !== 'geschlossen' : c.status === f);
       const mineOk = !st.caseMine || c.lawyerId === st.user.id;
-      const textOk = !q || [c.caseNumber, c.title, c.clientName, c.lawyerName, c.courtRef, c.opponent].join(' ').toLowerCase().includes(q);
+      const textOk =
+        !q ||
+        [c.caseNumber, c.title, c.clientName, c.lawyerName, c.courtRef, c.opponent].join(' ').toLowerCase().includes(q) ||
+        (!!fnId && (c.fivenetIds || []).includes(fnId));
       return stateOk && mineOk && textOk;
     });
   }
@@ -723,7 +811,7 @@
           <div class="page-actions"><button class="btn-gold btn-md" data-action="new-case">${icon('plus')}<span>${staff ? 'Neue Akte' : 'Mandat einreichen'}</span></button></div>
         </div>
         <div class="toolbar">
-          <label class="search">${icon('search')}<input id="caseSearch" class="field" type="search" placeholder="Aktenzeichen, Titel, Mandant …" value="${esc(st.caseQuery)}" aria-label="Akten durchsuchen"></label>
+          <label class="search">${icon('search')}<input id="caseSearch" class="field" type="search" placeholder="${staff ? 'Aktenzeichen, Mandant, FiveNet-Link …' : 'Aktenzeichen, Titel …'}" value="${esc(st.caseQuery)}" aria-label="Akten durchsuchen"></label>
           <div class="chip-row">
             ${filters.map(([k, l]) => `<button class="chip ${st.caseFilter === k ? 'active' : ''}" data-action="case-filter" data-value="${k}">${l} <span class="chip-count">${caseCount(k)}</span></button>`).join('')}
             ${staff ? `<button class="chip ${st.caseMine ? 'active' : ''}" data-action="case-mine">${icon('user', 'ico-sm')}Nur meine</button>` : ''}
@@ -733,18 +821,80 @@
     },
   };
 
+  /* ---------------------------------------------------------------- Aufgaben & Wiedervorlagen (Übersicht) */
+  function filteredTasks() {
+    const q = st.taskQuery.trim().toLowerCase();
+    return st.tasks.filter((t) => !q || [t.title, t.note, t.caseNumber, t.caseTitle, t.assignedName].join(' ').toLowerCase().includes(q));
+  }
+  function taskList() {
+    const list = filteredTasks();
+    if (!list.length) {
+      const msg = st.tasks.length
+        ? 'Keine Aufgaben für diese Suche.'
+        : st.taskState === 'done'
+          ? 'Noch keine erledigten Aufgaben.'
+          : st.taskScope === 'mine'
+            ? 'Keine offenen Aufgaben – alles erledigt.'
+            : 'Keine offenen Aufgaben im Team.';
+      return empty(msg, 'tasks');
+    }
+    if (st.taskState === 'done') return `<div class="task-list">${list.map((t) => taskItem(t)).join('')}</div>`;
+    const bucket = (t) => {
+      if (!t.dueDate) return 'none';
+      const d = daysUntil(t.dueDate);
+      return d < 0 ? 'overdue' : d === 0 ? 'today' : d <= 7 ? 'week' : 'later';
+    };
+    const groups = [['overdue', 'Überfällig'], ['today', 'Heute'], ['week', 'Nächste 7 Tage'], ['later', 'Später'], ['none', 'Ohne Datum']];
+    return groups
+      .map(([key, label]) => {
+        const items = list.filter((t) => bucket(t) === key);
+        if (!items.length) return '';
+        return `<h3 class="task-group ${key === 'overdue' ? 'is-overdue' : ''}">${esc(label)} <span>${items.length}</span></h3><div class="task-list">${items.map((t) => taskItem(t)).join('')}</div>`;
+      })
+      .join('');
+  }
+
+  views.tasks = {
+    async load() {
+      await Promise.all([load.tasks(), load.lawyers(), load.cases(), load.dueTasks()]);
+    },
+    render() {
+      return `
+        <div class="page-head">
+          <div><h1 class="page-title">Aufgaben & Wiedervorlagen</h1>
+            <p class="page-sub">Was ist zu tun, bis wann und von wem – mit oder ohne Aktenbezug. Fällige Aufgaben erscheinen in der Übersicht unter „Handlungsbedarf“.</p></div>
+          <div class="page-actions"><button class="btn-gold btn-md" data-action="task-new">${icon('plus')}<span>Neue Aufgabe</span></button></div>
+        </div>
+        <div class="toolbar">
+          <label class="search">${icon('search')}<input id="taskSearch" class="field" type="search" placeholder="Aufgabe, Aktenzeichen, Person …" value="${esc(st.taskQuery)}" aria-label="Aufgaben durchsuchen"></label>
+          <div class="chip-row">
+            <button class="chip ${st.taskScope === 'mine' ? 'active' : ''}" data-action="task-scope" data-value="mine">${icon('user', 'ico-sm')}Meine</button>
+            <button class="chip ${st.taskScope === 'all' ? 'active' : ''}" data-action="task-scope" data-value="all">${icon('users', 'ico-sm')}Ganzes Team</button>
+            <button class="chip ${st.taskState === 'open' ? 'active' : ''}" data-action="task-state" data-value="open">Offen</button>
+            <button class="chip ${st.taskState === 'done' ? 'active' : ''}" data-action="task-state" data-value="done">Erledigt</button>
+          </div>
+        </div>
+        <div id="taskList" class="panel panel-pad">${taskList()}</div>`;
+    },
+  };
+
+  function rememberCase(data) {
+    (data.appointments || []).forEach((e) => st.eventCache.set(e.id, e));
+    st.caseAttachments = data.attachments || [];
+    st.caseDocs = data.externalDocs || [];
+    st.caseTasks = data.tasks || [];
+    st.caseInfo = data.case;
+  }
   async function openCase(id) {
     await load.lawyers();
     const data = await api.get('/api/cases/' + id);
-    (data.appointments || []).forEach((e) => st.eventCache.set(e.id, e));
-    st.caseAttachments = data.attachments || [];
+    rememberCase(data);
     st.modalCaseId = id;
     openModal(caseDetail(data), { wide: true });
   }
   async function reloadCase(id) {
     const data = await api.get('/api/cases/' + id);
-    (data.appointments || []).forEach((e) => st.eventCache.set(e.id, e));
-    st.caseAttachments = data.attachments || [];
+    rememberCase(data);
     if (st.modalCaseId === id) replaceModal(caseDetail(data));
     refreshBehind();
   }
@@ -752,7 +902,7 @@
   function attachmentsSection(c, attachments) {
     const staff = isStaff();
     const canUpload = staff || !c.closed;
-    return `<div class="section">
+    return `<div class="section" id="secEvidence">
       <h3 class="section-title">Beweismittel & Anhänge <span class="text-xs text-dim font-normal" style="font-family:Inter,sans-serif">${attachments.length} / 40</span></h3>
       ${canUpload ? `<div class="flex flex-wrap items-center gap-3 mb-3">
           <input id="attCaption" class="field" style="max-width:340px" maxlength="200" placeholder="Beschreibung für neue Bilder (optional)" aria-label="Beschreibung für neue Bilder">
@@ -774,7 +924,220 @@
     </div>`;
   }
 
-  function caseDetail({ case: c, notes, appointments, invoices, attachments = [] }) {
+  /* ---------------------------------------------------------------- Aktenübersicht (Kennzahlen im Aktenkopf) */
+  function caseStats(c, { appointments, attachments, externalDocs, tasks }) {
+    const cutoff = Date.now() - 60 * 60 * 1000;
+    const next = appointments
+      .filter((e) => (e.status === 'bestaetigt' || e.status === 'angefragt') && (e.type === 'frist' || parseDate(e.startsAt) >= cutoff))
+      .sort(byStart)[0];
+    const open = tasks.filter((t) => !t.done);
+    const overdue = open.filter((t) => t.dueDate && daysUntil(t.dueDate) < 0).length;
+    const pill = (label, value, target, extra = '') =>
+      `<button type="button" class="stat-pill" data-action="scroll-to" data-target="${target}"><span class="k">${esc(label)}</span><span class="v">${value}</span>${extra}</button>`;
+    return `<div class="case-stats mb-5">
+      ${pill('Nächste Frist / Termin', next ? esc(next.title) : '<span class="text-dim">keine</span>', 'secEvents', next ? countdownHtml(next) : '')}
+      ${pill('Aufgaben', open.length ? `${open.length} offen` : '<span class="text-dim">keine offen</span>', 'secTasks', overdue ? `<span class="countdown cd-over">${overdue} überfällig</span>` : '')}
+      ${pill('FiveNet-Dokumente', String(externalDocs.length), 'secFivenet')}
+      ${pill('Beweismittel', String(attachments.length), 'secEvidence')}
+      ${pill('Letzte Aktivität', esc(relDays(c.updatedAt)), 'secNotes')}
+    </div>`;
+  }
+
+  /* ---------------------------------------------------------------- FiveNet-Dokumente in der Akte */
+  function fivenetDocCard(d, c) {
+    const staff = isStaff();
+    const canManage = staff && (d.linkedById === st.user.id || c.canEdit);
+    const meta = [d.docType, `Dokument-ID ${d.documentId}`, d.docDate ? `erstellt ${fmtDateOnly(d.docDate)}` : null, d.docAuthor || null]
+      .filter(Boolean)
+      .map(esc)
+      .join(' · ');
+    const also = staff && d.alsoIn && d.alsoIn.length
+      ? `<div class="fn-foot">Auch verknüpft mit: ${d.alsoIn
+          .map((o) => `<button type="button" class="link-btn font-mono" data-action="open-case" data-id="${o.id}" title="${esc(o.title)}">${esc(o.caseNumber)}</button>`)
+          .join(', ')}</div>`
+      : '';
+    return `<div class="fn-doc">
+      <div class="fn-head">
+        <span class="fn-badge">FiveNet</span>
+        <div class="fn-main"><div class="fn-title">${esc(d.title || `FiveNet-Dokument ${d.documentId}`)}</div><div class="fn-meta">${meta}</div></div>
+        ${staff && d.internal ? badge('intern', 'amber') : ''}
+      </div>
+      ${d.summary ? `<p class="fn-summary">${esc(d.summary)}</p>` : ''}
+      <div class="fn-foot">Quelle: FiveNet (${esc(d.host)}) · Verknüpft von ${esc(d.linkedByName)} am ${esc(parseDate(d.linkedAt)?.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) || '—')}${staff && d.viewedAs ? ` · eingesehen als „${esc(d.viewedAs)}“` : ''}</div>
+      ${also}
+      <div class="fn-actions">
+        <a class="btn-outline btn-sm" href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">${icon('external', 'ico-sm')}<span>In FiveNet öffnen</span></a>
+        ${staff ? `<button type="button" class="btn-ghost btn-sm" data-action="fn-cite" data-id="${d.id}">${icon('copy', 'ico-sm')}<span>Zitat kopieren</span></button>` : ''}
+        ${canManage ? `<button type="button" class="btn-ghost btn-sm" data-action="fn-edit" data-id="${d.id}">${icon('edit', 'ico-sm')}<span>Bearbeiten</span></button>
+          <button type="button" class="btn-ghost btn-sm fn-danger" data-action="fn-delete" data-id="${d.id}" data-case-id="${c.id}">${icon('trash', 'ico-sm')}<span>Entfernen</span></button>` : ''}
+      </div>
+    </div>`;
+  }
+
+  function fivenetSection(c, docs) {
+    const staff = isStaff();
+    if (!staff && !docs.length) return '';
+    return `<div class="section" id="secFivenet">
+      <h3 class="section-title">FiveNet-Dokumente <span class="flex items-center gap-2">${staff ? `<button type="button" class="btn-outline btn-sm" data-action="fn-add" data-case-id="${c.id}">${icon('link', 'ico-sm')}<span>FiveNet-Dokument hinzufügen</span></button>` : ''}</span></h3>
+      ${docs.length
+        ? `<div class="stack">${docs.map((d) => fivenetDocCard(d, c)).join('')}</div>`
+        : '<p class="text-sm text-dim">Noch keine FiveNet-Dokumente. Polizeiberichte, Urteile oder Verträge aus FiveNet lassen sich per Link mit der Akte verknüpfen – ohne sie zu kopieren.</p>'}
+      ${!staff ? '<p class="form-hint">Öffnen ist nur mit einer Berechtigung in FiveNet möglich.</p>' : ''}
+    </div>`;
+  }
+
+  function fivenetCitation(d) {
+    const parts = [d.docType, d.docDate ? fmtDateOnly(d.docDate) : null].filter(Boolean).join(', ');
+    return `FiveNet-Dokument Nr. ${d.documentId}${d.title ? ` „${d.title}“` : ''}${parts ? ` (${parts})` : ''}, ${d.url}`;
+  }
+
+  /** Dialog: Dokument verknüpfen (d = null) oder Angaben bearbeiten. */
+  function fivenetForm(d, c) {
+    const fn = st.fivenet || { instance: { url: 'https://fivenet.modernv.net', host: 'fivenet.modernv.net' }, docTypes: [], lastViewedAs: '' };
+    const editing = !!d;
+    const v = d || { title: '', docType: '', docDate: '', docAuthor: '', summary: '', viewedAs: fn.lastViewedAs || '', internal: true };
+    return `
+      <h2 id="modalTitle" class="modal-title">${editing ? 'FiveNet-Dokument bearbeiten' : 'FiveNet-Dokument hinzufügen'}</h2>
+      <p class="modal-sub"><span class="font-mono text-gold">${esc(c.caseNumber)}</span> · ${esc(c.title)}</p>
+      <form data-form="${editing ? 'fivenet-edit' : 'fivenet-link'}" data-case-id="${c.id}" ${editing ? `data-id="${d.id}"` : ''} class="form-grid cols-2">
+        ${editing
+          ? `<div class="span-2"><div class="label">FiveNet-Dokument</div><div class="fn-check ok"><div class="fn-line">${icon('check', 'ico-sm')}<span>Dokument-ID <strong>${esc(d.documentId)}</strong> · ${esc(d.host)}</span><a class="link-btn push" href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">In FiveNet öffnen ↗</a></div></div></div>`
+          : `<div class="span-2"><label class="label" for="fnInput">Link zum FiveNet-Dokument</label>
+              <input id="fnInput" name="input" class="field font-mono text-sm" required maxlength="500" autocomplete="off" spellcheck="false" autofocus placeholder="${esc(fn.instance.url)}/documents/1234">
+              <div id="fnCheck" class="fn-check" aria-live="polite"><span class="text-dim">Adresse aus FiveNet einfügen – die Dokument-ID wird automatisch erkannt.</span></div></div>`}
+        <div class="span-2"><label class="label" for="fnTitle">Titel</label><input id="fnTitle" name="title" class="field" maxlength="300" value="${esc(v.title)}" placeholder="z. B. Polizeibericht – Verkehrskontrolle"></div>
+        <div><label class="label">Dokumentart</label><input name="docType" class="field" maxlength="60" list="fnTypes" value="${esc(v.docType)}" placeholder="z. B. Polizeibericht"><datalist id="fnTypes">${(fn.docTypes || []).map((t) => `<option value="${esc(t)}"></option>`).join('')}</datalist></div>
+        <div><label class="label">Erstellt am (laut FiveNet)</label><input name="docDate" type="date" class="field" value="${esc(v.docDate || '')}"></div>
+        <div><label class="label">Verfasser / Behörde</label><input name="docAuthor" class="field" maxlength="120" value="${esc(v.docAuthor)}" placeholder="z. B. LSPD, Officer J. Miller"></div>
+        <div><label class="label">Eingesehen als (FiveNet-Charakter)</label><input name="viewedAs" class="field" maxlength="80" value="${esc(v.viewedAs || '')}" placeholder="eigene Angabe, optional"></div>
+        <div class="span-2"><label class="label">Kurzinhalt / Relevanz für die Akte</label><textarea name="summary" rows="3" maxlength="2000" class="field" placeholder="Was steht drin, warum ist es wichtig?">${esc(v.summary)}</textarea></div>
+        <label class="check span-2"><input type="checkbox" name="clientVisible" ${v.internal ? '' : 'checked'}> Für den Mandanten sichtbar (sonst nur intern)</label>
+        ${editing ? '' : `<label class="check span-2 fn-attest"><input type="checkbox" name="attest" required> Ich habe dieses Dokument in FiveNet mit meinem eigenen Charakter geöffnet und darf es einsehen.</label>
+          <div class="span-2 banner banner-gold mb-0">${icon('shield')}<div>FiveNet bietet externen Anwendungen keine Schnittstelle (kein OAuth2). Die Kanzlei ruft das Dokument deshalb nicht selbst ab und fragt nie nach Ihrem FiveNet-Passwort – gespeichert werden nur Link, Dokument-ID und Ihre Angaben.</div></div>`}
+        <div class="span-2 form-actions">
+          <button type="submit" class="btn-gold btn-md">${icon(editing ? 'check' : 'link', 'ico-sm')}<span>${editing ? 'Speichern' : 'Mit Akte verknüpfen'}</span></button>
+          <button type="button" class="btn-ghost btn-md" data-action="back-to-case">Abbrechen</button>
+        </div>
+      </form>`;
+  }
+
+  /** Live-Prüfung des eingefügten Links (Dokument-ID, Dubletten, Querverweise). */
+  async function checkFivenetInput(input) {
+    const box = $('#fnCheck');
+    if (!box) return;
+    const token = ++st.fnCheckToken;
+    const value = input.value.trim();
+    const submit = $('form[data-form="fivenet-link"] button[type="submit"]');
+    if (submit) submit.disabled = false;
+    if (!value) {
+      box.className = 'fn-check';
+      box.innerHTML = '<span class="text-dim">Adresse aus FiveNet einfügen – die Dokument-ID wird automatisch erkannt.</span>';
+      return;
+    }
+    box.className = 'fn-check';
+    box.innerHTML = '<span class="text-dim">Wird geprüft …</span>';
+    let r;
+    try {
+      r = await api.post('/api/fivenet/resolve', { input: value, caseId: st.modalCaseId || undefined });
+    } catch (e) {
+      if (token !== st.fnCheckToken || !box.isConnected) return;
+      box.className = 'fn-check bad';
+      box.innerHTML = `${icon('x', 'ico-sm')}<span>${esc(e.message)}</span>`;
+      return;
+    }
+    if (token !== st.fnCheckToken || !box.isConnected) return;
+    const lines = [
+      `<div class="fn-line">${icon('check', 'ico-sm')}<span>Dokument-ID <strong>${esc(r.documentId)}</strong> erkannt · ${esc(r.host)}</span><a class="link-btn push" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">In FiveNet öffnen ↗</a></div>`,
+    ];
+    if (r.linkedHere) lines.push(`<div class="fn-warn">Bereits mit dieser Akte verknüpft (von ${esc(r.linkedHere.linkedByName)}).</div>`);
+    if (r.otherCases.length) lines.push(`<div class="text-xs text-muted">Auch verknüpft mit: ${r.otherCases.map((o) => `<span class="font-mono">${esc(o.caseNumber)}</span>`).join(', ')}</div>`);
+    const title = $('#fnTitle');
+    if (title && !title.value && r.suggestedTitle) {
+      title.value = r.suggestedTitle;
+      lines.push('<div class="text-xs text-dim">Titel aus einer anderen Akte übernommen – bitte prüfen.</div>');
+    }
+    box.className = `fn-check ${r.linkedHere ? 'warn' : 'ok'}`;
+    box.innerHTML = lines.join('');
+    if (submit) submit.disabled = !!r.linkedHere;
+  }
+
+  function fivenetBody(f) {
+    const fd = new FormData(f);
+    return {
+      title: val(fd, 'title'),
+      docType: val(fd, 'docType'),
+      docDate: val(fd, 'docDate') || null,
+      docAuthor: val(fd, 'docAuthor'),
+      summary: val(fd, 'summary'),
+      viewedAs: val(fd, 'viewedAs'),
+      internal: fd.get('clientVisible') !== 'on',
+    };
+  }
+
+  /* ---------------------------------------------------------------- Aufgaben & Wiedervorlagen */
+  function taskItem(t, { showCase = true } = {}) {
+    const due = dueInfo(t.dueDate, t.done);
+    const meta = [
+      showCase && t.caseNumber ? `<button type="button" class="link-btn font-mono" data-action="open-case" data-id="${t.caseId}" title="${esc(t.caseTitle || '')}">${esc(t.caseNumber)}</button>` : null,
+      t.assignedName ? esc(t.assignedName) : '<span class="text-amber-300">niemand zuständig</span>',
+      t.done && t.doneByName ? `erledigt von ${esc(t.doneByName)}` : null,
+    ].filter(Boolean);
+    return `<div class="task-row ${t.done ? 'is-done' : ''}">
+      <button type="button" class="task-check" data-action="task-toggle" data-id="${t.id}" data-done="${t.done ? 1 : 0}" aria-label="${t.done ? 'Wieder öffnen' : 'Als erledigt markieren'}" title="${t.done ? 'Wieder öffnen' : 'Erledigt'}">${t.done ? icon('check', 'ico-sm') : ''}</button>
+      <div class="main"><div class="title">${esc(t.title)}</div>${t.note ? `<div class="note">${esc(t.note)}</div>` : ''}<div class="meta">${meta.join(' · ')}</div></div>
+      <div class="side">${due ? `<span class="countdown ${due.cls}">${esc(due.text)}</span>` : ''}
+        <span class="task-actions"><button type="button" class="icon-btn sm" data-action="task-edit" data-id="${t.id}" aria-label="Bearbeiten">${icon('edit', 'ico-sm')}</button>
+        <button type="button" class="icon-btn sm" data-action="task-delete" data-id="${t.id}" aria-label="Löschen">${icon('trash', 'ico-sm')}</button></span></div>
+    </div>`;
+  }
+
+  function caseTasksSection(c, tasks) {
+    const open = tasks.filter((t) => !t.done);
+    const done = tasks.filter((t) => t.done);
+    return `<div class="section" id="secTasks">
+      <h3 class="section-title">Aufgaben & Wiedervorlagen <span class="text-xs text-dim font-normal" style="font-family:Inter,sans-serif">${open.length} offen · ${done.length} erledigt</span></h3>
+      ${tasks.length ? `<div class="task-list">${open.map((t) => taskItem(t, { showCase: false })).join('')}${done.map((t) => taskItem(t, { showCase: false })).join('')}</div>` : '<p class="text-sm text-dim mb-2">Noch keine Aufgaben. Wiedervorlage mit Datum anlegen oder die Checkliste für dieses Rechtsgebiet übernehmen.</p>'}
+      <form data-form="task-quick" data-case-id="${c.id}" class="task-quick mt-3">
+        <input name="title" class="field" required minlength="2" maxlength="160" placeholder="Neue Aufgabe oder Wiedervorlage …" aria-label="Neue Aufgabe">
+        <input name="dueDate" type="date" class="field" aria-label="Fällig am" title="Fällig am (Wiedervorlage)">
+        <button type="submit" class="btn-outline btn-md">${icon('plus', 'ico-sm')}<span>Hinzufügen</span></button>
+      </form>
+      <div class="task-extra">
+        <button type="button" class="btn-ghost btn-sm" data-action="task-checklist" data-case-id="${c.id}">${icon('tasks', 'ico-sm')}<span>Checkliste ${esc(AREAS[c.area] || '')} übernehmen</span></button>
+        <button type="button" class="btn-ghost btn-sm" data-action="task-new" data-case-id="${c.id}">${icon('calendar', 'ico-sm')}<span>Mit Zuständigkeit & Notiz …</span></button>
+      </div>
+    </div>`;
+  }
+
+  function findTask(id) {
+    return [...st.caseTasks, ...st.tasks, ...st.myTasks].find((t) => t.id === id) || null;
+  }
+
+  function taskModal(t, preset = {}) {
+    const caseId = t ? t.caseId : preset.caseId || null;
+    const assignee = t ? t.assignedTo : preset.assignedTo ?? st.user.id;
+    const activeCases = st.cases.filter((c) => c.status !== 'geschlossen' || c.id === caseId);
+    openModal(`
+      <h2 id="modalTitle" class="modal-title">${t ? 'Aufgabe bearbeiten' : 'Neue Aufgabe'}</h2>
+      <p class="modal-sub">Mit Datum wird die Aufgabe zur Wiedervorlage und erscheint rechtzeitig unter „Handlungsbedarf“.</p>
+      <form data-form="task" ${t ? `data-id="${t.id}"` : ''} class="form-grid cols-2">
+        <div class="span-2"><label class="label">Aufgabe</label><input name="title" class="field" required minlength="2" maxlength="160" value="${esc(t ? t.title : '')}" autofocus></div>
+        <div><label class="label">Fällig am (Wiedervorlage)</label><input name="dueDate" type="date" class="field" value="${esc(t ? t.dueDate || '' : '')}"></div>
+        <div><label class="label">Zuständig</label><select name="assignedTo" class="field"><option value="">Niemand</option>${st.lawyers.map((l) => opt(l.id, l.displayName, l.id === assignee)).join('')}</select></div>
+        <div class="span-2"><label class="label">Akte (optional)</label><select name="caseId" class="field" ${t ? 'disabled title="Der Aktenbezug lässt sich nachträglich nicht ändern."' : ''}><option value="">Ohne Aktenbezug</option>${activeCases.map((c) => opt(c.id, `${c.caseNumber} – ${c.title}`, c.id === caseId)).join('')}</select></div>
+        <div class="span-2"><label class="label">Notiz</label><textarea name="note" rows="3" maxlength="1000" class="field">${esc(t ? t.note : '')}</textarea></div>
+        <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button>
+          <button type="button" class="btn-ghost btn-md" data-action="back-to-case">Abbrechen</button></div>
+      </form>`);
+  }
+
+  async function afterTaskChange() {
+    load.dueTasks().then(renderNav).catch(() => {});
+    if (st.modalCaseId && $('#secTasks')) await reloadCase(st.modalCaseId);
+    else await refreshBehind();
+  }
+
+  function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [] }) {
     const staff = isStaff();
     const admin = isAdmin();
     const me = st.user.id;
@@ -885,16 +1248,19 @@
       ${statusSeg}
       ${track}
       ${claim}
+      ${staff ? caseStats(c, { appointments, attachments, externalDocs, tasks }) : ''}
       <div class="info-grid mb-5">${info}</div>
       ${pin}
       ${quick.length ? `<div class="form-actions mb-2">${quick.join('')}</div>` : ''}
       ${editForm}
       <div class="section"><h3 class="section-title">Sachverhalt</h3><p class="text-sm whitespace-pre-wrap text-muted">${esc(c.description || '—')}</p></div>
       ${c.publicNote ? `<div class="section"><h3 class="section-title">Statushinweis</h3><div class="banner banner-gold mb-0"><p class="text-sm whitespace-pre-wrap">${esc(c.publicNote)}</p></div></div>` : ''}
+      ${fivenetSection(c, externalDocs)}
       ${attachmentsSection(c, attachments)}
-      <div class="section"><h3 class="section-title">Termine & Fristen</h3>${apptList}</div>
+      <div class="section" id="secEvents"><h3 class="section-title">Termine & Fristen</h3>${apptList}</div>
+      ${staff ? caseTasksSection(c, tasks) : ''}
       ${invoiceList ? `<div class="section"><h3 class="section-title">Rechnungen & Honorare</h3>${invoiceList}</div>` : ''}
-      <div class="section"><h3 class="section-title">Verlauf & Notizen</h3>
+      <div class="section" id="secNotes"><h3 class="section-title">Verlauf & Notizen</h3>
         ${noteList}
         <form data-form="add-note" data-id="${c.id}" class="mt-4 space-y-3">
           <textarea name="body" rows="3" maxlength="4000" required class="field" placeholder="${staff ? 'Notiz, Telefonat, Beweismittel, nächster Schritt …' : 'Nachricht oder Ergänzung zu Ihrer Akte …'}" aria-label="Neue Notiz"></textarea>
@@ -1669,9 +2035,66 @@
   };
 
   /* ---------------------------------------------------------------- Einstellungen */
+  /* ---------------------------------------------------------------- FiveNet: Verbindungsstatus & Schnittstellenprüfung */
+  const INTERFACE_STATUS = {
+    unavailable: ['Nicht vorhanden', 'slate'],
+    blocked: ['Nur mit Passwort-Sitzung', 'red'],
+    unsuitable: ['Ungeeignet', 'amber'],
+    respected: ['Berücksichtigt', 'emerald'],
+    used: ['Genutzt', 'emerald'],
+  };
+  function fivenetInterfaces() {
+    const list = st.fivenet?.interfaces || [];
+    return `<div class="if-list">${list
+      .map((i) => `<div class="if-row"><div class="flex items-center justify-between gap-2 flex-wrap"><strong class="text-sm">${esc(i.label)}</strong>${statusBadge(INTERFACE_STATUS, i.status)}</div><p class="text-xs text-dim mt-1">${esc(i.note)}</p></div>`)
+      .join('')}</div>`;
+  }
+  function fivenetProfilePanel() {
+    const fn = st.fivenet;
+    if (!fn) return '';
+    const cap = fn.capabilities;
+    const row = (k, v, ok) => `<div class="fn-status-row"><span class="k">${esc(k)}</span><span class="v ${ok ? 'text-emerald-300' : 'text-dim'}">${v}</span></div>`;
+    return `<section class="panel panel-pad">
+      <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('link')} FiveNet-Verbindung</h2>${badge('Referenz-Modus', 'gold')}</div>
+      <div class="fn-status">
+        ${row('Instanz', `<a class="link-btn" href="${esc(fn.instance.url)}" target="_blank" rel="noopener noreferrer">${esc(fn.instance.host)} ↗</a>`, true)}
+        ${row('Account', cap.accountLink ? 'Verbunden ✓' : 'Nicht verbindbar – FiveNet bietet keine Freigabe für externe Anwendungen', cap.accountLink)}
+        ${row('Aktiver Charakter', cap.characterSelect ? 'Abrufbar' : 'Nicht abrufbar – FiveNet gibt ihn nur in der eigenen Oberfläche preis', cap.characterSelect)}
+        ${row('Dokumentabruf', cap.documentFetch ? 'Automatisch' : 'Nicht möglich – Dokumente werden als Referenz verknüpft', cap.documentFetch)}
+        ${fn.lastViewedAs ? row('Zuletzt angegeben', `„${esc(fn.lastViewedAs)}“ <span class="text-xs">(eigene Angabe)</span>`, false) : ''}
+      </div>
+      <div class="banner banner-amber mt-4 mb-0">${icon('shield')}<div><strong>Niemals das FiveNet-Passwort eingeben.</strong> Die Kanzlei-Plattform fragt nie danach. Eine Verbindung über Passwort oder Sitzungs-Cookies wäre unsicher und ist bewusst nicht vorgesehen.</div></div>
+      <ol class="text-sm text-muted list-decimal pl-5 mt-4 space-y-1">
+        <li>In FiveNet den Charakter wählen, der das Dokument sehen darf.</li>
+        <li>Dokument öffnen und die Adresse aus der Adresszeile kopieren.</li>
+        <li>In der Akte „FiveNet-Dokument hinzufügen“ – die Dokument-ID wird automatisch erkannt.</li>
+      </ol>
+      <details class="edit-box mt-4"><summary>Ergebnis der Schnittstellenprüfung</summary>${fivenetInterfaces()}</details>
+    </section>`;
+  }
+  function fivenetSettingsPanel(s) {
+    const fn = st.fivenet;
+    const inst = s.fivenetInstance;
+    return `<section class="panel panel-pad mt-4 lg:mt-5">
+      <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('link')} FiveNet</h2>${badge(inst.host, 'gold')}</div>
+      <p class="text-sm text-muted mb-4">Akten können FiveNet-Dokumente als geprüfte Referenz enthalten (Link, Dokument-ID, Angaben des Anwalts). ${fn ? `Derzeit <strong>${fn.stats.links}</strong> Verknüpfung${fn.stats.links === 1 ? '' : 'en'} mit <strong>${fn.stats.documents}</strong> Dokument${fn.stats.documents === 1 ? '' : 'en'}.` : ''}</p>
+      <div class="grid-2">
+        <form data-form="settings-fivenet" class="form-grid top">
+          <div><label class="label">Adresse der FiveNet-Instanz</label><input name="fivenetUrl" class="field font-mono text-sm" maxlength="200" value="${esc(s.fivenetUrl)}" placeholder="${esc(s.fivenetEnvUrl || s.fivenetDefaultUrl)}" autocomplete="off">
+            <p class="form-hint">Leer lassen = ${s.fivenetEnvUrl ? 'Umgebungsvariable FIVENET_URL' : 'Standard'} (${esc(s.fivenetEnvUrl || s.fivenetDefaultUrl)}). Nur Links dieser Instanz werden in Akten angenommen; bestehende Verknüpfungen behalten ihre Adresse.</p></div>
+          <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button>
+            <button type="button" class="btn-outline btn-md" data-action="fn-check">${icon('globe', 'ico-sm')}<span>Erreichbarkeit prüfen</span></button></div>
+          <div id="fnCheckResult" class="text-sm" aria-live="polite"></div>
+        </form>
+        <div><div class="label">Ergebnis der Schnittstellenprüfung (FiveNet v2026.9)</div>${fivenetInterfaces()}</div>
+      </div>
+    </section>`;
+  }
+
   views.settings = {
     async load() {
-      st.settings = (await api.get('/api/admin/settings')).settings;
+      const [r] = await Promise.all([api.get('/api/admin/settings'), load.fivenet(true)]);
+      st.settings = r.settings;
     },
     render() {
       const s = st.settings;
@@ -1714,6 +2137,7 @@
             </section>
           </div>
         </div>
+        ${fivenetSettingsPanel(s)}
         <section class="panel panel-pad mt-4 lg:mt-5">
           <div class="panel-head"><h2 class="panel-title">Rechnungsdaten der Kanzlei</h2></div>
           <form data-form="settings-firm" class="form-grid cols-2">
@@ -1729,7 +2153,7 @@
   /* ---------------------------------------------------------------- Profil */
   views.profile = {
     async load() {
-      const [me, ds] = await Promise.all([api.get('/api/auth/me'), api.get('/api/discord/status')]);
+      const [me, ds] = await Promise.all([api.get('/api/auth/me'), api.get('/api/discord/status'), load.fivenet()]);
       st.user = me.user;
       st.discordOAuth = ds.oauth;
       renderUser();
@@ -1745,7 +2169,7 @@
           : '<p class="text-sm text-muted">Die Kanzleileitung hat die Discord-Anmeldung noch nicht eingerichtet.</p>';
       return `
         ${u.mustChangePassword ? `<div class="banner banner-amber">${icon('alert')}<div><strong>Bitte jetzt ein eigenes Passwort festlegen.</strong> Ihr aktuelles Passwort wurde automatisch erzeugt oder von der Kanzleileitung zurückgesetzt.</div></div>` : ''}
-        <div class="page-head"><div><h1 class="page-title">Mein Profil</h1><p class="page-sub">Kontaktdaten, Passwort und Discord-Verknüpfung.</p></div></div>
+        <div class="page-head"><div><h1 class="page-title">Mein Profil</h1><p class="page-sub">Kontaktdaten, Passwort, Discord${isStaff() ? ' und FiveNet' : ''}.</p></div></div>
         <div class="grid-2">
           <section class="panel panel-pad">
             <div class="flex items-center gap-5 mb-5">
@@ -1774,6 +2198,7 @@
             <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${DISCORD_ICON} Discord</h2>${u.discord ? badge('Verbunden', 'emerald') : ''}</div>
             ${discord}
           </section>
+          ${isStaff() ? fivenetProfilePanel() : ''}
         </div>`;
     },
   };
@@ -2204,7 +2629,7 @@
       await reloadCase(id);
     },
     'delete-case': async (el) => {
-      if (!confirm(`Akte ${el.dataset.number} endgültig löschen? Notizen werden mitgelöscht, Termine und Rechnungen verlieren den Aktenbezug.`)) return;
+      if (!confirm(`Akte ${el.dataset.number} endgültig löschen? Notizen, Aufgaben und FiveNet-Verknüpfungen werden mitgelöscht, Termine und Rechnungen verlieren den Aktenbezug.`)) return;
       await api.del('/api/cases/' + el.dataset.id);
       toast('Akte gelöscht.');
       closeModal();
@@ -2532,6 +2957,97 @@
       await returnOrClose();
     },
     'back-to-case': () => returnOrClose(),
+    'scroll-to': (el) => {
+      $('#' + el.dataset.target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    },
+
+    // FiveNet-Dokumente
+    'fn-add': async () => {
+      if (!st.caseInfo) return;
+      st.returnCase = st.caseInfo.id;
+      await load.fivenet();
+      openModal(fivenetForm(null, st.caseInfo));
+    },
+    'fn-edit': async (el) => {
+      const d = st.caseDocs.find((x) => x.id === Number(el.dataset.id));
+      if (!d || !st.caseInfo) return;
+      st.returnCase = st.caseInfo.id;
+      await load.fivenet();
+      openModal(fivenetForm(d, st.caseInfo));
+    },
+    'fn-delete': async (el) => {
+      const d = st.caseDocs.find((x) => x.id === Number(el.dataset.id));
+      if (!d || !confirm(`Verknüpfung mit FiveNet-Dokument ${d.documentId} aus der Akte entfernen? Das Dokument in FiveNet bleibt unverändert.`)) return;
+      const caseId = Number(el.dataset.caseId);
+      await api.del(`/api/cases/${caseId}/fivenet/${d.id}`);
+      toast('Verknüpfung entfernt.');
+      await reloadCase(caseId);
+    },
+    'fn-cite': async (el) => {
+      const d = st.caseDocs.find((x) => x.id === Number(el.dataset.id));
+      if (!d) return;
+      const ok = await copy(fivenetCitation(d));
+      toast(ok ? 'Zitat kopiert – z. B. für Schriftsätze oder Nachrichten.' : 'Kopieren nicht möglich.', ok ? 'ok' : 'error');
+    },
+    'fn-check': async () => {
+      const box = $('#fnCheckResult');
+      if (box) box.innerHTML = '<span class="text-dim">Prüfe …</span>';
+      const r = await api.post('/api/fivenet/check');
+      if (!box || !box.isConnected) return;
+      box.innerHTML = r.result.reachable
+        ? `<span class="text-emerald-300">✓ ${esc(r.instance.host)} ist erreichbar – FiveNet ${esc(r.result.version)}</span>`
+        : `<span class="text-amber-300">${esc(r.instance.host)} antwortet nicht wie erwartet (${esc(r.result.detail || 'unbekannt')}). Verknüpfen funktioniert trotzdem – die Kanzlei ruft FiveNet dafür nicht auf.</span>`;
+    },
+
+    // Aufgaben & Wiedervorlagen
+    'task-scope': async (el) => {
+      st.taskScope = el.dataset.value;
+      await load.tasks();
+      renderView();
+    },
+    'task-state': async (el) => {
+      st.taskState = el.dataset.value;
+      await load.tasks();
+      renderView();
+    },
+    'task-toggle': async (el) => {
+      const done = el.dataset.done !== '1';
+      el.disabled = true;
+      try {
+        await api.patch('/api/tasks/' + el.dataset.id, { done });
+      } finally {
+        if (el.isConnected) el.disabled = false;
+      }
+      toast(done ? 'Erledigt.' : 'Aufgabe wieder geöffnet.');
+      await afterTaskChange();
+    },
+    'task-new': async (el) => {
+      const caseId = el.dataset.caseId ? Number(el.dataset.caseId) : null;
+      st.returnCase = caseId && st.modalCaseId === caseId ? caseId : null;
+      await Promise.all([load.lawyers(), load.cases()]);
+      const lawyer = caseId && st.caseInfo && st.caseInfo.id === caseId ? st.caseInfo.lawyerId : null;
+      taskModal(null, { caseId, assignedTo: lawyer || st.user.id });
+    },
+    'task-edit': async (el) => {
+      const t = findTask(Number(el.dataset.id));
+      if (!t) return;
+      st.returnCase = st.modalCaseId && t.caseId === st.modalCaseId ? st.modalCaseId : null;
+      await Promise.all([load.lawyers(), load.cases()]);
+      taskModal(t);
+    },
+    'task-delete': async (el) => {
+      const t = findTask(Number(el.dataset.id));
+      if (!confirm(`Aufgabe${t ? ` „${t.title}“` : ''} löschen?`)) return;
+      await api.del('/api/tasks/' + el.dataset.id);
+      toast('Aufgabe gelöscht.');
+      await afterTaskChange();
+    },
+    'task-checklist': async (el) => {
+      const caseId = Number(el.dataset.caseId);
+      const r = await api.post('/api/tasks/checklist', { caseId });
+      toast(r.added ? `${r.added} Aufgaben aus der Checkliste übernommen.` : 'Alle Punkte der Checkliste sind bereits in der Akte.');
+      await afterTaskChange();
+    },
 
     // Bewerbungen
     'app-tab': (el) => {
@@ -2864,6 +3380,54 @@
       closeModal();
       await refreshBehind();
     },
+    'fivenet-link': async (f) => {
+      const fd = new FormData(f);
+      if (fd.get('attest') !== 'on') throw new Error('Bitte bestätigen Sie, dass Sie das Dokument in FiveNet selbst einsehen dürfen.');
+      await api.post(`/api/cases/${f.dataset.caseId}/fivenet`, { input: val(fd, 'input'), attest: true, ...fivenetBody(f) });
+      st.fivenet = null; // Vorschläge (Dokumentarten, Charakter) neu laden
+      toast('FiveNet-Dokument mit der Akte verknüpft.');
+      await returnOrClose();
+    },
+    'fivenet-edit': async (f) => {
+      await api.patch(`/api/cases/${f.dataset.caseId}/fivenet/${f.dataset.id}`, fivenetBody(f));
+      st.fivenet = null;
+      toast('Angaben gespeichert.');
+      await returnOrClose();
+    },
+    'settings-fivenet': async (f) => {
+      const res = await api.patch('/api/admin/settings', { fivenetUrl: val(new FormData(f), 'fivenetUrl') });
+      st.settings = res.settings;
+      await load.fivenet(true);
+      toast('FiveNet-Einstellungen gespeichert.');
+      renderView();
+    },
+    'task-quick': async (f) => {
+      const fd = new FormData(f);
+      const body = { title: val(fd, 'title'), caseId: Number(f.dataset.caseId) };
+      if (val(fd, 'dueDate')) body.dueDate = val(fd, 'dueDate');
+      await api.post('/api/tasks', body);
+      toast(body.dueDate ? 'Wiedervorlage angelegt.' : 'Aufgabe angelegt.');
+      await afterTaskChange();
+    },
+    task: async (f) => {
+      const fd = new FormData(f);
+      const id = f.dataset.id ? Number(f.dataset.id) : null;
+      const body = {
+        title: val(fd, 'title'),
+        note: val(fd, 'note'),
+        dueDate: val(fd, 'dueDate') || null,
+        assignedTo: val(fd, 'assignedTo') ? Number(val(fd, 'assignedTo')) : null,
+      };
+      if (id) {
+        await api.patch('/api/tasks/' + id, body);
+      } else {
+        if (val(fd, 'caseId')) body.caseId = Number(val(fd, 'caseId'));
+        await api.post('/api/tasks', body);
+      }
+      toast(id ? 'Aufgabe gespeichert.' : 'Aufgabe angelegt.');
+      load.dueTasks().then(renderNav).catch(() => {});
+      await returnOrClose();
+    },
     'settings-firm': async (f) => {
       const fd = new FormData(f);
       const res = await api.patch('/api/admin/settings', { firmAddress: val(fd, 'firmAddress'), firmPaymentInfo: val(fd, 'firmPaymentInfo'), firmContact: val(fd, 'firmContact') });
@@ -2939,6 +3503,12 @@
     if (t.id === 'caseSearch') {
       st.caseQuery = t.value;
       $('#caseList').innerHTML = caseTable();
+    } else if (t.id === 'fnInput') {
+      clearTimeout(st.fnTimer);
+      st.fnTimer = setTimeout(() => checkFivenetInput(t), 300);
+    } else if (t.id === 'taskSearch') {
+      st.taskQuery = t.value;
+      $('#taskList').innerHTML = taskList();
     } else if (t.id === 'userSearch') {
       st.userQuery = t.value;
       $('#userList').innerHTML = userTable();
@@ -2982,7 +3552,7 @@
   // Ungelesene Post, neue Bewerbungen und Dienststatus regelmäßig aktualisieren (Badges in der Navigation)
   setInterval(() => {
     if (document.hidden || !st.user) return;
-    Promise.all([load.unread(), load.appCount()])
+    Promise.all([load.unread(), load.appCount(), load.dueTasks()])
       .then(renderNav)
       .catch(() => {});
   }, 30000);
@@ -3013,7 +3583,7 @@
     if (discordState && DISCORD_MSG[discordState]) toast(...DISCORD_MSG[discordState]);
 
     try {
-      await Promise.all([load.unread(), load.appCount(), load.duty()]);
+      await Promise.all([load.unread(), load.appCount(), load.duty(), load.dueTasks()]);
       renderUser();
     } catch {
       /* Badges und Dienststatus sind nicht kritisch */

@@ -31,7 +31,8 @@ function logActivity(user, action, entity = '', entityId = null, details = '') {
 const CASE_SELECT = `
   SELECT c.*,
          cu.display_name AS client_account_name, cu.email AS client_email, cu.phone AS client_account_phone,
-         lu.display_name AS lawyer_name, lu.discord_id AS lawyer_discord_id
+         lu.display_name AS lawyer_name, lu.discord_id AS lawyer_discord_id,
+         (SELECT group_concat(e.external_id, ' ') FROM case_external_docs e WHERE e.case_id = c.id) AS external_doc_ids
   FROM cases c
   LEFT JOIN users cu ON cu.id = c.client_id
   LEFT JOIN users lu ON lu.id = c.lawyer_id`;
@@ -79,6 +80,8 @@ function caseRow(c, u) {
     closed: c.status === 'geschlossen',
     publicNote: c.public_note,
     source: c.source,
+    // Für die Aktensuche per FiveNet-Link oder Dokument-ID (nur Team).
+    fivenetIds: staff ? String(c.external_doc_ids || '').split(' ').filter(Boolean) : undefined,
     createdAt: c.created_at,
     updatedAt: c.updated_at,
   };
@@ -103,6 +106,98 @@ function addSystemNote(caseId, user, body, internal = false) {
     `INSERT INTO notes (case_id, author_id, author_name, author_role, body, internal, system)
      VALUES (?, ?, ?, ?, ?, ?, 1)`
   ).run(caseId, user ? user.id : null, user ? user.display_name : 'System', user ? user.role : 'system', body, internal ? 1 : 0);
+}
+
+/* ================================================================
+   Externe Dokumente (FiveNet-Referenzen)
+   ================================================================ */
+/**
+ * others: andere Akten, die dasselbe Dokument referenzieren (nur für das Team).
+ * Mandanten sehen weder die Charakter-Angabe noch Querverweise auf fremde Akten.
+ */
+function externalDocRow(d, u, others = []) {
+  const staff = isStaff(u);
+  return {
+    id: d.id,
+    provider: d.provider,
+    documentId: d.external_id,
+    url: d.canonical_url,
+    originalUrl: staff ? d.original_url : undefined,
+    host: d.host,
+    title: d.title,
+    docType: d.doc_type,
+    docDate: d.doc_date || null,
+    docAuthor: d.doc_author,
+    summary: d.summary,
+    viewedAs: staff ? d.viewed_as : undefined,
+    internal: !!d.internal,
+    attested: staff ? !!d.attested : undefined,
+    linkedById: d.linked_by,
+    linkedByName: d.linked_by_name,
+    linkedAt: d.linked_at,
+    updatedAt: d.updated_at || null,
+    alsoIn: staff ? others : undefined,
+  };
+}
+
+/** Lädt die Referenzen einer Akte inklusive Querverweisen auf andere Akten. */
+function externalDocsForCase(caseId, u) {
+  const staff = isStaff(u);
+  const rows = db
+    .prepare(
+      `SELECT * FROM case_external_docs WHERE case_id = ?
+       ORDER BY COALESCE(doc_date, substr(linked_at, 1, 10)) DESC, id DESC`
+    )
+    .all(caseId)
+    .filter((d) => staff || !d.internal);
+  const others = new Map();
+  if (staff && rows.length) {
+    const ids = [...new Set(rows.map((d) => d.external_id))];
+    db.prepare(
+      `SELECT e.external_id, c.id, c.case_number, c.title FROM case_external_docs e JOIN cases c ON c.id = e.case_id
+       WHERE e.provider = 'fivenet' AND e.case_id != ? AND e.external_id IN (${ids.map(() => '?').join(',')})
+       ORDER BY c.case_number`
+    )
+      .all(caseId, ...ids)
+      .forEach((r) => {
+        if (!others.has(r.external_id)) others.set(r.external_id, []);
+        others.get(r.external_id).push({ id: r.id, caseNumber: r.case_number, title: r.title });
+      });
+  }
+  return rows.map((d) => externalDocRow(d, u, others.get(d.external_id) || []));
+}
+
+/* ================================================================
+   Aufgaben & Wiedervorlagen
+   ================================================================ */
+const TASK_SELECT = `
+  SELECT t.*, c.case_number, c.title AS case_title, c.status AS case_status,
+         au.display_name AS assigned_name, cu.display_name AS creator_name, du.display_name AS done_by_name
+  FROM tasks t
+  LEFT JOIN cases c  ON c.id  = t.case_id
+  LEFT JOIN users au ON au.id = t.assigned_to
+  LEFT JOIN users cu ON cu.id = t.created_by
+  LEFT JOIN users du ON du.id = t.done_by`;
+
+function taskRow(t) {
+  return {
+    id: t.id,
+    caseId: t.case_id,
+    caseNumber: t.case_number || null,
+    caseTitle: t.case_title || null,
+    caseClosed: t.case_status === 'geschlossen',
+    title: t.title,
+    note: t.note,
+    dueDate: t.due_date || null,
+    assignedTo: t.assigned_to,
+    assignedName: t.assigned_name || null,
+    done: !!t.done,
+    doneAt: t.done_at || null,
+    doneByName: t.done_by_name || null,
+    createdBy: t.created_by,
+    creatorName: t.creator_name || null,
+    createdAt: t.created_at,
+  };
 }
 
 /* ================================================================
@@ -393,6 +488,10 @@ module.exports = {
   dutySessionRow,
   onDutyMembers,
   CASE_SELECT,
+  externalDocRow,
+  externalDocsForCase,
+  TASK_SELECT,
+  taskRow,
   getCase,
   caseAccess,
   caseRow,
