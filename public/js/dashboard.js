@@ -5,6 +5,9 @@
 (() => {
   'use strict';
   const { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage } = window.PS;
+  /** Bestätigung im Kanzlei-Design (statt window.confirm). */
+  const ask = (message, opts) => window.PS.confirm(message, opts);
+  const askDelete = (title, message, confirmText = 'Löschen') => ask(message, { title, confirmText, danger: true });
 
   /* ================================================================
      Konstanten
@@ -2326,7 +2329,7 @@
     const id = Number(t.dataset.id);
     const field = t.dataset.userField;
     const value = field === 'rank' ? t.value.trim() || null : t.value;
-    if (field === 'role' && !confirm(`Rolle wirklich auf „${ROLES[value]}“ ändern? Das Konto wird dabei abgemeldet.`)) {
+    if (field === 'role' && !(await ask(`Die Rolle wird auf „${ROLES[value]}“ geändert. Das Konto wird dabei abgemeldet.`, { title: 'Rolle ändern?', confirmText: 'Rolle ändern' }))) {
       $('#userList').innerHTML = userTable();
       return;
     }
@@ -2987,21 +2990,21 @@
       else await refreshBehind();
     },
     'release-case': async (el) => {
-      if (!confirm('Möchten Sie diese Akte wirklich abgeben? Sie erscheint dann wieder als offene Anfrage.')) return;
+      if (!(await ask('Die Akte erscheint danach wieder als offene Anfrage für das Team.', { title: 'Akte abgeben?', confirmText: 'Akte abgeben' }))) return;
       const id = Number(el.dataset.id);
       await api.patch('/api/cases/' + id, { lawyerId: null });
       toast('Akte abgegeben.');
       await reloadCase(id);
     },
     'delete-case': async (el) => {
-      if (!confirm(`Akte ${el.dataset.number} endgültig löschen? Notizen, Aufgaben und FiveNet-Verknüpfungen werden mitgelöscht, Termine und Rechnungen verlieren den Aktenbezug.`)) return;
+      if (!(await askDelete(`Akte ${el.dataset.number} löschen?`, 'Notizen, Aufgaben und verknüpfte externe Dokumente werden mitgelöscht, Termine und Rechnungen verlieren den Aktenbezug. Das lässt sich nicht rückgängig machen.', 'Endgültig löschen'))) return;
       await api.del('/api/cases/' + el.dataset.id);
       toast('Akte gelöscht.');
       closeModal();
       await refreshBehind();
     },
     'delete-note': async (el) => {
-      if (!confirm('Diese Notiz löschen?')) return;
+      if (!(await askDelete('Notiz löschen?', 'Die Notiz wird aus dem Verlauf der Akte entfernt.'))) return;
       const caseId = Number(el.dataset.caseId);
       await api.del(`/api/cases/${caseId}/notes/${el.dataset.id}`);
       await reloadCase(caseId);
@@ -3026,7 +3029,7 @@
       await returnOrClose();
     },
     'event-delete': async (el) => {
-      if (!confirm('Diesen Eintrag endgültig löschen?')) return;
+      if (!(await askDelete('Eintrag löschen?', 'Der Termin bzw. die Frist wird endgültig aus dem Kalender gelöscht.'))) return;
       await api.del('/api/calendar/' + el.dataset.id);
       st.eventCache.delete(Number(el.dataset.id));
       toast('Eintrag gelöscht.');
@@ -3099,7 +3102,7 @@
       renderView();
     },
     'mail-delete': async (el) => {
-      if (!confirm('Diese Nachricht löschen?')) return;
+      if (!(await askDelete('Nachricht löschen?', 'Die Nachricht verschwindet aus Ihrem Postfach.'))) return;
       await api.del('/api/messages/' + el.dataset.id);
       st.mailSel = null;
       toast('Nachricht gelöscht.');
@@ -3120,7 +3123,7 @@
       await refreshBehind();
     },
     'board-delete': async (el) => {
-      if (!confirm('Diese Notiz von der Pinnwand entfernen?')) return;
+      if (!(await askDelete('Notiz entfernen?', 'Die Notiz wird von der Pinnwand entfernt.', 'Entfernen'))) return;
       await api.del('/api/board/' + el.dataset.id);
       toast('Notiz entfernt.');
       await refreshBehind();
@@ -3165,7 +3168,7 @@
       await refreshBehind();
     },
     'inv-delete': async (el) => {
-      if (!confirm(`Dokument ${el.dataset.number} endgültig löschen? (Stornieren ist meist die bessere Wahl.)`)) return;
+      if (!(await askDelete(`Dokument ${el.dataset.number} löschen?`, 'Stornieren ist meist die bessere Wahl – dann bleibt das Dokument nachvollziehbar.', 'Endgültig löschen'))) return;
       await api.del('/api/invoices/' + el.dataset.id);
       toast('Dokument gelöscht.');
       await refreshBehind();
@@ -3216,7 +3219,7 @@
     },
     'user-reset': async (el) => {
       const u = st.users.find((x) => x.id === Number(el.dataset.id));
-      if (!u || !confirm(`Neues Einmal-Passwort für ${u.displayName} erzeugen? Das bisherige Passwort wird sofort ungültig.`)) return;
+      if (!u || !(await ask(`Für ${u.displayName} wird ein neues Einmal-Passwort erzeugt. Das bisherige Passwort wird sofort ungültig.`, { title: 'Passwort zurücksetzen?', confirmText: 'Neues Passwort erzeugen' }))) return;
       const res = await api.post(`/api/admin/users/${u.id}/reset-password`);
       showCredentials(res.credentials, u.displayName);
       refreshBehind();
@@ -3224,14 +3227,14 @@
     'user-toggle': async (el) => {
       const u = st.users.find((x) => x.id === Number(el.dataset.id));
       if (!u) return;
-      if (u.active && !confirm(`${u.displayName} sperren? Das Konto wird sofort abgemeldet.`)) return;
+      if (u.active && !(await askDelete('Konto sperren?', `${u.displayName} wird sofort abgemeldet und kann sich nicht mehr anmelden.`, 'Sperren'))) return;
       await api.patch('/api/admin/users/' + u.id, { active: !u.active });
       toast(u.active ? 'Konto gesperrt.' : 'Konto entsperrt.');
       await refreshBehind();
     },
     'user-delete': async (el) => {
       const u = st.users.find((x) => x.id === Number(el.dataset.id));
-      if (!u || !confirm(`Konto von ${u.displayName} endgültig löschen? Akten bleiben erhalten, das Konto verschwindet.`)) return;
+      if (!u || !(await askDelete('Konto löschen?', `Das Konto von ${u.displayName} wird endgültig gelöscht. Akten bleiben erhalten.`, 'Endgültig löschen'))) return;
       await api.del('/api/admin/users/' + u.id);
       toast('Konto gelöscht.');
       await refreshBehind();
@@ -3242,7 +3245,7 @@
     'fee-edit': (el) => feeModal(st.adminFees.find((f) => f.id === Number(el.dataset.id))),
     'fee-delete': async (el) => {
       const f = st.adminFees.find((x) => x.id === Number(el.dataset.id));
-      if (!f || !confirm(`„${f.name}“ aus der Honorarordnung löschen?`)) return;
+      if (!f || !(await askDelete('Leistung löschen?', `„${f.name}“ wird aus der Honorarordnung gelöscht – auch auf der Website.`))) return;
       await api.del('/api/admin/fees/' + f.id);
       toast('Leistung gelöscht.');
       await refreshBehind();
@@ -3255,7 +3258,7 @@
     },
     'duty-set': (el) => setDutyStatus(el.dataset.status),
     'duty-force-off': async (el) => {
-      if (!confirm(`${el.dataset.name} jetzt ausstempeln?`)) return;
+      if (!(await ask(`${el.dataset.name} wird jetzt ausgestempelt.`, { title: 'Ausstempeln?', confirmText: 'Ausstempeln' }))) return;
       st.duty = await api.post('/api/duty/force-off/' + el.dataset.id);
       toast(`${el.dataset.name} wurde ausgestempelt.`);
       await refreshBehind();
@@ -3273,7 +3276,7 @@
     'duty-session-new': () => dutySessionModal(null),
     'duty-session-edit': (el) => dutySessionModal(st.dutyData.sessions.find((s) => s.id === Number(el.dataset.id))),
     'duty-session-delete': async (el) => {
-      if (!confirm('Diese Schicht löschen?')) return;
+      if (!(await askDelete('Schicht löschen?', 'Die Dienstzeit wird endgültig gelöscht.'))) return;
       await api.del('/api/duty/sessions/' + el.dataset.id);
       toast('Schicht gelöscht.');
       await refreshBehind();
@@ -3316,7 +3319,7 @@
       );
     },
     'att-delete': async (el) => {
-      if (!confirm('Diesen Anhang endgültig löschen?')) return;
+      if (!(await askDelete('Anhang löschen?', 'Das Bild wird endgültig aus der Akte gelöscht.'))) return;
       await api.del(`/api/cases/${el.dataset.caseId}/attachments/${el.dataset.id}`);
       toast('Anhang gelöscht.');
       await returnOrClose();
@@ -3370,7 +3373,7 @@
     },
     'fn-delete': async (el) => {
       const d = st.caseDocs.find((x) => x.id === Number(el.dataset.id));
-      if (!d || !confirm(`Verknüpfung mit ${extOf(d).noun}${d.title ? ` „${d.title}“` : ''} aus der Akte entfernen? Das Original bleibt unverändert, übernommene Bilder bleiben als Beweismittel in der Akte.`)) return;
+      if (!d || !(await askDelete('Verknüpfung entfernen?', `${extOf(d).noun}${d.title ? ` „${d.title}“` : ''} wird aus der Akte entfernt. Das Original bleibt unverändert, übernommene Bilder bleiben als Beweismittel in der Akte.`, 'Entfernen'))) return;
       const caseId = Number(el.dataset.caseId);
       await api.del(extUrl(caseId, d.id));
       toast('Verknüpfung entfernt.');
@@ -3430,7 +3433,7 @@
     },
     'task-delete': async (el) => {
       const t = findTask(Number(el.dataset.id));
-      if (!confirm(`Aufgabe${t ? ` „${t.title}“` : ''} löschen?`)) return;
+      if (!(await askDelete('Aufgabe löschen?', t ? `„${t.title}“ wird gelöscht.` : 'Die Aufgabe wird gelöscht.'))) return;
       await api.del('/api/tasks/' + el.dataset.id);
       toast('Aufgabe gelöscht.');
       await afterTaskChange();
@@ -3467,7 +3470,7 @@
       hireModal(data.application);
     },
     'app-delete': async (el) => {
-      if (!confirm(`Bewerbung ${el.dataset.number} endgültig löschen?`)) return;
+      if (!(await askDelete(`Bewerbung ${el.dataset.number} löschen?`, 'Die Bewerbung und alle Notizen dazu werden endgültig gelöscht.', 'Endgültig löschen'))) return;
       await api.del('/api/admin/applications/' + el.dataset.id);
       toast('Bewerbung gelöscht.');
       closeModal();
@@ -3477,7 +3480,7 @@
     'position-edit': (el) => positionModal(st.positions.find((p) => p.id === Number(el.dataset.id))),
     'position-delete': async (el) => {
       const p = st.positions.find((x) => x.id === Number(el.dataset.id));
-      if (!p || !confirm(`Stelle „${p.title}“ löschen? Bestehende Bewerbungen bleiben erhalten.`)) return;
+      if (!p || !(await askDelete('Stelle löschen?', `„${p.title}“ wird von der Karriereseite entfernt. Bestehende Bewerbungen bleiben erhalten.`))) return;
       await api.del('/api/admin/positions/' + p.id);
       toast('Stelle gelöscht.');
       await refreshBehind();
@@ -3495,7 +3498,7 @@
       toast('Testnachricht an Discord gesendet.');
     },
     'discord-unlink': async () => {
-      if (!confirm('Discord-Verbindung wirklich trennen?')) return;
+      if (!(await ask('Die Anmeldung per Discord ist danach nicht mehr möglich, bis Sie das Konto erneut verbinden.', { title: 'Discord-Verbindung trennen?', confirmText: 'Trennen' }))) return;
       const res = await api.post('/api/discord/unlink');
       st.user = res.user;
       renderUser();
