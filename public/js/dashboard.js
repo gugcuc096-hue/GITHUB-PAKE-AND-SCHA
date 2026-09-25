@@ -169,6 +169,7 @@
     caseDocs: [],
     caseInfo: null,
     fnCheckToken: 0,
+    fnPending: { urls: [], blobs: [] },
   };
 
   const $ = (s, root = document) => root.querySelector(s);
@@ -913,7 +914,7 @@
           .map(
             (a, i) => `<button type="button" class="att" data-action="att-open" data-index="${i}" aria-label="${esc(a.caption || 'Anhang ansehen')}">
               <img src="${esc(a.url)}" alt="${esc(a.caption)}" loading="lazy">
-              ${a.internal ? `<span class="tag">${badge('intern', 'amber')}</span>` : ''}${a.caption ? `<span class="cap">${esc(a.caption)}</span>` : ''}</button>`
+              <span class="tag">${a.internal ? badge('intern', 'amber') : ''}${a.externalDocId ? badge('FiveNet', 'sky') : ''}</span>${a.caption ? `<span class="cap">${esc(a.caption)}</span>` : ''}</button>`
           )
           .join('')}
         ${canUpload && attachments.length < 40
@@ -951,6 +952,19 @@
       .filter(Boolean)
       .map(esc)
       .join(' · ');
+    const images = st.caseAttachments.map((a, i) => ({ a, i })).filter(({ a }) => a.externalDocId === d.id);
+    const content = d.contentText
+      ? `<details class="fn-text"><summary>${icon('doc', 'ico-sm')}<span>Abschrift anzeigen</span><span class="text-dim text-xs">${d.contentText.length.toLocaleString('de-DE')} Zeichen · übernommen ${esc(fmtDate(d.contentAt))}${d.contentByName ? ' von ' + esc(d.contentByName) : ''}</span></summary>
+          <div class="fn-pre">${esc(d.contentText)}</div>
+          <div class="fn-actions"><button type="button" class="btn-ghost btn-sm" data-action="fn-copy-text" data-id="${d.id}">${icon('copy', 'ico-sm')}<span>Text kopieren</span></button>
+            <a class="btn-ghost btn-sm" href="/api/cases/${c.id}/fivenet/${d.id}/text" download>${icon('download', 'ico-sm')}<span>Als Textdatei</span></a></div>
+          <p class="form-hint">Abschrift – maßgeblich ist das Original in FiveNet; spätere Änderungen dort sind hier nicht enthalten.</p></details>`
+      : '';
+    const gallery = images.length
+      ? `<div class="att-grid fn-gallery">${images
+          .map(({ a, i }) => `<button type="button" class="att" data-action="att-open" data-index="${i}" aria-label="${esc(a.caption || 'Bild ansehen')}"><img src="${esc(a.url)}" alt="${esc(a.caption)}" loading="lazy"></button>`)
+          .join('')}</div>`
+      : '';
     const also = staff && d.alsoIn && d.alsoIn.length
       ? `<div class="fn-foot">Auch verknüpft mit: ${d.alsoIn
           .map((o) => `<button type="button" class="link-btn font-mono" data-action="open-case" data-id="${o.id}" title="${esc(o.title)}">${esc(o.caseNumber)}</button>`)
@@ -963,11 +977,15 @@
         ${staff && d.internal ? badge('intern', 'amber') : ''}
       </div>
       ${d.summary ? `<p class="fn-summary">${esc(d.summary)}</p>` : ''}
+      ${content}
+      ${gallery}
       <div class="fn-foot">Quelle: FiveNet (${esc(d.host)}) · Verknüpft von ${esc(d.linkedByName)} am ${esc(parseDate(d.linkedAt)?.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) || '—')}${staff && d.viewedAs ? ` · eingesehen als „${esc(d.viewedAs)}“` : ''}</div>
       ${also}
       <div class="fn-actions">
         <a class="btn-outline btn-sm" href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">${icon('external', 'ico-sm')}<span>In FiveNet öffnen</span></a>
         ${staff ? `<button type="button" class="btn-ghost btn-sm" data-action="fn-cite" data-id="${d.id}">${icon('copy', 'ico-sm')}<span>Zitat kopieren</span></button>` : ''}
+        ${staff && !d.contentText ? `<button type="button" class="btn-ghost btn-sm" data-action="fn-edit" data-id="${d.id}" data-focus="fnContent">${icon('doc', 'ico-sm')}<span>Text & Bilder übernehmen</span></button>` : ''}
+        ${staff && st.caseAttachments.length < 40 ? `<label class="btn-ghost btn-sm file-btn">${icon('camera', 'ico-sm')}<span>Bild anhängen</span><input type="file" accept="image/*" multiple data-upload="fivenet-img" data-case-id="${c.id}" data-doc-id="${d.id}" aria-label="Bilder zum FiveNet-Dokument hinzufügen"></label>` : ''}
         ${canManage ? `<button type="button" class="btn-ghost btn-sm" data-action="fn-edit" data-id="${d.id}">${icon('edit', 'ico-sm')}<span>Bearbeiten</span></button>
           <button type="button" class="btn-ghost btn-sm fn-danger" data-action="fn-delete" data-id="${d.id}" data-case-id="${c.id}">${icon('trash', 'ico-sm')}<span>Entfernen</span></button>` : ''}
       </div>
@@ -1011,9 +1029,18 @@
         <div><label class="label">Verfasser / Behörde</label><input name="docAuthor" class="field" maxlength="120" value="${esc(v.docAuthor)}" placeholder="z. B. LSPD, Officer J. Miller"></div>
         <div><label class="label">Eingesehen als (FiveNet-Charakter)</label><input name="viewedAs" class="field" maxlength="80" value="${esc(v.viewedAs || '')}" placeholder="eigene Angabe, optional"></div>
         <div class="span-2"><label class="label">Kurzinhalt / Relevanz für die Akte</label><textarea name="summary" rows="3" maxlength="2000" class="field" placeholder="Was steht drin, warum ist es wichtig?">${esc(v.summary)}</textarea></div>
-        <label class="check span-2"><input type="checkbox" name="clientVisible" ${v.internal ? '' : 'checked'}> Für den Mandanten sichtbar (sonst nur intern)</label>
-        ${editing ? '' : `<label class="check span-2 fn-attest"><input type="checkbox" name="attest" required> Ich habe dieses Dokument in FiveNet mit meinem eigenen Charakter geöffnet und darf es einsehen.</label>
-          <div class="span-2 banner banner-gold mb-0">${icon('shield')}<div>FiveNet bietet externen Anwendungen keine Schnittstelle (kein OAuth2). Die Kanzlei ruft das Dokument deshalb nicht selbst ab und fragt nie nach Ihrem FiveNet-Passwort – gespeichert werden nur Link, Dokument-ID und Ihre Angaben.</div></div>`}
+        <div class="span-2 fn-content-box">
+          <label class="label" for="fnContent">Inhalt aus FiveNet – Text & Bilder (optional)</label>
+          <textarea id="fnContent" name="contentText" rows="7" maxlength="60000" class="field fn-content" placeholder="Im FiveNet-Dokument den Inhalt mit der Maus markieren → Strg+C, dann hier Strg+V. Text wird als Abschrift gespeichert, enthaltene Bilder werden automatisch übernommen.">${esc(v.contentText || '')}</textarea>
+          <div id="fnPending" class="fn-pending"></div>
+          <div class="fn-line mt-2">
+            <label class="btn-ghost btn-sm file-btn">${icon('camera', 'ico-sm')}<span>Bilder / Screenshots wählen</span><input type="file" accept="image/*" multiple data-upload="fn-pending" aria-label="Bilder auswählen"></label>
+            <span class="form-hint">Screenshots (Win+Umschalt+S) oder „Bild kopieren“ lassen sich auch direkt mit Strg+V einfügen.</span>
+          </div>
+        </div>
+        <label class="check span-2"><input type="checkbox" name="clientVisible" ${v.internal ? '' : 'checked'}> Für den Mandanten sichtbar (sonst nur intern) – gilt auch für Abschrift und Bilder</label>
+        ${editing ? '' : `<label class="check span-2 fn-attest"><input type="checkbox" name="attest" required> Ich habe dieses Dokument in FiveNet mit meinem eigenen Charakter geöffnet und darf es einsehen und für die Akte übernehmen.</label>
+          <div class="span-2 banner banner-gold mb-0">${icon('shield')}<div>FiveNet bietet externen Anwendungen keine Schnittstelle (kein OAuth2). Die Kanzlei ruft das Dokument deshalb nicht selbst ab und fragt nie nach Ihrem FiveNet-Passwort. Übernommen wird nur, was Sie hier einfügen – Bilder daraus lädt der Server direkt aus dem FiveNet-Dateispeicher.</div></div>`}
         <div class="span-2 form-actions">
           <button type="submit" class="btn-gold btn-md">${icon(editing ? 'check' : 'link', 'ico-sm')}<span>${editing ? 'Speichern' : 'Mit Akte verknüpfen'}</span></button>
           <button type="button" class="btn-ghost btn-md" data-action="back-to-case">Abbrechen</button>
@@ -1071,7 +1098,218 @@
       summary: val(fd, 'summary'),
       viewedAs: val(fd, 'viewedAs'),
       internal: fd.get('clientVisible') !== 'on',
+      contentText: String(fd.get('contentText') ?? '').replace(/\s+$/, '').replace(/^\s*\n/, ''),
     };
+  }
+
+  /* ---------------------------------------------------------------- FiveNet: Inhalt übernehmen (Einfügen) */
+  const FN_BLOCK = new Set(['P', 'DIV', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER', 'ASIDE', 'MAIN', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'LI', 'TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR', 'BLOCKQUOTE', 'PRE', 'FIGURE', 'FIGCAPTION', 'DL', 'DT', 'DD']);
+  const FN_IMAGE_PATHS = ['/api/filestore/', '/api/image_proxy/'];
+  const FN_MAX_IMAGES = 10;
+
+  /**
+   * Wandelt kopiertes HTML aus FiveNet in lesbaren Text und sammelt die Bildadressen.
+   * DOMParser lädt keine Bilder und führt keine Skripte aus; übernommen werden nur Textknoten.
+   */
+  function parsePastedHtml(html) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    doc.querySelectorAll('script, style, noscript, template, svg, button, input, select, textarea').forEach((n) => n.remove());
+    const images = [];
+    doc.querySelectorAll('img').forEach((img) => {
+      const src = img.getAttribute('src');
+      if (src) images.push(src);
+      const marker = doc.createElement('p');
+      marker.textContent = '[Bild]';
+      img.replaceWith(marker);
+    });
+    const out = [];
+    const walk = (node) => {
+      for (const n of node.childNodes) {
+        if (n.nodeType === 3) {
+          out.push(n.nodeValue.replace(/\s+/g, ' '));
+          continue;
+        }
+        if (n.nodeType !== 1) continue;
+        const tag = n.tagName;
+        if (tag === 'BR') {
+          out.push('\n');
+          continue;
+        }
+        if (tag === 'HR') {
+          out.push('\n————————\n');
+          continue;
+        }
+        const block = FN_BLOCK.has(tag);
+        // Listenpunkte und Tabellenzeilen ohne Leerzeile untereinander, Absätze mit Leerzeile.
+        const tight = tag === 'LI' || tag === 'TR' || tag === 'DT' || tag === 'DD';
+        if (block) out.push('\n');
+        if (tag === 'LI') out.push('• ');
+        if ((tag === 'TD' || tag === 'TH') && n.previousElementSibling) out.push(' | ');
+        walk(n);
+        if (block && !tight) out.push('\n');
+        if (/^H[1-6]$/.test(tag)) out.push('\n');
+      }
+    };
+    walk(doc.body);
+    const text = out
+      .join('')
+      .split('\n')
+      .map((l) => l.replace(/[ \t\u00a0]+/g, ' ').trim())
+      .join('\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+    return { text, images };
+  }
+
+  /** Nur Bilder aus dem Dateispeicher / Bild-Proxy der FiveNet-Instanz werden übernommen. */
+  function fivenetImageUrl(src) {
+    const base = st.fivenet?.instance?.url || 'https://fivenet.modernv.net';
+    try {
+      const u = new URL(src, base);
+      const b = new URL(base);
+      if (u.protocol !== 'https:' || u.hostname.replace(/^www\./, '') !== b.hostname.replace(/^www\./, '') || u.port !== b.port) return null;
+      if (!FN_IMAGE_PATHS.some((p) => u.pathname.startsWith(p))) return null;
+      u.hash = '';
+      return u.toString();
+    } catch {
+      return null;
+    }
+  }
+
+  function dataUrlToBlob(src) {
+    const m = String(src).match(/^data:(image\/(?:png|jpeg|webp));base64,([a-z0-9+/=\s]+)$/i);
+    if (!m) return null;
+    const bin = atob(m[2].replace(/\s+/g, ''));
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+    return new Blob([bytes], { type: m[1].toLowerCase() });
+  }
+
+  function pendingCount() {
+    return st.fnPending.urls.length + st.fnPending.blobs.length;
+  }
+
+  function addPendingImages({ urls = [], blobs = [] }) {
+    let dropped = 0;
+    for (const u of urls) {
+      if (st.fnPending.urls.includes(u)) continue;
+      if (pendingCount() >= FN_MAX_IMAGES) dropped += 1;
+      else st.fnPending.urls.push(u);
+    }
+    for (const b of blobs) {
+      if (pendingCount() >= FN_MAX_IMAGES) dropped += 1;
+      else st.fnPending.blobs.push(b);
+    }
+    if (dropped) toast(`Pro Vorgang werden höchstens ${FN_MAX_IMAGES} Bilder übernommen – ${dropped} weggelassen.`, 'error');
+    renderPending();
+  }
+
+  function renderPending() {
+    const box = $('#fnPending');
+    if (!box) return;
+    (st.fnPending.previews || []).forEach((u) => URL.revokeObjectURL(u));
+    st.fnPending.previews = st.fnPending.blobs.map((b) => URL.createObjectURL(b));
+    const items = [
+      ...st.fnPending.urls.map((u, i) => ({ src: u, kind: 'url', i, label: 'aus FiveNet' })),
+      ...st.fnPending.blobs.map((b, i) => ({ src: st.fnPending.previews[i], kind: 'blob', i, label: 'eingefügt' })),
+    ];
+    box.innerHTML = items.length
+      ? `<div class="text-xs text-muted mb-1">${items.length} Bild${items.length === 1 ? '' : 'er'} ${items.length === 1 ? 'wird' : 'werden'} beim Speichern als Anhang übernommen:</div>
+         <div class="fn-thumbs">${items
+           .map((it) => `<div class="fn-thumb"><img src="${esc(it.src)}" alt="" referrerpolicy="no-referrer" loading="lazy"><span class="lbl">${esc(it.label)}</span>
+             <button type="button" class="rm" data-action="fn-img-remove" data-kind="${it.kind}" data-index="${it.i}" aria-label="Bild entfernen">${icon('x', 'ico-sm')}</button></div>`)
+           .join('')}</div>`
+      : '';
+  }
+
+  function resetPending() {
+    (st.fnPending.previews || []).forEach((u) => URL.revokeObjectURL(u));
+    st.fnPending = { urls: [], blobs: [] };
+  }
+
+  function insertAtCursor(el, text) {
+    const max = Number(el.getAttribute('maxlength')) || Infinity;
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? el.value.length;
+    const room = max - (el.value.length - (end - start));
+    const piece = text.length > room ? text.slice(0, Math.max(0, room)) : text;
+    if (piece.length < text.length) toast('Der Text ist sehr lang und wurde gekürzt (höchstens 60.000 Zeichen).', 'error');
+    el.setRangeText(piece, start, end, 'end');
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  /** Einfügen im FiveNet-Dialog: HTML → Text + Bildadressen, Bilddateien aus der Zwischenablage → Anhänge. */
+  function onFivenetPaste(e) {
+    const cd = e.clipboardData;
+    if (!cd) return;
+    const files = [...(cd.files || [])].filter((f) => /^image\/(png|jpeg|webp|gif|bmp)$/.test(f.type));
+    const html = cd.getData('text/html');
+    const plain = cd.getData('text/plain');
+    const inContent = e.target && e.target.id === 'fnContent';
+    if (files.length) addPendingImages({ blobs: files });
+    if (html && inContent) {
+      const { text, images } = parsePastedHtml(html);
+      const urls = [];
+      const blobs = [];
+      let external = 0;
+      for (const src of images) {
+        const blob = src.startsWith('data:') ? dataUrlToBlob(src) : null;
+        if (blob) blobs.push(blob);
+        else {
+          const u = fivenetImageUrl(src);
+          if (u) urls.push(u);
+          else external += 1;
+        }
+      }
+      if (urls.length || blobs.length) addPendingImages({ urls, blobs });
+      if (external) toast(`${external} Bild${external === 1 ? '' : 'er'} liegt nicht im FiveNet-Dateispeicher – bitte als Screenshot einfügen.`, 'error');
+      if (text) {
+        e.preventDefault();
+        insertAtCursor(e.target, text);
+      }
+      return;
+    }
+    if (files.length && !plain) {
+      e.preventDefault();
+      toast(files.length === 1 ? 'Bild hinzugefügt – wird beim Speichern übernommen.' : `${files.length} Bilder hinzugefügt.`);
+    }
+  }
+
+  /** Nach dem Speichern: vorgemerkte Bilder als Anhänge zum FiveNet-Dokument übernehmen. */
+  async function importPendingImages(caseId, doc) {
+    const pending = st.fnPending;
+    const result = { ok: 0, failed: 0, errors: [] };
+    if (!pending.urls.length && !pending.blobs.length) return result;
+    toast('Bilder werden übernommen …');
+    if (pending.urls.length) {
+      try {
+        const r = await api.post(`/api/cases/${caseId}/fivenet/${doc.id}/images`, { urls: pending.urls });
+        result.ok += r.imported;
+        result.failed += r.failed.length;
+        result.errors.push(...r.failed.map((f) => f.error));
+      } catch (e) {
+        result.failed += pending.urls.length;
+        result.errors.push(e.message);
+      }
+    }
+    const caption = `FiveNet ${doc.documentId}${doc.title ? ' – ' + doc.title : ''}`.slice(0, 180);
+    for (const b of pending.blobs) {
+      try {
+        const blob = await resizeImage(b, { max: 1600 });
+        await api.upload(`/api/cases/${caseId}/attachments?caption=${encodeURIComponent(caption)}&internal=${doc.internal ? 1 : 0}&fivenetDoc=${doc.id}`, blob);
+        result.ok += 1;
+      } catch (e) {
+        result.failed += 1;
+        result.errors.push(e.message);
+      }
+    }
+    resetPending();
+    return result;
+  }
+
+  function reportImport(r) {
+    if (r.ok) toast(`${r.ok} Bild${r.ok === 1 ? '' : 'er'} als Anhang übernommen.`);
+    if (r.failed) toast(`${r.failed} Bild${r.failed === 1 ? '' : 'er'} nicht übernommen (${[...new Set(r.errors)].slice(0, 2).join('; ')}). Tipp: als Screenshot mit Strg+V einfügen.`, 'error');
   }
 
   /* ---------------------------------------------------------------- Aufgaben & Wiedervorlagen */
@@ -2060,7 +2298,7 @@
         ${row('Instanz', `<a class="link-btn" href="${esc(fn.instance.url)}" target="_blank" rel="noopener noreferrer">${esc(fn.instance.host)} ↗</a>`, true)}
         ${row('Account', cap.accountLink ? 'Verbunden ✓' : 'Nicht verbindbar – FiveNet bietet keine Freigabe für externe Anwendungen', cap.accountLink)}
         ${row('Aktiver Charakter', cap.characterSelect ? 'Abrufbar' : 'Nicht abrufbar – FiveNet gibt ihn nur in der eigenen Oberfläche preis', cap.characterSelect)}
-        ${row('Dokumentabruf', cap.documentFetch ? 'Automatisch' : 'Nicht möglich – Dokumente werden als Referenz verknüpft', cap.documentFetch)}
+        ${row('Dokumentabruf', cap.documentFetch ? 'Automatisch' : 'Nicht automatisch – Text & Bilder per Kopieren/Einfügen übernehmen', cap.documentFetch)}
         ${fn.lastViewedAs ? row('Zuletzt angegeben', `„${esc(fn.lastViewedAs)}“ <span class="text-xs">(eigene Angabe)</span>`, false) : ''}
       </div>
       <div class="banner banner-amber mt-4 mb-0">${icon('shield')}<div><strong>Niemals das FiveNet-Passwort eingeben.</strong> Die Kanzlei-Plattform fragt nie danach. Eine Verbindung über Passwort oder Sitzungs-Cookies wäre unsicher und ist bewusst nicht vorgesehen.</div></div>
@@ -2068,6 +2306,7 @@
         <li>In FiveNet den Charakter wählen, der das Dokument sehen darf.</li>
         <li>Dokument öffnen und die Adresse aus der Adresszeile kopieren.</li>
         <li>In der Akte „FiveNet-Dokument hinzufügen“ – die Dokument-ID wird automatisch erkannt.</li>
+        <li>Optional: den Dokumentinhalt in FiveNet markieren, Strg+C, im Feld „Inhalt aus FiveNet“ Strg+V – Text wird zur Abschrift, Bilder werden als Anhang übernommen.</li>
       </ol>
       <details class="edit-box mt-4"><summary>Ergebnis der Schnittstellenprüfung</summary>${fivenetInterfaces()}</details>
     </section>`;
@@ -2564,6 +2803,15 @@
       if (ctl) ctl.innerHTML = teamPhotoControls(m);
       toast('Foto gespeichert – live auf der Website.');
       await refreshBehind();
+    } else if (kind === 'fn-pending') {
+      addPendingImages({ blobs: files });
+    } else if (kind === 'fivenet-img') {
+      const caseId = Number(input.dataset.caseId);
+      const d = st.caseDocs.find((x) => x.id === Number(input.dataset.docId));
+      if (!d) return;
+      st.fnPending = { urls: [], blobs: files.slice(0, FN_MAX_IMAGES) };
+      reportImport(await importPendingImages(caseId, d));
+      await reloadCase(caseId);
     } else if (kind === 'evidence') {
       const caseId = Number(input.dataset.caseId);
       const caption = ($('#attCaption')?.value || '').trim();
@@ -2966,6 +3214,7 @@
       if (!st.caseInfo) return;
       st.returnCase = st.caseInfo.id;
       await load.fivenet();
+      resetPending();
       openModal(fivenetForm(null, st.caseInfo));
     },
     'fn-edit': async (el) => {
@@ -2973,11 +3222,29 @@
       if (!d || !st.caseInfo) return;
       st.returnCase = st.caseInfo.id;
       await load.fivenet();
+      resetPending();
       openModal(fivenetForm(d, st.caseInfo));
+      if (el.dataset.focus) {
+        const target = $('#' + el.dataset.focus);
+        target?.scrollIntoView({ block: 'center' });
+        target?.focus();
+      }
+    },
+    'fn-img-remove': (el) => {
+      const i = Number(el.dataset.index);
+      if (el.dataset.kind === 'url') st.fnPending.urls.splice(i, 1);
+      else st.fnPending.blobs.splice(i, 1);
+      renderPending();
+    },
+    'fn-copy-text': async (el) => {
+      const d = st.caseDocs.find((x) => x.id === Number(el.dataset.id));
+      if (!d) return;
+      const ok = await copy(d.contentText);
+      toast(ok ? 'Abschrift kopiert.' : 'Kopieren nicht möglich.', ok ? 'ok' : 'error');
     },
     'fn-delete': async (el) => {
       const d = st.caseDocs.find((x) => x.id === Number(el.dataset.id));
-      if (!d || !confirm(`Verknüpfung mit FiveNet-Dokument ${d.documentId} aus der Akte entfernen? Das Dokument in FiveNet bleibt unverändert.`)) return;
+      if (!d || !confirm(`Verknüpfung mit FiveNet-Dokument ${d.documentId} aus der Akte entfernen? Das Dokument in FiveNet bleibt unverändert, übernommene Bilder bleiben als Beweismittel in der Akte.`)) return;
       const caseId = Number(el.dataset.caseId);
       await api.del(`/api/cases/${caseId}/fivenet/${d.id}`);
       toast('Verknüpfung entfernt.');
@@ -3383,15 +3650,17 @@
     'fivenet-link': async (f) => {
       const fd = new FormData(f);
       if (fd.get('attest') !== 'on') throw new Error('Bitte bestätigen Sie, dass Sie das Dokument in FiveNet selbst einsehen dürfen.');
-      await api.post(`/api/cases/${f.dataset.caseId}/fivenet`, { input: val(fd, 'input'), attest: true, ...fivenetBody(f) });
+      const res = await api.post(`/api/cases/${f.dataset.caseId}/fivenet`, { input: val(fd, 'input'), attest: true, ...fivenetBody(f) });
       st.fivenet = null; // Vorschläge (Dokumentarten, Charakter) neu laden
       toast('FiveNet-Dokument mit der Akte verknüpft.');
+      reportImport(await importPendingImages(Number(f.dataset.caseId), res.document));
       await returnOrClose();
     },
     'fivenet-edit': async (f) => {
-      await api.patch(`/api/cases/${f.dataset.caseId}/fivenet/${f.dataset.id}`, fivenetBody(f));
+      const res = await api.patch(`/api/cases/${f.dataset.caseId}/fivenet/${f.dataset.id}`, fivenetBody(f));
       st.fivenet = null;
       toast('Angaben gespeichert.');
+      reportImport(await importPendingImages(Number(f.dataset.caseId), res.document));
       await returnOrClose();
     },
     'settings-fivenet': async (f) => {
@@ -3496,6 +3765,10 @@
     const buttons = $$('button[type="submit"]', f);
     buttons.forEach((b) => (b.disabled = true));
     guard(() => forms[f.dataset.form](f)).finally(() => buttons.forEach((b) => b.isConnected && (b.disabled = false)));
+  });
+
+  document.addEventListener('paste', (e) => {
+    if (e.target && e.target.closest && e.target.closest('form[data-form="fivenet-link"], form[data-form="fivenet-edit"]')) onFivenetPaste(e);
   });
 
   document.addEventListener('input', (e) => {

@@ -84,6 +84,8 @@ const FIELD_LABELS = {
   caseId: 'Akte',
   done: 'Erledigt',
   fivenetUrl: 'FiveNet-Adresse',
+  contentText: 'Inhalt aus FiveNet',
+  urls: 'Bilder',
 };
 
 // Checklisten-Vorlagen je Rechtsgebiet (werden auf Wunsch als Aufgaben in eine Akte übernommen).
@@ -122,6 +124,9 @@ const CHECKLISTS = {
   ],
   sonstiges: ['Mandantengespräch führen', 'Honorarvereinbarung erstellen', 'Nächste Schritte festlegen'],
 };
+
+/** Höchstzahl an Bildanhängen pro Akte (Beweismittel inkl. aus FiveNet übernommener Bilder). */
+const MAX_ATTACHMENTS_PER_CASE = 40;
 
 /** Express 4 fängt Fehler aus async-Handlern nicht selbst ab. */
 function wrap(fn) {
@@ -172,6 +177,7 @@ module.exports = {
   DUTY_STATUS,
   APPLICATION_STATUS,
   CHECKLISTS,
+  MAX_ATTACHMENTS_PER_CASE,
   wrap,
   parseBody,
   idParam,

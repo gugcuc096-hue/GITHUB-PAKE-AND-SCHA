@@ -25,17 +25,22 @@ const DIRS = {
   evidence: EVIDENCE_DIR,
 };
 
-/** Prüft und speichert ein hochgeladenes Bild; gibt { file, mime, size } zurück oder wirft einen 400-Fehler. */
-function saveImage(req, kind) {
-  const info = detectImage(req.body);
+/** Prüft und speichert Bilddaten; gibt { file, mime, size } zurück oder wirft einen 400-Fehler. */
+function saveImageBuffer(buf, kind) {
+  const info = detectImage(buf);
   if (!info) {
     const err = new Error('Bitte ein Bild im Format JPG, PNG oder WebP hochladen.');
     err.status = 400;
     throw err;
   }
   const file = `${crypto.randomBytes(12).toString('hex')}.${info.ext}`;
-  fs.writeFileSync(path.join(DIRS[kind], file), req.body);
-  return { file, mime: info.mime, size: req.body.length };
+  fs.writeFileSync(path.join(DIRS[kind], file), buf);
+  return { file, mime: info.mime, size: buf.length };
+}
+
+/** Prüft und speichert ein hochgeladenes Bild (Rohdaten im Request-Body). */
+function saveImage(req, kind) {
+  return saveImageBuffer(req.body, kind);
 }
 
 /** Löscht eine gespeicherte Datei; nur einfache Dateinamen (kein Pfad) werden akzeptiert. */
@@ -51,4 +56,4 @@ function evidencePath(file) {
 const avatarUrl = (file) => (file ? `/media/avatars/${file}` : null);
 const teamPhotoUrl = (file) => (file ? `/media/team/${file}` : null);
 
-module.exports = { imageBody, detectImage, saveImage, removeFile, evidencePath, avatarUrl, teamPhotoUrl, MAX_BYTES };
+module.exports = { imageBody, detectImage, saveImage, saveImageBuffer, removeFile, evidencePath, avatarUrl, teamPhotoUrl, MAX_BYTES };

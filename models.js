@@ -129,6 +129,9 @@ function externalDocRow(d, u, others = []) {
     docDate: d.doc_date || null,
     docAuthor: d.doc_author,
     summary: d.summary,
+    contentText: d.content_text || '',
+    contentAt: d.content_at || null,
+    contentByName: d.content_by_name || '',
     viewedAs: staff ? d.viewed_as : undefined,
     internal: !!d.internal,
     attested: staff ? !!d.attested : undefined,
@@ -393,6 +396,7 @@ function boardRow(n) {
 function attachmentRow(a, caseId) {
   return {
     id: a.id,
+    externalDocId: a.external_doc_id || null,
     caption: a.caption,
     internal: !!a.internal,
     mime: a.mime,
