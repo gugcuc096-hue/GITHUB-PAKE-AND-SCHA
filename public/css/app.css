@@ -708,7 +708,11 @@ details.edit-box[open] > summary::after { content: '–'; }
 @media (max-width: 480px) { .ps-dialog-actions > * { flex: 1 1 100%; } }
 body.ps-dialog-open { overflow: hidden; }
 
-/* Discord-Einstellungen: Ereignis | Nachricht | Rolle pingen */
-.ev-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 0.55rem 1rem; align-items: center; }
-.ev-grid > .label { margin: 0; }
-.ev-grid input[type="checkbox"] { width: 18px; height: 18px; justify-self: center; accent-color: var(--gold-500); }
+/* Discord-Einstellungen: je Ereignis Nachricht, Ping, Kanal und Rolle */
+.ev-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.ev-item { border: 1px solid var(--line); border-radius: 12px; padding: 0.6rem 0.75rem; background: rgba(255, 255, 255, 0.02); }
+.ev-top { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 1rem; }
+.ev-top .ev-name { flex: 1 1 12rem; font-size: 0.875rem; font-weight: 500; }
+.ev-top .check { margin: 0; font-size: 0.8rem; }
+.ev-fields { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 0.5rem; margin-top: 0.5rem; }
+@media (max-width: 560px) { .ev-fields { grid-template-columns: minmax(0, 1fr); } }

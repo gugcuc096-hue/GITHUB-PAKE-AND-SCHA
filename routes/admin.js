@@ -230,6 +230,7 @@ function settingsPayload() {
     discordWebhookFromEnv: !dbUrl && discord.isValidWebhookUrl(process.env.DISCORD_WEBHOOK_URL),
     discordWebhookActive: !!discord.webhookUrl() || Object.keys(discord.eventWebhooks()).length > 0,
     discordEventWebhooks: discord.eventWebhooks(),
+    discordEventRoles: discord.eventRoles(),
     discordEvents: discord.enabledEvents(),
     availableEvents: discord.EVENTS,
     discordPingRole: discord.pingRole(),
@@ -257,6 +258,7 @@ router.patch(
       discordPingRole: z.string().trim().max(40).optional(),
       discordPingEvents: z.array(z.string()).max(20).optional(),
       discordEventWebhooks: z.record(z.string().trim().max(300)).optional(),
+      discordEventRoles: z.record(z.string().trim().max(40)).optional(),
       firmAddress: z.string().trim().max(300).optional(),
       firmPaymentInfo: z.string().trim().max(300).optional(),
       firmContact: z.string().trim().max(120).optional(),
@@ -286,6 +288,16 @@ router.patch(
       }
       d.discordEventWebhooks = clean;
     }
+    if (d.discordEventRoles !== undefined) {
+      const clean = {};
+      for (const [event, input] of Object.entries(d.discordEventRoles)) {
+        if (!discord.EVENTS[event]) continue;
+        const role = discord.parseRoleId(input);
+        if (role === null) return res.status(400).json({ error: `Die Rollen-ID bei „${discord.EVENTS[event]}“ besteht nur aus Ziffern.` });
+        if (role) clean[event] = role;
+      }
+      d.discordEventRoles = clean;
+    }
     if (d.discordWebhookUrl && !discord.isValidWebhookUrl(d.discordWebhookUrl)) {
       return res.status(400).json({ error: 'Das ist keine gültige Discord-Webhook-URL (https://discord.com/api/webhooks/…).' });
     }
@@ -296,6 +308,7 @@ router.patch(
       if (d.discordEvents !== undefined) setSetting('discord_events', JSON.stringify(d.discordEvents.filter((e) => discord.EVENTS[e])));
       if (d.discordPingRole !== undefined) setSetting('discord_ping_role', d.discordPingRole);
       if (d.discordEventWebhooks !== undefined) setSetting('discord_event_webhooks', JSON.stringify(d.discordEventWebhooks));
+      if (d.discordEventRoles !== undefined) setSetting('discord_event_roles', JSON.stringify(d.discordEventRoles));
       if (d.discordPingEvents !== undefined) setSetting('discord_ping_events', JSON.stringify(d.discordPingEvents.filter((e) => discord.EVENTS[e])));
       if (d.firmAddress !== undefined) setSetting('firm_address', d.firmAddress);
       if (d.firmPaymentInfo !== undefined) setSetting('firm_payment_info', d.firmPaymentInfo);
@@ -320,7 +333,7 @@ router.post(
         sent: result.sent,
       });
     }
-    res.json({ success: true, sent: result.sent });
+    res.json({ success: true, sent: result.sent, pinged: result.pinged });
   })
 );
 
