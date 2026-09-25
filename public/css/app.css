@@ -707,3 +707,8 @@ details.edit-box[open] > summary::after { content: '–'; }
 .ps-dialog-actions > * { min-width: 8.5rem; }
 @media (max-width: 480px) { .ps-dialog-actions > * { flex: 1 1 100%; } }
 body.ps-dialog-open { overflow: hidden; }
+
+/* Discord-Einstellungen: Ereignis | Nachricht | Rolle pingen */
+.ev-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 0.55rem 1rem; align-items: center; }
+.ev-grid > .label { margin: 0; }
+.ev-grid input[type="checkbox"] { width: 18px; height: 18px; justify-self: center; accent-color: var(--gold-500); }
