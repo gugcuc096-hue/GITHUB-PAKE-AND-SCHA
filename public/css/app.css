@@ -250,11 +250,9 @@ input[type="datetime-local"].field, input[type="date"].field { color-scheme: dar
 .sidebar-backdrop { position: fixed; inset: 0; z-index: 55; background: rgba(0, 0, 0, 0.6); opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
 .sidebar-backdrop.show { opacity: 1; pointer-events: auto; }
 .brand { display: flex; align-items: center; gap: 0.75rem; padding: 0.35rem 0.5rem 0.9rem; border-bottom: 1px solid var(--line); text-decoration: none; color: inherit; }
-.brand-mark {
-  width: 42px; height: 42px; border-radius: 12px; border: 1px solid var(--gold-hairline); background: rgba(212, 175, 55, 0.06);
-  display: flex; align-items: center; justify-content: center; font-family: 'Cormorant Garamond', serif; color: var(--gold-500);
-  font-size: 1.15rem; font-weight: 700; flex-shrink: 0; box-shadow: 0 0 20px rgba(212, 175, 55, 0.12);
-}
+/* Kanzlei-Monogramm (freigestellt, je Bildschirmdichte eigene Datei über srcset) */
+.brand-logo { height: 44px; width: auto; display: block; flex-shrink: 0; filter: drop-shadow(0 0 12px rgba(212, 175, 55, 0.25)); transition: transform 0.2s ease; }
+a:hover > .brand-logo { transform: scale(1.04); }
 .brand-name { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; font-weight: 600; line-height: 1.1; }
 .brand-sub { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.2em; color: var(--gold-500); }
 .nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
