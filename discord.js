@@ -95,6 +95,29 @@ function pingEvents() {
   }
 }
 
+/** Eigene Rolle je Ereignis (leer = Standard-Rolle). */
+function eventRoles() {
+  const raw = getSetting('discord_event_roles', null);
+  if (!raw) return {};
+  try {
+    const out = {};
+    for (const [event, id] of Object.entries(JSON.parse(raw) || {})) {
+      const role = parseRoleId(id);
+      if (EVENTS[event] && role) out[event] = role;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+/** Welche Rolle bei diesem Ereignis gepingt wird ([] = kein Ping). */
+function rolesFor(event) {
+  if (!pingEvents().includes(event)) return [];
+  const role = eventRoles()[event] || pingRole();
+  return role ? [role] : [];
+}
+
 function publicUrl(pathname = '/dashboard.html') {
   const base = (process.env.PUBLIC_URL || '').replace(/\/+$/, '');
   return /^https?:\/\//.test(base) ? base + pathname : undefined;
@@ -146,9 +169,7 @@ async function postWebhook(url, payload) {
 function notify(event, message) {
   const url = webhookFor(event);
   if (!url || !enabledEvents().includes(event)) return;
-  const role = pingRole();
-  const roleIds = role && pingEvents().includes(event) ? [role] : [];
-  const payload = buildPayload({ link: publicUrl(), ...message, roleIds });
+  const payload = buildPayload({ link: publicUrl(), ...message, roleIds: rolesFor(event) });
   postWebhook(url, payload).catch((err) => console.warn(`Discord-Webhook (${event}) fehlgeschlagen: ${err.message}`));
 }
 
@@ -168,27 +189,35 @@ async function sendTestAll(userName) {
     if (!channels.has(url)) channels.set(url, []);
     if (enabled.includes(event)) channels.get(url).push(event);
   }
-  const role = pingRole();
-  const pings = pingEvents();
-  const result = { sent: 0, failed: [] };
+  const result = { sent: 0, failed: [], pinged: [] };
   for (const [url, events] of channels) {
-    const list = events.length ? events.map((e) => `• ${EVENTS[e]}${role && pings.includes(e) ? ' (mit Ping)' : ''}`).join('\n') : '• (keine Ereignisse eingeschaltet)';
+    // Rollen in der Beschreibung werden von Discord als Name angezeigt (ohne zu pingen) –
+    // so sieht man direkt, ob die Rollen-ID stimmt.
+    const list = events.length
+      ? events.map((e) => `• ${EVENTS[e]}${rolesFor(e).length ? ` → pingt <@&${rolesFor(e)[0]}>` : ''}`).join('\n')
+      : '• (keine Ereignisse eingeschaltet)';
+    const roles = [...new Set(events.flatMap((e) => rolesFor(e)))];
     const standardNote = url === standard ? '\n\nDas ist der Standard-Kanal: Ereignisse ohne eigenen Kanal landen hier.' : '';
+    const pingNote = roles.length
+      ? '\n\nKam über dieser Nachricht kein Ping an? Dann in Discord: Servereinstellungen → Rollen → Rolle wählen → „Erlaube jedem, @mention für diese Rolle zu verwenden“ einschalten. Ohne diese Einstellung dürfen Webhooks die Rolle nicht pingen.'
+      : '';
     try {
       await postWebhook(
         url,
         buildPayload({
           title: 'Verbindung hergestellt',
-          description: `Getestet von ${userName}. In diesem Kanal kommen an:\n${list}${standardNote}`,
+          description: `Getestet von ${userName}. In diesem Kanal kommen an:\n${list}${standardNote}${pingNote}`,
           link: publicUrl(),
-          roleIds: role && events.some((e) => pings.includes(e)) ? [role] : [],
+          roleIds: roles,
         })
       );
       result.sent += 1;
+      result.pinged.push(...roles);
     } catch (err) {
       result.failed.push({ events: events.map((e) => EVENTS[e]), error: err.message });
     }
   }
+  result.pinged = [...new Set(result.pinged)];
   return result;
 }
 
@@ -261,6 +290,8 @@ module.exports = {
   parseRoleId,
   pingRole,
   pingEvents,
+  eventRoles,
+  rolesFor,
   notify,
   sendTestAll,
   oauthConfig,
