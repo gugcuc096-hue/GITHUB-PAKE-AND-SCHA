@@ -16,7 +16,7 @@ publicRouter.get('/', (req, res) => {
   res.json({ fees: rows.map(feeRow) });
 });
 
-/* Kanzleileitung: Honorarordnung pflegen */
+/* Board of Partners: Honorarordnung pflegen */
 const adminRouter = express.Router();
 adminRouter.use(requireAuth, requireAdmin);
 

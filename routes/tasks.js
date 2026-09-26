@@ -190,7 +190,7 @@ router.delete(
     const t = id && getTask(id);
     if (!t) return res.status(404).json({ error: 'Aufgabe nicht gefunden.' });
     const allowed = req.user.role === 'admin' || t.created_by === req.user.id || t.assigned_to === req.user.id;
-    if (!allowed) return res.status(403).json({ error: 'Nur wer die Aufgabe angelegt hat, die zuständige Person oder die Kanzleileitung kann sie löschen.' });
+    if (!allowed) return res.status(403).json({ error: 'Nur wer die Aufgabe angelegt hat, die zuständige Person oder das Board of Partners kann sie löschen.' });
     db.prepare('DELETE FROM tasks WHERE id = ?').run(t.id);
     res.json({ success: true });
   })

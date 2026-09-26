@@ -22,7 +22,7 @@ const TEAM = [
     rank: 'Founding Partner',
     roleTitle: 'Founding Partner',
     tier: 'leitung',
-    description: 'Kanzleileitung. Verfassungsrecht, Grundsatzverfahren und strategische Gesamtverantwortung für alle Mandate.',
+    description: 'Board of Partners. Verfassungsrecht, Grundsatzverfahren und strategische Gesamtverantwortung für alle Mandate.',
   },
   {
     key: 'SCHA',
@@ -195,7 +195,7 @@ function ensureMainAdmin() {
   }
 
   logCredentials('Kein aktiver Admin gefunden – Haupt-Admin wurde (wieder)hergestellt', [
-    { name: 'Dr. Alois Pake (Kanzleileitung)', email, password, generated: !envPassword },
+    { name: 'Dr. Alois Pake (Board of Partners)', email, password, generated: !envPassword },
   ]);
 }
 

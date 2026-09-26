@@ -200,9 +200,9 @@ function loadLink(req, res, c, { manage = true } = {}) {
     res.status(404).json({ error: 'Verknüpfung nicht gefunden.' });
     return null;
   }
-  // Ändern/Entfernen: wer verknüpft hat, der zuständige Anwalt oder die Kanzleileitung.
+  // Ändern/Entfernen: wer verknüpft hat, der zuständige Anwalt oder das Board of Partners.
   if (manage && link.linked_by !== req.user.id && !caseAccess(c, req.user).canEdit) {
-    res.status(403).json({ error: 'Nur wer das Dokument verknüpft hat, der zuständige Anwalt oder die Kanzleileitung kann das ändern.' });
+    res.status(403).json({ error: 'Nur wer das Dokument verknüpft hat, der zuständige Anwalt oder das Board of Partners kann das ändern.' });
     return null;
   }
   return link;

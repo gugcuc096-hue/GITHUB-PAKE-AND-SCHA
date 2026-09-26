@@ -173,8 +173,13 @@ const ASSOCIATE_RANKS = ['Senior Associate', 'Associate', 'Junior Associate'];
 const RANKS = [...BOARD_RANKS, ...ASSOCIATE_RANKS];
 /** Leer (kein Rang) oder einer der Ränge. */
 const rankField = z.union([z.enum(RANKS), z.literal('')]);
-/** Gehört zum Board of Partners (Rang Founding/Equity Partner oder Partner)? */
-const isBoard = (u) => !!u && (u.role === 'anwalt' || u.role === 'admin') && BOARD_RANKS.includes(u.rank);
+/**
+ * Gehört zum Board of Partners? Board of Partners und Kanzleileitung sind dasselbe:
+ * die Dashboard-Rolle „Board of Partners“ (admin) oder ein Partner-Rang.
+ */
+const isBoard = (u) => !!u && (u.role === 'admin' || (u.role === 'anwalt' && BOARD_RANKS.includes(u.rank)));
+/** SQL-Sortierung nach Rang (Founding Partner zuerst … Junior Associate, dann ohne Rang). */
+const RANK_ORDER_SQL = (col = 'rank') => `CASE ${col} ${RANKS.map((r, i) => `WHEN '${r}' THEN ${i}`).join(' ')} ELSE ${RANKS.length} END`;
 
 module.exports = {
   BOARD_RANKS,
@@ -182,6 +187,7 @@ module.exports = {
   RANKS,
   rankField,
   isBoard,
+  RANK_ORDER_SQL,
   STEPS,
   CASE_STATUS,
   AREAS,

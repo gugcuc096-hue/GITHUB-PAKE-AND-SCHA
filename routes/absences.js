@@ -92,10 +92,10 @@ router.post(
     );
     if (!d) return;
     const u = req.user;
-    // Die Kanzleileitung kann auch jemand anderen abmelden (z. B. auf Zuruf im Spiel).
+    // Das Board of Partners kann auch jemand anderen abmelden (z. B. auf Zuruf im Spiel).
     let userId = u.id;
     if (d.userId && d.userId !== u.id) {
-      if (u.role !== 'admin') return res.status(403).json({ error: 'Nur die Kanzleileitung kann andere Teammitglieder abmelden.' });
+      if (u.role !== 'admin') return res.status(403).json({ error: 'Nur das Board of Partners kann andere Teammitglieder abmelden.' });
       const other = db.prepare("SELECT id FROM users WHERE id = ? AND role IN ('anwalt','admin') AND active = 1").get(d.userId);
       if (!other) return res.status(400).json({ error: 'Dieses Teammitglied gibt es nicht.' });
       userId = other.id;
@@ -125,7 +125,7 @@ function loadOwn(req, res) {
     return null;
   }
   if (req.user.role !== 'admin' && a.user_id !== req.user.id) {
-    res.status(403).json({ error: 'Nur die eigene Abmeldung (oder als Kanzleileitung) lässt sich ändern.' });
+    res.status(403).json({ error: 'Nur die eigene Abmeldung (oder als Board of Partners) lässt sich ändern.' });
     return null;
   }
   return a;

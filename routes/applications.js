@@ -101,7 +101,7 @@ publicRouter.post(
 );
 
 /* ================================================================
-   Kanzleileitung: Bewerbungen
+   Board of Partners: Bewerbungen
    ================================================================ */
 const adminRouter = express.Router();
 adminRouter.use(requireAuth, requireAdmin);
@@ -242,7 +242,7 @@ adminRouter.post(
       }
       db.prepare(
         "UPDATE applications SET status = 'angenommen', hired_user_id = ?, public_note = CASE WHEN public_note = '' THEN ? ELSE public_note END, updated_at = datetime('now') WHERE id = ?"
-      ).run(userId, 'Herzlichen Glückwunsch – willkommen im Team von Pake & Scha! Ihre Zugangsdaten erhalten Sie direkt von der Kanzleileitung.', a.id);
+      ).run(userId, 'Herzlichen Glückwunsch – willkommen im Team von Pake & Scha! Ihre Zugangsdaten erhalten Sie direkt vom Board of Partners.', a.id);
     });
     logActivity(req.user, 'Bewerber eingestellt', 'application', a.id, `${a.name} als ${d.rank || 'Mitarbeiter (ohne Rang)'}`);
     res.json({ ...detail(load(a.id)), credentials: { email, password } });
@@ -262,7 +262,7 @@ adminRouter.delete(
 );
 
 /* ================================================================
-   Kanzleileitung: Stellenausschreibungen
+   Board of Partners: Stellenausschreibungen
    ================================================================ */
 const positionsRouter = express.Router();
 positionsRouter.use(requireAuth, requireAdmin);

@@ -12,7 +12,7 @@
   /* ================================================================
      Konstanten
      ================================================================ */
-  const ROLES = { mandant: 'Mandant', anwalt: 'Anwalt', admin: 'Kanzleileitung' };
+  const ROLES = { mandant: 'Mandant', anwalt: 'Anwalt', admin: 'Board of Partners' };
   const STEPS = ['Eingang', 'Akteneinsicht', 'Strategie', 'Verhandlung'];
   const AREAS = { strafrecht: 'Strafrecht', zivilrecht: 'Zivilrecht', verfassungsrecht: 'Verfassungsrecht', vertragsrecht: 'Vertragsrecht', sonstiges: 'Sonstiges' };
   const URGENCY = { normal: ['Normal', 'slate'], eilig: ['Eilig', 'amber'], notfall: ['Notfall', 'red'] };
@@ -106,12 +106,12 @@
     invoices: { label: 'Rechnungen', icon: 'receipt' },
     duty: { label: 'Dienstzeiten', icon: 'clock', staff: true },
     work: { label: 'Aktenbearbeitung', icon: 'briefcase', board: true, section: 'Board of Partners' },
-    team: { label: 'Team', icon: 'users', admin: true, section: 'Kanzleileitung' },
-    applications: { label: 'Bewerbungen', icon: 'userAdd', admin: true, section: 'Kanzleileitung' },
-    users: { label: 'Benutzer', icon: 'key', admin: true, section: 'Kanzleileitung' },
-    fees: { label: 'Honorarordnung', icon: 'scale', admin: true, section: 'Kanzleileitung' },
-    audit: { label: 'Protokoll', icon: 'list', admin: true, section: 'Kanzleileitung' },
-    settings: { label: 'Einstellungen', icon: 'cog', admin: true, section: 'Kanzleileitung' },
+    team: { label: 'Team', icon: 'users', admin: true, section: 'Board of Partners' },
+    applications: { label: 'Bewerbungen', icon: 'userAdd', admin: true, section: 'Board of Partners' },
+    users: { label: 'Benutzer', icon: 'key', admin: true, section: 'Board of Partners' },
+    fees: { label: 'Honorarordnung', icon: 'scale', admin: true, section: 'Board of Partners' },
+    audit: { label: 'Protokoll', icon: 'list', admin: true, section: 'Board of Partners' },
+    settings: { label: 'Einstellungen', icon: 'cog', admin: true, section: 'Board of Partners' },
     profile: { label: 'Mein Profil', short: 'Profil', icon: 'user', section: 'Konto' },
     'invoice-new': { label: 'Neues Dokument', icon: 'receipt', staff: true, hidden: true },
   };
@@ -211,7 +211,7 @@
   }
 
   /**
-   * Auswahl der zuständigen Anwälte. withLead: Auswahl des federführenden Anwalts (Kanzleileitung);
+   * Auswahl der zuständigen Anwälte. withLead: Auswahl des federführenden Anwalts (Board of Partners);
    * sonst ist leadId fest (z. B. man selbst) und nur weitere Anwälte werden gewählt.
    */
   function lawyerPicker({ leadId = null, coIds = [], withLead = false, extra = [], leadLabel = 'Federführender Anwalt', emptyLead = 'Nicht zugewiesen' }) {
@@ -2391,7 +2391,16 @@
     const staff = isStaff();
     const team = st.contacts.filter((c) => c.role !== 'mandant');
     const clients = st.contacts.filter((c) => c.role === 'mandant');
-    const label = (c) => c.displayName + (c.rank ? ' · ' + c.rank : c.role === 'admin' ? ' · Kanzleileitung' : '');
+    const label = (c) => c.displayName + (c.rank ? ' · ' + c.rank : '');
+    // Team nach Rang: Board of Partners (Founding → Partner), Associate Attorneys (Senior → Junior), dann ohne Rang
+    const byRank = (a, b) => (RANKS.indexOf(a.rank) + 1 || 99) - (RANKS.indexOf(b.rank) + 1 || 99) || a.displayName.localeCompare(b.displayName, 'de');
+    const teamGroups = [
+      ...Object.entries(RANK_GROUPS).map(([g, ranks]) => [g, team.filter((c) => ranks.includes(c.rank))]),
+      ['Weitere Mitarbeiter', team.filter((c) => !RANKS.includes(c.rank))],
+    ]
+      .filter(([, list]) => list.length)
+      .map(([g, list]) => `<optgroup label="${esc(g)}">${list.sort(byRank).map((c) => opt(c.id, label(c), c.id === preset.recipientId)).join('')}</optgroup>`)
+      .join('');
     const cases = st.cases.filter((c) => c.status !== 'geschlossen' || c.id === preset.caseId);
     openModal(`
       <h2 class="modal-title">${preset.reply ? 'Antworten' : 'Neue Nachricht'}</h2>
@@ -2401,7 +2410,7 @@
           <select id="cmpTo" name="recipient" class="field" required>
             <option value="">Bitte auswählen …</option>
             ${staff ? '<option value="broadcast">📢 Rundschreiben an das ganze Team</option>' : ''}
-            ${team.length ? `<optgroup label="Kanzlei">${team.map((c) => opt(c.id, label(c), c.id === preset.recipientId)).join('')}</optgroup>` : ''}
+            ${teamGroups}
             ${clients.length ? `<optgroup label="Mandanten">${clients.map((c) => opt(c.id, c.displayName, c.id === preset.recipientId)).join('')}</optgroup>` : ''}
           </select></div>
         <div><label class="label" for="cmpSubject">Betreff</label><input id="cmpSubject" name="subject" class="field" maxlength="150" value="${esc(preset.subject || '')}"></div>
@@ -2709,7 +2718,7 @@
            <div data-account-pane="create" class="hidden">
              <div class="form-grid cols-2">
                <div><label class="label">E-Mail (Login)</label><input name="accountEmail" type="email" class="field" placeholder="vorname.nachname@pake-scha.ls"></div>
-               <div><label class="label">Rolle</label><select name="accountRole" class="field">${opt('anwalt', 'Anwalt')}${opt('admin', 'Kanzleileitung (Admin)')}</select></div>
+               <div><label class="label">Rolle</label><select name="accountRole" class="field">${opt('anwalt', 'Anwalt')}${opt('admin', 'Board of Partners (Admin)')}</select></div>
              </div>
              <p class="form-hint">Es wird ein Einmal-Passwort erzeugt und nach dem Speichern angezeigt.</p>
            </div>`;
@@ -3085,7 +3094,7 @@
             </section>
             <section class="panel panel-pad">
               <div class="panel-head"><h2 class="panel-title">Notfall-Zugang</h2></div>
-              <p class="text-sm text-muted">Passwort vergessen und kein Admin mehr erreichbar? In Render unter „Environment“ die Variable <code class="font-mono text-gold text-xs">ADMIN_RESET_PASSWORD</code> (mind. 10 Zeichen) setzen und neu deployen. Das Konto der Kanzleileitung erhält dieses Passwort. Danach die Variable wieder entfernen.</p>
+              <p class="text-sm text-muted">Passwort vergessen und kein Admin mehr erreichbar? In Render unter „Environment“ die Variable <code class="font-mono text-gold text-xs">ADMIN_RESET_PASSWORD</code> (mind. 10 Zeichen) setzen und neu deployen. Das Konto des Board of Partners erhält dieses Passwort. Danach die Variable wieder entfernen.</p>
               <p class="text-sm text-muted mt-2">Gibt es gar keinen aktiven Admin mehr, stellt der Server das Konto von Dr. Alois Pake beim Start automatisch wieder her (Passwort im Render-Log bzw. aus <code class="font-mono text-xs">ADMIN_PASSWORD</code>).</p>
             </section>
           </div>
@@ -3120,9 +3129,9 @@
         : st.discordOAuth
           ? `<p class="text-sm text-muted mb-4">Verbinden Sie Ihr Discord-Konto, um sich künftig mit einem Klick anzumelden${isStaff() ? ' und bei Fristen oder neuen Akten im Kanzlei-Discord erwähnt zu werden' : ''}.</p>
              <a class="btn-discord btn-md" href="/api/discord/connect">${DISCORD_ICON}<span>Mit Discord verbinden</span></a>`
-          : `<p class="text-sm text-muted">Die Kanzleileitung hat die Discord-Anmeldung noch nicht eingerichtet.${isAdmin() ? ' <a href="#settings" class="text-gold underline">Einstellungen → Discord-Login</a> zeigt, was fehlt.' : ''}</p>`;
+          : `<p class="text-sm text-muted">Das Board of Partners hat die Discord-Anmeldung noch nicht eingerichtet.${isAdmin() ? ' <a href="#settings" class="text-gold underline">Einstellungen → Discord-Login</a> zeigt, was fehlt.' : ''}</p>`;
       return `
-        ${u.mustChangePassword ? `<div class="banner banner-amber">${icon('alert')}<div><strong>Bitte jetzt ein eigenes Passwort festlegen.</strong> Ihr aktuelles Passwort wurde automatisch erzeugt oder von der Kanzleileitung zurückgesetzt.</div></div>` : ''}
+        ${u.mustChangePassword ? `<div class="banner banner-amber">${icon('alert')}<div><strong>Bitte jetzt ein eigenes Passwort festlegen.</strong> Ihr aktuelles Passwort wurde automatisch erzeugt oder vom Board of Partners zurückgesetzt.</div></div>` : ''}
         <div class="page-head"><div><h1 class="page-title">Mein Profil</h1><p class="page-sub">Kontaktdaten, Passwort, Discord${isStaff() ? ' und FiveNet' : ''}.</p></div></div>
         <div class="grid-2">
           <section class="panel panel-pad">
@@ -3606,7 +3615,7 @@
       <form data-form="app-hire" data-id="${a.id}" class="form-grid cols-2">
         <div class="span-2"><label class="label">E-Mail (Login)</label><input name="email" type="email" class="field" required maxlength="120" value="${esc(a.email)}" placeholder="vorname.nachname@pake-scha.ls" autofocus></div>
         <div><label class="label">Rang</label>${rankSelect('rank', RANKS.includes(rank) ? rank : '', { emptyLabel: '— ohne Rang (z. B. Assistenz) —' })}</div>
-        <div><label class="label">Rolle im Dashboard</label><select name="role" class="field">${opt('anwalt', 'Anwalt / Mitarbeiter', true)}${opt('admin', 'Kanzleileitung (Admin)')}</select></div>
+        <div><label class="label">Rolle im Dashboard</label><select name="role" class="field">${opt('anwalt', 'Anwalt / Mitarbeiter', true)}${opt('admin', 'Board of Partners (Admin)')}</select></div>
         <div class="span-2"><label class="label">Kurzbeschreibung für die Website (optional)</label><textarea name="description" rows="2" maxlength="400" class="field"></textarea></div>
         <label class="check span-2"><input type="checkbox" name="createProfile" checked> Team-Profil anlegen</label>
         <label class="check span-2"><input type="checkbox" name="visible" checked> Sofort auf der Website anzeigen</label>
@@ -4166,7 +4175,7 @@
       const c = st.caseInfo;
       st.returnCase = c.id;
       const [{ templates }, defaults] = await Promise.all([api.get('/api/contract-templates'), api.get(`/api/cases/${c.id}/contracts/defaults`), load.lawyers(), load.fees()]);
-      if (!templates.length) throw new Error('Es gibt keine aktive Vertragsvorlage. Die Kanzleileitung kann sie unter Einstellungen → Vertragsvorlagen anlegen.');
+      if (!templates.length) throw new Error('Es gibt keine aktive Vertragsvorlage. Das Board of Partners kann sie unter Einstellungen → Vertragsvorlagen anlegen.');
       openModal(contractForm(c, { templates, defaults }));
     },
     'contract-edit': async (el) => {

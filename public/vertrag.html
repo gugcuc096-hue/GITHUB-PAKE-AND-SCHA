@@ -161,7 +161,7 @@
             }
             if (can.canSignLawyer) parts.push(`<div class="row"><button class="btn gold" id="signLawyer" type="button">Als Anwalt unterschreiben</button><span>Ihre Unterschrift erscheint als ${esc(k.lawyerName || '')} im Unterschriftsfeld.</span></div>`);
             if (can.canRecordClient) parts.push('<div class="row"><button class="btn" id="recordClient" type="button">Mandant hat im Spiel unterschrieben – erfassen</button></div>');
-            if (can.canReset) parts.push('<div class="row"><button class="btn danger" id="resetSigs" type="button">Unterschriften zurücksetzen</button><span class="hint">Nur Kanzleileitung</span></div>');
+            if (can.canReset) parts.push('<div class="row"><button class="btn danger" id="resetSigs" type="button">Unterschriften zurücksetzen</button><span class="hint">Nur Board of Partners</span></div>');
             panel.innerHTML = `<div class="panel"><div class="chips">${chips}</div>${parts.join('')}<div class="err" id="panelErr" hidden></div></div>`;
             const err = (e) => { const el = document.getElementById('panelErr'); el.hidden = false; el.textContent = e.message || String(e); };
             const sign = async (body, btn) => {

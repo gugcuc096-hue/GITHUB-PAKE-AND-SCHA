@@ -23,7 +23,7 @@ publicRouter.get('/', (req, res) => {
   });
 });
 
-/* Kanzleileitung: Team verwalten */
+/* Board of Partners: Team verwalten */
 const adminRouter = express.Router();
 adminRouter.use(requireAuth, requireAdmin);
 

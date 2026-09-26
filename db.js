@@ -275,7 +275,7 @@ db.exec(`
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
-  -- Aktivitätsprotokoll für die Kanzleileitung
+  -- Aktivitätsprotokoll für das Board of Partners
   CREATE TABLE IF NOT EXISTS audit_log (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id    INTEGER REFERENCES users(id) ON DELETE SET NULL,
@@ -364,7 +364,7 @@ db.exec(`
     created_at      TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
-  -- Vertragsvorlagen (z. B. Mandatsvertrag), im Dashboard von der Kanzleileitung pflegbar
+  -- Vertragsvorlagen (z. B. Mandatsvertrag), im Dashboard vom Board of Partners pflegbar
   CREATE TABLE IF NOT EXISTS contract_templates (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     key             TEXT UNIQUE,                  -- mitgelieferte Vorlage (zum Zurücksetzen), sonst NULL

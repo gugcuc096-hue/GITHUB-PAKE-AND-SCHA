@@ -2,7 +2,7 @@
 /*
  * Verträge zu Akten (z. B. Mandatsvertrag) und deren Vorlagen.
  *
- * /api/contract-templates          – Vorlagen lesen (Team), pflegen (Kanzleileitung)
+ * /api/contract-templates          – Vorlagen lesen (Team), pflegen (Board of Partners)
  * /api/cases/:id/contracts         – Vertrag anlegen, Vorbelegung der Felder
  * /api/contracts/:cid              – ansehen, ändern (solange niemand unterschrieben hat), löschen, unterschreiben
  *
@@ -106,7 +106,7 @@ function permissions(k, c, u) {
   };
 }
 
-/** Anwalt für den Vertrag: jemand aus dem Aktenteam – die Kanzleileitung darf jeden aktiven Anwalt wählen. */
+/** Anwalt für den Vertrag: jemand aus dem Aktenteam – das Board of Partners darf jeden aktiven Anwalt wählen. */
 function checkLawyer(lawyerId, c, u) {
   const lawyer = db.prepare("SELECT id, display_name, rank FROM users WHERE id = ? AND role IN ('anwalt','admin') AND active = 1").get(lawyerId);
   if (!lawyer) return { error: 'Der gewählte Anwalt existiert nicht oder ist deaktiviert.' };
@@ -310,7 +310,7 @@ caseRouter.post(
   wrap(async (req, res) => {
     const c = loadCase(req, res);
     if (!c) return;
-    if (!caseAccess(c, req.user).canEdit) return res.status(403).json({ error: 'Verträge erstellen dürfen die zuständigen Anwälte und die Kanzleileitung.' });
+    if (!caseAccess(c, req.user).canEdit) return res.status(403).json({ error: 'Verträge erstellen dürfen die zuständigen Anwälte und das Board of Partners.' });
     const d = parseBody(z.object({ templateId: z.number().int().positive(), lawyerId: z.number().int().positive(), data: fieldSchema, services: servicesSchema.optional() }), req, res);
     if (!d) return;
     const t = db.prepare('SELECT * FROM contract_templates WHERE id = ? AND active = 1').get(d.templateId);
@@ -390,7 +390,7 @@ router.delete(
   wrap(async (req, res) => {
     const { k, c, can } = loadContract(req, res);
     if (!k) return;
-    if (!can.canDelete) return res.status(403).json({ error: 'Unterschriebene Verträge kann nur die Kanzleileitung löschen.' });
+    if (!can.canDelete) return res.status(403).json({ error: 'Unterschriebene Verträge kann nur das Board of Partners löschen.' });
     tx(() => {
       db.prepare('DELETE FROM case_contracts WHERE id = ?').run(k.id);
       addSystemNote(c.id, req.user, `${k.template_name} gelöscht${statusOf(k) !== 'entwurf' ? ' (war bereits unterschrieben)' : ''}.`);
@@ -454,7 +454,7 @@ router.post(
   })
 );
 
-/** Kanzleileitung: Unterschriften zurücksetzen (z. B. versehentlich unterschrieben). */
+/** Board of Partners: Unterschriften zurücksetzen (z. B. versehentlich unterschrieben). */
 router.post(
   '/:cid/reset',
   requireAdmin,

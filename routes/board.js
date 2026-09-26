@@ -47,7 +47,7 @@ router.patch(
     if (!n) return res.status(404).json({ error: 'Notiz nicht gefunden.' });
     const d = parseBody(schema.partial(), req, res);
     if (!d) return;
-    // Anheften darf jeder; Inhalt ändern nur Autor oder Kanzleileitung.
+    // Anheften darf jeder; Inhalt ändern nur Autor odem Board of Partners.
     const contentChange = d.title !== undefined || d.body !== undefined || d.color !== undefined;
     if (contentChange && n.author_id !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Sie können nur eigene Notizen bearbeiten.' });

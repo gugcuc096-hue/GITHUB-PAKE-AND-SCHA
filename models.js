@@ -7,7 +7,7 @@ const { avatarUrl, teamPhotoUrl } = require('./uploads');
 /* ================================================================
    Aktivitätsprotokoll
    ================================================================ */
-/** Hält fest, wer was geändert hat (sichtbar für die Kanzleileitung). Fehler hier dürfen nie eine Aktion blockieren. */
+/** Hält fest, wer was geändert hat (sichtbar für das Board of Partners). Fehler hier dürfen nie eine Aktion blockieren. */
 function logActivity(user, action, entity = '', entityId = null, details = '') {
   try {
     db.prepare('INSERT INTO audit_log (user_id, user_name, action, entity, entity_id, details) VALUES (?, ?, ?, ?, ?, ?)').run(
@@ -96,7 +96,7 @@ function caseAccess(c, u) {
   const isCoLawyer = staff && coLawyersOf(c).some((l) => l.id === u.id);
   return {
     canView: staff || owner,
-    // Bearbeiten dürfen alle zuständigen Anwälte; das Team zusammenstellen der federführende Anwalt und die Kanzleileitung.
+    // Bearbeiten dürfen alle zuständigen Anwälte; das Team zusammenstellen der federführende Anwalt und das Board of Partners.
     canEdit: admin || isLead || isCoLawyer,
     canClaim: staff && !c.lawyer_id,
     canManageLawyers: admin || isLead,
