@@ -4,11 +4,12 @@ const express = require('express');
 const { z } = require('zod');
 const { db, tx, nextCaseNumber, randomPin } = require('../db');
 const { requireAuth, requireAdmin, isStaff } = require('../auth');
-const { wrap, parseBody, idParam, AREAS, URGENCIES, CASE_STATUS, STEPS, truncate, MAX_ATTACHMENTS_PER_CASE } = require('../helpers');
+const { wrap, parseBody, idParam, AREAS, URGENCIES, CASE_STATUS, STEPS, truncate, MAX_ATTACHMENTS_PER_CASE, isBoard } = require('../helpers');
 const {
   CASE_SELECT,
   getCase,
   caseAccess,
+  syncCaseWork,
   caseLawyers,
   coLawyersOf,
   caseRow,
@@ -27,6 +28,7 @@ const {
 } = require('../models');
 const discord = require('../discord');
 const { contractsForCase } = require('./contracts');
+const { workForCase } = require('./work');
 const { imageBody, saveImage, removeFile, evidencePath } = require('../uploads');
 
 const router = express.Router();
@@ -185,6 +187,7 @@ router.post(
       const addCo = db.prepare('INSERT INTO case_lawyers (case_id, user_id, added_by) VALUES (?, ?, ?)');
       coIds.forEach((cid) => addCo.run(newId, cid, u.id));
       addSystemNote(newId, u, 'Akte angelegt.');
+      syncCaseWork(newId);
       return newId;
     });
 
@@ -233,6 +236,8 @@ router.get(
       attachments: attachments.map((a) => attachmentRow(a, c.id)),
       externalDocs: externalDocsForCase(c.id, req.user),
       contracts: contractsForCase(c.id),
+      // Bearbeitungszeiten nur für das Board of Partners
+      work: isBoard(req.user) ? { rows: workForCase(c.id), closedAt: c.closed_at || null } : undefined,
       tasks: staff ? tasks.map(taskRow) : undefined,
     });
   })
@@ -400,6 +405,11 @@ router.patch(
         coAfter.filter((id) => !coBefore.includes(id)).forEach((id) => addCo.run(c.id, id, u.id));
       }
       if (history.length) addSystemNote(c.id, u, history.join(' · '));
+      if (lawyerChanged || coChanged || (newStatus && newStatus !== c.status)) {
+        const workReason =
+          c.lawyer_id === u.id && leadAfter !== u.id ? 'abgegeben' : coBefore.includes(u.id) && !coAfter.includes(u.id) && leadAfter !== u.id ? 'Mitarbeit beendet' : 'nicht mehr zuständig';
+        syncCaseWork(c.id, workReason);
+      }
     });
 
     const updated = getCase(c.id);

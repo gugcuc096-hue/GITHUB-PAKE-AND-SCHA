@@ -17,6 +17,7 @@ const FIELDS = {
   mandant_geburtsdatum: 'Geburtsdatum des Mandanten',
   grundgebuehr: 'Grundgebühr',
   zusatzgebuehr: 'Zusatzgebühr',
+  leistungen: 'Vereinbarte Leistungen (aus der Honorarordnung, je Zeile eine)',
   datum: 'Datum der Unterzeichnung',
   ort: 'Ort der Unterzeichnung',
 };
@@ -55,6 +56,8 @@ Das Mandatsverhältnis beginnt mit Unterzeichnung dieses Vertrages und wird auf 
 ### § 2 Honorar und Aufwendungsersatz
 Die Vergütung für die anwaltliche Tätigkeit bemisst sich nach der offiziellen und internen Gebührenordnung der Kanzlei Pake & Scha.
 1. Für das vorliegende Verfahren wird folgende Zahlungsvereinbarung getroffen:
+    *Vereinbarte Leistungen:*
+    {{leistungen}}
     *Grundgebühr: {{grundgebuehr}}*
     *Zusatzgebühr: {{zusatzgebuehr}}*
 2. Der Mandant verpflichtet sich, die erstellte Rechnung unverzüglich nach Erhalt und innerhalb der festgesetzten Zahlungsfrist per Barzahlung oder Überweisung zu begleichen.
@@ -82,6 +85,11 @@ Durch ihre eigenhändige Unterschrift erklären die Vertragsparteien ihr ausdrü
 
 const DEFAULT_TEMPLATES = [{ key: 'mandatsvertrag', name: 'Mandatsvertrag', body: MANDATSVERTRAG }];
 
+/** Frühere Fassungen der mitgelieferten Vorlagen – unverändert übernommene werden automatisch aktualisiert. */
+const PREVIOUS_VERSIONS = {
+  mandatsvertrag: [MANDATSVERTRAG.replace('    *Vereinbarte Leistungen:*\n    {{leistungen}}\n', '')],
+};
+
 const MAX_BODY = 30000;
 
 /** Platzhalter im Text, die es nicht gibt (Tippfehler in der Vorlage). */
@@ -91,4 +99,4 @@ function unknownPlaceholders(body) {
   return [...new Set(found.filter((f) => !known.has(f)))];
 }
 
-module.exports = { FIELDS, AUTO_FIELDS, DEFAULT_HEADER, DEFAULT_PLACE, DEFAULT_TEMPLATES, MAX_BODY, unknownPlaceholders };
+module.exports = { FIELDS, AUTO_FIELDS, DEFAULT_HEADER, DEFAULT_PLACE, DEFAULT_TEMPLATES, PREVIOUS_VERSIONS, MAX_BODY, unknownPlaceholders };

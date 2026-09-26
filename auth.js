@@ -81,6 +81,8 @@ function publicUser(u) {
     role: u.role,
     phone: u.phone || null,
     rank: u.rank || null,
+    // Board of Partners (Founding/Equity Partner, Partner) – z. B. für die Auswertung der Aktenbearbeitung
+    board: (u.role === 'anwalt' || u.role === 'admin') && ['Founding Partner', 'Equity Partner', 'Partner'].includes(u.rank),
     active: !!u.active,
     mustChangePassword: !!u.must_change_password,
     avatarUrl: userAvatarUrl(u),

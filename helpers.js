@@ -167,7 +167,21 @@ function deriveInitials(name) {
   return '??';
 }
 
+/* Ränge der Kanzlei: Board of Partners und Associate Attorneys (keine weiteren). */
+const BOARD_RANKS = ['Founding Partner', 'Equity Partner', 'Partner'];
+const ASSOCIATE_RANKS = ['Senior Associate', 'Associate', 'Junior Associate'];
+const RANKS = [...BOARD_RANKS, ...ASSOCIATE_RANKS];
+/** Leer (kein Rang) oder einer der Ränge. */
+const rankField = z.union([z.enum(RANKS), z.literal('')]);
+/** Gehört zum Board of Partners (Rang Founding/Equity Partner oder Partner)? */
+const isBoard = (u) => !!u && (u.role === 'anwalt' || u.role === 'admin') && BOARD_RANKS.includes(u.rank);
+
 module.exports = {
+  BOARD_RANKS,
+  ASSOCIATE_RANKS,
+  RANKS,
+  rankField,
+  isBoard,
   STEPS,
   CASE_STATUS,
   AREAS,

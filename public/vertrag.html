@@ -224,8 +224,8 @@
                     const t = templates.find((x) => x.id === templateId);
                     if (!t) throw Object.assign(new Error('Vorlage nicht gefunden.'), { status: 404 });
                     const sample = params.get('beispiel') === '1'
-                        ? { anwalt: 'Dr. Alois Pake', anwalt_rang: 'Managing Partner', anwalt_geburtsdatum: '12.03.1988', mandant: 'John Doe', mandant_geburtsdatum: '04.07.1995', grundgebuehr: '100.000 $', zusatzgebuehr: '25.000 $ je weiterem Verhandlungstag', datum: new Date().toLocaleDateString('de-DE'), ort: 'Los Santos, San Andreas', aktenzeichen: 'PS-2026-0001', akte: 'Beispielakte', rechtsgebiet: 'Strafrecht', kanzlei: 'Pake & Scha Legal Consulting' }
-                        : { aktenzeichen: '', akte: '', rechtsgebiet: '', kanzlei: 'Pake & Scha Legal Consulting', anwalt: '', anwalt_rang: '', anwalt_geburtsdatum: '', mandant: '', mandant_geburtsdatum: '', grundgebuehr: '', zusatzgebuehr: '', datum: '', ort: '' };
+                        ? { anwalt: 'Dr. Alois Pake', anwalt_rang: 'Founding Partner', anwalt_geburtsdatum: '12.03.1988', mandant: 'John Doe', mandant_geburtsdatum: '04.07.1995', leistungen: '• Vertretung Hauptverhandlung (alle Gerichte) – 100.000 $\n• U-Haft-Vertretung vor Ort – 50.000 $', grundgebuehr: '150.000 $', zusatzgebuehr: '25.000 $ je weiterem Verhandlungstag', datum: new Date().toLocaleDateString('de-DE'), ort: 'Los Santos, San Andreas', aktenzeichen: 'PS-2026-0001', akte: 'Beispielakte', rechtsgebiet: 'Strafrecht', kanzlei: 'Pake & Scha Legal Consulting' }
+                        : { aktenzeichen: '', akte: '', rechtsgebiet: '', kanzlei: 'Pake & Scha Legal Consulting', anwalt: '', anwalt_rang: '', anwalt_geburtsdatum: '', mandant: '', mandant_geburtsdatum: '', leistungen: '', grundgebuehr: '', zusatzgebuehr: '', datum: '', ort: '' };
                     document.title = `Vorschau: ${t.name} | Pake & Scha`;
                     document.getElementById('backLink').href = '/dashboard.html#settings';
                     document.getElementById('backLink').textContent = '← Einstellungen';

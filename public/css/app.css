@@ -706,7 +706,36 @@ details.edit-box[open] > summary::after { content: '–'; }
 .fn-table thead th { position: sticky; top: 0; z-index: 1; background: #141b2e; color: var(--text-main); font-weight: 600; white-space: nowrap; }
 .fn-table tbody tr:nth-child(even) td { background: rgba(255, 255, 255, 0.02); }
 .fn-table tr.gap td { padding: 0.2rem; background: transparent; }
+/* Aktenbearbeitung (Board of Partners) */
+.work-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; margin-bottom: 0.75rem; }
+.work-stats > div { display: flex; flex-direction: column; padding: 0.55rem 0.7rem; border-radius: 12px; border: 1px solid var(--line); background: rgba(2, 5, 14, 0.35); min-width: 0; }
+.work-stats .k { font-size: 0.66rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-dim); }
+.work-stats .v { font-size: 1.15rem; font-weight: 600; color: var(--text-main); margin-top: 0.15rem; }
+.work-stats .s { font-size: 0.72rem; color: var(--text-dim); }
+.work-list > summary { cursor: pointer; font-size: 0.85rem; font-weight: 600; color: var(--gold-light); padding: 0.35rem 0; }
+@media (max-width: 480px) { .work-stats { grid-template-columns: 1fr; } }
+
+/* Abmeldungen */
+.chip-radio { position: relative; display: inline-flex; cursor: pointer; }
+.chip-radio input { position: absolute; opacity: 0; pointer-events: none; }
+.chip-radio span { display: inline-flex; align-items: center; padding: 0.45rem 0.85rem; border-radius: 999px; border: 1px solid var(--glass-border); font-size: 0.85rem; color: var(--text-muted); background: rgba(15, 23, 42, 0.4); transition: all 0.15s ease; }
+.chip-radio input:checked + span { border-color: var(--gold-hairline); background: var(--gold-soft); color: var(--gold-light); }
+.chip-radio input:focus-visible + span { outline: 2px solid var(--gold-hairline); outline-offset: 2px; }
+.absence-strip { display: flex; align-items: center; gap: 0.6rem; padding: 0.7rem 1rem; border-radius: 14px; border: 1px solid rgba(245, 158, 11, 0.35); background: rgba(245, 158, 11, 0.08); color: #fde68a; font-size: 0.875rem; }
+.absence-strip:hover { border-color: rgba(245, 158, 11, 0.6); }
+
 /* Verträge in der Akte */
+.svc-list { max-height: 19rem; overflow: auto; border: 1px solid var(--glass-border); border-radius: 12px; padding: 0.35rem 0.6rem; background: rgba(2, 5, 14, 0.35); margin-top: 0.35rem; }
+.svc-cat { font-size: 0.66rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold-light); margin: 0.55rem 0 0.2rem; }
+.svc { display: grid; grid-template-columns: auto 1fr 4.2rem 6.5rem; align-items: center; gap: 0.6rem; padding: 0.35rem 0.25rem; border-bottom: 1px solid var(--line); cursor: pointer; font-size: 0.875rem; color: var(--text-muted); }
+.svc:last-child { border-bottom: 0; }
+.svc:has(.svc-check:checked) { color: var(--text-main); }
+.svc-qty { padding: 0.3rem 0.4rem; text-align: center; font-size: 0.85rem; }
+.svc-qty:disabled { opacity: 0.35; }
+.svc-price { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.8rem; text-align: right; color: var(--gold-light); }
+.svc-sum { display: flex; justify-content: space-between; align-items: baseline; margin-top: 0.5rem; padding: 0.55rem 0.8rem; border-radius: 10px; background: var(--gold-soft); border: 1px solid var(--gold-hairline); font-size: 0.875rem; }
+.svc-sum strong { font-family: 'JetBrains Mono', ui-monospace, monospace; color: var(--gold-light); font-size: 1rem; }
+@media (max-width: 480px) { .svc { grid-template-columns: auto 1fr 3.6rem; } .svc-price { grid-column: 2 / 4; text-align: left; } }
 .contract-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem 1rem; padding: 0.85rem 1rem; border: 1px solid var(--glass-border); border-left: 3px solid var(--gold-500); border-radius: 14px; background: rgba(15, 23, 42, 0.45); }
 .contract-main { min-width: 0; flex: 1 1 16rem; }
 .contract-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; }

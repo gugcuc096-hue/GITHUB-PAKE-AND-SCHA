@@ -44,6 +44,32 @@ function getCase(id) {
   return db.prepare(`${CASE_SELECT} WHERE c.id = ?`).get(id) || null;
 }
 
+/**
+ * Bearbeitungszeiten nachführen: Für jeden zuständigen Anwalt (federführend oder weiterer) gibt es
+ * einen offenen Eintrag in case_work; wer nicht mehr zuständig ist oder wenn die Akte geschlossen
+ * wird, endet der Eintrag. Wird nach jeder Änderung an Zuständigkeit oder Status aufgerufen.
+ */
+function syncCaseWork(caseId, reason = 'nicht mehr zuständig') {
+  const c = db.prepare('SELECT id, lawyer_id, status FROM cases WHERE id = ?').get(caseId);
+  if (!c) return;
+  const now = new Date().toISOString();
+  const closed = c.status === 'geschlossen';
+  const want = new Map();
+  if (!closed) {
+    if (c.lawyer_id) want.set(c.lawyer_id, 'lead');
+    for (const r of db.prepare('SELECT user_id FROM case_lawyers WHERE case_id = ?').all(caseId)) if (!want.has(r.user_id)) want.set(r.user_id, 'co');
+  }
+  const open = db.prepare('SELECT * FROM case_work WHERE case_id = ? AND ended_at IS NULL').all(caseId);
+  for (const w of open) {
+    if (!want.has(w.user_id)) db.prepare('UPDATE case_work SET ended_at = ?, end_reason = ? WHERE id = ?').run(now, closed ? 'Akte geschlossen' : reason, w.id);
+    else if (want.get(w.user_id) !== w.role) db.prepare('UPDATE case_work SET role = ? WHERE id = ?').run(want.get(w.user_id), w.id);
+  }
+  const add = db.prepare('INSERT INTO case_work (case_id, user_id, role, started_at) VALUES (?, ?, ?, ?)');
+  for (const [uid, role] of want) if (!open.some((w) => w.user_id === uid)) add.run(caseId, uid, role, now);
+  if (closed) db.prepare('UPDATE cases SET closed_at = COALESCE(closed_at, ?) WHERE id = ?').run(now, caseId);
+  else db.prepare('UPDATE cases SET closed_at = NULL WHERE id = ? AND closed_at IS NOT NULL').run(caseId);
+}
+
 /** Weitere Anwälte der Akte (ohne den federführenden): [{ id, name, discordId }] */
 function coLawyersOf(c) {
   if (!c.co_lawyers) {
@@ -528,6 +554,7 @@ module.exports = {
   taskRow,
   getCase,
   caseAccess,
+  syncCaseWork,
   coLawyersOf,
   caseLawyers,
   caseRow,

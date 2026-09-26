@@ -49,6 +49,7 @@ const CASES_SQL = (name) => `
     step          INTEGER NOT NULL DEFAULT 0,
     public_note   TEXT NOT NULL DEFAULT '',
     source        TEXT NOT NULL DEFAULT 'portal',
+    closed_at     TEXT,
     created_at    TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
   )`;
@@ -337,6 +338,32 @@ db.exec(`
     PRIMARY KEY (case_id, user_id)
   );
 
+  -- Bearbeitung von Akten: wer war wann zuständig (automatisch bei Zuweisung, Abgabe, Schließen).
+  -- Nur für das Board of Partners auswertbar.
+  CREATE TABLE IF NOT EXISTS case_work (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id    INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role       TEXT NOT NULL DEFAULT 'lead',     -- 'lead' (federführend) | 'co' (weiterer Anwalt)
+    started_at TEXT NOT NULL,                    -- ISO-Zeitpunkt
+    ended_at   TEXT,
+    end_reason TEXT NOT NULL DEFAULT '',
+    estimated  INTEGER NOT NULL DEFAULT 0        -- vor Einführung der Erfassung: aus dem Aktenverlauf geschätzt
+  );
+
+  -- Abmeldungen des Teams (Abwesenheit von–bis, Grund); werden auf Wunsch in Discord gemeldet
+  CREATE TABLE IF NOT EXISTS absences (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    start_date      TEXT NOT NULL,                -- YYYY-MM-DD
+    end_date        TEXT NOT NULL,                -- YYYY-MM-DD (einschließlich)
+    reason          TEXT NOT NULL DEFAULT 'sonstiges',
+    note            TEXT NOT NULL DEFAULT '',
+    returned_at     TEXT,                         -- vorzeitig zurückgemeldet
+    created_by_name TEXT NOT NULL DEFAULT '',
+    created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   -- Vertragsvorlagen (z. B. Mandatsvertrag), im Dashboard von der Kanzleileitung pflegbar
   CREATE TABLE IF NOT EXISTS contract_templates (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -392,6 +419,8 @@ addColumn('team_members', 'photo', 'TEXT');
 addColumn('case_external_docs', 'content_text', "TEXT NOT NULL DEFAULT ''");
 addColumn('case_external_docs', 'content_at', 'TEXT');
 addColumn('case_external_docs', 'content_by_name', "TEXT NOT NULL DEFAULT ''");
+// Zeitpunkt des Schließens einer Akte (für die Bearbeitungsdauer); beim Wiedereröffnen wieder NULL.
+addColumn('cases', 'closed_at', 'TEXT');
 // Reihenfolge in der Akte (per Ziehen festgelegt); NULL = noch nicht einsortiert, erscheint oben.
 addColumn('case_external_docs', 'sort_order', 'INTEGER');
 addColumn('case_attachments', 'external_doc_id', 'INTEGER REFERENCES case_external_docs(id) ON DELETE SET NULL');
@@ -486,6 +515,9 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_cases_lawyer ON cases(lawyer_id);
   CREATE INDEX IF NOT EXISTS idx_case_lawyers_user ON case_lawyers(user_id);
   CREATE INDEX IF NOT EXISTS idx_contracts_case ON case_contracts(case_id);
+  CREATE INDEX IF NOT EXISTS idx_absences_dates ON absences(end_date, start_date);
+  CREATE INDEX IF NOT EXISTS idx_case_work_case ON case_work(case_id, ended_at);
+  CREATE INDEX IF NOT EXISTS idx_case_work_user ON case_work(user_id);
   CREATE INDEX IF NOT EXISTS idx_cases_status ON cases(status);
   CREATE INDEX IF NOT EXISTS idx_notes_case ON notes(case_id);
   CREATE INDEX IF NOT EXISTS idx_appt_case ON appointments(case_id);

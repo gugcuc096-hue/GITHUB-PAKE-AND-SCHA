@@ -19,8 +19,8 @@ const TEAM = [
     name: 'Dr. Alois Pake',
     email: DEFAULT_ADMIN_EMAIL,
     role: 'admin',
-    rank: 'Managing Partner',
-    roleTitle: 'Managing Partner / Kanzleileitung',
+    rank: 'Founding Partner',
+    roleTitle: 'Founding Partner',
     tier: 'leitung',
     description: 'Kanzleileitung. Verfassungsrecht, Grundsatzverfahren und strategische Gesamtverantwortung für alle Mandate.',
   },
@@ -29,8 +29,8 @@ const TEAM = [
     name: 'Michael Scha',
     email: 'michael.scha@pake-scha.ls',
     role: 'admin',
-    rank: 'Managing Partner',
-    roleTitle: 'Managing Partner',
+    rank: 'Founding Partner',
+    roleTitle: 'Founding Partner',
     tier: 'leitung',
     description: 'Wirtschafts- und Strafrecht, Vertretung von Unternehmen und Organisationen.',
   },
@@ -101,16 +101,15 @@ function migrateLegacyData() {
       const target = adminEmail();
       const clash = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(target, parker.id);
       const email = clash ? parker.email : target;
-      db.prepare("UPDATE users SET display_name = 'Dr. Alois Pake', rank = 'Managing Partner', email = ? WHERE id = ?").run(email, parker.id);
+      db.prepare("UPDATE users SET display_name = 'Dr. Alois Pake', rank = 'Founding Partner', email = ? WHERE id = ?").run(email, parker.id);
       console.log(`Migration: Konto "Dr. Alois Parker" heißt jetzt "Dr. Alois Pake" (Login-E-Mail: ${email}, Passwort unverändert).`);
     }
-    db.prepare("UPDATE users SET rank = 'Managing Partner' WHERE rank = 'founding_partner'").run();
+    db.prepare("UPDATE users SET rank = 'Founding Partner' WHERE rank = 'founding_partner'").run();
     db.prepare("UPDATE users SET rank = 'Senior Associate' WHERE rank = 'senior_associate'").run();
 
     db.prepare(
-      "UPDATE team_members SET name = 'Dr. Alois Pake', role_title = 'Managing Partner / Kanzleileitung', initials = 'A.P.' WHERE name = 'Dr. Alois Parker'"
+      "UPDATE team_members SET name = 'Dr. Alois Pake', role_title = 'Founding Partner', initials = 'A.P.' WHERE name = 'Dr. Alois Parker'"
     ).run();
-    db.prepare("UPDATE team_members SET role_title = 'Managing Partner' WHERE name = 'Michael Scha' AND role_title = 'Founding Partner'").run();
     // Früherer Platzhalter-Eintrag der Startseite (nicht Teil der festen Besetzung).
     db.prepare("DELETE FROM team_members WHERE name = 'Martinez' AND role_title = 'Rechtsanwalt / Mitarbeiter'").run();
     db.prepare("UPDATE team_members SET tier = 'anwalt' WHERE tier NOT IN ('leitung','anwalt')").run();
@@ -191,7 +190,7 @@ function ensureMainAdmin() {
     destroyAllSessions(existing.id);
   } else {
     db.prepare(
-      "INSERT INTO users (email, password_hash, display_name, role, rank, must_change_password) VALUES (?, ?, 'Dr. Alois Pake', 'admin', 'Managing Partner', ?)"
+      "INSERT INTO users (email, password_hash, display_name, role, rank, must_change_password) VALUES (?, ?, 'Dr. Alois Pake', 'admin', 'Founding Partner', ?)"
     ).run(email, hashPassword(password), envPassword ? 0 : 1);
   }
 
@@ -221,7 +220,7 @@ function applyEmergencyReset() {
     destroyAllSessions(existing.id);
   } else {
     db.prepare(
-      "INSERT INTO users (email, password_hash, display_name, role, rank) VALUES (?, ?, 'Dr. Alois Pake', 'admin', 'Managing Partner')"
+      "INSERT INTO users (email, password_hash, display_name, role, rank) VALUES (?, ?, 'Dr. Alois Pake', 'admin', 'Founding Partner')"
     ).run(email, hashPassword(newPassword));
   }
 
@@ -299,6 +298,13 @@ function fixCourtWording() {
 
 /** Mitgelieferte Vertragsvorlagen einmalig anlegen (danach im Dashboard änderbar). */
 function ensureContractTemplates() {
+  // Unverändert übernommene ältere Fassungen auf den aktuellen Stand bringen (eigene Änderungen bleiben).
+  for (const t of contracts.DEFAULT_TEMPLATES) {
+    for (const old of contracts.PREVIOUS_VERSIONS[t.key] || []) {
+      const r = db.prepare("UPDATE contract_templates SET body = ?, updated_at = datetime('now') WHERE key = ? AND body = ?").run(t.body, t.key, old);
+      if (r.changes) console.log(`Vertragsvorlage „${t.name}“ auf die aktuelle Fassung aktualisiert.`);
+    }
+  }
   const insert = db.prepare('INSERT OR IGNORE INTO contract_templates (key, name, body, sort_order) VALUES (?, ?, ?, ?)');
   contracts.DEFAULT_TEMPLATES.forEach((t, i) => {
     const flag = `seeded_contract_${t.key}`;
@@ -310,8 +316,61 @@ function ensureContractTemplates() {
   });
 }
 
+/**
+ * Einmalige Umstellung der Ränge: Es gibt nur noch Founding Partner, Equity Partner, Partner
+ * (Board of Partners) sowie Senior Associate, Associate und Junior Associate.
+ * „Managing Partner“ und „Managing Partner / Kanzleileitung“ werden zu „Founding Partner“.
+ */
+function migrateRanks() {
+  if (getSetting('migration_ranks_v1')) return;
+  const OLD = ['Managing Partner', 'Managing Partner / Kanzleileitung'];
+  tx(() => {
+    const users = db.prepare(`UPDATE users SET rank = 'Founding Partner' WHERE rank IN (${OLD.map(() => '?').join(',')})`).run(...OLD);
+    const team = db.prepare(`UPDATE team_members SET role_title = 'Founding Partner' WHERE role_title IN (${OLD.map(() => '?').join(',')})`).run(...OLD);
+    if (users.changes || team.changes) console.log(`Ränge: ${users.changes} Konto/Konten und ${team.changes} Team-Profil(e) von „Managing Partner“ auf „Founding Partner“ umgestellt.`);
+    setSetting('migration_ranks_v1', new Date().toISOString());
+  });
+}
+
+/**
+ * Einmalig: Bearbeitungszeiten für Akten nachtragen, die es vor Einführung der Erfassung gab.
+ * Beginn = letzter Verlaufseintrag, der den Anwalt nennt (sonst Anlage der Akte), Ende bei
+ * geschlossenen Akten = letzte Änderung. Diese Einträge sind als „geschätzt“ markiert.
+ */
+function backfillCaseWork() {
+  if (getSetting('backfilled_case_work')) return;
+  const iso = (v) => (v ? `${String(v).replace(' ', 'T')}${/Z|[+-]\d\d:?\d\d$/.test(v) ? '' : 'Z'}` : new Date().toISOString());
+  tx(() => {
+    const cases = db.prepare('SELECT * FROM cases WHERE id NOT IN (SELECT DISTINCT case_id FROM case_work)').all();
+    const add = db.prepare('INSERT INTO case_work (case_id, user_id, role, started_at, ended_at, end_reason, estimated) VALUES (?, ?, ?, ?, ?, ?, 1)');
+    for (const c of cases) {
+      const team = [];
+      if (c.lawyer_id) team.push({ id: c.lawyer_id, role: 'lead' });
+      for (const r of db.prepare('SELECT user_id FROM case_lawyers WHERE case_id = ?').all(c.id)) if (r.user_id !== c.lawyer_id) team.push({ id: r.user_id, role: 'co' });
+      const closed = c.status === 'geschlossen';
+      for (const m of team) {
+        const u = db.prepare('SELECT display_name FROM users WHERE id = ?').get(m.id);
+        if (!u) continue;
+        // Nur Verlaufseinträge, die eine Zuweisung beschreiben (nicht z. B. eine Vertragsunterschrift).
+        const n = u.display_name;
+        const note = db
+          .prepare(
+            `SELECT created_at FROM notes WHERE case_id = ? AND system = 1
+               AND (instr(body, ?) > 0 OR instr(body, ?) > 0 OR instr(body, ?) > 0 OR instr(body, ?) > 0)
+             ORDER BY created_at DESC, id DESC LIMIT 1`
+          )
+          .get(c.id, `Zuständigkeit: ${n}`, `Federführend: ${n}`, `federführend jetzt: ${n}`, `+ ${n}`);
+        add.run(c.id, m.id, m.role, iso(note ? note.created_at : c.created_at), closed ? iso(c.updated_at) : null, closed ? 'Akte geschlossen' : '');
+      }
+      if (closed && !c.closed_at) db.prepare('UPDATE cases SET closed_at = ? WHERE id = ?').run(iso(c.updated_at), c.id);
+    }
+    setSetting('backfilled_case_work', new Date().toISOString());
+  });
+}
+
 function runBootstrap() {
   migrateLegacyData();
+  migrateRanks();
   ensureTeamAccounts();
   ensureTeamProfiles();
   ensureMainAdmin();
@@ -320,6 +379,7 @@ function runBootstrap() {
   ensureDefaultPositions();
   fixCourtWording();
   ensureContractTemplates();
+  backfillCaseWork();
 }
 
 module.exports = { runBootstrap };

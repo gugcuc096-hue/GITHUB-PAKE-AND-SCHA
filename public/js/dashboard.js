@@ -24,7 +24,9 @@
   const INVOICE_STATUS = { offen: ['Offen', 'amber'], bezahlt: ['Bezahlt', 'emerald'], storniert: ['Storniert', 'slate'] };
   const INVOICE_KIND = { rechnung: 'Rechnung', honorarvereinbarung: 'Honorarvereinbarung' };
   const FEE_CATEGORIES = { rechtsberatung: 'Rechtsberatung', strafrecht: 'Strafrecht & Haftvertretung', notfall: 'Notfall & Sofortdienst', gericht: 'Gerichtsverfahren', vertraege: 'Verträge & Dokumente' };
-  const RANKS = ['Managing Partner', 'Managing Partner / Kanzleileitung', 'Founding Partner', 'Equity Partner', 'Partner', 'Senior Associate', 'Associate', 'Junior Associate'];
+  // Ränge der Kanzlei – es gibt nur diese sechs (siehe helpers.js auf dem Server).
+  const RANK_GROUPS = { 'Board of Partners': ['Founding Partner', 'Equity Partner', 'Partner'], 'Associate Attorneys': ['Senior Associate', 'Associate', 'Junior Associate'] };
+  const RANKS = Object.values(RANK_GROUPS).flat();
   const NOTE_COLORS = { gold: '#d4af37', blue: '#60a5fa', green: '#34d399', red: '#f87171', slate: '#94a3b8' };
   const DISCORD_MSG = {
     linked: ['Discord-Konto erfolgreich verbunden.', 'ok'],
@@ -103,6 +105,7 @@
     board: { label: 'Pinnwand', icon: 'pin', staff: true },
     invoices: { label: 'Rechnungen', icon: 'receipt' },
     duty: { label: 'Dienstzeiten', icon: 'clock', staff: true },
+    work: { label: 'Aktenbearbeitung', icon: 'briefcase', board: true, section: 'Board of Partners' },
     team: { label: 'Team', icon: 'users', admin: true, section: 'Kanzleileitung' },
     applications: { label: 'Bewerbungen', icon: 'userAdd', admin: true, section: 'Kanzleileitung' },
     users: { label: 'Benutzer', icon: 'key', admin: true, section: 'Kanzleileitung' },
@@ -181,9 +184,20 @@
   const $$ = (s, root = document) => [...root.querySelectorAll(s)];
   const isStaff = () => !!st.user && (st.user.role === 'anwalt' || st.user.role === 'admin');
   const isAdmin = () => !!st.user && st.user.role === 'admin';
+  /** Board of Partners (Founding/Equity Partner, Partner) – z. B. Auswertung der Aktenbearbeitung. */
+  const isBoard = () => !!st.user && !!st.user.board;
   const badge = (text, color = 'gold') => `<span class="badge badge-${color}">${esc(text)}</span>`;
   const statusBadge = (map, key) => badge(...(map[key] || [key, 'slate']));
   const opt = (value, label, selected = false) => `<option value="${esc(value)}" ${selected ? 'selected' : ''}>${esc(label)}</option>`;
+
+  /** Auswahlliste der Ränge; ein veralteter Rang bleibt sichtbar, bis ein neuer gewählt wird. */
+  function rankSelect(name, current, { id = '', required = false, emptyLabel = '— kein Rang —', attrs = '' } = {}) {
+    const legacy = current && !RANKS.includes(current) ? `<option value="${esc(current)}" selected disabled>${esc(current)} (nicht mehr vorhanden – bitte wählen)</option>` : '';
+    const groups = Object.entries(RANK_GROUPS)
+      .map(([g, list]) => `<optgroup label="${esc(g)}">${list.map((r) => opt(r, r, r === current)).join('')}</optgroup>`)
+      .join('');
+    return `<select ${id ? `id="${id}"` : ''} name="${name}" class="field" ${required ? 'required' : ''} ${attrs}><option value="" ${!current ? 'selected' : ''} ${required ? 'disabled' : ''}>${esc(emptyLabel)}</option>${legacy}${groups}</select>`;
+  }
 
   /* ---------------------------------------------------------------- Zuständige Anwälte (mehrere pro Akte) */
   /** Federführender Anwalt zuerst, dann die weiteren. */
@@ -276,6 +290,7 @@
     const v = VIEWS[view];
     if (!v) return false;
     if (v.admin && !isAdmin()) return false;
+    if (v.board && !isBoard()) return false;
     if (v.staff && !isStaff()) return false;
     return true;
   }
@@ -481,7 +496,9 @@
     $('#dutyPop').innerHTML =
       Object.entries(DUTY)
         .map(([k, l]) => `<button type="button" class="pop-item ${s === k ? 'active' : ''}" role="menuitem" data-action="duty-set" data-status="${k}"><span class="duty-dot s-${k}"></span>${esc(l)}${s === k ? '<span class="ml-auto text-xs">✓</span>' : ''}</button>`)
-        .join('') + '<div class="pop-note"><a href="#duty" class="text-xs text-gold hover:underline">Stempeluhr & Dienstzeiten →</a></div>';
+        .join('') +
+      `<button type="button" class="pop-item" role="menuitem" data-action="absence-new">${icon('calendar', 'ico-sm')}Abmelden (Abwesenheit)…</button>` +
+      '<div class="pop-note"><a href="#duty" class="text-xs text-gold hover:underline">Stempeluhr, Dienstzeiten & Abmeldungen →</a></div>';
     $('#dutyPop').classList.add('open');
     $('#dutyBtn').setAttribute('aria-expanded', 'true');
   }
@@ -722,7 +739,7 @@
 
   views.overview = {
     async load() {
-      await Promise.all([load.cases(), load.events(), load.invoices(), load.board(), load.unread(), load.duty(), load.myTasks()]);
+      await Promise.all([load.cases(), load.events(), load.invoices(), load.board(), load.unread(), load.duty(), load.myTasks(), isStaff() ? api.get('/api/absences').then((r) => (st.absences = r)) : null]);
     },
     render() {
       const u = st.user;
@@ -796,6 +813,7 @@
 
       return `${head}
         ${attentionPanel()}
+        ${absenceStrip()}
         <div class="grid-2">${eventsPanel}${requestsPanel}</div>
         <div class="grid-2 mt-4 lg:mt-5">${recentPanel}${boardPanel}</div>`;
     },
@@ -1034,7 +1052,27 @@
     const lawyerId = k ? k.lawyerId : defaults.lawyerId;
     const field = (name, label, attrs = '', span = false) =>
       `<div class="${span ? 'span-2' : ''}"><label class="label" for="kf_${name}">${esc(label)}</label><input id="kf_${name}" name="${name}" class="field" maxlength="${name.includes('gebuehr') ? 200 : 120}" value="${esc(v[name] || '')}" ${attrs}></div>`;
-    const feeOptions = (st.fees || []).map((f) => `<option value="${esc(money(f.price))}">${esc(f.name)} – ${esc(money(f.price))}</option>`).join('');
+    // Leistungen aus der Honorarordnung (Mehrfachauswahl, Menge je Leistung); gespeicherte Auswahl beim Bearbeiten wiederherstellen
+    const saved = (k && Array.isArray(k.data.services) ? k.data.services : []).map((x) => ({ ...x }));
+    const fees = (st.fees || []).map((f) => ({ name: f.name, price: f.price, category: f.category }));
+    saved.filter((x) => !fees.some((f) => f.name === x.name)).forEach((x) => fees.push({ name: x.name, price: x.price, category: '_alt' }));
+    const cats = { ...FEE_CATEGORIES, _alt: 'Aus diesem Vertrag (nicht mehr in der Honorarordnung)' };
+    const svcList = Object.entries(cats)
+      .map(([cat, label]) => {
+        const list = fees.filter((f) => f.category === cat);
+        if (!list.length) return '';
+        return `<div class="svc-cat">${esc(label)}</div>${list
+          .map((f) => {
+            const sel = saved.find((x) => x.name === f.name);
+            const price = sel ? sel.price : f.price;
+            return `<label class="svc"><input type="checkbox" class="svc-check" data-name="${esc(f.name)}" data-price="${price}" ${sel ? 'checked' : ''}>
+              <span class="svc-name">${esc(f.name)}</span>
+              <input type="number" class="field svc-qty" min="1" max="99" value="${sel ? sel.qty : 1}" aria-label="Menge ${esc(f.name)}" ${sel ? '' : 'disabled'}>
+              <span class="svc-price">${esc(money(price))}</span></label>`;
+          })
+          .join('')}`;
+      })
+      .join('');
     return `
       <h2 id="modalTitle" class="modal-title">${k ? `${esc(k.templateName)} bearbeiten` : 'Mandatsvertrag erstellen'}</h2>
       <p class="modal-sub"><span class="font-mono text-gold">${esc(c.caseNumber)}</span> · ${esc(c.title)}</p>
@@ -1051,8 +1089,11 @@
         ${field('mandant', 'Name des Mandanten')}
         ${field('mandant_geburtsdatum', 'Geburtsdatum (IC)', 'placeholder="TT.MM.JJJJ"')}
         <div class="span-2 form-sub">Honorar</div>
-        <div><label class="label" for="kf_grundgebuehr">Grundgebühr</label><input id="kf_grundgebuehr" name="grundgebuehr" class="field" maxlength="200" value="${esc(v.grundgebuehr || '')}" placeholder="z. B. 100.000 $" list="kfFees"><datalist id="kfFees">${feeOptions}</datalist>
-          <p class="form-hint">Vorschläge aus der Honorarordnung beim Tippen.</p></div>
+        ${svcList ? `<div class="span-2"><div class="label">Leistungen aus der Honorarordnung <span class="text-dim font-normal normal-case tracking-normal">– mehrere wählbar, die Summe wird zur Grundgebühr</span></div>
+          <div class="svc-list" id="svcList">${svcList}</div>
+          <div class="svc-sum"><span>Summe der Leistungen</span><strong id="svcSum">${esc(money(saved.reduce((sum, x) => sum + x.price * x.qty, 0)))}</strong></div></div>` : ''}
+        <div><label class="label" for="kf_grundgebuehr">Grundgebühr</label><input id="kf_grundgebuehr" name="grundgebuehr" class="field" maxlength="200" value="${esc(v.grundgebuehr || '')}" placeholder="z. B. 100.000 $">
+          <p class="form-hint">${svcList ? 'Wird aus den gewählten Leistungen berechnet – bei Bedarf anpassbar (z. B. Rabatt).' : 'Betrag in $.'}</p></div>
         ${field('zusatzgebuehr', 'Zusatzgebühr', 'placeholder="z. B. 25.000 $ je weiterem Verhandlungstag"')}
         <div class="span-2 form-sub">Unterzeichnung</div>
         ${field('datum', 'Datum', 'placeholder="TT.MM.JJJJ"')}
@@ -1065,16 +1106,40 @@
       </form>`;
   }
 
+  async function afterAbsenceChange() {
+    st.absences = await api.get('/api/absences');
+    if (st.view === 'duty' || st.view === 'overview') renderView();
+  }
+
   async function refreshSettingsTemplates() {
     st.contractTemplates = await api.get('/api/contract-templates?all=1');
     if (st.view === 'settings') renderView();
+  }
+
+  function contractServices(form) {
+    return [...form.querySelectorAll('.svc-check:checked')].map((box) => ({
+      name: box.dataset.name,
+      price: Number(box.dataset.price) || 0,
+      qty: Math.min(99, Math.max(1, Number(box.closest('.svc').querySelector('.svc-qty').value) || 1)),
+    }));
+  }
+
+  /** Leistungen geändert: Summe neu berechnen und als Grundgebühr eintragen. */
+  function updateServiceSum(form) {
+    const list = contractServices(form);
+    const sum = list.reduce((s, x) => s + x.price * x.qty, 0);
+    const out = form.querySelector('#svcSum');
+    if (out) out.textContent = money(sum);
+    if (list.length && form.elements.grundgebuehr) form.elements.grundgebuehr.value = money(sum);
   }
 
   function contractBody(f) {
     const fd = new FormData(f);
     const data = {};
     ['anwalt', 'anwalt_rang', 'anwalt_geburtsdatum', 'mandant', 'mandant_geburtsdatum', 'grundgebuehr', 'zusatzgebuehr', 'datum', 'ort'].forEach((k) => (data[k] = val(fd, k)));
-    return { lawyerId: Number(fd.get('lawyerId')), data };
+    const body = { lawyerId: Number(fd.get('lawyerId')), data };
+    if (f.querySelector('#svcList')) body.services = contractServices(f);
+    return body;
   }
 
   /* ---------------------------------------------------------------- Externe Dokumente (FiveNet, Google Docs & Google Sheets) */
@@ -1911,7 +1976,7 @@
     else await refreshBehind();
   }
 
-  function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [] }) {
+  function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work }) {
     const staff = isStaff();
     const admin = isAdmin();
     const me = st.user.id;
@@ -2032,6 +2097,7 @@
       ${c.publicNote ? `<div class="section"><h3 class="section-title">Statushinweis</h3><div class="banner banner-gold mb-0"><p class="text-sm whitespace-pre-wrap">${esc(c.publicNote)}</p></div></div>` : ''}
       ${contractsSection(c, contracts)}
       ${externalSection(c, externalDocs)}
+      ${caseWorkSection(c, work)}
       ${attachmentsSection(c, attachments)}
       <div class="section" id="secEvents"><h3 class="section-title">Termine & Fristen</h3>${apptList}</div>
       ${staff ? caseTasksSection(c, tasks) : ''}
@@ -2658,8 +2724,7 @@
             </div>`
           : '<p class="span-2 form-hint">Ein Foto für die Website können Sie direkt nach dem Anlegen hinzufügen.</p>'}
         <div class="span-2"><label class="label" for="tmName">Name</label><input id="tmName" name="name" class="field" required minlength="2" maxlength="80" value="${esc(v.name || '')}" placeholder="z. B. Dr. jur. Damat Lex" autofocus></div>
-        <div><label class="label" for="tmRank">Rang / Titel</label><input id="tmRank" name="roleTitle" class="field" list="rankList" required minlength="2" maxlength="80" value="${esc(v.roleTitle || '')}" placeholder="z. B. Senior Associate">
-          <datalist id="rankList">${RANKS.map((r) => `<option value="${esc(r)}"></option>`).join('')}</datalist></div>
+        <div><label class="label" for="tmRank">Rang</label>${rankSelect('roleTitle', v.roleTitle || '', { id: 'tmRank', required: true, emptyLabel: 'Rang wählen …' })}</div>
         <div><label class="label" for="tmTier">Ebene auf der Website</label><select id="tmTier" name="tier" class="field">${opt('leitung', 'Board of Partners (gold)', v.tier === 'leitung')}${opt('anwalt', 'Associate Attorneys', v.tier !== 'leitung')}</select></div>
         <div class="span-2"><label class="label" for="tmDesc">Kurzbeschreibung</label><textarea id="tmDesc" name="description" class="field" rows="3" maxlength="400" placeholder="Schwerpunkte, Zuständigkeiten …">${esc(v.description || '')}</textarea></div>
         <div><label class="label" for="tmInit">Initialen</label><input id="tmInit" name="initials" class="field" maxlength="5" value="${esc(v.initials || '')}" placeholder="automatisch"></div>
@@ -2707,7 +2772,7 @@
               <div class="font-medium flex flex-wrap items-center gap-2">${esc(u.displayName)}${self ? badge('Sie', 'gold') : ''}${!u.active ? badge('Gesperrt', 'red') : ''}${u.mustChangePassword ? badge('Einmal-Passwort', 'amber') : ''}${u.dutyLabel ? badge(u.dutyLabel, 'emerald') : ''}</div>
               <div class="text-xs text-dim break-all">${esc(u.email)}${u.phone ? ' · ' + esc(u.phone) : ''}</div></div></div></td>
             <td data-label="Rolle"><select class="field" style="min-width:150px" data-user-field="role" data-id="${u.id}" ${self ? 'disabled' : ''} aria-label="Rolle">${Object.entries(ROLES).map(([k, l]) => opt(k, l, u.role === k)).join('')}</select></td>
-            <td data-label="Rang"><input class="field" style="min-width:150px" data-user-field="rank" data-id="${u.id}" maxlength="60" list="rankListUsers" value="${esc(u.rank || '')}" placeholder="—" aria-label="Rang"></td>
+            <td data-label="Rang">${rankSelect('rank', u.rank || '', { emptyLabel: '—', attrs: `style="min-width:170px" data-user-field="rank" data-id="${u.id}" aria-label="Rang"` })}</td>
             <td data-label="Discord" class="text-sm">${u.discordUsername ? esc(u.discordUsername) : '<span class="text-dim">—</span>'}</td>
             <td data-label="Letzter Login" class="text-xs text-dim nowrap">${esc(fmtDate(u.lastLoginAt))}</td>
             <td class="td-actions">${
@@ -2718,8 +2783,7 @@
                    <button class="icon-btn sm" data-action="user-delete" data-id="${u.id}" aria-label="Löschen">${icon('trash', 'ico-sm')}</button>`
             }</td></tr>`;
         })
-        .join('')}</tbody></table></div>
-      <datalist id="rankListUsers">${RANKS.map((r) => `<option value="${esc(r)}"></option>`).join('')}</datalist>`;
+        .join('')}</tbody></table></div>`;
   }
 
   views.users = {
@@ -3100,16 +3164,184 @@
     return { from, to };
   }
 
+  /* ---------------------------------------------------------------- Aktenbearbeitung (nur Board of Partners) */
+  /** Dauer lesbar: 45 Min · 3 Std 20 Min · 4 T 6 Std */
+  function fmtDur(ms) {
+    if (ms == null) return '—';
+    const min = Math.max(0, Math.round(ms / 60000));
+    if (min < 60) return `${min} Min`;
+    const h = Math.floor(min / 60);
+    if (h < 24) return `${h} Std${min % 60 ? ` ${min % 60} Min` : ''}`;
+    const d = Math.floor(h / 24);
+    return `${d} ${d === 1 ? 'Tag' : 'Tage'}${h % 24 ? ` ${h % 24} Std` : ''}`;
+  }
+  const ROLE_BADGE = { lead: ['federführend', 'gold'], co: ['weiterer Anwalt', 'sky'] };
+  const WORK_DAYS = [
+    [7, '7 Tage'],
+    [30, '30 Tage'],
+    [90, '90 Tage'],
+    [365, '1 Jahr'],
+    [0, 'Alles'],
+  ];
+
+  function workCaseLine(w) {
+    return `<div class="list-row wrap">
+      <div class="main"><div class="title flex flex-wrap items-center gap-2"><button type="button" class="link-btn font-mono" data-action="open-case" data-id="${w.caseId}">${esc(w.caseNumber)}</button>${esc(w.caseTitle)}</div>
+        <div class="meta">${statusBadge(ROLE_BADGE, w.role)} seit ${esc(fmtDate(w.since))}${w.running ? '' : ` · beendet ${esc(fmtDate(w.endedAt))}${w.endReason ? ' (' + esc(w.endReason) + ')' : ''}`}${w.estimated ? ' · <span title="Vor Einführung der Erfassung – Beginn aus dem Aktenverlauf geschätzt">≈ geschätzt</span>' : ''}</div></div>
+      <div class="shrink-0 text-right"><div class="font-mono text-sm ${w.running ? 'text-emerald-300' : 'text-gold'}">${w.estimated ? '≈ ' : ''}${esc(fmtDur(w.durationMs))}</div><div class="text-xs text-dim">${w.running ? 'läuft' : 'abgeschlossen'}</div></div>
+    </div>`;
+  }
+
+  views.work = {
+    async load() {
+      st.work = await api.get('/api/work?days=' + (st.workDays ?? 90));
+    },
+    render() {
+      const w = st.work;
+      const sm = w.summary;
+      const chips = WORK_DAYS.map(([d, l]) => `<button class="chip ${w.days === d ? 'active' : ''}" data-action="work-days" data-days="${d}">${esc(l)}</button>`).join('');
+      const members = w.members.length
+        ? w.members
+            .map(
+              (m) => `<section class="panel panel-pad">
+              <div class="panel-head"><div><h2 class="panel-title">${esc(m.name)}</h2><div class="text-xs text-dim">${esc(m.rank || 'ohne Rang')}${m.active ? '' : ' · deaktiviert'}</div></div>
+                ${m.runningCount ? badge(`${m.runningCount} in Bearbeitung`, 'emerald') : badge('keine laufende Akte', 'slate')}</div>
+              <div class="work-stats">
+                <div><span class="k">Laufend</span><span class="v">${m.runningCount}</span><span class="s">${esc(fmtDur(m.runningMs))} insgesamt</span></div>
+                <div><span class="k">Abgeschlossen</span><span class="v">${m.finishedCount}</span><span class="s">${esc(fmtDur(m.finishedMs))} insgesamt</span></div>
+                <div><span class="k">Ø je Akte</span><span class="v">${esc(fmtDur(m.avgFinishedMs))}</span><span class="s">abgeschlossene</span></div>
+              </div>
+              ${m.cases.length ? `<details class="work-list" ${m.runningCount ? 'open' : ''}><summary>${m.cases.length} ${m.cases.length === 1 ? 'Akte' : 'Akten'} im Zeitraum</summary>${m.cases.map(workCaseLine).join('')}</details>` : '<p class="text-sm text-dim">Keine Akten im Zeitraum.</p>'}
+            </section>`
+            )
+            .join('')
+        : empty('Keine Mitarbeiter mit Akten im Zeitraum.', 'users');
+      const caseRows = w.cases.length
+        ? `<div class="tbl-wrap"><table class="tbl tbl-cards">
+            <thead><tr><th>Akte</th><th>Zuständig</th><th>Status</th><th>Bearbeitungsdauer</th></tr></thead>
+            <tbody>${w.cases
+              .map(
+                (c) => `<tr class="row" data-action="open-case" data-id="${c.id}">
+                <td class="td-main"><div class="font-mono text-gold text-xs">${esc(c.caseNumber)}</div><div class="font-medium">${esc(c.title)}</div></td>
+                <td data-label="Zuständig">${c.team.length ? c.team.map((t) => esc(t.name) + (t.role === 'lead' && c.team.length > 1 ? ' <span class="text-dim text-xs">(federführend)</span>' : '')).join(', ') : c.closed ? '<span class="text-dim">—</span>' : badge('Unbesetzt', 'amber')}</td>
+                <td data-label="Status">${statusBadge(CASE_STATUS, c.status)}</td>
+                <td data-label="Dauer" class="nowrap"><span class="font-mono ${c.closed ? 'text-gold' : 'text-emerald-300'}">${esc(fmtDur(c.durationMs))}</span><div class="text-xs text-dim">${c.closed ? `bis Abschluss ${esc(fmtDate(c.closedAt))}` : `offen seit ${esc(fmtDate(c.openedAt))}`}</div></td></tr>`
+              )
+              .join('')}</tbody></table></div>`
+        : empty('Keine Akten im Zeitraum.', 'folder');
+      return `
+        <div class="page-head">
+          <div><h1 class="page-title">Aktenbearbeitung</h1><p class="page-sub">Wer bearbeitet welche Akten – und wie lange. Nur für das Board of Partners sichtbar; erfasst wird automatisch bei Zuweisung, Abgabe und Abschluss.</p></div>
+        </div>
+        <div class="chip-row mb-4" role="group" aria-label="Zeitraum">${chips}</div>
+        <div class="kpi-grid mb-4 lg:mb-5">
+          ${kpi('Akten in Bearbeitung', String(sm.runningCases), `${sm.unassigned} davon ohne Anwalt`, 'briefcase', '#work')}
+          ${kpi('Geschlossen', String(sm.closedCases), w.days ? `in den letzten ${w.days} Tagen` : 'insgesamt', 'check', '#work')}
+          ${kpi('Ø Bearbeitungsdauer', fmtDur(sm.avgClosedMs), 'Eröffnung bis Abschluss', 'clock', '#work')}
+          ${kpi('Mitarbeiter', String(w.members.filter((m) => m.runningCount).length), 'mit laufenden Akten', 'users', '#work')}
+        </div>
+        ${sm.estimatedEntries ? '<p class="form-hint mb-4">≈ = vor Einführung der Erfassung; Beginn aus dem Aktenverlauf geschätzt.</p>' : ''}
+        <div class="grid-2 mb-4 lg:mb-5 items-start">${members}</div>
+        <section class="panel panel-pad"><div class="panel-head"><h2 class="panel-title">Akten nach Bearbeitungsdauer</h2></div>${caseRows}</section>`;
+    },
+  };
+
+  /** Akte: Bearbeitungszeiten (nur Board of Partners). */
+  function caseWorkSection(c, work) {
+    if (!work || !isBoard()) return '';
+    const now = Date.now();
+    const opened = parseDate(c.createdAt);
+    const end = work.closedAt ? parseDate(work.closedAt) : null;
+    const total = opened ? (end ? end.getTime() : now) - opened.getTime() : null;
+    const rows = work.rows.length
+      ? work.rows
+          .map(
+            (w) => `<div class="list-row wrap"><div class="main"><div class="title flex flex-wrap items-center gap-2">${esc(w.name)}${statusBadge(ROLE_BADGE, w.role)}</div>
+              <div class="meta">${esc(fmtDate(w.startedAt))} – ${w.running ? 'heute' : esc(fmtDate(w.endedAt))}${w.endReason ? ' · ' + esc(w.endReason) : ''}${w.estimated ? ' · ≈ geschätzt' : ''}</div></div>
+              <span class="font-mono text-sm shrink-0 ${w.running ? 'text-emerald-300' : 'text-gold'}">${w.estimated ? '≈ ' : ''}${esc(fmtDur(w.durationMs))}</span></div>`
+          )
+          .join('')
+      : '<p class="text-sm text-dim">Noch keine Bearbeitung erfasst.</p>';
+    return `<div class="section" id="secWork"><h3 class="section-title">Bearbeitungszeiten <span class="text-xs text-dim font-normal">nur Board of Partners</span></h3>
+      <p class="text-sm text-muted mb-2">${end ? `Bearbeitungsdauer bis zum Abschluss: <strong>${esc(fmtDur(total))}</strong>` : `Offen seit <strong>${esc(fmtDur(total))}</strong>`}</p>
+      ${rows}</div>`;
+  }
+
+  /* ---------------------------------------------------------------- Abmeldungen */
+  const ABSENCE_BADGE = { aktiv: ['abgemeldet', 'amber'], geplant: ['geplant', 'sky'], vorbei: ['beendet', 'slate'] };
+  const dayDe = (d) => new Date(`${d}T12:00:00`).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+  const absenceDays = (a) => Math.round((new Date(`${a.endDate}T12:00:00`) - new Date(`${a.startDate}T12:00:00`)) / 864e5) + 1;
+
+  /** Übersicht: kurze Zeile, wer heute abgemeldet ist. */
+  function absenceStrip() {
+    const now = (st.absences?.absences || []).filter((a) => a.state === 'aktiv');
+    if (!isStaff() || !now.length) return '';
+    return `<a href="#duty" class="absence-strip mb-4 lg:mb-5">${icon('calendar', 'ico-sm')}<span><strong>Heute abgemeldet:</strong> ${now
+      .map((a) => `${esc(a.name)} <span class="text-dim">(bis ${esc(dayDe(a.endDate))}, ${esc(a.reasonLabel)})</span>`)
+      .join(', ')}</span></a>`;
+  }
+
+  function absencePanel() {
+    const data = st.absences;
+    if (!data) return '';
+    const list = data.absences.filter((a) => a.state !== 'vorbei');
+    const rows = list.length
+      ? list
+          .map((a) => {
+            const left = a.state === 'aktiv' ? daysUntil(a.endDate) : null;
+            return `<div class="list-row wrap">
+              ${avatarWrap(a.avatarUrl, a.name, null, 'sm')}
+              <div class="main"><div class="title flex flex-wrap items-center gap-2">${esc(a.name)}${statusBadge(ABSENCE_BADGE, a.state)}${badge(a.reasonLabel, 'slate')}</div>
+                <div class="meta">${esc(dayDe(a.startDate))} – ${esc(dayDe(a.endDate))} · ${absenceDays(a)} ${absenceDays(a) === 1 ? 'Tag' : 'Tage'}${left !== null ? ` · ${left === 0 ? 'letzter Tag heute' : `noch ${left + 1} Tage`}` : ''}${a.note ? ' · ' + esc(a.note) : ''}</div></div>
+              ${a.canManage
+                ? `<div class="flex gap-1 shrink-0">${a.state === 'aktiv' ? `<button class="btn-outline btn-sm" data-action="absence-return" data-id="${a.id}">Zurückmelden</button>` : ''}
+                    <button class="btn-ghost btn-sm" data-action="absence-delete" data-id="${a.id}">${a.state === 'geplant' ? 'Zurückziehen' : 'Löschen'}</button></div>`
+                : ''}
+            </div>`;
+          })
+          .join('')
+      : empty('Niemand ist abgemeldet.', 'calendar');
+    const mine = list.find((a) => a.userId === st.user.id && a.state === 'aktiv');
+    return `<section class="panel panel-pad mb-4 lg:mb-5" id="secAbsences">
+      <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('calendar')} Abmeldungen</h2>
+        <button class="btn-outline btn-sm" data-action="absence-new">${icon('plus', 'ico-sm')}<span>Abmelden</span></button></div>
+      ${mine ? `<div class="banner banner-amber mb-3">${icon('alert')}<div>Sie sind bis ${esc(dayDe(mine.endDate))} abgemeldet. Wieder da? <button class="link-btn" data-action="absence-return" data-id="${mine.id}">Jetzt zurückmelden</button></div></div>` : ''}
+      ${rows}
+      <p class="form-hint mt-3">Abmeldungen, Rückmeldungen und Zurückziehen erscheinen auf Wunsch in Discord (Einstellungen → Discord → „Abmeldung / Rückmeldung“).</p>
+    </section>`;
+  }
+
+  async function absenceModal() {
+    const data = st.absences || (st.absences = await api.get('/api/absences'));
+    if (isAdmin()) await load.lawyers();
+    const today = data.today;
+    openModal(`
+      <h2 class="modal-title">Abmelden</h2>
+      <p class="modal-sub">Abwesenheit eintragen – das Team sieht sie unter „Dienstzeiten“, auf Wunsch geht sie auch in den Discord.</p>
+      <form data-form="absence" class="form-grid cols-2">
+        ${isAdmin() ? `<div class="span-2"><label class="label">Wer?</label><select name="userId" class="field">${st.lawyers.map((l) => opt(l.id, l.displayName + (l.id === st.user.id ? ' (Sie)' : ''), l.id === st.user.id)).join('')}</select></div>` : ''}
+        <div><label class="label" for="abFrom">Von</label><input id="abFrom" name="startDate" type="date" class="field" required min="${esc(today)}" value="${esc(today)}"></div>
+        <div><label class="label" for="abTo">Bis (einschließlich)</label><input id="abTo" name="endDate" type="date" class="field" required min="${esc(today)}" value="${esc(today)}"></div>
+        <div class="span-2"><label class="label">Grund</label><div class="chip-row" role="radiogroup">${Object.entries(data.reasons)
+          .map(([k, l], i) => `<label class="chip-radio"><input type="radio" name="reason" value="${k}" ${i === 0 ? 'checked' : ''}><span>${esc(l)}</span></label>`)
+          .join('')}</div></div>
+        <div class="span-2"><label class="label" for="abNote">Notiz (optional)</label><input id="abNote" name="note" class="field" maxlength="300" placeholder="z. B. im Urlaub, per Discord erreichbar"></div>
+        <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Abmeldung eintragen</span></button></div>
+      </form>`);
+  }
+
   views.duty = {
     async load() {
       if (!st.dutyWeek) st.dutyWeek = mondayOf(new Date());
       const { from, to } = weekRange();
-      const [state, data] = await Promise.all([
+      const [state, data, absences] = await Promise.all([
         api.get('/api/duty'),
         api.get(`/api/duty/sessions?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`),
+        api.get('/api/absences'),
       ]);
       st.duty = state;
       st.dutyData = data;
+      st.absences = absences;
       if (!st.dutyUser || !data.totals.some((t) => t.userId === st.dutyUser)) st.dutyUser = st.user.id;
       renderUser();
     },
@@ -3195,10 +3427,12 @@
 
       return `
         <div class="page-head">
-          <div><h1 class="page-title">Stempeluhr & Dienstzeiten</h1><p class="page-sub">Dienst beginnen und beenden, Wochenstunden des Teams im Blick – ideal für Gehaltsabrechnung und Eilnotdienst.</p></div>
-          ${admin ? `<div class="page-actions"><button class="btn-outline btn-md" data-action="duty-session-new">${icon('plus', 'ico-sm')}<span>Schicht nachtragen</span></button></div>` : ''}
+          <div><h1 class="page-title">Stempeluhr & Dienstzeiten</h1><p class="page-sub">Dienst beginnen und beenden, Abmeldungen eintragen, Wochenstunden des Teams im Blick – ideal für Gehaltsabrechnung und Eilnotdienst.</p></div>
+          <div class="page-actions"><button class="btn-gold btn-md" data-action="absence-new">${icon('calendar', 'ico-sm')}<span>Abmelden</span></button>
+          ${admin ? `<button class="btn-outline btn-md" data-action="duty-session-new">${icon('plus', 'ico-sm')}<span>Schicht nachtragen</span></button>` : ''}</div>
         </div>
         <div class="grid-2 mb-4 lg:mb-5">${myCard}${onDutyCard}</div>
+        ${absencePanel()}
         <section class="panel panel-pad mb-4 lg:mb-5">
           <div class="panel-head">
             <div class="week-nav">
@@ -3364,13 +3598,14 @@
   }
 
   function hireModal(a) {
+    // Vorschlag aus der Stellenbezeichnung (z. B. „Associate / Rechtsanwalt (m/w/d)“ → Associate)
     const rank = a.positionTitle.replace(/\s*\(m\/w\/d\)\s*/i, '').replace('Initiativbewerbung', 'Junior Associate').split('/')[0].trim();
     openModal(`
       <h2 class="modal-title">${esc(a.name)} einstellen</h2>
       <p class="modal-sub">Legt ein Login-Konto mit Einmal-Passwort an und auf Wunsch ein Profil im Bereich „Unser Team“ auf der Website.</p>
       <form data-form="app-hire" data-id="${a.id}" class="form-grid cols-2">
         <div class="span-2"><label class="label">E-Mail (Login)</label><input name="email" type="email" class="field" required maxlength="120" value="${esc(a.email)}" placeholder="vorname.nachname@pake-scha.ls" autofocus></div>
-        <div><label class="label">Rang</label><input name="rank" class="field" required minlength="2" maxlength="60" list="rankListHire" value="${esc(rank)}"><datalist id="rankListHire">${RANKS.map((r) => `<option value="${esc(r)}"></option>`).join('')}</datalist></div>
+        <div><label class="label">Rang</label>${rankSelect('rank', RANKS.includes(rank) ? rank : '', { emptyLabel: '— ohne Rang (z. B. Assistenz) —' })}</div>
         <div><label class="label">Rolle im Dashboard</label><select name="role" class="field">${opt('anwalt', 'Anwalt / Mitarbeiter', true)}${opt('admin', 'Kanzleileitung (Admin)')}</select></div>
         <div class="span-2"><label class="label">Kurzbeschreibung für die Website (optional)</label><textarea name="description" rows="2" maxlength="400" class="field"></textarea></div>
         <label class="check span-2"><input type="checkbox" name="createProfile" checked> Team-Profil anlegen</label>
@@ -3756,7 +3991,7 @@
           <div class="span-2"><label class="label">Name</label><input name="displayName" class="field" required minlength="2" maxlength="80" autofocus></div>
           <div class="span-2"><label class="label">E-Mail (Login)</label><input name="email" type="email" class="field" required maxlength="120"></div>
           <div><label class="label">Rolle</label><select name="role" class="field">${Object.entries(ROLES).map(([k, l]) => opt(k, l, k === 'anwalt')).join('')}</select></div>
-          <div><label class="label">Rang (optional)</label><input name="rank" class="field" maxlength="60" list="rankListNew"><datalist id="rankListNew">${RANKS.map((r) => `<option value="${esc(r)}"></option>`).join('')}</datalist></div>
+          <div><label class="label">Rang (optional)</label>${rankSelect('rank', '')}</div>
           <div class="span-2"><label class="label">Telefon (optional)</label><input name="phone" class="field" maxlength="40"></div>
           <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Konto anlegen</span></button></div>
         </form>`);
@@ -3904,6 +4139,27 @@
       await api.del(`/api/contract-templates/${x.id}`);
       toast('Vorlage gelöscht.');
       await refreshSettingsTemplates();
+    },
+    'work-days': async (el) => {
+      st.workDays = Number(el.dataset.days);
+      await views.work.load();
+      renderView();
+    },
+    'absence-new': async () => {
+      closeDutyPop();
+      await absenceModal();
+    },
+    'absence-return': async (el) => {
+      if (!(await ask('Die Abmeldung endet heute.', { title: 'Zurückmelden?', confirmText: 'Zurückmelden' }))) return;
+      await api.post(`/api/absences/${el.dataset.id}/return`, {});
+      toast('Willkommen zurück – Rückmeldung eingetragen.');
+      await afterAbsenceChange();
+    },
+    'absence-delete': async (el) => {
+      if (!(await ask('Die Abmeldung wird entfernt.', { title: 'Abmeldung zurückziehen?', confirmText: 'Zurückziehen' }))) return;
+      await api.del(`/api/absences/${el.dataset.id}`);
+      toast('Abmeldung zurückgezogen.');
+      await afterAbsenceChange();
     },
     'contract-new': async (el) => {
       if (!st.caseInfo) return;
@@ -4404,6 +4660,15 @@
       reportImport(await importPendingImages(Number(f.dataset.caseId), res.document));
       await returnOrClose();
     },
+    absence: async (f) => {
+      const fd = new FormData(f);
+      const body = { startDate: val(fd, 'startDate'), endDate: val(fd, 'endDate'), reason: val(fd, 'reason') || 'sonstiges', note: val(fd, 'note') };
+      if (f.elements.userId) body.userId = Number(fd.get('userId'));
+      await api.post('/api/absences', body);
+      toast('Abmeldung eingetragen.');
+      closeModal();
+      await afterAbsenceChange();
+    },
     'tpl-save': async (f) => {
       const fd = new FormData(f);
       const body = { name: val(fd, 'name'), body: String(fd.get('body') || ''), active: fd.get('active') === 'on' };
@@ -4562,6 +4827,8 @@
     } else if (t.name === 'eventRole' && t.value.trim()) {
       const box = t.closest('.ev-item')?.querySelector('input[name="pingEvents"]');
       if (box) box.checked = true;
+    } else if (t.classList && t.classList.contains('svc-qty')) {
+      updateServiceSum(t.form); // Menge geändert: Summe sofort aktualisieren
     } else if (t.id === 'fnContent') {
       t.dataset.auto = '0'; // von Hand geändert – beim nächsten automatischen Laden nicht überschreiben
     } else if (t.id === 'taskSearch') {
@@ -4604,6 +4871,21 @@
     }
     if (t.dataset.userField) guard(() => updateUserField(t));
     if (t.matches('[data-ext-sort]')) sortExternalDocs(t);
+    // Vertrag: Leistung an-/abgewählt → Menge freischalten, Summe neu berechnen
+    if (t.classList.contains('svc-check') || t.classList.contains('svc-qty')) {
+      if (t.classList.contains('svc-check')) t.closest('.svc').querySelector('.svc-qty').disabled = !t.checked;
+      updateServiceSum(t.form);
+    }
+    // Abmeldung: „Bis“ nie vor „Von“
+    if (t.id === 'abFrom') {
+      const to = $('#abTo');
+      if (to) {
+        to.min = t.value;
+        if (to.value < t.value) to.value = t.value;
+      }
+    }
+    // Team-Profil: Board-Ränge erscheinen auf der Website in der goldenen Ebene
+    if (t.id === 'tmRank' && $('#tmTier')) $('#tmTier').value = RANK_GROUPS['Board of Partners'].includes(t.value) ? 'leitung' : 'anwalt';
     // Vertrag: anderer unterzeichnender Anwalt → Name und Rang übernehmen
     if (t.id === 'kf_lawyer') {
       const l = st.lawyers.find((x) => x.id === Number(t.value));

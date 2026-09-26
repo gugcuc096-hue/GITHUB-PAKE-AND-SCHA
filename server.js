@@ -69,6 +69,8 @@ app.use('/api/gdocs', externalRoutes.gdocsRouter);
 app.use('/api/gsheets', externalRoutes.gsheetsRouter);
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/contracts', contractRoutes.router);
+app.use('/api/absences', require('./routes/absences').router);
+app.use('/api/work', require('./routes/work').router);
 app.use('/api/contract-templates', contractRoutes.templatesRouter);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/messages', require('./routes/messages'));

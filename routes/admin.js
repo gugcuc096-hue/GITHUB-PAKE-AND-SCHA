@@ -3,7 +3,7 @@ const express = require('express');
 const { z } = require('zod');
 const { db, tx, getSetting, setSetting } = require('../db');
 const { requireAuth, requireAdmin, requireStaff, hashPassword, generateTempPassword, destroyAllSessions, userAvatarUrl } = require('../auth');
-const { wrap, parseBody, idParam, DUTY_STATUS } = require('../helpers');
+const { wrap, parseBody, idParam, DUTY_STATUS, rankField } = require('../helpers');
 const { logActivity } = require('../models');
 const { removeFile } = require('../uploads');
 const discord = require('../discord');
@@ -66,7 +66,7 @@ router.post(
       displayName: z.string().trim().min(2).max(80),
       email: z.string().trim().email().max(120),
       role: z.enum(['mandant', 'anwalt', 'admin']),
-      rank: z.string().trim().max(60).optional(),
+      rank: rankField.optional(),
       phone: z.string().trim().max(40).optional(),
     });
     const d = parseBody(schema, req, res);
@@ -93,7 +93,7 @@ router.patch(
     if (!target) return res.status(404).json({ error: 'Nutzer nicht gefunden.' });
     const schema = z.object({
       role: z.enum(['mandant', 'anwalt', 'admin']).optional(),
-      rank: z.string().trim().max(60).nullable().optional(),
+      rank: rankField.nullable().optional(),
       active: z.boolean().optional(),
       displayName: z.string().trim().min(2).max(80).optional(),
       email: z.string().trim().email().max(120).optional(),

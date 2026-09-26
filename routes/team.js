@@ -3,7 +3,7 @@ const express = require('express');
 const { z } = require('zod');
 const { db, tx, getSetting } = require('../db');
 const { requireAuth, requireAdmin, hashPassword, generateTempPassword, destroyAllSessions } = require('../auth');
-const { wrap, parseBody, idParam, deriveInitials } = require('../helpers');
+const { wrap, parseBody, idParam, deriveInitials, RANKS } = require('../helpers');
 const { teamRow, TEAM_SELECT, logActivity } = require('../models');
 const { imageBody, saveImage, removeFile } = require('../uploads');
 
@@ -33,7 +33,7 @@ const accountSchema = z.object({
 });
 const memberSchema = z.object({
   name: z.string().trim().min(2).max(80),
-  roleTitle: z.string().trim().min(2).max(80),
+  roleTitle: z.enum(RANKS),
   tier: z.enum(['leitung', 'anwalt']).optional(),
   description: z.string().trim().max(400).optional(),
   initials: z.string().trim().max(5).optional(),

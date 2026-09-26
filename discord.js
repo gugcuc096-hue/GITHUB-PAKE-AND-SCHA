@@ -35,6 +35,7 @@ const EVENTS = {
   'message.broadcast': 'Rundschreiben an das Team',
   'application.created': 'Neue Bewerbung',
   'duty.changed': 'Dienstbeginn / Dienstende eines Anwalts',
+  'absence.changed': 'Abmeldung / Rückmeldung eines Mitarbeiters',
   'task.assigned': 'Aufgabe einem anderen Teammitglied zugewiesen',
 };
 
