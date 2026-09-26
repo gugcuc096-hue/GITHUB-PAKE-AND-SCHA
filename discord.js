@@ -35,6 +35,7 @@ const EVENTS = {
   'message.broadcast': 'Rundschreiben an das Team',
   'application.created': 'Neue Bewerbung',
   'duty.changed': 'Dienstbeginn / Dienstende eines Anwalts',
+  'absence.changed': 'Abmeldung / Rückmeldung eines Mitarbeiters',
   'task.assigned': 'Aufgabe einem anderen Teammitglied zugewiesen',
 };
 
@@ -263,7 +264,7 @@ function oauthConfig(req) {
 const KNOWN_ENV = ['DISCORD_CLIENT_ID', 'DISCORD_CLIENT_SECRET', 'DISCORD_REDIRECT_URI', 'DISCORD_WEBHOOK_URL', 'DISCORD_PING_ROLE', 'PUBLIC_URL'];
 
 /**
- * Prüfbericht für die Kanzleileitung: Welche Variablen findet der laufende Server?
+ * Prüfbericht für das Board of Partners: Welche Variablen findet der laufende Server?
  * Enthält nur Namen und einen Status – niemals die Werte selbst.
  */
 function oauthDiagnostics(origin) {

@@ -194,7 +194,7 @@ router.delete(
     const a = id && getAppointment(id);
     if (!a || !isStaff(u)) return res.status(404).json({ error: 'Termin nicht gefunden.' });
     if (u.role !== 'admin' && a.created_by !== u.id && a.assigned_to !== u.id) {
-      return res.status(403).json({ error: 'Nur Ersteller, Zuständige oder die Kanzleileitung können diesen Eintrag löschen.' });
+      return res.status(403).json({ error: 'Nur Ersteller, Zuständige oder das Board of Partners können diesen Eintrag löschen.' });
     }
     db.prepare('DELETE FROM appointments WHERE id = ?').run(a.id);
     res.json({ success: true });

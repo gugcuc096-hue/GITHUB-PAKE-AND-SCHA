@@ -4,7 +4,7 @@ const rateLimit = require('express-rate-limit');
 const { z } = require('zod');
 const { db, tx } = require('../db');
 const { requireAuth, isStaff } = require('../auth');
-const { wrap, parseBody, idParam, truncate } = require('../helpers');
+const { wrap, parseBody, idParam, truncate, RANK_ORDER_SQL } = require('../helpers');
 const { MESSAGE_SELECT, messageRow, getCase, caseAccess } = require('../models');
 const discord = require('../discord');
 
@@ -40,12 +40,12 @@ router.get('/contacts', (req, res) => {
   const rows =
     req.user.role === 'mandant'
       ? db
-          .prepare("SELECT id, display_name AS displayName, role, rank FROM users WHERE role IN ('anwalt','admin') AND active = 1 ORDER BY display_name")
+          .prepare(`SELECT id, display_name AS displayName, role, rank FROM users WHERE role IN ('anwalt','admin') AND active = 1 ORDER BY ${RANK_ORDER_SQL()}, display_name`)
           .all()
       : db
           .prepare(
             `SELECT id, display_name AS displayName, role, rank FROM users WHERE id != ? AND active = 1
-             ORDER BY CASE role WHEN 'admin' THEN 0 WHEN 'anwalt' THEN 1 ELSE 2 END, display_name`
+             ORDER BY CASE role WHEN 'mandant' THEN 1 ELSE 0 END, ${RANK_ORDER_SQL()}, display_name`
           )
           .all(req.user.id);
   res.json({ contacts: rows });

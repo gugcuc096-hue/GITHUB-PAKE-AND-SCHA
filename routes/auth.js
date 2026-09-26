@@ -36,7 +36,7 @@ const registerLimiter = rateLimit({
 });
 
 // Selbst-Registrierung vergibt ausschließlich die Rolle "mandant". Höhere
-// Rollen vergibt nur die Kanzleileitung im Dashboard.
+// Rollen vergibt nur das Board of Partners im Dashboard.
 const registerSchema = z.object({
   displayName: z.string().trim().min(2).max(80),
   email: z.string().trim().email().max(120),
@@ -72,7 +72,7 @@ router.post(
     if (!user || !verifyPassword(data.password, user.password_hash)) {
       return res.status(401).json({ error: 'E-Mail-Adresse oder Passwort ist falsch.' });
     }
-    if (!user.active) return res.status(403).json({ error: 'Dieser Zugang wurde gesperrt. Bitte wenden Sie sich an die Kanzleileitung.' });
+    if (!user.active) return res.status(403).json({ error: 'Dieser Zugang wurde gesperrt. Bitte wenden Sie sich an das Board of Partners.' });
     createSession(res, user.id);
     if (isStaff(user)) logActivity(user, 'Anmeldung', 'user', user.id);
     res.json({ success: true, user: publicUser(user) });
@@ -104,7 +104,7 @@ router.patch(
     const data = parseBody(schema, req, res);
     if (!data) return;
     if (data.phone !== undefined) db.prepare('UPDATE users SET phone = ? WHERE id = ?').run(data.phone || null, req.user.id);
-    // Namen des Teams pflegt die Kanzleileitung (Team-Verwaltung), Mandanten ändern ihren selbst.
+    // Namen des Teams pflegt das Board of Partners (Team-Verwaltung), Mandanten ändern ihren selbst.
     if (data.displayName !== undefined && req.user.role === 'mandant') {
       db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run(data.displayName, req.user.id);
     }

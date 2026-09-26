@@ -139,7 +139,7 @@ router.get(
   })
 );
 
-/* ---------------------------------------------------------------- Korrekturen (Kanzleileitung) */
+/* ---------------------------------------------------------------- Korrekturen (Board of Partners) */
 const sessionSchema = z.object({
   userId: z.number().int().positive(),
   startedAt: isoDateTime,

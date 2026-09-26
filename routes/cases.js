@@ -4,11 +4,12 @@ const express = require('express');
 const { z } = require('zod');
 const { db, tx, nextCaseNumber, randomPin } = require('../db');
 const { requireAuth, requireAdmin, isStaff } = require('../auth');
-const { wrap, parseBody, idParam, AREAS, URGENCIES, CASE_STATUS, STEPS, truncate, MAX_ATTACHMENTS_PER_CASE } = require('../helpers');
+const { wrap, parseBody, idParam, AREAS, URGENCIES, CASE_STATUS, STEPS, truncate, MAX_ATTACHMENTS_PER_CASE, isBoard } = require('../helpers');
 const {
   CASE_SELECT,
   getCase,
   caseAccess,
+  syncCaseWork,
   caseLawyers,
   coLawyersOf,
   caseRow,
@@ -27,6 +28,7 @@ const {
 } = require('../models');
 const discord = require('../discord');
 const { contractsForCase } = require('./contracts');
+const { workForCase } = require('./work');
 const { imageBody, saveImage, removeFile, evidencePath } = require('../uploads');
 
 const router = express.Router();
@@ -49,7 +51,7 @@ function lawyerMentions(c, user, onlyIds = null) {
     .map((l) => l.discordId);
 }
 
-/** Aktive Anwälte/Kanzleileitung zu den IDs; unbekannte oder deaktivierte IDs werden gemeldet. */
+/** Aktive Anwälte/Board of Partners zu den IDs; unbekannte oder deaktivierte IDs werden gemeldet. */
 function activeLawyers(ids) {
   if (!ids.length) return { found: [], missing: [] };
   const rows = db
@@ -150,7 +152,7 @@ router.post(
         }
         lawyerId = d.lawyerId;
       }
-      // Weitere Anwälte: wer die Akte anlegt, ist federführend (oder die Kanzleileitung weist zu).
+      // Weitere Anwälte: wer die Akte anlegt, ist federführend (oder das Board of Partners weist zu).
       coIds = [...new Set(d.coLawyerIds || [])];
       const { missing } = activeLawyers(coIds);
       if (missing.length) return res.status(400).json({ error: 'Mindestens ein gewählter Anwalt existiert nicht oder ist deaktiviert.' });
@@ -185,6 +187,7 @@ router.post(
       const addCo = db.prepare('INSERT INTO case_lawyers (case_id, user_id, added_by) VALUES (?, ?, ?)');
       coIds.forEach((cid) => addCo.run(newId, cid, u.id));
       addSystemNote(newId, u, 'Akte angelegt.');
+      syncCaseWork(newId);
       return newId;
     });
 
@@ -233,6 +236,8 @@ router.get(
       attachments: attachments.map((a) => attachmentRow(a, c.id)),
       externalDocs: externalDocsForCase(c.id, req.user),
       contracts: contractsForCase(c.id),
+      // Bearbeitungszeiten nur für das Board of Partners
+      work: isBoard(req.user) ? { rows: workForCase(c.id), closedAt: c.closed_at || null } : undefined,
       tasks: staff ? tasks.map(taskRow) : undefined,
     });
   })
@@ -320,7 +325,7 @@ router.patch(
       if (!newStatus && !leadAfter && c.status === 'in_bearbeitung') newStatus = 'offen';
     }
 
-    // Weitere Anwälte: zusammenstellen dürfen die Kanzleileitung und der federführende Anwalt;
+    // Weitere Anwälte: zusammenstellen dürfen das Board of Partners und der federführende Anwalt;
     // ein weiterer Anwalt darf sich selbst austragen.
     let coChanged = false;
     let coAdded = [];
@@ -331,7 +336,7 @@ router.patch(
       const isLeadNow = isStaff(u) && (c.lawyer_id === u.id || leadAfter === u.id);
       const selfLeave = !added.length && removed.length === 1 && removed[0] === u.id;
       if ((added.length || removed.length) && u.role !== 'admin' && !isLeadNow && !selfLeave) {
-        return res.status(403).json({ error: 'Weitere Anwälte kann nur der federführende Anwalt oder die Kanzleileitung zuweisen.' });
+        return res.status(403).json({ error: 'Weitere Anwälte kann nur der federführende Anwalt oder das Board of Partners zuweisen.' });
       }
       const { found, missing } = activeLawyers(added);
       if (missing.length) return res.status(400).json({ error: 'Mindestens ein gewählter Anwalt existiert nicht oder ist deaktiviert.' });
@@ -374,7 +379,7 @@ router.patch(
     // Wer die Akte gerade selbst übernommen hat, darf im selben Schritt weiterarbeiten.
     const canEditNow = access.canEdit || (lawyerChanged && leadAfter === u.id);
     if (wantsEdit && !canEditNow) {
-      return res.status(403).json({ error: 'Nur der zuständige Anwalt oder die Kanzleileitung kann diese Akte bearbeiten.' });
+      return res.status(403).json({ error: 'Nur der zuständige Anwalt oder das Board of Partners kann diese Akte bearbeiten.' });
     }
 
     for (const key of editFields) {
@@ -400,6 +405,11 @@ router.patch(
         coAfter.filter((id) => !coBefore.includes(id)).forEach((id) => addCo.run(c.id, id, u.id));
       }
       if (history.length) addSystemNote(c.id, u, history.join(' · '));
+      if (lawyerChanged || coChanged || (newStatus && newStatus !== c.status)) {
+        const workReason =
+          c.lawyer_id === u.id && leadAfter !== u.id ? 'abgegeben' : coBefore.includes(u.id) && !coAfter.includes(u.id) && leadAfter !== u.id ? 'Mitarbeit beendet' : 'nicht mehr zuständig';
+        syncCaseWork(c.id, workReason);
+      }
     });
 
     const updated = getCase(c.id);
@@ -513,7 +523,7 @@ router.delete(
     const a = attId && db.prepare('SELECT * FROM case_attachments WHERE id = ? AND case_id = ?').get(attId, c.id);
     if (!a || (a.internal && !isStaff(req.user))) return res.status(404).json({ error: 'Anhang nicht gefunden.' });
     if (a.uploader_id !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Nur die hochladende Person oder die Kanzleileitung kann den Anhang löschen.' });
+      return res.status(403).json({ error: 'Nur die hochladende Person oder das Board of Partners kann den Anhang löschen.' });
     }
     db.prepare('DELETE FROM case_attachments WHERE id = ?').run(a.id);
     removeFile('evidence', a.file);

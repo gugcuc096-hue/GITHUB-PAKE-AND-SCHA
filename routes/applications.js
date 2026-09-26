@@ -4,7 +4,7 @@ const rateLimit = require('express-rate-limit');
 const { z } = require('zod');
 const { db, tx, nextApplicationNumber, randomPin } = require('../db');
 const { requireAuth, requireAdmin, hashPassword, generateTempPassword } = require('../auth');
-const { wrap, parseBody, idParam, isoDateTime, deriveInitials, truncate, APPLICATION_STATUS } = require('../helpers');
+const { wrap, parseBody, idParam, isoDateTime, deriveInitials, truncate, APPLICATION_STATUS, rankField, BOARD_RANKS } = require('../helpers');
 const { applicationRow, positionRow, logActivity } = require('../models');
 const discord = require('../discord');
 
@@ -19,7 +19,6 @@ const limit = (windowMs, max, message, skipFailedRequests = false) =>
     handler: (req, res) => res.status(429).json({ error: message }),
   });
 
-const LEADERSHIP = /partner|kanzleileitung/i;
 
 /* ================================================================
    Öffentlich: Karriereseite
@@ -102,7 +101,7 @@ publicRouter.post(
 );
 
 /* ================================================================
-   Kanzleileitung: Bewerbungen
+   Board of Partners: Bewerbungen
    ================================================================ */
 const adminRouter = express.Router();
 adminRouter.use(requireAuth, requireAdmin);
@@ -217,7 +216,7 @@ adminRouter.post(
       z.object({
         email: z.string().trim().email().max(120),
         role: z.enum(['anwalt', 'admin']),
-        rank: z.string().trim().min(2).max(60),
+        rank: rankField,
         createProfile: z.boolean().optional(),
         visible: z.boolean().optional(),
         description: z.string().trim().max(400).optional(),
@@ -233,19 +232,19 @@ adminRouter.post(
     tx(() => {
       const info = db
         .prepare('INSERT INTO users (email, password_hash, display_name, role, rank, phone, must_change_password) VALUES (?, ?, ?, ?, ?, ?, 1)')
-        .run(email, hashPassword(password), a.name, d.role, d.rank, a.phone || null);
+        .run(email, hashPassword(password), a.name, d.role, d.rank || null, a.phone || null);
       const userId = Number(info.lastInsertRowid);
       if (d.createProfile !== false) {
         const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order), 0) AS m FROM team_members').get().m;
         db.prepare(
           'INSERT INTO team_members (name, role_title, description, initials, tier, sort_order, user_id, visible) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-        ).run(a.name, d.rank, d.description || '', deriveInitials(a.name), LEADERSHIP.test(d.rank) ? 'leitung' : 'anwalt', maxOrder + 1, userId, d.visible === false ? 0 : 1);
+        ).run(a.name, d.rank || 'Mitarbeiter', d.description || '', deriveInitials(a.name), BOARD_RANKS.includes(d.rank) ? 'leitung' : 'anwalt', maxOrder + 1, userId, d.visible === false ? 0 : 1);
       }
       db.prepare(
         "UPDATE applications SET status = 'angenommen', hired_user_id = ?, public_note = CASE WHEN public_note = '' THEN ? ELSE public_note END, updated_at = datetime('now') WHERE id = ?"
-      ).run(userId, 'Herzlichen Glückwunsch – willkommen im Team von Pake & Scha! Ihre Zugangsdaten erhalten Sie direkt von der Kanzleileitung.', a.id);
+      ).run(userId, 'Herzlichen Glückwunsch – willkommen im Team von Pake & Scha! Ihre Zugangsdaten erhalten Sie direkt vom Board of Partners.', a.id);
     });
-    logActivity(req.user, 'Bewerber eingestellt', 'application', a.id, `${a.name} als ${d.rank}`);
+    logActivity(req.user, 'Bewerber eingestellt', 'application', a.id, `${a.name} als ${d.rank || 'Mitarbeiter (ohne Rang)'}`);
     res.json({ ...detail(load(a.id)), credentials: { email, password } });
   })
 );
@@ -263,7 +262,7 @@ adminRouter.delete(
 );
 
 /* ================================================================
-   Kanzleileitung: Stellenausschreibungen
+   Board of Partners: Stellenausschreibungen
    ================================================================ */
 const positionsRouter = express.Router();
 positionsRouter.use(requireAuth, requireAdmin);

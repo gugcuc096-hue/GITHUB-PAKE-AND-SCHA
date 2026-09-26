@@ -22,7 +22,8 @@
       const k = key.toLowerCase();
       if (!(k in values)) return `<span class="k-unknown">${esc(m)}</span>`;
       const v = String(values[k] ?? '').trim();
-      return v ? `<span class="k-val">${esc(v)}</span>` : '<span class="k-blank"></span>';
+      // Mehrzeilige Werte (z. B. mehrere Leistungen) zeilenweise darstellen
+      return v ? `<span class="k-val">${esc(v).replace(/\n/g, '<br>')}</span>` : '<span class="k-blank"></span>';
     });
     return s;
   }

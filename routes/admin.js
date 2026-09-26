@@ -3,13 +3,13 @@ const express = require('express');
 const { z } = require('zod');
 const { db, tx, getSetting, setSetting } = require('../db');
 const { requireAuth, requireAdmin, requireStaff, hashPassword, generateTempPassword, destroyAllSessions, userAvatarUrl } = require('../auth');
-const { wrap, parseBody, idParam, DUTY_STATUS } = require('../helpers');
+const { wrap, parseBody, idParam, DUTY_STATUS, rankField, RANK_ORDER_SQL } = require('../helpers');
 const { logActivity } = require('../models');
 const { removeFile } = require('../uploads');
 const discord = require('../discord');
 const fivenet = require('../fivenet');
 
-const ROLE_LABEL = { mandant: 'Mandant', anwalt: 'Anwalt', admin: 'Kanzleileitung' };
+const ROLE_LABEL = { mandant: 'Mandant', anwalt: 'Anwalt', admin: 'Board of Partners' };
 
 /* Verzeichnis der Anwälte (für Zuweisungen) -- für das ganze Team */
 const directoryRouter = express.Router();
@@ -18,14 +18,14 @@ directoryRouter.get('/', requireAuth, requireStaff, (req, res) => {
     .prepare(
       `SELECT * FROM users
        WHERE role IN ('anwalt','admin') AND active = 1
-       ORDER BY CASE role WHEN 'admin' THEN 0 ELSE 1 END, display_name`
+       ORDER BY ${RANK_ORDER_SQL()}, display_name`
     )
     .all()
     .map((u) => ({ id: u.id, displayName: u.display_name, role: u.role, rank: u.rank, avatarUrl: userAvatarUrl(u) }));
   res.json({ lawyers });
 });
 
-/* Kanzleileitung */
+/* Board of Partners */
 const router = express.Router();
 router.use(requireAuth, requireAdmin);
 
@@ -66,7 +66,7 @@ router.post(
       displayName: z.string().trim().min(2).max(80),
       email: z.string().trim().email().max(120),
       role: z.enum(['mandant', 'anwalt', 'admin']),
-      rank: z.string().trim().max(60).optional(),
+      rank: rankField.optional(),
       phone: z.string().trim().max(40).optional(),
     });
     const d = parseBody(schema, req, res);
@@ -93,7 +93,7 @@ router.patch(
     if (!target) return res.status(404).json({ error: 'Nutzer nicht gefunden.' });
     const schema = z.object({
       role: z.enum(['mandant', 'anwalt', 'admin']).optional(),
-      rank: z.string().trim().max(60).nullable().optional(),
+      rank: rankField.nullable().optional(),
       active: z.boolean().optional(),
       displayName: z.string().trim().min(2).max(80).optional(),
       email: z.string().trim().email().max(120).optional(),
@@ -149,7 +149,7 @@ router.patch(
   })
 );
 
-// Passwort vergessen: Die Kanzleileitung erzeugt ein Einmal-Passwort (keine Shell nötig).
+// Passwort vergessen: Das Board of Partners erzeugt ein Einmal-Passwort (keine Shell nötig).
 router.post(
   '/users/:id/reset-password',
   wrap(async (req, res) => {
