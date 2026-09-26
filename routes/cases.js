@@ -26,6 +26,7 @@ const {
   logActivity,
 } = require('../models');
 const discord = require('../discord');
+const { contractsForCase } = require('./contracts');
 const { imageBody, saveImage, removeFile, evidencePath } = require('../uploads');
 
 const router = express.Router();
@@ -231,6 +232,7 @@ router.get(
       invoices: invoices.map(invoiceRow),
       attachments: attachments.map((a) => attachmentRow(a, c.id)),
       externalDocs: externalDocsForCase(c.id, req.user),
+      contracts: contractsForCase(c.id),
       tasks: staff ? tasks.map(taskRow) : undefined,
     });
   })

@@ -28,6 +28,7 @@ Premium-Webanwendung für die GTA-RP-Kanzlei **Pake & Scha Legal Consulting**: �
 | **Reihenfolge der Dokumente** | Externe Dokumente einer Akte lassen sich ordnen: Dokument **gedrückt halten und nach oben oder unten ziehen** (Maus und Touch; am Rand scrollt die Akte mit), über den Griff ⠿ mit der Maus sofort, per Tastatur mit Griff + ↑/↓ · Menü „Sortieren“: nach Datum (älteste/neueste zuerst), Titel oder Quelle · die Reihenfolge wird gespeichert und gilt für alle, auch für den Mandanten |
 | **Aufgaben & Wiedervorlagen** | Aufgaben mit Fälligkeitsdatum, Zuständigkeit und Notiz – mit oder ohne Aktenbezug · Checklisten je Rechtsgebiet per Klick in die Akte übernehmen · Erledigt-Vermerk im Aktenverlauf · Zähler fälliger Aufgaben in der Navigation · Discord-Erwähnung bei Zuweisung |
 | **Mehrere Anwälte pro Akte** | Ein federführender Anwalt plus beliebig viele weitere Anwälte (bis zu 10) · alle zuständigen Anwälte dürfen die Akte bearbeiten und sehen sie unter „Meine Akten“ · das Team stellen der federführende Anwalt und die Kanzleileitung zusammen, weitere Anwälte können ihre Mitarbeit selbst beenden · gibt der federführende Anwalt ab, übernimmt der nächste · Discord-Ereignis „Anwalt einer Akte zugewiesen“ pingt die neu zugewiesenen Anwälte · Mandant und öffentliche Statusabfrage zeigen alle zuständigen Anwälte |
+| **Mandatsverträge** | In der Akte „Mandatsvertrag erstellen“ → Vorlage der Kanzlei wird mit Anwalt (Name, Rang), Mandant, Honorar, Datum und Ort gefüllt (Vorbelegung aus Akte und früheren Verträgen, Honorar-Vorschläge aus der Honorarordnung) · Druckansicht im Layout der Kanzleivorlage (Kopfzeile auf jeder Seite, PDF über den Druckdialog) · **Unterschriften:** der genannte Anwalt unterschreibt digital, der Mandant im Portal (Name eintippen) – oder die Kanzlei erfasst die Unterschrift im Spiel · nach der ersten Unterschrift gesperrt · Verlauf und Discord-Ereignis „Mandatsvertrag unterschrieben“ · Vorlagen unter Einstellungen → Vertragsvorlagen bearbeiten (siehe [Mandatsverträge](#mandatsverträge)) |
 | **Aktenübersicht & Handlungsbedarf** | Kennzahlen im Aktenkopf (nächste Frist, offene/überfällige Aufgaben, FiveNet-Dokumente, Beweismittel, letzte Aktivität) · Übersicht zeigt überfällige und heute fällige Aufgaben sowie eigene Akten ohne Bewegung seit 7 Tagen |
 | **Protokoll** (Admin) | Wer hat wann was geändert: Akten, Rechnungen, Konten, Team, Bewerbungen, Einstellungen, Anmeldungen des Teams |
 
@@ -157,6 +158,17 @@ Tabellen aus Google Sheets (z. B. Asservatenlisten, Zeugenlisten, Kostenaufstell
 - **In der Akte:** Anzeige als Tabelle (erste Zeile = Kopfzeile), „Tabelle kopieren“ fügt sich mit allen Spalten in Excel oder Google Sheets ein, „Als Textdatei“ liefert ausgerichtete Spalten.
 - **Technik (`gsheets.js`):** CSV-Export freigegebener Tabellen (`docs.google.com/spreadsheets/d/<ID>/export?format=csv&gid=<Blatt>`), gleiche Sicherheitsgrenzen wie bei Google Docs – kein Google-Konto, keine Passwörter, keine Cookies, nur `docs.google.com` und Weiterleitungen zu `*.googleusercontent.com`, höchstens 3 MB. Übernommen werden Werte (keine Formeln, Formatierungen oder Diagramme), höchstens 50 Spalten und 60.000 Zeichen – bei größeren Tabellen wird an einer Zeilengrenze gekürzt und das angezeigt.
 
+## Mandatsverträge
+
+Die Vorlage „Mandatsvertrag“ entspricht der Google-Docs-Vorlage der Kanzlei (Titelseite mit den Parteien, §§ 1–5, Rechtswirksamkeit, Unterschriftsseite). Ablauf:
+
+1. **Erstellen:** In der Akte unter „Verträge“ → „Mandatsvertrag erstellen“. Unterzeichnender Anwalt (aus dem Aktenteam), Name/Rang/Geburtsdatum, Mandant, Grund- und Zusatzgebühr, Datum und Ort sind vorbelegt bzw. werden aus früheren Verträgen übernommen. Leere Felder erscheinen als Linie zum handschriftlichen Ausfüllen.
+2. **Ansehen & drucken:** `vertrag.html?id=…` zeigt den Vertrag im Layout der Vorlage; „Drucken / PDF“ → „Als PDF speichern“. Die Kopfzeile wiederholt sich auf jeder Seite.
+3. **Unterschreiben:** Der im Vertrag genannte Anwalt unterschreibt selbst. Der Mandant unterschreibt im Portal, indem er seinen Namen eintippt (muss zum Namen im Vertrag passen) – oder die Kanzlei erfasst „Mandant hat im Spiel unterschrieben“ (mit Namen des Erfassenden im Verlauf). Nach der ersten Unterschrift ist der Inhalt gesperrt; die Kanzleileitung kann Unterschriften zurücksetzen.
+4. **Vorlagen pflegen:** Einstellungen → Vertragsvorlagen (Kanzleileitung): Text bearbeiten, weitere Vorlagen anlegen (z. B. Vollmacht), Vorschau mit Beispielwerten, „Original wiederherstellen“. Bestehende Verträge behalten den Text, mit dem sie erstellt wurden.
+
+Formatierung der Vorlagen: `# Titel`, `## Abschnitt`, `### § Überschrift`, `1. nummerierter Absatz`, `| zentrierte Zeile`, vier Leerzeichen = eingerückt, `**fett**`, `*kursiv*`, `===` neue Seite, `[Unterschriften]` Unterschriftsfeld. Platzhalter: `{{anwalt}}`, `{{anwalt_rang}}`, `{{anwalt_geburtsdatum}}`, `{{mandant}}`, `{{mandant_geburtsdatum}}`, `{{grundgebuehr}}`, `{{zusatzgebuehr}}`, `{{datum}}`, `{{ort}}`, `{{aktenzeichen}}`, `{{akte}}`, `{{rechtsgebiet}}`, `{{kanzlei}}`.
+
 ## Rollen und Rechte
 
 | | Mandant | Anwalt | Kanzleileitung (Admin) |
@@ -165,6 +177,7 @@ Tabellen aus Google Sheets (z. B. Asservatenlisten, Zeugenlisten, Kostenaufstell
 | Akte bearbeiten | – | zugewiesene (federführend oder als weiterer Anwalt) | alle |
 | Unbesetzte Akte übernehmen | – | ja | ja / zuweisen |
 | Weitere Anwälte zuweisen | – | als federführender Anwalt; eigene Mitarbeit beenden | ja |
+| Mandatsverträge | eigene ansehen und unterschreiben | erstellen/bearbeiten in zugewiesenen Akten, als genannter Anwalt unterschreiben, Mandanten-Unterschrift erfassen | alles, Vorlagen pflegen, Unterschriften zurücksetzen |
 | Interne Notizen | – | ja | ja |
 | Kalender | eigene Termine anfragen/absagen | alles | alles |
 | Kanzlei-Post | an die Kanzlei | an alle + Rundschreiben | an alle + Rundschreiben |
@@ -196,6 +209,7 @@ discord.js       Webhooks & OAuth2
 fivenet.js       FiveNet: Schnittstellenprüfung, Link-Erkennung, Instanz-Einstellung
 gdocs.js         Google Docs: Link-Erkennung, Export freigegebener Dokumente, Bildadressen
 gsheets.js       Google Sheets: Link-Erkennung, CSV-Export freigegebener Tabellenblätter
+contracts.js     Vertragsvorlagen: Standard-Mandatsvertrag, Platzhalter
 remote.js        Abrufe externer Quellen mit Zeit-, Größen- und Weiterleitungsgrenzen
 uploads.js       Bild-Uploads (Formatprüfung anhand der Dateisignatur)
 helpers.js       Konstanten, Validierung

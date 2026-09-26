@@ -336,6 +336,38 @@ db.exec(`
     added_at TEXT NOT NULL DEFAULT (datetime('now')),
     PRIMARY KEY (case_id, user_id)
   );
+
+  -- Vertragsvorlagen (z. B. Mandatsvertrag), im Dashboard von der Kanzleileitung pflegbar
+  CREATE TABLE IF NOT EXISTS contract_templates (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    key             TEXT UNIQUE,                  -- mitgelieferte Vorlage (zum Zurücksetzen), sonst NULL
+    name            TEXT NOT NULL,
+    body            TEXT NOT NULL,
+    active          INTEGER NOT NULL DEFAULT 1,
+    sort_order      INTEGER NOT NULL DEFAULT 0,
+    updated_by_name TEXT NOT NULL DEFAULT '',
+    updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  -- Verträge einer Akte: Vorlagentext und ausgefüllte Felder werden beim Erstellen festgehalten
+  CREATE TABLE IF NOT EXISTS case_contracts (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id           INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    template_name     TEXT NOT NULL,
+    body              TEXT NOT NULL,
+    data              TEXT NOT NULL DEFAULT '{}',
+    lawyer_id         INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    lawyer_signature  TEXT,
+    lawyer_signed_at  TEXT,
+    client_signature  TEXT,
+    client_signed_at  TEXT,
+    client_signed_via TEXT,                       -- 'portal' (selbst) oder 'kanzlei' (im Spiel unterschrieben, erfasst)
+    client_recorded_by_name TEXT NOT NULL DEFAULT '',
+    created_by        INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_by_name   TEXT NOT NULL DEFAULT '',
+    created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `);
 
 /* ================================================================
@@ -453,6 +485,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_cases_client ON cases(client_id);
   CREATE INDEX IF NOT EXISTS idx_cases_lawyer ON cases(lawyer_id);
   CREATE INDEX IF NOT EXISTS idx_case_lawyers_user ON case_lawyers(user_id);
+  CREATE INDEX IF NOT EXISTS idx_contracts_case ON case_contracts(case_id);
   CREATE INDEX IF NOT EXISTS idx_cases_status ON cases(status);
   CREATE INDEX IF NOT EXISTS idx_notes_case ON notes(case_id);
   CREATE INDEX IF NOT EXISTS idx_appt_case ON appointments(case_id);

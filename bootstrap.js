@@ -8,6 +8,7 @@
 const { db, tx, getSetting, setSetting } = require('./db');
 const { hashPassword, generateStrongPassword, destroyAllSessions } = require('./auth');
 const { deriveInitials } = require('./helpers');
+const contracts = require('./contracts');
 
 const DEFAULT_ADMIN_EMAIL = 'alois.pake@pake-scha.ls';
 
@@ -296,6 +297,19 @@ function fixCourtWording() {
   });
 }
 
+/** Mitgelieferte Vertragsvorlagen einmalig anlegen (danach im Dashboard änderbar). */
+function ensureContractTemplates() {
+  const insert = db.prepare('INSERT OR IGNORE INTO contract_templates (key, name, body, sort_order) VALUES (?, ?, ?, ?)');
+  contracts.DEFAULT_TEMPLATES.forEach((t, i) => {
+    const flag = `seeded_contract_${t.key}`;
+    if (getSetting(flag)) return;
+    tx(() => {
+      insert.run(t.key, t.name, t.body, i + 1);
+      setSetting(flag, new Date().toISOString());
+    });
+  });
+}
+
 function runBootstrap() {
   migrateLegacyData();
   ensureTeamAccounts();
@@ -305,6 +319,7 @@ function runBootstrap() {
   ensureDefaultFees();
   ensureDefaultPositions();
   fixCourtWording();
+  ensureContractTemplates();
 }
 
 module.exports = { runBootstrap };
