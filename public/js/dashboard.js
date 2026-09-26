@@ -184,6 +184,38 @@
   const badge = (text, color = 'gold') => `<span class="badge badge-${color}">${esc(text)}</span>`;
   const statusBadge = (map, key) => badge(...(map[key] || [key, 'slate']));
   const opt = (value, label, selected = false) => `<option value="${esc(value)}" ${selected ? 'selected' : ''}>${esc(label)}</option>`;
+
+  /* ---------------------------------------------------------------- Zuständige Anwälte (mehrere pro Akte) */
+  /** Federführender Anwalt zuerst, dann die weiteren. */
+  const caseTeam = (c) => [...(c.lawyerId ? [{ id: c.lawyerId, name: c.lawyerName || '—', lead: true }] : []), ...(c.coLawyers || []).map((l) => ({ ...l, lead: false }))];
+  /** Arbeitet der Benutzer an der Akte mit (federführend oder als weiterer Anwalt)? */
+  const onCase = (c, uid = st.user.id) => c.lawyerId === uid || (c.coLawyers || []).some((l) => l.id === uid);
+  function teamText(c) {
+    const team = caseTeam(c);
+    if (!team.length) return 'Noch nicht zugewiesen';
+    return team.map((l) => (l.lead && team.length > 1 ? `${l.name} (federführend)` : l.name)).join(', ');
+  }
+
+  /**
+   * Auswahl der zuständigen Anwälte. withLead: Auswahl des federführenden Anwalts (Kanzleileitung);
+   * sonst ist leadId fest (z. B. man selbst) und nur weitere Anwälte werden gewählt.
+   */
+  function lawyerPicker({ leadId = null, coIds = [], withLead = false, extra = [], leadLabel = 'Federführender Anwalt', emptyLead = 'Nicht zugewiesen' }) {
+    const people = [...st.lawyers.map((l) => ({ id: l.id, name: l.displayName, rank: l.rank })), ...extra.filter((x) => !st.lawyers.some((l) => l.id === x.id))];
+    const lead = withLead
+      ? `<div class="span-2"><label class="label" for="teamLead">${esc(leadLabel)}</label><select id="teamLead" name="lawyerId" class="field">
+          <option value="">${esc(emptyLead)}</option>${people.map((l) => opt(l.id, l.name + (l.rank ? ' · ' + l.rank : ''), l.id === leadId)).join('')}</select></div>`
+      : '';
+    const options = people
+      .filter((l) => withLead || l.id !== leadId)
+      .map(
+        (l) => `<label class="check lawyer-opt"><input type="checkbox" name="coLawyerIds" value="${l.id}" ${coIds.includes(l.id) ? 'checked' : ''} ${withLead && l.id === leadId ? 'disabled' : ''}>
+          <span>${esc(l.name)}${l.rank ? `<span class="block text-dim text-xs">${esc(l.rank)}</span>` : ''}</span></label>`
+      )
+      .join('');
+    return `${lead}<div class="span-2" data-team><div class="label">Weitere Anwälte <span class="text-dim font-normal normal-case tracking-normal">– arbeiten mit und dürfen die Akte bearbeiten</span></div>
+      ${options ? `<div class="lawyer-grid">${options}</div>` : '<p class="text-sm text-dim">Keine weiteren Anwälte im Team.</p>'}</div>`;
+  }
   const empty = (text, ico = 'folder') => `<div class="empty">${icon(ico, 'ico-lg')}<p>${esc(text)}</p></div>`;
   const pad = (n) => String(n).padStart(2, '0');
   const dayKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -674,7 +706,7 @@
     const today = st.myTasks.filter((t) => t.dueDate && daysUntil(t.dueDate) === 0);
     const stale = st.cases.filter((c) => {
       const d = parseDate(c.updatedAt);
-      return c.status === 'in_bearbeitung' && c.lawyerId === me && d && -daysUntil(dayKey(d)) >= STALE_DAYS;
+      return c.status === 'in_bearbeitung' && onCase(c, me) && d && -daysUntil(dayKey(d)) >= STALE_DAYS;
     });
     if (!overdue.length && !today.length && !stale.length) return '';
     const due = [...overdue, ...today];
@@ -711,7 +743,7 @@
       const kpis = staff
         ? [
             kpi('Neue Anfragen', active.filter((c) => c.status === 'offen').length, `${active.filter((c) => !c.lawyerId).length} ohne Anwalt`, 'folder', '#cases'),
-            kpi('In Bearbeitung', active.filter((c) => c.status === 'in_bearbeitung').length, `${active.filter((c) => c.lawyerId === u.id).length} davon bei Ihnen`, 'briefcase', '#cases'),
+            kpi('In Bearbeitung', active.filter((c) => c.status === 'in_bearbeitung').length, `${active.filter((c) => onCase(c, u.id)).length} davon bei Ihnen`, 'briefcase', '#cases'),
             kpiEvent('Nächste Frist / Termin', nextDeadline),
             kpi('Kanzlei-Post', st.unread, st.unread === 1 ? 'ungelesene Nachricht' : 'ungelesene Nachrichten', 'mail', '#mail'),
           ]
@@ -777,10 +809,10 @@
     return st.cases.filter((c) => {
       const f = st.caseFilter;
       const stateOk = f === 'alle' || (f === 'aktiv' ? c.status !== 'geschlossen' : c.status === f);
-      const mineOk = !st.caseMine || c.lawyerId === st.user.id;
+      const mineOk = !st.caseMine || onCase(c);
       const textOk =
         !q ||
-        [c.caseNumber, c.title, c.clientName, c.lawyerName, c.courtRef, c.opponent].join(' ').toLowerCase().includes(q) ||
+        [c.caseNumber, c.title, c.clientName, c.lawyerName, ...(c.coLawyers || []).map((l) => l.name), c.courtRef, c.opponent].join(' ').toLowerCase().includes(q) ||
         // Google-Sheets-IDs tragen ggf. das Tabellenblatt (#gid=…) – gefunden wird jede Verknüpfung der Tabelle.
         (!!extId && (c.externalDocIds || []).some((x) => x.split('#')[0] === extId));
       return stateOk && mineOk && textOk;
@@ -803,7 +835,7 @@
           <td class="td-main"><div class="font-mono text-gold text-xs">${esc(c.caseNumber)}</div><div class="font-medium">${esc(c.title)}</div>
             <div class="text-xs text-dim mt-1 flex flex-wrap items-center gap-2">${esc(AREAS[c.area] || c.area)}${c.urgency !== 'normal' ? badge(...URGENCY[c.urgency]) : ''}</div></td>
           ${staff ? `<td data-label="Mandant">${esc(c.clientName)}</td>` : ''}
-          <td data-label="Zuständig">${c.lawyerName ? esc(c.lawyerName) : badge('Unbesetzt', 'amber')}</td>
+          <td data-label="Zuständig">${c.lawyerName ? `${esc(c.lawyerName)}${(c.coLawyers || []).length ? `<div class="text-xs text-dim">+ ${esc(c.coLawyers.map((l) => l.name).join(', '))}</div>` : ''}` : badge('Unbesetzt', 'amber')}</td>
           <td data-label="Status">${statusBadge(CASE_STATUS, c.status)}</td>
           <td data-label="Aktualisiert" class="text-dim text-xs nowrap">${esc(fmtDate(c.updatedAt))}</td></tr>`
         )
@@ -1807,7 +1839,7 @@
     const info = [
       ['Mandant', c.clientName + (staff && !c.hasClientAccount ? ' (ohne Konto)' : '')],
       staff ? ['Kontakt', [c.clientPhone, c.clientEmail].filter(Boolean).join(' · ') || '—'] : null,
-      ['Zuständig', c.lawyerName || 'Noch nicht zugewiesen'],
+      [caseTeam(c).length > 1 ? 'Zuständige Anwälte' : 'Zuständig', teamText(c)],
       ['Rechtsgebiet', AREAS[c.area] || c.area],
       ['Dringlichkeit', (URGENCY[c.urgency] || [c.urgency])[0]],
       c.opponent ? ['Gegenpartei', c.opponent] : null,
@@ -1842,6 +1874,7 @@
       quick.push(`<button class="btn-outline btn-sm" data-action="new-invoice" data-case-id="${c.id}">${icon('receipt', 'ico-sm')}<span>Rechnung</span></button>`);
       if (c.clientId) quick.push(`<button class="btn-outline btn-sm" data-action="compose" data-recipient="${c.clientId}" data-case-id="${c.id}" data-return-case="${c.id}">${icon('mail', 'ico-sm')}<span>Mandant anschreiben</span></button>`);
       if (c.lawyerId === me) quick.push(`<button class="btn-ghost btn-sm" data-action="release-case" data-id="${c.id}">Akte abgeben</button>`);
+      if (c.isCoLawyer) quick.push(`<button class="btn-ghost btn-sm" data-action="leave-case" data-id="${c.id}">Mitarbeit beenden</button>`);
       if (admin) quick.push(`<button class="btn-danger btn-sm" data-action="delete-case" data-id="${c.id}" data-number="${esc(c.caseNumber)}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>`);
     } else {
       if (!c.closed) quick.push(`<button class="btn-outline btn-sm" data-action="new-event" data-case-id="${c.id}" data-return-case="${c.id}">${icon('calendar', 'ico-sm')}<span>Termin anfragen</span></button>`);
@@ -1856,11 +1889,11 @@
             <div><label class="label">Rechtsgebiet</label><select name="area" class="field">${Object.entries(AREAS).map(([k, l]) => opt(k, l, c.area === k)).join('')}</select></div>
             <div><label class="label">Dringlichkeit</label><select name="urgency" class="field">${Object.entries(URGENCY).map(([k, [l]]) => opt(k, l, c.urgency === k)).join('')}</select></div>
             <div><label class="label">Verfahrensstand</label><select name="step" class="field">${STEPS.map((s, i) => opt(i, s, c.step === i)).join('')}</select></div>
-            ${admin ? `<div><label class="label">Zuständiger Anwalt</label><select name="lawyerId" class="field"><option value="">Nicht zugewiesen</option>${st.lawyers.map((l) => opt(l.id, l.displayName, c.lawyerId === l.id)).join('')}</select></div>` : '<div></div>'}
             ${!c.hasClientAccount ? `<div><label class="label">Mandant</label><input name="clientName" class="field" maxlength="80" value="${esc(c.clientName === '—' ? '' : c.clientName)}"></div>` : ''}
             <div><label class="label">Telefon Mandant</label><input name="clientPhone" class="field" maxlength="40" value="${esc(c.clientPhone || '')}"></div>
             <div><label class="label">Gegenpartei</label><input name="opponent" class="field" maxlength="120" value="${esc(c.opponent)}"></div>
             <div><label class="label">Gerichtsaktenzeichen</label><input name="courtRef" class="field" maxlength="60" value="${esc(c.courtRef)}"></div>
+            ${c.canManageLawyers ? lawyerPicker({ leadId: c.lawyerId, coIds: (c.coLawyers || []).map((l) => l.id), withLead: admin, extra: caseTeam(c) }) : ''}
             <div class="span-2"><label class="label">Sachverhalt</label><textarea name="description" rows="5" maxlength="4000" class="field">${esc(c.description)}</textarea></div>
             <div class="span-2"><label class="label">Statushinweis (sichtbar für den Mandanten und in der öffentlichen Abfrage)</label><textarea name="publicNote" rows="2" maxlength="500" class="field">${esc(c.publicNote)}</textarea></div>
             <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Änderungen speichern</span></button></div>
@@ -1930,7 +1963,7 @@
     if (staff) await load.lawyers();
     openModal(`
       <h2 class="modal-title">${staff ? 'Neue Akte anlegen' : 'Mandat einreichen'}</h2>
-      <p class="modal-sub">${staff ? 'Mandanten ohne Website-Konto einfach per Name erfassen. Die Akte wird Ihnen direkt zugewiesen.' : 'Schildern Sie Ihr Anliegen – ein Anwalt der Kanzlei meldet sich umgehend.'}</p>
+      <p class="modal-sub">${staff ? 'Mandanten ohne Website-Konto einfach per Name erfassen. Die Akte wird Ihnen direkt zugewiesen – weitere Anwälte können Sie unten hinzufügen.' : 'Schildern Sie Ihr Anliegen – ein Anwalt der Kanzlei meldet sich umgehend.'}</p>
       <form data-form="new-case" class="form-grid cols-2">
         ${staff ? `
           <div><label class="label" for="ncName">Mandant (Name)</label><input id="ncName" name="clientName" class="field" maxlength="80" placeholder="z. B. John Doe" autofocus></div>
@@ -1941,7 +1974,7 @@
         <div><label class="label">Dringlichkeit</label><select name="urgency" class="field">${Object.entries(URGENCY).map(([k, [l]]) => opt(k, l)).join('')}</select></div>
         ${staff ? `<div><label class="label">Gegenpartei</label><input name="opponent" class="field" maxlength="120" placeholder="optional"></div>
           <div><label class="label">Gerichtsaktenzeichen</label><input name="courtRef" class="field" maxlength="60" placeholder="optional"></div>` : ''}
-        ${isAdmin() ? `<div class="span-2"><label class="label">Zuständiger Anwalt</label><select name="lawyerId" class="field"><option value="">Noch niemand (offene Anfrage)</option>${st.lawyers.map((l) => opt(l.id, l.displayName + (l.rank ? ' · ' + l.rank : ''), l.id === st.user.id)).join('')}</select></div>` : ''}
+        ${staff ? lawyerPicker({ leadId: st.user.id, withLead: isAdmin(), emptyLead: 'Noch niemand (offene Anfrage)' }) : ''}
         <div class="span-2"><label class="label">Sachverhalt</label><textarea name="description" rows="5" class="field" ${staff ? '' : 'required minlength="10"'} maxlength="4000" placeholder="Was ist passiert? Wer ist beteiligt? Gibt es bereits Fristen oder Termine?"></textarea></div>
         <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>${staff ? 'Akte anlegen' : 'Mandat einreichen'}</span></button></div>
       </form>`);
@@ -3330,10 +3363,23 @@
       else await refreshBehind();
     },
     'release-case': async (el) => {
-      if (!(await ask('Die Akte erscheint danach wieder als offene Anfrage für das Team.', { title: 'Akte abgeben?', confirmText: 'Akte abgeben' }))) return;
+      const next = st.caseInfo && st.caseInfo.id === Number(el.dataset.id) ? (st.caseInfo.coLawyers || [])[0] : null;
+      const text = next
+        ? `Die Federführung geht an ${next.name} über. Sie arbeiten danach nicht mehr an der Akte mit.`
+        : 'Die Akte erscheint danach wieder als offene Anfrage für das Team.';
+      if (!(await ask(text, { title: 'Akte abgeben?', confirmText: 'Akte abgeben' }))) return;
       const id = Number(el.dataset.id);
       await api.patch('/api/cases/' + id, { lawyerId: null });
-      toast('Akte abgegeben.');
+      toast(next ? `Akte abgegeben – federführend ist jetzt ${next.name}.` : 'Akte abgegeben.');
+      await reloadCase(id);
+    },
+    'leave-case': async (el) => {
+      const id = Number(el.dataset.id);
+      const c = st.caseInfo && st.caseInfo.id === id ? st.caseInfo : null;
+      if (!c) return;
+      if (!(await ask('Sie werden als weiterer Anwalt aus der Akte ausgetragen und können sie danach nicht mehr bearbeiten.', { title: 'Mitarbeit beenden?', confirmText: 'Mitarbeit beenden' }))) return;
+      await api.patch('/api/cases/' + id, { coLawyerIds: (c.coLawyers || []).map((l) => l.id).filter((uid) => uid !== st.user.id) });
+      toast('Sie arbeiten nicht mehr an dieser Akte mit.');
       await reloadCase(id);
     },
     'delete-case': async (el) => {
@@ -3862,6 +3908,7 @@
           if (val(fd, k)) body[k] = val(fd, k);
         });
         if (f.elements.lawyerId) body.lawyerId = val(fd, 'lawyerId') ? Number(val(fd, 'lawyerId')) : null;
+        if (f.querySelector('[data-team]')) body.coLawyerIds = fd.getAll('coLawyerIds').map(Number);
       }
       const res = await api.post('/api/cases', body);
       toast(`Akte ${res.case.caseNumber} angelegt.`);
@@ -3878,6 +3925,7 @@
       });
       if (f.elements.step) body.step = Number(fd.get('step'));
       if (f.elements.lawyerId) body.lawyerId = fd.get('lawyerId') ? Number(fd.get('lawyerId')) : null;
+      if (f.querySelector('[data-team]')) body.coLawyerIds = fd.getAll('coLawyerIds').map(Number);
       await api.patch('/api/cases/' + id, body);
       toast('Akte gespeichert.');
       await reloadCase(id);
@@ -4315,6 +4363,14 @@
     }
     if (t.dataset.userField) guard(() => updateUserField(t));
     if (t.matches('[data-ext-sort]')) sortExternalDocs(t);
+    // Federführender Anwalt gewählt: derselbe kann nicht zugleich „weiterer Anwalt“ sein.
+    if (t.id === 'teamLead') {
+      t.form.querySelectorAll('input[name="coLawyerIds"]').forEach((box) => {
+        const isLead = box.value === t.value;
+        box.disabled = isLead;
+        if (isLead) box.checked = false;
+      });
+    }
   });
 
   window.addEventListener('hashchange', () => go(hashView()));

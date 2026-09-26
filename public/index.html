@@ -380,7 +380,7 @@
                 <div class="p-4 border-t md:border-t-0 md:border-l border-[var(--glass-border)]">
                     <div class="text-[0.65rem] uppercase tracking-widest text-[var(--gold-500)] mb-1 font-semibold">Zulassung</div>
                     <div class="font-serif text-2xl sm:text-3xl font-bold text-white">Alle Instanzen</div>
-                    <div class="text-xs text-[var(--text-muted)] mt-1">Vertretung vor dem District Court</div>
+                    <div class="text-xs text-[var(--text-muted)] mt-1">Vertretung vor allen Gerichten</div>
                 </div>
                 <div class="p-4 border-t md:border-t-0 border-l border-[var(--glass-border)]">
                     <div class="text-[0.65rem] uppercase tracking-widest text-[var(--gold-500)] mb-1 font-semibold">Standort</div>
@@ -644,9 +644,9 @@
                             <h3 class="font-serif text-2xl text-[var(--gold-light)] font-semibold">Gerichtsverfahren</h3>
                         </div>
                         <div class="grid gap-3">
-                            <div class="price-item ledger-item p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2" data-name="vertretung hauptverhandlung us district court" data-category="gericht" data-price="100000">
+                            <div class="price-item ledger-item p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2" data-name="vertretung hauptverhandlung alle gerichte" data-category="gericht" data-price="100000">
                                 <div>
-                                    <div class="font-medium text-white text-base">Vertretung Hauptverhandlung (US District Court)</div>
+                                    <div class="font-medium text-white text-base">Vertretung Hauptverhandlung (alle Gerichte)</div>
                                     <div class="text-xs text-[var(--text-muted)]">Vollständige Vertretung inklusive Plädoyer, Beweisanträgen und Zeugenbefragung vor Gericht.</div>
                                 </div>
                                 <div class="font-mono text-[var(--gold-500)] font-semibold text-lg whitespace-nowrap">100.000 $</div>
@@ -742,7 +742,7 @@
                     <label class="flex items-center justify-between p-3.5 rounded-xl border border-[var(--glass-border)] bg-slate-900/40 hover:bg-slate-900/70 cursor-pointer transition-all">
                         <div class="flex items-center gap-3">
                             <input type="checkbox" class="calc-check accent-[var(--gold-500)] w-4 h-4" value="100000" data-name="Vertretung Hauptverhandlung" onchange="calculateTotal()">
-                            <span class="text-sm font-medium text-white">Vertretung Hauptverhandlung (US District Court)</span>
+                            <span class="text-sm font-medium text-white">Vertretung Hauptverhandlung (alle Gerichte)</span>
                         </div>
                         <span class="font-mono text-xs text-[var(--gold-500)]">100.000 $</span>
                     </label>
@@ -841,7 +841,7 @@
                             <div id="caseNumber" class="font-mono text-lg text-white"></div>
                         </div>
                         <div>
-                            <div class="text-[0.65rem] uppercase tracking-widest text-[var(--text-muted)]">Zuständiger Anwalt</div>
+                            <div id="caseLawyerLabel" class="text-[0.65rem] uppercase tracking-widest text-[var(--text-muted)]">Zuständiger Anwalt</div>
                             <div id="caseLawyer" class="font-serif text-lg text-[var(--gold-light)]"></div>
                         </div>
                         <div id="caseBadge" class="px-4 py-1.5 rounded-full text-xs font-semibold border whitespace-nowrap self-start sm:self-auto"></div>

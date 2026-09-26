@@ -326,6 +326,16 @@ db.exec(`
     created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
   );
+
+  -- Weitere Anwälte einer Akte (Mitbearbeitung). Der federführende Anwalt steht in cases.lawyer_id
+  -- und ist hier nie zusätzlich eingetragen.
+  CREATE TABLE IF NOT EXISTS case_lawyers (
+    case_id  INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    added_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    added_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (case_id, user_id)
+  );
 `);
 
 /* ================================================================
@@ -442,6 +452,7 @@ migrateLegacyTables();
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_cases_client ON cases(client_id);
   CREATE INDEX IF NOT EXISTS idx_cases_lawyer ON cases(lawyer_id);
+  CREATE INDEX IF NOT EXISTS idx_case_lawyers_user ON case_lawyers(user_id);
   CREATE INDEX IF NOT EXISTS idx_cases_status ON cases(status);
   CREATE INDEX IF NOT EXISTS idx_notes_case ON notes(case_id);
   CREATE INDEX IF NOT EXISTS idx_appt_case ON appointments(case_id);

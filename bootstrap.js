@@ -54,7 +54,7 @@ const DEFAULT_FEES = [
   ['strafrecht', 'U-Haft-Vertretung vor Ort', 'Unverzügliches Erscheinen bei Festnahme, Wahrnehmung der Beschuldigtenrechte und Vertretung im Verhör.', 50000, 1],
   ['strafrecht', 'Akteneinsicht & Strafantragsprüfung', 'Anforderung und Auswertung behördlicher Ermittlungsakten zur Vorbereitung der Verteidigung.', 30000, 0],
   ['notfall', '24/7 Eilnotdiensteinsatz (Nacht/Feiertag)', 'Sofortige Begleitung bei Durchsuchungen, Beschlagnahmen oder vorläufigen Festnahmen außerhalb der regulären Zeiten.', 75000, 1],
-  ['gericht', 'Vertretung Hauptverhandlung (US District Court)', 'Vollständige Vertretung inklusive Plädoyer, Beweisanträgen und Zeugenbefragung vor Gericht.', 100000, 1],
+  ['gericht', 'Vertretung Hauptverhandlung (alle Gerichte)', 'Vollständige Vertretung inklusive Plädoyer, Beweisanträgen und Zeugenbefragung vor Gericht.', 100000, 1],
   ['gericht', 'Verfassungsbeschwerde / Grundsatzverfahren', 'Ausarbeitung und Prozessführung bei Grundrechtsverletzungen oder verfassungsrechtlichen Streitfragen.', 150000, 0],
   ['vertraege', 'Vertragsentwurf (Standard)', 'Erstellung rechtssicherer Standardverträge (Kaufvertrag, Arbeitsvertrag, Dienstleistung).', 35000, 1],
   ['vertraege', 'Vertragsprüfung & Überarbeitung', 'Rechtliche Analyse fremder Verträge auf Haftungsrisiken und unwirksame Klauseln.', 25000, 0],
@@ -250,7 +250,7 @@ function ensureDefaultFees() {
 const DEFAULT_POSITIONS = [
   [
     'Associate / Rechtsanwalt (m/w/d)',
-    'Eigenständige Mandatsbearbeitung im Tagesgeschäft: Ticketbearbeitung, Beratungsgespräche, Vertretung bei Festnahmen und vor dem District Court.',
+    'Eigenständige Mandatsbearbeitung im Tagesgeschäft: Ticketbearbeitung, Beratungsgespräche, Vertretung bei Festnahmen und vor allen Gerichten.',
     'Juristische Ausbildung oder vergleichbare Erfahrung (IC), sicheres Auftreten, Zuverlässigkeit und regelmäßige Aktivität.',
   ],
   [
@@ -276,6 +276,26 @@ function ensureDefaultPositions() {
   });
 }
 
+/**
+ * Einmalige Textkorrektur: Die Kanzlei vertritt vor allen Gerichten, nicht nur vor dem District Court.
+ * Geändert werden nur Einträge, die noch genau dem früheren Standardtext entsprechen –
+ * im Dashboard selbst angepasste Texte bleiben unberührt.
+ */
+function fixCourtWording() {
+  if (getSetting('fixed_court_wording')) return;
+  tx(() => {
+    db.prepare('UPDATE fees SET name = ? WHERE name = ?').run(
+      'Vertretung Hauptverhandlung (alle Gerichte)',
+      'Vertretung Hauptverhandlung (US District Court)'
+    );
+    db.prepare('UPDATE positions SET description = ? WHERE description = ?').run(
+      'Eigenständige Mandatsbearbeitung im Tagesgeschäft: Ticketbearbeitung, Beratungsgespräche, Vertretung bei Festnahmen und vor allen Gerichten.',
+      'Eigenständige Mandatsbearbeitung im Tagesgeschäft: Ticketbearbeitung, Beratungsgespräche, Vertretung bei Festnahmen und vor dem District Court.'
+    );
+    setSetting('fixed_court_wording', new Date().toISOString());
+  });
+}
+
 function runBootstrap() {
   migrateLegacyData();
   ensureTeamAccounts();
@@ -284,6 +304,7 @@ function runBootstrap() {
   applyEmergencyReset();
   ensureDefaultFees();
   ensureDefaultPositions();
+  fixCourtWording();
 }
 
 module.exports = { runBootstrap };

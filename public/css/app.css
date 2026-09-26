@@ -706,6 +706,13 @@ details.edit-box[open] > summary::after { content: '–'; }
 .fn-table thead th { position: sticky; top: 0; z-index: 1; background: #141b2e; color: var(--text-main); font-weight: 600; white-space: nowrap; }
 .fn-table tbody tr:nth-child(even) td { background: rgba(255, 255, 255, 0.02); }
 .fn-table tr.gap td { padding: 0.2rem; background: transparent; }
+/* Mehrere Anwälte pro Akte */
+.lawyer-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: 0.45rem; margin-top: 0.35rem; }
+.lawyer-opt { align-items: center; padding: 0.5rem 0.7rem; border: 1px solid var(--glass-border); border-radius: 10px; background: rgba(15, 23, 42, 0.4); transition: border-color 0.15s ease, background-color 0.15s ease; }
+.lawyer-opt:hover { border-color: var(--gold-hairline); }
+.lawyer-opt:has(input:checked) { border-color: var(--gold-hairline); background: var(--gold-soft); color: var(--text-main); }
+.lawyer-opt:has(input:disabled) { opacity: 0.45; cursor: not-allowed; }
+
 /* Externe Dokumente: Reihenfolge per Ziehen */
 .ext-sortbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; margin-bottom: 0.75rem; }
 .ext-sortbar .form-hint { margin: 0; display: inline-flex; align-items: center; gap: 0.35rem; }

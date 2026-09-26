@@ -44,9 +44,14 @@ router.post(
       )
       .get(d.caseNumber.toUpperCase(), d.pin);
     if (!c) return res.status(404).json({ error: 'Kein Mandat mit diesen Angaben gefunden.' });
+    const co = db
+      .prepare('SELECT u.display_name FROM case_lawyers cl JOIN users u ON u.id = cl.user_id WHERE cl.case_id = ? ORDER BY cl.added_at, u.id')
+      .all(c.id)
+      .map((r) => r.display_name);
     res.json({
       caseNumber: c.case_number,
-      lawyer: c.lawyer_name || 'Noch nicht zugewiesen',
+      lawyer: c.lawyer_name ? [c.lawyer_name, ...co].join(', ') : 'Noch nicht zugewiesen',
+      lawyerCount: c.lawyer_name ? 1 + co.length : 0,
       status: c.status === 'geschlossen' ? 'Abgeschlossen' : c.status === 'offen' ? 'Eingegangen' : STEPS[c.step] || STEPS[0],
       statusLabel: CASE_STATUS[c.status],
       step: c.step,

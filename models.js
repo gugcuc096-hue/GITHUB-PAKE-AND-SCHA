@@ -32,7 +32,10 @@ const CASE_SELECT = `
   SELECT c.*,
          cu.display_name AS client_account_name, cu.email AS client_email, cu.phone AS client_account_phone,
          lu.display_name AS lawyer_name, lu.discord_id AS lawyer_discord_id,
-         (SELECT group_concat(e.external_id, ' ') FROM case_external_docs e WHERE e.case_id = c.id) AS external_doc_ids
+         (SELECT group_concat(e.external_id, ' ') FROM case_external_docs e WHERE e.case_id = c.id) AS external_doc_ids,
+         (SELECT json_group_array(json_object('id', x.id, 'name', x.display_name, 'discordId', x.discord_id))
+            FROM (SELECT u2.id, u2.display_name, u2.discord_id FROM case_lawyers cl JOIN users u2 ON u2.id = cl.user_id
+                  WHERE cl.case_id = c.id ORDER BY cl.added_at, u2.id) x) AS co_lawyers_json
   FROM cases c
   LEFT JOIN users cu ON cu.id = c.client_id
   LEFT JOIN users lu ON lu.id = c.lawyer_id`;
@@ -41,14 +44,38 @@ function getCase(id) {
   return db.prepare(`${CASE_SELECT} WHERE c.id = ?`).get(id) || null;
 }
 
+/** Weitere Anwälte der Akte (ohne den federführenden): [{ id, name, discordId }] */
+function coLawyersOf(c) {
+  if (!c.co_lawyers) {
+    try {
+      c.co_lawyers = JSON.parse(c.co_lawyers_json || '[]');
+    } catch {
+      c.co_lawyers = [];
+    }
+  }
+  return c.co_lawyers;
+}
+
+/** Alle zuständigen Anwälte: federführend zuerst, dann die weiteren. */
+function caseLawyers(c) {
+  const lead = c.lawyer_id ? [{ id: c.lawyer_id, name: c.lawyer_name || '—', discordId: c.lawyer_discord_id || null, lead: true }] : [];
+  return [...lead, ...coLawyersOf(c).map((l) => ({ ...l, lead: false }))];
+}
+
 function caseAccess(c, u) {
   const admin = u.role === 'admin';
   const staff = isStaff(u);
   const owner = u.role === 'mandant' && c.client_id === u.id;
+  const isLead = staff && c.lawyer_id === u.id;
+  const isCoLawyer = staff && coLawyersOf(c).some((l) => l.id === u.id);
   return {
     canView: staff || owner,
-    canEdit: admin || (staff && c.lawyer_id === u.id),
+    // Bearbeiten dürfen alle zuständigen Anwälte; das Team zusammenstellen der federführende Anwalt und die Kanzleileitung.
+    canEdit: admin || isLead || isCoLawyer,
     canClaim: staff && !c.lawyer_id,
+    canManageLawyers: admin || isLead,
+    isLead,
+    isCoLawyer,
     canDelete: admin,
   };
 }
@@ -73,6 +100,8 @@ function caseRow(c, u) {
     courtRef: c.court_ref,
     lawyerId: c.lawyer_id,
     lawyerName: c.lawyer_name || null,
+    // Weitere zuständige Anwälte (Mitbearbeitung)
+    coLawyers: coLawyersOf(c).map((l) => ({ id: l.id, name: l.name })),
     status: c.status,
     statusLabel: CASE_STATUS[c.status] || c.status,
     step: c.step,
@@ -499,6 +528,8 @@ module.exports = {
   taskRow,
   getCase,
   caseAccess,
+  coLawyersOf,
+  caseLawyers,
   caseRow,
   noteRow,
   addSystemNote,

@@ -26,6 +26,7 @@ const WEBHOOK_RE = /^https:\/\/(?:(?:canary|ptb)\.)?discord(?:app)?\.com\/api\/w
 const EVENTS = {
   'case.created': 'Neues Mandat / neue Akte',
   'case.status': 'Statusänderung einer Akte',
+  'case.assigned': 'Anwalt einer Akte zugewiesen (auch als weiterer Anwalt)',
   'calendar.created': 'Neuer Gerichtstermin / neue Frist',
   'calendar.reminder': 'Erinnerung 24 h vor Frist oder Gerichtstermin',
   'appointment.requested': 'Terminanfrage eines Mandanten',

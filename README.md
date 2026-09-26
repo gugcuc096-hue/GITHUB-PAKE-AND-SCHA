@@ -27,6 +27,7 @@ Premium-Webanwendung für die GTA-RP-Kanzlei **Pake & Scha Legal Consulting**: �
 | **Google-Sheets-Tabellen** | In der Akte „Google-Sheets-Tabelle“ → Link einfügen → freigegebene Tabellen werden **automatisch als Tabelle übernommen** (das Tabellenblatt aus dem Link, sonst das erste) · Anzeige als Tabelle in der Akte, „Tabelle kopieren“ fügt sich direkt in Excel/Sheets ein, Textdatei mit ausgerichteten Spalten · nicht freigegebene Tabellen: Zellen kopieren und einfügen (siehe [Google-Sheets-Integration](#google-sheets-integration)) |
 | **Reihenfolge der Dokumente** | Externe Dokumente einer Akte lassen sich ordnen: Dokument **gedrückt halten und nach oben oder unten ziehen** (Maus und Touch; am Rand scrollt die Akte mit), über den Griff ⠿ mit der Maus sofort, per Tastatur mit Griff + ↑/↓ · Menü „Sortieren“: nach Datum (älteste/neueste zuerst), Titel oder Quelle · die Reihenfolge wird gespeichert und gilt für alle, auch für den Mandanten |
 | **Aufgaben & Wiedervorlagen** | Aufgaben mit Fälligkeitsdatum, Zuständigkeit und Notiz – mit oder ohne Aktenbezug · Checklisten je Rechtsgebiet per Klick in die Akte übernehmen · Erledigt-Vermerk im Aktenverlauf · Zähler fälliger Aufgaben in der Navigation · Discord-Erwähnung bei Zuweisung |
+| **Mehrere Anwälte pro Akte** | Ein federführender Anwalt plus beliebig viele weitere Anwälte (bis zu 10) · alle zuständigen Anwälte dürfen die Akte bearbeiten und sehen sie unter „Meine Akten“ · das Team stellen der federführende Anwalt und die Kanzleileitung zusammen, weitere Anwälte können ihre Mitarbeit selbst beenden · gibt der federführende Anwalt ab, übernimmt der nächste · Discord-Ereignis „Anwalt einer Akte zugewiesen“ pingt die neu zugewiesenen Anwälte · Mandant und öffentliche Statusabfrage zeigen alle zuständigen Anwälte |
 | **Aktenübersicht & Handlungsbedarf** | Kennzahlen im Aktenkopf (nächste Frist, offene/überfällige Aufgaben, FiveNet-Dokumente, Beweismittel, letzte Aktivität) · Übersicht zeigt überfällige und heute fällige Aufgaben sowie eigene Akten ohne Bewegung seit 7 Tagen |
 | **Protokoll** (Admin) | Wer hat wann was geändert: Akten, Rechnungen, Konten, Team, Bewerbungen, Einstellungen, Anmeldungen des Teams |
 
@@ -161,8 +162,9 @@ Tabellen aus Google Sheets (z. B. Asservatenlisten, Zeugenlisten, Kostenaufstell
 | | Mandant | Anwalt | Kanzleileitung (Admin) |
 |---|---|---|---|
 | Akten sehen | eigene | alle | alle |
-| Akte bearbeiten | – | zugewiesene | alle |
+| Akte bearbeiten | – | zugewiesene (federführend oder als weiterer Anwalt) | alle |
 | Unbesetzte Akte übernehmen | – | ja | ja / zuweisen |
+| Weitere Anwälte zuweisen | – | als federführender Anwalt; eigene Mitarbeit beenden | ja |
 | Interne Notizen | – | ja | ja |
 | Kalender | eigene Termine anfragen/absagen | alles | alles |
 | Kanzlei-Post | an die Kanzlei | an alle + Rundschreiben | an alle + Rundschreiben |
