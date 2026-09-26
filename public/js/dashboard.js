@@ -85,6 +85,7 @@
     external: 'M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14',
     shield: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
     tasks: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4',
+    grip: 'M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01',
     table: 'M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z',
     doc: 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z',
   };
@@ -964,7 +965,7 @@
   const extOf = (d) => EXT[d.provider] || EXT.fivenet;
   const extUrl = (caseId, linkId = null, suffix = '') => `/api/cases/${caseId}/external${linkId ? '/' + linkId : ''}${suffix}`;
 
-  function externalDocCard(d, c) {
+  function externalDocCard(d, c, sortable = false) {
     const staff = isStaff();
     const p = extOf(d);
     const gd = !!p.google;
@@ -1001,8 +1002,9 @@
           .join(', ')}</div>`
       : '';
     const linkedOn = esc(parseDate(d.linkedAt)?.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) || '—');
-    return `<div class="fn-doc ${gd ? `is-${esc(d.provider)}` : ''}">
+    return `<div class="fn-doc ${gd ? `is-${esc(d.provider)}` : ''}" data-doc-id="${d.id}">
       <div class="fn-head">
+        ${sortable ? `<button type="button" class="fn-grip" aria-label="Verschieben: gedrückt halten und ziehen – oder mit den Pfeiltasten ↑ ↓" title="Gedrückt halten und nach oben oder unten ziehen">${icon('grip', 'ico-sm')}</button>` : ''}
         <span class="${p.badgeCls}">${esc(p.name)}</span>
         <div class="fn-main"><div class="fn-title">${esc(d.title || `${p.noun}${gd ? '' : ' ' + d.documentId}`)}</div><div class="fn-meta">${meta}</div></div>
         ${staff && d.internal ? badge('intern', 'amber') : ''}
@@ -1039,6 +1041,7 @@
 
   function externalSection(c, docs) {
     const staff = isStaff();
+    const sortable = staff && docs.length > 1;
     if (!staff && !docs.length) return '';
     return `<div class="section" id="secExternal">
       <h3 class="section-title">Externe Dokumente ${staff ? `<span class="ext-add">
@@ -1046,7 +1049,16 @@
         <button type="button" class="btn-outline btn-sm" data-action="gd-add" data-provider="gdocs">${icon('doc', 'ico-sm')}<span>Google-Docs-Dokument</span></button>
         <button type="button" class="btn-outline btn-sm" data-action="gd-add" data-provider="gsheets">${icon('table', 'ico-sm')}<span>Google-Sheets-Tabelle</span></button></span>` : ''}</h3>
       ${docs.length
-        ? `<div class="stack">${docs.map((d) => externalDocCard(d, c)).join('')}</div>`
+        ? `${sortable ? `<div class="ext-sortbar">
+              <span class="form-hint">${icon('grip', 'ico-sm')} Reihenfolge ändern: Dokument gedrückt halten und nach oben oder unten ziehen.</span>
+              <select class="field ext-sort" data-ext-sort data-case-id="${c.id}" aria-label="Dokumente sortieren">
+                <option value="">Sortieren …</option>
+                <option value="date-asc">Datum: älteste zuerst</option>
+                <option value="date-desc">Datum: neueste zuerst</option>
+                <option value="title">Titel A–Z</option>
+                <option value="source">Nach Quelle</option>
+              </select></div>` : ''}
+            <div class="stack"${sortable ? ` id="extList" data-case-id="${c.id}"` : ''}>${docs.map((d) => externalDocCard(d, c, sortable)).join('')}</div>`
         : '<p class="text-sm text-dim">Noch keine externen Dokumente. Polizeiberichte und Strafakten aus FiveNet, Verträge und Schriftsätze aus Google Docs oder Aufstellungen aus Google Sheets lassen sich per Link mit der Akte verknüpfen – mit Abschrift und Bildern.</p>'}
       ${!staff ? '<p class="form-hint">Öffnen im Original ist nur mit einer Berechtigung in FiveNet bzw. bei Google möglich.</p>' : ''}
     </div>`;
@@ -1507,6 +1519,213 @@
     if (r.skipped && !r.ok && !r.failed) toast('Die Bilder sind bereits in der Akte – nichts Neues.');
     if (r.failed) toast(`${r.failed} Bild${r.failed === 1 ? '' : 'er'} nicht übernommen (${[...new Set(r.errors)].slice(0, 2).join('; ')}). Tipp: als Screenshot mit Strg+V einfügen.`, 'error');
   }
+
+  /* ---------------------------------------------------------------- Externe Dokumente: Reihenfolge */
+  // Gedrückt halten (Maus oder Finger) und ziehen; über den Griff mit der Maus sofort. Tastatur: Griff + ↑/↓.
+  const DRAG_HOLD_MS = 280;
+  const DRAG_SLOP = 8; // so weit darf sich der Finger während des Haltens bewegen, sonst ist es Scrollen
+  const DRAG_SKIP = 'a, button:not(.fn-grip), input, select, textarea, label, summary, .fn-text, .fn-gallery';
+  const drag = { pending: null, active: null, suppressClick: false, saveTimer: 0 };
+
+  const extIds = (list) => [...list.children].map((el) => Number(el.dataset.docId));
+
+  function scrollParentOf(el) {
+    for (let n = el.parentElement; n && n !== document.body; n = n.parentElement) {
+      const oy = getComputedStyle(n).overflowY;
+      if ((oy === 'auto' || oy === 'scroll') && n.scrollHeight > n.clientHeight) return n;
+    }
+    return document.scrollingElement || document.documentElement;
+  }
+
+  /** Verschiebt Karten im DOM und lässt die übrigen sanft an ihren neuen Platz gleiten. */
+  function reorderWithAnimation(list, apply, except = null) {
+    const cards = [...list.children];
+    const before = new Map(cards.map((el) => [el, el.offsetTop]));
+    apply();
+    for (const el of cards) {
+      const delta = before.get(el) - el.offsetTop;
+      if (!delta || el === except) continue;
+      el.style.transition = 'none';
+      el.style.transform = `translateY(${delta}px)`;
+      el.getBoundingClientRect();
+      el.style.transition = '';
+      el.style.transform = '';
+    }
+  }
+
+  function cancelPendingDrag() {
+    if (!drag.pending) return;
+    clearTimeout(drag.pending.timer);
+    drag.pending.card.classList.remove('is-pressing');
+    drag.pending = null;
+  }
+
+  function startDrag(p) {
+    const card = p.card;
+    const list = card.parentElement;
+    if (!card.isConnected || !list) return;
+    card.classList.remove('is-pressing');
+    const scroller = scrollParentOf(list);
+    drag.active = { card, list, scroller, pointerId: p.pointerId, startY: p.y + scroller.scrollTop, originY: p.y, lastY: p.y, order: extIds(list), raf: 0 };
+    card.classList.add('is-dragging');
+    card.style.transform = 'scale(1.01)'; // sichtbar „angehoben“, sobald das Halten erkannt ist
+    document.body.classList.add('ps-dragging');
+    window.getSelection()?.removeAllRanges();
+    if (p.touch) navigator.vibrate?.(12);
+    drag.active.raf = requestAnimationFrame(autoScrollDrag);
+  }
+
+  function moveDrag(clientY) {
+    const a = drag.active;
+    a.lastY = clientY;
+    const place = () => {
+      const dy = clientY + a.scroller.scrollTop - a.startY;
+      a.card.style.transform = `translateY(${dy}px) scale(1.01)`;
+      return a.card.offsetTop + dy + a.card.offsetHeight / 2; // Mitte der gezogenen Karte (ohne andere Animationen)
+    };
+    // Auch bei schnellen Bewegungen über mehrere Karten hinweg: so lange tauschen, bis die Position passt.
+    for (let i = 0; i < 100; i += 1) {
+      const mid = place();
+      const next = a.card.nextElementSibling;
+      const prev = a.card.previousElementSibling;
+      let target = null;
+      if (next && mid > next.offsetTop + next.offsetHeight / 2) target = () => next.after(a.card);
+      else if (prev && mid < prev.offsetTop + prev.offsetHeight / 2) target = () => prev.before(a.card);
+      if (!target) break;
+      const top = a.card.offsetTop;
+      reorderWithAnimation(a.list, target, a.card);
+      a.startY += a.card.offsetTop - top; // Karte bleibt unter Finger/Maus
+    }
+  }
+
+  /** Am oberen/unteren Rand beim Ziehen mitscrollen – nur in die Richtung, in die gezogen wird. */
+  function autoScrollDrag() {
+    const a = drag.active;
+    if (!a) return;
+    const root = a.scroller === document.scrollingElement || a.scroller === document.documentElement;
+    const box = root ? { top: 0, bottom: window.innerHeight } : a.scroller.getBoundingClientRect();
+    const edge = 70;
+    const moved = a.lastY - a.originY;
+    let v = 0;
+    if (moved < -10 && a.lastY < box.top + edge) v = -Math.min(16, Math.ceil((box.top + edge - a.lastY) / 5));
+    else if (moved > 10 && a.lastY > box.bottom - edge) v = Math.min(16, Math.ceil((a.lastY - box.bottom + edge) / 5));
+    if (v) {
+      const was = a.scroller.scrollTop;
+      a.scroller.scrollTop += v;
+      if (a.scroller.scrollTop !== was) moveDrag(a.lastY);
+    }
+    a.raf = requestAnimationFrame(autoScrollDrag);
+  }
+
+  function endDrag() {
+    const a = drag.active;
+    drag.active = null;
+    cancelAnimationFrame(a.raf);
+    a.card.classList.remove('is-dragging');
+    a.card.getBoundingClientRect();
+    a.card.style.transform = ''; // gleitet an ihren Platz
+    document.body.classList.remove('ps-dragging');
+    drag.suppressClick = true;
+    setTimeout(() => (drag.suppressClick = false), 0);
+    const order = extIds(a.list);
+    if (order.join() !== a.order.join()) saveExternalOrder(Number(a.list.dataset.caseId), order);
+  }
+
+  async function saveExternalOrder(caseId, ids, { quiet = false } = {}) {
+    try {
+      await api.put(extUrl(caseId, null, '/order'), { ids });
+      st.caseDocs.sort((x, y) => ids.indexOf(x.id) - ids.indexOf(y.id));
+      if (!quiet) toast('Reihenfolge gespeichert.');
+    } catch (e) {
+      toast(e.message, 'error');
+      if (st.modalCaseId === caseId) await reloadCase(caseId);
+    }
+  }
+
+  /** Sortieren-Menü: einmalig nach Datum, Titel oder Quelle ordnen – danach per Ziehen feinjustierbar. */
+  function sortExternalDocs(select) {
+    const how = select.value;
+    select.value = '';
+    const list = $('#extList');
+    if (!how || !list) return;
+    const day = (d) => d.docDate || String(d.linkedAt || '').slice(0, 10);
+    const source = { fivenet: 0, gdocs: 1, gsheets: 2 };
+    const cmp = {
+      'date-asc': (x, y) => day(x).localeCompare(day(y)) || x.id - y.id,
+      'date-desc': (x, y) => day(y).localeCompare(day(x)) || y.id - x.id,
+      title: (x, y) => (x.title || extOf(x).noun).localeCompare(y.title || extOf(y).noun, 'de', { sensitivity: 'base', numeric: true }),
+      source: (x, y) => (source[x.provider] ?? 9) - (source[y.provider] ?? 9) || day(y).localeCompare(day(x)),
+    }[how];
+    const shown = new Set(extIds(list));
+    const ids = st.caseDocs.filter((d) => shown.has(d.id)).sort(cmp).map((d) => d.id);
+    if (ids.join() === extIds(list).join()) {
+      toast('Die Dokumente sind bereits so sortiert.');
+      return;
+    }
+    const byId = new Map([...list.children].map((el) => [Number(el.dataset.docId), el]));
+    reorderWithAnimation(list, () => ids.forEach((id) => list.append(byId.get(id))));
+    saveExternalOrder(Number(list.dataset.caseId), ids);
+  }
+
+  /** Tastatur: Griff fokussieren, dann ↑/↓ – gespeichert wird kurz nach dem letzten Schritt. */
+  function moveExternalByKey(grip, dir) {
+    const card = grip.closest('.fn-doc');
+    const list = card?.parentElement;
+    const other = dir < 0 ? card?.previousElementSibling : card?.nextElementSibling;
+    if (!other || !list) return;
+    reorderWithAnimation(list, () => (dir < 0 ? other.before(card) : other.after(card)));
+    grip.focus();
+    clearTimeout(drag.saveTimer);
+    drag.saveTimer = setTimeout(() => saveExternalOrder(Number(list.dataset.caseId), extIds(list)), 600);
+  }
+
+  document.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || drag.active || drag.pending) return;
+    const card = e.target.closest('#extList > .fn-doc');
+    if (!card) return;
+    const grip = e.target.closest('.fn-grip');
+    if (!grip && e.target.closest(DRAG_SKIP)) return;
+    const p = { card, pointerId: e.pointerId, x: e.clientX, y: e.clientY, touch: e.pointerType !== 'mouse' };
+    if (grip) {
+      // Der Griff blockiert das Scrollen (touch-action: none) – hier geht es sofort los.
+      e.preventDefault();
+      startDrag(p);
+      return;
+    }
+    card.classList.add('is-pressing');
+    drag.pending = { ...p, timer: setTimeout(() => { const q = drag.pending; drag.pending = null; if (q) startDrag(q); }, DRAG_HOLD_MS) };
+  });
+  document.addEventListener('pointermove', (e) => {
+    if (drag.pending && e.pointerId === drag.pending.pointerId) {
+      if (Math.hypot(e.clientX - drag.pending.x, e.clientY - drag.pending.y) > DRAG_SLOP) cancelPendingDrag();
+      return;
+    }
+    if (drag.active && e.pointerId === drag.active.pointerId) {
+      e.preventDefault();
+      moveDrag(e.clientY);
+    }
+  });
+  const pointerDone = (e) => {
+    if (drag.pending && e.pointerId === drag.pending.pointerId) cancelPendingDrag();
+    if (drag.active && e.pointerId === drag.active.pointerId) endDrag();
+  };
+  document.addEventListener('pointerup', pointerDone);
+  document.addEventListener('pointercancel', pointerDone);
+  // Während des Ziehens nicht scrollen, kein Kontextmenü, kein Klick nach dem Loslassen.
+  document.addEventListener('touchmove', (e) => { if (drag.active) e.preventDefault(); }, { passive: false });
+  document.addEventListener('contextmenu', (e) => { if (drag.active || drag.pending) e.preventDefault(); });
+  document.addEventListener('click', (e) => {
+    if (drag.suppressClick) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, true);
+  document.addEventListener('keydown', (e) => {
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && e.target.matches?.('#extList .fn-grip')) {
+      e.preventDefault();
+      moveExternalByKey(e.target, e.key === 'ArrowUp' ? -1 : 1);
+    }
+  });
 
   /* ---------------------------------------------------------------- Aufgaben & Wiedervorlagen */
   function taskItem(t, { showCase = true } = {}) {
@@ -4095,6 +4314,7 @@
       return;
     }
     if (t.dataset.userField) guard(() => updateUserField(t));
+    if (t.matches('[data-ext-sort]')) sortExternalDocs(t);
   });
 
   window.addEventListener('hashchange', () => go(hashView()));

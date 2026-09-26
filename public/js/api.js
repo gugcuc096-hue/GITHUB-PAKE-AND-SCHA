@@ -29,6 +29,7 @@
     get: (url) => request('GET', url),
     post: (url, body) => request('POST', url, body),
     patch: (url, body) => request('PATCH', url, body),
+    put: (url, body) => request('PUT', url, body),
     del: (url) => request('DELETE', url),
     /** Lädt ein Bild (Blob) als Binärdaten hoch. */
     upload: (url, blob) => request('POST', url, blob),

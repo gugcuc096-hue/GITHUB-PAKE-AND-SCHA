@@ -350,6 +350,8 @@ addColumn('team_members', 'photo', 'TEXT');
 addColumn('case_external_docs', 'content_text', "TEXT NOT NULL DEFAULT ''");
 addColumn('case_external_docs', 'content_at', 'TEXT');
 addColumn('case_external_docs', 'content_by_name', "TEXT NOT NULL DEFAULT ''");
+// Reihenfolge in der Akte (per Ziehen festgelegt); NULL = noch nicht einsortiert, erscheint oben.
+addColumn('case_external_docs', 'sort_order', 'INTEGER');
 addColumn('case_attachments', 'external_doc_id', 'INTEGER REFERENCES case_external_docs(id) ON DELETE SET NULL');
 addColumn('case_attachments', 'source_url', 'TEXT');
 addColumn('case_attachments', 'content_hash', 'TEXT');

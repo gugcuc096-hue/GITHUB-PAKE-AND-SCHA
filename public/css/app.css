@@ -706,6 +706,23 @@ details.edit-box[open] > summary::after { content: '–'; }
 .fn-table thead th { position: sticky; top: 0; z-index: 1; background: #141b2e; color: var(--text-main); font-weight: 600; white-space: nowrap; }
 .fn-table tbody tr:nth-child(even) td { background: rgba(255, 255, 255, 0.02); }
 .fn-table tr.gap td { padding: 0.2rem; background: transparent; }
+/* Externe Dokumente: Reihenfolge per Ziehen */
+.ext-sortbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; margin-bottom: 0.75rem; }
+.ext-sortbar .form-hint { margin: 0; display: inline-flex; align-items: center; gap: 0.35rem; }
+.ext-sortbar .form-hint .ico-sm { stroke-width: 3; }
+.ext-sort { width: auto; min-width: 12rem; padding-top: 0.4rem; padding-bottom: 0.4rem; font-size: 0.8rem; }
+#extList > .fn-doc { transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease; }
+.fn-grip { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; margin: -3px -0.4rem 0 -0.55rem; border: 0; border-radius: 8px; background: transparent; color: var(--text-dim); cursor: grab; touch-action: none; }
+.fn-grip .ico-sm { width: 18px; height: 18px; stroke-width: 3; }
+.fn-grip:hover, .fn-grip:focus-visible { color: var(--gold-light); background: rgba(255, 255, 255, 0.07); }
+.fn-grip:focus-visible { outline: 2px solid var(--gold-hairline); outline-offset: 1px; }
+#extList > .fn-doc.is-pressing { transform: scale(0.985); }
+#extList > .fn-doc.is-dragging { position: relative; z-index: 5; transition: box-shadow 0.2s ease; background: #121a2f; box-shadow: 0 18px 44px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--gold-hairline); }
+body.ps-dragging, body.ps-dragging * { cursor: grabbing !important; -webkit-user-select: none; user-select: none; }
+@media (pointer: coarse) {
+  #extList > .fn-doc { -webkit-touch-callout: none; }
+  #extList .fn-head { -webkit-user-select: none; user-select: none; }
+}
 .fn-content.is-sheet { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.8rem; tab-size: 16; white-space: pre; overflow-x: auto; }
 .fn-check.hidden { display: none; }
 
