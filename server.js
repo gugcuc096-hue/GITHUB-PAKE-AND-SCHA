@@ -16,6 +16,7 @@ const admin = require('./routes/admin');
 const applications = require('./routes/applications');
 const fivenetRoutes = require('./routes/fivenet');
 const externalRoutes = require('./routes/external');
+const contractRoutes = require('./routes/contracts');
 
 const PORT = Number(process.env.PORT) || 3000;
 const app = express();
@@ -60,12 +61,15 @@ app.use('/api', (req, res, next) => {
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/cases/:id/external', externalRoutes.caseRouter);
+app.use('/api/cases/:id/contracts', contractRoutes.caseRouter);
 app.use('/api/cases/:id/fivenet', externalRoutes.caseRouter); // ältere Adresse, bleibt gültig
 app.use('/api/cases', require('./routes/cases'));
 app.use('/api/fivenet', fivenetRoutes.router);
 app.use('/api/gdocs', externalRoutes.gdocsRouter);
 app.use('/api/gsheets', externalRoutes.gsheetsRouter);
 app.use('/api/tasks', require('./routes/tasks'));
+app.use('/api/contracts', contractRoutes.router);
+app.use('/api/contract-templates', contractRoutes.templatesRouter);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/board', require('./routes/board'));

@@ -184,6 +184,38 @@
   const badge = (text, color = 'gold') => `<span class="badge badge-${color}">${esc(text)}</span>`;
   const statusBadge = (map, key) => badge(...(map[key] || [key, 'slate']));
   const opt = (value, label, selected = false) => `<option value="${esc(value)}" ${selected ? 'selected' : ''}>${esc(label)}</option>`;
+
+  /* ---------------------------------------------------------------- Zuständige Anwälte (mehrere pro Akte) */
+  /** Federführender Anwalt zuerst, dann die weiteren. */
+  const caseTeam = (c) => [...(c.lawyerId ? [{ id: c.lawyerId, name: c.lawyerName || '—', lead: true }] : []), ...(c.coLawyers || []).map((l) => ({ ...l, lead: false }))];
+  /** Arbeitet der Benutzer an der Akte mit (federführend oder als weiterer Anwalt)? */
+  const onCase = (c, uid = st.user.id) => c.lawyerId === uid || (c.coLawyers || []).some((l) => l.id === uid);
+  function teamText(c) {
+    const team = caseTeam(c);
+    if (!team.length) return 'Noch nicht zugewiesen';
+    return team.map((l) => (l.lead && team.length > 1 ? `${l.name} (federführend)` : l.name)).join(', ');
+  }
+
+  /**
+   * Auswahl der zuständigen Anwälte. withLead: Auswahl des federführenden Anwalts (Kanzleileitung);
+   * sonst ist leadId fest (z. B. man selbst) und nur weitere Anwälte werden gewählt.
+   */
+  function lawyerPicker({ leadId = null, coIds = [], withLead = false, extra = [], leadLabel = 'Federführender Anwalt', emptyLead = 'Nicht zugewiesen' }) {
+    const people = [...st.lawyers.map((l) => ({ id: l.id, name: l.displayName, rank: l.rank })), ...extra.filter((x) => !st.lawyers.some((l) => l.id === x.id))];
+    const lead = withLead
+      ? `<div class="span-2"><label class="label" for="teamLead">${esc(leadLabel)}</label><select id="teamLead" name="lawyerId" class="field">
+          <option value="">${esc(emptyLead)}</option>${people.map((l) => opt(l.id, l.name + (l.rank ? ' · ' + l.rank : ''), l.id === leadId)).join('')}</select></div>`
+      : '';
+    const options = people
+      .filter((l) => withLead || l.id !== leadId)
+      .map(
+        (l) => `<label class="check lawyer-opt"><input type="checkbox" name="coLawyerIds" value="${l.id}" ${coIds.includes(l.id) ? 'checked' : ''} ${withLead && l.id === leadId ? 'disabled' : ''}>
+          <span>${esc(l.name)}${l.rank ? `<span class="block text-dim text-xs">${esc(l.rank)}</span>` : ''}</span></label>`
+      )
+      .join('');
+    return `${lead}<div class="span-2" data-team><div class="label">Weitere Anwälte <span class="text-dim font-normal normal-case tracking-normal">– arbeiten mit und dürfen die Akte bearbeiten</span></div>
+      ${options ? `<div class="lawyer-grid">${options}</div>` : '<p class="text-sm text-dim">Keine weiteren Anwälte im Team.</p>'}</div>`;
+  }
   const empty = (text, ico = 'folder') => `<div class="empty">${icon(ico, 'ico-lg')}<p>${esc(text)}</p></div>`;
   const pad = (n) => String(n).padStart(2, '0');
   const dayKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -674,7 +706,7 @@
     const today = st.myTasks.filter((t) => t.dueDate && daysUntil(t.dueDate) === 0);
     const stale = st.cases.filter((c) => {
       const d = parseDate(c.updatedAt);
-      return c.status === 'in_bearbeitung' && c.lawyerId === me && d && -daysUntil(dayKey(d)) >= STALE_DAYS;
+      return c.status === 'in_bearbeitung' && onCase(c, me) && d && -daysUntil(dayKey(d)) >= STALE_DAYS;
     });
     if (!overdue.length && !today.length && !stale.length) return '';
     const due = [...overdue, ...today];
@@ -711,7 +743,7 @@
       const kpis = staff
         ? [
             kpi('Neue Anfragen', active.filter((c) => c.status === 'offen').length, `${active.filter((c) => !c.lawyerId).length} ohne Anwalt`, 'folder', '#cases'),
-            kpi('In Bearbeitung', active.filter((c) => c.status === 'in_bearbeitung').length, `${active.filter((c) => c.lawyerId === u.id).length} davon bei Ihnen`, 'briefcase', '#cases'),
+            kpi('In Bearbeitung', active.filter((c) => c.status === 'in_bearbeitung').length, `${active.filter((c) => onCase(c, u.id)).length} davon bei Ihnen`, 'briefcase', '#cases'),
             kpiEvent('Nächste Frist / Termin', nextDeadline),
             kpi('Kanzlei-Post', st.unread, st.unread === 1 ? 'ungelesene Nachricht' : 'ungelesene Nachrichten', 'mail', '#mail'),
           ]
@@ -777,10 +809,10 @@
     return st.cases.filter((c) => {
       const f = st.caseFilter;
       const stateOk = f === 'alle' || (f === 'aktiv' ? c.status !== 'geschlossen' : c.status === f);
-      const mineOk = !st.caseMine || c.lawyerId === st.user.id;
+      const mineOk = !st.caseMine || onCase(c);
       const textOk =
         !q ||
-        [c.caseNumber, c.title, c.clientName, c.lawyerName, c.courtRef, c.opponent].join(' ').toLowerCase().includes(q) ||
+        [c.caseNumber, c.title, c.clientName, c.lawyerName, ...(c.coLawyers || []).map((l) => l.name), c.courtRef, c.opponent].join(' ').toLowerCase().includes(q) ||
         // Google-Sheets-IDs tragen ggf. das Tabellenblatt (#gid=…) – gefunden wird jede Verknüpfung der Tabelle.
         (!!extId && (c.externalDocIds || []).some((x) => x.split('#')[0] === extId));
       return stateOk && mineOk && textOk;
@@ -803,7 +835,7 @@
           <td class="td-main"><div class="font-mono text-gold text-xs">${esc(c.caseNumber)}</div><div class="font-medium">${esc(c.title)}</div>
             <div class="text-xs text-dim mt-1 flex flex-wrap items-center gap-2">${esc(AREAS[c.area] || c.area)}${c.urgency !== 'normal' ? badge(...URGENCY[c.urgency]) : ''}</div></td>
           ${staff ? `<td data-label="Mandant">${esc(c.clientName)}</td>` : ''}
-          <td data-label="Zuständig">${c.lawyerName ? esc(c.lawyerName) : badge('Unbesetzt', 'amber')}</td>
+          <td data-label="Zuständig">${c.lawyerName ? `${esc(c.lawyerName)}${(c.coLawyers || []).length ? `<div class="text-xs text-dim">+ ${esc(c.coLawyers.map((l) => l.name).join(', '))}</div>` : ''}` : badge('Unbesetzt', 'amber')}</td>
           <td data-label="Status">${statusBadge(CASE_STATUS, c.status)}</td>
           <td data-label="Aktualisiert" class="text-dim text-xs nowrap">${esc(fmtDate(c.updatedAt))}</td></tr>`
         )
@@ -895,6 +927,7 @@
     (data.appointments || []).forEach((e) => st.eventCache.set(e.id, e));
     st.caseAttachments = data.attachments || [];
     st.caseDocs = data.externalDocs || [];
+    st.caseContracts = data.contracts || [];
     st.caseTasks = data.tasks || [];
     st.caseInfo = data.case;
   }
@@ -954,6 +987,94 @@
       ${pill('Beweismittel', String(attachments.length), 'secEvidence')}
       ${pill('Letzte Aktivität', esc(relDays(c.updatedAt)), 'secNotes')}
     </div>`;
+  }
+
+  /* ---------------------------------------------------------------- Verträge (Mandatsvertrag u. a.) */
+  const CONTRACT_STATUS = { entwurf: ['Entwurf', 'slate'], teilweise: ['Teilweise unterschrieben', 'amber'], unterschrieben: ['Unterschrieben', 'emerald'] };
+
+  function contractCard(k, c) {
+    const staff = isStaff();
+    const signs = [
+      k.lawyerSignedAt ? `✓ Anwalt (${esc(k.lawyerSignature)})` : `Anwalt: ${esc(k.lawyerName || '—')} – offen`,
+      k.clientSignedAt ? `✓ Mandant (${esc(k.clientSignature)}${k.clientSignedVia === 'kanzlei' ? ', im Spiel' : ''})` : 'Mandant – offen',
+    ].join(' · ');
+    const mine = staff && k.lawyerId === st.user.id && !k.lawyerSignedAt;
+    const clientCanSign = !staff && !k.clientSignedAt;
+    return `<div class="contract-row">
+      <div class="contract-main">
+        <div class="flex flex-wrap items-center gap-2"><span class="font-medium">${esc(k.templateName)}</span>${statusBadge(CONTRACT_STATUS, k.status)}</div>
+        <div class="text-xs text-dim mt-1">${signs} · erstellt ${esc(fmtDate(k.createdAt))}${k.createdByName ? ' von ' + esc(k.createdByName) : ''}</div>
+      </div>
+      <div class="contract-actions">
+        <a class="${clientCanSign || mine ? 'btn-gold' : 'btn-outline'} btn-sm" href="/vertrag.html?id=${k.id}" target="_blank" rel="noopener">${icon(clientCanSign || mine ? 'edit' : 'printer', 'ico-sm')}<span>${clientCanSign ? 'Ansehen & unterschreiben' : mine ? 'Ansehen & unterschreiben' : 'Ansehen / PDF'}</span></a>
+        ${staff && c.canEdit && !k.locked ? `<button type="button" class="btn-ghost btn-sm" data-action="contract-edit" data-id="${k.id}">${icon('edit', 'ico-sm')}<span>Bearbeiten</span></button>` : ''}
+        ${staff && c.canEdit && !k.clientSignedAt ? `<button type="button" class="btn-ghost btn-sm" data-action="contract-record" data-id="${k.id}" data-case-id="${c.id}">${icon('check', 'ico-sm')}<span>Unterschrift Mandant erfassen</span></button>` : ''}
+        ${staff && (isAdmin() || (c.canEdit && !k.locked)) ? `<button type="button" class="btn-ghost btn-sm fn-danger" data-action="contract-delete" data-id="${k.id}" data-case-id="${c.id}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>` : ''}
+      </div>
+    </div>`;
+  }
+
+  function contractsSection(c, list) {
+    const staff = isStaff();
+    if (!staff && !list.length) return '';
+    return `<div class="section" id="secContracts">
+      <h3 class="section-title">Verträge ${staff && c.canEdit ? `<span class="ext-add"><button type="button" class="btn-outline btn-sm" data-action="contract-new" data-case-id="${c.id}">${icon('doc', 'ico-sm')}<span>Mandatsvertrag erstellen</span></button></span>` : ''}</h3>
+      ${list.length
+        ? `<div class="stack">${list.map((k) => contractCard(k, c)).join('')}</div>`
+        : `<p class="text-sm text-dim">Noch kein Vertrag. „Mandatsvertrag erstellen“ füllt die Vorlage der Kanzlei mit den Daten dieser Akte – danach unterschreiben Anwalt und Mandant (im Portal oder im Spiel), und der Vertrag lässt sich drucken oder als PDF speichern.</p>`}
+      ${!staff && list.some((k) => !k.clientSignedAt) ? '<p class="form-hint">Bitte lesen Sie den Vertrag und unterschreiben Sie ihn über „Ansehen &amp; unterschreiben“.</p>' : ''}
+    </div>`;
+  }
+
+  /** Formular: Vertrag erstellen (k = null) oder bearbeiten. */
+  function contractForm(c, { templates, defaults, k = null }) {
+    const v = k ? k.data : defaults.data;
+    const team = defaults.team || [];
+    const lawyers = isAdmin() ? st.lawyers.map((l) => ({ id: l.id, name: l.displayName })) : team;
+    const lawyerId = k ? k.lawyerId : defaults.lawyerId;
+    const field = (name, label, attrs = '', span = false) =>
+      `<div class="${span ? 'span-2' : ''}"><label class="label" for="kf_${name}">${esc(label)}</label><input id="kf_${name}" name="${name}" class="field" maxlength="${name.includes('gebuehr') ? 200 : 120}" value="${esc(v[name] || '')}" ${attrs}></div>`;
+    const feeOptions = (st.fees || []).map((f) => `<option value="${esc(money(f.price))}">${esc(f.name)} – ${esc(money(f.price))}</option>`).join('');
+    return `
+      <h2 id="modalTitle" class="modal-title">${k ? `${esc(k.templateName)} bearbeiten` : 'Mandatsvertrag erstellen'}</h2>
+      <p class="modal-sub"><span class="font-mono text-gold">${esc(c.caseNumber)}</span> · ${esc(c.title)}</p>
+      <form data-form="${k ? 'contract-edit' : 'contract-new'}" data-case-id="${c.id}" ${k ? `data-id="${k.id}"` : ''} class="form-grid cols-2">
+        ${!k && templates.length > 1 ? `<div class="span-2"><label class="label">Vorlage</label><select name="templateId" class="field">${templates.map((t) => opt(t.id, t.name)).join('')}</select></div>` : !k ? `<input type="hidden" name="templateId" value="${templates[0] ? templates[0].id : ''}">` : ''}
+        <div class="span-2 form-sub">Anwalt</div>
+        <div class="span-2"><label class="label" for="kf_lawyer">Unterzeichnender Anwalt</label><select id="kf_lawyer" name="lawyerId" class="field">${lawyers.map((l) => opt(l.id, l.name, l.id === lawyerId)).join('')}</select>
+          <p class="form-hint">Nur dieser Anwalt kann den Vertrag unterschreiben.</p></div>
+        ${field('anwalt', 'Name im Vertrag')}
+        ${field('anwalt_rang', 'Rang', 'placeholder="z. B. Senior Associate"')}
+        ${field('anwalt_geburtsdatum', 'Geburtsdatum (IC)', 'placeholder="TT.MM.JJJJ"')}
+        <div></div>
+        <div class="span-2 form-sub">Mandant</div>
+        ${field('mandant', 'Name des Mandanten')}
+        ${field('mandant_geburtsdatum', 'Geburtsdatum (IC)', 'placeholder="TT.MM.JJJJ"')}
+        <div class="span-2 form-sub">Honorar</div>
+        <div><label class="label" for="kf_grundgebuehr">Grundgebühr</label><input id="kf_grundgebuehr" name="grundgebuehr" class="field" maxlength="200" value="${esc(v.grundgebuehr || '')}" placeholder="z. B. 100.000 $" list="kfFees"><datalist id="kfFees">${feeOptions}</datalist>
+          <p class="form-hint">Vorschläge aus der Honorarordnung beim Tippen.</p></div>
+        ${field('zusatzgebuehr', 'Zusatzgebühr', 'placeholder="z. B. 25.000 $ je weiterem Verhandlungstag"')}
+        <div class="span-2 form-sub">Unterzeichnung</div>
+        ${field('datum', 'Datum', 'placeholder="TT.MM.JJJJ"')}
+        ${field('ort', 'Ort')}
+        <p class="span-2 form-hint">Leere Felder erscheinen im Vertrag als Linie zum handschriftlichen Ausfüllen. Nach der ersten Unterschrift ist der Vertrag nicht mehr änderbar.</p>
+        <div class="span-2 form-actions">
+          <button type="submit" class="btn-gold btn-md">${icon('check', 'ico-sm')}<span>${k ? 'Speichern' : 'Vertrag erstellen'}</span></button>
+          <button type="button" class="btn-ghost btn-md" data-action="back-to-case">Abbrechen</button>
+        </div>
+      </form>`;
+  }
+
+  async function refreshSettingsTemplates() {
+    st.contractTemplates = await api.get('/api/contract-templates?all=1');
+    if (st.view === 'settings') renderView();
+  }
+
+  function contractBody(f) {
+    const fd = new FormData(f);
+    const data = {};
+    ['anwalt', 'anwalt_rang', 'anwalt_geburtsdatum', 'mandant', 'mandant_geburtsdatum', 'grundgebuehr', 'zusatzgebuehr', 'datum', 'ort'].forEach((k) => (data[k] = val(fd, k)));
+    return { lawyerId: Number(fd.get('lawyerId')), data };
   }
 
   /* ---------------------------------------------------------------- Externe Dokumente (FiveNet, Google Docs & Google Sheets) */
@@ -1790,7 +1911,7 @@
     else await refreshBehind();
   }
 
-  function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [] }) {
+  function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [] }) {
     const staff = isStaff();
     const admin = isAdmin();
     const me = st.user.id;
@@ -1807,7 +1928,7 @@
     const info = [
       ['Mandant', c.clientName + (staff && !c.hasClientAccount ? ' (ohne Konto)' : '')],
       staff ? ['Kontakt', [c.clientPhone, c.clientEmail].filter(Boolean).join(' · ') || '—'] : null,
-      ['Zuständig', c.lawyerName || 'Noch nicht zugewiesen'],
+      [caseTeam(c).length > 1 ? 'Zuständige Anwälte' : 'Zuständig', teamText(c)],
       ['Rechtsgebiet', AREAS[c.area] || c.area],
       ['Dringlichkeit', (URGENCY[c.urgency] || [c.urgency])[0]],
       c.opponent ? ['Gegenpartei', c.opponent] : null,
@@ -1842,6 +1963,7 @@
       quick.push(`<button class="btn-outline btn-sm" data-action="new-invoice" data-case-id="${c.id}">${icon('receipt', 'ico-sm')}<span>Rechnung</span></button>`);
       if (c.clientId) quick.push(`<button class="btn-outline btn-sm" data-action="compose" data-recipient="${c.clientId}" data-case-id="${c.id}" data-return-case="${c.id}">${icon('mail', 'ico-sm')}<span>Mandant anschreiben</span></button>`);
       if (c.lawyerId === me) quick.push(`<button class="btn-ghost btn-sm" data-action="release-case" data-id="${c.id}">Akte abgeben</button>`);
+      if (c.isCoLawyer) quick.push(`<button class="btn-ghost btn-sm" data-action="leave-case" data-id="${c.id}">Mitarbeit beenden</button>`);
       if (admin) quick.push(`<button class="btn-danger btn-sm" data-action="delete-case" data-id="${c.id}" data-number="${esc(c.caseNumber)}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>`);
     } else {
       if (!c.closed) quick.push(`<button class="btn-outline btn-sm" data-action="new-event" data-case-id="${c.id}" data-return-case="${c.id}">${icon('calendar', 'ico-sm')}<span>Termin anfragen</span></button>`);
@@ -1856,11 +1978,11 @@
             <div><label class="label">Rechtsgebiet</label><select name="area" class="field">${Object.entries(AREAS).map(([k, l]) => opt(k, l, c.area === k)).join('')}</select></div>
             <div><label class="label">Dringlichkeit</label><select name="urgency" class="field">${Object.entries(URGENCY).map(([k, [l]]) => opt(k, l, c.urgency === k)).join('')}</select></div>
             <div><label class="label">Verfahrensstand</label><select name="step" class="field">${STEPS.map((s, i) => opt(i, s, c.step === i)).join('')}</select></div>
-            ${admin ? `<div><label class="label">Zuständiger Anwalt</label><select name="lawyerId" class="field"><option value="">Nicht zugewiesen</option>${st.lawyers.map((l) => opt(l.id, l.displayName, c.lawyerId === l.id)).join('')}</select></div>` : '<div></div>'}
             ${!c.hasClientAccount ? `<div><label class="label">Mandant</label><input name="clientName" class="field" maxlength="80" value="${esc(c.clientName === '—' ? '' : c.clientName)}"></div>` : ''}
             <div><label class="label">Telefon Mandant</label><input name="clientPhone" class="field" maxlength="40" value="${esc(c.clientPhone || '')}"></div>
             <div><label class="label">Gegenpartei</label><input name="opponent" class="field" maxlength="120" value="${esc(c.opponent)}"></div>
             <div><label class="label">Gerichtsaktenzeichen</label><input name="courtRef" class="field" maxlength="60" value="${esc(c.courtRef)}"></div>
+            ${c.canManageLawyers ? lawyerPicker({ leadId: c.lawyerId, coIds: (c.coLawyers || []).map((l) => l.id), withLead: admin, extra: caseTeam(c) }) : ''}
             <div class="span-2"><label class="label">Sachverhalt</label><textarea name="description" rows="5" maxlength="4000" class="field">${esc(c.description)}</textarea></div>
             <div class="span-2"><label class="label">Statushinweis (sichtbar für den Mandanten und in der öffentlichen Abfrage)</label><textarea name="publicNote" rows="2" maxlength="500" class="field">${esc(c.publicNote)}</textarea></div>
             <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Änderungen speichern</span></button></div>
@@ -1908,6 +2030,7 @@
       ${editForm}
       <div class="section"><h3 class="section-title">Sachverhalt</h3><p class="text-sm whitespace-pre-wrap text-muted">${esc(c.description || '—')}</p></div>
       ${c.publicNote ? `<div class="section"><h3 class="section-title">Statushinweis</h3><div class="banner banner-gold mb-0"><p class="text-sm whitespace-pre-wrap">${esc(c.publicNote)}</p></div></div>` : ''}
+      ${contractsSection(c, contracts)}
       ${externalSection(c, externalDocs)}
       ${attachmentsSection(c, attachments)}
       <div class="section" id="secEvents"><h3 class="section-title">Termine & Fristen</h3>${apptList}</div>
@@ -1930,7 +2053,7 @@
     if (staff) await load.lawyers();
     openModal(`
       <h2 class="modal-title">${staff ? 'Neue Akte anlegen' : 'Mandat einreichen'}</h2>
-      <p class="modal-sub">${staff ? 'Mandanten ohne Website-Konto einfach per Name erfassen. Die Akte wird Ihnen direkt zugewiesen.' : 'Schildern Sie Ihr Anliegen – ein Anwalt der Kanzlei meldet sich umgehend.'}</p>
+      <p class="modal-sub">${staff ? 'Mandanten ohne Website-Konto einfach per Name erfassen. Die Akte wird Ihnen direkt zugewiesen – weitere Anwälte können Sie unten hinzufügen.' : 'Schildern Sie Ihr Anliegen – ein Anwalt der Kanzlei meldet sich umgehend.'}</p>
       <form data-form="new-case" class="form-grid cols-2">
         ${staff ? `
           <div><label class="label" for="ncName">Mandant (Name)</label><input id="ncName" name="clientName" class="field" maxlength="80" placeholder="z. B. John Doe" autofocus></div>
@@ -1941,7 +2064,7 @@
         <div><label class="label">Dringlichkeit</label><select name="urgency" class="field">${Object.entries(URGENCY).map(([k, [l]]) => opt(k, l)).join('')}</select></div>
         ${staff ? `<div><label class="label">Gegenpartei</label><input name="opponent" class="field" maxlength="120" placeholder="optional"></div>
           <div><label class="label">Gerichtsaktenzeichen</label><input name="courtRef" class="field" maxlength="60" placeholder="optional"></div>` : ''}
-        ${isAdmin() ? `<div class="span-2"><label class="label">Zuständiger Anwalt</label><select name="lawyerId" class="field"><option value="">Noch niemand (offene Anfrage)</option>${st.lawyers.map((l) => opt(l.id, l.displayName + (l.rank ? ' · ' + l.rank : ''), l.id === st.user.id)).join('')}</select></div>` : ''}
+        ${staff ? lawyerPicker({ leadId: st.user.id, withLead: isAdmin(), emptyLead: 'Noch niemand (offene Anfrage)' }) : ''}
         <div class="span-2"><label class="label">Sachverhalt</label><textarea name="description" rows="5" class="field" ${staff ? '' : 'required minlength="10"'} maxlength="4000" placeholder="Was ist passiert? Wer ist beteiligt? Gibt es bereits Fristen oder Termine?"></textarea></div>
         <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>${staff ? 'Akte anlegen' : 'Mandat einreichen'}</span></button></div>
       </form>`);
@@ -2745,6 +2868,72 @@
     </section>`;
   }
 
+  /* ---------------------------------------------------------------- Einstellungen: Vertragsvorlagen */
+  const TPL_HELP = [
+    ['# Titel', 'großer Dokumenttitel'],
+    ['## II. Abschnitt', 'goldene Abschnittsüberschrift'],
+    ['### § 1 Überschrift', 'fette Paragraphenüberschrift'],
+    ['1. Text', 'nummerierter Absatz'],
+    ['| Text', 'zentrierte Zeile (Parteien)'],
+    ['    Text', 'eingerückte Zeile (4 Leerzeichen)'],
+    ['**fett**  *kursiv*', 'Hervorhebung'],
+    ['===', 'neue Seite'],
+    ['[Unterschriften]', 'Unterschriftsfeld (sonst am Ende)'],
+  ];
+
+  function contractTemplatesPanel() {
+    const t = st.contractTemplates;
+    if (!t) return '';
+    const rows = t.templates.length
+      ? t.templates
+          .map(
+            (x) => `<div class="contract-row">
+              <div class="contract-main"><div class="flex flex-wrap items-center gap-2"><span class="font-medium">${esc(x.name)}</span>${x.active ? badge('aktiv', 'emerald') : badge('inaktiv', 'slate')}${x.isDefault ? badge('mitgeliefert', 'gold') : ''}</div>
+                <div class="text-xs text-dim mt-1">Zuletzt geändert ${esc(fmtDate(x.updatedAt))}${x.updatedByName ? ' von ' + esc(x.updatedByName) : ''} · ${x.body.length.toLocaleString('de-DE')} Zeichen</div></div>
+              <div class="contract-actions">
+                <button type="button" class="btn-outline btn-sm" data-action="tpl-edit" data-id="${x.id}">${icon('edit', 'ico-sm')}<span>Bearbeiten</span></button>
+                <a class="btn-ghost btn-sm" href="/vertrag.html?vorlage=${x.id}&beispiel=1" target="_blank" rel="noopener">${icon('external', 'ico-sm')}<span>Vorschau</span></a>
+                ${x.isDefault ? `<button type="button" class="btn-ghost btn-sm" data-action="tpl-reset" data-id="${x.id}">Original wiederherstellen</button>` : ''}
+                <button type="button" class="btn-ghost btn-sm fn-danger" data-action="tpl-delete" data-id="${x.id}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>
+              </div></div>`
+          )
+          .join('')
+      : '<p class="text-sm text-dim">Keine Vorlagen vorhanden.</p>';
+    return `<section class="panel panel-pad mt-4 lg:mt-5" id="secTemplates">
+      <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('doc')} Vertragsvorlagen</h2>
+        <button type="button" class="btn-outline btn-sm" data-action="tpl-new">${icon('plus', 'ico-sm')}<span>Neue Vorlage</span></button></div>
+      <p class="text-sm text-muted mb-4">Grundlage für „Mandatsvertrag erstellen“ in der Akte. Änderungen gelten für neue Verträge – bereits erstellte Verträge behalten ihren Text.</p>
+      <div class="stack">${rows}</div>
+      <form data-form="contract-header" class="form-grid cols-2 mt-5">
+        <div><label class="label">Kopfzeile rechts (jede Vertragsseite)</label><textarea name="header" rows="2" maxlength="300" class="field">${esc(t.header)}</textarea></div>
+        <div class="form-actions items-end"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Kopfzeile speichern</span></button></div>
+      </form>
+    </section>`;
+  }
+
+  function templateForm(x) {
+    const t = st.contractTemplates;
+    const fields = { ...t.fields, ...t.autoFields };
+    return `
+      <h2 id="modalTitle" class="modal-title">${x ? 'Vorlage bearbeiten' : 'Neue Vertragsvorlage'}</h2>
+      <p class="modal-sub">Platzhalter anklicken, um sie an der Cursorposition einzufügen.</p>
+      <form data-form="tpl-save" ${x ? `data-id="${x.id}"` : ''} class="form-grid cols-2">
+        <div><label class="label" for="tplName">Name</label><input id="tplName" name="name" class="field" required minlength="2" maxlength="80" value="${esc(x ? x.name : '')}" placeholder="z. B. Vollmacht"></div>
+        <label class="check self-end"><input type="checkbox" name="active" ${!x || x.active ? 'checked' : ''}> Aktiv (in Akten auswählbar)</label>
+        <div class="span-2"><div class="label">Platzhalter</div><div class="tpl-chips">${Object.entries(fields)
+          .map(([k, label]) => `<button type="button" class="tpl-chip" data-action="tpl-insert" data-text="{{${k}}}" title="${esc(label)}">{{${esc(k)}}}</button>`)
+          .join('')}</div></div>
+        <div class="span-2"><label class="label" for="tplBody">Text der Vorlage</label><textarea id="tplBody" name="body" rows="20" maxlength="30000" class="field tpl-body" spellcheck="true" required>${esc(x ? x.body : '# Titel\n\n| -zwischen-\n| **{{anwalt}}**\n| - und -\n| **{{mandant}}**\n===\n## Bedingungen\n\n### § 1 …\nText …\n===\n[Unterschriften]\n')}</textarea></div>
+        <details class="span-2 edit-box"><summary>Formatierung</summary>
+          <div class="tpl-help">${TPL_HELP.map(([code, what]) => `<code>${esc(code)}</code><span>${esc(what)}</span>`).join('')}</div>
+          <p class="form-hint">Leere Platzhalter erscheinen im Vertrag als Linie zum handschriftlichen Ausfüllen.</p></details>
+        <div class="span-2 form-actions">
+          <button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button>
+          <button type="button" class="btn-ghost btn-md" data-action="close-modal">Abbrechen</button>
+        </div>
+      </form>`;
+  }
+
   /** Prüfbericht Discord-Login: was der laufende Server in Render findet (nur Namen, keine Werte). */
   function discordOAuthCheck(d) {
     if (!d) return '';
@@ -2774,8 +2963,9 @@
 
   views.settings = {
     async load() {
-      const [r] = await Promise.all([api.get('/api/admin/settings'), load.fivenet(true)]);
+      const [r, tpl] = await Promise.all([api.get('/api/admin/settings'), api.get('/api/contract-templates?all=1'), load.fivenet(true)]);
       st.settings = r.settings;
+      st.contractTemplates = tpl;
     },
     render() {
       const s = st.settings;
@@ -2837,6 +3027,7 @@
           </div>
         </div>
         ${fivenetSettingsPanel(s)}
+        ${contractTemplatesPanel()}
         <section class="panel panel-pad mt-4 lg:mt-5">
           <div class="panel-head"><h2 class="panel-title">Rechnungsdaten der Kanzlei</h2></div>
           <form data-form="settings-firm" class="form-grid cols-2">
@@ -3330,10 +3521,23 @@
       else await refreshBehind();
     },
     'release-case': async (el) => {
-      if (!(await ask('Die Akte erscheint danach wieder als offene Anfrage für das Team.', { title: 'Akte abgeben?', confirmText: 'Akte abgeben' }))) return;
+      const next = st.caseInfo && st.caseInfo.id === Number(el.dataset.id) ? (st.caseInfo.coLawyers || [])[0] : null;
+      const text = next
+        ? `Die Federführung geht an ${next.name} über. Sie arbeiten danach nicht mehr an der Akte mit.`
+        : 'Die Akte erscheint danach wieder als offene Anfrage für das Team.';
+      if (!(await ask(text, { title: 'Akte abgeben?', confirmText: 'Akte abgeben' }))) return;
       const id = Number(el.dataset.id);
       await api.patch('/api/cases/' + id, { lawyerId: null });
-      toast('Akte abgegeben.');
+      toast(next ? `Akte abgegeben – federführend ist jetzt ${next.name}.` : 'Akte abgegeben.');
+      await reloadCase(id);
+    },
+    'leave-case': async (el) => {
+      const id = Number(el.dataset.id);
+      const c = st.caseInfo && st.caseInfo.id === id ? st.caseInfo : null;
+      if (!c) return;
+      if (!(await ask('Sie werden als weiterer Anwalt aus der Akte ausgetragen und können sie danach nicht mehr bearbeiten.', { title: 'Mitarbeit beenden?', confirmText: 'Mitarbeit beenden' }))) return;
+      await api.patch('/api/cases/' + id, { coLawyerIds: (c.coLawyers || []).map((l) => l.id).filter((uid) => uid !== st.user.id) });
+      toast('Sie arbeiten nicht mehr an dieser Akte mit.');
       await reloadCase(id);
     },
     'delete-case': async (el) => {
@@ -3677,6 +3881,61 @@
       resetPending();
       openModal(externalForm('fivenet', null, st.caseInfo));
     },
+    'tpl-new': () => openModal(templateForm(null), { wide: true }),
+    'tpl-edit': (el) => {
+      const x = st.contractTemplates.templates.find((t) => t.id === Number(el.dataset.id));
+      if (x) openModal(templateForm(x), { wide: true });
+    },
+    'tpl-insert': (el) => {
+      const area = $('#tplBody');
+      if (!area) return;
+      area.focus();
+      area.setRangeText(el.dataset.text, area.selectionStart, area.selectionEnd, 'end');
+    },
+    'tpl-reset': async (el) => {
+      if (!(await ask('Der Text wird auf die mitgelieferte Fassung (nach eurer Google-Docs-Vorlage) zurückgesetzt. Bereits erstellte Verträge bleiben unverändert.', { title: 'Original wiederherstellen?', confirmText: 'Zurücksetzen' }))) return;
+      await api.post(`/api/contract-templates/${el.dataset.id}/reset`, {});
+      toast('Vorlage zurückgesetzt.');
+      await refreshSettingsTemplates();
+    },
+    'tpl-delete': async (el) => {
+      const x = st.contractTemplates.templates.find((t) => t.id === Number(el.dataset.id));
+      if (!x || !(await askDelete(`Vorlage „${x.name}“ löschen?`, 'Bereits erstellte Verträge behalten ihren Text. Tipp: Statt zu löschen kann man die Vorlage auch auf „inaktiv“ setzen.', 'Löschen'))) return;
+      await api.del(`/api/contract-templates/${x.id}`);
+      toast('Vorlage gelöscht.');
+      await refreshSettingsTemplates();
+    },
+    'contract-new': async (el) => {
+      if (!st.caseInfo) return;
+      const c = st.caseInfo;
+      st.returnCase = c.id;
+      const [{ templates }, defaults] = await Promise.all([api.get('/api/contract-templates'), api.get(`/api/cases/${c.id}/contracts/defaults`), load.lawyers(), load.fees()]);
+      if (!templates.length) throw new Error('Es gibt keine aktive Vertragsvorlage. Die Kanzleileitung kann sie unter Einstellungen → Vertragsvorlagen anlegen.');
+      openModal(contractForm(c, { templates, defaults }));
+    },
+    'contract-edit': async (el) => {
+      const k = (st.caseContracts || []).find((x) => x.id === Number(el.dataset.id));
+      if (!k || !st.caseInfo) return;
+      st.returnCase = st.caseInfo.id;
+      const [defaults] = await Promise.all([api.get(`/api/cases/${st.caseInfo.id}/contracts/defaults`), load.lawyers(), load.fees()]);
+      openModal(contractForm(st.caseInfo, { templates: [], defaults, k }));
+    },
+    'contract-record': async (el) => {
+      const k = (st.caseContracts || []).find((x) => x.id === Number(el.dataset.id));
+      if (!k) return;
+      if (!(await ask(`Bitte nur bestätigen, wenn ${k.data.mandant || 'der Mandant'} den Vertrag im Spiel tatsächlich unterschrieben hat. Die Erfassung wird mit Ihrem Namen im Aktenverlauf vermerkt.`, { title: 'Unterschrift des Mandanten erfassen?', confirmText: 'Erfassen' }))) return;
+      await api.post(`/api/contracts/${k.id}/sign`, { as: 'erfassen' });
+      toast('Unterschrift des Mandanten erfasst.');
+      await reloadCase(Number(el.dataset.caseId));
+    },
+    'contract-delete': async (el) => {
+      const k = (st.caseContracts || []).find((x) => x.id === Number(el.dataset.id));
+      if (!k) return;
+      if (!(await askDelete(`${k.templateName} löschen?`, k.locked ? 'Der Vertrag ist bereits unterschrieben. Er wird endgültig entfernt; im Aktenverlauf bleibt ein Vermerk.' : 'Der Entwurf wird entfernt.', 'Löschen'))) return;
+      await api.del(`/api/contracts/${k.id}`);
+      toast('Vertrag gelöscht.');
+      await reloadCase(Number(el.dataset.caseId));
+    },
     'gd-add': async (el) => {
       if (!st.caseInfo) return;
       st.returnCase = st.caseInfo.id;
@@ -3862,6 +4121,7 @@
           if (val(fd, k)) body[k] = val(fd, k);
         });
         if (f.elements.lawyerId) body.lawyerId = val(fd, 'lawyerId') ? Number(val(fd, 'lawyerId')) : null;
+        if (f.querySelector('[data-team]')) body.coLawyerIds = fd.getAll('coLawyerIds').map(Number);
       }
       const res = await api.post('/api/cases', body);
       toast(`Akte ${res.case.caseNumber} angelegt.`);
@@ -3878,6 +4138,7 @@
       });
       if (f.elements.step) body.step = Number(fd.get('step'));
       if (f.elements.lawyerId) body.lawyerId = fd.get('lawyerId') ? Number(fd.get('lawyerId')) : null;
+      if (f.querySelector('[data-team]')) body.coLawyerIds = fd.getAll('coLawyerIds').map(Number);
       await api.patch('/api/cases/' + id, body);
       toast('Akte gespeichert.');
       await reloadCase(id);
@@ -4143,6 +4404,33 @@
       reportImport(await importPendingImages(Number(f.dataset.caseId), res.document));
       await returnOrClose();
     },
+    'tpl-save': async (f) => {
+      const fd = new FormData(f);
+      const body = { name: val(fd, 'name'), body: String(fd.get('body') || ''), active: fd.get('active') === 'on' };
+      if (f.dataset.id) await api.patch(`/api/contract-templates/${f.dataset.id}`, body);
+      else await api.post('/api/contract-templates', body);
+      toast('Vorlage gespeichert.');
+      closeModal();
+      await refreshSettingsTemplates();
+    },
+    'contract-header': async (f) => {
+      await api.put('/api/contract-templates/header', { header: String(new FormData(f).get('header') || '').trim() });
+      toast('Kopfzeile gespeichert.');
+      await refreshSettingsTemplates();
+    },
+    'contract-new': async (f) => {
+      const caseId = Number(f.dataset.caseId);
+      const res = await api.post(`/api/cases/${caseId}/contracts`, { templateId: Number(new FormData(f).get('templateId')), ...contractBody(f) });
+      toast('Vertrag erstellt – jetzt ansehen und unterschreiben.');
+      st.contractTabAt = Date.now();
+      window.open(`/vertrag.html?id=${res.contract.id}`, '_blank', 'noopener');
+      await returnOrClose();
+    },
+    'contract-edit': async (f) => {
+      await api.patch(`/api/contracts/${f.dataset.id}`, contractBody(f));
+      toast('Vertrag gespeichert.');
+      await returnOrClose();
+    },
     'ext-edit': async (f) => {
       const res = await api.patch(extUrl(f.dataset.caseId, f.dataset.id), fivenetBody(f));
       st.fivenet = null;
@@ -4214,6 +4502,7 @@
      ================================================================ */
   document.addEventListener('click', (e) => {
     if (!e.target.closest('#dutyWrap')) closeDutyPop();
+    if (e.target.closest('a[href^="/vertrag.html"]')) st.contractTabAt = Date.now();
     if (e.target === $('#modal')) {
       closeModal();
       return;
@@ -4315,9 +4604,43 @@
     }
     if (t.dataset.userField) guard(() => updateUserField(t));
     if (t.matches('[data-ext-sort]')) sortExternalDocs(t);
+    // Vertrag: anderer unterzeichnender Anwalt → Name und Rang übernehmen
+    if (t.id === 'kf_lawyer') {
+      const l = st.lawyers.find((x) => x.id === Number(t.value));
+      if (l) {
+        t.form.elements.anwalt.value = l.displayName;
+        t.form.elements.anwalt_rang.value = l.rank || '';
+      }
+    }
+    // Federführender Anwalt gewählt: derselbe kann nicht zugleich „weiterer Anwalt“ sein.
+    if (t.id === 'teamLead') {
+      t.form.querySelectorAll('input[name="coLawyerIds"]').forEach((box) => {
+        const isLead = box.value === t.value;
+        box.disabled = isLead;
+        if (isLead) box.checked = false;
+      });
+    }
   });
 
   window.addEventListener('hashchange', () => go(hashView()));
+
+  // Vertrag im anderen Tab unterschrieben: beim Zurückkehren die offene Akte auffrischen –
+  // aber nur, wenn dort nichts halb Eingetipptes verloren ginge.
+  window.addEventListener('focus', () => {
+    const id = st.modalCaseId;
+    // Nur nach dem Öffnen eines Vertrags (nicht bei jedem Fensterwechsel).
+    if (!st.contractTabAt || Date.now() - st.contractTabAt > 30 * 60 * 1000) return;
+    if (!id || !$('#secContracts') || document.body.classList.contains('ps-dialog-open')) return;
+    const dirty = [...document.querySelectorAll('#modal input, #modal textarea, #modal select')].some((el) => {
+      if (el.type === 'checkbox' || el.type === 'radio') return el.checked !== el.defaultChecked;
+      if (el.tagName === 'SELECT') {
+        const def = [...el.options].findIndex((o) => o.defaultSelected);
+        return el.selectedIndex !== (def < 0 ? 0 : def);
+      }
+      return el.value !== el.defaultValue;
+    });
+    if (!dirty) reloadCase(id).catch(() => {});
+  });
 
   // Ungelesene Post, neue Bewerbungen und Dienststatus regelmäßig aktualisieren (Badges in der Navigation)
   setInterval(() => {

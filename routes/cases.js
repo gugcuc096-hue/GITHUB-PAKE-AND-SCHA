@@ -9,6 +9,8 @@ const {
   CASE_SELECT,
   getCase,
   caseAccess,
+  caseLawyers,
+  coLawyersOf,
   caseRow,
   noteRow,
   addSystemNote,
@@ -24,12 +26,37 @@ const {
   logActivity,
 } = require('../models');
 const discord = require('../discord');
+const { contractsForCase } = require('./contracts');
 const { imageBody, saveImage, removeFile, evidencePath } = require('../uploads');
 
 const router = express.Router();
 router.use(requireAuth);
 
 const URGENCY_LABEL = { normal: 'Normal', eilig: 'Eilig', notfall: '🚨 Notfall' };
+const MAX_CO_LAWYERS = 10;
+
+/** „Anna Pake (federführend), Ben Scha“ – für Discord und Verlauf. */
+function lawyerNames(c) {
+  const all = caseLawyers(c);
+  if (!all.length) return 'Noch nicht zugewiesen';
+  return all.map((l) => (l.lead && all.length > 1 ? `${l.name} (federführend)` : l.name)).join(', ');
+}
+
+/** Discord-IDs der zuständigen Anwälte – ohne die Person, die gerade handelt. */
+function lawyerMentions(c, user, onlyIds = null) {
+  return caseLawyers(c)
+    .filter((l) => l.discordId && (!user || l.id !== user.id) && (!onlyIds || onlyIds.includes(l.id)))
+    .map((l) => l.discordId);
+}
+
+/** Aktive Anwälte/Kanzleileitung zu den IDs; unbekannte oder deaktivierte IDs werden gemeldet. */
+function activeLawyers(ids) {
+  if (!ids.length) return { found: [], missing: [] };
+  const rows = db
+    .prepare(`SELECT id, display_name FROM users WHERE role IN ('anwalt','admin') AND active = 1 AND id IN (${ids.map(() => '?').join(',')})`)
+    .all(...ids);
+  return { found: rows, missing: ids.filter((id) => !rows.some((r) => r.id === id)) };
+}
 
 function notifyCreated(c, user) {
   discord.notify('case.created', {
@@ -39,10 +66,29 @@ function notifyCreated(c, user) {
     fields: [
       { name: 'Mandant', value: c.client_account_name || c.client_name || '—' },
       { name: 'Dringlichkeit', value: URGENCY_LABEL[c.urgency] || c.urgency },
-      { name: 'Zuständig', value: c.lawyer_name || 'Noch nicht zugewiesen' },
+      { name: 'Zuständig', value: lawyerNames(c) },
       { name: 'Angelegt von', value: user ? user.display_name : 'Website-Formular' },
     ],
-    mentionIds: c.lawyer_discord_id && (!user || c.lawyer_id !== user.id) ? [c.lawyer_discord_id] : [],
+    mentionIds: lawyerMentions(c, user),
+  });
+}
+
+/** Neu zugewiesene Anwälte in Discord anpingen (Ereignis „case.assigned“). */
+function notifyAssigned(c, user, newIds) {
+  if (!newIds.length) return;
+  const names = caseLawyers(c)
+    .filter((l) => newIds.includes(l.id))
+    .map((l) => l.name)
+    .join(', ');
+  discord.notify('case.assigned', {
+    title: `${c.case_number}: ${newIds.length === 1 ? 'Anwalt' : 'Anwälte'} zugewiesen`,
+    description: truncate(c.title, 300),
+    fields: [
+      { name: 'Neu zugewiesen', value: names },
+      { name: 'Zuständig insgesamt', value: lawyerNames(c) },
+      { name: 'Zugewiesen von', value: user.display_name },
+    ],
+    mentionIds: lawyerMentions(c, user, newIds),
   });
 }
 
@@ -67,6 +113,7 @@ const createSchema = z.object({
   opponent: z.string().trim().max(120).optional(),
   courtRef: z.string().trim().max(60).optional(),
   lawyerId: z.number().int().positive().nullable().optional(),
+  coLawyerIds: z.array(z.number().int().positive()).max(MAX_CO_LAWYERS).optional(),
 });
 
 router.post(
@@ -79,6 +126,7 @@ router.post(
     let clientId = null;
     let clientName = '';
     let lawyerId = null;
+    let coIds = [];
     let source = 'portal';
 
     if (u.role === 'mandant') {
@@ -102,6 +150,12 @@ router.post(
         }
         lawyerId = d.lawyerId;
       }
+      // Weitere Anwälte: wer die Akte anlegt, ist federführend (oder die Kanzleileitung weist zu).
+      coIds = [...new Set(d.coLawyerIds || [])];
+      const { missing } = activeLawyers(coIds);
+      if (missing.length) return res.status(400).json({ error: 'Mindestens ein gewählter Anwalt existiert nicht oder ist deaktiviert.' });
+      if (!lawyerId && coIds.length) lawyerId = coIds.shift(); // ohne Federführung übernimmt der erste
+      coIds = coIds.filter((cid) => cid !== lawyerId);
     }
 
     const id = tx(() => {
@@ -128,6 +182,8 @@ router.post(
           source
         );
       const newId = Number(info.lastInsertRowid);
+      const addCo = db.prepare('INSERT INTO case_lawyers (case_id, user_id, added_by) VALUES (?, ?, ?)');
+      coIds.forEach((cid) => addCo.run(newId, cid, u.id));
       addSystemNote(newId, u, 'Akte angelegt.');
       return newId;
     });
@@ -176,6 +232,7 @@ router.get(
       invoices: invoices.map(invoiceRow),
       attachments: attachments.map((a) => attachmentRow(a, c.id)),
       externalDocs: externalDocsForCase(c.id, req.user),
+      contracts: contractsForCase(c.id),
       tasks: staff ? tasks.map(taskRow) : undefined,
     });
   })
@@ -195,6 +252,8 @@ const updateSchema = z.object({
   step: z.number().int().min(0).max(3).optional(),
   publicNote: z.string().trim().max(500).optional(),
   lawyerId: z.number().int().positive().nullable().optional(),
+  // Vollständige Liste der weiteren Anwälte (ersetzt die bisherige)
+  coLawyerIds: z.array(z.number().int().positive()).max(MAX_CO_LAWYERS).optional(),
 });
 
 const FIELD_COLUMNS = {
@@ -230,31 +289,90 @@ router.patch(
 
     // Übernehmen / Abgeben / Zuweisen hat eigene Regeln: Eine unbesetzte Akte
     // darf jedes Teammitglied übernehmen, ohne vorher "canEdit" zu haben.
+    const coBefore = coLawyersOf(c).map((l) => l.id);
+    let coAfter = coBefore;
+    let leadAfter = c.lawyer_id;
     let lawyerChanged = false;
     if (d.lawyerId !== undefined && d.lawyerId !== c.lawyer_id) {
       const isClaim = isStaff(u) && d.lawyerId === u.id && !c.lawyer_id;
       const isRelease = isStaff(u) && d.lawyerId === null && c.lawyer_id === u.id;
       if (u.role !== 'admin' && !isClaim && !isRelease) {
-        return res.status(403).json({ error: 'Keine Berechtigung, den zuständigen Anwalt zu ändern.' });
+        return res.status(403).json({ error: 'Keine Berechtigung, den federführenden Anwalt zu ändern.' });
       }
-      let lawyerName = null;
-      if (d.lawyerId !== null) {
-        const lawyer = db.prepare("SELECT id, display_name FROM users WHERE id = ? AND role IN ('anwalt','admin') AND active = 1").get(d.lawyerId);
+      leadAfter = d.lawyerId;
+      // Gibt der federführende Anwalt ab, übernimmt der erste (aktive) weitere Anwalt die Federführung.
+      if (leadAfter === null && coBefore.length && d.coLawyerIds === undefined) {
+        const { found } = activeLawyers(coBefore);
+        leadAfter = coBefore.find((id) => found.some((f) => f.id === id)) ?? null;
+      }
+      if (leadAfter !== null) {
+        const lawyer = db.prepare("SELECT id, display_name FROM users WHERE id = ? AND role IN ('anwalt','admin') AND active = 1").get(leadAfter);
         if (!lawyer) return res.status(400).json({ error: 'Der gewählte Anwalt existiert nicht.' });
-        lawyerName = lawyer.display_name;
+        history.push(isRelease ? `Akte abgegeben – federführend jetzt: ${lawyer.display_name}` : `Federführend: ${lawyer.display_name}`);
+      } else {
+        history.push('Akte wurde abgegeben (derzeit ohne zuständigen Anwalt).');
       }
+      coAfter = coBefore.filter((id) => id !== leadAfter);
       sets.push('lawyer_id = ?');
-      values.push(d.lawyerId);
+      values.push(leadAfter);
       lawyerChanged = true;
-      history.push(d.lawyerId ? `Zuständigkeit: ${lawyerName}` : 'Akte wurde abgegeben (derzeit ohne zuständigen Anwalt).');
-      if (!newStatus && d.lawyerId && c.status === 'offen') newStatus = 'in_bearbeitung';
-      if (!newStatus && !d.lawyerId && c.status === 'in_bearbeitung') newStatus = 'offen';
+      if (!newStatus && leadAfter && c.status === 'offen') newStatus = 'in_bearbeitung';
+      if (!newStatus && !leadAfter && c.status === 'in_bearbeitung') newStatus = 'offen';
+    }
+
+    // Weitere Anwälte: zusammenstellen dürfen die Kanzleileitung und der federführende Anwalt;
+    // ein weiterer Anwalt darf sich selbst austragen.
+    let coChanged = false;
+    let coAdded = [];
+    if (d.coLawyerIds !== undefined) {
+      const wanted = [...new Set(d.coLawyerIds)].filter((id) => id !== leadAfter);
+      const added = wanted.filter((id) => !coBefore.includes(id));
+      const removed = coBefore.filter((id) => !wanted.includes(id) && id !== leadAfter);
+      const isLeadNow = isStaff(u) && (c.lawyer_id === u.id || leadAfter === u.id);
+      const selfLeave = !added.length && removed.length === 1 && removed[0] === u.id;
+      if ((added.length || removed.length) && u.role !== 'admin' && !isLeadNow && !selfLeave) {
+        return res.status(403).json({ error: 'Weitere Anwälte kann nur der federführende Anwalt oder die Kanzleileitung zuweisen.' });
+      }
+      const { found, missing } = activeLawyers(added);
+      if (missing.length) return res.status(400).json({ error: 'Mindestens ein gewählter Anwalt existiert nicht oder ist deaktiviert.' });
+      if (added.length || removed.length || coAfter.length !== wanted.length) {
+        const nameOf = (id) => found.find((f) => f.id === id)?.display_name || coLawyersOf(c).find((l) => l.id === id)?.name || `#${id}`;
+        if (selfLeave) history.push(`${u.display_name} arbeitet nicht mehr an der Akte mit`);
+        else if (added.length || removed.length) {
+          history.push(
+            `Weitere Anwälte: ${[...added.map((id) => '+ ' + nameOf(id)), ...removed.map((id) => '− ' + nameOf(id))].join(', ')}`
+          );
+        }
+        coAfter = wanted;
+        coChanged = true;
+        coAdded = added;
+      }
+      if (!leadAfter && coAfter.length) {
+        // Ohne Federführung wird der erste weitere Anwalt federführend.
+        leadAfter = coAfter[0];
+        coAfter = coAfter.slice(1);
+        const at = sets.indexOf('lawyer_id = ?');
+        if (at >= 0) values[at] = leadAfter;
+        else {
+          sets.push('lawyer_id = ?');
+          values.push(leadAfter);
+        }
+        lawyerChanged = true;
+        const leadName = activeLawyers([leadAfter]).found[0]?.display_name || coLawyersOf(c).find((l) => l.id === leadAfter)?.name || `#${leadAfter}`;
+        const gone = history.findIndex((h) => h.startsWith('Akte wurde abgegeben (derzeit'));
+        if (gone >= 0) history.splice(gone, 1);
+        history.push(`Federführend: ${leadName}`);
+        // Die Akte bleibt besetzt – kein automatischer Wechsel auf „offen“.
+        if (d.status === undefined) newStatus = c.status === 'offen' ? 'in_bearbeitung' : undefined;
+      }
+    } else if (lawyerChanged && coAfter.length !== coBefore.length) {
+      coChanged = true; // neuer Federführender stand bisher unter den weiteren Anwälten
     }
 
     const editFields = Object.keys(FIELD_COLUMNS).filter((k) => d[k] !== undefined);
     const wantsEdit = editFields.length > 0 || d.status !== undefined;
     // Wer die Akte gerade selbst übernommen hat, darf im selben Schritt weiterarbeiten.
-    const canEditNow = access.canEdit || (lawyerChanged && d.lawyerId === u.id);
+    const canEditNow = access.canEdit || (lawyerChanged && leadAfter === u.id);
     if (wantsEdit && !canEditNow) {
       return res.status(403).json({ error: 'Nur der zuständige Anwalt oder die Kanzleileitung kann diese Akte bearbeiten.' });
     }
@@ -270,15 +388,23 @@ router.patch(
       history.push(`Status: ${CASE_STATUS[c.status]} → ${CASE_STATUS[newStatus]}`);
     }
 
-    if (!sets.length) return res.json({ case: { ...caseRow(c, u), ...access } });
+    if (!sets.length && !coChanged) return res.json({ case: { ...caseRow(c, u), ...access } });
 
     sets.push("updated_at = datetime('now')");
     tx(() => {
       db.prepare(`UPDATE cases SET ${sets.join(', ')} WHERE id = ?`).run(...values, c.id);
+      if (coChanged || lawyerChanged) {
+        const keep = new Set(coAfter);
+        coBefore.filter((id) => !keep.has(id)).forEach((id) => db.prepare('DELETE FROM case_lawyers WHERE case_id = ? AND user_id = ?').run(c.id, id));
+        const addCo = db.prepare('INSERT OR IGNORE INTO case_lawyers (case_id, user_id, added_by) VALUES (?, ?, ?)');
+        coAfter.filter((id) => !coBefore.includes(id)).forEach((id) => addCo.run(c.id, id, u.id));
+      }
       if (history.length) addSystemNote(c.id, u, history.join(' · '));
     });
 
     const updated = getCase(c.id);
+    const newlyAssigned = [...(lawyerChanged && leadAfter && leadAfter !== c.lawyer_id && !coBefore.includes(leadAfter) ? [leadAfter] : []), ...coAdded];
+    notifyAssigned(updated, u, newlyAssigned);
     if (history.length) logActivity(u, 'Akte geändert', 'case', c.id, `${c.case_number}: ${history.join(' · ')}`);
     if (newStatus && newStatus !== c.status) {
       discord.notify('case.status', {
@@ -286,7 +412,7 @@ router.patch(
         description: truncate(updated.title, 300),
         fields: [
           { name: 'Mandant', value: updated.client_account_name || updated.client_name || '—' },
-          { name: 'Zuständig', value: updated.lawyer_name || '—' },
+          { name: 'Zuständig', value: lawyerNames(updated) },
           { name: 'Geändert von', value: u.display_name },
         ],
       });

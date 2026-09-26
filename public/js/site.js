@@ -132,6 +132,7 @@
 
       document.getElementById('caseNumber').textContent = d.caseNumber;
       document.getElementById('caseLawyer').textContent = d.lawyer;
+      document.getElementById('caseLawyerLabel').textContent = d.lawyerCount > 1 ? 'Zuständige Anwälte' : 'Zuständiger Anwalt';
       document.getElementById('caseNote').textContent = d.note || 'Zu Ihrer Akte liegt aktuell kein zusätzlicher Hinweis vor.';
 
       const badgeClass = d.closed
