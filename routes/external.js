@@ -8,7 +8,7 @@
  *   nicht freigegebene lassen sich ebenfalls per Kopieren/Einfügen übernehmen (siehe gdocs.js).
  * - Google Sheets: gleiche Regeln; übernommen wird das Tabellenblatt aus dem Link (siehe gsheets.js).
  *
- * /api/cases/:id/external         – verknüpfen, bearbeiten, entfernen, Bilder, Textdatei
+ * /api/cases/:id/external         – verknüpfen, bearbeiten, entfernen, Reihenfolge, Bilder, Textdatei
  * /api/cases/:id/fivenet          – gleicher Router (ältere Adresse, bleibt gültig)
  * /api/gdocs/fetch                – Google-Docs-Link erkennen und freigegebenen Inhalt laden
  * /api/gsheets/fetch              – Google-Sheets-Link erkennen und freigegebenes Tabellenblatt laden
@@ -296,6 +296,31 @@ caseRouter.post(
     }
     logActivity(req.user, `${p.noun} verknüpft`, 'case', c.id, `${c.case_number}: ${p.label(ref.documentId, d.title)}`);
     res.status(201).json({ document: externalDocRow(row, req.user) });
+  })
+);
+
+/**
+ * Reihenfolge der Dokumente in der Akte (Ziehen im Dashboard). Erwartet alle Verknüpfungen der
+ * Akte genau einmal – so kann eine veraltete Ansicht keine Dokumente „verlieren“.
+ */
+caseRouter.put(
+  '/order',
+  requireStaff,
+  wrap(async (req, res) => {
+    const c = loadCase(req, res);
+    if (!c) return;
+    const d = parseBody(z.object({ ids: z.array(z.number().int().positive()).max(MAX_DOCS_PER_CASE) }), req, res);
+    if (!d) return;
+    const current = db.prepare('SELECT id FROM case_external_docs WHERE case_id = ?').all(c.id).map((r) => r.id);
+    const wanted = new Set(d.ids);
+    if (wanted.size !== d.ids.length || wanted.size !== current.length || current.some((id) => !wanted.has(id))) {
+      return res.status(409).json({ error: 'Die Dokumente der Akte haben sich inzwischen geändert. Die Akte wird neu geladen – bitte noch einmal verschieben.' });
+    }
+    tx(() => {
+      const set = db.prepare('UPDATE case_external_docs SET sort_order = ? WHERE id = ? AND case_id = ?');
+      d.ids.forEach((id, i) => set.run(i + 1, id, c.id));
+    });
+    res.json({ success: true });
   })
 );
 

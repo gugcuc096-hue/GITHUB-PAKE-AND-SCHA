@@ -149,7 +149,7 @@ function externalDocsForCase(caseId, u) {
   const rows = db
     .prepare(
       `SELECT * FROM case_external_docs WHERE case_id = ?
-       ORDER BY COALESCE(doc_date, substr(linked_at, 1, 10)) DESC, id DESC`
+       ORDER BY sort_order IS NOT NULL, sort_order, COALESCE(doc_date, substr(linked_at, 1, 10)) DESC, id DESC`
     )
     .all(caseId)
     .filter((d) => staff || !d.internal);
