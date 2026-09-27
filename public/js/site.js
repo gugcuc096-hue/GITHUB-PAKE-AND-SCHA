@@ -1,6 +1,6 @@
 /*
  * Verbindet die öffentliche Startseite (index.html) mit dem Backend:
- * Login-/Dashboard-Button, Mandatsanfrage, Aktenstatus-Abfrage sowie Team und
+ * Login-/Dashboard-Button, Mandatsanfrage, Aktenstatus-Abfrage, Anliegen an das Board of Partners sowie Team und
  * Honorarordnung live aus der Datenbank (vom Dashboard aus pflegbar).
  * Wird NACH dem Inline-Skript der Startseite geladen.
  */
@@ -291,6 +291,222 @@
       el.classList.remove('hidden');
     })
     .catch(() => {});
+
+  /* ---------------------------------------------------------------- Anliegen an das Board of Partners */
+  // Jeder kann ein Anliegen einreichen (auch ohne Konto). Sehen kann es nur das Board of Partners;
+  // die einreichende Person liest Antworten mit Vorgangsnummer + Pin (angemeldet auch im Dashboard).
+  const CONCERN_BADGE = {
+    offen: 'text-amber-300 border-amber-500/40 bg-amber-500/10',
+    in_bearbeitung: 'text-sky-200 border-sky-400/40 bg-sky-400/10',
+    erledigt: 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10',
+    abgelehnt: 'text-slate-300 border-slate-500/40 bg-slate-500/10',
+  };
+  const concernModal = document.getElementById('concernModal');
+  let concernAccess = null; // { reference, pin } der zuletzt abgefragten Vorgangs
+
+  function fmtWhen(v) {
+    const d = window.PS.parseDate ? window.PS.parseDate(v) : new Date(v);
+    return d ? d.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+  }
+
+  function concernTab(tab) {
+    document.querySelectorAll('[data-concern-tab]').forEach((b) => {
+      const on = b.dataset.concernTab === tab;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    document.getElementById('concernNewPane').classList.toggle('hidden', tab !== 'new');
+    document.getElementById('concernStatusPane').classList.toggle('hidden', tab !== 'status');
+  }
+
+  /** Formular an den Besucher anpassen: angemeldet = Name aus dem Konto, Kategorien je Rolle. */
+  async function prepareConcernForm() {
+    try {
+      const o = await api.get('/api/public/concern-options');
+      const sel = document.getElementById('cfCategory');
+      const current = sel.value;
+      sel.innerHTML = Object.entries(o.categories)
+        .map(([k, l]) => `<option value="${esc(k)}" ${k === current ? 'selected' : ''}>${esc(l)}</option>`)
+        .join('');
+      const info = document.getElementById('cfAccount');
+      info.classList.toggle('hidden', !o.account);
+      if (o.account) {
+        info.innerHTML = `Angemeldet als <strong class="text-white">${esc(o.account.name)}</strong> (${esc(o.account.group)}). Ihr Anliegen erscheint zusätzlich in Ihrem Dashboard unter „Anliegen ans Board“.`;
+      }
+      document.getElementById('concernForm').dataset.account = o.account ? '1' : '';
+      syncConcernPersonal();
+    } catch {
+      /* Standard-Kategorien aus dem HTML bleiben stehen */
+    }
+  }
+  function syncConcernPersonal() {
+    const form = document.getElementById('concernForm');
+    const hide = !!form.dataset.account || document.getElementById('cfAnon').checked;
+    document.getElementById('cfPersonal').classList.toggle('hidden', hide);
+  }
+
+  window.openConcernModal = function (tab = 'new') {
+    document.getElementById('concernForm').classList.remove('hidden');
+    document.getElementById('concernSuccess').classList.add('hidden');
+    concernTab(tab);
+    prepareConcernForm();
+    concernModal.classList.remove('opacity-0', 'pointer-events-none');
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => {
+      if (!window.matchMedia('(min-width: 768px)').matches) return;
+      document.getElementById(tab === 'status' ? 'clRef' : 'cfSubject')?.focus();
+    }, 50);
+  };
+  window.closeConcernModal = function () {
+    concernModal.classList.add('opacity-0', 'pointer-events-none');
+    document.body.style.overflow = '';
+  };
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !concernModal.classList.contains('pointer-events-none')) window.closeConcernModal();
+  });
+  concernModal.addEventListener('click', (e) => {
+    if (e.target === concernModal) window.closeConcernModal();
+  });
+  document.querySelectorAll('[data-concern-tab]').forEach((b) => b.addEventListener('click', () => concernTab(b.dataset.concernTab)));
+  document.getElementById('cfAnon').addEventListener('change', syncConcernPersonal);
+
+  function showConcernSuccess(res) {
+    const box = document.getElementById('concernSuccess');
+    const text = `Vorgangsnummer: ${res.reference}\nPin: ${res.pin}`;
+    box.innerHTML = `
+      <div class="w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center justify-center mx-auto mb-4">
+        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg></div>
+      <h3 class="font-serif text-2xl font-semibold text-white text-center mb-2">Anliegen übermittelt</h3>
+      <p class="text-sm text-[var(--text-muted)] text-center mb-5">Das Board of Partners wurde benachrichtigt und meldet sich.${res.linkedToAccount ? ' Sie finden das Anliegen auch in Ihrem Dashboard.' : ''}</p>
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3 text-center"><div class="text-[0.6rem] uppercase tracking-widest text-[var(--text-muted)]">Vorgangsnummer</div><div class="font-mono text-lg text-[var(--gold-light)]">${esc(res.reference)}</div></div>
+        <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3 text-center"><div class="text-[0.6rem] uppercase tracking-widest text-[var(--text-muted)]">Pin</div><div class="font-mono text-lg tracking-[0.2em] text-[var(--gold-light)]">${esc(res.pin)}</div></div>
+      </div>
+      <p class="text-xs text-amber-300/90 text-center mb-5">Bitte notieren Sie beide Angaben – damit lesen Sie jederzeit die Antwort des Boards.</p>
+      <div class="flex flex-col sm:flex-row gap-2">
+        <button type="button" id="concernCopy" class="btn-outline flex-1 py-3 text-xs uppercase tracking-wider">Daten kopieren</button>
+        ${res.linkedToAccount
+          ? '<a href="/dashboard.html#concerns" class="btn-gold flex-1 py-3 text-xs uppercase tracking-wider text-center">Im Dashboard ansehen</a>'
+          : '<button type="button" id="concernCheck" class="btn-gold flex-1 py-3 text-xs uppercase tracking-wider">Status ansehen</button>'}
+      </div>`;
+    document.getElementById('concernForm').classList.add('hidden');
+    box.classList.remove('hidden');
+    document.getElementById('concernCopy').addEventListener('click', async () => {
+      const ok = await copy(text);
+      showToast(ok ? 'Kopiert' : 'Nicht möglich', ok ? 'Vorgangsnummer und Pin sind in der Zwischenablage.' : 'Bitte die Angaben notieren.');
+    });
+    document.getElementById('concernCheck')?.addEventListener('click', () => {
+      document.getElementById('clRef').value = res.reference;
+      document.getElementById('clPin').value = res.pin;
+      concernTab('status');
+      lookupConcern();
+    });
+  }
+
+  document.getElementById('concernForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const anonymous = form.elements.anonymous.checked;
+    const data = {
+      category: form.elements.category.value,
+      urgency: (form.querySelector('input[name="urgency"]:checked') || {}).value || 'normal',
+      subject: form.elements.subject.value.trim(),
+      body: form.elements.body.value.trim(),
+      anonymous,
+      website: form.elements.website.value,
+    };
+    if (!form.dataset.account && !anonymous) {
+      data.name = form.elements.name.value.trim();
+      data.contact = form.elements.contact.value.trim();
+      if (data.name.length < 2) return showToast('Angaben fehlen', 'Bitte Ihren Namen angeben – oder anonym einreichen.');
+    }
+    if (data.subject.length < 3) return showToast('Angaben fehlen', 'Bitte einen Betreff angeben (mind. 3 Zeichen).');
+    if (data.body.length < 10) return showToast('Angaben fehlen', 'Bitte beschreiben Sie Ihr Anliegen (mind. 10 Zeichen).');
+    const btn = form.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    try {
+      const res = await api.post('/api/public/concerns', data);
+      form.reset();
+      syncConcernPersonal();
+      showConcernSuccess(res);
+    } catch (err) {
+      showToast('Das hat nicht geklappt', err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  function renderConcern(d) {
+    const thread = d.messages.length
+      ? d.messages
+          .map((m) => {
+            const cls = m.system
+              ? 'border-dashed border-[var(--glass-border)] text-[var(--text-dim)]'
+              : m.fromBoard
+                ? 'border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.06)]'
+                : 'border-[var(--glass-border)] bg-slate-900/40';
+            return `<div class="rounded-xl border ${cls} px-4 py-3">
+              <div class="flex flex-wrap items-center gap-2 text-[0.7rem] text-[var(--text-dim)] mb-1"><span class="${m.fromBoard && !m.system ? 'text-[var(--gold-light)] font-medium' : 'text-[var(--text-muted)] font-medium'}">${esc(m.author)}</span>${m.fromBoard && !m.system ? '<span class="uppercase tracking-wider">Board of Partners</span>' : ''}<span>${esc(fmtWhen(m.createdAt))}</span></div>
+              <div class="text-sm whitespace-pre-wrap break-words">${esc(m.body)}</div></div>`;
+          })
+          .join('')
+      : '<p class="text-sm text-[var(--text-dim)] italic">Noch keine Antwort – das Board of Partners meldet sich hier.</p>';
+    const reply = d.closed
+      ? '<p class="text-xs text-[var(--text-dim)] mt-4">Dieses Anliegen ist abgeschlossen. Für etwas Neues reichen Sie bitte ein neues Anliegen ein.</p>'
+      : `<form id="concernReply" class="mt-4 space-y-3">
+          <label for="crText" class="block text-xs uppercase tracking-wider text-[var(--text-muted)]">Nachricht an das Board</label>
+          <textarea id="crText" rows="3" maxlength="5000" required class="w-full bg-slate-900/80 border border-[var(--glass-border)] rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--gold-500)]"></textarea>
+          <button type="submit" class="btn-outline w-full py-2.5 text-xs uppercase tracking-wider disabled:opacity-60">Nachricht senden</button>
+        </form>`;
+    document.getElementById('concernResult').innerHTML = `
+      <div class="rounded-xl border border-[var(--glass-border)] bg-slate-900/40 p-4 mb-4">
+        <div class="flex items-start justify-between gap-3 mb-2">
+          <div class="min-w-0"><div class="font-mono text-xs text-[var(--gold-light)]">${esc(d.reference)}</div><div class="font-serif text-xl text-white break-words">${esc(d.subject)}</div></div>
+          <span class="px-3 py-1 rounded-full text-xs font-semibold border whitespace-nowrap ${CONCERN_BADGE[d.status] || ''}">${esc(d.statusLabel)}</span>
+        </div>
+        <div class="text-[0.7rem] text-[var(--text-dim)] mb-3">${esc(d.categoryLabel)} · eingereicht ${esc(fmtWhen(d.createdAt))}${d.anonymous ? ' · anonym' : ''}</div>
+        <div class="text-sm text-[var(--text-muted)] whitespace-pre-wrap break-words">${esc(d.body)}</div>
+      </div>
+      <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Verlauf</div>
+      <div class="space-y-2">${thread}</div>
+      ${reply}`;
+    document.getElementById('concernReply')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = document.getElementById('crText').value.trim();
+      if (!text) return;
+      const btn = e.target.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      try {
+        await api.post('/api/public/concern-reply', { ...concernAccess, body: text });
+        showToast('Gesendet', 'Ihre Nachricht ist beim Board of Partners eingegangen.');
+        await lookupConcern();
+      } catch (err) {
+        showToast('Das hat nicht geklappt', err.message);
+        btn.disabled = false;
+      }
+    });
+  }
+
+  async function lookupConcern() {
+    const reference = document.getElementById('clRef').value.trim().toUpperCase();
+    const pin = document.getElementById('clPin').value.trim();
+    const out = document.getElementById('concernResult');
+    if (!reference || !pin) return showToast('Angaben fehlen', 'Bitte Vorgangsnummer und Pin eingeben.');
+    try {
+      const d = await api.post('/api/public/concern-status', { reference, pin });
+      concernAccess = { reference, pin };
+      renderConcern(d);
+    } catch (err) {
+      out.innerHTML = `<p class="text-center py-6 text-red-300 text-sm">${esc(err.status === 429 ? err.message : 'Kein Anliegen mit diesen Angaben gefunden. Bitte Vorgangsnummer und Pin prüfen.')}</p>`;
+    }
+  }
+  document.getElementById('concernLookup').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    await lookupConcern();
+    btn.disabled = false;
+  });
 
   ['caseInput', 'casePin'].forEach((id) => {
     document.getElementById(id)?.addEventListener('keydown', (ev) => {

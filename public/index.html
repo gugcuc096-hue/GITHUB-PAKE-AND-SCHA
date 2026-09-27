@@ -250,6 +250,10 @@
         /* Copy button */
         .copy-btn { transition: all 0.2s ease; }
         .copy-btn.copied { color: var(--emerald-500) !important; border-color: rgba(16,185,129,0.5) !important; }
+        /* Anliegen ans Board: Reiter „Einreichen“ / „Status abfragen“ */
+        .concern-tab { border-color: var(--glass-border); color: var(--text-muted); background: transparent; }
+        .concern-tab:hover { color: #fff; }
+        .concern-tab.is-active { border-color: var(--gold-500); color: var(--gold-light); background: rgba(212,175,55,0.1); }
 
         /* Back to top */
         #backToTop { opacity: 0; pointer-events: none; transition: all 0.3s ease; transform: translateY(8px); }
@@ -356,13 +360,20 @@
                 Pake & Scha Legal Consulting ist Ihre verlässliche Kanzlei für anspruchsvolle Mandate im Zivil-, Straf- und Verfassungsrecht. Wir vertreten Privatpersonen, Unternehmen und Fraktionen mit hoher juristischer Expertise, strategischer Konsequenz und absoluter Diskretion.
             </p>
 
-            <div class="flex flex-col sm:flex-row justify-center items-center gap-4 mb-20">
+            <div class="flex flex-col sm:flex-row justify-center items-center gap-4 mb-6">
                 <button onclick="openTicketModal()" class="btn-gold px-8 py-4 text-sm w-full sm:w-auto uppercase tracking-wider">
                     Sofortiges Mandat Anfragen
                 </button>
                 <a href="#rechner" class="btn-outline px-8 py-4 text-sm w-full sm:w-auto text-center uppercase tracking-wider">
                     Interaktiver Tarifrechner
                 </a>
+            </div>
+            <div class="mb-16 sm:mb-20">
+                <button type="button" onclick="openConcernModal()" class="inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1 px-2 text-sm text-[var(--text-muted)] hover:text-[var(--gold-light)] transition-colors">
+                    <svg class="hidden sm:block w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                    <span>Lob, Kritik oder ein Anliegen an die Kanzleileitung?</span>
+                    <span class="text-[var(--gold-500)] font-medium underline underline-offset-4 decoration-[var(--gold-hairline)]">Anliegen an das Board of Partners</span>
+                </button>
             </div>
 
             <!-- Faktenbasierte Infoboxen -->
@@ -1019,6 +1030,23 @@
                     24/7 Eilnotdienst — aktuelle Uhrzeit Kanzlei: <span class="font-mono text-[var(--gold-light)]" id="liveClockFooter">--:--:--</span>
                 </div>
             </div>
+
+            <!-- Anliegen an das Board of Partners -->
+            <div id="anliegen" class="glass-card p-6 sm:p-8 md:p-10 max-w-4xl mx-auto mt-8 scroll-mt-28">
+                <div class="flex flex-col md:flex-row md:items-center gap-6 md:gap-10">
+                    <div class="flex-1 text-center md:text-left">
+                        <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Kanzleileitung</div>
+                        <h2 class="font-serif text-3xl font-semibold text-white mb-3">Anliegen an das Board of Partners</h2>
+                        <p class="text-[var(--text-muted)] text-sm leading-relaxed">
+                            Lob, Kritik, eine Beschwerde oder ein Anliegen, das die Führungsebene persönlich klären soll? Ihr Anliegen sieht ausschließlich das Board of Partners – auf Wunsch auch anonym. Mit Vorgangsnummer und Pin lesen Sie die Antwort jederzeit hier.
+                        </p>
+                    </div>
+                    <div class="flex flex-col gap-3 md:w-60 shrink-0">
+                        <button type="button" onclick="openConcernModal()" class="btn-gold px-6 py-3.5 text-xs uppercase tracking-wider">Anliegen einreichen</button>
+                        <button type="button" onclick="openConcernModal('status')" class="btn-outline px-6 py-3.5 text-xs uppercase tracking-wider">Status abfragen</button>
+                    </div>
+                </div>
+            </div>
         </section>
     </main>
 
@@ -1034,6 +1062,7 @@
                 <a href="#honorar" class="hover:text-[var(--gold-500)] transition-colors">Honorarordnung</a>
                 <a href="#raenge" class="hover:text-[var(--gold-500)] transition-colors">Kanzleiränge</a>
                 <a href="#kontakt" class="hover:text-[var(--gold-500)] transition-colors">Kontakt</a>
+                <a href="#anliegen" class="hover:text-[var(--gold-500)] transition-colors">Anliegen ans Board</a>
                 <a href="/karriere.html" class="hover:text-[var(--gold-500)] transition-colors">Karriere</a>
                 <a href="/login.html" data-auth-link class="text-[var(--gold-500)] hover:text-[var(--gold-light)] transition-colors"><span data-auth-label data-auth-out="Mandantenportal" data-auth-in="Dashboard">Mandantenportal</span></a>
             </div>
@@ -1106,6 +1135,86 @@
             </form>
             </div>
             <div id="ticketSuccess" class="hidden" aria-live="polite"></div>
+        </div>
+    </div>
+
+    <!-- MODAL: ANLIEGEN AN DAS BOARD OF PARTNERS (Logik in /js/site.js) -->
+    <div id="concernModal" role="dialog" aria-modal="true" aria-labelledby="concernTitle" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/80 backdrop-blur-md opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="glass-card max-w-lg w-full p-5 sm:p-6 md:p-8 relative border-t-2 border-t-[var(--gold-500)] max-h-[92vh] max-h-[92dvh] overflow-y-auto rounded-b-none sm:rounded-b-[20px]">
+            <button type="button" onclick="closeConcernModal()" aria-label="Schließen" class="absolute top-3 right-3 w-10 h-10 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-white/5">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+            <h3 id="concernTitle" class="font-serif text-2xl font-semibold text-white mb-2 pr-10">Anliegen an das Board of Partners</h3>
+            <p class="text-xs text-[var(--text-muted)] mb-5">Ihr Anliegen sieht ausschließlich das Board of Partners – die Leitung der Kanzlei. Sie erhalten sofort eine Vorgangsnummer und einen Pin, mit denen Sie die Antwort hier abrufen.</p>
+            <div class="grid grid-cols-2 gap-2 mb-5" role="tablist" aria-label="Anliegen">
+                <button type="button" role="tab" data-concern-tab="new" class="concern-tab py-2.5 rounded-lg border text-xs uppercase tracking-wider transition-colors">Einreichen</button>
+                <button type="button" role="tab" data-concern-tab="status" class="concern-tab py-2.5 rounded-lg border text-xs uppercase tracking-wider transition-colors">Status abfragen</button>
+            </div>
+
+            <div id="concernNewPane">
+                <form id="concernForm" class="space-y-4" novalidate>
+                    <div id="cfAccount" class="hidden text-xs rounded-lg border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] text-[var(--text-muted)] px-4 py-3"></div>
+                    <div id="cfPersonal" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label for="cfName" class="block text-xs uppercase tracking-wider text-[var(--text-muted)] mb-1">Ihr Name</label>
+                            <input id="cfName" name="name" type="text" maxlength="80" autocomplete="name" placeholder="z. B. Max Mustermann" class="w-full bg-slate-900/80 border border-[var(--glass-border)] rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--gold-500)]">
+                        </div>
+                        <div>
+                            <label for="cfContact" class="block text-xs uppercase tracking-wider text-[var(--text-muted)] mb-1">Kontakt <span class="normal-case tracking-normal text-[var(--text-dim)]">(optional)</span></label>
+                            <input id="cfContact" name="contact" type="text" maxlength="100" placeholder="Telefon im Spiel oder Discord" class="w-full bg-slate-900/80 border border-[var(--glass-border)] rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--gold-500)]">
+                        </div>
+                    </div>
+                    <!-- Spam-Schutz: dieses Feld bleibt für Menschen unsichtbar und leer -->
+                    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label for="cfCategory" class="block text-xs uppercase tracking-wider text-[var(--text-muted)] mb-1">Kategorie</label>
+                            <select id="cfCategory" name="category" class="w-full bg-slate-900/80 border border-[var(--glass-border)] rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--gold-500)]">
+                                <option value="betreuung">Betreuung meines Mandats</option>
+                                <option value="beschwerde">Beschwerde / Konflikt</option>
+                                <option value="abrechnung">Rechnung &amp; Honorar</option>
+                                <option value="kooperation">Anfrage / Zusammenarbeit</option>
+                                <option value="vorschlag">Vorschlag / Lob / Idee</option>
+                                <option value="sonstiges">Sonstiges</option>
+                            </select>
+                        </div>
+                        <div>
+                            <span class="block text-xs uppercase tracking-wider text-[var(--text-muted)] mb-1">Dringlichkeit</span>
+                            <div class="grid grid-cols-2 gap-2">
+                                <label class="flex items-center justify-center gap-2 py-2.5 rounded-lg border border-[var(--glass-border)] text-xs cursor-pointer hover:border-[var(--gold-500)] transition-all">
+                                    <input type="radio" name="urgency" value="normal" checked class="accent-[var(--gold-500)]"> Normal
+                                </label>
+                                <label class="flex items-center justify-center gap-2 py-2.5 rounded-lg border border-red-500/30 text-xs text-red-300 cursor-pointer hover:border-red-400 transition-all">
+                                    <input type="radio" name="urgency" value="dringend" class="accent-red-500"> Dringend
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="cfSubject" class="block text-xs uppercase tracking-wider text-[var(--text-muted)] mb-1">Betreff</label>
+                        <input id="cfSubject" name="subject" type="text" required maxlength="150" placeholder="Worum geht es?" class="w-full bg-slate-900/80 border border-[var(--glass-border)] rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--gold-500)]">
+                    </div>
+                    <div>
+                        <label for="cfBody" class="block text-xs uppercase tracking-wider text-[var(--text-muted)] mb-1">Ihr Anliegen</label>
+                        <textarea id="cfBody" name="body" rows="5" required maxlength="5000" placeholder="Bitte schildern Sie Ihr Anliegen möglichst konkret." class="w-full bg-slate-900/80 border border-[var(--glass-border)] rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--gold-500)]"></textarea>
+                    </div>
+                    <label class="flex items-start gap-3 text-sm text-[var(--text-muted)] cursor-pointer">
+                        <input id="cfAnon" type="checkbox" name="anonymous" class="mt-1 w-4 h-4 accent-[var(--gold-500)] shrink-0">
+                        <span>Anonym einreichen<span class="block text-xs text-[var(--text-dim)] mt-0.5">Das Board sieht weder Ihren Namen noch Ihren Kontakt. Die Antwort lesen Sie trotzdem mit Vorgangsnummer und Pin.</span></span>
+                    </label>
+                    <button type="submit" class="btn-gold w-full py-3 text-xs uppercase tracking-wider mt-2 disabled:opacity-60">An das Board senden</button>
+                </form>
+                <div id="concernSuccess" class="hidden" aria-live="polite"></div>
+            </div>
+
+            <div id="concernStatusPane" class="hidden">
+                <form id="concernLookup" class="grid grid-cols-1 sm:grid-cols-[1fr_9rem] gap-3 mb-3" novalidate>
+                    <input id="clRef" type="text" autocomplete="off" autocapitalize="characters" placeholder="Vorgangsnummer, z. B. AN-2026-0001" aria-label="Vorgangsnummer" class="w-full bg-slate-900/80 border border-[var(--glass-border)] rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--gold-500)] font-mono">
+                    <input id="clPin" type="text" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Pin" aria-label="Pin (6 Ziffern)" class="w-full bg-slate-900/80 border border-[var(--glass-border)] rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--gold-500)] font-mono tracking-widest">
+                    <button type="submit" class="btn-gold sm:col-span-2 py-3 text-xs uppercase tracking-wider disabled:opacity-60">Status abfragen</button>
+                </form>
+                <div id="concernResult" aria-live="polite"><p class="text-center py-6 text-[var(--text-dim)] text-sm italic">Vorgangsnummer und Pin finden Sie in der Bestätigung Ihres Anliegens.</p></div>
+            </div>
         </div>
     </div>
 

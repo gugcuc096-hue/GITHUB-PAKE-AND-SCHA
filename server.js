@@ -17,6 +17,7 @@ const applications = require('./routes/applications');
 const fivenetRoutes = require('./routes/fivenet');
 const externalRoutes = require('./routes/external');
 const contractRoutes = require('./routes/contracts');
+const concernRoutes = require('./routes/concerns');
 
 const PORT = Number(process.env.PORT) || 3000;
 const app = express();
@@ -71,7 +72,7 @@ app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/contracts', contractRoutes.router);
 app.use('/api/absences', require('./routes/absences').router);
 app.use('/api/work', require('./routes/work').router);
-app.use('/api/concerns', require('./routes/concerns').router);
+app.use('/api/concerns', concernRoutes.router);
 app.use('/api/personnel', require('./routes/personnel').router);
 app.use('/api/contract-templates', contractRoutes.templatesRouter);
 app.use('/api/calendar', calendarRoutes);
@@ -90,6 +91,7 @@ app.use('/api/admin', admin.router);
 app.use('/api/discord', require('./routes/discord'));
 app.use('/api/public', require('./routes/public'));
 app.use('/api/public', applications.publicRouter);
+app.use('/api/public', concernRoutes.publicRouter);
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Schnittstelle nicht gefunden.' }));
 
