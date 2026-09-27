@@ -351,6 +351,51 @@ db.exec(`
     estimated  INTEGER NOT NULL DEFAULT 0        -- vor Einführung der Erfassung: aus dem Aktenverlauf geschätzt
   );
 
+  -- Anliegen an das Board of Partners (Führungsebene) von Mitarbeitern und Mandanten: Einreichung, Antworten, Status
+  CREATE TABLE IF NOT EXISTS concerns (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    author_id         INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    author_name       TEXT NOT NULL DEFAULT '',
+    author_group      TEXT NOT NULL DEFAULT 'mitarbeiter', -- mitarbeiter | mandant (bleibt auch bei anonymen Anliegen sichtbar)
+    anonymous         INTEGER NOT NULL DEFAULT 0,  -- dem Board wird die einreichende Person nicht angezeigt
+    category          TEXT NOT NULL DEFAULT 'sonstiges',
+    urgency           TEXT NOT NULL DEFAULT 'normal',
+    subject           TEXT NOT NULL,
+    body              TEXT NOT NULL,
+    status            TEXT NOT NULL DEFAULT 'offen', -- offen | in_bearbeitung | erledigt | abgelehnt
+    assigned_to       INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    author_seen_at    TEXT,                          -- zuletzt von der einreichenden Person geöffnet
+    board_activity_at TEXT,                          -- letzte sichtbare Antwort/Statusänderung des Boards
+    created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
+    closed_at         TEXT
+  );
+  CREATE TABLE IF NOT EXISTS concern_messages (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    concern_id  INTEGER NOT NULL REFERENCES concerns(id) ON DELETE CASCADE,
+    author_id   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    author_name TEXT NOT NULL DEFAULT '',
+    from_board  INTEGER NOT NULL DEFAULT 0,
+    internal    INTEGER NOT NULL DEFAULT 0,          -- interne Notiz des Boards (für die einreichende Person unsichtbar)
+    system      INTEGER NOT NULL DEFAULT 0,
+    body        TEXT NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  -- Personalprotokoll: Einstellungen und Beförderungen/Rangänderungen (für alle Mitarbeiter sichtbar)
+  CREATE TABLE IF NOT EXISTS personnel_events (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    person_name TEXT NOT NULL,
+    type        TEXT NOT NULL,                       -- einstellung | befoerderung | rueckstufung | rangaenderung
+    old_rank    TEXT,
+    new_rank    TEXT,
+    note        TEXT NOT NULL DEFAULT '',
+    by_id       INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    by_name     TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   -- Abmeldungen des Teams (Abwesenheit von–bis, Grund); werden auf Wunsch in Discord gemeldet
   CREATE TABLE IF NOT EXISTS absences (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -404,6 +449,7 @@ db.exec(`
 addColumn('users', 'discord_id', 'TEXT');
 addColumn('users', 'discord_username', 'TEXT');
 addColumn('users', 'discord_avatar', 'TEXT');
+addColumn('users', 'personnel_seen_id', 'INTEGER'); // zuletzt gesehener Eintrag im Personalprotokoll
 addColumn('users', 'must_change_password', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('team_members', 'user_id', 'INTEGER REFERENCES users(id) ON DELETE SET NULL');
 addColumn('team_members', 'visible', 'INTEGER NOT NULL DEFAULT 1');
@@ -516,6 +562,10 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_case_lawyers_user ON case_lawyers(user_id);
   CREATE INDEX IF NOT EXISTS idx_contracts_case ON case_contracts(case_id);
   CREATE INDEX IF NOT EXISTS idx_absences_dates ON absences(end_date, start_date);
+  CREATE INDEX IF NOT EXISTS idx_concerns_status ON concerns(status, updated_at);
+  CREATE INDEX IF NOT EXISTS idx_concerns_author ON concerns(author_id);
+  CREATE INDEX IF NOT EXISTS idx_concern_messages ON concern_messages(concern_id);
+  CREATE INDEX IF NOT EXISTS idx_personnel_created ON personnel_events(created_at);
   CREATE INDEX IF NOT EXISTS idx_case_work_case ON case_work(case_id, ended_at);
   CREATE INDEX IF NOT EXISTS idx_case_work_user ON case_work(user_id);
   CREATE INDEX IF NOT EXISTS idx_cases_status ON cases(status);

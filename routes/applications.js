@@ -7,6 +7,7 @@ const { requireAuth, requireAdmin, hashPassword, generateTempPassword } = requir
 const { wrap, parseBody, idParam, isoDateTime, deriveInitials, truncate, APPLICATION_STATUS, rankField, BOARD_RANKS } = require('../helpers');
 const { applicationRow, positionRow, logActivity } = require('../models');
 const discord = require('../discord');
+const personnel = require('./personnel');
 
 // skipFailedRequests: Tippfehler im Formular (400) verbrauchen kein Kontingent.
 const limit = (windowMs, max, message, skipFailedRequests = false) =>
@@ -229,11 +230,13 @@ adminRouter.post(
     if (db.prepare('SELECT id FROM users WHERE email = ?').get(email)) return res.status(409).json({ error: 'Diese E-Mail-Adresse ist bereits vergeben.' });
 
     const password = generateTempPassword();
+    let hiredId;
     tx(() => {
       const info = db
         .prepare('INSERT INTO users (email, password_hash, display_name, role, rank, phone, must_change_password) VALUES (?, ?, ?, ?, ?, ?, 1)')
         .run(email, hashPassword(password), a.name, d.role, d.rank || null, a.phone || null);
       const userId = Number(info.lastInsertRowid);
+      hiredId = userId;
       if (d.createProfile !== false) {
         const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order), 0) AS m FROM team_members').get().m;
         db.prepare(
@@ -245,6 +248,7 @@ adminRouter.post(
       ).run(userId, 'Herzlichen Glückwunsch – willkommen im Team von Pake & Scha! Ihre Zugangsdaten erhalten Sie direkt vom Board of Partners.', a.id);
     });
     logActivity(req.user, 'Bewerber eingestellt', 'application', a.id, `${a.name} als ${d.rank || 'Mitarbeiter (ohne Rang)'}`);
+    personnel.recordHire({ userId: hiredId, name: a.name, rank: d.rank || null, note: `Über Bewerbung ${a.number}`, by: req.user });
     res.json({ ...detail(load(a.id)), credentials: { email, password } });
   })
 );

@@ -36,6 +36,9 @@ const EVENTS = {
   'application.created': 'Neue Bewerbung',
   'duty.changed': 'Dienstbeginn / Dienstende eines Anwalts',
   'absence.changed': 'Abmeldung / Rückmeldung eines Mitarbeiters',
+  'concern.created': 'Neues Anliegen an das Board of Partners',
+  'concern.updated': 'Anliegen ans Board: Rückmeldung der einreichenden Person / Statusänderung',
+  'personnel.changed': 'Beförderung / Einstellung (Personalprotokoll)',
   'task.assigned': 'Aufgabe einem anderen Teammitglied zugewiesen',
 };
 
