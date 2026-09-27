@@ -472,6 +472,11 @@ addColumn('case_external_docs', 'sort_order', 'INTEGER');
 addColumn('case_attachments', 'external_doc_id', 'INTEGER REFERENCES case_external_docs(id) ON DELETE SET NULL');
 addColumn('case_attachments', 'source_url', 'TEXT');
 addColumn('case_attachments', 'content_hash', 'TEXT');
+// Anliegen ans Board: Vorgangsnummer + Pin (Statusabfrage auf der Website), Kontakt, Herkunft
+addColumn('concerns', 'reference', 'TEXT');
+addColumn('concerns', 'access_pin', 'TEXT');
+addColumn('concerns', 'contact', "TEXT NOT NULL DEFAULT ''");
+addColumn('concerns', 'source', "TEXT NOT NULL DEFAULT 'dashboard'"); // dashboard | web
 
 // NOT NULL entfernen oder ON-DELETE-Regeln ändern geht in SQLite nur über
 // einen Neuaufbau der Tabelle (offizielles 12-Schritte-Verfahren). Vorher
@@ -563,6 +568,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_contracts_case ON case_contracts(case_id);
   CREATE INDEX IF NOT EXISTS idx_absences_dates ON absences(end_date, start_date);
   CREATE INDEX IF NOT EXISTS idx_concerns_status ON concerns(status, updated_at);
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_concerns_reference ON concerns(reference);
   CREATE INDEX IF NOT EXISTS idx_concerns_author ON concerns(author_id);
   CREATE INDEX IF NOT EXISTS idx_concern_messages ON concern_messages(concern_id);
   CREATE INDEX IF NOT EXISTS idx_personnel_created ON personnel_events(created_at);
@@ -619,6 +625,7 @@ function nextNumber(prefix, table, column) {
 const nextCaseNumber = () => nextNumber('PS', 'cases', 'case_number');
 const nextInvoiceNumber = (kind) => nextNumber(kind === 'honorarvereinbarung' ? 'HV' : 'RE', 'invoices', 'number');
 const nextApplicationNumber = () => nextNumber('BW', 'applications', 'number');
+const nextConcernNumber = () => nextNumber('AN', 'concerns', 'reference');
 
 function randomPin() {
   return String(crypto.randomInt(0, 1000000)).padStart(6, '0');
@@ -632,6 +639,11 @@ function setSetting(key, value) {
   db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, String(value));
 }
 
+// Ältere Anliegen (vor Einführung der Vorgangsnummer) nachträglich nummerieren.
+for (const row of db.prepare('SELECT id FROM concerns WHERE reference IS NULL ORDER BY id').all()) {
+  db.prepare('UPDATE concerns SET reference = ?, access_pin = ? WHERE id = ?').run(nextConcernNumber(), randomPin(), row.id);
+}
+
 module.exports = {
   db,
   DB_PATH,
@@ -642,6 +654,7 @@ module.exports = {
   nextCaseNumber,
   nextInvoiceNumber,
   nextApplicationNumber,
+  nextConcernNumber,
   randomPin,
   getSetting,
   setSetting,

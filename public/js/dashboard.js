@@ -109,6 +109,7 @@
     invoices: { label: 'Rechnungen', icon: 'receipt' },
     duty: { label: 'Dienstzeiten', icon: 'clock', staff: true },
     personnel: { label: 'Beförderungen & Einstellungen', short: 'Personal', icon: 'star', staff: true },
+    'concerns-board': { label: 'Eingegangene Anliegen', short: 'Anliegen', icon: 'chat', board: true, section: 'Board of Partners' },
     work: { label: 'Aktenbearbeitung', icon: 'briefcase', board: true, section: 'Board of Partners' },
     team: { label: 'Team', icon: 'users', admin: true, section: 'Board of Partners' },
     applications: { label: 'Bewerbungen', icon: 'userAdd', admin: true, section: 'Board of Partners' },
@@ -177,10 +178,12 @@
     taskQuery: '',
     dueTasks: 0,
     // Anliegen ans Board, Personalprotokoll
-    concerns: null,
+    concerns: null, // eigene Anliegen
+    concernsAll: null, // alle Anliegen (Board of Partners)
     concernFilter: 'aktiv',
     concernGroup: 'alle',
-    concernCount: 0,
+    concernUnseen: 0,
+    concernOpen: 0,
     modalConcernId: null,
     personnel: null,
     personnelNew: 0,
@@ -438,9 +441,11 @@
     async dueTasks() {
       if (isStaff()) st.dueTasks = (await api.get('/api/tasks/due-count?today=' + dayKey(new Date()))).due;
     },
-    /** Board: offene Anliegen; alle: eigene Anliegen mit neuer Antwort. */
+    /** Eigene Anliegen mit neuer Antwort; Board: offene Anliegen im Eingang. */
     async concernCount() {
-      st.concernCount = (await api.get('/api/concerns/counts')).total;
+      const c = await api.get('/api/concerns/counts');
+      st.concernUnseen = c.unseen;
+      st.concernOpen = c.open;
     },
     async personnelCount() {
       if (isStaff()) st.personnelNew = st.view === 'personnel' ? 0 : (await api.get('/api/personnel/counts')).unseen;
@@ -462,7 +467,7 @@
         section = v.section;
         html += `<div class="nav-section">${esc(section)}</div>`;
       }
-      const count = { mail: st.unread, applications: st.newApplications, tasks: st.dueTasks, concerns: st.concernCount, personnel: st.personnelNew }[key] || 0;
+      const count = { mail: st.unread, applications: st.newApplications, tasks: st.dueTasks, concerns: st.concernUnseen, 'concerns-board': st.concernOpen, personnel: st.personnelNew }[key] || 0;
       const active = st.view === key || (key === 'invoices' && st.view === 'invoice-new');
       html += `<a href="#${key}" class="nav-item ${active ? 'active' : ''}" ${active ? 'aria-current="page"' : ''}>${icon(v.icon)}<span>${esc(viewLabel(key))}</span>${count ? `<span class="nav-count">${count > 99 ? '99+' : count}</span>` : ''}</a>`;
     }
@@ -811,7 +816,7 @@
           <div><p class="text-xs uppercase tracking-[0.2em] text-gold mb-1">${esc(today)}</p>
             <h1 class="page-title">${esc(greet)}, ${esc(u.displayName)}</h1>
             <p class="page-sub">${esc(u.rank || ROLES[u.role])} · Pake &amp; Scha Legal Consulting</p></div>
-          ${staff ? `<div class="page-actions"><button class="btn-outline btn-md" data-action="new-event">${icon('calendar', 'ico-sm')}<span>Frist / Termin</span></button><button class="btn-gold btn-md" data-action="new-case">${icon('plus')}<span>Neue Akte</span></button></div>` : ''}
+          <div class="page-actions"><button class="btn-outline btn-md" data-action="concern-new">${icon('chat', 'ico-sm')}<span>Anliegen ans Board</span></button>${staff ? `<button class="btn-outline btn-md" data-action="new-event">${icon('calendar', 'ico-sm')}<span>Frist / Termin</span></button><button class="btn-gold btn-md" data-action="new-case">${icon('plus')}<span>Neue Akte</span></button>` : ''}</div>
         </div>
         ${dutyStrip()}
         <div class="kpi-grid">${kpis.join('')}</div>`;
@@ -3204,13 +3209,13 @@
     ['alle', 'Alle Absender'],
     ['mitarbeiter', 'Mitarbeiter'],
     ['mandant', 'Mandanten'],
+    ['extern', 'Über die Website'],
   ];
   /** Absender aus Sicht des Boards: Name + Rang bzw. „Mandant“ (bei anonymen Anliegen nur die Gruppe). */
   const concernFrom = (k) => (k.mine ? 'Ihnen' : `${k.author} (${k.authorRank || k.authorGroupLabel})`);
   const concernMatches = (k, filter = st.concernFilter) => filter === 'alle' || (filter === 'aktiv' ? !k.closed : k.closed);
 
-  function concernList() {
-    const d = st.concerns;
+  function concernList(d) {
     const all = d.scope === 'all';
     const rows = d.concerns.filter((k) => concernMatches(k) && (!all || st.concernGroup === 'alle' || k.authorGroup === st.concernGroup));
     if (!rows.length) {
@@ -3220,6 +3225,7 @@
       .map((k) => {
         const meta = [
           k.categoryLabel,
+          k.reference,
           all ? `von ${concernFrom(k)}` : k.anonymous ? 'anonym eingereicht' : null,
           fmtDate(k.createdAt),
           k.assignedName ? `zuständig: ${k.assignedName}` : null,
@@ -3235,41 +3241,49 @@
       .join('');
   }
 
+  function concernsPage(d) {
+    const all = d.scope === 'all';
+    const count = (f) => d.concerns.filter((k) => concernMatches(k, f)).length;
+    const sub = all
+      ? 'Alle Anliegen von Mitarbeitern, Mandanten und Website-Besuchern – nur für das Board of Partners sichtbar. Ihre Antworten sehen die Einreichenden in ihrem Dashboard bzw. auf der Website (Vorgangsnummer + Pin); interne Notizen nur das Board.'
+      : isStaff()
+        ? 'Ein Anliegen an die Führungsebene – Personal, Konflikte, Vorschläge, Abläufe oder Vergütung. Auf Wunsch anonym. Einsehen kann es nur das Board of Partners; hier sehen Sie Ihre eigenen Anliegen und die Antworten.'
+        : 'Sie möchten die Kanzleileitung direkt erreichen – etwa zur Betreuung Ihres Mandats, mit einer Beschwerde oder einem Lob? Das Board of Partners kümmert sich persönlich darum. Hier sehen Sie Ihre Anliegen und die Antworten.';
+    return `
+      <div class="page-head">
+        <div><h1 class="page-title">${all ? 'Eingegangene Anliegen' : 'Anliegen an das Board of Partners'}</h1><p class="page-sub">${esc(sub)}</p></div>
+        <div class="page-actions"><button class="${all ? 'btn-outline' : 'btn-gold'} btn-md" data-action="concern-new">${icon('plus')}<span>Neues Anliegen</span></button></div>
+      </div>
+      <div class="toolbar">
+        <div class="chip-row">
+          ${CONCERN_FILTERS.map(([k, l]) => `<button class="chip ${st.concernFilter === k ? 'active' : ''}" data-action="concern-filter" data-value="${k}">${l} <span class="chip-count">${count(k)}</span></button>`).join('')}
+        </div>
+        ${all ? `<div class="chip-row">${CONCERN_GROUPS.map(([k, l]) => `<button class="chip ${st.concernGroup === k ? 'active' : ''}" data-action="concern-group" data-value="${k}">${l}</button>`).join('')}</div>` : ''}
+      </div>
+      <div class="panel p-2 md:p-3">${concernList(d)}</div>`;
+  }
+  /** Für alle: eigene Anliegen und Einreichen. */
   views.concerns = {
     async load() {
-      st.concerns = await api.get('/api/concerns');
+      st.concerns = await api.get('/api/concerns?scope=mine');
     },
-    render() {
-      const d = st.concerns;
-      const all = d.scope === 'all';
-      const count = (f) => d.concerns.filter((k) => concernMatches(k, f)).length;
-      const sub = all
-        ? 'Anliegen von Mitarbeitern und Mandanten an die Führungsebene. Ihre Antworten sehen die Einreichenden in ihrem Dashboard – interne Notizen nur das Board.'
-        : isStaff()
-          ? 'Ein Anliegen an die Führungsebene – Personal, Konflikte, Vorschläge, Abläufe oder Vergütung. Auf Wunsch anonym.'
-          : 'Sie möchten die Kanzleileitung direkt erreichen – etwa zur Betreuung Ihres Mandats, mit einer Beschwerde oder einem Lob? Das Board of Partners kümmert sich persönlich darum.';
-      return `
-        <div class="page-head">
-          <div><h1 class="page-title">Anliegen an das Board of Partners</h1><p class="page-sub">${esc(sub)}</p></div>
-          <div class="page-actions"><button class="btn-gold btn-md" data-action="concern-new">${icon('plus')}<span>Neues Anliegen</span></button></div>
-        </div>
-        <div class="toolbar">
-          <div class="chip-row">
-            ${CONCERN_FILTERS.map(([k, l]) => `<button class="chip ${st.concernFilter === k ? 'active' : ''}" data-action="concern-filter" data-value="${k}">${l} <span class="chip-count">${count(k)}</span></button>`).join('')}
-          </div>
-          ${all ? `<div class="chip-row">${CONCERN_GROUPS.map(([k, l]) => `<button class="chip ${st.concernGroup === k ? 'active' : ''}" data-action="concern-group" data-value="${k}">${l}</button>`).join('')}</div>` : ''}
-        </div>
-        <div class="panel p-2 md:p-3">${concernList()}</div>`;
+    render: () => concernsPage(st.concerns),
+  };
+  /** Eingang aller Anliegen – nur Board of Partners. */
+  views['concerns-board'] = {
+    async load() {
+      st.concernsAll = await api.get('/api/concerns?scope=all');
     },
+    render: () => concernsPage(st.concernsAll),
   };
 
   async function concernNewModal() {
-    if (!st.concerns) st.concerns = await api.get('/api/concerns');
+    if (!st.concerns) st.concerns = await api.get('/api/concerns?scope=mine');
     const cats = st.concerns.myCategories || {};
     const staff = isStaff();
     openModal(`
       <h2 class="modal-title">Anliegen an das Board of Partners</h2>
-      <p class="modal-sub">${staff ? 'Für Führungsthemen: Personal, Konflikte, Vorschläge, Abläufe, Vergütung …' : 'Zur Betreuung Ihres Mandats, einer Rechnung, als Beschwerde oder Lob – direkt an die Kanzleileitung.'} Das Board of Partners antwortet Ihnen hier im Dashboard.</p>
+      <p class="modal-sub">${staff ? 'Für Führungsthemen: Personal, Konflikte, Vorschläge, Abläufe, Vergütung …' : 'Zur Betreuung Ihres Mandats, einer Rechnung, als Beschwerde oder Lob – direkt an die Kanzleileitung.'} Einsehen kann es nur das Board of Partners; die Antwort finden Sie unter „Anliegen ans Board“.</p>
       <form data-form="concern-new" class="form-grid cols-2">
         <div><label class="label" for="cnCat">Kategorie</label><select id="cnCat" name="category" class="field" required>${Object.entries(cats).map(([k, l]) => opt(k, l)).join('')}</select></div>
         <div><label class="label" for="cnUrg">Dringlichkeit</label><select id="cnUrg" name="urgency" class="field">${opt('normal', 'Normal', true)}${opt('dringend', 'Dringend')}</select></div>
@@ -3284,9 +3298,11 @@
     const k = d.concern;
     const asBoard = d.board && !k.mine;
     const info = [
+      ['Vorgang', `<span class="font-mono text-gold">${esc(k.reference || '—')}</span>`],
       ['Kategorie', esc(k.categoryLabel)],
       ['Eingereicht von', k.mine ? `Ihnen${k.anonymous ? ' <span class="text-dim">(anonym)</span>' : ''}` : esc(concernFrom(k))],
-      ['Eingereicht am', esc(fmtDate(k.createdAt))],
+      ...(k.contact ? [['Kontakt', esc(k.contact)]] : []),
+      ['Eingereicht am', esc(fmtDate(k.createdAt)) + (k.source === 'web' ? ' <span class="text-dim">· Website</span>' : '')],
       ['Dringlichkeit', k.urgency === 'dringend' ? badge('Dringend', 'red') : 'Normal'],
       ['Zuständig im Board', esc(k.assignedName || 'noch offen')],
       ['Status', statusBadge(CONCERN_STATUS, k.status)],
@@ -3341,10 +3357,15 @@
     else openModal(html, { wide: true });
     st.modalConcernId = d.concern.id;
     // Geöffnet = gelesen: Hinweis „Neue Antwort“ und Zähler in der Navigation aktualisieren.
-    const row = st.concerns?.concerns.find((x) => x.id === d.concern.id);
-    if (row && row.unseen) {
-      row.unseen = false;
-      if (st.view === 'concerns') $('#content').innerHTML = views.concerns.render();
+    for (const [list, view] of [
+      [st.concerns, 'concerns'],
+      [st.concernsAll, 'concerns-board'],
+    ]) {
+      const row = list?.concerns.find((x) => x.id === d.concern.id);
+      if (row && row.unseen) {
+        row.unseen = false;
+        if (st.view === view) $('#content').innerHTML = views[view].render();
+      }
     }
     if (d.concern.mine) load.concernCount().then(renderNav).catch(() => {});
   }
