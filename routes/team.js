@@ -6,6 +6,7 @@ const { requireAuth, requireAdmin, hashPassword, generateTempPassword, destroyAl
 const { wrap, parseBody, idParam, deriveInitials, RANKS } = require('../helpers');
 const { teamRow, TEAM_SELECT, logActivity } = require('../models');
 const { imageBody, saveImage, removeFile } = require('../uploads');
+const personnel = require('./personnel');
 
 const ORDER = 'ORDER BY t.sort_order ASC, t.id ASC';
 
@@ -84,6 +85,8 @@ adminRouter.post(
       if (problem) return res.status(400).json({ error: problem });
     }
 
+    // Rang eines verknüpften Kontos vorher (für das Personalprotokoll)
+    const linkedBefore = d.userId ? db.prepare('SELECT rank FROM users WHERE id = ?').get(d.userId) : null;
     let credentials = null;
     const id = tx(() => {
       let userId = d.userId || null;
@@ -105,6 +108,8 @@ adminRouter.post(
     });
 
     logActivity(req.user, 'Teammitglied hinzugefügt', 'team', id, `${d.name} (${d.roleTitle})${credentials ? ' inkl. Login-Konto' : ''}`);
+    if (credentials) personnel.recordHire({ userId: credentials.userId, name: d.name, rank: d.roleTitle, by: req.user });
+    else if (linkedBefore) personnel.recordRankChange({ userId: d.userId, name: d.name, oldRank: linkedBefore.rank, newRank: d.roleTitle, by: req.user });
     res.status(201).json({
       member: teamRow(load(id), true),
       credentials: credentials ? { email: credentials.email, password: credentials.password } : null,
@@ -125,6 +130,9 @@ adminRouter.patch(
       if (problem) return res.status(400).json({ error: problem });
     }
 
+    // Rang vorher: der des verknüpften Kontos, sonst der im Profil (für das Personalprotokoll)
+    const linkId = d.userId === undefined ? m.user_id : d.userId;
+    const rankBefore = linkId ? db.prepare('SELECT rank FROM users WHERE id = ?').get(linkId)?.rank ?? null : m.role_title;
     let credentials = null;
     tx(() => {
       const name = d.name ?? m.name;
@@ -153,6 +161,12 @@ adminRouter.patch(
     });
 
     logActivity(req.user, 'Teammitglied geändert', 'team', m.id, d.name && d.name !== m.name ? `${m.name} → ${d.name}` : m.name);
+    const newName = d.name ?? m.name;
+    const newTitle = d.roleTitle ?? m.role_title;
+    if (credentials) personnel.recordHire({ userId: credentials.userId, name: newName, rank: newTitle, by: req.user });
+    else if (d.roleTitle !== undefined || d.userId !== undefined) {
+      personnel.recordRankChange({ userId: linkId || null, name: newName, oldRank: rankBefore, newRank: newTitle, by: req.user });
+    }
     res.json({
       member: teamRow(load(m.id), true),
       credentials: credentials ? { email: credentials.email, password: credentials.password } : null,

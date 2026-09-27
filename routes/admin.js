@@ -3,11 +3,12 @@ const express = require('express');
 const { z } = require('zod');
 const { db, tx, getSetting, setSetting } = require('../db');
 const { requireAuth, requireAdmin, requireStaff, hashPassword, generateTempPassword, destroyAllSessions, userAvatarUrl } = require('../auth');
-const { wrap, parseBody, idParam, DUTY_STATUS, rankField, RANK_ORDER_SQL } = require('../helpers');
+const { wrap, parseBody, idParam, DUTY_STATUS, rankField, RANK_ORDER_SQL, BOARD_RANKS } = require('../helpers');
 const { logActivity } = require('../models');
 const { removeFile } = require('../uploads');
 const discord = require('../discord');
 const fivenet = require('../fivenet');
+const personnel = require('./personnel');
 
 const ROLE_LABEL = { mandant: 'Mandant', anwalt: 'Anwalt', admin: 'Board of Partners' };
 
@@ -81,6 +82,8 @@ router.post(
       .run(email, hashPassword(password), d.displayName, d.role, d.rank || null, d.phone || null);
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(info.lastInsertRowid));
     logActivity(req.user, 'Konto angelegt', 'user', user.id, `${user.display_name} (${ROLE_LABEL[user.role]})`);
+    // Neues Mitarbeiterkonto = Einstellung (Personalprotokoll)
+    if (user.role !== 'mandant') personnel.recordHire({ userId: user.id, name: user.display_name, rank: user.rank, by: req.user });
     res.status(201).json({ user: userRow(user), credentials: { email, password } });
   })
 );
@@ -137,8 +140,20 @@ router.patch(
       }
       // Name/Rang im verknüpften Team-Profil mitziehen.
       if (d.displayName !== undefined) db.prepare('UPDATE team_members SET name = ? WHERE user_id = ?').run(d.displayName, id);
-      if (d.rank) db.prepare('UPDATE team_members SET role_title = ? WHERE user_id = ?').run(d.rank, id);
+      if (d.rank) {
+        db.prepare(
+          "UPDATE team_members SET role_title = ?, tier = CASE WHEN ? THEN 'leitung' WHEN tier = 'leitung' THEN 'anwalt' ELSE tier END WHERE user_id = ?"
+        ).run(d.rank, BOARD_RANKS.includes(d.rank) ? 1 : 0, id);
+      }
     });
+    // Personalprotokoll: Mandant → Mitarbeiter ist eine Einstellung, sonst ggf. Beförderung/Rangänderung.
+    const nowRole = d.role ?? target.role;
+    const nowRank = d.rank !== undefined ? d.rank || null : target.rank;
+    const name = d.displayName ?? target.display_name;
+    if (target.role === 'mandant' && nowRole !== 'mandant') personnel.recordHire({ userId: id, name, rank: nowRank, by: req.user });
+    else if (target.role !== 'mandant' && nowRole !== 'mandant' && d.rank !== undefined) {
+      personnel.recordRankChange({ userId: id, name, oldRank: target.rank, newRank: nowRank, by: req.user });
+    }
     const changes = [];
     if (d.role !== undefined && d.role !== target.role) changes.push(`Rolle: ${ROLE_LABEL[target.role]} → ${ROLE_LABEL[d.role]}`);
     if (d.active !== undefined && !!d.active !== !!target.active) changes.push(d.active ? 'entsperrt' : 'gesperrt');
@@ -255,9 +270,9 @@ router.patch(
   wrap(async (req, res) => {
     const schema = z.object({
       discordWebhookUrl: z.string().trim().max(300).optional(),
-      discordEvents: z.array(z.string()).max(20).optional(),
+      discordEvents: z.array(z.string()).max(50).optional(),
       discordPingRole: z.string().trim().max(40).optional(),
-      discordPingEvents: z.array(z.string()).max(20).optional(),
+      discordPingEvents: z.array(z.string()).max(50).optional(),
       discordEventWebhooks: z.record(z.string().trim().max(300)).optional(),
       discordEventRoles: z.record(z.string().trim().max(40)).optional(),
       firmAddress: z.string().trim().max(300).optional(),

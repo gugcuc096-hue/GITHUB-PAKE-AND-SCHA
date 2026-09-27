@@ -83,6 +83,8 @@
     briefcase: 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
     globe: 'M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9',
     send: 'M12 19l9 2-9-18-9 18 9-2zm0 0v-8',
+    chat: 'M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z',
+    star: 'M11.48 3.5a.56.56 0 011.04 0l2.12 5.11a.56.56 0 00.48.35l5.52.44c.5.04.7.66.32.99l-4.2 3.6a.56.56 0 00-.18.56l1.28 5.39a.56.56 0 01-.84.61l-4.73-2.89a.56.56 0 00-.58 0l-4.73 2.89a.56.56 0 01-.84-.61l1.28-5.39a.56.56 0 00-.18-.56l-4.2-3.6a.56.56 0 01.32-.99l5.52-.44a.56.56 0 00.48-.35l2.12-5.11z',
     link: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1',
     external: 'M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14',
     shield: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
@@ -102,9 +104,11 @@
     tasks: { label: 'Aufgaben', icon: 'tasks', staff: true },
     calendar: { label: 'Kalender & Fristen', short: 'Kalender', clientLabel: 'Termine', icon: 'calendar' },
     mail: { label: 'Kanzlei-Post', short: 'Post', icon: 'mail' },
+    concerns: { label: 'Anliegen ans Board', short: 'Anliegen', icon: 'chat' },
     board: { label: 'Pinnwand', icon: 'pin', staff: true },
     invoices: { label: 'Rechnungen', icon: 'receipt' },
     duty: { label: 'Dienstzeiten', icon: 'clock', staff: true },
+    personnel: { label: 'Beförderungen & Einstellungen', short: 'Personal', icon: 'star', staff: true },
     work: { label: 'Aktenbearbeitung', icon: 'briefcase', board: true, section: 'Board of Partners' },
     team: { label: 'Team', icon: 'users', admin: true, section: 'Board of Partners' },
     applications: { label: 'Bewerbungen', icon: 'userAdd', admin: true, section: 'Board of Partners' },
@@ -172,6 +176,14 @@
     taskState: 'open',
     taskQuery: '',
     dueTasks: 0,
+    // Anliegen ans Board, Personalprotokoll
+    concerns: null,
+    concernFilter: 'aktiv',
+    concernGroup: 'alle',
+    concernCount: 0,
+    modalConcernId: null,
+    personnel: null,
+    personnelNew: 0,
     // FiveNet
     fivenet: null,
     caseDocs: [],
@@ -426,6 +438,13 @@
     async dueTasks() {
       if (isStaff()) st.dueTasks = (await api.get('/api/tasks/due-count?today=' + dayKey(new Date()))).due;
     },
+    /** Board: offene Anliegen; alle: eigene Anliegen mit neuer Antwort. */
+    async concernCount() {
+      st.concernCount = (await api.get('/api/concerns/counts')).total;
+    },
+    async personnelCount() {
+      if (isStaff()) st.personnelNew = st.view === 'personnel' ? 0 : (await api.get('/api/personnel/counts')).unseen;
+    },
     async fivenet(force = false) {
       if (isStaff() && (force || !st.fivenet)) st.fivenet = await api.get('/api/fivenet/status');
     },
@@ -443,7 +462,7 @@
         section = v.section;
         html += `<div class="nav-section">${esc(section)}</div>`;
       }
-      const count = key === 'mail' ? st.unread : key === 'applications' ? st.newApplications : key === 'tasks' ? st.dueTasks : 0;
+      const count = { mail: st.unread, applications: st.newApplications, tasks: st.dueTasks, concerns: st.concernCount, personnel: st.personnelNew }[key] || 0;
       const active = st.view === key || (key === 'invoices' && st.view === 'invoice-new');
       html += `<a href="#${key}" class="nav-item ${active ? 'active' : ''}" ${active ? 'aria-current="page"' : ''}>${icon(v.icon)}<span>${esc(viewLabel(key))}</span>${count ? `<span class="nav-count">${count > 99 ? '99+' : count}</span>` : ''}</a>`;
     }
@@ -559,6 +578,7 @@
     document.body.classList.remove('modal-open');
     st.modalCaseId = null;
     st.modalAppId = null;
+    st.modalConcernId = null;
   }
 
   const loadingHtml = () =>
@@ -3173,6 +3193,248 @@
     return { from, to };
   }
 
+  /* ---------------------------------------------------------------- Anliegen an das Board of Partners */
+  const CONCERN_STATUS = { offen: ['Offen', 'amber'], in_bearbeitung: ['In Bearbeitung', 'sky'], erledigt: ['Erledigt', 'emerald'], abgelehnt: ['Abgelehnt', 'slate'] };
+  const CONCERN_FILTERS = [
+    ['aktiv', 'Aktiv'],
+    ['erledigt', 'Abgeschlossen'],
+    ['alle', 'Alle'],
+  ];
+  const CONCERN_GROUPS = [
+    ['alle', 'Alle Absender'],
+    ['mitarbeiter', 'Mitarbeiter'],
+    ['mandant', 'Mandanten'],
+  ];
+  /** Absender aus Sicht des Boards: Name + Rang bzw. „Mandant“ (bei anonymen Anliegen nur die Gruppe). */
+  const concernFrom = (k) => (k.mine ? 'Ihnen' : `${k.author} (${k.authorRank || k.authorGroupLabel})`);
+  const concernMatches = (k, filter = st.concernFilter) => filter === 'alle' || (filter === 'aktiv' ? !k.closed : k.closed);
+
+  function concernList() {
+    const d = st.concerns;
+    const all = d.scope === 'all';
+    const rows = d.concerns.filter((k) => concernMatches(k) && (!all || st.concernGroup === 'alle' || k.authorGroup === st.concernGroup));
+    if (!rows.length) {
+      return empty(d.concerns.length ? 'Keine Anliegen für diese Auswahl.' : all ? 'Noch keine Anliegen eingegangen.' : 'Sie haben noch kein Anliegen eingereicht.', 'chat');
+    }
+    return rows
+      .map((k) => {
+        const meta = [
+          k.categoryLabel,
+          all ? `von ${concernFrom(k)}` : k.anonymous ? 'anonym eingereicht' : null,
+          fmtDate(k.createdAt),
+          k.assignedName ? `zuständig: ${k.assignedName}` : null,
+          k.replyCount ? `${k.replyCount} ${k.replyCount === 1 ? 'Nachricht' : 'Nachrichten'}` : null,
+        ]
+          .filter(Boolean)
+          .map(esc)
+          .join(' · ');
+        return `<div class="list-row" data-action="concern-open" data-id="${k.id}" role="button" tabindex="0">
+          <div class="main"><div class="title">${esc(k.subject)}</div><div class="meta">${meta}</div></div>
+          <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">${k.unseen ? badge('Neue Antwort', 'gold') : ''}${k.urgency === 'dringend' && !k.closed ? badge('Dringend', 'red') : ''}${statusBadge(CONCERN_STATUS, k.status)}</div></div>`;
+      })
+      .join('');
+  }
+
+  views.concerns = {
+    async load() {
+      st.concerns = await api.get('/api/concerns');
+    },
+    render() {
+      const d = st.concerns;
+      const all = d.scope === 'all';
+      const count = (f) => d.concerns.filter((k) => concernMatches(k, f)).length;
+      const sub = all
+        ? 'Anliegen von Mitarbeitern und Mandanten an die Führungsebene. Ihre Antworten sehen die Einreichenden in ihrem Dashboard – interne Notizen nur das Board.'
+        : isStaff()
+          ? 'Ein Anliegen an die Führungsebene – Personal, Konflikte, Vorschläge, Abläufe oder Vergütung. Auf Wunsch anonym.'
+          : 'Sie möchten die Kanzleileitung direkt erreichen – etwa zur Betreuung Ihres Mandats, mit einer Beschwerde oder einem Lob? Das Board of Partners kümmert sich persönlich darum.';
+      return `
+        <div class="page-head">
+          <div><h1 class="page-title">Anliegen an das Board of Partners</h1><p class="page-sub">${esc(sub)}</p></div>
+          <div class="page-actions"><button class="btn-gold btn-md" data-action="concern-new">${icon('plus')}<span>Neues Anliegen</span></button></div>
+        </div>
+        <div class="toolbar">
+          <div class="chip-row">
+            ${CONCERN_FILTERS.map(([k, l]) => `<button class="chip ${st.concernFilter === k ? 'active' : ''}" data-action="concern-filter" data-value="${k}">${l} <span class="chip-count">${count(k)}</span></button>`).join('')}
+          </div>
+          ${all ? `<div class="chip-row">${CONCERN_GROUPS.map(([k, l]) => `<button class="chip ${st.concernGroup === k ? 'active' : ''}" data-action="concern-group" data-value="${k}">${l}</button>`).join('')}</div>` : ''}
+        </div>
+        <div class="panel p-2 md:p-3">${concernList()}</div>`;
+    },
+  };
+
+  async function concernNewModal() {
+    if (!st.concerns) st.concerns = await api.get('/api/concerns');
+    const cats = st.concerns.myCategories || {};
+    const staff = isStaff();
+    openModal(`
+      <h2 class="modal-title">Anliegen an das Board of Partners</h2>
+      <p class="modal-sub">${staff ? 'Für Führungsthemen: Personal, Konflikte, Vorschläge, Abläufe, Vergütung …' : 'Zur Betreuung Ihres Mandats, einer Rechnung, als Beschwerde oder Lob – direkt an die Kanzleileitung.'} Das Board of Partners antwortet Ihnen hier im Dashboard.</p>
+      <form data-form="concern-new" class="form-grid cols-2">
+        <div><label class="label" for="cnCat">Kategorie</label><select id="cnCat" name="category" class="field" required>${Object.entries(cats).map(([k, l]) => opt(k, l)).join('')}</select></div>
+        <div><label class="label" for="cnUrg">Dringlichkeit</label><select id="cnUrg" name="urgency" class="field">${opt('normal', 'Normal', true)}${opt('dringend', 'Dringend')}</select></div>
+        <div class="span-2"><label class="label" for="cnSubj">Betreff</label><input id="cnSubj" name="subject" class="field" required minlength="3" maxlength="150" autofocus placeholder="${staff ? 'z. B. Vorschlag zur Dienstplanung' : 'z. B. Frage zur Betreuung meiner Akte'}"></div>
+        <div class="span-2"><label class="label" for="cnBody">Ihr Anliegen</label><textarea id="cnBody" name="body" rows="7" class="field" required minlength="10" maxlength="5000" placeholder="Bitte schildern Sie Ihr Anliegen möglichst konkret."></textarea></div>
+        <label class="check span-2"><input type="checkbox" name="anonymous"><span>Anonym einreichen<span class="block text-dim text-xs">Das Board sieht Ihren Namen nicht – nur, dass es ${staff ? 'von einem Mitarbeiter' : 'von einem Mandanten'} kommt. Antworten erhalten Sie trotzdem hier.</span></span></label>
+        <div class="form-actions span-2"><button type="submit" class="btn-gold btn-md">${icon('send')}<span>An das Board senden</span></button></div>
+      </form>`);
+  }
+
+  function concernDetailHtml(d) {
+    const k = d.concern;
+    const asBoard = d.board && !k.mine;
+    const info = [
+      ['Kategorie', esc(k.categoryLabel)],
+      ['Eingereicht von', k.mine ? `Ihnen${k.anonymous ? ' <span class="text-dim">(anonym)</span>' : ''}` : esc(concernFrom(k))],
+      ['Eingereicht am', esc(fmtDate(k.createdAt))],
+      ['Dringlichkeit', k.urgency === 'dringend' ? badge('Dringend', 'red') : 'Normal'],
+      ['Zuständig im Board', esc(k.assignedName || 'noch offen')],
+      ['Status', statusBadge(CONCERN_STATUS, k.status)],
+    ]
+      .map(([l, v]) => `<div><div class="k">${l}</div><div class="v">${v}</div></div>`)
+      .join('');
+    const thread = d.messages.length
+      ? `<div class="timeline">${d.messages
+          .map(
+            (m) => `<div class="tl-item ${m.internal ? 'tl-internal' : ''} ${m.system ? 'tl-system' : ''}">
+              <div class="tl-meta"><span class="text-muted font-medium">${esc(m.author)}</span>${m.fromBoard && !m.system ? badge('Board of Partners', 'gold') : ''}${m.internal ? badge('intern', 'amber') : ''}<span>${esc(fmtDate(m.createdAt))}</span></div>
+              <div class="tl-body">${esc(m.body)}</div></div>`
+          )
+          .join('')}</div>`
+      : `<p class="text-sm text-dim">${k.mine ? 'Noch keine Antwort – das Board of Partners meldet sich hier bei Ihnen.' : 'Noch keine Antwort.'}</p>`;
+    const canWrite = asBoard || !k.closed;
+    const reply = canWrite
+      ? `<form data-form="concern-reply" data-id="${k.id}" class="form-grid mt-3">
+          <div><label class="label" for="crBody">${asBoard ? 'Antwort an die einreichende Person' : 'Nachricht an das Board'}</label><textarea id="crBody" name="body" rows="4" class="field" required maxlength="5000"></textarea></div>
+          ${asBoard ? '<label class="check"><input type="checkbox" name="internal"><span>Interne Notiz <span class="text-dim">– nur für das Board sichtbar</span></span></label>' : ''}
+          <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('send')}<span>Senden</span></button></div>
+        </form>`
+      : '<p class="text-sm text-dim mt-3">Dieses Anliegen ist abgeschlossen. Für etwas Neues bitte ein neues Anliegen einreichen.</p>';
+    const manage = asBoard
+      ? `<div class="section"><div class="section-title">Bearbeitung (Board)</div>
+          <form data-form="concern-manage" data-id="${k.id}" class="form-grid cols-2">
+            <div><label class="label" for="cmStatus">Status</label><select id="cmStatus" name="status" class="field">${Object.entries(CONCERN_STATUS).map(([s, [l]]) => opt(s, l, s === k.status)).join('')}</select></div>
+            <div><label class="label" for="cmAssign">Zuständig im Board</label><select id="cmAssign" name="assignedTo" class="field"><option value="">— niemand —</option>${d.boardMembers
+              .map((b) => opt(b.id, b.name + (b.rank ? ' · ' + b.rank : ''), b.id === k.assignedTo))
+              .join('')}</select></div>
+            <div class="form-actions span-2"><button type="submit" class="btn-outline btn-md">${icon('check')}<span>Übernehmen</span></button></div>
+          </form></div>`
+      : '';
+    const tools = [
+      d.canWithdraw ? `<button class="btn-ghost btn-sm" data-action="concern-withdraw" data-id="${k.id}">${icon('trash', 'ico-sm')}<span>Zurückziehen</span></button>` : '',
+      d.canDelete && !d.canWithdraw ? `<button class="btn-ghost btn-sm" data-action="concern-delete" data-id="${k.id}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>` : '',
+    ].join('');
+    return `
+      <h2 class="modal-title">${esc(k.subject)}</h2>
+      <p class="modal-sub">Anliegen an das Board of Partners${k.mine && k.anonymous ? ' · anonym eingereicht – das Board sieht Ihren Namen nicht' : ''}</p>
+      <div class="info-grid">${info}</div>
+      <div class="section"><div class="section-title">Anliegen</div><div class="tl-item"><div class="tl-body">${esc(k.body)}</div></div></div>
+      <div class="section"><div class="section-title">Verlauf</div>${thread}${reply}</div>
+      ${manage}
+      ${tools ? `<div class="flex justify-end gap-2 mt-4">${tools}</div>` : ''}`;
+  }
+
+  async function openConcern(id) {
+    const d = await api.get('/api/concerns/' + id);
+    const html = concernDetailHtml(d);
+    if ($('#modal').classList.contains('open') && st.modalConcernId === d.concern.id) replaceModal(html);
+    else openModal(html, { wide: true });
+    st.modalConcernId = d.concern.id;
+    // Geöffnet = gelesen: Hinweis „Neue Antwort“ und Zähler in der Navigation aktualisieren.
+    const row = st.concerns?.concerns.find((x) => x.id === d.concern.id);
+    if (row && row.unseen) {
+      row.unseen = false;
+      if (st.view === 'concerns') $('#content').innerHTML = views.concerns.render();
+    }
+    if (d.concern.mine) load.concernCount().then(renderNav).catch(() => {});
+  }
+
+  /* ---------------------------------------------------------------- Beförderungen & Einstellungen */
+  const PERSONNEL_TYPE = { einstellung: ['Einstellung', 'sky'], befoerderung: ['Beförderung', 'gold'], rueckstufung: ['Rückstufung', 'slate'], rangaenderung: ['Rangänderung', 'slate'] };
+
+  function personnelItem(e) {
+    const p = st.personnel;
+    const text =
+      e.type === 'einstellung'
+        ? `ist neu im Team${e.newRank ? ` als <strong class="text-gold">${esc(e.newRank)}</strong>` : ''}`
+        : e.type === 'befoerderung'
+          ? `wurde befördert: ${esc(e.oldRank || 'ohne Rang')} → <strong class="text-gold">${esc(e.newRank)}</strong>`
+          : `Rang geändert: ${esc(e.oldRank || 'ohne Rang')} → <strong>${esc(e.newRank || 'ohne Rang')}</strong>`;
+    return `<div class="list-row wrap pers-row">
+      <span class="avatar">${avatarImg(e.avatarUrl, e.name)}</span>
+      <div class="main"><div class="title"><span class="font-medium">${esc(e.name)}</span> <span class="text-muted">${text}</span></div>
+        <div class="meta">${esc(fmtDate(e.createdAt))} · ${e.type === 'einstellung' ? 'eingestellt' : e.type === 'befoerderung' ? 'befördert' : 'geändert'} von ${esc(e.byName)}</div>
+        ${e.note ? `<div class="pers-note">${esc(e.note)}</div>` : ''}</div>
+      <div class="flex items-center gap-2 shrink-0">${statusBadge(PERSONNEL_TYPE, e.type)}${p.canDelete ? `<button class="icon-btn sm" data-action="personnel-delete" data-id="${e.id}" aria-label="Eintrag entfernen">${icon('trash', 'ico-sm')}</button>` : ''}</div></div>`;
+  }
+
+  views.personnel = {
+    async load() {
+      st.personnel = await api.get('/api/personnel');
+      st.personnelNew = 0;
+    },
+    render() {
+      const p = st.personnel;
+      const since = Date.now() - 30 * 864e5;
+      const recent = p.events.filter((e) => (parseDate(e.createdAt) || 0) >= since);
+      const n = (t) => recent.filter((e) => e.type === t).length;
+      return `
+        <div class="page-head">
+          <div><h1 class="page-title">Beförderungen &amp; Einstellungen</h1><p class="page-sub">Wer neu im Team ist und wer befördert wurde – für alle Mitarbeiter sichtbar. Befördern kann nur das Board of Partners.</p></div>
+          ${p.board ? `<div class="page-actions"><button class="btn-gold btn-md" data-action="personnel-promote">${icon('star')}<span>Befördern</span></button></div>` : ''}
+        </div>
+        <div class="grid grid-cols-2 gap-3 md:gap-4 mb-4">
+          <div class="panel kpi"><div class="kpi-label">${icon('star', 'ico-sm')}Beförderungen</div><div class="kpi-value">${n('befoerderung')}</div><div class="kpi-sub">in den letzten 30 Tagen</div></div>
+          <div class="panel kpi"><div class="kpi-label">${icon('userAdd', 'ico-sm')}Einstellungen</div><div class="kpi-value">${n('einstellung')}</div><div class="kpi-sub">in den letzten 30 Tagen</div></div>
+        </div>
+        <div class="panel p-2 md:p-3">${p.events.length ? p.events.map(personnelItem).join('') : empty('Noch keine Einträge. Einstellungen und Beförderungen erscheinen hier automatisch.', 'star')}</div>`;
+    },
+  };
+
+  /** Rangauswahl für Beförderungen: Ränge über maxRank (eigener Rang eines Partners) sind gesperrt. */
+  function promoteRankSelect(maxRank) {
+    const limit = maxRank ? RANKS.indexOf(maxRank) : 0;
+    const groups = Object.entries(RANK_GROUPS)
+      .map(([g, list]) => `<optgroup label="${esc(g)}">${list.map((r) => `<option value="${esc(r)}" ${RANKS.indexOf(r) < limit ? 'disabled' : ''}>${esc(r)}</option>`).join('')}</optgroup>`)
+      .join('');
+    return `<select id="prRank" name="rank" class="field" required><option value="" disabled selected>Bitte wählen …</option>${groups}</select>`;
+  }
+  function promoteModal() {
+    const p = st.personnel;
+    const people = (p.staff || []).filter((s) => s.editable);
+    if (!people.length) return toast('Es gibt niemanden, dessen Rang Sie ändern können.', 'error');
+    openModal(`
+      <h2 class="modal-title">Befördern</h2>
+      <p class="modal-sub">Neuer Rang für ein Teammitglied. Die Beförderung erscheint für alle Mitarbeiter unter „Beförderungen &amp; Einstellungen“ und – falls eingerichtet – im Discord.${p.maxRank ? ` Sie können bis zu Ihrem eigenen Rang (${esc(p.maxRank)}) befördern.` : ''}</p>
+      <form data-form="personnel-promote" class="form-grid">
+        <div><label class="label" for="prUser">Teammitglied</label><select id="prUser" name="userId" class="field" required><option value="" disabled selected>Bitte wählen …</option>${people
+          .map((s) => opt(s.id, `${s.name} · ${s.rank || 'ohne Rang'}`))
+          .join('')}</select></div>
+        <div><label class="label" for="prRank">Neuer Rang</label>${promoteRankSelect(p.maxRank)}</div>
+        <div id="prPreview" class="text-sm text-dim" aria-live="polite"></div>
+        <div><label class="label" for="prNote">Begründung / Glückwunsch <span class="text-dim font-normal normal-case tracking-normal">(optional, für alle sichtbar)</span></label><textarea id="prNote" name="note" rows="3" maxlength="500" class="field" placeholder="z. B. Für herausragende Arbeit im Fall …"></textarea></div>
+        <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('star')}<span id="prSubmit">Befördern</span></button></div>
+      </form>`);
+  }
+  /** Vorschau im Beförderungsdialog: „Associate → Senior Associate (Beförderung)“. */
+  function updatePromotePreview() {
+    const u = st.personnel?.staff?.find((s) => s.id === Number($('#prUser')?.value));
+    const rank = $('#prRank')?.value;
+    const box = $('#prPreview');
+    if (!box) return;
+    if (!u || !rank) {
+      box.textContent = '';
+      return;
+    }
+    const a = RANKS.indexOf(u.rank || '');
+    const b = RANKS.indexOf(rank);
+    const kind = u.rank === rank ? null : a >= 0 && b > a ? 'Rückstufung' : a >= 0 || b >= 0 ? 'Beförderung' : 'Rangänderung';
+    box.innerHTML = kind
+      ? `${esc(u.name)}: ${esc(u.rank || 'ohne Rang')} → <strong class="text-gold">${esc(rank)}</strong> ${statusBadge(PERSONNEL_TYPE, kind === 'Rückstufung' ? 'rueckstufung' : 'befoerderung')}`
+      : `${esc(u.name)} hat bereits diesen Rang.`;
+    $('#prSubmit').textContent = kind === 'Rückstufung' ? 'Rang ändern' : 'Befördern';
+  }
+
   /* ---------------------------------------------------------------- Aktenbearbeitung (nur Board of Partners) */
   /** Dauer lesbar: 45 Min · 3 Std 20 Min · 4 T 6 Std */
   function fmtDur(ms) {
@@ -4154,6 +4416,40 @@
       await views.work.load();
       renderView();
     },
+    // Anliegen an das Board of Partners
+    'concern-new': () => concernNewModal(),
+    'concern-open': (el) => openConcern(Number(el.dataset.id)),
+    'concern-filter': (el) => {
+      st.concernFilter = el.dataset.value;
+      renderView();
+    },
+    'concern-group': (el) => {
+      st.concernGroup = el.dataset.value;
+      renderView();
+    },
+    'concern-withdraw': async (el) => {
+      if (!(await ask('Das Anliegen wird gelöscht – das Board hat noch nicht darauf reagiert.', { title: 'Anliegen zurückziehen?', confirmText: 'Zurückziehen', danger: true }))) return;
+      await api.del('/api/concerns/' + el.dataset.id);
+      toast('Anliegen zurückgezogen.');
+      closeModal();
+      await Promise.all([refreshBehind(), load.concernCount().then(renderNav)]);
+    },
+    'concern-delete': async (el) => {
+      if (!(await ask('Das Anliegen samt Verlauf wird endgültig gelöscht.', { title: 'Anliegen löschen?', confirmText: 'Löschen', danger: true }))) return;
+      await api.del('/api/concerns/' + el.dataset.id);
+      toast('Anliegen gelöscht.');
+      closeModal();
+      await Promise.all([refreshBehind(), load.concernCount().then(renderNav)]);
+    },
+    // Beförderungen & Einstellungen
+    'personnel-promote': () => promoteModal(),
+    'personnel-delete': async (el) => {
+      if (!(await ask('Der Eintrag verschwindet aus dem Protokoll. Der aktuelle Rang bleibt unverändert.', { title: 'Eintrag entfernen?', confirmText: 'Entfernen', danger: true }))) return;
+      await api.del('/api/personnel/' + el.dataset.id);
+      toast('Eintrag entfernt.');
+      await refreshBehind();
+    },
+
     'absence-new': async () => {
       closeDutyPop();
       await absenceModal();
@@ -4376,6 +4672,52 @@
      Formulare
      ================================================================ */
   const forms = {
+    'concern-new': async (f) => {
+      const fd = new FormData(f);
+      const res = await api.post('/api/concerns', {
+        category: val(fd, 'category'),
+        urgency: val(fd, 'urgency') || 'normal',
+        subject: val(fd, 'subject'),
+        body: val(fd, 'body'),
+        anonymous: fd.has('anonymous'),
+      });
+      toast('Ihr Anliegen wurde an das Board of Partners übermittelt.');
+      st.concernFilter = 'aktiv';
+      if (st.view === 'concerns') await refreshBehind();
+      else await navigate('concerns');
+      load.concernCount().then(renderNav).catch(() => {});
+      await openConcern(res.concern.id);
+    },
+    'concern-reply': async (f) => {
+      const fd = new FormData(f);
+      await api.post(`/api/concerns/${f.dataset.id}/messages`, { body: val(fd, 'body'), internal: fd.has('internal') });
+      toast(fd.has('internal') ? 'Interne Notiz gespeichert.' : 'Nachricht gesendet.');
+      await openConcern(Number(f.dataset.id));
+      refreshBehind();
+      load.concernCount().then(renderNav).catch(() => {});
+    },
+    'concern-manage': async (f) => {
+      const fd = new FormData(f);
+      await api.patch('/api/concerns/' + f.dataset.id, { status: val(fd, 'status'), assignedTo: val(fd, 'assignedTo') ? Number(val(fd, 'assignedTo')) : null });
+      toast('Anliegen aktualisiert.');
+      await openConcern(Number(f.dataset.id));
+      refreshBehind();
+      load.concernCount().then(renderNav).catch(() => {});
+    },
+    'personnel-promote': async (f) => {
+      const fd = new FormData(f);
+      const userId = Number(val(fd, 'userId'));
+      const rank = val(fd, 'rank');
+      if (!userId || !rank) throw new Error('Bitte Teammitglied und neuen Rang wählen.');
+      const person = st.personnel.staff.find((s) => s.id === userId);
+      const r = await api.post('/api/personnel/promote', { userId, rank, note: val(fd, 'note') || undefined });
+      toast(r.type === 'befoerderung' ? `Beförderung eingetragen – ${person ? person.name : 'das Teammitglied'} ist jetzt ${rank}.` : `${r.typeLabel} eingetragen.`);
+      // Ränge stecken auch in Auswahllisten (Anwälte, Empfänger) – beim nächsten Öffnen neu laden.
+      st.lawyers = [];
+      st.contacts = null;
+      closeModal();
+      await refreshBehind();
+    },
     'new-case': async (f) => {
       const fd = new FormData(f);
       const body = { title: val(fd, 'title'), area: val(fd, 'area'), urgency: val(fd, 'urgency'), description: val(fd, 'description') };
@@ -4861,6 +5203,7 @@
   });
 
   document.addEventListener('change', (e) => {
+    if (e.target.id === 'prUser' || e.target.id === 'prRank') updatePromotePreview();
     const t = e.target;
     if (t.dataset.upload) {
       guard(() => handleUpload(t));
@@ -4936,7 +5279,7 @@
   // Ungelesene Post, neue Bewerbungen und Dienststatus regelmäßig aktualisieren (Badges in der Navigation)
   setInterval(() => {
     if (document.hidden || !st.user) return;
-    Promise.all([load.unread(), load.appCount(), load.dueTasks()])
+    Promise.all([load.unread(), load.appCount(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {})])
       .then(renderNav)
       .catch(() => {});
   }, 30000);
@@ -4967,7 +5310,7 @@
     if (discordState && DISCORD_MSG[discordState]) toast(...DISCORD_MSG[discordState]);
 
     try {
-      await Promise.all([load.unread(), load.appCount(), load.duty(), load.dueTasks()]);
+      await Promise.all([load.unread(), load.appCount(), load.duty(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {})]);
       renderUser();
     } catch {
       /* Badges und Dienststatus sind nicht kritisch */
