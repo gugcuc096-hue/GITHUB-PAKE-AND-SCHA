@@ -185,7 +185,47 @@ const isBoard = (u) => !!u && (u.role === 'admin' || (u.role === 'anwalt' && BOA
 /** SQL-Sortierung nach Rang (Founding Partner zuerst … Junior Associate, dann ohne Rang). */
 const RANK_ORDER_SQL = (col = 'rank') => `CASE ${col} ${RANKS.map((r, i) => `WHEN '${r}' THEN ${i}`).join(' ')} ELSE ${RANKS.length} END`;
 
+/* ---------------------------------------------------------------- Login-E-Mail der Kanzlei */
+// Alle Konten haben eine Adresse mit dieser Endung – frei wählbar ist nur der Teil vor dem @.
+const EMAIL_DOMAIN = 'pake-scha.ls';
+const EMAIL_LOCAL_RE = /^[a-z0-9](?:[a-z0-9._-]{0,46}[a-z0-9])?$/;
+const EMAIL_HINT = `Die E-Mail-Adresse endet immer auf @${EMAIL_DOMAIN}. Davor bitte nur Buchstaben (a–z), Zahlen, Punkt, Bindestrich oder Unterstrich – z. B. max.mustermann@${EMAIL_DOMAIN}.`;
+
+/** „max.mustermann“ oder „max.mustermann@pake-scha.ls“ → „max.mustermann@pake-scha.ls“; andere Endung/ungültig → null. */
+function firmEmail(input) {
+  let v = String(input || '').trim().toLowerCase();
+  const at = v.indexOf('@');
+  if (at >= 0) {
+    if (v.slice(at + 1) !== EMAIL_DOMAIN) return null;
+    v = v.slice(0, at);
+  }
+  return EMAIL_LOCAL_RE.test(v) && !/[._-]{2}/.test(v) ? `${v}@${EMAIL_DOMAIN}` : null;
+}
+
+/** Für die Umstellung bestehender Konten: beliebige Adresse bzw. Name → gültiger Teil vor dem @. */
+function firmLocalFrom(text) {
+  return String(text || '')
+    .toLowerCase()
+    .split('@')[0]
+    .split('+')[0]
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/ß/g, 'ss')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9._-]+/g, '.')
+    .replace(/[._-]{2,}/g, '.')
+    .replace(/^[._-]+/, '')
+    .slice(0, 40)
+    .replace(/[._-]+$/, '');
+}
+
 module.exports = {
+  EMAIL_DOMAIN,
+  EMAIL_HINT,
+  firmEmail,
+  firmLocalFrom,
   BOARD_RANKS,
   ASSOCIATE_RANKS,
   RANKS,

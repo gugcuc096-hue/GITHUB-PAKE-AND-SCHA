@@ -486,6 +486,10 @@ for (const table of ['applications', 'concerns']) {
   addColumn(table, 'discord_panel_state', 'TEXT');
   addColumn(table, 'discord_extra', 'TEXT');
 }
+// Login-E-Mail: alle Konten auf @pake-scha.ls; die vorherige Adresse bleibt als Login-Alias gültig
+addColumn('users', 'old_email', 'TEXT');
+addColumn('users', 'email_notice', 'INTEGER NOT NULL DEFAULT 0'); // 1 = Hinweis „Ihre E-Mail wurde umgestellt“ zeigen
+db.exec('CREATE INDEX IF NOT EXISTS idx_users_old_email ON users(old_email)');
 // Ticket per /delete gelöscht → nicht automatisch neu anlegen (nur über „Ticket anlegen“ im Dashboard)
 for (const table of ['cases', 'applications', 'concerns']) addColumn(table, 'discord_deleted', 'INTEGER NOT NULL DEFAULT 0');
 // Reihenfolge in der Akte (per Ziehen festgelegt); NULL = noch nicht einsortiert, erscheint oben.

@@ -4,7 +4,7 @@ const rateLimit = require('express-rate-limit');
 const { z } = require('zod');
 const { db, tx, nextApplicationNumber, randomPin } = require('../db');
 const { requireAuth, requireAdmin, hashPassword, generateTempPassword } = require('../auth');
-const { wrap, parseBody, idParam, isoDateTime, deriveInitials, truncate, APPLICATION_STATUS, rankField, BOARD_RANKS, RANKS, isBoard } = require('../helpers');
+const { wrap, parseBody, idParam, isoDateTime, deriveInitials, truncate, APPLICATION_STATUS, rankField, BOARD_RANKS, RANKS, isBoard, firmEmail, EMAIL_HINT } = require('../helpers');
 const { applicationRow, positionRow, logActivity } = require('../models');
 const discord = require('../discord');
 const personnel = require('./personnel');
@@ -258,7 +258,7 @@ adminRouter.post(
     if (a.hired_user_id) return res.status(400).json({ error: 'Für diese Bewerbung wurde bereits ein Konto angelegt.' });
     const d = parseBody(
       z.object({
-        email: z.string().trim().email().max(120),
+        email: z.string().trim().min(1).max(120), // Teil vor dem @ oder Adresse mit @pake-scha.ls
         role: z.enum(['anwalt', 'admin']),
         rank: rankField,
         createProfile: z.boolean().optional(),
@@ -276,7 +276,8 @@ adminRouter.post(
         return res.status(403).json({ error: `Sie können höchstens bis zu Ihrem eigenen Rang (${req.user.rank}) einstellen.` });
       }
     }
-    const email = d.email.toLowerCase();
+    const email = firmEmail(d.email);
+    if (!email) return res.status(400).json({ error: EMAIL_HINT });
     if (db.prepare('SELECT id FROM users WHERE email = ?').get(email)) return res.status(409).json({ error: 'Diese E-Mail-Adresse ist bereits vergeben.' });
 
     const password = generateTempPassword();

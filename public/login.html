@@ -37,14 +37,15 @@
             <form id="loginForm" class="space-y-4" novalidate>
                 <div>
                     <label class="label" for="email">E-Mail-Adresse</label>
-                    <input id="email" name="email" type="email" autocomplete="username" required class="field" placeholder="vorname.nachname@pake-scha.ls">
+                    <input id="email" name="email" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required class="field" placeholder="vorname.nachname@pake-scha.ls">
+                    <p class="form-hint">Der Teil vor dem @ reicht. Ihre frühere E-Mail-Adresse funktioniert weiterhin.</p>
                 </div>
                 <div>
                     <div class="flex items-center justify-between"><label class="label" for="password">Passwort</label><button type="button" id="forgotBtn" class="text-xs text-gold hover:underline mb-1">Passwort vergessen?</button></div>
                     <input id="password" name="password" type="password" autocomplete="current-password" required class="field">
                 </div>
                 <p id="forgotInfo" class="hidden text-sm text-muted rounded-xl p-3" style="background:rgba(212,175,55,.08);border:1px solid var(--gold-hairline)">
-                    Das Board of Partners kann Ihr Passwort im Dashboard unter „Benutzer“ mit einem Klick zurücksetzen und Ihnen ein Einmal-Passwort geben. Bitte wenden Sie sich an Dr. Alois Pake oder Michael Scha.
+                    Discord verknüpft? Dann schreiben Sie auf dem Kanzlei-Discord einfach <strong>/passwort</strong> – der Bot schickt Ihnen ein neues Passwort per Direktnachricht. Sonst kann das Board of Partners Ihr Passwort im Dashboard unter „Benutzer“ zurücksetzen – bitte wenden Sie sich an Dr. Alois Pake oder Michael Scha.
                 </p>
                 <p id="formError" class="form-error" role="alert"></p>
                 <button id="submitBtn" type="submit" class="btn-gold btn-lg btn-block">Anmelden</button>
