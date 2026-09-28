@@ -264,9 +264,20 @@ function clientDiscordIds(c) {
 }
 const clientDiscordId = (c) => clientDiscordIds(c)[0] || null;
 
+/** Per /add hinzugefügte Personen (bleiben beim Abgleich erhalten, bis /remove). */
+const parseExtra = (r) => {
+  try {
+    const list = JSON.parse(r.discord_extra || '[]');
+    return Array.isArray(list) ? list.filter(isId) : [];
+  } catch {
+    return [];
+  }
+};
+
 /** Wer soll (zusätzlich zu den Team-Rollen) im Ticket sein? */
 function wantedMembers(c) {
   const map = new Map();
+  for (const id of parseExtra(c)) map.set(id, 'extra');
   for (const l of caseLawyers(c)) if (isId(l.discordId)) map.set(l.discordId, 'lawyer');
   for (const id of clientDiscordIds(c)) map.set(id, 'client');
   return map;
@@ -290,8 +301,8 @@ function saveState(caseId, fields) {
 }
 
 function memberOverwrite(id, kind, closed) {
-  // Geschlossene Akte: Mandant liest nur noch mit; Anwälte behalten Schreibrechte.
-  if (kind === 'client' && closed) return { id, type: 1, allow: String(READ_ONLY), deny: String(P.SEND_MESSAGES) };
+  // Geschlossene Akte: Mandant und hinzugefügte Personen lesen nur noch mit; Anwälte behalten Schreibrechte.
+  if (kind !== 'lawyer' && closed) return { id, type: 1, allow: String(READ_ONLY), deny: String(P.SEND_MESSAGES) };
   return { id, type: 1, allow: String(MEMBER_ALLOW), deny: '0' };
 }
 
@@ -395,7 +406,7 @@ async function syncMembers(c) {
   for (const [id, kind] of wanted) {
     if (id === bot) continue;
     // Beim Mandanten Schreibrecht an den Akten-Status anpassen (auch wenn schon drin).
-    const needsUpdate = !current.has(id) || (kind === 'client' && archivedBefore !== closed);
+    const needsUpdate = !current.has(id) || (kind !== 'lawyer' && archivedBefore !== closed);
     if (!needsUpdate) continue;
     if (!current.has(id) && !(await isMember(cfg.guildId, id))) continue;
     const o = memberOverwrite(id, kind, closed);
@@ -826,7 +837,7 @@ async function createBoardChannel(kind, r, { quiet = false } = {}) {
     { id: bot, type: 1, allow: String(BOT_ALLOW), deny: '0' },
     ...b.roleIds.map((id) => ({ id, type: 0, allow: String(MEMBER_ALLOW), deny: '0' })),
   ];
-  for (const id of boardMemberIds()) {
+  for (const id of new Set([...boardMemberIds(), ...parseExtra(r)])) {
     if (id === bot || !(await isMember(cfg.guildId, id))) continue;
     overwrites.push({ id, type: 1, allow: String(MEMBER_ALLOW), deny: '0' });
     added.push(id);
@@ -864,7 +875,7 @@ async function ensureBoard(kind, id) {
   }
   const cfg = config();
   const bot = await botId();
-  const wanted = new Set(boardMemberIds().filter((m) => m !== bot));
+  const wanted = new Set([...boardMemberIds(), ...parseExtra(r)].filter((m) => m !== bot));
   const current = new Set(parseMembers(r));
   try {
     for (const m of wanted) {
@@ -1102,6 +1113,16 @@ async function test() {
     }
   }
   if (!isId(cfg.categoryId) && !isId(b.categoryId)) add(false, 'Kategorien', 'Mindestens eine Kategorie (Mandate oder Board) eintragen.');
+  if (panelInteractive()) {
+    try {
+      await registerCommands({ force: true });
+      add(true, 'Buttons & Befehle', 'Public Key gesetzt, /add und /remove angemeldet');
+    } catch (err) {
+      add(false, 'Buttons & Befehle', `/add und /remove konnten nicht angemeldet werden: ${err.message}`);
+    }
+  } else {
+    add(true, 'Buttons & Befehle', 'kein DISCORD_PUBLIC_KEY – nur „Im Dashboard öffnen“, keine Befehle');
+  }
   const ok = checks.every((c) => c.ok || c.label === 'Team-Rollen' || c.label === 'Board-Rollen');
   setSetting('discord_ticket_last_test', JSON.stringify({ at: new Date().toISOString(), ok }));
   return { ok, checks };
@@ -1137,7 +1158,93 @@ function status() {
   };
 }
 
+/* ================================================================
+   Slash-Commands /add und /remove (externe Personen ins Ticket holen)
+   ================================================================ */
+const TICKET_TABLES = { case: 'cases', application: 'applications', concern: 'concerns' };
+
+/** Zu welchem Ticket gehört dieser Kanal? → { kind, row } oder null */
+function ticketByChannel(channelId) {
+  if (!isId(channelId)) return null;
+  for (const [kind, table] of Object.entries(TICKET_TABLES)) {
+    const row = db.prepare(`SELECT id FROM ${table} WHERE discord_channel_id = ?`).get(channelId);
+    if (row) return { kind, row: kind === 'case' ? getCase(row.id) : boardRow(kind, row.id) };
+  }
+  return null;
+}
+
+/** Gehört die Person ohnehin fest zum Ticket (Anwalt, Mandant, Board)? Dann nicht per /remove entfernbar. */
+function fixedMemberRole(kind, row, userId) {
+  if (kind === 'case') {
+    const w = wantedMembers({ ...row, discord_extra: '[]' });
+    return w.get(userId) === 'lawyer' ? 'zuständiger Anwalt' : w.get(userId) === 'client' ? 'Mandant' : null;
+  }
+  return boardMemberIds().includes(userId) ? 'Mitglied des Board of Partners' : null;
+}
+
+/** Discord hat beim Befehl mitgeliefert, dass die Person auf dem Server ist – spart eine Abfrage. */
+function markMember(userId) {
+  const { guildId } = config();
+  if (isId(guildId) && isId(userId)) memberCache.set(`${guildId}:${userId}`, { value: true, until: Date.now() + 30 * 60 * 1000 });
+}
+
+/** Person merken und Ticket abgleichen (fügt die Berechtigung hinzu bzw. entfernt sie). */
+function setExtra(kind, id, userId, add) {
+  const table = TICKET_TABLES[kind];
+  const row = db.prepare(`SELECT discord_extra FROM ${table} WHERE id = ?`).get(id);
+  if (!row) return false;
+  const list = parseExtra(row);
+  const has = list.includes(userId);
+  if (add === has) return false;
+  const next = add ? [...list, userId].slice(-25) : list.filter((x) => x !== userId);
+  db.prepare(`UPDATE ${table} SET discord_extra = ? WHERE id = ?`).run(JSON.stringify(next), id);
+  return true;
+}
+function syncTicket(kind, id) {
+  return kind === 'case' ? syncCase(id) : boardSync(kind, id);
+}
+const extraMembers = (row) => parseExtra(row);
+
+const COMMANDS = [
+  {
+    name: 'add',
+    description: 'Person zu diesem Ticket hinzufügen (z. B. Zeuge, Gutachter, Kollege)',
+    type: 1,
+    dm_permission: false,
+    options: [{ type: 6, name: 'person', description: 'Wer soll ins Ticket?', required: true }],
+  },
+  {
+    name: 'remove',
+    description: 'Hinzugefügte Person aus diesem Ticket entfernen',
+    type: 1,
+    dm_permission: false,
+    options: [{ type: 6, name: 'person', description: 'Wer soll raus?', required: true }],
+  },
+];
+
+/**
+ * /add und /remove beim Discord-Server anmelden (Guild-Commands, sofort verfügbar). Nur mit Bot-Token,
+ * Server-ID und Public Key (sonst kämen die Befehle nicht bei der Website an). Einmal je Einstellung.
+ */
+async function registerCommands({ force = false } = {}) {
+  const cfg = config();
+  if (!token() || !isId(cfg.guildId) || !panelInteractive()) return { ok: false, skipped: true };
+  const app = await rest('GET', '/applications/@me');
+  const key = crypto.createHash('sha256').update(`${app.id}|${cfg.guildId}|${JSON.stringify(COMMANDS)}|${token().slice(-8)}`).digest('hex').slice(0, 16);
+  if (!force && getSetting('discord_commands_registered', '') === key) return { ok: true, cached: true };
+  await rest('PUT', `/applications/${app.id}/guilds/${cfg.guildId}/commands`, COMMANDS);
+  setSetting('discord_commands_registered', key);
+  return { ok: true };
+}
+
 module.exports = {
+  markMember,
+  ticketByChannel,
+  fixedMemberRole,
+  setExtra,
+  syncTicket,
+  extraMembers,
+  registerCommands,
   publicKeyHex,
   boardActive,
   boardCreated,

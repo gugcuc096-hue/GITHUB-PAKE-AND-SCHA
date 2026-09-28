@@ -66,6 +66,7 @@ router.patch(
       setSetting(key, typeof d[k] === 'boolean' ? (d[k] ? '1' : '0') : d[k]);
     }
     logActivity(req.user, 'Einstellungen geändert', 'settings', null, `Discord-Tickets: ${Object.keys(d).join(', ')}`);
+    tickets.registerCommands().catch((err) => console.warn('Discord-Befehle nicht angemeldet:', err.message)); // /add, /remove
     res.json(tickets.status());
   })
 );

@@ -1,7 +1,8 @@
 'use strict';
 /*
  * Discord-Interaktionen: Klicks auf die Buttons im Ticket (Akte übernehmen, Akte schließen, Wieder öffnen,
- * Anliegen erledigt). Discord schickt jeden Klick per HTTP an diese Adresse – eingetragen im Developer
+ * Anliegen erledigt) und die Befehle /add und /remove (externe Personen ins Ticket holen bzw. entfernen).
+ * Discord schickt jeden Klick und Befehl per HTTP an diese Adresse – eingetragen im Developer
  * Portal unter „Interactions Endpoint URL“ (<PUBLIC_URL>/api/discord/interactions).
  *
  * Sicherheit:
@@ -16,7 +17,7 @@ const express = require('express');
 const { db } = require('../db');
 const { isStaff } = require('../auth');
 const { isBoard } = require('../helpers');
-const { getCase, caseAccess } = require('../models');
+const { getCase, caseAccess, logActivity } = require('../models');
 const tickets = require('../tickets');
 const cases = require('./cases');
 const concerns = require('./concerns');
@@ -92,6 +93,61 @@ function handleConcern(action, id, u, channelId) {
   return ephemeral(status === 'erledigt' ? `✅ Anliegen ${k.reference} als erledigt markiert.` : `🔓 Anliegen ${k.reference} wieder geöffnet.`);
 }
 
+const TICKET_LABEL = { case: 'Akte', application: 'Bewerbung', concern: 'Anliegen' };
+const ticketName = (t) => `${TICKET_LABEL[t.kind]} ${t.kind === 'case' ? t.row.case_number : t.kind === 'application' ? t.row.number : t.row.reference || ''}`.trim();
+
+/** /add @person bzw. /remove @person im Ticket-Kanal. */
+function handleCommand(body, u, actorId) {
+  const name = body.data?.name;
+  if (name !== 'add' && name !== 'remove') return ephemeral('Unbekannter Befehl.');
+  const t = tickets.ticketByChannel(String(body.channel_id || ''));
+  if (!t || !t.row) return ephemeral('/add und /remove funktionieren nur in Ticket-Kanälen (Akten, Bewerbungen, Anliegen).');
+  // Rechte wie im Dashboard: Akte → zuständige Anwälte und Board of Partners; Board-Tickets → Board of Partners
+  if (t.kind === 'case') {
+    if (!isStaff(u) || !(caseAccess(t.row, u).canEdit || isBoard(u))) return ephemeral('Personen hinzufügen oder entfernen können die zuständigen Anwälte und das Board of Partners.');
+  } else if (!isBoard(u)) {
+    return ephemeral('Nur für das Board of Partners.');
+  }
+  const targetId = String((body.data.options || []).find((o) => o.name === 'person')?.value || '');
+  const target = body.data.resolved?.users?.[targetId];
+  if (!tickets.isId(targetId) || !target) return ephemeral('Bitte eine Person auswählen.');
+  if (target.bot) return ephemeral('Bots können nicht hinzugefügt werden.');
+  const who = target.global_name || target.username || targetId;
+  const fixed = tickets.fixedMemberRole(t.kind, t.row, targetId);
+  const extras = tickets.extraMembers(t.row);
+
+  if (name === 'add') {
+    if (!body.data.resolved?.members?.[targetId]) return ephemeral(`${who} ist nicht auf diesem Discord-Server – bitte zuerst einladen.`);
+    if (fixed) return ephemeral(`${who} ist bereits im Ticket (${fixed}).`);
+    if (extras.includes(targetId)) return ephemeral(`${who} ist bereits hinzugefügt.`);
+    tickets.markMember(targetId);
+    tickets.setExtra(t.kind, t.row.id, targetId, true);
+    tickets.syncTicket(t.kind, t.row.id);
+    logActivity(u, 'Discord-Ticket: Person hinzugefügt', t.kind, t.row.id, `${ticketName(t)}: ${who}`);
+    return {
+      type: 4,
+      data: {
+        content: `➕ <@${targetId}> wurde von <@${actorId}> zum Ticket hinzugefügt.`,
+        allowed_mentions: { parse: [], users: [targetId] }, // nur die hinzugefügte Person wird gepingt
+      },
+    };
+  }
+
+  if (!extras.includes(targetId)) {
+    return ephemeral(fixed ? `${who} gehört als ${fixed} fest zum Ticket – das ändert ihr über die Website.` : `${who} wurde nicht per /add hinzugefügt.`);
+  }
+  tickets.setExtra(t.kind, t.row.id, targetId, false);
+  tickets.syncTicket(t.kind, t.row.id);
+  logActivity(u, 'Discord-Ticket: Person entfernt', t.kind, t.row.id, `${ticketName(t)}: ${who}`);
+  return {
+    type: 4,
+    data: {
+      content: fixed ? `➖ ${who} ist nicht mehr zusätzlich eingetragen, bleibt aber als ${fixed} im Ticket.` : `➖ ${who} wurde von <@${actorId}> aus dem Ticket entfernt.`,
+      allowed_mentions: { parse: [] },
+    },
+  };
+}
+
 router.post('/', express.raw({ type: '*/*', limit: '100kb' }), (req, res) => {
   if (!verified(req)) return res.status(401).send('invalid request signature');
   let body;
@@ -101,16 +157,17 @@ router.post('/', express.raw({ type: '*/*', limit: '100kb' }), (req, res) => {
     return res.status(400).end();
   }
   if (body.type === 1) return res.json({ type: 1 }); // PING (Prüfung durch Discord)
-  if (body.type !== 3) return res.json(ephemeral('Diese Aktion wird nicht unterstützt.'));
+  if (body.type !== 2 && body.type !== 3) return res.json(ephemeral('Diese Aktion wird nicht unterstützt.'));
 
   try {
-    const [kind, action, idText] = String(body.data?.custom_id || '').split(':');
-    const id = Number(idText);
-    if (!Number.isInteger(id) || id <= 0) return res.json(ephemeral('Unbekannter Button.'));
     if (String(body.guild_id || '') !== tickets.config().guildId) return res.json(ephemeral('Dieser Server ist nicht für die Kanzlei-Tickets eingerichtet.'));
     const discordId = String(body.member?.user?.id || body.user?.id || '');
     const u = tickets.isId(discordId) ? db.prepare('SELECT * FROM users WHERE discord_id = ? AND active = 1').get(discordId) : null;
     if (!u) return res.json(ephemeral(NOT_LINKED));
+    if (body.type === 2) return res.json(handleCommand(body, u, discordId)); // Slash-Command
+    const [kind, action, idText] = String(body.data?.custom_id || '').split(':');
+    const id = Number(idText);
+    if (!Number.isInteger(id) || id <= 0) return res.json(ephemeral('Unbekannter Button.'));
     const channelId = String(body.channel_id || body.channel?.id || '');
     if (kind === 'case') return res.json(handleCase(action, id, u, channelId));
     if (kind === 'concern') return res.json(handleConcern(action, id, u, channelId));
