@@ -345,8 +345,10 @@ async function createChannel(c, { quiet = false } = {}) {
     : 'Neues Ticket zur Akte. Alle Neuigkeiten erscheinen automatisch hier.';
   const pingRoles = cfg.pingRoles && !quiet;
   const pings = [...(pingRoles ? cfg.roleIds.map((id) => `<@&${id}>`) : []), ...lawyerIds.map((id) => `<@${id}>`)].join(' ');
+  const panel = panelFor('case', c);
   const msg = await send(channel.id, {
     content: [pings, intro].filter(Boolean).join('\n'),
+    components: panel.components,
     embeds: [
       embed({
         title: `📁 Akte ${c.case_number}: ${truncate(c.title, 200)}`,
@@ -374,7 +376,10 @@ async function createChannel(c, { quiet = false } = {}) {
     ],
     allowed_mentions: { parse: [], users: [...(clientIn ? [client] : []), ...lawyerIds], roles: pingRoles ? cfg.roleIds : [] },
   });
-  if (msg && msg.id) rest('PUT', `/channels/${channel.id}/pins/${msg.id}`).catch(() => {});
+  if (msg && msg.id) {
+    saveState(c.id, { discord_panel_id: String(msg.id), discord_panel_state: panel.state });
+    rest('PUT', `/channels/${channel.id}/pins/${msg.id}`).catch(() => {});
+  }
   return channel.id;
 }
 
@@ -438,6 +443,81 @@ function send(channelId, payload) {
   return rest('POST', `/channels/${channelId}/messages`, payload);
 }
 
+/* ---------------------------------------------------------------- Panel (Buttons im Ticket) */
+/*
+ * Buttons zum Übernehmen/Schließen/Wieder öffnen funktionieren nur, wenn Discord Klicks an die Website
+ * schicken kann: Developer Portal → „Interactions Endpoint URL“ = <PUBLIC_URL>/api/discord/interactions
+ * und DISCORD_PUBLIC_KEY in Render (siehe routes/interactions.js). Ohne das gibt es nur den Link-Button.
+ */
+const publicKeyHex = () => {
+  const k = discord.envValue('DISCORD_PUBLIC_KEY').toLowerCase();
+  return /^[0-9a-f]{64}$/.test(k) ? k : '';
+};
+const panelInteractive = () => !!publicKeyHex();
+const siteBase = () => {
+  const b = discord.envValue('PUBLIC_URL').replace(/\/+$/, '');
+  return /^https?:\/\//.test(b) ? b : '';
+};
+const button = (label, customId, style = 2, extra = {}) => ({ type: 2, style, label, custom_id: customId, ...extra });
+const linkButton = (label, url) => ({ type: 2, style: 5, label, url });
+
+/** Buttons je Ticket-Art; state ändert sich, sobald andere Buttons nötig sind. */
+function panelFor(kind, r) {
+  const interactive = panelInteractive();
+  const base = siteBase();
+  const buttons = [];
+  let state;
+  if (kind === 'case') {
+    const closed = r.status === 'geschlossen';
+    if (interactive) {
+      if (!closed && !r.lawyer_id) buttons.push(button('Akte übernehmen', `case:claim:${r.id}`, 3, { emoji: { name: '🙋' } }));
+      buttons.push(closed ? button('Wieder öffnen', `case:reopen:${r.id}`, 1, { emoji: { name: '🔓' } }) : button('Akte schließen', `case:close:${r.id}`, 4, { emoji: { name: '🔒' } }));
+    }
+    if (base) buttons.push(linkButton('Im Dashboard öffnen', `${base}/dashboard.html?case=${r.id}`));
+    state = `${closed ? 'closed' : 'open'}|${r.lawyer_id ? 'taken' : 'free'}`;
+  } else if (kind === 'concern') {
+    const closed = BOARD_KINDS.concern.closed.includes(r.status);
+    if (interactive) buttons.push(closed ? button('Wieder öffnen', `concern:reopen:${r.id}`, 1, { emoji: { name: '🔓' } }) : button('Als erledigt markieren', `concern:done:${r.id}`, 3, { emoji: { name: '✅' } }));
+    if (base) buttons.push(linkButton('Im Dashboard öffnen', `${base}/dashboard.html#concerns-board`));
+    state = closed ? 'closed' : 'open';
+  } else {
+    if (base) buttons.push(linkButton('Im Dashboard öffnen', `${base}/dashboard.html#applications`));
+    state = 'link';
+  }
+  const components = buttons.length ? [{ type: 1, components: buttons }] : [];
+  return { components, state: `${state}|${interactive ? 'i' : 'l'}|${base ? 'b' : ''}` };
+}
+
+/**
+ * Panel eines Tickets auf den aktuellen Stand bringen: Buttons der angehefteten Begrüßung bzw. einer
+ * eigenen „Ticket-Steuerung“ tauschen (z. B. „Schließen“ ↔ „Wieder öffnen“). Ältere Tickets ohne Panel
+ * bekommen eins. save(fields) schreibt discord_panel_id/-state an die Zeile.
+ */
+async function refreshPanel(kind, r, save) {
+  if (!r || !r.discord_channel_id) return;
+  const { components, state } = panelFor(kind, r);
+  if (state === r.discord_panel_state) return;
+  if (r.discord_panel_id) {
+    try {
+      await rest('PATCH', `/channels/${r.discord_channel_id}/messages/${r.discord_panel_id}`, { components });
+      save({ discord_panel_state: state });
+      return;
+    } catch (err) {
+      if (err.code !== 10008) throw err; // Nachricht gelöscht → neues Panel
+    }
+  }
+  if (!components.length) {
+    save({ discord_panel_state: state });
+    return;
+  }
+  const msg = await send(r.discord_channel_id, { content: '🎛️ **Ticket-Steuerung**', components, allowed_mentions: { parse: [] } });
+  if (msg && msg.id) {
+    save({ discord_panel_id: String(msg.id), discord_panel_state: state });
+    rest('PUT', `/channels/${r.discord_channel_id}/pins/${msg.id}`).catch(() => {});
+  }
+}
+const refreshCasePanel = (caseId) => refreshPanel('case', getCase(caseId), (f) => saveState(caseId, f));
+
 /* ---------------------------------------------------------------- Warteschlange */
 const queues = new Map();
 function enqueue(key, job, onError) {
@@ -483,7 +563,7 @@ async function ensure(caseId) {
   } catch (err) {
     if (err.code !== 10003) throw err;
     // Kanal wurde in Discord gelöscht → neu anlegen
-    saveState(c.id, { discord_channel_id: null, discord_members: null, discord_archived: 0 });
+    saveState(c.id, { discord_channel_id: null, discord_members: null, discord_archived: 0, discord_panel_id: null, discord_panel_state: null });
     c = getCase(caseId);
     await createChannel(c);
   }
@@ -507,7 +587,10 @@ function syncCase(caseId) {
   if (!active()) return Promise.resolve();
   return enqueue(caseId, async () => {
     const c = await ensure(caseId);
-    if (c) await syncArchive(c);
+    if (c) {
+      await syncArchive(c);
+      await refreshCasePanel(caseId);
+    }
   });
 }
 
@@ -545,11 +628,12 @@ function post(caseId, msg) {
     } catch (err) {
       if (err.code !== 10003) throw err;
       // Kanal wurde in Discord gelöscht → neu anlegen und die Nachricht dort senden
-      saveState(c.id, { discord_channel_id: null, discord_members: null, discord_archived: 0 });
+      saveState(c.id, { discord_channel_id: null, discord_members: null, discord_archived: 0, discord_panel_id: null, discord_panel_state: null });
       c = await ensure(caseId);
       await send(c.discord_channel_id, payload);
     }
     await syncArchive(c);
+    await refreshCasePanel(caseId);
   });
 }
 
@@ -607,7 +691,22 @@ async function backfill() {
       if (boardRow(kind, r.id)?.discord_channel_id) created += 1;
     }
   }
-  return { created, total };
+  // Bestehende offene Tickets bekommen (neue) Buttons
+  let panels = 0;
+  if (active()) {
+    for (const r of db.prepare("SELECT id FROM cases WHERE discord_channel_id IS NOT NULL AND status != 'geschlossen'").all()) {
+      await syncCase(r.id);
+      panels += 1;
+    }
+  }
+  for (const kind of kinds) {
+    const t = BOARD_KINDS[kind];
+    for (const r of db.prepare(`SELECT id FROM ${t.table} WHERE discord_channel_id IS NOT NULL AND status NOT IN (${t.closed.map(() => '?').join(',')})`).all(...t.closed)) {
+      await boardSync(kind, r.id);
+      panels += 1;
+    }
+  }
+  return { created, total, panels };
 }
 
 /* ================================================================
@@ -742,12 +841,17 @@ async function createBoardChannel(kind, r, { quiet = false } = {}) {
   });
   saveBoard(kind, r.id, { discord_channel_id: String(channel.id), discord_members: JSON.stringify(added), discord_archived: closed ? 1 : 0, discord_error: null });
   const ping = cfg.pingRoles && !quiet && b.roleIds.length;
+  const panel = panelFor(kind, r);
   const msg = await send(channel.id, {
     content: ping ? b.roleIds.map((id) => `<@&${id}>`).join(' ') : undefined,
     embeds: [boardIntro(kind, r)],
+    components: panel.components,
     allowed_mentions: { parse: [], roles: ping ? b.roleIds : [] },
   });
-  if (msg && msg.id) rest('PUT', `/channels/${channel.id}/pins/${msg.id}`).catch(() => {});
+  if (msg && msg.id) {
+    saveBoard(kind, r.id, { discord_panel_id: String(msg.id), discord_panel_state: panel.state });
+    rest('PUT', `/channels/${channel.id}/pins/${msg.id}`).catch(() => {});
+  }
 }
 
 /** Kanal sicherstellen, Board-Mitglieder und Archiv abgleichen. Liefert die frische Zeile oder null. */
@@ -777,7 +881,7 @@ async function ensureBoard(kind, id) {
     }
   } catch (err) {
     if (err.code !== 10003) throw err;
-    saveBoard(kind, id, { discord_channel_id: null, discord_members: null, discord_archived: 0 });
+    saveBoard(kind, id, { discord_channel_id: null, discord_members: null, discord_archived: 0, discord_panel_id: null, discord_panel_state: null });
     r = boardRow(kind, id);
     await createBoardChannel(kind, r);
     return boardRow(kind, id);
@@ -837,11 +941,12 @@ function boardPost(kind, id, msg) {
         await send(r.discord_channel_id, payload);
       } catch (err) {
         if (err.code !== 10003) throw err;
-        saveBoard(kind, id, { discord_channel_id: null, discord_members: null, discord_archived: 0 });
+        saveBoard(kind, id, { discord_channel_id: null, discord_members: null, discord_archived: 0, discord_panel_id: null, discord_panel_state: null });
         r = await ensureBoard(kind, id);
         await send(r.discord_channel_id, payload);
       }
       await syncBoardArchive(kind, boardRow(kind, id));
+      await refreshPanel(kind, boardRow(kind, id), (f) => saveBoard(kind, id, f));
     },
     boardError(kind, id)
   );
@@ -854,7 +959,10 @@ function boardSync(kind, id) {
     boardKey(kind, id),
     async () => {
       const r = await ensureBoard(kind, id);
-      if (r) await syncBoardArchive(kind, r);
+      if (r) {
+        await syncBoardArchive(kind, r);
+        await refreshPanel(kind, boardRow(kind, id), (f) => saveBoard(kind, id, f));
+      }
     },
     boardError(kind, id)
   );
@@ -1016,6 +1124,11 @@ function status() {
     lastTest,
     ...cfg,
     board: { ...boardConfig(), activeApplications: boardActive('application'), activeConcerns: boardActive('concern') },
+    panel: {
+      interactive: panelInteractive(),
+      publicUrl: !!siteBase(),
+      interactionsUrl: `${siteBase() || ''}/api/discord/interactions`,
+    },
     counts: db.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN discord_channel_id IS NOT NULL THEN 1 ELSE 0 END) AS withTicket FROM cases WHERE status != 'geschlossen'").get(),
     boardCounts: {
       applications: db.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN discord_channel_id IS NOT NULL THEN 1 ELSE 0 END) AS withTicket FROM applications WHERE status NOT IN ('angenommen','abgelehnt')").get(),
@@ -1025,6 +1138,7 @@ function status() {
 }
 
 module.exports = {
+  publicKeyHex,
   boardActive,
   boardCreated,
   boardPost,

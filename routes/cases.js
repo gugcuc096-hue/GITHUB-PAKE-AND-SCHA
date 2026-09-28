@@ -641,4 +641,57 @@ router.delete(
   })
 );
 
+/* ---------------------------------------------------------------- Änderungen aus dem Discord-Ticket (Buttons) */
+// Rechte prüft der Aufrufer (routes/interactions.js); hier nur die Änderung samt Verlauf und Meldungen.
+
+function notifyStatus(c, u, newStatus) {
+  discord.notify('case.status', {
+    title: `${c.case_number}: ${CASE_STATUS[newStatus]}`,
+    description: truncate(c.title, 300),
+    fields: [
+      { name: 'Mandant', value: c.client_account_name || c.client_name || '—' },
+      { name: 'Zuständig', value: lawyerNames(c) },
+      { name: 'Geändert von', value: u.display_name },
+    ],
+  });
+}
+
+/** Status setzen (z. B. „Akte schließen“ / „Wieder öffnen“). Liefert false, wenn sich nichts ändert. */
+function setCaseStatus(c, u, newStatus, via = '') {
+  if (!CASE_STATUS[newStatus] || newStatus === c.status) return false;
+  const history = [`Status: ${CASE_STATUS[c.status]} → ${CASE_STATUS[newStatus]}${via}`];
+  tx(() => {
+    db.prepare("UPDATE cases SET status = ?, updated_at = datetime('now') WHERE id = ?").run(newStatus, c.id);
+    addSystemNote(c.id, u, history.join(' · '));
+    syncCaseWork(c.id);
+  });
+  const updated = getCase(c.id);
+  logActivity(u, 'Akte geändert', 'case', c.id, `${c.case_number}: ${history.join(' · ')}`);
+  notifyStatus(updated, u, newStatus);
+  ticketUpdate(c, updated, u, { history, editFields: [], d: {}, newStatus, newlyAssigned: [] });
+  return true;
+}
+
+/** Unbesetzte Akte übernehmen (federführend). Liefert false, wenn sie schon besetzt oder geschlossen ist. */
+function claimCase(c, u, via = '') {
+  if (c.lawyer_id || c.status === 'geschlossen') return false;
+  const wasCo = coLawyersOf(c).some((l) => l.id === u.id);
+  const newStatus = c.status === 'offen' ? 'in_bearbeitung' : undefined;
+  const history = [`Federführend: ${u.display_name}${via}`, ...(newStatus ? [`Status: ${CASE_STATUS[c.status]} → ${CASE_STATUS[newStatus]}`] : [])];
+  tx(() => {
+    db.prepare("UPDATE cases SET lawyer_id = ?, status = COALESCE(?, status), updated_at = datetime('now') WHERE id = ?").run(u.id, newStatus || null, c.id);
+    db.prepare('DELETE FROM case_lawyers WHERE case_id = ? AND user_id = ?').run(c.id, u.id);
+    addSystemNote(c.id, u, history.join(' · '));
+    syncCaseWork(c.id);
+  });
+  const updated = getCase(c.id);
+  notifyAssigned(updated, u, wasCo ? [] : [u.id]);
+  logActivity(u, 'Akte geändert', 'case', c.id, `${c.case_number}: ${history.join(' · ')}`);
+  if (newStatus) notifyStatus(updated, u, newStatus);
+  ticketUpdate(c, updated, u, { history, editFields: [], d: {}, newStatus, newlyAssigned: wasCo ? [] : [u.id] });
+  return true;
+}
+
 module.exports = router;
+module.exports.setCaseStatus = setCaseStatus;
+module.exports.claimCase = claimCase;

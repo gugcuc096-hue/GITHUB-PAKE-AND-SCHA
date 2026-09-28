@@ -37,6 +37,9 @@ app.use(
     referrerPolicy: { policy: 'same-origin' },
   })
 );
+// Discord-Button-Klicks (Ticket-Panel): brauchen den unveränderten Rohtext für die Signaturprüfung –
+// deshalb vor express.json().
+app.use('/api/discord/interactions', require('./routes/interactions'));
 app.use(express.json({ limit: '300kb' }));
 app.use(cookieParser());
 app.use(loadUser);

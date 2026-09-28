@@ -318,50 +318,59 @@ router.post(
 );
 
 /* ---------------------------------------------------------------- Status / Zuständigkeit (Board) */
+/**
+ * Status und/oder Zuständigkeit ändern (Dashboard oder Button im Discord-Ticket).
+ * Liefert { error, status } oder { changed: true|false }.
+ */
+function changeConcern(k, u, d, via = '') {
+  if (!isBoard(u)) return { status: 403, error: 'Nur das Board of Partners kann den Status ändern.' };
+  if (k.author_id === u.id) return { status: 403, error: 'Über das eigene Anliegen entscheidet ein anderes Mitglied des Board of Partners.' };
+  const notes = [];
+  const sets = [];
+  const values = [];
+  if (d.status && d.status !== k.status) {
+    sets.push('status = ?', 'closed_at = ?');
+    values.push(d.status, CLOSED.includes(d.status) ? new Date().toISOString() : null);
+    notes.push(`Status: ${STATUS[k.status]} → ${STATUS[d.status]} (${u.display_name}${via})`);
+  }
+  if (d.assignedTo !== undefined && d.assignedTo !== k.assigned_to) {
+    let name = null;
+    if (d.assignedTo !== null) {
+      const m = db.prepare(`SELECT id, display_name FROM users WHERE id = ? AND ${BOARD_MEMBER_SQL}`).get(d.assignedTo);
+      if (!m) return { status: 400, error: 'Zuständig kann nur ein Mitglied des Board of Partners sein.' };
+      name = m.display_name;
+    }
+    sets.push('assigned_to = ?');
+    values.push(d.assignedTo);
+    notes.push(name ? `Zuständig im Board: ${name}` : 'Zuständigkeit im Board aufgehoben');
+  }
+  if (!sets.length) return { changed: false };
+  tx(() => {
+    db.prepare(`UPDATE concerns SET ${sets.join(', ')}, updated_at = datetime('now'), board_activity_at = datetime('now') WHERE id = ?`).run(...values, k.id);
+    db.prepare('INSERT INTO concern_messages (concern_id, author_id, author_name, from_board, system, body) VALUES (?, ?, ?, 1, 1, ?)').run(k.id, u.id, u.display_name, notes.join(' · '));
+  });
+  tickets.boardPost('concern', k.id, {
+    title: d.status && CLOSED.includes(d.status) ? `🔒 Anliegen ${STATUS[d.status].toLowerCase()}` : d.status && CLOSED.includes(k.status) ? '🔓 Anliegen wieder geöffnet' : '📌 Anliegen aktualisiert',
+    description: notes.map((n) => `• ${n}`).join('\n'),
+    color: d.status && CLOSED.includes(d.status) ? tickets.COLORS.slate : tickets.COLORS.gold,
+    by: u.display_name,
+  });
+  if (d.status && d.status !== k.status) {
+    notify('concern.updated', k, `📋 Anliegen ans Board: ${STATUS[d.status]}`, [{ name: 'Geändert von', value: u.display_name }]);
+    logActivity(u, 'Anliegen ans Board: Status', 'concern', k.id, `${k.reference}: ${STATUS[d.status]}${via}`);
+  }
+  return { changed: true };
+}
+
 router.patch(
   '/:id',
   wrap(async (req, res) => {
     const k = load(req, res);
     if (!k) return;
-    const u = req.user;
-    if (!isBoard(u)) return res.status(403).json({ error: 'Nur das Board of Partners kann den Status ändern.' });
-    if (k.author_id === u.id) return res.status(403).json({ error: 'Über das eigene Anliegen entscheidet ein anderes Mitglied des Board of Partners.' });
     const d = parseBody(z.object({ status: z.enum(Object.keys(STATUS)).optional(), assignedTo: z.number().int().positive().nullable().optional() }), req, res);
     if (!d) return;
-    const notes = [];
-    const sets = [];
-    const values = [];
-    if (d.status && d.status !== k.status) {
-      sets.push('status = ?', 'closed_at = ?');
-      values.push(d.status, CLOSED.includes(d.status) ? new Date().toISOString() : null);
-      notes.push(`Status: ${STATUS[k.status]} → ${STATUS[d.status]} (${u.display_name})`);
-    }
-    if (d.assignedTo !== undefined && d.assignedTo !== k.assigned_to) {
-      let name = null;
-      if (d.assignedTo !== null) {
-        const m = db.prepare(`SELECT id, display_name FROM users WHERE id = ? AND ${BOARD_MEMBER_SQL}`).get(d.assignedTo);
-        if (!m) return res.status(400).json({ error: 'Zuständig kann nur ein Mitglied des Board of Partners sein.' });
-        name = m.display_name;
-      }
-      sets.push('assigned_to = ?');
-      values.push(d.assignedTo);
-      notes.push(name ? `Zuständig im Board: ${name}` : 'Zuständigkeit im Board aufgehoben');
-    }
-    if (!sets.length) return res.json({ success: true });
-    tx(() => {
-      db.prepare(`UPDATE concerns SET ${sets.join(', ')}, updated_at = datetime('now'), board_activity_at = datetime('now') WHERE id = ?`).run(...values, k.id);
-      db.prepare('INSERT INTO concern_messages (concern_id, author_id, author_name, from_board, system, body) VALUES (?, ?, ?, 1, 1, ?)').run(k.id, u.id, u.display_name, notes.join(' · '));
-    });
-    tickets.boardPost('concern', k.id, {
-      title: d.status && CLOSED.includes(d.status) ? `🔒 Anliegen ${STATUS[d.status].toLowerCase()}` : '📌 Anliegen aktualisiert',
-      description: notes.map((n) => `• ${n}`).join('\n'),
-      color: d.status && CLOSED.includes(d.status) ? tickets.COLORS.slate : tickets.COLORS.gold,
-      by: u.display_name,
-    });
-    if (d.status && d.status !== k.status) {
-      notify('concern.updated', k, `📋 Anliegen ans Board: ${STATUS[d.status]}`, [{ name: 'Geändert von', value: u.display_name }]);
-      logActivity(u, 'Anliegen ans Board: Status', 'concern', k.id, `${k.reference}: ${STATUS[d.status]}`);
-    }
+    const r = changeConcern(k, req.user, d);
+    if (r.error) return res.status(r.status).json({ error: r.error });
     res.json({ success: true });
   })
 );
@@ -474,4 +483,4 @@ publicRouter.post(
   })
 );
 
-module.exports = { router, publicRouter, CATEGORIES, STATUS };
+module.exports = { router, publicRouter, CATEGORIES, STATUS, CLOSED, SELECT, changeConcern };
