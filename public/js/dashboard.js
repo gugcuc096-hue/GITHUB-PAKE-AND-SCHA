@@ -2617,7 +2617,50 @@
       <div class="item-total" data-item-total="${i}">${money((Number(it.quantity) || 0) * (Number(it.unitPrice) || 0))}</div>
       <button type="button" class="icon-btn sm item-remove" data-action="inv-remove-item" data-index="${i}" aria-label="Position entfernen">${icon('x', 'ico-sm')}</button></div>`;
   }
-  function summaryHtml() {
+  function invoiceItemsHtml(d) {
+    return d.items.length ? d.items.map(itemRowHtml).join('') : '<p class="text-sm text-dim py-4">Noch keine Positionen – Leistungen oben anhaken oder eine freie Position erfassen.</p>';
+  }
+  /** Leistung an-/abgehakt: Position hinzufügen bzw. entfernen (ohne die Seite neu aufzubauen). */
+  function toggleInvoiceFee(id, on) {
+    const d = st.draft;
+    const fee = st.fees.find((f) => f.id === id);
+    const qty = $(`.inv-fee-qty[data-fee="${id}"]`);
+    if (on && fee && !d.items.some((it) => it.feeId === id)) {
+      d.items.push({ feeId: id, description: fee.name, quantity: Math.max(1, Math.round(Number(qty?.value) || 1)), unitPrice: fee.price });
+    } else if (!on) {
+      d.items = d.items.filter((it) => it.feeId !== id);
+    }
+    if (qty) qty.disabled = !on;
+    $('#invItems').innerHTML = invoiceItemsHtml(d);
+    updateInvoiceSummary();
+  }
+  function filterInvoiceFees(q) {
+    const needle = q.trim().toLowerCase();
+    let header = null;
+    let headerHasHit = false;
+    let hits = 0;
+    // style.display statt Klasse: .svc setzt selbst display:grid
+    const close = () => header && (header.style.display = headerHasHit ? '' : 'none');
+    for (const el of $$('#feeList > *')) {
+      if (el.hasAttribute('data-fee-cat')) {
+        close();
+        header = el;
+        headerHasHit = false;
+      } else if (el.dataset.feeName !== undefined) {
+        const hit = !needle || el.dataset.feeName.includes(needle);
+        el.style.display = hit ? '' : 'none';
+        if (hit) {
+          headerHasHit = true;
+          hits += 1;
+        }
+      }
+    }
+    close();
+    $('#feeNone')?.classList.toggle('hidden', hits > 0);
+  }
+
+  /** Nur die Zahlen der Summenbox – wird beim Tippen aktualisiert, der Button bleibt stehen. */
+  function summaryFiguresHtml() {
     const d = st.draft;
     const t = draftTotals(d);
     return `
@@ -2626,14 +2669,20 @@
       <div class="sum-row"><span class="text-muted">Zwischensumme</span><span class="v">${money(t.subtotal)}</span></div>
       ${t.dp ? `<div class="sum-row" style="color:#6ee7b7"><span>Rabatt (${fmtPct(t.dp)} %)</span><span class="v">− ${money(t.discount)}</span></div>` : ''}
       ${t.sp ? `<div class="sum-row" style="color:#fcd34d"><span>Zuschlag (${fmtPct(t.sp)} %)</span><span class="v">+ ${money(t.surcharge)}</span></div>` : ''}
-      <div class="sum-row sum-total"><span class="font-semibold">Gesamtbetrag</span><span class="v">${money(t.total)}</span></div>
+      <div class="sum-row sum-total"><span class="font-semibold">Gesamtbetrag</span><span class="v">${money(t.total)}</span></div>`;
+  }
+  function summaryHtml() {
+    return `
+      <div id="invSumFigures">${summaryFiguresHtml()}</div>
       <p class="form-hint mb-4">Nach dem Erstellen öffnet sich die Druckansicht – dort „Als PDF speichern“ wählen.</p>
       <button type="submit" class="btn-gold btn-lg btn-block">${icon('check')}<span>Dokument erstellen</span></button>
       <a href="#invoices" class="btn-ghost btn-md btn-block mt-2">Abbrechen</a>`;
   }
   function updateInvoiceSummary() {
-    const box = $('#invSummary');
-    if (box) box.innerHTML = summaryHtml();
+    // Nicht die ganze Box ersetzen: Verlässt man ein Feld per Klick auf „Dokument erstellen“, würde der
+    // Button sonst während des Klicks ausgetauscht und der Klick ginge verloren.
+    const box = $('#invSumFigures');
+    if (box) box.innerHTML = summaryFiguresHtml();
     st.draft.items.forEach((it, i) => {
       const el = $(`[data-item-total="${i}"]`);
       if (el) el.textContent = money((Number(it.quantity) || 0) * (Number(it.unitPrice) || 0));
@@ -2647,10 +2696,21 @@
     },
     render() {
       const d = st.draft;
-      const feeOpts = Object.entries(FEE_CATEGORIES)
+      // Leistungen aus der Honorarordnung zum Abhaken – angehakte stehen sofort als Position in der Rechnung
+      const picked = new Map(d.items.filter((it) => it.feeId).map((it) => [it.feeId, it]));
+      const feeList = Object.entries(FEE_CATEGORIES)
         .map(([cat, label]) => {
           const list = st.fees.filter((f) => f.category === cat);
-          return list.length ? `<optgroup label="${esc(label)}">${list.map((f) => opt(f.id, `${f.name} – ${money(f.price)}`)).join('')}</optgroup>` : '';
+          if (!list.length) return '';
+          return `<div class="svc-cat" data-fee-cat>${esc(label)}</div>${list
+            .map((f) => {
+              const it = picked.get(f.id);
+              return `<label class="svc" data-fee-name="${esc(f.name.toLowerCase())}"><input type="checkbox" class="inv-fee" data-fee="${f.id}" ${it ? 'checked' : ''}>
+                <span class="svc-name">${esc(f.name)}</span>
+                <input type="number" class="field inv-fee-qty" data-fee="${f.id}" min="1" max="999" inputmode="numeric" value="${it ? esc(it.quantity) : 1}" aria-label="Menge ${esc(f.name)}" ${it ? '' : 'disabled'}>
+                <span class="svc-price">${esc(money(f.price))}</span></label>`;
+            })
+            .join('')}`;
         })
         .join('');
       const hv = d.kind === 'honorarvereinbarung';
@@ -2675,14 +2735,15 @@
               </div>
             </section>
             <section class="panel panel-pad">
-              <div class="panel-head"><h2 class="panel-title">Positionen</h2></div>
-              <div class="flex flex-col sm:flex-row gap-2 mb-4">
-                <select id="feePicker" class="field" aria-label="Leistung aus der Honorarordnung">${feeOpts || '<option value="">Honorarordnung ist leer</option>'}</select>
-                <button type="button" class="btn-outline btn-md" data-action="inv-add-fee">${icon('plus', 'ico-sm')}<span>Übernehmen</span></button>
-                <button type="button" class="btn-ghost btn-md" data-action="inv-add-item">${icon('edit', 'ico-sm')}<span>Freie Position</span></button>
-              </div>
+              <div class="panel-head"><h2 class="panel-title">Leistungen</h2><button type="button" class="btn-ghost btn-sm" data-action="inv-add-item">${icon('edit', 'ico-sm')}<span>Freie Position</span></button></div>
+              ${feeList
+                ? `<div class="label">Aus der Honorarordnung <span class="text-dim font-normal normal-case tracking-normal">– einfach anhaken, mehrere möglich; Menge rechts</span></div>
+                   <input id="feeFilter" type="search" class="field mt-1" placeholder="Leistung suchen …" aria-label="Leistungen durchsuchen" autocomplete="off">
+                   <div class="svc-list" id="feeList">${feeList}<p class="text-sm text-dim py-2 hidden" id="feeNone">Keine Leistung gefunden.</p></div>`
+                : '<p class="text-sm text-dim">Die Honorarordnung ist leer – Positionen über „Freie Position“ erfassen.</p>'}
+              <h3 class="section-title mt-5">Positionen</h3>
               <div class="item-head"><span>Leistung</span><span>Menge</span><span>Einzelpreis ($)</span><span style="text-align:right">Summe</span><span></span></div>
-              <div id="invItems">${d.items.length ? d.items.map(itemRowHtml).join('') : '<p class="text-sm text-dim py-4">Noch keine Positionen – übernehmen Sie eine Leistung aus der Honorarordnung.</p>'}</div>
+              <div id="invItems">${invoiceItemsHtml(d)}</div>
             </section>
             <section class="panel panel-pad">
               <div class="form-grid cols-2">
@@ -2704,10 +2765,25 @@
   function onInvoiceInput(t) {
     const d = st.draft;
     if (!d) return;
+    if (t.id === 'feeFilter') return filterInvoiceFees(t.value);
+    if (t.classList.contains('inv-fee-qty')) {
+      // Menge in der Liste geändert → Position mitziehen
+      const i = d.items.findIndex((it) => it.feeId === Number(t.dataset.fee));
+      if (i < 0 || t.value === '') return;
+      d.items[i].quantity = Math.min(999, Math.max(1, Math.round(Number(t.value) || 1)));
+      const row = $(`[data-item="quantity"][data-index="${i}"]`);
+      if (row) row.value = d.items[i].quantity;
+      return updateInvoiceSummary();
+    }
     if (t.dataset.item) {
       const it = d.items[Number(t.dataset.index)];
       if (!it) return;
       it[t.dataset.item] = t.dataset.item === 'description' ? t.value : t.value === '' ? '' : Number(t.value);
+      // Menge in der Position geändert → Liste oben mitziehen
+      if (it.feeId && t.dataset.item === 'quantity') {
+        const q = $(`.inv-fee-qty[data-fee="${it.feeId}"]`);
+        if (q && t.value !== '') q.value = t.value;
+      }
     } else if (['clientName', 'clientContact', 'subject', 'notes', 'dueDate'].includes(t.name)) {
       d[t.name] = t.value;
     } else if (t.name === 'discountPct' || t.name === 'surchargePct') {
@@ -2718,6 +2794,7 @@
   function onInvoiceChange(t) {
     const d = st.draft;
     if (!d) return;
+    if (t.classList.contains('inv-fee')) return toggleInvoiceFee(Number(t.dataset.fee), t.checked);
     if (t.name === 'kind') {
       d.kind = t.value;
       renderView();
@@ -4312,13 +4389,6 @@
       await load.cases();
       st.draft = newDraft(el.dataset.caseId ? Number(el.dataset.caseId) : null);
       await navigate('invoice-new');
-    },
-    'inv-add-fee': () => {
-      const id = Number($('#feePicker')?.value);
-      const fee = st.fees.find((f) => f.id === id);
-      if (!fee) return;
-      st.draft.items.push({ description: fee.name, quantity: 1, unitPrice: fee.price });
-      renderView();
     },
     'inv-add-item': () => {
       st.draft.items.push({ description: '', quantity: 1, unitPrice: 0 });

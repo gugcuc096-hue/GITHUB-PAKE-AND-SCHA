@@ -13,7 +13,7 @@ Premium-Webanwendung für die GTA-RP-Kanzlei **Pake & Scha Legal Consulting**: �
 | **Kalender & Fristen** | Gerichtstermine, Fristen, Mandantengespräche, interne Termine · Monatsansicht · Live-Countdown · Terminanfragen von Mandanten bestätigen · Discord-Erinnerung 24 h vor Frist/Gerichtstermin |
 | **Kanzlei-Post** | Posteingang/Gesendet, Antworten, Aktenbezug, „wichtig“-Markierung, Rundschreiben ans ganze Team, Ungelesen-Zähler |
 | **Pinnwand** | Team-Notizen mit Farben, Anheften (erscheint in der Übersicht) |
-| **Rechnungen & Honorare** | Generator mit Positionen aus der Honorarordnung, Rabatt/Zuschlag, Rechnung **oder** Honorarvereinbarung, Druck-/PDF-Ansicht, Status offen/bezahlt/storniert |
+| **Rechnungen & Honorare** | Generator: Leistungen aus der Honorarordnung **einfach anhaken** (mehrere auf einmal, Menge je Leistung, Suche) – sie stehen sofort als Positionen in der Rechnung; dazu freie Positionen, Rabatt/Zuschlag, Rechnung **oder** Honorarvereinbarung, Druck-/PDF-Ansicht, Status offen/bezahlt/storniert |
 | **Team-Verwaltung** (Admin) | Mitglieder hinzufügen, umbenennen, Rang/Beschreibung ändern, sortieren, ausblenden, löschen – sofort live auf der Website · optional mit Login-Konto (Einmal-Passwort) |
 | **Benutzer** (Admin) | Rollen, Ränge, Sperren, Löschen, **Passwort-Reset per Klick** |
 | **Honorarordnung** (Admin) | Preise/Leistungen pflegen → Website, Tarifrechner und Rechnungs-Generator |
