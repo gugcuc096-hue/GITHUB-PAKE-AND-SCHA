@@ -102,7 +102,21 @@ Die Passwörter kommen aus `ADMIN_PASSWORD`, `SEED_SCHA_PASSWORD` und `SEED_LEX_
 
 **Buttons im Ticket (Panel):** Die angeheftete Begrüßung jedes Tickets enthält Buttons – Akten: „Akte übernehmen“ (solange unbesetzt), „Akte schließen“ (mit Rückfrage) bzw. „Wieder öffnen“, „Im Dashboard öffnen“; Anliegen: „Als erledigt markieren“ / „Wieder öffnen“; Bewerbungen: „Im Dashboard öffnen“. Ein Klick wirkt genau wie im Dashboard (Verlauf „über Discord“, Meldungen, Archiv) und die Buttons passen sich an. Klicken darf nur, wer sein Discord mit einem Website-Konto verknüpft hat und dieselben Rechte wie im Dashboard besitzt (Akte: zuständige Anwälte / Board of Partners, Übernehmen: jedes Teammitglied; Anliegen: Board of Partners) – Mandanten und Fremde bekommen nur einen Hinweis, den nur sie sehen. Einrichtung: Developer Portal → *General Information* → „Public Key“ in Render als `DISCORD_PUBLIC_KEY` → deployen → **danach** im Developer Portal „Interactions Endpoint URL“ = `https://<ihre-domain>/api/discord/interactions` → speichern (Discord prüft die Adresse dabei). Bestehende Tickets bekommen die Buttons über „Offene nachholen“. Ohne Public Key gibt es nur den Button „Im Dashboard öffnen“.
 
-**Befehle `/add` und `/remove`:** Im Ticket-Kanal holt `/add @Person` jemanden dazu, der sonst keinen Zugriff hätte (z. B. Zeuge, Gutachter, Kollege); `/remove @Person` nimmt ihn wieder heraus. Erlaubt für die zuständigen Anwälte und das Board of Partners (Board-Tickets: nur Board), mit verknüpftem Discord. Die Person muss auf dem Server sein, wird beim Hinzufügen erwähnt und bleibt auch nach Abgleichen im Ticket; bei geschlossenen Akten kann sie – wie der Mandant – nur noch lesen. Fest zugehörige Personen (zuständige Anwälte, Mandant, Board) lassen sich nicht per `/remove` entfernen – das geht über die Website. Beides steht im Protokoll. Die Befehle meldet die Website selbst an (beim Start, beim Speichern der Ticket-Einstellungen und bei „Verbindung testen“), sobald Bot-Token, Server-ID und `DISCORD_PUBLIC_KEY` gesetzt sind.
+**Befehle des Kanzlei-Bots (Slash-Commands):** Alle Antworten und Nachrichten des Bots sind Embeds; Erwähnungen stehen nur dann zusätzlich im Text, wenn jemand wirklich gepingt werden soll (z. B. die per `/add` hinzugefügte Person).
+
+| Befehl | Wo | Wer | Was passiert |
+|---|---|---|---|
+| `/add @Person` · `/remove @Person` | Ticket-Kanal | zuständige Anwälte, Board (Board-Tickets: nur Board) | holt jemanden ins Ticket (Zeuge, Gutachter, Kollege) bzw. nimmt ihn wieder heraus; bleibt beim Abgleichen erhalten; fest zugehörige Personen (Anwälte, Mandant, Board) nur über die Website |
+| `/delete [grund]` | Ticket-Kanal | wie `/add` | Rückfrage „Ja, Ticket löschen“ → Hinweis im Kanal, nach 5 Sekunden wird der **Kanal gelöscht**. Akte/Bewerbung/Anliegen bleiben erhalten; das Ticket wird **nicht automatisch neu angelegt** – im Dashboard steht „per /delete gelöscht“ mit „Neu anlegen“. Vermerk im Aktenverlauf (intern) und im Protokoll |
+| `/passwort` | überall auf dem Server | jeder mit verknüpftem Discord | neues Einmal-Passwort per **Direktnachricht** (Embed mit E-Mail, Passwort als Spoiler, Login-Link); die E-Mail bleibt gleich, beim Login wird ein eigenes Passwort festgelegt, alle alten Anmeldungen enden. Kann der Bot keine DM schicken (DMs gesperrt), bleibt das alte Passwort gültig. Höchstens alle 10 Minuten; steht im Protokoll |
+| `/akte [aktenzeichen]` | überall (im Ticket ohne Angabe) | wer die Akte auch im Dashboard sieht | Status, Verfahrensstand, Zuständige, nächster Termin, offene Aufgaben (Kanzlei), Hinweis der Kanzlei, Link ins Dashboard – nur für die Person sichtbar. Aktenzeichen auch kurz („12“) |
+| `/notiz text [aktenzeichen]` | überall (im Ticket ohne Angabe) | Kanzlei | interne Notiz zur Akte – für den Mandanten unsichtbar, erscheint nie im Ticket |
+| `/dienst status [notiz]` | überall | Kanzlei | Stempeluhr: Im Dienst, Im Gericht, Pause, Außer Dienst – wie im Dashboard (inkl. Discord-Meldung Dienstbeginn/-ende) |
+| `/imdienst` | überall | alle | wer von der Kanzlei gerade im Dienst ist |
+| `/termine` | überall | alle mit verknüpftem Discord | die nächsten 10 Termine/Fristen (Kanzlei: eigene und die der eigenen Akten; Mandanten: für sie sichtbare) |
+| `/hilfe` | überall | alle | Übersicht der Befehle (Kanzlei sieht zusätzlich ihre Befehle) |
+
+Antworten auf Befehle sind nur für die ausführende Person sichtbar – außer `/add` und `/remove`, die im Ticket für alle erscheinen. Die Befehle meldet die Website selbst an (beim Start, beim Speichern der Ticket-Einstellungen und bei „Verbindung testen“), sobald Bot-Token, Server-ID und `DISCORD_PUBLIC_KEY` gesetzt sind. Wer klickt oder einen Befehl nutzt, wird über sein verknüpftes Discord dem Website-Konto zugeordnet; es gelten dieselben Rechte wie im Dashboard.
 
 **Wer wird wann erwähnt (gepingt)?** Beim neuen Ticket: Team- bzw. Board-Rolle (abschaltbar) und die zuständigen Anwälte. Danach nie mehr die ganze Rolle – nur gezielt: der Mandant bei Status, Verfahrensstand, Hinweisen, Nachrichten/Anhängen der Kanzlei, Terminen, Verträgen und Rechnungen; die zuständigen Anwälte bei Nachrichten/Anhängen/Terminanfragen des Mandanten und seiner Vertragsunterschrift; neu zugewiesene Anwälte bei ihrer Zuweisung. Wer eine Änderung selbst vornimmt, wird nie erwähnt. Board-Tickets erwähnen nach der Eröffnung niemanden mehr.
 
@@ -123,7 +137,7 @@ Ist er noch nicht auf dem Discord-Server, fügt der Bot ihn beim Verknüpfen aut
 6. Für Board-Tickets zusätzlich die Kategorie „Board of Partners“ (optional ein Board-Archiv) und die Board-Rolle eintragen.
 7. „Offene nachholen“ legt Tickets für alle bestehenden offenen Akten, Bewerbungen und Anliegen an.
 
-Wird ein Ticket-Kanal in Discord gelöscht, legt der Bot beim nächsten Ereignis automatisch einen neuen an. Fehler (z. B. fehlende Rechte) stehen in der Akte beim Ticket.
+Wird ein Ticket-Kanal von Hand in Discord gelöscht, legt der Bot beim nächsten Ereignis automatisch einen neuen an (mit `/delete` gelöschte Tickets dagegen nicht). Fehler (z. B. fehlende Rechte) stehen in der Akte beim Ticket.
 
 ## Kooperationen
 
@@ -277,6 +291,7 @@ Es gibt genau sechs Ränge (Benutzer, Team-Profile und Einstellung von Bewerbern
 - Fremde Akten liefern 404 statt 403 · Aktenstatus nur mit 6-stelligem Aktenpin
 - Alle Nutzertexte werden im Frontend escaped (XSS) · Discord-Nachrichten pingen nie `@everyone`
 - FiveNet: keine Passwörter, keine Sitzungs-Tokens, kein Scraping · „In FiveNet öffnen“ verlinkt immer auf die aus Instanz und Dokument-ID gebaute Adresse, nie auf die eingefügte
+- Discord-Bot: jede Interaktion ist von Discord signiert (`DISCORD_PUBLIC_KEY`), Bot-Token nur in Render · `/passwort` schickt das Einmal-Passwort ausschließlich per Direktnachricht an das verknüpfte Discord (nie in einen Kanal), beendet alle Sitzungen und erzwingt ein eigenes Passwort beim Login
 - Bitte nur **In-Character-Daten** speichern und keine echten Passwörter wiederverwenden
 
 ## Projektstruktur
@@ -288,6 +303,7 @@ auth.js          Sessions, Passwörter, Rollen-Middleware
 bootstrap.js     Team-Seed, Notfall-Admin, Passwort-Reset, Datenmigration
 discord.js       Webhooks & OAuth2
 tickets.js       Discord-Tickets: je Akte ein privater Kanal (Bot, REST-API)
+botCommands.js   Befehle des Kanzlei-Bots (/passwort, /akte, /notiz, /dienst, /imdienst, /termine, /hilfe), Antworten als Embed
 cooperations.js  Kooperationen: Rabatt-Erkennung über Discord-Rollen bzw. zugeordnete Konten
 fivenet.js       FiveNet: Schnittstellenprüfung, Link-Erkennung, Instanz-Einstellung
 gdocs.js         Google Docs: Link-Erkennung, Export freigegebener Dokumente, Bildadressen

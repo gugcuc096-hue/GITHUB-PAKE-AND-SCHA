@@ -486,6 +486,8 @@ for (const table of ['applications', 'concerns']) {
   addColumn(table, 'discord_panel_state', 'TEXT');
   addColumn(table, 'discord_extra', 'TEXT');
 }
+// Ticket per /delete gelöscht → nicht automatisch neu anlegen (nur über „Ticket anlegen“ im Dashboard)
+for (const table of ['cases', 'applications', 'concerns']) addColumn(table, 'discord_deleted', 'INTEGER NOT NULL DEFAULT 0');
 // Reihenfolge in der Akte (per Ziehen festgelegt); NULL = noch nicht einsortiert, erscheint oben.
 addColumn('case_external_docs', 'sort_order', 'INTEGER');
 addColumn('case_attachments', 'external_doc_id', 'INTEGER REFERENCES case_external_docs(id) ON DELETE SET NULL');

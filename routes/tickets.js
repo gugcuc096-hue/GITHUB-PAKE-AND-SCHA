@@ -66,7 +66,7 @@ router.patch(
       setSetting(key, typeof d[k] === 'boolean' ? (d[k] ? '1' : '0') : d[k]);
     }
     logActivity(req.user, 'Einstellungen geändert', 'settings', null, `Discord-Tickets: ${Object.keys(d).join(', ')}`);
-    tickets.registerCommands().catch((err) => console.warn('Discord-Befehle nicht angemeldet:', err.message)); // /add, /remove
+    tickets.registerCommands().catch((err) => console.warn('Discord-Befehle nicht angemeldet:', err.message)); // Slash-Befehle
     res.json(tickets.status());
   })
 );
@@ -101,7 +101,8 @@ router.post(
     const c = id && getCase(id);
     if (!c || !caseAccess(c, req.user).canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
     if (!tickets.active()) return res.status(400).json({ error: 'Discord-Tickets sind nicht eingerichtet.' });
-    await tickets.syncCase(c.id);
+    // Kanzlei: auch ein per /delete gelöschtes Ticket neu anlegen („Ticket anlegen“)
+    await tickets.syncCase(c.id, { recreate: req.user.role !== 'mandant' });
     const fresh = getCase(c.id);
     if (fresh.discord_error && req.user.role !== 'mandant') return res.status(502).json({ error: fresh.discord_error, ticket: tickets.ticketInfo(fresh, req.user) });
     res.json({ ticket: tickets.ticketInfo(fresh, req.user) });
@@ -118,7 +119,7 @@ router.post(
     const id = idParam(req);
     if (!id || !db.prepare(`SELECT id FROM ${table} WHERE id = ?`).get(id)) return res.status(404).json({ error: 'Nicht gefunden.' });
     if (!tickets.boardActive(kind)) return res.status(400).json({ error: 'Board-Tickets sind dafür nicht eingerichtet.' });
-    await tickets.boardSync(kind, id);
+    await tickets.boardSync(kind, id, { recreate: true });
     const row = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id);
     if (row.discord_error) return res.status(502).json({ error: row.discord_error, ticket: tickets.boardTicketInfo(kind, row) });
     res.json({ ticket: tickets.boardTicketInfo(kind, row) });

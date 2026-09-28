@@ -358,12 +358,12 @@ async function createChannel(c, { quiet = false } = {}) {
   const pings = [...(pingRoles ? cfg.roleIds.map((id) => `<@&${id}>`) : []), ...lawyerIds.map((id) => `<@${id}>`)].join(' ');
   const panel = panelFor('case', c);
   const msg = await send(channel.id, {
-    content: [pings, intro].filter(Boolean).join('\n'),
+    content: pings || undefined, // nur die Erwähnungen (pingen) – alles andere steht im Embed
     components: panel.components,
     embeds: [
       embed({
         title: `📁 Akte ${c.case_number}: ${truncate(c.title, 200)}`,
-        description: c.description ? truncate(c.description, 1500) : undefined,
+        description: `${intro}${c.description ? `\n\n**Sachverhalt**\n>>> ${truncate(c.description, 1500)}` : ''}`,
         fields: [
           { name: 'Mandant', value: c.client_account_name || c.client_name || '—' },
           { name: 'Rechtsgebiet', value: AREA_LABEL[c.area] || c.area || '—' },
@@ -521,7 +521,11 @@ async function refreshPanel(kind, r, save) {
     save({ discord_panel_state: state });
     return;
   }
-  const msg = await send(r.discord_channel_id, { content: '🎛️ **Ticket-Steuerung**', components, allowed_mentions: { parse: [] } });
+  const msg = await send(r.discord_channel_id, {
+    embeds: [embed({ title: '🎛️ Ticket-Steuerung', description: 'Die wichtigsten Aktionen für dieses Ticket. Weitere Befehle: `/hilfe`', color: COLORS.slate })],
+    components,
+    allowed_mentions: { parse: [] },
+  });
   if (msg && msg.id) {
     save({ discord_panel_id: String(msg.id), discord_panel_state: state });
     rest('PUT', `/channels/${r.discord_channel_id}/pins/${msg.id}`).catch(() => {});
@@ -559,6 +563,7 @@ async function ensure(caseId) {
   let c = getCase(caseId);
   if (!c) return null;
   if (!c.discord_channel_id) {
+    if (c.discord_deleted) return null; // per /delete gelöscht – nur über „Ticket anlegen“ im Dashboard neu
     await createChannel(c);
     return getCase(caseId);
   }
@@ -567,7 +572,14 @@ async function ensure(caseId) {
     const clientJoined = joined.find((j) => j.kind === 'client');
     if (clientJoined) {
       await send(c.discord_channel_id, {
-        content: `<@${clientJoined.id}> ist dem Ticket beigetreten. Willkommen! Hier erscheinen alle Neuigkeiten zu Ihrer Akte ${c.case_number}.`,
+        content: `<@${clientJoined.id}>`,
+        embeds: [
+          embed({
+            title: '👋 Willkommen im Ticket',
+            description: `<@${clientJoined.id}> ist dem Ticket beigetreten. Hier erscheinen alle Neuigkeiten zu Ihrer Akte **${c.case_number}** – Status, Termine, Verträge und Rechnungen.`,
+            color: COLORS.green,
+          }),
+        ],
         allowed_mentions: { parse: [], users: [clientJoined.id] },
       });
     }
@@ -593,9 +605,10 @@ function caseCreated(caseId, opts = {}) {
   });
 }
 
-/** Mitglieder/Archiv abgleichen (z. B. nach Discord-Verknüpfung). */
-function syncCase(caseId) {
+/** Mitglieder/Archiv abgleichen (z. B. nach Discord-Verknüpfung). recreate: per /delete gelöschtes Ticket neu anlegen. */
+function syncCase(caseId, { recreate = false } = {}) {
   if (!active()) return Promise.resolve();
+  if (recreate) db.prepare('UPDATE cases SET discord_deleted = 0 WHERE id = ?').run(caseId);
   return enqueue(caseId, async () => {
     const c = await ensure(caseId);
     if (c) {
@@ -674,7 +687,7 @@ function syncUser(userId) {
     )
     .all(userId, userId, userId);
   // Offene Akten eines Mandanten ohne Ticket (z. B. vor Einrichtung angelegt) bekommen jetzt eins.
-  const missing = db.prepare("SELECT id FROM cases WHERE client_id = ? AND discord_channel_id IS NULL AND status != 'geschlossen'").all(userId);
+  const missing = db.prepare("SELECT id FROM cases WHERE client_id = ? AND discord_channel_id IS NULL AND discord_deleted = 0 AND status != 'geschlossen'").all(userId);
   return Promise.all([...rows, ...missing].map((r) => syncCase(r.id)));
 }
 
@@ -685,7 +698,7 @@ async function backfill() {
   let created = 0;
   let total = 0;
   if (active()) {
-    const rows = db.prepare("SELECT id FROM cases WHERE discord_channel_id IS NULL AND status != 'geschlossen' ORDER BY id").all();
+    const rows = db.prepare("SELECT id FROM cases WHERE discord_channel_id IS NULL AND discord_deleted = 0 AND status != 'geschlossen' ORDER BY id").all();
     total += rows.length;
     for (const r of rows) {
       await caseCreated(r.id, { quiet: true });
@@ -695,7 +708,7 @@ async function backfill() {
   // Offene Bewerbungen und Anliegen ohne Ticket
   for (const kind of kinds) {
     const t = BOARD_KINDS[kind];
-    const rows = db.prepare(`SELECT id FROM ${t.table} WHERE discord_channel_id IS NULL AND status NOT IN (${t.closed.map(() => '?').join(',')}) ORDER BY id`).all(...t.closed);
+    const rows = db.prepare(`SELECT id FROM ${t.table} WHERE discord_channel_id IS NULL AND discord_deleted = 0 AND status NOT IN (${t.closed.map(() => '?').join(',')}) ORDER BY id`).all(...t.closed);
     total += rows.length;
     for (const r of rows) {
       await boardCreated(kind, r.id, { quiet: true });
@@ -870,6 +883,7 @@ async function ensureBoard(kind, id) {
   let r = boardRow(kind, id);
   if (!r) return null;
   if (!r.discord_channel_id) {
+    if (r.discord_deleted) return null; // per /delete gelöscht
     await createBoardChannel(kind, r);
     return boardRow(kind, id);
   }
@@ -964,8 +978,9 @@ function boardPost(kind, id, msg) {
 }
 
 /** Mitglieder/Archiv eines Board-Tickets abgleichen (legt es an, falls es fehlt). */
-function boardSync(kind, id) {
+function boardSync(kind, id, { recreate = false } = {}) {
   if (!boardActive(kind)) return Promise.resolve();
+  if (recreate) saveBoard(kind, id, { discord_deleted: 0 });
   return enqueue(
     boardKey(kind, id),
     async () => {
@@ -1010,6 +1025,7 @@ function boardTicketInfo(kind, r) {
   return {
     url: r.discord_channel_id && isId(config().guildId) ? `https://discord.com/channels/${config().guildId}/${r.discord_channel_id}` : null,
     exists: !!r.discord_channel_id,
+    deleted: !r.discord_channel_id && !!r.discord_deleted,
     archived: !!r.discord_archived,
     error: r.discord_error || null,
   };
@@ -1022,6 +1038,7 @@ function ticketInfo(c, viewer) {
   return {
     url: channelUrl(c),
     exists: !!c.discord_channel_id,
+    deleted: !c.discord_channel_id && !!c.discord_deleted,
     clientLinked: clientDiscordIds(c).length > 0,
     clientInTicket: !!clientInChannel(c),
     archived: !!c.discord_archived,
@@ -1116,9 +1133,9 @@ async function test() {
   if (panelInteractive()) {
     try {
       await registerCommands({ force: true });
-      add(true, 'Buttons & Befehle', 'Public Key gesetzt, /add und /remove angemeldet');
+      add(true, 'Buttons & Befehle', `Public Key gesetzt, ${COMMANDS.length} Befehle angemeldet (${COMMANDS.map((c) => '/' + c.name).join(', ')})`);
     } catch (err) {
-      add(false, 'Buttons & Befehle', `/add und /remove konnten nicht angemeldet werden: ${err.message}`);
+      add(false, 'Buttons & Befehle', `Die Befehle konnten nicht angemeldet werden: ${err.message}`);
     }
   } else {
     add(true, 'Buttons & Befehle', 'kein DISCORD_PUBLIC_KEY – nur „Im Dashboard öffnen“, keine Befehle');
@@ -1159,7 +1176,7 @@ function status() {
 }
 
 /* ================================================================
-   Slash-Commands /add und /remove (externe Personen ins Ticket holen)
+   Slash-Commands: /add, /remove, /delete im Ticket; übrige Befehle siehe botCommands.js
    ================================================================ */
 const TICKET_TABLES = { case: 'cases', application: 'applications', concern: 'concerns' };
 
@@ -1205,25 +1222,96 @@ function syncTicket(kind, id) {
 }
 const extraMembers = (row) => parseExtra(row);
 
+/**
+ * Ticket-Kanal löschen (/delete). Akte, Bewerbung bzw. Anliegen bleiben unverändert – nur der Discord-Kanal
+ * verschwindet. Danach wird er nicht automatisch neu angelegt (discord_deleted), sondern nur über
+ * „Ticket anlegen“ im Dashboard. Vor dem Löschen erscheint ein kurzer Hinweis im Kanal.
+ */
+function deleteTicket(kind, id, { by, reason, delayMs = 5000 } = {}) {
+  const table = TICKET_TABLES[kind];
+  const row = table && db.prepare(`SELECT id, discord_channel_id FROM ${table} WHERE id = ?`).get(id);
+  if (!row || !row.discord_channel_id) return null;
+  const channelId = row.discord_channel_id;
+  db.prepare(
+    `UPDATE ${table} SET discord_deleted = 1, discord_channel_id = NULL, discord_members = NULL, discord_archived = 0,
+       discord_panel_id = NULL, discord_panel_state = NULL, discord_extra = NULL, discord_error = NULL WHERE id = ?`
+  ).run(id);
+  const seconds = Math.round(delayMs / 1000);
+  enqueue(kind === 'case' ? id : boardKey(kind, id), async () => {
+    await send(channelId, {
+      embeds: [
+        embed({
+          title: '🗑️ Ticket wird gelöscht',
+          description: `Dieser Kanal wird in ${seconds} Sekunden gelöscht.${reason ? `\n\n**Grund:** ${truncate(reason, 300)}` : ''}`,
+          color: COLORS.red,
+          footer: by ? `${by} · Pake & Scha Legal Consulting` : undefined,
+        }),
+      ],
+      allowed_mentions: { parse: [] },
+    }).catch(() => {});
+    await sleep(delayMs);
+    await rest('DELETE', `/channels/${channelId}`).catch((err) => {
+      if (err.status !== 404) throw err;
+    });
+  });
+  return channelId;
+}
+
+const STR = 3;
+const USER = 6;
+const aktenzeichen = (description) => ({ type: STR, name: 'aktenzeichen', description, required: false, max_length: 20 });
 const COMMANDS = [
   {
     name: 'add',
     description: 'Person zu diesem Ticket hinzufügen (z. B. Zeuge, Gutachter, Kollege)',
-    type: 1,
-    dm_permission: false,
-    options: [{ type: 6, name: 'person', description: 'Wer soll ins Ticket?', required: true }],
+    options: [{ type: USER, name: 'person', description: 'Wer soll ins Ticket?', required: true }],
   },
   {
     name: 'remove',
     description: 'Hinzugefügte Person aus diesem Ticket entfernen',
-    type: 1,
-    dm_permission: false,
-    options: [{ type: 6, name: 'person', description: 'Wer soll raus?', required: true }],
+    options: [{ type: USER, name: 'person', description: 'Wer soll raus?', required: true }],
   },
-];
+  {
+    name: 'delete',
+    description: 'Diesen Ticket-Kanal löschen (die Akte bleibt erhalten)',
+    options: [{ type: STR, name: 'grund', description: 'Warum wird das Ticket gelöscht? (optional)', required: false, max_length: 200 }],
+  },
+  { name: 'passwort', description: 'Neues Passwort für dein Website-Konto – kommt per Direktnachricht' },
+  { name: 'akte', description: 'Stand einer Akte anzeigen (im Ticket: diese Akte)', options: [aktenzeichen('z. B. PS-2026-0012 – im Ticket nicht nötig')] },
+  {
+    name: 'notiz',
+    description: 'Interne Notiz zur Akte speichern (nur Kanzlei, für den Mandanten unsichtbar)',
+    options: [
+      { type: STR, name: 'text', description: 'Inhalt der Notiz', required: true, max_length: 1500 },
+      aktenzeichen('z. B. PS-2026-0012 – im Ticket nicht nötig'),
+    ],
+  },
+  {
+    name: 'dienst',
+    description: 'Dienststatus setzen (Stempeluhr der Website)',
+    options: [
+      {
+        type: STR,
+        name: 'status',
+        description: 'Neuer Status',
+        required: true,
+        choices: [
+          { name: '🟢 Im Dienst', value: 'dienst' },
+          { name: '⚖️ Im Gericht', value: 'gericht' },
+          { name: '☕ Pause', value: 'pause' },
+          { name: '⚪ Außer Dienst', value: 'off' },
+        ],
+      },
+      { type: STR, name: 'notiz', description: 'z. B. „Mission Row PD“ (optional)', required: false, max_length: 120 },
+    ],
+  },
+  { name: 'imdienst', description: 'Wer von der Kanzlei ist gerade im Dienst?' },
+  { name: 'termine', description: 'Deine nächsten Termine und Fristen' },
+  { name: 'hilfe', description: 'Alle Befehle des Kanzlei-Bots' },
+].map((c) => ({ type: 1, dm_permission: false, ...c }));
 
 /**
- * /add und /remove beim Discord-Server anmelden (Guild-Commands, sofort verfügbar). Nur mit Bot-Token,
+ * Befehle (/add, /remove, /delete, /passwort, /akte, /notiz, /dienst, /imdienst, /termine, /hilfe) beim Discord-Server anmelden (Guild-Commands, sofort verfügbar). Nur mit Bot-Token,
  * Server-ID und Public Key (sonst kämen die Befehle nicht bei der Website an). Einmal je Einstellung.
  */
 async function registerCommands({ force = false } = {}) {
@@ -1238,7 +1326,11 @@ async function registerCommands({ force = false } = {}) {
 }
 
 module.exports = {
-  rest, // für Kooperationen (Discord-Rollen lesen)
+  rest, // für Kooperationen (Discord-Rollen lesen) und Bot-Befehle
+  embed,
+  deleteTicket,
+  siteBase,
+  COMMANDS,
   hasToken: () => !!token(),
   markMember,
   ticketByChannel,
