@@ -2033,7 +2033,53 @@
       <div class="flex flex-wrap gap-2">${open}<button class="btn-outline btn-sm" data-action="ticket-sync" data-id="${c.id}">${t.exists ? 'Abgleichen' : 'Ticket anlegen'}</button></div></div>`;
   }
 
-  function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket }) {
+  /** Darf das Mandanten-Konto der Akte verknüpfen/lösen: zuständige Anwälte und Board of Partners. */
+  const canLinkClient = (c) => isStaff() && (c.canEdit || isBoard());
+
+  /** Akte ohne Mandanten-Konto: passende Konten (gleicher Name) vorschlagen. */
+  function clientLinkBanner(c, suggestions) {
+    if (c.hasClientAccount || !canLinkClient(c) || !suggestions || !suggestions.length) return '';
+    return `<div class="banner banner-amber items-start justify-between flex-wrap">
+      <div class="min-w-0"><strong>${suggestions.length === 1 ? 'Passendes Mandanten-Konto gefunden' : 'Passende Mandanten-Konten gefunden'}</strong>
+        <div class="text-sm text-muted">Die Akte hat noch kein Website-Konto. Hat sich ${esc(c.clientName === '—' ? 'der Mandant' : c.clientName)} inzwischen registriert? Nach dem Verknüpfen sieht der Mandant die Akte unter „Meine Akten“.</div>
+        <div class="mt-3 space-y-2">${suggestions
+          .map(
+            (a) => `<div class="flex flex-wrap items-center gap-2"><span class="text-sm font-medium">${esc(a.name)}</span><span class="text-xs text-dim">${esc(a.email)}${a.createdAt ? ` · registriert ${esc(fmtDateOnly(String(a.createdAt).slice(0, 10)))}` : ''}</span>
+              <button class="btn-gold btn-sm" data-action="case-link-client" data-id="${c.id}" data-client="${a.id}" data-name="${esc(a.name)}">Verknüpfen</button></div>`
+          )
+          .join('')}</div></div>
+      <button class="btn-outline btn-sm" data-action="case-client-search" data-id="${c.id}">Anderes Konto suchen</button></div>`;
+  }
+
+  function clientAccountList(c, accounts) {
+    if (!accounts.length) return '<p class="text-sm text-dim py-4">Kein passendes Mandanten-Konto gefunden. Der Mandant muss sich zuerst auf der Website registrieren.</p>';
+    return accounts
+      .map(
+        (a) => `<div class="list-row wrap"><div class="main"><div class="title">${esc(a.name)}${a.suggested ? ' ' + badge('passt zum Namen in der Akte', 'emerald') : ''}${a.id === c.clientId ? ' ' + badge('aktuell verknüpft', 'slate') : ''}</div>
+          <div class="meta">${esc([a.email, a.phone, a.createdAt ? `registriert ${fmtDateOnly(String(a.createdAt).slice(0, 10))}` : ''].filter(Boolean).join(' · '))}</div></div>
+          ${a.id === c.clientId ? '' : `<button class="btn-gold btn-sm shrink-0" data-action="case-link-client" data-id="${c.id}" data-client="${a.id}" data-name="${esc(a.name)}">Verknüpfen</button>`}</div>`
+      )
+      .join('');
+  }
+
+  function clientSearchDialog(c, accounts) {
+    return `
+      <h2 id="modalTitle" class="modal-title">Mandanten-Konto verknüpfen</h2>
+      <p class="modal-sub">Akte <span class="font-mono text-gold">${esc(c.caseNumber)}</span>${c.clientName && c.clientName !== '—' ? ` · Mandant laut Akte: <strong>${esc(c.clientName)}</strong>` : ''}. Wählen Sie das Website-Konto des Mandanten – danach sieht er die Akte mit Terminen, Verträgen, Rechnungen und Nachrichten in seinem Portal${c.hasClientAccount ? '. Das bisher verknüpfte Konto verliert den Zugriff' : ''}.</p>
+      <input id="clientAccSearch" class="field" type="search" maxlength="80" placeholder="Name oder E-Mail suchen …" autocomplete="off" data-case-id="${c.id}" aria-label="Mandanten-Konto suchen" autofocus>
+      <div id="clientAccList" class="mt-4">${clientAccountList(c, accounts)}</div>
+      <div class="form-actions mt-4"><button type="button" class="btn-ghost btn-md" data-action="back-to-case">Abbrechen</button></div>`;
+  }
+
+  async function searchClientAccounts(input) {
+    const c = st.caseInfo;
+    if (!c || String(c.id) !== input.dataset.caseId) return;
+    const q = input.value.trim();
+    const { accounts } = await api.get(`/api/cases/client-accounts?caseId=${c.id}&q=${encodeURIComponent(q)}`);
+    if (input.isConnected && input.value.trim() === q) $('#clientAccList').innerHTML = clientAccountList(c, accounts);
+  }
+
+  function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, clientSuggestions }) {
     const staff = isStaff();
     const admin = isAdmin();
     const me = st.user.id;
@@ -2083,6 +2129,7 @@
     if (staff) {
       quick.push(`<button class="btn-outline btn-sm" data-action="new-event" data-case-id="${c.id}" data-return-case="${c.id}">${icon('calendar', 'ico-sm')}<span>Frist / Termin</span></button>`);
       quick.push(`<button class="btn-outline btn-sm" data-action="new-invoice" data-case-id="${c.id}">${icon('receipt', 'ico-sm')}<span>Rechnung</span></button>`);
+      if (!c.hasClientAccount && canLinkClient(c)) quick.push(`<button class="btn-outline btn-sm" data-action="case-client-search" data-id="${c.id}">${icon('user', 'ico-sm')}<span>Mandanten-Konto verknüpfen</span></button>`);
       if (c.clientId) quick.push(`<button class="btn-outline btn-sm" data-action="compose" data-recipient="${c.clientId}" data-case-id="${c.id}" data-return-case="${c.id}">${icon('mail', 'ico-sm')}<span>Mandant anschreiben</span></button>`);
       if (c.lawyerId === me) quick.push(`<button class="btn-ghost btn-sm" data-action="release-case" data-id="${c.id}">Akte abgeben</button>`);
       if (c.isCoLawyer) quick.push(`<button class="btn-ghost btn-sm" data-action="leave-case" data-id="${c.id}">Mitarbeit beenden</button>`);
@@ -2100,6 +2147,7 @@
             <div><label class="label">Rechtsgebiet</label><select name="area" class="field">${Object.entries(AREAS).map(([k, l]) => opt(k, l, c.area === k)).join('')}</select></div>
             <div><label class="label">Dringlichkeit</label><select name="urgency" class="field">${Object.entries(URGENCY).map(([k, [l]]) => opt(k, l, c.urgency === k)).join('')}</select></div>
             <div><label class="label">Verfahrensstand</label><select name="step" class="field">${STEPS.map((s, i) => opt(i, s, c.step === i)).join('')}</select></div>
+            ${c.hasClientAccount && canLinkClient(c) ? `<div class="span-2 flex flex-wrap items-center justify-between gap-2 text-sm"><div><span class="text-xs uppercase tracking-widest text-dim mr-1">Mandanten-Konto</span> <strong>${esc(c.clientName)}</strong>${c.clientEmail ? ` <span class="text-dim">· ${esc(c.clientEmail)}</span>` : ''}</div><div class="flex flex-wrap gap-2"><button type="button" class="btn-outline btn-sm" data-action="case-client-search" data-id="${c.id}">Anderes Konto</button><button type="button" class="btn-ghost btn-sm" data-action="case-unlink-client" data-id="${c.id}">Verknüpfung lösen</button></div></div>` : ''}
             ${!c.hasClientAccount ? `<div><label class="label">Mandant</label><input name="clientName" class="field" maxlength="80" value="${esc(c.clientName === '—' ? '' : c.clientName)}"></div>` : ''}
             <div><label class="label">Telefon Mandant</label><input name="clientPhone" class="field" maxlength="40" value="${esc(c.clientPhone || '')}"></div>
             <div><label class="label">Gegenpartei</label><input name="opponent" class="field" maxlength="120" value="${esc(c.opponent)}"></div>
@@ -2148,6 +2196,7 @@
       ${staff ? caseStats(c, { appointments, attachments, externalDocs, tasks }) : ''}
       <div class="info-grid mb-5">${info}</div>
       ${pin}
+      ${clientLinkBanner(c, clientSuggestions)}
       ${ticketBanner(c, ticket)}
       ${quick.length ? `<div class="form-actions mb-2">${quick.join('')}</div>` : ''}
       ${editForm}
@@ -4569,6 +4618,35 @@
       await returnOrClose();
     },
     'back-to-case': () => returnOrClose(),
+    'case-client-search': async (el) => {
+      const id = Number(el.dataset.id);
+      const c = st.caseInfo && st.caseInfo.id === id ? st.caseInfo : (await api.get('/api/cases/' + id)).case;
+      const { accounts } = await api.get(`/api/cases/client-accounts?caseId=${id}`);
+      st.returnCase = id;
+      openModal(clientSearchDialog(c, accounts));
+    },
+    'case-link-client': async (el) => {
+      const id = Number(el.dataset.id);
+      const c = st.caseInfo && st.caseInfo.id === id ? st.caseInfo : null;
+      const msg = `${el.dataset.name} sieht die Akte${c ? ` ${c.caseNumber}` : ''} danach unter „Meine Akten“ – mit Terminen, Verträgen, Rechnungen, Nachrichten und (falls eingerichtet) dem Discord-Ticket. Interne Notizen bleiben intern.${c && c.hasClientAccount ? ` Das bisherige Konto (${c.clientName}) verliert den Zugriff.` : ''}`;
+      if (!(await ask(msg, { title: 'Mandanten-Konto verknüpfen?', confirmText: 'Verknüpfen' }))) return;
+      const fromDialog = !!$('#clientAccSearch');
+      await api.put(`/api/cases/${id}/client`, { clientId: Number(el.dataset.client) });
+      toast(`Konto von ${el.dataset.name} mit der Akte verknüpft.`);
+      if (fromDialog) {
+        st.returnCase = null;
+        await openCase(id);
+        refreshBehind();
+      } else await reloadCase(id);
+    },
+    'case-unlink-client': async (el) => {
+      const id = Number(el.dataset.id);
+      const c = st.caseInfo && st.caseInfo.id === id ? st.caseInfo : null;
+      if (!(await askDelete('Verknüpfung lösen?', `${c ? c.clientName : 'Der Mandant'} sieht die Akte danach nicht mehr im Portal (Aktenstatus mit Aktenzeichen + Pin bleibt möglich). Der Name bleibt in der Akte eingetragen.`, 'Verknüpfung lösen'))) return;
+      await api.put(`/api/cases/${id}/client`, { clientId: null });
+      toast('Verknüpfung gelöst.');
+      await reloadCase(id);
+    },
     'scroll-to': (el) => {
       $('#' + el.dataset.target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     },
@@ -5438,6 +5516,9 @@
       updateServiceSum(t.form); // Menge geändert: Summe sofort aktualisieren
     } else if (t.id === 'fnContent') {
       t.dataset.auto = '0'; // von Hand geändert – beim nächsten automatischen Laden nicht überschreiben
+    } else if (t.id === 'clientAccSearch') {
+      clearTimeout(st.clientAccTimer);
+      st.clientAccTimer = setTimeout(() => guard(() => searchClientAccounts(t)), 250);
     } else if (t.id === 'taskSearch') {
       st.taskQuery = t.value;
       $('#taskList').innerHTML = taskList();

@@ -200,6 +200,100 @@ router.post(
   })
 );
 
+/* ---------------------------------------------------------------- Mandanten-Konto nachträglich verknüpfen */
+/** Name vergleichbar machen: Kleinbuchstaben, ohne Titel/Satzzeichen, einfache Leerzeichen. */
+const normName = (s) =>
+  String(s || '')
+    .toLowerCase()
+    .replace(/\b(dr|prof|jur|med|rer|nat)\.?\s*/g, '')
+    .replace(/[^a-z0-9äöüß ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const accountRow = (u, suggested = false) => ({ id: u.id, name: u.display_name, email: u.email, phone: u.phone || '', suggested, createdAt: u.created_at });
+
+/** Mandantenkonten, deren Name zum Namen in der Akte passt (Vorschläge). */
+function clientSuggestions(c) {
+  const wanted = normName(c.client_name);
+  if (!wanted || wanted.length < 3) return [];
+  return db
+    .prepare("SELECT id, display_name, email, phone, created_at FROM users WHERE role = 'mandant' AND active = 1")
+    .all()
+    .filter((u) => {
+      const n = normName(u.display_name);
+      return n && (n === wanted || n.includes(wanted) || wanted.includes(n));
+    })
+    .slice(0, 5)
+    .map((u) => accountRow(u, true));
+}
+
+/** Suche nach Mandantenkonten (Name oder E-Mail) – nur Team. Vorschläge zur Akte zuerst. */
+router.get('/client-accounts', (req, res) => {
+  if (!isStaff(req.user)) return res.status(403).json({ error: 'Keine Berechtigung.' });
+  const q = String(req.query.q || '').trim().slice(0, 80);
+  const c = Number(req.query.caseId) ? getCase(Number(req.query.caseId)) : null;
+  const needle = q.toLowerCase();
+  const suggestions = (c && !c.client_id ? clientSuggestions(c) : []).filter((a) => !needle || `${a.name} ${a.email}`.toLowerCase().includes(needle));
+  const like = `%${q.replace(/[%_]/g, '')}%`;
+  const found = db
+    .prepare(
+      `SELECT id, display_name, email, phone, created_at FROM users
+       WHERE role = 'mandant' AND active = 1 AND (? = '' OR display_name LIKE ? OR email LIKE ?)
+       ORDER BY created_at DESC LIMIT 25`
+    )
+    .all(q, like, like)
+    .filter((u) => !suggestions.some((x) => x.id === u.id))
+    .map((u) => accountRow(u));
+  res.json({ accounts: [...suggestions, ...found] });
+});
+
+/** Mandanten-Konto mit der Akte verknüpfen (clientId) oder die Verknüpfung lösen (null). */
+router.put(
+  '/:id/client',
+  wrap(async (req, res) => {
+    const u = req.user;
+    const id = idParam(req);
+    const c = id && getCase(id);
+    if (!c || !caseAccess(c, u).canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
+    if (!isStaff(u) || !(caseAccess(c, u).canEdit || isBoard(u))) {
+      return res.status(403).json({ error: 'Nur die zuständigen Anwälte und das Board of Partners können den Mandanten verknüpfen.' });
+    }
+    const d = parseBody(z.object({ clientId: z.number().int().positive().nullable() }), req, res);
+    if (!d) return;
+    if (d.clientId === c.client_id) return res.json({ case: { ...caseRow(c, u), ...caseAccess(c, u) } });
+    let account = null;
+    if (d.clientId !== null) {
+      account = db.prepare("SELECT id, display_name, email FROM users WHERE id = ? AND role = 'mandant' AND active = 1").get(d.clientId);
+      if (!account) return res.status(400).json({ error: 'Das gewählte Konto existiert nicht oder ist kein aktives Mandantenkonto.' });
+    }
+    const note = account
+      ? `Mandanten-Konto verknüpft: ${account.display_name}${c.client_id ? ` (vorher: ${c.client_account_name || '—'})` : ''}`
+      : `Verknüpfung mit dem Mandanten-Konto ${c.client_account_name || ''} gelöst`;
+    tx(() => {
+      // Beim Lösen den Namen in der Akte behalten, damit der Mandant weiter genannt wird.
+      if (!account && !c.client_name && c.client_account_name) db.prepare('UPDATE cases SET client_name = ? WHERE id = ?').run(c.client_account_name, c.id);
+      db.prepare("UPDATE cases SET client_id = ?, updated_at = datetime('now') WHERE id = ?").run(account ? account.id : null, c.id);
+      // Mandanten-Termine der Akte gehören ab jetzt (bzw. nicht mehr) zum Konto
+      db.prepare('UPDATE appointments SET client_id = ? WHERE case_id = ? AND client_id IS ?').run(account ? account.id : null, c.id, c.client_id ?? null);
+      addSystemNote(c.id, u, note, true); // intern – der (neue) Mandant soll frühere Konten nicht sehen
+    });
+    logActivity(u, 'Akte geändert', 'case', c.id, `${c.case_number}: ${note}`);
+    const updated = getCase(c.id);
+    // Discord-Ticket: Mandant kommt hinein (verknüpftes Discord) bzw. wird entfernt
+    if (account) {
+      tickets.post(c.id, {
+        title: '👤 Mandanten-Konto verknüpft',
+        description: `Die Akte ist jetzt mit dem Portal-Konto von **${account.display_name}** verbunden – Termine, Verträge, Rechnungen und Nachrichten sieht der Mandant im Mandantenportal.`,
+        color: tickets.COLORS.green,
+        by: u.display_name,
+      });
+    } else {
+      tickets.syncCase(c.id);
+    }
+    res.json({ case: { ...caseRow(updated, u), ...caseAccess(updated, u) } });
+  })
+);
+
 /* ---------------------------------------------------------------- Detail */
 router.get(
   '/:id',
@@ -242,6 +336,8 @@ router.get(
       work: isBoard(req.user) ? { rows: workForCase(c.id), closedAt: c.closed_at || null } : undefined,
       tasks: staff ? tasks.map(taskRow) : undefined,
       ticket: tickets.ticketInfo(c, req.user),
+      // Team: passende Mandantenkonten, solange die Akte noch keins hat (z. B. Mandant hat sich später registriert)
+      clientSuggestions: staff && !c.client_id ? clientSuggestions(c) : undefined,
     });
   })
 );
