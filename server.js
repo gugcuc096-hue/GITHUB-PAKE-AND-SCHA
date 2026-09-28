@@ -141,6 +141,8 @@ const reminderTimer = setInterval(() => {
 reminderTimer.unref();
 
 app.listen(PORT, () => {
+  // Discord-Befehle /add und /remove anmelden (nur wenn Bot-Token, Server und Public Key eingerichtet sind)
+  setTimeout(() => require('./tickets').registerCommands().catch((err) => console.warn('Discord-Befehle nicht angemeldet:', err.message)), 3000).unref();
   console.log(`Pake & Scha Server läuft unter http://localhost:${PORT}`);
   console.log(`Datenbank: ${DB_PATH}`);
   if (process.env.RENDER && !process.env.DB_PATH) {
