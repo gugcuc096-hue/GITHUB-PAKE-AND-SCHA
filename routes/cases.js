@@ -27,6 +27,7 @@ const {
   logActivity,
 } = require('../models');
 const discord = require('../discord');
+const tickets = require('../tickets');
 const { contractsForCase } = require('./contracts');
 const { workForCase } = require('./work');
 const { imageBody, saveImage, removeFile, evidencePath } = require('../uploads');
@@ -193,6 +194,7 @@ router.post(
 
     const c = getCase(id);
     notifyCreated(c, u);
+    tickets.caseCreated(id);
     if (isStaff(u)) logActivity(u, 'Akte angelegt', 'case', id, `${c.case_number} – ${c.title}`);
     res.status(201).json({ case: caseRow(c, u) });
   })
@@ -239,6 +241,7 @@ router.get(
       // Bearbeitungszeiten nur für das Board of Partners
       work: isBoard(req.user) ? { rows: workForCase(c.id), closedAt: c.closed_at || null } : undefined,
       tasks: staff ? tasks.map(taskRow) : undefined,
+      ticket: tickets.ticketInfo(c, req.user),
     });
   })
 );
@@ -427,9 +430,59 @@ router.patch(
         ],
       });
     }
+    ticketUpdate(c, updated, u, { history, editFields, d, newStatus, newlyAssigned });
     res.json({ case: { ...caseRow(updated, u), ...caseAccess(updated, u) } });
   })
 );
+
+const FIELD_LABELS = { title: 'Titel', area: 'Rechtsgebiet', urgency: 'Dringlichkeit', description: 'Sachverhalt', clientName: 'Mandant', opponent: 'Gegenseite', courtRef: 'Gerichtsaktenzeichen' };
+
+/** Änderung der Akte im Discord-Ticket melden (nur, was der Mandant auch im Portal sieht). */
+function ticketUpdate(before, c, u, { history, editFields, d, newStatus, newlyAssigned }) {
+  const statusChanged = !!newStatus && newStatus !== before.status;
+  const noteChanged = d.publicNote !== undefined && d.publicNote !== (before.public_note || '') && !!d.publicNote;
+  const changed = editFields.filter((k) => FIELD_LABELS[k] && d[k] !== undefined && String(d[k]) !== String(before[FIELD_COLUMNS[k]] ?? ''));
+  const lines = [...history];
+  if (changed.length) lines.push(`Angaben aktualisiert: ${changed.map((k) => FIELD_LABELS[k]).join(', ')}`);
+  if (!lines.length && !noteChanged) return;
+  const closing = statusChanged && newStatus === 'geschlossen';
+  const reopening = statusChanged && before.status === 'geschlossen';
+  const stepChanged = d.step !== undefined && d.step !== before.step;
+  const title = closing
+    ? '🔒 Akte geschlossen'
+    : reopening
+      ? '🔓 Akte wieder geöffnet'
+      : statusChanged || stepChanged
+        ? '📌 Stand der Akte aktualisiert'
+        : newlyAssigned.length || history.some((h) => /Federführend|Anwälte|abgegeben|arbeitet nicht mehr/.test(h))
+          ? '👤 Zuständigkeit geändert'
+          : noteChanged && !lines.length
+            ? '💡 Neuer Hinweis der Kanzlei'
+            : '✏️ Akte aktualisiert';
+  const description = [
+    closing ? 'Die Akte ist abgeschlossen. Das Ticket wird archiviert – der Verlauf bleibt lesbar.' : null,
+    lines.length ? lines.map((l) => `• ${l}`).join('\n') : null,
+    noteChanged ? `**Hinweis der Kanzlei:** ${d.publicNote}` : null,
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+  tickets.post(c.id, {
+    title,
+    description,
+    color: closing ? tickets.COLORS.slate : reopening ? tickets.COLORS.green : tickets.COLORS.gold,
+    fields: [
+      { name: 'Status', value: CASE_STATUS[c.status] },
+      { name: 'Verfahrensstand', value: STEPS[c.step] || STEPS[0] },
+      { name: 'Zuständig', value: lawyerNames(c), inline: false },
+    ],
+    mention: statusChanged || stepChanged || noteChanged ? 'client' : undefined,
+    mentionIds: caseLawyers(c)
+      .filter((l) => newlyAssigned.includes(l.id))
+      .map((l) => l.discordId),
+    by: u.display_name,
+    byDiscordId: u.discord_id,
+  });
+}
 
 router.delete(
   '/:id',
@@ -441,6 +494,7 @@ router.delete(
     const files = db.prepare('SELECT file FROM case_attachments WHERE case_id = ?').all(c.id);
     db.prepare('DELETE FROM cases WHERE id = ?').run(c.id);
     files.forEach((f) => removeFile('evidence', f.file));
+    tickets.caseDeleted(c, req.user.display_name);
     logActivity(req.user, 'Akte gelöscht', 'case', c.id, `${c.case_number} – ${c.title}`);
     res.json({ success: true });
   })
@@ -492,6 +546,16 @@ router.post(
       return r;
     });
     const row = db.prepare('SELECT * FROM case_attachments WHERE id = ?').get(Number(info.lastInsertRowid));
+    if (!internal) {
+      tickets.post(c.id, {
+        title: '📎 Neuer Anhang in der Akte',
+        description: `${caption ? `**${caption}**\n` : ''}Im ${isStaff(req.user) ? 'Mandantenportal' : 'Portal'} unter der Akte ${c.case_number} abrufbar.`,
+        color: tickets.COLORS.blue,
+        mention: isStaff(req.user) ? 'client' : 'lawyers',
+        by: req.user.display_name,
+        byDiscordId: req.user.discord_id,
+      });
+    }
     res.status(201).json({ attachment: attachmentRow(row, c.id) });
   })
 );
@@ -547,6 +611,17 @@ router.post(
       ).run(c.id, req.user.id, req.user.display_name, req.user.role, d.body, internal ? 1 : 0);
       db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(c.id);
     });
+    // Interne Notizen bleiben intern – ins Ticket kommt nur, was auch der Mandant sieht.
+    if (!internal) {
+      tickets.post(c.id, {
+        title: `💬 Nachricht von ${req.user.display_name}`,
+        description: d.body,
+        color: isStaff(req.user) ? tickets.COLORS.gold : tickets.COLORS.blue,
+        mention: isStaff(req.user) ? 'client' : 'lawyers',
+        by: isStaff(req.user) ? req.user.rank || 'Pake & Scha' : 'Mandant (über das Portal)',
+        byDiscordId: req.user.discord_id,
+      });
+    }
     res.status(201).json({ success: true });
   })
 );

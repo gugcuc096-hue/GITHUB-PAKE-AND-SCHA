@@ -32,6 +32,9 @@ app.use(
     // und nutzen Inline-Skripte; eine strenge Standard-CSP würde das blockieren.
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
+    // „same-origin“ statt „no-referrer“: fremde Seiten erfahren weiterhin nichts, aber Formulare der
+    // eigenen Seite (z. B. „Discord-Ticket beitreten“) senden ihre Herkunft mit (sonst „Origin: null“).
+    referrerPolicy: { policy: 'same-origin' },
   })
 );
 app.use(express.json({ limit: '300kb' }));
@@ -42,7 +45,8 @@ app.use(loadUser);
 app.use('/api', (req, res, next) => {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
   const origin = req.get('origin');
-  if (!origin) return next();
+  // Formular-Navigationen mit „Origin: null“ akzeptieren, wenn der Browser „same-origin“ bestätigt (nicht fälschbar).
+  if (!origin || (origin === 'null' && req.get('sec-fetch-site') === 'same-origin')) return next();
   let host;
   try {
     host = new URL(origin).host;
@@ -89,6 +93,7 @@ app.use('/api/admin/applications', applications.adminRouter);
 app.use('/api/admin/positions', applications.positionsRouter);
 app.use('/api/admin', admin.router);
 app.use('/api/discord', require('./routes/discord'));
+app.use('/api/tickets', require('./routes/tickets'));
 app.use('/api/public', require('./routes/public'));
 app.use('/api/public', applications.publicRouter);
 app.use('/api/public', concernRoutes.publicRouter);

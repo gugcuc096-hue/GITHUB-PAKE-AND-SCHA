@@ -706,6 +706,13 @@ details.edit-box[open] > summary::after { content: '–'; }
 .fn-table thead th { position: sticky; top: 0; z-index: 1; background: #141b2e; color: var(--text-main); font-weight: 600; white-space: nowrap; }
 .fn-table tbody tr:nth-child(even) td { background: rgba(255, 255, 255, 0.02); }
 .fn-table tr.gap td { padding: 0.2rem; background: transparent; }
+/* Discord-Tickets */
+.banner-discord { border-color: rgba(88, 101, 242, 0.45); background: rgba(88, 101, 242, 0.1); }
+.btn-discord { display: inline-flex; align-items: center; gap: 0.45rem; border-radius: 999px; background: #5865f2; color: #fff; font-weight: 600; font-size: 0.8rem; padding: 0.45rem 0.95rem; transition: background 0.15s ease; white-space: nowrap; }
+.btn-discord:hover { background: #4752c4; }
+.btn-discord .ico { width: 16px; height: 16px; }
+.ticket-checks { display: flex; flex-direction: column; gap: 0.4rem; padding: 0.75rem 0.9rem; border: 1px solid var(--line); border-radius: 12px; background: rgba(2, 5, 14, 0.35); }
+
 /* Beförderungen & Einstellungen */
 .pers-row { align-items: flex-start; }
 .pers-row .title { white-space: normal; }

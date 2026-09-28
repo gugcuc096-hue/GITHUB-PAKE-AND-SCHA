@@ -17,6 +17,7 @@ const { requireAuth, requireStaff, requireAdmin, isStaff } = require('../auth');
 const { wrap, parseBody, idParam, truncate } = require('../helpers');
 const { getCase, caseAccess, caseLawyers, addSystemNote, logActivity } = require('../models');
 const discord = require('../discord');
+const tickets = require('../tickets');
 const contracts = require('../contracts');
 
 const header = () => getSetting('contract_header', contracts.DEFAULT_HEADER);
@@ -328,6 +329,14 @@ caseRouter.post(
       return Number(info.lastInsertRowid);
     });
     logActivity(req.user, 'Vertrag erstellt', 'case', c.id, `${c.case_number}: ${t.name}`);
+    tickets.post(c.id, {
+      title: `📝 ${t.name} erstellt`,
+      description: `Der Vertrag liegt im Mandantenportal unter der Akte ${c.case_number} bereit – bitte prüfen und unterschreiben.`,
+      fields: [{ name: 'Unterzeichnender Anwalt', value: lawyer.display_name }],
+      mention: 'client',
+      by: req.user.display_name,
+      byDiscordId: req.user.discord_id,
+    });
     res.status(201).json({ contract: contractRow(db.prepare(`${CONTRACT_SELECT} WHERE k.id = ?`).get(id)) });
   })
 );
@@ -450,6 +459,19 @@ router.post(
       db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(c.id);
     });
     notifySigned(c, updated, d.as === 'anwalt' ? 'Anwalt' : 'Mandanten', u);
+    const full = !!(updated.lawyer_signed_at && updated.client_signed_at);
+    tickets.post(c.id, {
+      title: full ? `✅ ${k.template_name} vollständig unterschrieben` : `✍️ ${k.template_name} vom ${d.as === 'anwalt' ? 'Anwalt' : 'Mandanten'} unterschrieben`,
+      description: full ? 'Beide Unterschriften liegen vor – der Vertrag ist wirksam.' : d.as === 'anwalt' ? 'Jetzt fehlt noch die Unterschrift des Mandanten (im Mandantenportal).' : 'Jetzt fehlt noch die Unterschrift des Anwalts.',
+      color: full ? tickets.COLORS.green : tickets.COLORS.gold,
+      fields: [
+        { name: 'Anwalt', value: updated.lawyer_signed_at ? `✅ ${updated.lawyer_signature}` : '⏳ offen' },
+        { name: 'Mandant', value: updated.client_signed_at ? `✅ ${updated.client_signature}${updated.client_signed_via === 'kanzlei' ? ' (im Spiel)' : ''}` : '⏳ offen' },
+      ],
+      mention: d.as === 'anwalt' && !full ? 'client' : 'lawyers',
+      by: u.display_name,
+      byDiscordId: u.discord_id,
+    });
     res.json({ contract: contractRow(updated, { withBody: true }), can: permissions(updated, c, u) });
   })
 );

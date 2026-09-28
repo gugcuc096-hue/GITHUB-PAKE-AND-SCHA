@@ -61,7 +61,11 @@
         ${res.linkedToAccount && res.caseId
           ? `<a href="/dashboard.html?case=${Number(res.caseId)}" class="btn-gold flex-1 py-3 text-xs uppercase tracking-wider">Zur Akte</a>`
           : '<button type="button" id="ticketCheck" class="btn-gold flex-1 py-3 text-xs uppercase tracking-wider">Status ansehen</button>'}
-      </div>`;
+      </div>
+      ${res.discordTicket
+        ? `<button type="button" id="ticketDiscord" class="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-full bg-[#5865F2] hover:bg-[#4752c4] text-white text-xs uppercase tracking-wider font-semibold py-3 transition-colors">Discord-Ticket beitreten</button>
+           <p class="text-[0.7rem] text-center text-[var(--text-dim)] mt-2">Ihr privates Ticket auf dem Discord der Kanzlei – alle Neuigkeiten zu Ihrer Akte automatisch.</p>`
+        : ''}`;
     wrap.classList.add('hidden');
     box.classList.remove('hidden');
 
@@ -69,6 +73,7 @@
       const ok = await copy(text);
       showToast(ok ? 'Kopiert' : 'Nicht möglich', ok ? 'Aktenzeichen und Pin sind in der Zwischenablage.' : 'Bitte die Angaben notieren.');
     });
+    document.getElementById('ticketDiscord')?.addEventListener('click', () => joinTicket(res.caseNumber, res.pin));
     document.getElementById('ticketCheck')?.addEventListener('click', () => {
       closeTicketModal();
       document.getElementById('caseInput').value = res.caseNumber;
@@ -110,6 +115,45 @@
       btn.disabled = false;
     }
   };
+
+  /* ---------------------------------------------------------------- Discord-Ticket der Akte */
+  /** Schickt Aktenzeichen + Pin per POST an den Server, der zur Discord-Anmeldung weiterleitet. */
+  function joinTicket(caseNumber, pin) {
+    const f = document.getElementById('ticketJoinForm');
+    f.elements.caseNumber.value = caseNumber;
+    f.elements.pin.value = pin;
+    f.submit();
+  }
+  function showCaseTicket(t, number, pin) {
+    const box = document.getElementById('caseTicket');
+    if (!box) return;
+    box.classList.toggle('hidden', !t);
+    if (!t) return;
+    document.getElementById('caseTicketText').textContent = t.joined
+      ? 'Sie sind bereits im Discord-Ticket Ihrer Akte. Dort erscheinen alle Neuigkeiten automatisch.'
+      : 'Alle Neuigkeiten zu Ihrer Akte – Status, Termine, Verträge – auch als privates Discord-Ticket. Mit Ihrem Discord anmelden und automatisch beitreten.';
+    const btn = document.getElementById('caseTicketBtn');
+    btn.querySelector('span').textContent = t.joined ? 'Erneut verbinden' : 'Discord-Ticket beitreten';
+    btn.onclick = () => joinTicket(number, pin);
+  }
+
+  // Rückmeldung nach dem Discord-Beitritt (…/?ticket=…#akte)
+  (() => {
+    const code = new URLSearchParams(location.search).get('ticket');
+    if (!code) return;
+    const MSG = {
+      pending: ['Discord verbunden', 'Sie werden dem Ticket hinzugefügt, sobald Sie auf dem Discord-Server der Kanzlei sind.'],
+      notfound: ['Nicht gefunden', 'Kein Mandat mit diesen Angaben – bitte Aktenzeichen und Aktenpin prüfen.'],
+      limit: ['Zu viele Versuche', 'Bitte in ein paar Minuten erneut versuchen.'],
+      disabled: ['Nicht verfügbar', 'Discord-Tickets sind derzeit nicht eingerichtet.'],
+      denied: ['Abgebrochen', 'Die Discord-Anmeldung wurde abgebrochen.'],
+      state: ['Bitte erneut versuchen', 'Die Sicherheitsprüfung ist abgelaufen.'],
+      error: ['Das hat nicht geklappt', 'Die Verbindung mit Discord ist fehlgeschlagen. Bitte erneut versuchen.'],
+    };
+    const [title, text] = MSG[code] || MSG.error;
+    history.replaceState(null, '', location.pathname + location.hash);
+    setTimeout(() => showToast(title, text), 300);
+  })();
 
   /* ---------------------------------------------------------------- Aktenstatus */
   window.lookupCase = async function () {
@@ -154,6 +198,7 @@
         else if (i === d.step) node.classList.add('current');
       }
       document.getElementById('trackFill').style.width = (d.closed ? 75 : (d.step / 3) * 75) + '%';
+      showCaseTicket(d.discordTicket, number, pin);
     } catch (err) {
       result.classList.add('hidden');
       notFound.classList.remove('hidden');

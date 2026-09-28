@@ -31,6 +31,7 @@ Premium-Webanwendung für die GTA-RP-Kanzlei **Pake & Scha Legal Consulting**: �
 | **Mandatsverträge** | In der Akte „Mandatsvertrag erstellen“ → Vorlage der Kanzlei wird mit Anwalt (Name, Rang), Mandant, Honorar, Datum und Ort gefüllt (Vorbelegung aus Akte und früheren Verträgen, Honorar-Vorschläge aus der Honorarordnung) · Druckansicht im Layout der Kanzleivorlage (Kopfzeile auf jeder Seite, PDF über den Druckdialog) · **Unterschriften:** der genannte Anwalt unterschreibt digital, der Mandant im Portal (Name eintippen) – oder die Kanzlei erfasst die Unterschrift im Spiel · nach der ersten Unterschrift gesperrt · Verlauf und Discord-Ereignis „Mandatsvertrag unterschrieben“ · **mehrere Leistungen aus der Honorarordnung** (mit Menge) wählbar – die Summe wird automatisch zur Grundgebühr, die Leistungen stehen einzeln im Vertrag · Vorlagen unter Einstellungen → Vertragsvorlagen bearbeiten (siehe [Mandatsverträge](#mandatsverträge)) |
 | **Abmeldungen** | Unter „Dienstzeiten“ (oder im Dienst-Menü oben) „Abmelden“: Zeitraum, Grund (Urlaub, Krankheit, Privat, OOC, Sonstiges), Notiz · das Team sieht aktuelle und geplante Abmeldungen, die Übersicht zeigt „Heute abgemeldet“ · „Zurückmelden“ beendet eine Abmeldung vorzeitig, „Zurückziehen“ entfernt sie · Board of Partners kann andere abmelden · Discord-Ereignis „Abmeldung / Rückmeldung“ (eigener Kanal und Rollen-Ping einstellbar) |
 | **Aktenbearbeitung** (nur Board of Partners) | Automatische Erfassung, wer welche Akte bearbeitet (federführend oder weiterer Anwalt) und wie lange – bei Zuweisung, Abgabe, Mitarbeit beenden, Schließen und Wiedereröffnen · Ansicht „Aktenbearbeitung“: laufende und abgeschlossene Bearbeitungen je Mitarbeiter, Ø Dauer, Akten nach Bearbeitungsdauer, Zeitraum 7 Tage bis alles · in jeder Akte „Bearbeitungszeiten“ · ältere Akten werden aus dem Aktenverlauf geschätzt (≈) |
+| **Discord-Tickets** | Je Akte ein privater Discord-Kanal: Status, Zuständigkeit, Nachrichten, Termine, Verträge und Rechnungen erscheinen automatisch; Mandanten werden automatisch hinzugefügt (verknüpftes Discord oder „Discord-Ticket beitreten“ auf der Website); geschlossene Akten wandern ins Archiv – siehe *Discord einrichten* |
 | **Anliegen ans Board** | **Jeder** kann ein Anliegen an das Board of Partners stellen: auf der **Startseite der Website** („Anliegen an das Board of Partners“ unter den Hero-Buttons und im Kontaktbereich, auch **ohne Konto**) sowie im Dashboard über „Anliegen ans Board“ im Menü oder den Button in der Übersicht · Kategorie (Mitarbeiter: Personal & Beförderung, Beschwerde, Vorschlag, Organisation, Gehalt · Mandanten/Besucher: Betreuung des Mandats, Beschwerde, Rechnung & Honorar, Anfrage/Zusammenarbeit, Vorschlag/Lob), Dringlichkeit, auf Wunsch **anonym** (das Board sieht dann nur „Anonym (Mitarbeiter / Mandant / über die Website)“, keinen Namen und keinen Kontakt) · jedes Anliegen erhält **Vorgangsnummer + Pin** (AN-JJJJ-NNNN) – damit lesen Einreichende die Antworten auf der Startseite („Status abfragen“) und können antworten; angemeldete sehen ihre Anliegen zusätzlich im Dashboard · **einsehen kann die Anliegen nur das Board of Partners**: Menübereich „Board of Partners“ → „Eingegangene Anliegen“ (Filter nach Status und Absender) – antworten, interne Notizen (für Einreichende unsichtbar), Status (Offen, In Bearbeitung, Erledigt, Abgelehnt) und Zuständigkeit · Zähler im Menü: Board = offene Anliegen, alle = neue Antworten · Zurückziehen, solange das Board noch nicht reagiert hat · Discord-Ereignisse „Neues Anliegen an das Board of Partners“ und „Rückmeldung / Statusänderung“ (eigener Kanal und Rollen-Ping einstellbar; bei anonymen Anliegen ohne Namen) |
 | **Beförderungen & Einstellungen** | Personalprotokoll für **alle Mitarbeiter** sichtbar: wer neu im Team ist und wer befördert wurde (vorher → nachher, von wem, Begründung) · **Befördern nur durch das Board of Partners** („Befördern“ in dieser Ansicht; niemand ändert seinen eigenen Rang; Partner ohne Admin-Rolle befördern höchstens bis zum eigenen Rang und nur Kollegen unterhalb ihres Rangs) · Einstellungen werden automatisch eingetragen (Bewerber eingestellt, Mitarbeiterkonto angelegt, Team-Profil mit Konto, Mandantenkonto zum Mitarbeiter gemacht), ebenso Rangänderungen unter „Benutzer“ und „Team“ · Team-Profil der Website zieht mit · Zähler im Menü für neue Einträge · Discord-Ereignis „Beförderung / Einstellung“ – z. B. eigener Kanal *#beförderungen*; verknüpfte Discord-Konten werden erwähnt |
 | **Aktenübersicht & Handlungsbedarf** | Kennzahlen im Aktenkopf (nächste Frist, offene/überfällige Aufgaben, FiveNet-Dokumente, Beweismittel, letzte Aktivität) · Übersicht zeigt überfällige und heute fällige Aufgaben sowie eigene Akten ohne Bewegung seit 7 Tagen |
@@ -77,6 +78,39 @@ Die Passwörter kommen aus `ADMIN_PASSWORD`, `SEED_SCHA_PASSWORD` und `SEED_LEX_
 2. *OAuth2* → Redirect `https://<ihre-domain>/api/discord/callback` hinzufügen
 3. In Render `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` und `PUBLIC_URL` setzen → deployen
 4. Jeder Nutzer verknüpft sein Konto unter *Mein Profil* und kann sich danach per Discord anmelden. Verknüpfte Anwälte werden bei Zuweisungen und Fristen im Kanal erwähnt.
+
+**Discord-Tickets (je Akte ein privater Kanal):** Für jede Akte legt ein Bot automatisch einen eigenen, privaten Kanal an (z. B. `#ps-2026-0012-max-mustermann`). Alles, was der Mandant auch im Portal sieht, erscheint dort automatisch:
+
+| Ereignis | Im Ticket |
+|---|---|
+| Neue Akte (Website-Formular oder Dashboard) | Kanal wird angelegt, angeheftete Übersicht (Aktenzeichen, Titel, Sachverhalt, Rechtsgebiet, Dringlichkeit, Status, Zuständige), Team-Rolle und Anwälte werden erwähnt |
+| Status, Verfahrensstand, Hinweis an den Mandanten, geänderte Angaben | „Stand der Akte aktualisiert“ (Mandant wird erwähnt) |
+| Anwalt zugewiesen / weitere Anwälte / Abgabe | „Zuständigkeit geändert“ – neue Anwälte kommen in den Kanal, ausgetragene verlieren den Zugriff |
+| Nachricht (nicht intern) in der Akte | Nachricht von Anwalt bzw. Mandant – die Gegenseite wird erwähnt |
+| Anhang (nicht intern) | Hinweis auf den neuen Anhang |
+| Termine/Fristen der Akte, die der Mandant sieht | Neu, Terminanfrage, bestätigt, abgesagt, verlegt, erledigt, Erinnerung 24 h vorher |
+| Mandatsvertrag | erstellt, vom Anwalt / Mandanten / vollständig unterschrieben |
+| Rechnung / Honorarvereinbarung zur Akte | Nummer, Betrag, Fälligkeit |
+| Akte geschlossen / wieder geöffnet | Hinweis, Kanal wandert ins Archiv (Mandant nur noch lesend) bzw. zurück |
+| Akte gelöscht | Hinweis, Kanal ins Archiv (Verlauf bleibt) |
+
+**Nie im Ticket:** interne Notizen, interne Anhänge, Aufgaben, interne Termine, Telefonnummern – der Mandant liest mit. Nachrichten, die im Discord-Kanal geschrieben werden, landen nicht in der Akte (Einbahnstraße Website → Discord).
+
+**Wer ist im Ticket?** Die eingestellten Team-Rollen (z. B. „Anwälte“), zusätzlich die zuständigen Anwälte mit verknüpftem Discord und der **Mandant – automatisch**, sobald
+- sein Portal-Konto mit Discord verknüpft ist (*Mein Profil → Discord verbinden*; alle seine Akten), oder
+- er auf der Website unter *Aktenstatus* bzw. direkt nach dem Einreichen eines Mandats mit Aktenzeichen + Aktenpin „**Discord-Ticket beitreten**“ klickt (ohne Konto, Discord-Anmeldung mit Bestätigung).
+
+Ist er noch nicht auf dem Discord-Server, fügt der Bot ihn beim Verknüpfen automatisch hinzu (Discord fragt dafür einmal um Erlaubnis, „guilds.join“). In der Akte zeigt das Dashboard den Ticket-Status („Mandant im Ticket“, „In Discord öffnen“, „Abgleichen“).
+
+**Einrichtung:**
+1. [discord.com/developers/applications](https://discord.com/developers/applications) → **dieselbe App wie beim Discord-Login** → *Bot* → „Reset Token“ → Token kopieren. (Nur mit derselben App kann der Bot Mandanten dem Server hinzufügen.)
+2. In Render unter *Environment* `DISCORD_BOT_TOKEN` setzen → deployen. Der Token steht nur dort – nie in der Datenbank, im Code oder im Browser.
+3. Dashboard → *Einstellungen* → *Discord-Tickets (Bot)* → „Einladungslink“ öffnen und den Bot auf den Server einladen (enthält die nötigen Rechte: Kanäle verwalten, Berechtigungen verwalten, Nachrichten senden/verwalten, Links einbetten, Dateien anhängen, Verlauf lesen, Rollen erwähnen, Einladung erstellen).
+4. In Discord eine Kategorie für Tickets anlegen (z. B. „Mandate“), optional eine fürs Archiv. IDs kopieren (Einstellungen → Erweitert → Entwicklermodus, dann Rechtsklick → „ID kopieren“).
+5. Server-ID, Kategorie(n) und Team-Rolle(n) eintragen, „Discord-Tickets einschalten“, speichern, **„Verbindung testen“** (prüft Token, Server, Rechte des Bots, Rollen und Kategorien).
+6. „Offene Akten nachholen“ legt Tickets für alle bestehenden offenen Akten an.
+
+Wird ein Ticket-Kanal in Discord gelöscht, legt der Bot beim nächsten Ereignis automatisch einen neuen an. Fehler (z. B. fehlende Rechte) stehen in der Akte beim Ticket.
 
 ## Lokal starten
 
@@ -224,6 +258,7 @@ db.js            SQLite-Schema, Migrationen, Helfer
 auth.js          Sessions, Passwörter, Rollen-Middleware
 bootstrap.js     Team-Seed, Notfall-Admin, Passwort-Reset, Datenmigration
 discord.js       Webhooks & OAuth2
+tickets.js       Discord-Tickets: je Akte ein privater Kanal (Bot, REST-API)
 fivenet.js       FiveNet: Schnittstellenprüfung, Link-Erkennung, Instanz-Einstellung
 gdocs.js         Google Docs: Link-Erkennung, Export freigegebener Dokumente, Bildadressen
 gsheets.js       Google Sheets: Link-Erkennung, CSV-Export freigegebener Tabellenblätter
@@ -232,6 +267,6 @@ remote.js        Abrufe externer Quellen mit Zeit-, Größen- und Weiterleitungs
 uploads.js       Bild-Uploads (Formatprüfung anhand der Dateisignatur)
 helpers.js       Konstanten, Validierung
 models.js        Datenabfragen, Zeilen-Mapping, Zugriffsregeln, Protokoll
-routes/          auth, cases, calendar, messages, board, invoices, fees, team, admin, discord, public, duty, applications, fivenet, external, tasks, concerns, personnel
+routes/          auth, cases, calendar, messages, board, invoices, fees, team, admin, discord, public, duty, applications, fivenet, external, tasks, concerns, personnel, tickets
 public/          index.html, karriere.html, login.html, register.html, dashboard.html, invoice.html, css/, js/
 ```

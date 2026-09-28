@@ -6,6 +6,7 @@ const { db, tx, nextCaseNumber, randomPin, getSetting } = require('../db');
 const { wrap, parseBody, AREAS, URGENCIES, STEPS, CASE_STATUS, truncate } = require('../helpers');
 const { addSystemNote, getCase, onDutyMembers } = require('../models');
 const discord = require('../discord');
+const tickets = require('../tickets');
 
 const router = express.Router();
 
@@ -58,6 +59,8 @@ router.post(
       closed: c.status === 'geschlossen',
       note: c.public_note || null,
       updatedAt: c.updated_at,
+      // Discord-Ticket: beitreten per Discord-Anmeldung (Aktenzeichen + Pin), sofern eingerichtet
+      discordTicket: tickets.active() && discord.oauthConfigured() ? { joined: !!tickets.ticketInfo(c, null)?.clientInTicket } : null,
     });
   })
 );
@@ -119,7 +122,15 @@ router.post(
       ],
     });
 
-    res.status(201).json({ caseId: account ? id : undefined, caseNumber: c.case_number, pin, linkedToAccount: !!account });
+    tickets.caseCreated(id);
+    res.status(201).json({
+      caseId: account ? id : undefined,
+      caseNumber: c.case_number,
+      pin,
+      linkedToAccount: !!account,
+      // Discord-Ticket: ohne verknüpftes Konto kann der Mandant mit Aktenzeichen + Pin beitreten
+      discordTicket: tickets.active() && discord.oauthConfigured(),
+    });
   })
 );
 
