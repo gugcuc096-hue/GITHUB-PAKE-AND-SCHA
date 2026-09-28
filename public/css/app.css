@@ -747,6 +747,10 @@ details.edit-box[open] > summary::after { content: '–'; }
 .svc:has(.svc-check:checked) { color: var(--text-main); }
 .svc-qty { padding: 0.3rem 0.4rem; text-align: center; font-size: 0.85rem; }
 .svc-qty:disabled { opacity: 0.35; }
+.inv-fee-qty { padding: 0.3rem 0.4rem; text-align: center; font-size: 0.85rem; }
+.inv-fee-qty:disabled { opacity: 0.35; }
+.svc:has(.inv-fee:checked) { color: var(--text-main); background: rgba(212, 175, 55, 0.06); }
+#feeList { max-height: 22rem; }
 .svc-price { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.8rem; text-align: right; color: var(--gold-light); }
 .svc-sum { display: flex; justify-content: space-between; align-items: baseline; margin-top: 0.5rem; padding: 0.55rem 0.8rem; border-radius: 10px; background: var(--gold-soft); border: 1px solid var(--gold-hairline); font-size: 0.875rem; }
 .svc-sum strong { font-family: 'JetBrains Mono', ui-monospace, monospace; color: var(--gold-light); font-size: 1rem; }
