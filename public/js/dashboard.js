@@ -83,6 +83,7 @@
     briefcase: 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
     globe: 'M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9',
     send: 'M12 19l9 2-9-18-9 18 9-2zm0 0v-8',
+    tag: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z',
     chat: 'M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z',
     star: 'M11.48 3.5a.56.56 0 011.04 0l2.12 5.11a.56.56 0 00.48.35l5.52.44c.5.04.7.66.32.99l-4.2 3.6a.56.56 0 00-.18.56l1.28 5.39a.56.56 0 01-.84.61l-4.73-2.89a.56.56 0 00-.58 0l-4.73 2.89a.56.56 0 01-.84-.61l1.28-5.39a.56.56 0 00-.18-.56l-4.2-3.6a.56.56 0 01.32-.99l5.52-.44a.56.56 0 00.48-.35l2.12-5.11z',
     link: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1',
@@ -113,6 +114,7 @@
     work: { label: 'Aktenbearbeitung', icon: 'briefcase', board: true, section: 'Board of Partners' },
     team: { label: 'Team', icon: 'users', admin: true, section: 'Board of Partners' },
     applications: { label: 'Bewerbungen', icon: 'userAdd', board: true, section: 'Board of Partners' },
+    cooperations: { label: 'Kooperationen', icon: 'tag', board: true, section: 'Board of Partners' },
     users: { label: 'Benutzer', icon: 'key', admin: true, section: 'Board of Partners' },
     fees: { label: 'Honorarordnung', icon: 'scale', admin: true, section: 'Board of Partners' },
     audit: { label: 'Protokoll', icon: 'list', admin: true, section: 'Board of Partners' },
@@ -2633,6 +2635,8 @@
       items: [],
       discountPct: 0,
       surchargePct: 0,
+      coopId: null, // Kooperation (Rabatt-Satz kommt aus der Kooperation)
+      coopAuto: false, // automatisch aus der Erkennung gesetzt
       dueDate: dayKey(new Date(Date.now() + 7 * 864e5)),
       notes: '',
     };
@@ -2650,13 +2654,19 @@
     const v = Number(n);
     return Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : 0;
   }
+  const draftCoop = (d) => (d.coopId ? (st.coopList || []).find((k) => k.id === d.coopId && k.valid) || null : null);
+  /** Wie auf dem Server: Kooperationsrabatt und Rabatt auf die Zwischensumme, danach der Zuschlag. */
   function draftTotals(d) {
     const subtotal = d.items.reduce((s, it) => s + (Math.max(1, Math.round(Number(it.quantity) || 1))) * Math.max(0, Math.round(Number(it.unitPrice) || 0)), 0);
+    const k = draftCoop(d);
+    const cp = k ? k.discountPct : 0;
     const dp = clampPct(d.discountPct);
     const sp = clampPct(d.surchargePct);
-    const discount = Math.round((subtotal * dp) / 100);
-    const surcharge = Math.round(((subtotal - discount) * sp) / 100);
-    return { subtotal, discount, surcharge, total: subtotal - discount + surcharge, dp, sp };
+    const coop = Math.round((subtotal * cp) / 100);
+    const discount = Math.min(subtotal - coop, Math.round((subtotal * dp) / 100));
+    const net = subtotal - coop - discount;
+    const surcharge = Math.round((net * sp) / 100);
+    return { subtotal, coop, coopName: k ? k.name : '', cp, discount, surcharge, total: net + surcharge, dp, sp };
   }
   function itemRowHtml(it, i) {
     return `<div class="item-row">
@@ -2716,6 +2726,7 @@
       <h2 class="panel-title mb-3">${esc(INVOICE_KIND[d.kind])}</h2>
       <div class="sum-row"><span class="text-muted">Positionen</span><span class="v">${d.items.length}</span></div>
       <div class="sum-row"><span class="text-muted">Zwischensumme</span><span class="v">${money(t.subtotal)}</span></div>
+      ${t.cp ? `<div class="sum-row" style="color:#6ee7b7"><span>Kooperation ${esc(t.coopName)} (${fmtPct(t.cp)} %)</span><span class="v">− ${money(t.coop)}</span></div>` : ''}
       ${t.dp ? `<div class="sum-row" style="color:#6ee7b7"><span>Rabatt (${fmtPct(t.dp)} %)</span><span class="v">− ${money(t.discount)}</span></div>` : ''}
       ${t.sp ? `<div class="sum-row" style="color:#fcd34d"><span>Zuschlag (${fmtPct(t.sp)} %)</span><span class="v">+ ${money(t.surcharge)}</span></div>` : ''}
       <div class="sum-row sum-total"><span class="font-semibold">Gesamtbetrag</span><span class="v">${money(t.total)}</span></div>`;
@@ -2738,10 +2749,60 @@
     });
   }
 
+  /** Kooperation im Rechnungsformular: Auswahl + Ergebnis der Erkennung (Discord-Rolle / zugeordnetes Konto). */
+  function coopBoxHtml() {
+    const d = st.draft;
+    const list = (st.coopList || []).filter((k) => k.valid || k.id === d.coopId);
+    if (!list.length) return '';
+    const det = st.coopDetect && st.coopDetect.draft === d && st.coopDetect.caseId === d.caseId ? st.coopDetect : null;
+    let info = '';
+    if (!d.caseId) info = '<div class="form-hint">Mit Aktenbezug prüft die Kanzlei automatisch, ob der Mandant zu einer Kooperation gehört (Discord-Rolle).</div>';
+    else if (!det || det.loading) info = `<div class="form-hint">${icon('clock', 'ico-sm')} Discord-Rollen des Mandanten werden geprüft …</div>`;
+    else {
+      info = det.matches.length
+        ? det.matches.map((m, i) => `<div class="text-sm mt-2" style="color:#6ee7b7">🤝 ${i === 0 ? 'Erkannt' : 'Ebenfalls'}: <strong>${esc(m.name)}</strong> · ${fmtPct(m.discountPct)} % <span class="text-dim">(${esc(m.detail)})</span></div>`).join('')
+        : `<div class="form-hint">${det.checkedDiscord ? 'Keine Kooperation erkannt – der Mandant hat keine der Kooperations-Rollen.' : 'Keine Kooperation erkannt.'}</div>`;
+      if (det.notes && det.notes.length) info += `<div class="form-hint">${det.notes.map(esc).join('<br>')}</div>`;
+    }
+    return `<div class="span-2"><label class="label">Kooperation</label>
+      <select name="cooperationId" class="field"><option value="">Keine Kooperation</option>${list.map((k) => opt(k.id, `${k.name} – ${fmtPct(k.discountPct)} % Rabatt${k.valid ? '' : ' (nicht mehr aktiv)'}`, k.id === d.coopId)).join('')}</select>
+      ${info}</div>`;
+  }
+  function refreshCoopBox() {
+    const box = $('#invCoop');
+    if (box) box.innerHTML = coopBoxHtml();
+  }
+  /** Gehört der Mandant der gewählten Akte zu einer Kooperation? Setzt den Rabatt automatisch (änderbar). */
+  async function runCoopDetect() {
+    const d = st.draft;
+    if (!d || !(st.coopList || []).some((k) => k.valid)) return;
+    const caseId = d.caseId;
+    if (!caseId || (st.coopDetect && st.coopDetect.draft === d && st.coopDetect.caseId === caseId)) return refreshCoopBox();
+    st.coopDetect = { caseId, draft: d, loading: true };
+    refreshCoopBox();
+    let r;
+    try {
+      r = await api.get('/api/cooperations/detect?caseId=' + caseId);
+    } catch (e) {
+      r = { matches: [], notes: [e.message], checkedDiscord: false };
+    }
+    if (st.draft !== d || d.caseId !== caseId) return;
+    st.coopDetect = { caseId, draft: d, ...r };
+    if (r.matches.length && (!d.coopId || d.coopAuto)) {
+      d.coopId = r.matches[0].id;
+      d.coopAuto = true;
+      toast(`Kooperation ${r.matches[0].name} erkannt – ${fmtPct(r.matches[0].discountPct)} % Rabatt übernommen.`);
+    }
+    refreshCoopBox();
+    updateInvoiceSummary();
+  }
+
   views['invoice-new'] = {
     async load() {
-      await Promise.all([load.fees(), load.cases()]);
+      const [coops] = await Promise.all([api.get('/api/cooperations?basic=1').catch(() => ({ cooperations: [] })), load.fees(), load.cases()]);
+      st.coopList = coops.cooperations;
       if (!st.draft) st.draft = newDraft();
+      runCoopDetect(); // läuft im Hintergrund, die Seite wartet nicht auf Discord
     },
     render() {
       const d = st.draft;
@@ -2796,6 +2857,7 @@
             </section>
             <section class="panel panel-pad">
               <div class="form-grid cols-2">
+                <div class="span-2" id="invCoop" style="display:contents">${coopBoxHtml()}</div>
                 <div><label class="label">Rabatt in %</label><input name="discountPct" type="number" inputmode="decimal" min="0" max="100" step="0.5" class="field" value="${esc(d.discountPct)}">
                   <div class="chip-row mt-2"><button type="button" class="chip" data-action="inv-preset" data-field="discountPct" data-value="10">Mandatsbündel 10 %</button><button type="button" class="chip" data-action="inv-preset" data-field="discountPct" data-value="0">Kein Rabatt</button></div></div>
                 <div><label class="label">Zuschlag in %</label><input name="surchargePct" type="number" inputmode="decimal" min="0" max="100" step="0.5" class="field" value="${esc(d.surchargePct)}">
@@ -2850,7 +2912,17 @@
     } else if (t.name === 'caseId') {
       d.caseId = t.value ? Number(t.value) : null;
       applyCaseToDraft(d, d.caseId);
+      if (d.coopAuto) {
+        // automatisch gesetzte Kooperation gehörte zum Mandanten der vorigen Akte
+        d.coopId = null;
+        d.coopAuto = false;
+      }
       renderView();
+      runCoopDetect();
+    } else if (t.name === 'cooperationId') {
+      d.coopId = t.value ? Number(t.value) : null;
+      d.coopAuto = false;
+      updateInvoiceSummary();
     } else {
       onInvoiceInput(t);
     }
@@ -3367,7 +3439,13 @@
   /* ---------------------------------------------------------------- Profil */
   views.profile = {
     async load() {
-      const [me, ds] = await Promise.all([api.get('/api/auth/me'), api.get('/api/discord/status'), load.fivenet()]);
+      const [me, ds, coops] = await Promise.all([
+        api.get('/api/auth/me'),
+        api.get('/api/discord/status'),
+        isStaff() ? null : api.get('/api/cooperations/mine').catch(() => null),
+        load.fivenet(),
+      ]);
+      st.myCoops = coops ? coops.matches : [];
       st.user = me.user;
       st.discordOAuth = ds.oauth;
       renderUser();
@@ -3412,6 +3490,11 @@
             <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${DISCORD_ICON} Discord</h2>${u.discord ? badge('Verbunden', 'emerald') : ''}</div>
             ${discord}
           </section>
+          ${!isStaff() && st.myCoops.length ? `<section class="panel panel-pad">
+            <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('tag')} Ihre Kooperationsvorteile</h2></div>
+            <div class="space-y-2">${st.myCoops.map((m) => `<div class="flex flex-wrap items-center gap-2">${badge(`${fmtPct(m.discountPct)} % Rabatt`, 'gold')}<strong>${esc(m.name)}</strong><span class="text-xs text-dim">${m.via === 'discord' ? 'über Ihre Discord-Rolle' : 'Ihrem Konto zugeordnet'}</span></div>`).join('')}</div>
+            <p class="text-sm text-muted mt-3">Als Mitglied eines Kooperationspartners erhalten Sie diesen Rabatt auf Rechnungen und Honorarvereinbarungen der Kanzlei – er wird automatisch berücksichtigt.</p>
+          </section>` : ''}
           ${isStaff() ? fivenetProfilePanel() : ''}
         </div>`;
     },
@@ -3681,6 +3764,142 @@
       ? `${esc(u.name)}: ${esc(u.rank || 'ohne Rang')} → <strong class="text-gold">${esc(rank)}</strong> ${statusBadge(PERSONNEL_TYPE, kind === 'Rückstufung' ? 'rueckstufung' : 'befoerderung')}`
       : `${esc(u.name)} hat bereits diesen Rang.`;
     $('#prSubmit').textContent = kind === 'Rückstufung' ? 'Rang ändern' : 'Befördern';
+  }
+
+  /* ---------------------------------------------------------------- Kooperationen (Board of Partners) */
+  const fmtCoopPct = (n) => `${fmtPct(n)} %`;
+  const coopState = (k) => (!k.active ? ['inaktiv', 'slate'] : !k.valid ? ['abgelaufen', 'amber'] : ['aktiv', 'emerald']);
+
+  function coopCard(k) {
+    const [stateLabel, stateColor] = coopState(k);
+    const roles = k.roles.length
+      ? k.roles.map((r) => `<span class="badge badge-sky">@${esc(r.name || r.id)}</span>`).join(' ')
+      : '<span class="text-dim">keine – nur von Hand zugeordnete Konten</span>';
+    const members = k.members.length
+      ? k.members
+          .map(
+            (m) => `<span class="badge badge-slate inline-flex items-center gap-1">${esc(m.name)}<button type="button" class="hover:text-red-300" data-action="coop-member-remove" data-id="${k.id}" data-user="${m.userId}" data-name="${esc(m.name)}" aria-label="${esc(m.name)} entfernen">${icon('x', 'ico-sm')}</button></span>`
+          )
+          .join(' ')
+      : '<span class="text-dim">keine</span>';
+    return `<div class="panel panel-pad">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><h3 class="font-serif text-xl font-semibold">${esc(k.name)}</h3>${badge(`${fmtCoopPct(k.discountPct)} Rabatt`, 'gold')}${badge(stateLabel, stateColor)}</div>
+          ${k.validUntil ? `<div class="text-xs text-dim mt-1">gültig bis ${esc(fmtDateOnly(k.validUntil))}</div>` : ''}
+          ${k.description ? `<p class="text-sm text-muted mt-2 whitespace-pre-wrap">${esc(k.description)}</p>` : ''}</div>
+        <div class="flex flex-wrap gap-2"><button class="btn-outline btn-sm" data-action="coop-edit" data-id="${k.id}">${icon('edit', 'ico-sm')}<span>Bearbeiten</span></button><button class="btn-ghost btn-sm" data-action="coop-delete" data-id="${k.id}">${icon('trash', 'ico-sm')}</button></div>
+      </div>
+      <div class="info-grid mt-4">
+        <div><div class="k">Discord-Rollen</div><div class="v flex flex-wrap gap-1">${roles}</div>
+          <div class="text-xs text-dim mt-1">${k.usesDefaultGuild ? 'Server der Kanzlei (Discord-Tickets)' : `Server ${esc(k.guildId)}`}</div>
+          ${k.roleError ? `<div class="text-xs text-red-300 mt-1">${icon('alert', 'ico-sm')} ${esc(k.roleError)}</div>` : ''}</div>
+        <div><div class="k">Von Hand zugeordnete Konten</div><div class="v flex flex-wrap gap-1">${members}</div>
+          <button class="link-btn mt-1" style="font-size:.75rem" data-action="coop-accounts" data-mode="member" data-id="${k.id}">+ Konto zuordnen</button></div>
+      </div></div>`;
+  }
+
+  views.cooperations = {
+    async load() {
+      st.coops = await api.get('/api/cooperations');
+      st.coopList = st.coops.cooperations;
+    },
+    render() {
+      const d = st.coops;
+      const warn = !d.discord.bot
+        ? `<div class="banner banner-amber">${icon('alert')}<div>Es ist kein Discord-Bot eingerichtet (<code>DISCORD_BOT_TOKEN</code>). Discord-Rollen werden dann nicht erkannt – es gelten nur von Hand zugeordnete Konten.</div></div>`
+        : !d.discord.defaultGuild
+          ? `<div class="banner banner-amber">${icon('alert')}<div>Kein Discord-Server hinterlegt: unter <a href="#settings" class="text-gold underline">Einstellungen → Discord-Tickets</a> die Server-ID eintragen oder bei jeder Kooperation den Server angeben.</div></div>`
+          : '';
+      return `
+        <div class="page-head">
+          <div><h1 class="page-title">Kooperationen</h1><p class="page-sub">Rabatt für Mitglieder von Kooperationspartnern – automatisch erkannt über ihre Discord-Rolle.</p></div>
+          <div class="page-actions"><button class="btn-outline btn-md" data-action="coop-accounts" data-mode="check">${icon('search', 'ico-sm')}<span>Mandant prüfen</span></button><button class="btn-gold btn-md" data-action="coop-new">${icon('plus')}<span>Neue Kooperation</span></button></div>
+        </div>
+        ${warn}
+        <div class="panel panel-pad mb-4 text-sm text-muted">
+          <strong class="text-white">So funktioniert's:</strong> Kooperation anlegen (z. B. „Burgershot“, 15 %) und die Discord-Rolle der Mitglieder auswählen.
+          Erstellt jemand eine Rechnung zu einer Akte, liest der Bot die Discord-Rollen des Mandanten (verknüpftes Discord bzw. „Discord-Ticket beitreten“) und setzt den Kooperationsrabatt automatisch ein.
+          Ohne Discord: Mandantenkonten von Hand zuordnen – oder die Kooperation in der Rechnung selbst auswählen.
+        </div>
+        ${d.cooperations.length ? `<div class="stack">${d.cooperations.map(coopCard).join('')}</div>` : `<div class="panel">${empty('Noch keine Kooperationen. „Neue Kooperation“ legt die erste an.', 'tag')}</div>`}`;
+    },
+  };
+
+  function coopForm(k = null) {
+    return `
+      <h2 id="modalTitle" class="modal-title">${k ? `${esc(k.name)} bearbeiten` : 'Neue Kooperation'}</h2>
+      <p class="modal-sub">Mitglieder erhalten den Rabatt auf Rechnungen und Honorarvereinbarungen. Erkannt werden sie über ihre Discord-Rolle oder weil ihr Konto von Hand zugeordnet ist.</p>
+      <form data-form="coop" ${k ? `data-id="${k.id}"` : ''} class="form-grid cols-2">
+        <div><label class="label">Name des Partners</label><input name="name" class="field" required minlength="2" maxlength="80" value="${esc(k ? k.name : '')}" placeholder="z. B. Burgershot" autofocus></div>
+        <div><label class="label">Rabatt in %</label><input name="discountPct" type="number" inputmode="decimal" min="0.5" max="100" step="0.5" class="field" required value="${esc(k ? k.discountPct : 10)}"></div>
+        <div><label class="label">Gültig bis <span class="text-dim font-normal normal-case tracking-normal">(optional)</span></label><input name="validUntil" type="date" class="field" value="${esc(k && k.validUntil ? k.validUntil : '')}"></div>
+        <div class="flex items-end"><label class="check"><input type="checkbox" name="active" ${!k || k.active ? 'checked' : ''}> Aktiv</label></div>
+        <div class="span-2"><label class="label">Vereinbarung / interne Notiz <span class="text-dim font-normal normal-case tracking-normal">(nur für das Team)</span></label><textarea name="description" rows="2" maxlength="1000" class="field" placeholder="z. B. Ansprechpartner, Bedingungen, seit wann">${esc(k ? k.description : '')}</textarea></div>
+        <fieldset class="span-2 form-grid">
+          <legend class="label flex items-center gap-2">${DISCORD_ICON} Discord-Rollen der Mitglieder</legend>
+          <div><label class="label">Discord-Server-ID <span class="text-dim font-normal normal-case tracking-normal">(leer = Server der Kanzlei aus „Discord-Tickets“; ein anderer Server geht, wenn der Bot dort ist)</span></label>
+            <div class="flex gap-2"><input id="coopGuild" name="guildId" class="field" inputmode="numeric" maxlength="25" value="${esc(k ? k.guildId : '')}" placeholder="leer lassen = Kanzlei-Server"><button type="button" class="btn-outline btn-md shrink-0" data-action="coop-load-roles">Rollen laden</button></div></div>
+          <div id="coopRoles" class="text-sm text-dim">Rollen werden geladen …</div>
+          <div><label class="label">Weitere Rollen-IDs <span class="text-dim font-normal normal-case tracking-normal">(optional, kommagetrennt – falls die Liste nicht lädt)</span></label><input name="roleIdsExtra" class="field" maxlength="400" value="" placeholder="123456789012345678"></div>
+        </fieldset>
+        <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>${k ? 'Speichern' : 'Kooperation anlegen'}</span></button></div>
+      </form>`;
+  }
+
+  /** Rollen des Servers als Häkchen-Liste; bereits gewählte (auch unbekannte) bleiben angehakt. */
+  async function loadCoopRoles(selected) {
+    const box = $('#coopRoles');
+    if (!box) return;
+    const guildId = ($('#coopGuild')?.value || '').trim();
+    const chosen = new Set(selected || $$('#coopRoles input[name="role"]:checked').map((i) => i.value));
+    box.innerHTML = 'Rollen werden geladen …';
+    try {
+      const { roles } = await api.get(`/api/cooperations/roles?fresh=1${guildId ? `&guildId=${encodeURIComponent(guildId)}` : ''}`);
+      const unknown = [...chosen].filter((id) => !roles.some((r) => r.id === id));
+      box.innerHTML = roles.length || unknown.length
+        ? `<div class="label">Rolle(n) auswählen – wer eine davon hat, bekommt den Rabatt</div><div class="chip-row" style="flex-wrap:wrap">${[
+            ...roles.map((r) => `<label class="check chip"><input type="checkbox" name="role" value="${esc(r.id)}" ${chosen.has(r.id) ? 'checked' : ''}> @${esc(r.name)}</label>`),
+            ...unknown.map((id) => `<label class="check chip"><input type="checkbox" name="role" value="${esc(id)}" checked> ${esc(id)} <span class="text-red-300">(nicht gefunden)</span></label>`),
+          ].join('')}</div>`
+        : 'Auf dem Server gibt es keine passenden Rollen.';
+    } catch (e) {
+      box.innerHTML = `<div class="text-red-300">${icon('alert', 'ico-sm')} ${esc(e.message)}</div>${[...chosen]
+        .map((id) => `<label class="check chip mt-2"><input type="checkbox" name="role" value="${esc(id)}" checked> ${esc(id)}</label>`)
+        .join('')}`;
+    }
+  }
+
+  function coopAccountsDialog(mode, k) {
+    return `
+      <h2 id="modalTitle" class="modal-title">${mode === 'member' ? `Konto zu „${esc(k.name)}“ zuordnen` : 'Mandant prüfen'}</h2>
+      <p class="modal-sub">${mode === 'member' ? 'Für Mitglieder ohne Discord (oder ohne die Rolle): Das Konto erhält den Rabatt dann immer.' : 'Welche Kooperation gilt für diesen Mandanten? Geprüft werden seine Discord-Rollen und von Hand zugeordnete Konten.'}</p>
+      <input id="coopAccSearch" class="field" type="search" maxlength="80" placeholder="Name oder E-Mail suchen …" autocomplete="off" data-mode="${mode}" data-id="${k ? k.id : ''}" aria-label="Mandantenkonto suchen" autofocus>
+      <div id="coopAccList" class="mt-4 text-sm text-dim">Tippen, um Mandantenkonten zu suchen.</div>
+      <div id="coopCheckResult" class="mt-4"></div>`;
+  }
+  async function searchCoopAccounts(input) {
+    const q = input.value.trim();
+    const { accounts } = await api.get(`/api/cases/client-accounts?q=${encodeURIComponent(q)}`);
+    if (!input.isConnected || input.value.trim() !== q) return;
+    const mode = input.dataset.mode;
+    $('#coopAccList').innerHTML = accounts.length
+      ? accounts
+          .map(
+            (a) => `<div class="list-row wrap"><div class="main"><div class="title">${esc(a.name)}</div><div class="meta">${esc(a.email)}</div></div>
+              <button class="btn-${mode === 'member' ? 'gold' : 'outline'} btn-sm shrink-0" data-action="${mode === 'member' ? 'coop-member-add' : 'coop-check'}" data-id="${esc(input.dataset.id)}" data-user="${a.id}" data-name="${esc(a.name)}">${mode === 'member' ? 'Zuordnen' : 'Prüfen'}</button></div>`
+          )
+          .join('')
+      : '<p class="text-sm text-dim">Kein Mandantenkonto gefunden.</p>';
+  }
+  function coopDetectHtml(r, name) {
+    const hits = r.matches.length
+      ? r.matches
+          .map((m, i) => `<div class="flex flex-wrap items-center gap-2">${badge(`${fmtCoopPct(m.discountPct)}`, i === 0 ? 'gold' : 'slate')}<strong>${esc(m.name)}</strong><span class="text-xs text-dim">${esc(m.detail)}</span>${i === 0 && r.matches.length > 1 ? badge('wird angewandt (höchster Rabatt)', 'emerald') : ''}</div>`)
+          .join('')
+      : `<div class="text-muted">${r.checkedDiscord ? 'Keine Kooperation – der Mandant hat keine der eingestellten Discord-Rollen.' : 'Keine Kooperation erkannt.'}</div>`;
+    return `<div class="banner ${r.matches.length ? 'banner-gold' : 'banner-slate'} is-stack">
+      <div class="text-xs uppercase tracking-widest opacity-80 mb-2">Ergebnis für ${esc(name)}</div><div class="space-y-2">${hits}</div>
+      ${r.notes.length ? `<div class="text-xs text-dim mt-2">${r.notes.map(esc).join('<br>')}</div>` : ''}</div>`;
   }
 
   /* ---------------------------------------------------------------- Aktenbearbeitung (nur Board of Partners) */
@@ -4618,6 +4837,49 @@
       await returnOrClose();
     },
     'back-to-case': () => returnOrClose(),
+
+    // Kooperationen
+    'coop-new': async () => {
+      openModal(coopForm());
+      await loadCoopRoles([]);
+    },
+    'coop-edit': async (el) => {
+      const k = st.coops.cooperations.find((x) => x.id === Number(el.dataset.id));
+      if (!k) return;
+      openModal(coopForm(k));
+      await loadCoopRoles(k.roles.map((r) => r.id));
+    },
+    'coop-load-roles': () => loadCoopRoles(),
+    'coop-delete': async (el) => {
+      const k = st.coops.cooperations.find((x) => x.id === Number(el.dataset.id));
+      if (!k || !(await askDelete(`Kooperation „${k.name}“ löschen?`, 'Neue Rechnungen erhalten den Rabatt dann nicht mehr. Bereits erstellte Rechnungen behalten ihn. Tipp: Zum Pausieren stattdessen „Aktiv“ abwählen.'))) return;
+      await api.del(`/api/cooperations/${k.id}`);
+      toast('Kooperation gelöscht.');
+      await refreshBehind();
+    },
+    'coop-accounts': async (el) => {
+      const k = el.dataset.id ? st.coops.cooperations.find((x) => x.id === Number(el.dataset.id)) : null;
+      openModal(coopAccountsDialog(el.dataset.mode, k));
+      await searchCoopAccounts($('#coopAccSearch'));
+    },
+    'coop-member-add': async (el) => {
+      await api.post(`/api/cooperations/${el.dataset.id}/members`, { userId: Number(el.dataset.user) });
+      toast(`${el.dataset.name} zugeordnet.`);
+      closeModal();
+      await refreshBehind();
+    },
+    'coop-member-remove': async (el) => {
+      if (!(await ask(`${el.dataset.name} erhält den Rabatt dann nur noch, wenn die Discord-Rolle passt.`, { title: 'Zuordnung entfernen?', confirmText: 'Entfernen' }))) return;
+      await api.del(`/api/cooperations/${el.dataset.id}/members/${el.dataset.user}`);
+      toast('Zuordnung entfernt.');
+      await refreshBehind();
+    },
+    'coop-check': async (el) => {
+      const box = $('#coopCheckResult');
+      box.innerHTML = '<p class="text-sm text-dim">Wird geprüft …</p>';
+      const r = await api.get(`/api/cooperations/detect?userId=${el.dataset.user}`);
+      box.innerHTML = coopDetectHtml(r, el.dataset.name);
+    },
     'case-client-search': async (el) => {
       const id = Number(el.dataset.id);
       const c = st.caseInfo && st.caseInfo.id === id ? st.caseInfo : (await api.get('/api/cases/' + id)).case;
@@ -5162,6 +5424,7 @@
         items,
         discountPct: clampPct(d.discountPct),
         surchargePct: clampPct(d.surchargePct),
+        cooperationId: draftCoop(d) ? d.coopId : null,
         dueDate: d.dueDate || null,
         notes: d.notes.trim(),
       });
@@ -5175,6 +5438,24 @@
           <a class="btn-gold btn-md" href="/invoice.html?id=${inv.id}" target="_blank" rel="noopener">${icon('printer', 'ico-sm')}<span>Drucken / Als PDF speichern</span></a>
           <button class="btn-ghost btn-md" data-action="close-modal">Schließen</button>
         </div>`);
+    },
+    coop: async (f) => {
+      const fd = new FormData(f);
+      const roles = [...fd.getAll('role'), ...String(fd.get('roleIdsExtra') || '').split(/[\s,;]+/)].map((x) => String(x).trim()).filter(Boolean);
+      const body = {
+        name: val(fd, 'name'),
+        discountPct: Number(fd.get('discountPct')),
+        validUntil: fd.get('validUntil') || null,
+        active: fd.get('active') === 'on',
+        description: val(fd, 'description'),
+        guildId: val(fd, 'guildId'),
+        roleIds: [...new Set(roles)].join(','),
+      };
+      if (f.dataset.id) await api.patch(`/api/cooperations/${f.dataset.id}`, body);
+      else await api.post('/api/cooperations', body);
+      toast(f.dataset.id ? 'Kooperation gespeichert.' : `Kooperation „${body.name}“ angelegt.`);
+      closeModal();
+      await refreshBehind();
     },
     team: async (f) => {
       const fd = new FormData(f);
@@ -5516,6 +5797,9 @@
       updateServiceSum(t.form); // Menge geändert: Summe sofort aktualisieren
     } else if (t.id === 'fnContent') {
       t.dataset.auto = '0'; // von Hand geändert – beim nächsten automatischen Laden nicht überschreiben
+    } else if (t.id === 'coopAccSearch') {
+      clearTimeout(st.coopAccTimer);
+      st.coopAccTimer = setTimeout(() => guard(() => searchCoopAccounts(t)), 250);
     } else if (t.id === 'clientAccSearch') {
       clearTimeout(st.clientAccTimer);
       st.clientAccTimer = setTimeout(() => guard(() => searchClientAccounts(t)), 250);

@@ -365,6 +365,8 @@ a:hover > .brand-logo { transform: scale(1.04); }
 .banner-amber { border-color: rgba(245, 158, 11, 0.35); background: rgba(245, 158, 11, 0.08); color: #fde68a; }
 .banner-gold { border-color: var(--gold-hairline); background: var(--gold-soft); color: var(--gold-light); }
 .banner-red { border-color: rgba(239, 68, 68, 0.35); background: rgba(239, 68, 68, 0.08); color: #fecaca; }
+.banner-slate { border-color: rgba(148, 163, 184, 0.3); background: rgba(148, 163, 184, 0.06); color: var(--text-muted); }
+.banner.is-stack { display: block; }
 .secret-box { font-family: 'JetBrains Mono', monospace; font-size: 1.15rem; letter-spacing: 0.04em; background: rgba(212, 175, 55, 0.08); border: 1px dashed var(--gold-hairline); padding: 0.85rem; border-radius: 12px; text-align: center; user-select: all; word-break: break-all; color: var(--gold-light); }
 
 /* Countdown */

@@ -16,6 +16,7 @@ Premium-Webanwendung für die GTA-RP-Kanzlei **Pake & Scha Legal Consulting**: �
 | **Rechnungen & Honorare** | Generator: Leistungen aus der Honorarordnung **einfach anhaken** (mehrere auf einmal, Menge je Leistung, Suche) – sie stehen sofort als Positionen in der Rechnung; dazu freie Positionen, Rabatt/Zuschlag, Rechnung **oder** Honorarvereinbarung, Druck-/PDF-Ansicht, Status offen/bezahlt/storniert |
 | **Team-Verwaltung** (Admin) | Mitglieder hinzufügen, umbenennen, Rang/Beschreibung ändern, sortieren, ausblenden, löschen – sofort live auf der Website · optional mit Login-Konto (Einmal-Passwort) |
 | **Benutzer** (Admin) | Rollen, Ränge, Sperren, Löschen, **Passwort-Reset per Klick** |
+| **Kooperationen** (Board of Partners) | Kooperationspartner anlegen (z. B. „Burgershot“) mit **Rabatt in %**, optional „gültig bis“, aktiv/inaktiv und interner Notiz · **Discord-Rolle(n) der Mitglieder** direkt aus der Rollenliste des Servers anhaken · beim Erstellen einer Rechnung mit Aktenbezug liest der Bot die Discord-Rollen des Mandanten und **setzt den Kooperationsrabatt automatisch** (bei mehreren der höchste; änderbar) · ohne Discord: Mandantenkonten von Hand zuordnen oder die Kooperation in der Rechnung auswählen · „Mandant prüfen“ zeigt, welche Kooperation gilt · Rechnung zeigt „Kooperationsrabatt Burgershot (15 %)“, Verlauf/Protokoll vermerken, ob per Discord-Rolle erkannt oder von Hand gewählt · Mandanten sehen ihre Vorteile unter *Mein Profil* (siehe [Kooperationen](#kooperationen)) |
 | **Honorarordnung** (Admin) | Preise/Leistungen pflegen → Website, Tarifrechner und Rechnungs-Generator |
 | **Discord** | Webhook für Kanzlei-Updates (mit Erwähnung verknüpfter Anwälte) · Konto verknüpfen · „Mit Discord anmelden“ |
 | **Profilbilder** | Jedes Konto kann ein Profilbild hochladen (im Browser zugeschnitten und verkleinert). Team-Profile können zusätzlich ein eigenes Foto für die Website bekommen. |
@@ -123,6 +124,19 @@ Ist er noch nicht auf dem Discord-Server, fügt der Bot ihn beim Verknüpfen aut
 7. „Offene nachholen“ legt Tickets für alle bestehenden offenen Akten, Bewerbungen und Anliegen an.
 
 Wird ein Ticket-Kanal in Discord gelöscht, legt der Bot beim nächsten Ereignis automatisch einen neuen an. Fehler (z. B. fehlende Rechte) stehen in der Akte beim Ticket.
+
+## Kooperationen
+
+Unter **Board of Partners → Kooperationen** legt das Board Kooperationspartner an – z. B. „Burgershot“ mit 15 % Rabatt.
+
+1. **Neue Kooperation** → Name, Rabatt in %, optional „gültig bis“ und eine interne Notiz.
+2. **Discord-Rollen:** Die Rollen des Kanzlei-Servers (Server-ID aus *Einstellungen → Discord-Tickets*) werden als Liste geladen – die Rolle der Mitglieder anhaken (z. B. `@Burgershot`). Mehrere Rollen sind möglich. Liegt die Rolle auf einem **anderen Server** (z. B. dem Discord des Partners), dessen Server-ID eintragen – der Bot muss dort eingeladen sein.
+3. **Rechnung erstellen:** Mit Aktenbezug prüft die Website im Hintergrund die Discord-Rollen des Mandanten (sein verknüpftes Discord bzw. das Discord aus „Discord-Ticket beitreten“). Passt eine Rolle, steht die Kooperation im Formular („🤝 Erkannt: Burgershot · 15 %“) und der Rabatt ist eingerechnet – bei mehreren Kooperationen die mit dem höchsten Rabatt. Die Auswahl lässt sich ändern oder auf „Keine Kooperation“ stellen; ohne Aktenbezug wird die Kooperation von Hand gewählt.
+4. **Ohne Discord:** Mandantenkonten unter „+ Konto zuordnen“ fest einer Kooperation zuordnen.
+
+Berechnung: Kooperationsrabatt und sonstiger Rabatt beziehen sich auf die Zwischensumme, danach kommt ein eventueller Zuschlag. Der Satz kommt immer aus der Kooperation (nicht aus dem Browser); Name und Satz werden in der Rechnung festgehalten – spätere Änderungen oder das Löschen der Kooperation ändern bestehende Rechnungen nicht. Inaktive oder abgelaufene Kooperationen gelten nicht mehr.
+
+Voraussetzung für die Rollen-Erkennung ist nur der Bot der Discord-Tickets (`DISCORD_BOT_TOKEN`, Bot auf dem Server). Er liest ausschließlich die Rollen einzelner Mitglieder und die Rollenliste des Servers – dafür sind keine zusätzlichen Rechte oder „Privileged Intents“ nötig. Der Token bleibt auf dem Server.
 
 ## Lokal starten
 
@@ -245,6 +259,7 @@ Es gibt genau sechs Ränge (Benutzer, Team-Profile und Einstellung von Bewerbern
 | Kalender | eigene Termine anfragen/absagen | alles | alles |
 | Kanzlei-Post | an die Kanzlei | an alle + Rundschreiben | an alle + Rundschreiben |
 | Rechnungen | eigene ansehen/drucken | erstellen, Status | erstellen, Status, löschen |
+| Kooperationen (Rabatte) | eigene Vorteile im Profil | in Rechnungen anwenden | anlegen, Rollen, Konten zuordnen (Partner-Rang ebenso) |
 | Beweismittel | eigene hochladen, öffentliche ansehen | alles (auch intern) | alles |
 | Externe Dokumente (FiveNet, Google Docs, Google Sheets) | freigegebene ansehen, Abschrift herunterladen | verknüpfen, Bilder übernehmen; eigene bzw. in zugewiesenen Akten bearbeiten/entfernen | alles |
 | Aufgaben & Wiedervorlagen | – | alle ansehen, anlegen, abhaken; eigene/zugewiesene löschen | alles |
@@ -273,6 +288,7 @@ auth.js          Sessions, Passwörter, Rollen-Middleware
 bootstrap.js     Team-Seed, Notfall-Admin, Passwort-Reset, Datenmigration
 discord.js       Webhooks & OAuth2
 tickets.js       Discord-Tickets: je Akte ein privater Kanal (Bot, REST-API)
+cooperations.js  Kooperationen: Rabatt-Erkennung über Discord-Rollen bzw. zugeordnete Konten
 fivenet.js       FiveNet: Schnittstellenprüfung, Link-Erkennung, Instanz-Einstellung
 gdocs.js         Google Docs: Link-Erkennung, Export freigegebener Dokumente, Bildadressen
 gsheets.js       Google Sheets: Link-Erkennung, CSV-Export freigegebener Tabellenblätter
@@ -281,6 +297,6 @@ remote.js        Abrufe externer Quellen mit Zeit-, Größen- und Weiterleitungs
 uploads.js       Bild-Uploads (Formatprüfung anhand der Dateisignatur)
 helpers.js       Konstanten, Validierung
 models.js        Datenabfragen, Zeilen-Mapping, Zugriffsregeln, Protokoll
-routes/          auth, cases, calendar, messages, board, invoices, fees, team, admin, discord, public, duty, applications, fivenet, external, tasks, concerns, personnel, tickets
+routes/          auth, cases, calendar, messages, board, invoices, fees, team, admin, discord, public, duty, applications, fivenet, external, tasks, concerns, personnel, tickets, interactions, cooperations
 public/          index.html, karriere.html, login.html, register.html, dashboard.html, invoice.html, css/, js/
 ```

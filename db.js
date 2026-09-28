@@ -497,6 +497,37 @@ addColumn('concerns', 'access_pin', 'TEXT');
 addColumn('concerns', 'contact', "TEXT NOT NULL DEFAULT ''");
 addColumn('concerns', 'source', "TEXT NOT NULL DEFAULT 'dashboard'"); // dashboard | web
 
+// Kooperationen (z. B. mit einem Unternehmen): Rabatt auf Rechnungen für dessen Mitglieder – erkannt über
+// Discord-Rollen (Bot liest die Rollen des Mandanten) oder von Hand zugeordnete Mandantenkonten.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS cooperations (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    name          TEXT NOT NULL,
+    description   TEXT NOT NULL DEFAULT '',          -- intern: Vereinbarung, Ansprechpartner …
+    discount_pct  REAL NOT NULL DEFAULT 0,
+    guild_id      TEXT NOT NULL DEFAULT '',          -- leer = Discord-Server der Kanzlei
+    role_ids      TEXT NOT NULL DEFAULT '',          -- Discord-Rollen (kommagetrennt)
+    valid_until   TEXT,                              -- YYYY-MM-DD (einschließlich), optional
+    active        INTEGER NOT NULL DEFAULT 1,
+    created_by    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS cooperation_members (
+    cooperation_id INTEGER NOT NULL REFERENCES cooperations(id) ON DELETE CASCADE,
+    user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    added_by_name  TEXT NOT NULL DEFAULT '',
+    created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (cooperation_id, user_id)
+  );
+`);
+// Rechnung: angewandter Kooperationsrabatt (Name und Satz werden festgehalten, falls die Kooperation sich ändert)
+addColumn('invoices', 'cooperation_id', 'INTEGER REFERENCES cooperations(id) ON DELETE SET NULL');
+addColumn('invoices', 'coop_name', "TEXT NOT NULL DEFAULT ''");
+addColumn('invoices', 'coop_pct', 'REAL NOT NULL DEFAULT 0');
+addColumn('invoices', 'coop_amount', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('invoices', 'coop_via', "TEXT NOT NULL DEFAULT ''"); // discord | konto | manuell
+
 // NOT NULL entfernen oder ON-DELETE-Regeln ändern geht in SQLite nur über
 // einen Neuaufbau der Tabelle (offizielles 12-Schritte-Verfahren). Vorher
 // wird automatisch eine vollständige Sicherungskopie der Datenbank angelegt.

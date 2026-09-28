@@ -81,6 +81,7 @@ app.use('/api/absences', require('./routes/absences').router);
 app.use('/api/work', require('./routes/work').router);
 app.use('/api/concerns', concernRoutes.router);
 app.use('/api/personnel', require('./routes/personnel').router);
+app.use('/api/cooperations', require('./routes/cooperations').router);
 app.use('/api/contract-templates', contractRoutes.templatesRouter);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/messages', require('./routes/messages'));
