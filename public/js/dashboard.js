@@ -2001,6 +2001,16 @@
     else await refreshBehind();
   }
 
+  /** Board-Ticket einer Bewerbung bzw. eines Anliegens (nur Board of Partners). */
+  function boardTicketLine(kind, id, t) {
+    if (!t) return '';
+    const open = t.url ? `<a href="${esc(t.url)}" target="_blank" rel="noopener" class="btn-discord btn-sm">${DISCORD_ICON}<span>In Discord öffnen</span></a>` : '';
+    return `<div class="banner banner-discord items-center justify-between flex-wrap mt-4">
+      <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><strong>Discord-Ticket (Board)</strong>${t.exists ? (t.archived ? badge('archiviert', 'slate') : badge('aktiv', 'emerald')) : badge('noch nicht angelegt', 'amber')}</div>
+        ${t.error ? `<div class="text-xs text-red-300 mt-1">${icon('alert', 'ico-sm')} ${esc(t.error)}</div>` : ''}</div>
+      <div class="flex flex-wrap gap-2">${open}<button class="btn-outline btn-sm" data-action="board-ticket-sync" data-kind="${kind}" data-id="${id}">${t.exists ? 'Abgleichen' : 'Ticket anlegen'}</button></div></div>`;
+  }
+
   /** Discord-Ticket der Akte (nur wenn Discord-Tickets eingerichtet sind). */
   function ticketBanner(c, t) {
     if (!t) return '';
@@ -3166,7 +3176,8 @@
   /* ---------------------------------------------------------------- Discord-Tickets (Einstellungen) */
   function ticketSettingsPanel(t) {
     if (!t) return '';
-    const state = t.active ? badge('Aktiv', 'emerald') : t.enabled ? badge('Eingeschaltet – Einrichtung unvollständig', 'amber') : badge('Aus', 'slate');
+    const anyOn = t.active || (t.board && (t.board.activeApplications || t.board.activeConcerns));
+    const state = anyOn ? badge('Aktiv', 'emerald') : t.enabled ? badge('Eingeschaltet – Einrichtung unvollständig', 'amber') : badge('Aus', 'slate');
     const ok = (b) => `<span class="inline-flex align-middle shrink-0 ${b ? 'text-emerald-300' : 'text-amber-300'}">${icon(b ? 'check' : 'alert', 'ico-sm')}</span>`;
     const test = st.ticketTest;
     const testHtml = test
@@ -3177,32 +3188,48 @@
             .join('')}</div>`
       : '';
     const counts = t.counts || { total: 0, withTicket: 0 };
+    const b = t.board || {};
+    const bc = t.boardCounts || { applications: {}, concerns: {} };
+    const open = (counts.total || 0) + (bc.applications.total || 0) + (bc.concerns.total || 0);
+    const done = (counts.withTicket || 0) + (bc.applications.withTicket || 0) + (bc.concerns.withTicket || 0);
+    const anyActive = t.active || b.activeApplications || b.activeConcerns;
     return `<section class="panel panel-pad mt-4 lg:mt-5">
       <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${DISCORD_ICON} Discord-Tickets (Bot)</h2>${state}</div>
-      <p class="text-sm text-muted mb-4">Für jede Akte legt der Bot einen <strong>privaten Discord-Kanal</strong> an. Darin erscheinen automatisch Status, Verfahrensstand, Zuständigkeit, Nachrichten, Anhänge, Termine/Fristen, Verträge und Rechnungen der Akte – interne Notizen nie. Der <strong>Mandant wird automatisch hinzugefügt</strong>, sobald sein Discord mit dem Portal verknüpft ist (oder er auf der Website mit Aktenzeichen + Pin „Discord-Ticket beitreten“ klickt). Geschlossene Akten wandern ins Archiv; der Mandant kann dann nur noch lesen.</p>
+      <p class="text-sm text-muted mb-4">Der Bot legt <strong>private Discord-Kanäle</strong> an – für jede Akte in der Kategorie der Mandate (z. B. „Mandatsanfragen“) und auf Wunsch für jede Bewerbung und jedes Anliegen in einer eigenen Board-Kategorie (z. B. „Board of Partners“, nur für das Board sichtbar). Bei Akten gilt: Darin erscheinen automatisch Status, Verfahrensstand, Zuständigkeit, Nachrichten, Anhänge, Termine/Fristen, Verträge und Rechnungen der Akte – interne Notizen nie. Der <strong>Mandant wird automatisch hinzugefügt</strong>, sobald sein Discord mit dem Portal verknüpft ist (oder er auf der Website mit Aktenzeichen + Pin „Discord-Ticket beitreten“ klickt). Geschlossene Akten wandern ins Archiv; der Mandant kann dann nur noch lesen.</p>
       <div class="grid-2">
         <div>
           <div class="label">Einrichtung</div>
           <ol class="text-sm text-muted list-decimal pl-5 space-y-2">
             <li>${ok(t.tokenSet)} <a href="https://discord.com/developers/applications" target="_blank" rel="noopener" class="text-gold hover:underline">Discord Developer Portal</a> → eure App (dieselbe wie beim Discord-Login) → <em>Bot</em> → „Reset Token“ → Token in Render unter „Environment“ als <code class="font-mono text-xs text-gold">DISCORD_BOT_TOKEN</code> eintragen → Deploy.${t.botName ? ` <span class="text-emerald-300">Bot: ${esc(t.botName)}</span>` : ''}</li>
             <li>Bot auf den Server einladen${t.inviteUrl ? `: <a href="${esc(t.inviteUrl)}" target="_blank" rel="noopener" class="text-gold hover:underline">Einladungslink mit allen nötigen Rechten</a>` : ' (Link erscheint, sobald DISCORD_CLIENT_ID gesetzt oder die Verbindung getestet ist)'}.</li>
-            <li>In Discord eine Kategorie für Tickets anlegen (z. B. „Mandate“), optional eine zweite fürs Archiv. IDs kopieren: Einstellungen → Erweitert → Entwicklermodus an, dann Rechtsklick → „ID kopieren“.</li>
-            <li>Rechts Server-ID, Kategorien und die Team-Rolle(n) eintragen, speichern und „Verbindung testen“.</li>
-            <li>Einschalten – neue Akten bekommen ab dann automatisch ein Ticket. Bestehende offene Akten: „Offene Akten nachholen“.</li>
+            <li>In Discord die Kategorien anlegen: z. B. „Mandatsanfragen“ (Akten) und „Board of Partners“ (Bewerbungen, Anliegen), optional je eine fürs Archiv. IDs kopieren: Einstellungen → Erweitert → Entwicklermodus an, dann Rechtsklick → „ID kopieren“.</li>
+            <li>Rechts Server-ID, Kategorien und Rollen eintragen, speichern und „Verbindung testen“.</li>
+            <li>Einschalten – neue Akten, Bewerbungen und Anliegen bekommen ab dann automatisch ein Ticket. Bestehende offene: „Offene nachholen“.</li>
           </ol>
           ${t.oauthConfigured ? '' : '<div class="banner banner-amber mt-3 mb-0">' + icon('alert') + '<div>Der <strong>Discord-Login</strong> ist noch nicht eingerichtet. Ohne ihn können Mandanten ihr Discord nicht verknüpfen und werden nicht automatisch ins Ticket aufgenommen.</div></div>'}
         </div>
         <form data-form="settings-tickets" class="form-grid">
           <label class="check"><input type="checkbox" name="enabled" ${t.enabled ? 'checked' : ''}> Discord-Tickets einschalten</label>
           <div><label class="label" for="tkGuild">Server-ID</label><input id="tkGuild" name="guildId" class="field font-mono text-xs" value="${esc(t.guildId)}" inputmode="numeric" autocomplete="off" placeholder="z. B. 1234567890123456789"></div>
-          <div><label class="label" for="tkCat">Kategorie für Tickets (ID)</label><input id="tkCat" name="categoryId" class="field font-mono text-xs" value="${esc(t.categoryId)}" inputmode="numeric" autocomplete="off"></div>
-          <div><label class="label" for="tkArch">Archiv-Kategorie (ID, optional)</label><input id="tkArch" name="archiveId" class="field font-mono text-xs" value="${esc(t.archiveId)}" inputmode="numeric" autocomplete="off"><p class="form-hint">Geschlossene Akten wandern hierhin. Leer = sie bleiben in der Ticket-Kategorie (Mandant nur lesend).</p></div>
-          <div><label class="label" for="tkRoles">Team-Rolle(n) mit Zugriff auf alle Tickets (IDs)</label><input id="tkRoles" name="roleIds" class="field font-mono text-xs" value="${esc((t.roleIds || []).join(', '))}" autocomplete="off" placeholder="z. B. Rolle „Anwälte“ – mehrere mit Komma"><p class="form-hint">Die zuständigen Anwälte mit verknüpftem Discord kommen zusätzlich einzeln ins Ticket.</p></div>
-          <label class="check"><input type="checkbox" name="pingRoles" ${t.pingRoles ? 'checked' : ''}> Team-Rolle bei neuem Ticket erwähnen</label>
+          <fieldset class="ticket-group"><legend>Mandats-Tickets (je Akte, mit Mandant) ${t.active ? badge('aktiv', 'emerald') : ''}</legend>
+            <div><label class="label" for="tkCat">Kategorie (ID) – z. B. „Mandatsanfragen“</label><input id="tkCat" name="categoryId" class="field font-mono text-xs" value="${esc(t.categoryId)}" inputmode="numeric" autocomplete="off"><p class="form-hint">Leer = keine Mandats-Tickets.</p></div>
+            <div><label class="label" for="tkArch">Archiv-Kategorie (ID, optional)</label><input id="tkArch" name="archiveId" class="field font-mono text-xs" value="${esc(t.archiveId)}" inputmode="numeric" autocomplete="off"><p class="form-hint">Geschlossene Akten wandern hierhin. Leer = sie bleiben in ihrer Kategorie (Mandant nur lesend).</p></div>
+            <div><label class="label" for="tkRoles">Team-Rolle(n) mit Zugriff auf alle Mandats-Tickets (IDs)</label><input id="tkRoles" name="roleIds" class="field font-mono text-xs" value="${esc((t.roleIds || []).join(', '))}" autocomplete="off" placeholder="z. B. Rolle „Anwälte“ – mehrere mit Komma"><p class="form-hint">Die zuständigen Anwälte mit verknüpftem Discord kommen zusätzlich einzeln ins Ticket.</p></div>
+          </fieldset>
+          <fieldset class="ticket-group"><legend>Board-Tickets (nur Board of Partners) ${b.activeApplications || b.activeConcerns ? badge('aktiv', 'emerald') : ''}</legend>
+            <div class="flex flex-wrap gap-x-5 gap-y-2">
+              <label class="check"><input type="checkbox" name="boardApplications" ${b.applications !== false ? 'checked' : ''}> Ticket je Bewerbung</label>
+              <label class="check"><input type="checkbox" name="boardConcerns" ${b.concerns !== false ? 'checked' : ''}> Ticket je Anliegen ans Board</label>
+            </div>
+            <div><label class="label" for="tkBCat">Kategorie (ID) – z. B. „Board of Partners“</label><input id="tkBCat" name="boardCategoryId" class="field font-mono text-xs" value="${esc(b.categoryId || '')}" inputmode="numeric" autocomplete="off"><p class="form-hint">Leer = keine Board-Tickets. Bewerber und Einreichende sind nicht im Kanal – deshalb erscheinen hier auch interne Notizen; anonyme Anliegen bleiben anonym.</p></div>
+            <div><label class="label" for="tkBArch">Board-Archiv (ID, optional)</label><input id="tkBArch" name="boardArchiveId" class="field font-mono text-xs" value="${esc(b.archiveId || '')}" inputmode="numeric" autocomplete="off"><p class="form-hint">Abgeschlossene Bewerbungen/Anliegen. Leer = allgemeine Archiv-Kategorie (Kanäle bleiben privat).</p></div>
+            <div><label class="label" for="tkBRoles">Board-Rolle(n) (IDs)</label><input id="tkBRoles" name="boardRoleIds" class="field font-mono text-xs" value="${esc((b.roleIds || []).join(', '))}" autocomplete="off" placeholder="z. B. Rolle „Board of Partners“"><p class="form-hint">Zusätzlich kommen alle Board-Mitglieder (Rolle „Board of Partners“ oder Partner-Rang) mit verknüpftem Discord einzeln hinein – normale Anwälte nicht.</p></div>
+          </fieldset>
+          <label class="check"><input type="checkbox" name="pingRoles" ${t.pingRoles ? 'checked' : ''}> Rolle bei neuem Ticket erwähnen (Team- bzw. Board-Rolle)</label>
           <div class="form-actions">
             <button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button>
             <button type="button" class="btn-outline btn-md" data-action="tickets-test" ${t.tokenSet ? '' : 'disabled'}>Verbindung testen</button>
-            <button type="button" class="btn-ghost btn-md" data-action="tickets-backfill" ${t.active ? '' : 'disabled'}>Offene Akten nachholen (${counts.withTicket || 0}/${counts.total || 0})</button>
+            <button type="button" class="btn-ghost btn-md" data-action="tickets-backfill" ${anyActive ? '' : 'disabled'}>Offene nachholen (${done}/${open})</button>
           </div>
           ${testHtml}
         </form>
@@ -3416,6 +3443,7 @@
       <h2 class="modal-title">${esc(k.subject)}</h2>
       <p class="modal-sub">Anliegen an das Board of Partners${k.mine && k.anonymous ? ' · anonym eingereicht – das Board sieht Ihren Namen nicht' : ''}</p>
       <div class="info-grid">${info}</div>
+      ${boardTicketLine('concern', k.id, d.ticket)}
       <div class="section"><div class="section-title">Anliegen</div><div class="tl-item"><div class="tl-body">${esc(k.body)}</div></div></div>
       <div class="section"><div class="section-title">Verlauf</div>${thread}${reply}</div>
       ${manage}
@@ -3907,7 +3935,7 @@
     refreshBehind();
   }
 
-  function appDetail({ application: a, notes, hiredUser }) {
+  function appDetail({ application: a, notes, hiredUser, ticket }) {
     const cell = (k, v) => `<div><div class="k">${esc(k)}</div><div class="v">${esc(v || '—')}</div></div>`;
     const qa = (q, text) => (text ? `<div class="qa"><div class="q">${esc(q)}</div><div class="a">${esc(text)}</div></div>` : '');
     return `
@@ -3928,6 +3956,7 @@
         .join('')}</div>
       ${hiredUser ? `<div class="banner banner-gold">${icon('check')}<div>Eingestellt – Login-Konto <strong>${esc(hiredUser.email)}</strong> wurde angelegt.</div></div>` : ''}
       <div class="info-grid mb-5">${cell('Alter', a.age ? String(a.age) : '')}${cell('Telefon', a.phone)}${cell('Discord', a.discord)}${cell('E-Mail', a.email)}${cell('Eingegangen', fmtDate(a.createdAt))}${cell('Gespräch', a.interviewAt ? fmtDate(a.interviewAt) : '')}</div>
+      ${boardTicketLine('application', a.id, ticket)}
       <div class="stack">${qa('Motivation', a.motivation)}${qa('Erfahrung', a.experience)}${qa('Verfügbarkeit', a.availability)}</div>
 
       <div class="grid-2 section">
@@ -4510,6 +4539,18 @@
       await views.work.load();
       renderView();
     },
+    // Board-Ticket einer Bewerbung / eines Anliegens
+    'board-ticket-sync': async (el) => {
+      el.disabled = true;
+      const { kind, id } = el.dataset;
+      try {
+        await api.post(`/api/tickets/board/${kind}/${id}/sync`, {});
+        toast('Board-Ticket abgeglichen.');
+      } finally {
+        if (kind === 'application') await openApplication(Number(id));
+        else await openConcern(Number(id));
+      }
+    },
     // Discord-Ticket einer Akte
     'ticket-sync': async (el) => {
       el.disabled = true;
@@ -4535,10 +4576,10 @@
       }
     },
     'tickets-backfill': async () => {
-      if (!(await ask('Für alle offenen Akten ohne Discord-Ticket wird jetzt ein Kanal angelegt.', { title: 'Tickets nachholen?', confirmText: 'Anlegen' }))) return;
+      if (!(await ask('Für alle offenen Akten, Bewerbungen und Anliegen ohne Discord-Ticket wird jetzt ein Kanal angelegt.', { title: 'Tickets nachholen?', confirmText: 'Anlegen' }))) return;
       const r = await api.post('/api/tickets/backfill', {});
       st.ticketSettings = r.status;
-      toast(`${r.created} von ${r.total} Tickets angelegt.`);
+      toast(`${r.created} von ${r.total} Tickets angelegt (Akten, Bewerbungen, Anliegen).`);
       renderView();
     },
 
@@ -4807,6 +4848,11 @@
         archiveId: val(fd, 'archiveId'),
         roleIds: val(fd, 'roleIds'),
         pingRoles: fd.has('pingRoles'),
+        boardCategoryId: val(fd, 'boardCategoryId'),
+        boardArchiveId: val(fd, 'boardArchiveId'),
+        boardRoleIds: val(fd, 'boardRoleIds'),
+        boardApplications: fd.has('boardApplications'),
+        boardConcerns: fd.has('boardConcerns'),
       });
       toast('Discord-Tickets gespeichert.');
       renderView();

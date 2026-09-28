@@ -7,6 +7,7 @@ const { wrap, parseBody, idParam, deriveInitials, RANKS } = require('../helpers'
 const { teamRow, TEAM_SELECT, logActivity } = require('../models');
 const { imageBody, saveImage, removeFile } = require('../uploads');
 const personnel = require('./personnel');
+const tickets = require('../tickets');
 
 const ORDER = 'ORDER BY t.sort_order ASC, t.id ASC';
 
@@ -166,6 +167,7 @@ adminRouter.patch(
     if (credentials) personnel.recordHire({ userId: credentials.userId, name: newName, rank: newTitle, by: req.user });
     else if (d.roleTitle !== undefined || d.userId !== undefined) {
       personnel.recordRankChange({ userId: linkId || null, name: newName, oldRank: rankBefore, newRank: newTitle, by: req.user });
+      tickets.syncBoardAll();
     }
     res.json({
       member: teamRow(load(m.id), true),

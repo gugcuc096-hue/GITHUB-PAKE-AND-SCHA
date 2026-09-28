@@ -132,6 +132,7 @@ router.get(
       if (profile.scope.includes('guilds.join')) await tickets.joinGuild(profile.id, profile.accessToken);
       await within(tickets.syncUser(req.user.id), 8000);
     }
+    tickets.syncBoardAll(); // Board-Mitglieder kommen in die Board-Tickets
     res.redirect('/dashboard.html?discord=linked#profile');
   })
 );
@@ -139,6 +140,7 @@ router.get(
 router.post('/unlink', requireAuth, (req, res) => {
   db.prepare('UPDATE users SET discord_id = NULL, discord_username = NULL, discord_avatar = NULL WHERE id = ?').run(req.user.id);
   tickets.syncUser(req.user.id); // aus den Tickets entfernen
+  tickets.syncBoardAll();
   res.json({ user: publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id)) });
 });
 

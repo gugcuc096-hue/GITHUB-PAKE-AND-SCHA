@@ -8,6 +8,9 @@ const { wrap, parseBody, idParam, isoDateTime, deriveInitials, truncate, APPLICA
 const { applicationRow, positionRow, logActivity } = require('../models');
 const discord = require('../discord');
 const personnel = require('./personnel');
+const tickets = require('../tickets');
+
+const stars = (n) => '★'.repeat(n) + '☆'.repeat(5 - n);
 
 // skipFailedRequests: Tippfehler im Formular (400) verbrauchen kein Kontingent.
 const limit = (windowMs, max, message, skipFailedRequests = false) =>
@@ -58,14 +61,17 @@ publicRouter.post(
       positionTitle = p.title;
     }
     const code = randomPin();
-    const number = tx(() => {
+    const { number, id } = tx(() => {
       const nr = nextApplicationNumber();
-      db.prepare(
-        `INSERT INTO applications (number, access_code, position_id, position_title, name, age, phone, email, discord, experience, motivation, availability)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(nr, code, d.positionId, positionTitle, d.name, d.age ?? null, d.phone || '', d.email || '', d.discord, d.experience || '', d.motivation, d.availability || '');
-      return nr;
+      const info = db
+        .prepare(
+          `INSERT INTO applications (number, access_code, position_id, position_title, name, age, phone, email, discord, experience, motivation, availability)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .run(nr, code, d.positionId, positionTitle, d.name, d.age ?? null, d.phone || '', d.email || '', d.discord, d.experience || '', d.motivation, d.availability || '');
+      return { number: nr, id: Number(info.lastInsertRowid) };
     });
+    tickets.boardCreated('application', id);
     discord.notify('application.created', {
       title: `📝 Neue Bewerbung ${number}`,
       description: truncate(d.motivation, 400),
@@ -123,7 +129,12 @@ function detail(a) {
     .all(a.id)
     .map((n) => ({ id: n.id, authorId: n.author_id, author: n.author_name, body: n.body, createdAt: n.created_at }));
   const hired = a.hired_user_id ? db.prepare('SELECT id, email, display_name FROM users WHERE id = ?').get(a.hired_user_id) : null;
-  return { application: applicationRow(a), notes, hiredUser: hired ? { id: hired.id, email: hired.email, displayName: hired.display_name } : null };
+  return {
+    application: applicationRow(a),
+    notes,
+    hiredUser: hired ? { id: hired.id, email: hired.email, displayName: hired.display_name } : null,
+    ticket: tickets.boardTicketInfo('application', a),
+  };
 }
 
 adminRouter.get('/', (req, res) => {
@@ -163,6 +174,20 @@ adminRouter.patch(
     if (d.status && d.status !== a.status) {
       logActivity(req.user, 'Bewerbungsstatus geändert', 'application', a.id, `${a.number} (${a.name}): ${APPLICATION_STATUS[a.status]} → ${APPLICATION_STATUS[d.status]}`);
     }
+    // Board-Ticket: Status, Bewertung, Nachricht an den Bewerber
+    const lines = [];
+    if (d.status && d.status !== a.status) lines.push(`Status: ${APPLICATION_STATUS[a.status]} → ${APPLICATION_STATUS[d.status]}`);
+    if (d.rating !== undefined && d.rating !== a.rating) lines.push(`Bewertung: ${stars(d.rating)}`);
+    if (d.publicNote !== undefined && d.publicNote !== a.public_note && d.publicNote) lines.push(`Nachricht an den Bewerber: ${d.publicNote}`);
+    if (lines.length) {
+      const closing = d.status === 'abgelehnt';
+      tickets.boardPost('application', a.id, {
+        title: closing ? '❌ Bewerbung abgesagt' : '📌 Bewerbung aktualisiert',
+        description: lines.map((l) => `• ${l}`).join('\n'),
+        color: closing ? tickets.COLORS.slate : tickets.COLORS.gold,
+        by: req.user.display_name,
+      });
+    }
     res.json(detail(load(a.id)));
   })
 );
@@ -176,6 +201,7 @@ adminRouter.post(
     const d = parseBody(z.object({ body: z.string().trim().min(1).max(3000) }), req, res);
     if (!d) return;
     db.prepare('INSERT INTO application_notes (application_id, author_id, author_name, body) VALUES (?, ?, ?, ?)').run(a.id, req.user.id, req.user.display_name, d.body);
+    tickets.boardPost('application', a.id, { title: `🗒️ Notiz von ${req.user.display_name}`, description: d.body, color: tickets.COLORS.blue, by: req.user.display_name });
     res.status(201).json(detail(a));
   })
 );
@@ -208,6 +234,16 @@ adminRouter.post(
       );
     });
     logActivity(req.user, 'Bewerbungsgespräch geplant', 'application', a.id, `${a.number} (${a.name})`);
+    const ts = Math.floor(new Date(startsAt).getTime() / 1000);
+    tickets.boardPost('application', a.id, {
+      title: '📅 Bewerbungsgespräch geplant',
+      fields: [
+        { name: 'Wann', value: `<t:${ts}:F> (<t:${ts}:R>)`, inline: false },
+        { name: 'Ort', value: location },
+      ],
+      color: tickets.COLORS.blue,
+      by: req.user.display_name,
+    });
     res.json(detail(load(a.id)));
   })
 );
@@ -263,6 +299,12 @@ adminRouter.post(
     });
     logActivity(req.user, 'Bewerber eingestellt', 'application', a.id, `${a.name} als ${d.rank || 'Mitarbeiter (ohne Rang)'}`);
     personnel.recordHire({ userId: hiredId, name: a.name, rank: d.rank || null, note: `Über Bewerbung ${a.number}`, by: req.user });
+    tickets.boardPost('application', a.id, {
+      title: `✅ ${a.name} eingestellt`,
+      description: `Konto angelegt${d.rank ? ` als **${d.rank}**` : ''}. Die Bewerbung ist abgeschlossen – der Kanal wandert ins Archiv.`,
+      color: tickets.COLORS.green,
+      by: req.user.display_name,
+    });
     res.json({ ...detail(load(a.id)), credentials: { email, password } });
   })
 );
@@ -275,6 +317,7 @@ adminRouter.delete(
     const a = id && load(id);
     if (!a) return res.status(404).json({ error: 'Bewerbung nicht gefunden.' });
     db.prepare('DELETE FROM applications WHERE id = ?').run(a.id);
+    tickets.boardDeleted('application', a, req.user.display_name);
     logActivity(req.user, 'Bewerbung gelöscht', 'application', a.id, `${a.number} (${a.name})`);
     res.json({ success: true });
   })

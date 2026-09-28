@@ -21,6 +21,7 @@ const { requireAuth } = require('../auth');
 const { wrap, parseBody, idParam, truncate, isBoard } = require('../helpers');
 const { logActivity } = require('../models');
 const discord = require('../discord');
+const tickets = require('../tickets');
 
 const CATEGORIES = {
   personal: 'Personal & Beförderung',
@@ -164,6 +165,7 @@ function createConcern({ user, name, contact = '', source, d }) {
   });
   const k = db.prepare(`${SELECT} WHERE k.id = ?`).get(id);
   notify('concern.created', k, '📨 Neues Anliegen an das Board of Partners', [{ name: 'Dringlichkeit', value: URGENCY[k.urgency] }], k.body);
+  tickets.boardCreated('concern', k.id);
   // Anonyme Anliegen erscheinen nicht im Protokoll (dort stünde sonst der Name).
   if (user && !k.anonymous) logActivity(user, 'Anliegen ans Board eingereicht', 'concern', k.id, `${k.reference}: ${truncate(k.subject, 110)}`);
   return { concern: k, pin };
@@ -182,6 +184,11 @@ function addAuthorMessage(k, body, user) {
     db.prepare("UPDATE concerns SET updated_at = datetime('now'), author_seen_at = datetime('now') WHERE id = ?").run(k.id);
   });
   notify('concern.updated', k, '💬 Rückmeldung zu einem Anliegen ans Board', [{ name: 'Status', value: STATUS[k.status] }], body);
+  tickets.boardPost('concern', k.id, {
+    title: `💬 Rückmeldung von ${k.anonymous ? 'Anonym' : k.author_name} (${groupLabel(k)})`,
+    description: body,
+    color: tickets.COLORS.blue,
+  });
   return null;
 }
 
@@ -265,6 +272,7 @@ router.get('/:id', (req, res) => {
     statuses: STATUS,
     canWithdraw: mine && k.status === 'offen' && !boardReplies,
     canDelete: u.role === 'admin' && !mine,
+    ticket: board && !mine ? tickets.boardTicketInfo('concern', k) : undefined,
   });
 });
 
@@ -298,6 +306,12 @@ router.post(
         // Antwort des Boards auf ein offenes Anliegen: automatisch „In Bearbeitung“
         if (k.status === 'offen') db.prepare("UPDATE concerns SET status = 'in_bearbeitung', assigned_to = COALESCE(assigned_to, ?) WHERE id = ?").run(u.id, k.id);
       }
+    });
+    tickets.boardPost('concern', k.id, {
+      title: internal ? `🔒 Interne Notiz von ${u.display_name}` : `↩️ Antwort von ${u.display_name} an die einreichende Person`,
+      description: d.body,
+      color: internal ? tickets.COLORS.slate : tickets.COLORS.gold,
+      by: u.display_name,
     });
     res.status(201).json({ success: true });
   })
@@ -338,6 +352,12 @@ router.patch(
       db.prepare(`UPDATE concerns SET ${sets.join(', ')}, updated_at = datetime('now'), board_activity_at = datetime('now') WHERE id = ?`).run(...values, k.id);
       db.prepare('INSERT INTO concern_messages (concern_id, author_id, author_name, from_board, system, body) VALUES (?, ?, ?, 1, 1, ?)').run(k.id, u.id, u.display_name, notes.join(' · '));
     });
+    tickets.boardPost('concern', k.id, {
+      title: d.status && CLOSED.includes(d.status) ? `🔒 Anliegen ${STATUS[d.status].toLowerCase()}` : '📌 Anliegen aktualisiert',
+      description: notes.map((n) => `• ${n}`).join('\n'),
+      color: d.status && CLOSED.includes(d.status) ? tickets.COLORS.slate : tickets.COLORS.gold,
+      by: u.display_name,
+    });
     if (d.status && d.status !== k.status) {
       notify('concern.updated', k, `📋 Anliegen ans Board: ${STATUS[d.status]}`, [{ name: 'Geändert von', value: u.display_name }]);
       logActivity(u, 'Anliegen ans Board: Status', 'concern', k.id, `${k.reference}: ${STATUS[d.status]}`);
@@ -359,6 +379,7 @@ router.delete(
       return res.status(403).json({ error: 'Zurückziehen geht nur, solange das Board noch nicht reagiert hat.' });
     }
     db.prepare('DELETE FROM concerns WHERE id = ?').run(k.id);
+    tickets.boardDeleted('concern', k, canWithdraw ? 'Zurückgezogen' : u.display_name);
     res.json({ success: true });
   })
 );
