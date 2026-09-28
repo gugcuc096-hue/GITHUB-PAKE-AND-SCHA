@@ -6,11 +6,30 @@ const { requireAuth, isStaff } = require('../auth');
 const { wrap, parseBody, idParam, isoDateTime, EVENT_TYPES, truncate } = require('../helpers');
 const { getCase, caseAccess, APPT_SELECT, getAppointment, apptVisible, apptRow } = require('../models');
 const discord = require('../discord');
+const tickets = require('../tickets');
 
 const router = express.Router();
 router.use(requireAuth);
 
 const TYPE_ICON = { mandant: '🤝', gericht: '⚖️', frist: '⏳', intern: '📌' };
+
+/** Termin/Frist einer Akte im Discord-Ticket melden – nur, wenn der Mandant ihn auch sieht. */
+function ticketAppointment(a, title, { by, mention = 'client', note } = {}) {
+  if (!a || !a.case_id || !a.client_visible) return;
+  tickets.post(a.case_id, {
+    title: `${title}: ${truncate(a.title, 180)}`,
+    description: note,
+    color: a.status === 'abgesagt' ? tickets.COLORS.slate : tickets.COLORS.blue,
+    fields: [
+      { name: 'Art', value: EVENT_TYPES[a.type] || a.type },
+      { name: a.type === 'frist' ? 'Fällig' : 'Wann', value: fmtDiscordTime(a.starts_at), inline: false },
+      ...(a.location ? [{ name: 'Ort', value: a.location }] : []),
+    ],
+    mention,
+    by: by ? by.display_name : undefined,
+    byDiscordId: by ? by.discord_id : undefined,
+  });
+}
 
 function fmtDiscordTime(iso) {
   // Discord rendert <t:…> automatisch in der Zeitzone jedes Lesers.
@@ -92,6 +111,8 @@ router.post(
       .run(c ? c.id : null, row.clientId, row.type, d.title, startsAt, endsAt, row.location, d.note || '', row.status, row.assignedTo, u.id, row.clientVisible);
 
     const a = getAppointment(Number(info.lastInsertRowid));
+    if (u.role === 'mandant') ticketAppointment(a, '📅 Terminanfrage des Mandanten', { by: u, mention: 'lawyers' });
+    else ticketAppointment(a, a.status === 'angefragt' ? '📅 Terminvorschlag' : a.type === 'frist' ? '⏳ Neue Frist' : '📅 Neuer Termin', { by: u });
     if (u.role === 'mandant') {
       discord.notify('appointment.requested', {
         title: `${TYPE_ICON.mandant} Terminanfrage: ${a.title}`,
@@ -138,6 +159,7 @@ router.patch(
       const onlyCancel = Object.keys(d).length === 1 && d.status === 'abgesagt';
       if (!onlyCancel || a.client_id !== u.id) return res.status(403).json({ error: 'Termine kann nur die Kanzlei ändern. Sie können Ihren Termin absagen.' });
       db.prepare("UPDATE appointments SET status = 'abgesagt' WHERE id = ?").run(a.id);
+      ticketAppointment(getAppointment(a.id), '❌ Termin vom Mandanten abgesagt', { by: u, mention: 'lawyers' });
       return res.json({ event: apptRow(getAppointment(a.id), u) });
     }
 
@@ -182,6 +204,14 @@ router.patch(
     if (updated.ends_at && updated.ends_at < updated.starts_at) {
       db.prepare('UPDATE appointments SET ends_at = NULL WHERE id = ?').run(a.id);
     }
+    // Ticket: bestätigt / abgesagt / erledigt / verlegt oder neu für den Mandanten sichtbar
+    const becameVisible = updated.client_visible && (!a.client_visible || updated.case_id !== a.case_id);
+    const moved = updated.starts_at !== a.starts_at;
+    if (becameVisible) ticketAppointment(updated, updated.type === 'frist' ? '⏳ Neue Frist' : '📅 Neuer Termin', { by: u });
+    else if (updated.status !== a.status) {
+      const label = { bestaetigt: '✅ Termin bestätigt', abgesagt: '❌ Termin abgesagt', erledigt: '✔️ Termin erledigt', angefragt: '📅 Termin wieder offen' }[updated.status];
+      if (label) ticketAppointment(updated, updated.type === 'frist' && updated.status === 'erledigt' ? '✔️ Frist erledigt' : label, { by: u });
+    } else if (moved) ticketAppointment(updated, updated.type === 'frist' ? '⏳ Frist geändert' : '🔁 Termin verlegt', { by: u });
     res.json({ event: apptRow(getAppointment(a.id), u) });
   })
 );
@@ -217,6 +247,7 @@ function sendDueReminders() {
     .all(now.toISOString(), soon.toISOString());
   for (const a of due) {
     db.prepare('UPDATE appointments SET reminded = 1 WHERE id = ?').run(a.id);
+    ticketAppointment(a, `⏰ Erinnerung – ${EVENT_TYPES[a.type]} in weniger als 24 Stunden`);
     discord.notify('calendar.reminder', {
       title: `⏰ Erinnerung – ${EVENT_TYPES[a.type]}: ${truncate(a.title, 200)}`,
       color: discord.RED,

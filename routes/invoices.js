@@ -6,6 +6,7 @@ const { requireAuth, requireStaff, requireAdmin, isStaff } = require('../auth');
 const { wrap, parseBody, idParam, dateOnly, truncate } = require('../helpers');
 const { INVOICE_SELECT, invoiceRow, getCase, addSystemNote, logActivity } = require('../models');
 const discord = require('../discord');
+const tickets = require('../tickets');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -133,6 +134,19 @@ router.post(
       ],
     });
 
+    if (c) {
+      tickets.post(c.id, {
+        title: `🧾 ${label} ${number}`,
+        description: `${d.subject ? `${truncate(d.subject, 300)}\n` : ''}Im Mandantenportal unter „Rechnungen“ abrufbar.`,
+        fields: [
+          { name: 'Betrag', value: money(t.total) },
+          ...(d.dueDate ? [{ name: 'Fällig am', value: new Date(`${d.dueDate}T12:00:00`).toLocaleDateString('de-DE') }] : []),
+        ],
+        mention: 'client',
+        by: u.display_name,
+        byDiscordId: u.discord_id,
+      });
+    }
     const inv = db.prepare(`${INVOICE_SELECT} WHERE i.id = ?`).get(Number(info.lastInsertRowid));
     res.status(201).json({ invoice: invoiceRow(inv) });
   })

@@ -2001,7 +2001,29 @@
     else await refreshBehind();
   }
 
-  function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work }) {
+  /** Discord-Ticket der Akte (nur wenn Discord-Tickets eingerichtet sind). */
+  function ticketBanner(c, t) {
+    if (!t) return '';
+    const open = t.url ? `<a href="${esc(t.url)}" target="_blank" rel="noopener" class="btn-discord btn-sm">${DISCORD_ICON}<span>In Discord öffnen</span></a>` : '';
+    if (!isStaff()) {
+      if (t.clientInTicket) return `<div class="banner banner-discord items-center justify-between flex-wrap"><div><strong>Ihr Discord-Ticket</strong><div class="text-sm text-muted">Alle Neuigkeiten zu dieser Akte erscheinen automatisch in Ihrem privaten Discord-Kanal.</div></div>${open}</div>`;
+      if (t.clientLinked)
+        return `<div class="banner banner-discord items-center justify-between flex-wrap"><div><strong>Discord-Ticket</strong><div class="text-sm text-muted">Sie werden automatisch hinzugefügt, sobald Sie auf dem Discord-Server der Kanzlei sind.</div></div><button class="btn-outline btn-sm" data-action="ticket-sync" data-id="${c.id}">Erneut prüfen</button></div>`;
+      return `<div class="banner banner-discord items-center justify-between flex-wrap"><div><strong>Discord-Ticket</strong><div class="text-sm text-muted">Verbinden Sie Ihr Discord-Konto – dann kommen Sie automatisch in das private Ticket zu Ihrer Akte.</div></div><a href="/api/discord/connect" class="btn-discord btn-sm">${DISCORD_ICON}<span>Discord verbinden</span></a></div>`;
+    }
+    const client = t.clientInTicket
+      ? badge('Mandant im Ticket', 'emerald')
+      : t.clientLinked
+        ? badge('Mandant nicht auf dem Server', 'amber')
+        : badge(c.hasClientAccount ? 'Mandant: Discord nicht verknüpft' : 'Mandant noch nicht beigetreten', 'slate');
+    return `<div class="banner banner-discord items-center justify-between flex-wrap">
+      <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><strong>Discord-Ticket</strong>${t.exists ? (t.archived ? badge('archiviert', 'slate') : badge('aktiv', 'emerald')) : badge('noch nicht angelegt', 'amber')}${t.exists ? client : ''}</div>
+        <div class="text-xs text-dim mt-1">${t.exists ? 'Status, Zuständigkeit, Nachrichten, Termine, Verträge und Rechnungen erscheinen automatisch im Kanal – interne Notizen nie.' : 'Wird automatisch angelegt; hier von Hand anlegen, falls es fehlt.'}${!t.clientInTicket && !c.hasClientAccount ? ' Mandanten ohne Konto treten auf der Website unter „Aktenstatus“ mit Aktenzeichen + Pin bei.' : ''}</div>
+        ${t.error ? `<div class="text-xs text-red-300 mt-1">${icon('alert', 'ico-sm')} ${esc(t.error)}</div>` : ''}</div>
+      <div class="flex flex-wrap gap-2">${open}<button class="btn-outline btn-sm" data-action="ticket-sync" data-id="${c.id}">${t.exists ? 'Abgleichen' : 'Ticket anlegen'}</button></div></div>`;
+  }
+
+  function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket }) {
     const staff = isStaff();
     const admin = isAdmin();
     const me = st.user.id;
@@ -2116,6 +2138,7 @@
       ${staff ? caseStats(c, { appointments, attachments, externalDocs, tasks }) : ''}
       <div class="info-grid mb-5">${info}</div>
       ${pin}
+      ${ticketBanner(c, ticket)}
       ${quick.length ? `<div class="form-actions mb-2">${quick.join('')}</div>` : ''}
       ${editForm}
       <div class="section"><h3 class="section-title">Sachverhalt</h3><p class="text-sm whitespace-pre-wrap text-muted">${esc(c.description || '—')}</p></div>
@@ -3061,9 +3084,10 @@
 
   views.settings = {
     async load() {
-      const [r, tpl] = await Promise.all([api.get('/api/admin/settings'), api.get('/api/contract-templates?all=1'), load.fivenet(true)]);
+      const [r, tpl, tk] = await Promise.all([api.get('/api/admin/settings'), api.get('/api/contract-templates?all=1'), api.get('/api/tickets/settings'), load.fivenet(true)]);
       st.settings = r.settings;
       st.contractTemplates = tpl;
+      st.ticketSettings = tk;
     },
     render() {
       const s = st.settings;
@@ -3124,6 +3148,7 @@
             </section>
           </div>
         </div>
+        ${ticketSettingsPanel(st.ticketSettings)}
         ${fivenetSettingsPanel(s)}
         ${contractTemplatesPanel()}
         <section class="panel panel-pad mt-4 lg:mt-5">
@@ -3137,6 +3162,53 @@
         </section>`;
     },
   };
+
+  /* ---------------------------------------------------------------- Discord-Tickets (Einstellungen) */
+  function ticketSettingsPanel(t) {
+    if (!t) return '';
+    const state = t.active ? badge('Aktiv', 'emerald') : t.enabled ? badge('Eingeschaltet – Einrichtung unvollständig', 'amber') : badge('Aus', 'slate');
+    const ok = (b) => `<span class="inline-flex align-middle shrink-0 ${b ? 'text-emerald-300' : 'text-amber-300'}">${icon(b ? 'check' : 'alert', 'ico-sm')}</span>`;
+    const test = st.ticketTest;
+    const testHtml = test
+      ? test.running
+        ? '<p class="text-sm text-dim mt-3">Verbindung wird geprüft …</p>'
+        : `<div class="ticket-checks mt-3">${test.checks
+            .map((c) => `<div class="flex items-start gap-2 text-sm">${ok(c.ok)}<div><strong>${esc(c.label)}</strong>${c.detail ? `<span class="text-muted"> – ${esc(c.detail)}</span>` : ''}</div></div>`)
+            .join('')}</div>`
+      : '';
+    const counts = t.counts || { total: 0, withTicket: 0 };
+    return `<section class="panel panel-pad mt-4 lg:mt-5">
+      <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${DISCORD_ICON} Discord-Tickets (Bot)</h2>${state}</div>
+      <p class="text-sm text-muted mb-4">Für jede Akte legt der Bot einen <strong>privaten Discord-Kanal</strong> an. Darin erscheinen automatisch Status, Verfahrensstand, Zuständigkeit, Nachrichten, Anhänge, Termine/Fristen, Verträge und Rechnungen der Akte – interne Notizen nie. Der <strong>Mandant wird automatisch hinzugefügt</strong>, sobald sein Discord mit dem Portal verknüpft ist (oder er auf der Website mit Aktenzeichen + Pin „Discord-Ticket beitreten“ klickt). Geschlossene Akten wandern ins Archiv; der Mandant kann dann nur noch lesen.</p>
+      <div class="grid-2">
+        <div>
+          <div class="label">Einrichtung</div>
+          <ol class="text-sm text-muted list-decimal pl-5 space-y-2">
+            <li>${ok(t.tokenSet)} <a href="https://discord.com/developers/applications" target="_blank" rel="noopener" class="text-gold hover:underline">Discord Developer Portal</a> → eure App (dieselbe wie beim Discord-Login) → <em>Bot</em> → „Reset Token“ → Token in Render unter „Environment“ als <code class="font-mono text-xs text-gold">DISCORD_BOT_TOKEN</code> eintragen → Deploy.${t.botName ? ` <span class="text-emerald-300">Bot: ${esc(t.botName)}</span>` : ''}</li>
+            <li>Bot auf den Server einladen${t.inviteUrl ? `: <a href="${esc(t.inviteUrl)}" target="_blank" rel="noopener" class="text-gold hover:underline">Einladungslink mit allen nötigen Rechten</a>` : ' (Link erscheint, sobald DISCORD_CLIENT_ID gesetzt oder die Verbindung getestet ist)'}.</li>
+            <li>In Discord eine Kategorie für Tickets anlegen (z. B. „Mandate“), optional eine zweite fürs Archiv. IDs kopieren: Einstellungen → Erweitert → Entwicklermodus an, dann Rechtsklick → „ID kopieren“.</li>
+            <li>Rechts Server-ID, Kategorien und die Team-Rolle(n) eintragen, speichern und „Verbindung testen“.</li>
+            <li>Einschalten – neue Akten bekommen ab dann automatisch ein Ticket. Bestehende offene Akten: „Offene Akten nachholen“.</li>
+          </ol>
+          ${t.oauthConfigured ? '' : '<div class="banner banner-amber mt-3 mb-0">' + icon('alert') + '<div>Der <strong>Discord-Login</strong> ist noch nicht eingerichtet. Ohne ihn können Mandanten ihr Discord nicht verknüpfen und werden nicht automatisch ins Ticket aufgenommen.</div></div>'}
+        </div>
+        <form data-form="settings-tickets" class="form-grid">
+          <label class="check"><input type="checkbox" name="enabled" ${t.enabled ? 'checked' : ''}> Discord-Tickets einschalten</label>
+          <div><label class="label" for="tkGuild">Server-ID</label><input id="tkGuild" name="guildId" class="field font-mono text-xs" value="${esc(t.guildId)}" inputmode="numeric" autocomplete="off" placeholder="z. B. 1234567890123456789"></div>
+          <div><label class="label" for="tkCat">Kategorie für Tickets (ID)</label><input id="tkCat" name="categoryId" class="field font-mono text-xs" value="${esc(t.categoryId)}" inputmode="numeric" autocomplete="off"></div>
+          <div><label class="label" for="tkArch">Archiv-Kategorie (ID, optional)</label><input id="tkArch" name="archiveId" class="field font-mono text-xs" value="${esc(t.archiveId)}" inputmode="numeric" autocomplete="off"><p class="form-hint">Geschlossene Akten wandern hierhin. Leer = sie bleiben in der Ticket-Kategorie (Mandant nur lesend).</p></div>
+          <div><label class="label" for="tkRoles">Team-Rolle(n) mit Zugriff auf alle Tickets (IDs)</label><input id="tkRoles" name="roleIds" class="field font-mono text-xs" value="${esc((t.roleIds || []).join(', '))}" autocomplete="off" placeholder="z. B. Rolle „Anwälte“ – mehrere mit Komma"><p class="form-hint">Die zuständigen Anwälte mit verknüpftem Discord kommen zusätzlich einzeln ins Ticket.</p></div>
+          <label class="check"><input type="checkbox" name="pingRoles" ${t.pingRoles ? 'checked' : ''}> Team-Rolle bei neuem Ticket erwähnen</label>
+          <div class="form-actions">
+            <button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button>
+            <button type="button" class="btn-outline btn-md" data-action="tickets-test" ${t.tokenSet ? '' : 'disabled'}>Verbindung testen</button>
+            <button type="button" class="btn-ghost btn-md" data-action="tickets-backfill" ${t.active ? '' : 'disabled'}>Offene Akten nachholen (${counts.withTicket || 0}/${counts.total || 0})</button>
+          </div>
+          ${testHtml}
+        </form>
+      </div>
+    </section>`;
+  }
 
   /* ---------------------------------------------------------------- Profil */
   views.profile = {
@@ -4437,6 +4509,38 @@
       await views.work.load();
       renderView();
     },
+    // Discord-Ticket einer Akte
+    'ticket-sync': async (el) => {
+      el.disabled = true;
+      try {
+        const r = await api.post(`/api/tickets/cases/${el.dataset.id}/sync`, {});
+        toast(r.ticket && r.ticket.exists ? (isStaff() ? 'Discord-Ticket abgeglichen.' : r.ticket.clientInTicket ? 'Sie sind im Discord-Ticket.' : 'Noch nicht auf dem Discord-Server der Kanzlei.') : 'Discord-Ticket wird angelegt …');
+      } finally {
+        await reloadCase(Number(el.dataset.id));
+      }
+    },
+    'tickets-test': async () => {
+      st.ticketTest = { running: true };
+      renderView();
+      try {
+        const r = await api.post('/api/tickets/test', {});
+        st.ticketTest = r;
+        st.ticketSettings = r.status;
+      } catch (e) {
+        st.ticketTest = null;
+        throw e;
+      } finally {
+        renderView();
+      }
+    },
+    'tickets-backfill': async () => {
+      if (!(await ask('Für alle offenen Akten ohne Discord-Ticket wird jetzt ein Kanal angelegt.', { title: 'Tickets nachholen?', confirmText: 'Anlegen' }))) return;
+      const r = await api.post('/api/tickets/backfill', {});
+      st.ticketSettings = r.status;
+      toast(`${r.created} von ${r.total} Tickets angelegt.`);
+      renderView();
+    },
+
     // Anliegen an das Board of Partners
     'concern-new': () => concernNewModal(),
     'concern-open': (el) => openConcern(Number(el.dataset.id)),
@@ -4693,6 +4797,19 @@
      Formulare
      ================================================================ */
   const forms = {
+    'settings-tickets': async (f) => {
+      const fd = new FormData(f);
+      st.ticketSettings = await api.patch('/api/tickets/settings', {
+        enabled: fd.has('enabled'),
+        guildId: val(fd, 'guildId'),
+        categoryId: val(fd, 'categoryId'),
+        archiveId: val(fd, 'archiveId'),
+        roleIds: val(fd, 'roleIds'),
+        pingRoles: fd.has('pingRoles'),
+      });
+      toast('Discord-Tickets gespeichert.');
+      renderView();
+    },
     'concern-new': async (f) => {
       const fd = new FormData(f);
       const res = await api.post('/api/concerns', {

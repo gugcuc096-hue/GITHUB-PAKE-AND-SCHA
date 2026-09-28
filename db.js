@@ -467,6 +467,12 @@ addColumn('case_external_docs', 'content_at', 'TEXT');
 addColumn('case_external_docs', 'content_by_name', "TEXT NOT NULL DEFAULT ''");
 // Zeitpunkt des Schließens einer Akte (für die Bearbeitungsdauer); beim Wiedereröffnen wieder NULL.
 addColumn('cases', 'closed_at', 'TEXT');
+// Discord-Ticket je Akte (Kanal, Mitglieder mit eigener Berechtigung, Mandant ohne Konto, letzter Fehler)
+addColumn('cases', 'discord_channel_id', 'TEXT');
+addColumn('cases', 'discord_members', 'TEXT');
+addColumn('cases', 'discord_client_id', 'TEXT');
+addColumn('cases', 'discord_archived', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('cases', 'discord_error', 'TEXT');
 // Reihenfolge in der Akte (per Ziehen festgelegt); NULL = noch nicht einsortiert, erscheint oben.
 addColumn('case_external_docs', 'sort_order', 'INTEGER');
 addColumn('case_attachments', 'external_doc_id', 'INTEGER REFERENCES case_external_docs(id) ON DELETE SET NULL');

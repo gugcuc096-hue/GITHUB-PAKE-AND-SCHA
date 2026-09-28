@@ -297,14 +297,15 @@ function oauthDiagnostics(origin) {
   };
 }
 
-function authorizeUrl(cfg, state) {
+/** scopes: „identify“ (Login) bzw. zusätzlich „guilds.join“ (Mandanten für das Discord-Ticket dem Server hinzufügen). */
+function authorizeUrl(cfg, state, scopes = ['identify'], prompt = 'none') {
   const params = new URLSearchParams({
     client_id: cfg.clientId,
     redirect_uri: cfg.redirectUri,
     response_type: 'code',
-    scope: 'identify',
+    scope: scopes.join(' '),
     state,
-    prompt: 'none',
+    prompt,
   });
   return `https://discord.com/oauth2/authorize?${params}`;
 }
@@ -331,7 +332,8 @@ async function fetchDiscordUser(cfg, code) {
   });
   if (!userRes.ok) throw new Error(`Discord-Profil konnte nicht geladen werden (${userRes.status})`);
   const u = await userRes.json();
-  return { id: String(u.id), username: u.global_name || u.username, avatar: u.avatar || null };
+  // accessToken nur für den einmaligen Server-Beitritt (guilds.join) – wird nirgends gespeichert.
+  return { id: String(u.id), username: u.global_name || u.username, avatar: u.avatar || null, accessToken: token.access_token, scope: String(token.scope || '') };
 }
 
 module.exports = {

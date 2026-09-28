@@ -1,0 +1,722 @@
+'use strict';
+/*
+ * Discord-Tickets: Für jede Akte ein eigener, privater Discord-Kanal („Ticket“).
+ *
+ *  - Neue Akte (Website-Formular oder Dashboard) → Kanal #ps-2026-0012-name in der Ticket-Kategorie
+ *  - Sichtbar für: die eingestellten Team-Rollen, die zuständigen Anwälte (mit verknüpftem Discord)
+ *    und den Mandanten (Discord-Konto mit dem Website-Konto verknüpft bzw. über Aktenzeichen + Pin
+ *    auf der Website „Discord-Ticket beitreten“)
+ *  - Alles, was der Mandant auch im Portal sieht, erscheint automatisch im Kanal: Status, Verfahrensstand,
+ *    Zuständigkeit, Hinweise, Nachrichten, Anhänge, Termine/Fristen, Verträge, Rechnungen
+ *  - Interne Notizen, interne Anhänge und Aufgaben landen NIE im Ticket (der Mandant liest mit).
+ *  - Akte geschlossen → Kanal wandert ins Archiv, der Mandant kann nur noch lesen; wieder geöffnet → zurück.
+ *
+ * Technik: Nur die Discord-REST-API mit einem Bot-Token (Umgebungsvariable DISCORD_BOT_TOKEN – nie in der
+ * Datenbank, nie im Frontend). Es läuft kein dauerhafter Bot-Prozess; einmalig meldet sich der Bot am
+ * Gateway an (von Discord vor dem ersten Senden verlangt). Alle Aufrufe je Akte laufen nacheinander in
+ * einer Warteschlange und blockieren nie die eigentliche Anfrage; Fehler landen an der Akte und im Log.
+ */
+const crypto = require('crypto');
+const { db, getSetting, setSetting } = require('./db');
+const { truncate, CASE_STATUS, STEPS } = require('./helpers');
+const { getCase, caseLawyers } = require('./models');
+const discord = require('./discord');
+
+const API = 'https://discord.com/api/v10';
+const ID_RE = /^\d{15,25}$/;
+const isId = (v) => ID_RE.test(String(v || ''));
+
+/* ---------------------------------------------------------------- Berechtigungen */
+const P = {
+  CREATE_INSTANT_INVITE: 1 << 0,
+  ADMINISTRATOR: 1 << 3,
+  MANAGE_CHANNELS: 1 << 4,
+  VIEW_CHANNEL: 1 << 10,
+  SEND_MESSAGES: 1 << 11,
+  MANAGE_MESSAGES: 1 << 13,
+  EMBED_LINKS: 1 << 14,
+  ATTACH_FILES: 1 << 15,
+  READ_MESSAGE_HISTORY: 1 << 16,
+  MENTION_EVERYONE: 1 << 17,
+  MANAGE_ROLES: 1 << 28,
+};
+const PERM_NAMES = {
+  CREATE_INSTANT_INVITE: 'Einladung erstellen (Mandanten dem Server hinzufügen)',
+  MANAGE_CHANNELS: 'Kanäle verwalten',
+  VIEW_CHANNEL: 'Kanäle ansehen',
+  SEND_MESSAGES: 'Nachrichten senden',
+  MANAGE_MESSAGES: 'Nachrichten verwalten (anheften)',
+  EMBED_LINKS: 'Links einbetten',
+  ATTACH_FILES: 'Dateien anhängen',
+  READ_MESSAGE_HISTORY: 'Nachrichtenverlauf lesen',
+  MENTION_EVERYONE: 'Alle Rollen erwähnen (Team-Rolle pingen)',
+  MANAGE_ROLES: 'Berechtigungen verwalten (Rollen verwalten)',
+};
+const REQUIRED = Object.keys(PERM_NAMES);
+const INVITE_PERMISSIONS = REQUIRED.reduce((s, k) => s + P[k], 0);
+const MEMBER_ALLOW = P.VIEW_CHANNEL + P.SEND_MESSAGES + P.EMBED_LINKS + P.ATTACH_FILES + P.READ_MESSAGE_HISTORY;
+const READ_ONLY = P.VIEW_CHANNEL + P.READ_MESSAGE_HISTORY;
+const BOT_ALLOW = MEMBER_ALLOW + P.MANAGE_MESSAGES + P.MANAGE_CHANNELS + P.MANAGE_ROLES;
+
+const COLORS = { gold: discord.GOLD, red: discord.RED, green: 0x10b981, blue: 0x38bdf8, slate: 0x64748b };
+
+/* ---------------------------------------------------------------- Einstellungen */
+const token = () => discord.envValue('DISCORD_BOT_TOKEN');
+
+function config() {
+  return {
+    enabled: getSetting('discord_tickets_enabled', '0') === '1',
+    guildId: getSetting('discord_ticket_guild', ''),
+    categoryId: getSetting('discord_ticket_category', ''),
+    archiveId: getSetting('discord_ticket_archive', ''),
+    roleIds: String(getSetting('discord_ticket_roles', '') || '')
+      .split(/[\s,;]+/)
+      .filter(isId),
+    pingRoles: getSetting('discord_ticket_ping', '1') === '1',
+  };
+}
+
+/** Sind Tickets eingeschaltet und vollständig eingerichtet? */
+function active() {
+  const c = config();
+  return c.enabled && !!token() && isId(c.guildId) && isId(c.categoryId);
+}
+
+function inviteUrl() {
+  const appId = getSetting('discord_bot_id', '') || discord.envValue('DISCORD_CLIENT_ID');
+  if (!isId(appId)) return null;
+  const guild = config().guildId;
+  const params = new URLSearchParams({ client_id: appId, scope: 'bot', permissions: String(INVITE_PERMISSIONS) });
+  if (isId(guild)) {
+    params.set('guild_id', guild);
+    params.set('disable_guild_select', 'true');
+  }
+  return `https://discord.com/oauth2/authorize?${params}`;
+}
+
+/* ---------------------------------------------------------------- REST */
+class DiscordApiError extends Error {
+  constructor(status, body) {
+    super(describeError(status, body));
+    this.status = status;
+    this.code = body && body.code;
+  }
+}
+
+function describeError(status, body) {
+  const code = body && body.code;
+  const known = {
+    10003: 'Kanal nicht gefunden (gelöscht?).',
+    10004: 'Discord-Server nicht gefunden – stimmt die Server-ID und ist der Bot eingeladen?',
+    10007: 'Die Person ist nicht auf dem Discord-Server.',
+    10013: 'Discord-Konto nicht gefunden.',
+    50001: 'Der Bot hat keinen Zugriff (fehlende Rechte auf Server oder Kategorie).',
+    50013: 'Dem Bot fehlen Berechtigungen (z. B. „Kanäle verwalten“ oder „Berechtigungen verwalten“).',
+    50035: 'Ungültige Angaben (z. B. falsche Kategorie-ID).',
+  };
+  if (status === 401) return 'Der Bot-Token ist ungültig (DISCORD_BOT_TOKEN prüfen).';
+  if (known[code]) return known[code];
+  const msg = body && body.message ? String(body.message) : '';
+  return `Discord antwortet mit ${status}${msg ? ': ' + truncate(msg, 160) : ''}`;
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function rest(method, path, body, attempt = 0) {
+  const res = await fetch(API + path, {
+    method,
+    headers: {
+      Authorization: `Bot ${token()}`,
+      'Content-Type': 'application/json',
+      'User-Agent': 'DiscordBot (https://pake-scha.ls, 1.0) PakeScha-Kanzlei',
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(12000),
+  });
+  if (res.status === 429 && attempt < 3) {
+    const info = await res.json().catch(() => ({}));
+    await sleep(Math.min(15, Number(info.retry_after) || 1) * 1000 + 250);
+    return rest(method, path, body, attempt + 1);
+  }
+  if (res.status === 204) return null;
+  const text = await res.text().catch(() => '');
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
+  if (!res.ok) throw new DiscordApiError(res.status, data);
+  return data;
+}
+
+/**
+ * Discord verlangt, dass sich ein Bot mindestens einmal am Gateway anmeldet, bevor er per REST
+ * Nachrichten sendet. Das passiert hier einmalig je Token (kurz verbinden, anmelden, trennen).
+ */
+async function identifyOnce() {
+  const t = token();
+  if (!t || typeof WebSocket !== 'function') return;
+  const hash = crypto.createHash('sha256').update(t).digest('hex').slice(0, 16);
+  if (getSetting('discord_bot_identified', '') === hash) return;
+  await new Promise((resolve) => {
+    let done = false;
+    let ws;
+    const finish = (ok) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      try {
+        ws.close();
+      } catch {
+        /* schon geschlossen */
+      }
+      if (ok) setSetting('discord_bot_identified', hash);
+      resolve();
+    };
+    const timer = setTimeout(() => finish(false), 15000);
+    try {
+      ws = new WebSocket('wss://gateway.discord.gg/?v=10&encoding=json');
+    } catch {
+      return finish(false);
+    }
+    ws.addEventListener('message', (ev) => {
+      let msg;
+      try {
+        msg = JSON.parse(ev.data);
+      } catch {
+        return;
+      }
+      if (msg.op === 10) ws.send(JSON.stringify({ op: 2, d: { token: t, intents: 0, properties: { os: 'linux', browser: 'pake-scha', device: 'pake-scha' } } }));
+      else if (msg.op === 0 && msg.t === 'READY') finish(true);
+      else if (msg.op === 9) finish(false);
+    });
+    ws.addEventListener('error', () => finish(false));
+    ws.addEventListener('close', () => finish(false));
+  });
+}
+
+let botUser = null;
+async function botId() {
+  if (botUser && botUser.token === token()) return botUser.id;
+  const me = await rest('GET', '/users/@me');
+  botUser = { id: String(me.id), name: me.global_name || me.username, token: token() };
+  setSetting('discord_bot_id', botUser.id);
+  return botUser.id;
+}
+
+/** Ist die Person Mitglied des Discord-Servers? (Kurz zwischengespeichert.) */
+const memberCache = new Map();
+async function isMember(guildId, userId) {
+  const key = `${guildId}:${userId}`;
+  const hit = memberCache.get(key);
+  if (hit && hit.until > Date.now()) return hit.value;
+  let value;
+  try {
+    await rest('GET', `/guilds/${guildId}/members/${userId}`);
+    value = true;
+  } catch (err) {
+    if (err.status === 404) value = false;
+    else throw err;
+  }
+  memberCache.set(key, { value, until: Date.now() + (value ? 30 * 60 * 1000 : 60 * 1000) });
+  return value;
+}
+
+/**
+ * Fügt eine Person dem Discord-Server hinzu (OAuth-Scope „guilds.join“ beim Verknüpfen).
+ * Der Zugangstoken wird nur für diesen einen Aufruf verwendet und nicht gespeichert.
+ */
+async function joinGuild(userId, accessToken) {
+  if (!active() || !isId(userId) || !accessToken) return false;
+  const { guildId } = config();
+  try {
+    await rest('PUT', `/guilds/${guildId}/members/${userId}`, { access_token: accessToken });
+    memberCache.set(`${guildId}:${userId}`, { value: true, until: Date.now() + 30 * 60 * 1000 });
+    return true;
+  } catch (err) {
+    console.warn('Discord-Tickets: Server-Beitritt fehlgeschlagen:', err.message);
+    return false;
+  }
+}
+
+/* ---------------------------------------------------------------- Akte ↔ Kanal */
+function slug(s) {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/ß/g, 'ss')
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+}
+const channelName = (c) => [String(c.case_number).toLowerCase(), slug(c.client_account_name || c.client_name)].filter(Boolean).join('-').slice(0, 90);
+const channelUrl = (c) => (c.discord_channel_id && isId(config().guildId) ? `https://discord.com/channels/${config().guildId}/${c.discord_channel_id}` : null);
+
+/** Discord-IDs des Mandanten: verknüpftes Konto und/oder über die Website („Discord-Ticket beitreten“). */
+function clientDiscordIds(c) {
+  const acc = c.client_id ? db.prepare('SELECT discord_id FROM users WHERE id = ? AND active = 1').get(c.client_id) : null;
+  return [...new Set([acc && acc.discord_id, c.discord_client_id].filter(isId))];
+}
+const clientDiscordId = (c) => clientDiscordIds(c)[0] || null;
+
+/** Wer soll (zusätzlich zu den Team-Rollen) im Ticket sein? */
+function wantedMembers(c) {
+  const map = new Map();
+  for (const l of caseLawyers(c)) if (isId(l.discordId)) map.set(l.discordId, 'lawyer');
+  for (const id of clientDiscordIds(c)) map.set(id, 'client');
+  return map;
+}
+/** Erster Mandanten-Account, der schon im Ticket ist (für Erwähnungen). */
+const clientInChannel = (c) => clientDiscordIds(c).find((id) => parseMembers(c).includes(id)) || null;
+
+const parseMembers = (c) => {
+  try {
+    const list = JSON.parse(c.discord_members || '[]');
+    return Array.isArray(list) ? list.filter(isId) : [];
+  } catch {
+    return [];
+  }
+};
+
+function saveState(caseId, fields) {
+  const keys = Object.keys(fields);
+  if (!keys.length) return;
+  db.prepare(`UPDATE cases SET ${keys.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...keys.map((k) => fields[k]), caseId);
+}
+
+function memberOverwrite(id, kind, closed) {
+  // Geschlossene Akte: Mandant liest nur noch mit; Anwälte behalten Schreibrechte.
+  if (kind === 'client' && closed) return { id, type: 1, allow: String(READ_ONLY), deny: String(P.SEND_MESSAGES) };
+  return { id, type: 1, allow: String(MEMBER_ALLOW), deny: '0' };
+}
+
+const URGENCY_LABEL = { normal: 'Normal', eilig: 'Eilig', notfall: '🚨 Notfall' };
+const AREA_LABEL = { strafrecht: 'Strafrecht', zivilrecht: 'Zivilrecht', verfassungsrecht: 'Verfassungsrecht', vertragsrecht: 'Vertragsrecht', sonstiges: 'Sonstiges' };
+
+function lawyerText(c) {
+  const all = caseLawyers(c);
+  if (!all.length) return 'Noch nicht zugewiesen';
+  return all.map((l) => (l.lead && all.length > 1 ? `${l.name} (federführend)` : l.name)).join(', ');
+}
+
+/** Legt den Kanal an und sendet die Begrüßung. quiet: ohne Rollen-Ping (z. B. beim Nachholen). */
+async function createChannel(c, { quiet = false } = {}) {
+  const cfg = config();
+  await identifyOnce();
+  const bot = await botId();
+  const closed = c.status === 'geschlossen';
+  const members = wantedMembers(c);
+  const added = [];
+  const overwrites = [
+    { id: cfg.guildId, type: 0, allow: '0', deny: String(P.VIEW_CHANNEL) }, // @everyone
+    { id: bot, type: 1, allow: String(BOT_ALLOW), deny: '0' },
+    ...cfg.roleIds.map((id) => ({ id, type: 0, allow: String(MEMBER_ALLOW), deny: '0' })),
+  ];
+  for (const [id, kind] of members) {
+    if (id === bot) continue;
+    if (await isMember(cfg.guildId, id)) {
+      overwrites.push(memberOverwrite(id, kind, closed));
+      added.push(id);
+    }
+  }
+  const channel = await rest('POST', `/guilds/${cfg.guildId}/channels`, {
+    name: channelName(c),
+    type: 0,
+    parent_id: closed && isId(cfg.archiveId) ? cfg.archiveId : cfg.categoryId,
+    topic: truncate(`Akte ${c.case_number} · ${c.title} – Pake & Scha Legal Consulting`, 1000),
+    permission_overwrites: overwrites,
+  });
+  saveState(c.id, { discord_channel_id: String(channel.id), discord_members: JSON.stringify(added), discord_archived: closed ? 1 : 0, discord_error: null });
+  c.discord_channel_id = String(channel.id);
+  c.discord_members = JSON.stringify(added);
+
+  const clientIn = clientDiscordIds(c).find((id) => added.includes(id)) || null;
+  const client = clientIn || clientDiscordId(c);
+  const lawyerIds = caseLawyers(c)
+    .map((l) => l.discordId)
+    .filter((id) => isId(id) && added.includes(id));
+  const intro = clientIn
+    ? `Willkommen <@${client}>! Das ist das Ticket zu Ihrer Akte bei Pake & Scha. Alle Neuigkeiten – Status, Termine, Verträge, Rechnungen – erscheinen automatisch hier.`
+    : 'Neues Ticket zur Akte. Alle Neuigkeiten erscheinen automatisch hier.';
+  const pingRoles = cfg.pingRoles && !quiet;
+  const pings = [...(pingRoles ? cfg.roleIds.map((id) => `<@&${id}>`) : []), ...lawyerIds.map((id) => `<@${id}>`)].join(' ');
+  const msg = await send(channel.id, {
+    content: [pings, intro].filter(Boolean).join('\n'),
+    embeds: [
+      embed({
+        title: `📁 Akte ${c.case_number}: ${truncate(c.title, 200)}`,
+        description: c.description ? truncate(c.description, 1500) : undefined,
+        fields: [
+          { name: 'Mandant', value: c.client_account_name || c.client_name || '—' },
+          { name: 'Rechtsgebiet', value: AREA_LABEL[c.area] || c.area || '—' },
+          { name: 'Dringlichkeit', value: URGENCY_LABEL[c.urgency] || c.urgency },
+          { name: 'Status', value: `${CASE_STATUS[c.status]} · ${STEPS[c.step] || STEPS[0]}` },
+          { name: 'Zuständig', value: lawyerText(c), inline: false },
+          ...(clientIn
+            ? []
+            : [
+                {
+                  name: 'Mandant im Ticket',
+                  value: client
+                    ? '⏳ Noch nicht auf dem Discord-Server – wird automatisch hinzugefügt, sobald er beitritt (Akte → „Discord abgleichen“).'
+                    : '⏳ Noch kein Discord verknüpft. Mandant: im Portal „Mein Profil → Discord verbinden“ oder auf der Website unter „Aktenstatus“ mit Aktenzeichen + Pin „Discord-Ticket beitreten“.',
+                  inline: false,
+                },
+              ]),
+        ],
+        color: c.urgency === 'notfall' ? COLORS.red : COLORS.gold,
+      }),
+    ],
+    allowed_mentions: { parse: [], users: [...(clientIn ? [client] : []), ...lawyerIds], roles: pingRoles ? cfg.roleIds : [] },
+  });
+  if (msg && msg.id) rest('PUT', `/channels/${channel.id}/pins/${msg.id}`).catch(() => {});
+  return channel.id;
+}
+
+/** Mitglieder und Archiv-Zustand des Kanals an die Akte angleichen. Liefert neu hinzugekommene Personen. */
+async function syncMembers(c) {
+  const cfg = config();
+  const bot = await botId();
+  const closed = c.status === 'geschlossen';
+  const wanted = wantedMembers(c);
+  const current = new Set(parseMembers(c));
+  const joined = [];
+  const archivedBefore = !!c.discord_archived;
+  for (const [id, kind] of wanted) {
+    if (id === bot) continue;
+    // Beim Mandanten Schreibrecht an den Akten-Status anpassen (auch wenn schon drin).
+    const needsUpdate = !current.has(id) || (kind === 'client' && archivedBefore !== closed);
+    if (!needsUpdate) continue;
+    if (!current.has(id) && !(await isMember(cfg.guildId, id))) continue;
+    const o = memberOverwrite(id, kind, closed);
+    await rest('PUT', `/channels/${c.discord_channel_id}/permissions/${id}`, { type: 1, allow: o.allow, deny: o.deny });
+    if (!current.has(id)) joined.push({ id, kind });
+    current.add(id);
+  }
+  for (const id of [...current]) {
+    if (wanted.has(id)) continue;
+    await rest('DELETE', `/channels/${c.discord_channel_id}/permissions/${id}`).catch((err) => {
+      if (err.status !== 404) throw err;
+    });
+    current.delete(id);
+  }
+  saveState(c.id, { discord_members: JSON.stringify([...current]) });
+  c.discord_members = JSON.stringify([...current]);
+  return joined;
+}
+
+async function syncArchive(c) {
+  const cfg = config();
+  const closed = c.status === 'geschlossen';
+  if (!!c.discord_archived === closed) return;
+  const parent = closed ? (isId(cfg.archiveId) ? cfg.archiveId : null) : cfg.categoryId;
+  if (parent) await rest('PATCH', `/channels/${c.discord_channel_id}`, { parent_id: parent, lock_permissions: false });
+  saveState(c.id, { discord_archived: closed ? 1 : 0 });
+  c.discord_archived = closed ? 1 : 0;
+}
+
+function embed({ title, description, fields = [], color = COLORS.gold, footer }) {
+  return {
+    title: truncate(title, 256),
+    description: description ? truncate(description, 4000) : undefined,
+    color,
+    fields: fields
+      .filter((f) => f && f.name)
+      .slice(0, 25)
+      .map((f) => ({ name: truncate(f.name, 256), value: truncate(f.value || '—', 1024), inline: f.inline !== false })),
+    footer: { text: footer || 'Pake & Scha Legal Consulting' },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function send(channelId, payload) {
+  return rest('POST', `/channels/${channelId}/messages`, payload);
+}
+
+/* ---------------------------------------------------------------- Warteschlange */
+const queues = new Map();
+function enqueue(key, job) {
+  const prev = queues.get(key) || Promise.resolve();
+  const next = prev.then(job).catch((err) => {
+    console.warn(`Discord-Tickets (${key}): ${err.message}`);
+    if (typeof key === 'number') {
+      try {
+        saveState(key, { discord_error: truncate(err.message, 300) });
+      } catch {
+        /* Akte evtl. gelöscht */
+      }
+    }
+  });
+  queues.set(key, next);
+  next.finally(() => {
+    if (queues.get(key) === next) queues.delete(key);
+  });
+  return next;
+}
+
+/**
+ * Kanal sicherstellen (anlegen, falls noch keiner existiert oder er gelöscht wurde), Mitglieder abgleichen.
+ * Liefert die (frisch geladene) Akte oder null.
+ */
+async function ensure(caseId) {
+  let c = getCase(caseId);
+  if (!c) return null;
+  if (!c.discord_channel_id) {
+    await createChannel(c);
+    return getCase(caseId);
+  }
+  try {
+    const joined = await syncMembers(c);
+    const clientJoined = joined.find((j) => j.kind === 'client');
+    if (clientJoined) {
+      await send(c.discord_channel_id, {
+        content: `<@${clientJoined.id}> ist dem Ticket beigetreten. Willkommen! Hier erscheinen alle Neuigkeiten zu Ihrer Akte ${c.case_number}.`,
+        allowed_mentions: { parse: [], users: [clientJoined.id] },
+      });
+    }
+  } catch (err) {
+    if (err.code !== 10003) throw err;
+    // Kanal wurde in Discord gelöscht → neu anlegen
+    saveState(c.id, { discord_channel_id: null, discord_members: null, discord_archived: 0 });
+    c = getCase(caseId);
+    await createChannel(c);
+  }
+  saveState(caseId, { discord_error: null });
+  return getCase(caseId);
+}
+
+/* ---------------------------------------------------------------- Öffentliche Schnittstelle */
+
+/** Neue Akte → Ticket anlegen. */
+function caseCreated(caseId, opts = {}) {
+  if (!active()) return Promise.resolve();
+  return enqueue(caseId, async () => {
+    const c = getCase(caseId);
+    if (c && !c.discord_channel_id) await createChannel(c, opts);
+  });
+}
+
+/** Mitglieder/Archiv abgleichen (z. B. nach Discord-Verknüpfung). */
+function syncCase(caseId) {
+  if (!active()) return Promise.resolve();
+  return enqueue(caseId, async () => {
+    const c = await ensure(caseId);
+    if (c) await syncArchive(c);
+  });
+}
+
+/**
+ * Nachricht ins Ticket der Akte. msg: { title, description, fields, color, mention: 'client'|'lawyers'|'all', by }
+ * Der Archiv-Zustand wird danach angeglichen (Schließen: erst Nachricht, dann ins Archiv).
+ */
+function post(caseId, msg) {
+  if (!active()) return Promise.resolve();
+  return enqueue(caseId, async () => {
+    let c = await ensure(caseId);
+    if (!c) return;
+    // Wiedereröffnet: erst aus dem Archiv holen, dann schreiben
+    if (c.status !== 'geschlossen' && c.discord_archived) {
+      await syncArchive(c);
+      await syncMembers(c);
+      c = getCase(caseId);
+    }
+    const members = parseMembers(c);
+    const client = clientInChannel(c);
+    const mentions = [];
+    if ((msg.mention === 'client' || msg.mention === 'all') && client) mentions.push(client);
+    if (msg.mention === 'lawyers' || msg.mention === 'all' || Array.isArray(msg.mentionIds)) {
+      const ids = Array.isArray(msg.mentionIds) ? msg.mentionIds : caseLawyers(c).map((l) => l.discordId);
+      ids.filter((id) => isId(id) && members.includes(id) && id !== msg.byDiscordId).forEach((id) => mentions.push(id));
+    }
+    const unique = [...new Set(mentions)];
+    const payload = {
+      content: unique.length ? unique.map((id) => `<@${id}>`).join(' ') : undefined,
+      embeds: [embed({ ...msg, footer: msg.by ? `${msg.by} · Pake & Scha Legal Consulting` : undefined })],
+      allowed_mentions: { parse: [], users: unique },
+    };
+    try {
+      await send(c.discord_channel_id, payload);
+    } catch (err) {
+      if (err.code !== 10003) throw err;
+      // Kanal wurde in Discord gelöscht → neu anlegen und die Nachricht dort senden
+      saveState(c.id, { discord_channel_id: null, discord_members: null, discord_archived: 0 });
+      c = await ensure(caseId);
+      await send(c.discord_channel_id, payload);
+    }
+    await syncArchive(c);
+  });
+}
+
+/** Akte gelöscht → Hinweis im Kanal und ins Archiv (der Verlauf bleibt erhalten). */
+function caseDeleted(c, by) {
+  if (!active() || !c.discord_channel_id) return Promise.resolve();
+  return enqueue(`deleted-${c.id}`, async () => {
+    const cfg = config();
+    await send(c.discord_channel_id, {
+      embeds: [embed({ title: `🗑️ Akte ${c.case_number} wurde gelöscht`, description: 'Das Ticket bleibt zur Nachverfolgung im Archiv.', color: COLORS.slate, footer: by ? `${by} · Pake & Scha Legal Consulting` : undefined })],
+      allowed_mentions: { parse: [] },
+    }).catch(() => {});
+    for (const client of clientDiscordIds(c)) {
+      await rest('PUT', `/channels/${c.discord_channel_id}/permissions/${client}`, { type: 1, allow: String(READ_ONLY), deny: String(P.SEND_MESSAGES) }).catch(() => {});
+    }
+    if (isId(cfg.archiveId)) await rest('PATCH', `/channels/${c.discord_channel_id}`, { parent_id: cfg.archiveId, lock_permissions: false }).catch(() => {});
+  });
+}
+
+/** Alle Tickets einer Person abgleichen (Discord verknüpft/getrennt). */
+function syncUser(userId) {
+  if (!active()) return Promise.resolve();
+  const rows = db
+    .prepare(
+      `SELECT DISTINCT c.id FROM cases c LEFT JOIN case_lawyers cl ON cl.case_id = c.id
+       WHERE c.discord_channel_id IS NOT NULL AND (c.client_id = ? OR c.lawyer_id = ? OR cl.user_id = ?)`
+    )
+    .all(userId, userId, userId);
+  // Offene Akten eines Mandanten ohne Ticket (z. B. vor Einrichtung angelegt) bekommen jetzt eins.
+  const missing = db.prepare("SELECT id FROM cases WHERE client_id = ? AND discord_channel_id IS NULL AND status != 'geschlossen'").all(userId);
+  return Promise.all([...rows, ...missing].map((r) => syncCase(r.id)));
+}
+
+/** Tickets für alle offenen Akten ohne Kanal anlegen (nach der Einrichtung). */
+async function backfill() {
+  if (!active()) throw new Error('Discord-Tickets sind nicht vollständig eingerichtet.');
+  const rows = db.prepare("SELECT id FROM cases WHERE discord_channel_id IS NULL AND status != 'geschlossen' ORDER BY id").all();
+  let created = 0;
+  for (const r of rows) {
+    await caseCreated(r.id, { quiet: true });
+    if (getCase(r.id)?.discord_channel_id) created += 1;
+  }
+  return { created, total: rows.length };
+}
+
+/** Infos für die Akte im Dashboard / auf der Website. */
+function ticketInfo(c, viewer) {
+  if (!active()) return null;
+  const staff = viewer && (viewer.role === 'anwalt' || viewer.role === 'admin');
+  return {
+    url: channelUrl(c),
+    exists: !!c.discord_channel_id,
+    clientLinked: clientDiscordIds(c).length > 0,
+    clientInTicket: !!clientInChannel(c),
+    archived: !!c.discord_archived,
+    error: staff ? c.discord_error || null : undefined,
+  };
+}
+
+/** Einrichtung prüfen: Token, Server, Kategorien, Rollen, Rechte des Bots. */
+async function test() {
+  const cfg = config();
+  const checks = [];
+  const add = (ok, label, detail = '') => checks.push({ ok, label, detail });
+  if (!token()) {
+    add(false, 'Bot-Token', 'DISCORD_BOT_TOKEN ist in Render nicht gesetzt.');
+    return { ok: false, checks };
+  }
+  let me;
+  try {
+    await identifyOnce();
+    me = await rest('GET', '/users/@me');
+    botUser = { id: String(me.id), name: me.global_name || me.username, token: token() };
+    setSetting('discord_bot_id', botUser.id);
+    setSetting('discord_bot_name', botUser.name);
+    add(true, 'Bot-Token', `angemeldet als ${botUser.name}`);
+  } catch (err) {
+    add(false, 'Bot-Token', err.message);
+    return { ok: false, checks };
+  }
+  if (!isId(cfg.guildId)) {
+    add(false, 'Discord-Server', 'Server-ID fehlt.');
+    return { ok: false, checks };
+  }
+  let guild;
+  try {
+    guild = await rest('GET', `/guilds/${cfg.guildId}`);
+    add(true, 'Discord-Server', guild.name);
+  } catch (err) {
+    add(false, 'Discord-Server', err.message);
+    return { ok: false, checks };
+  }
+  // Rechte des Bots aus seinen Rollen berechnen
+  try {
+    const member = await rest('GET', `/guilds/${cfg.guildId}/members/${botUser.id}`);
+    const roles = guild.roles || [];
+    let perms = 0n;
+    for (const r of roles) if (r.id === cfg.guildId || member.roles.includes(r.id)) perms |= BigInt(r.permissions);
+    const has = (bit) => (perms & BigInt(P.ADMINISTRATOR)) !== 0n || (perms & BigInt(bit)) !== 0n;
+    const missing = REQUIRED.filter((k) => !has(P[k])).map((k) => PERM_NAMES[k]);
+    add(!missing.length, 'Berechtigungen des Bots', missing.length ? `Es fehlt: ${missing.join(', ')}` : 'vollständig');
+    const roleIds = new Set(roles.map((r) => r.id));
+    if (cfg.roleIds.length) {
+      const unknown = cfg.roleIds.filter((id) => !roleIds.has(id));
+      add(!unknown.length, 'Team-Rollen', unknown.length ? `Unbekannte Rollen-ID: ${unknown.join(', ')}` : roles.filter((r) => cfg.roleIds.includes(r.id)).map((r) => r.name).join(', '));
+    } else {
+      add(false, 'Team-Rollen', 'Keine Rolle eingetragen – dann sehen nur die zuständigen Anwälte (mit verknüpftem Discord) die Tickets.');
+    }
+  } catch (err) {
+    add(false, 'Berechtigungen des Bots', err.message);
+  }
+  for (const [label, id, required] of [
+    ['Ticket-Kategorie', cfg.categoryId, true],
+    ['Archiv-Kategorie', cfg.archiveId, false],
+  ]) {
+    if (!isId(id)) {
+      if (required) add(false, label, 'Kategorie-ID fehlt.');
+      else add(true, label, 'keine – geschlossene Tickets bleiben in der Ticket-Kategorie (Mandant nur noch lesend)');
+      continue;
+    }
+    try {
+      const ch = await rest('GET', `/channels/${id}`);
+      const ok = ch.type === 4 && String(ch.guild_id) === cfg.guildId;
+      add(ok, label, ok ? ch.name : 'Die ID gehört zu keiner Kategorie auf diesem Server.');
+    } catch (err) {
+      add(false, label, err.message);
+    }
+  }
+  const ok = checks.every((c) => c.ok || c.label === 'Team-Rollen');
+  setSetting('discord_ticket_last_test', JSON.stringify({ at: new Date().toISOString(), ok }));
+  return { ok, checks };
+}
+
+function status() {
+  const cfg = config();
+  let lastTest = null;
+  try {
+    lastTest = JSON.parse(getSetting('discord_ticket_last_test', 'null'));
+  } catch {
+    lastTest = null;
+  }
+  return {
+    tokenSet: !!token(),
+    active: active(),
+    botName: getSetting('discord_bot_name', '') || null,
+    oauthConfigured: discord.oauthConfigured(),
+    inviteUrl: inviteUrl(),
+    lastTest,
+    ...cfg,
+    counts: db.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN discord_channel_id IS NOT NULL THEN 1 ELSE 0 END) AS withTicket FROM cases WHERE status != 'geschlossen'").get(),
+  };
+}
+
+module.exports = {
+  active,
+  config,
+  status,
+  test,
+  backfill,
+  caseCreated,
+  caseDeleted,
+  syncCase,
+  syncUser,
+  post,
+  joinGuild,
+  ticketInfo,
+  clientDiscordId,
+  COLORS,
+  INVITE_PERMISSIONS,
+  isId,
+};
