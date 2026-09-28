@@ -2,6 +2,7 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { db } = require('./db');
+const { EMAIL_DOMAIN } = require('./helpers');
 const { avatarUrl } = require('./uploads');
 
 const SESSION_COOKIE = 'sid';
@@ -72,6 +73,17 @@ function userAvatarUrl(u) {
   return avatarUrl(u.avatar) || discordAvatarUrl(u);
 }
 
+/**
+ * Konto zu einer eingegebenen Adresse: komplette Adresse, nur der Teil vor dem @ („max.mustermann“) oder die
+ * frühere Adresse vor der Umstellung auf @pake-scha.ls (z. B. „max@mail.ls“) – beim Login gilt dasselbe Passwort.
+ */
+function findUserByLogin(input) {
+  const v = String(input || '').trim().toLowerCase();
+  if (!v) return null;
+  const email = v.includes('@') ? v : `${v}@${EMAIL_DOMAIN}`;
+  return db.prepare('SELECT * FROM users WHERE email = ?').get(email) || (v.includes('@') ? db.prepare('SELECT * FROM users WHERE old_email = ?').get(v) : null) || null;
+}
+
 function publicUser(u) {
   if (!u) return null;
   return {
@@ -85,6 +97,8 @@ function publicUser(u) {
     board: u.role === 'admin' || (u.role === 'anwalt' && ['Founding Partner', 'Equity Partner', 'Partner'].includes(u.rank)),
     active: !!u.active,
     mustChangePassword: !!u.must_change_password,
+    // Login-E-Mail wurde auf @pake-scha.ls umgestellt → einmal Hinweis mit der alten Adresse
+    emailNotice: u.email_notice ? { oldEmail: u.old_email || null } : null,
     avatarUrl: userAvatarUrl(u),
     hasOwnAvatar: !!u.avatar,
     duty: { status: u.duty_status || 'off', note: u.duty_note || '', since: u.duty_since || null },
@@ -132,6 +146,7 @@ const requireAdmin = requireRole('admin');
 
 module.exports = {
   SESSION_COOKIE,
+  findUserByLogin,
   hashPassword,
   verifyPassword,
   generateStrongPassword,

@@ -3,7 +3,7 @@ const express = require('express');
 const { z } = require('zod');
 const { db, tx, getSetting, setSetting } = require('../db');
 const { requireAuth, requireAdmin, requireStaff, hashPassword, generateTempPassword, destroyAllSessions, userAvatarUrl } = require('../auth');
-const { wrap, parseBody, idParam, DUTY_STATUS, rankField, RANK_ORDER_SQL, BOARD_RANKS } = require('../helpers');
+const { wrap, parseBody, idParam, DUTY_STATUS, rankField, RANK_ORDER_SQL, BOARD_RANKS, firmEmail, EMAIL_HINT } = require('../helpers');
 const { logActivity } = require('../models');
 const { removeFile } = require('../uploads');
 const discord = require('../discord');
@@ -35,6 +35,7 @@ function userRow(u) {
   return {
     id: u.id,
     email: u.email,
+    oldEmail: u.old_email || null, // Adresse vor der Umstellung auf @pake-scha.ls (funktioniert beim Login weiter)
     displayName: u.display_name,
     role: u.role,
     rank: u.rank,
@@ -66,14 +67,15 @@ router.post(
   wrap(async (req, res) => {
     const schema = z.object({
       displayName: z.string().trim().min(2).max(80),
-      email: z.string().trim().email().max(120),
+      email: z.string().trim().min(1).max(120),
       role: z.enum(['mandant', 'anwalt', 'admin']),
       rank: rankField.optional(),
       phone: z.string().trim().max(40).optional(),
     });
     const d = parseBody(schema, req, res);
     if (!d) return;
-    const email = d.email.toLowerCase();
+    const email = firmEmail(d.email);
+    if (!email) return res.status(400).json({ error: EMAIL_HINT });
     if (db.prepare('SELECT id FROM users WHERE email = ?').get(email)) {
       return res.status(409).json({ error: 'Diese E-Mail-Adresse ist bereits vergeben.' });
     }
@@ -100,7 +102,7 @@ router.patch(
       rank: rankField.nullable().optional(),
       active: z.boolean().optional(),
       displayName: z.string().trim().min(2).max(80).optional(),
-      email: z.string().trim().email().max(120).optional(),
+      email: z.string().trim().min(1).max(120).optional(),
     });
     const d = parseBody(schema, req, res);
     if (!d) return;
@@ -112,8 +114,12 @@ router.patch(
     if (losesAdmin && activeAdminCount() <= 1) {
       return res.status(400).json({ error: 'Es muss mindestens ein aktiver Admin bestehen bleiben.' });
     }
-    if (d.email && d.email.toLowerCase() !== target.email) {
-      if (db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(d.email.toLowerCase(), id)) {
+    if (d.email !== undefined) {
+      d.email = firmEmail(d.email);
+      if (!d.email) return res.status(400).json({ error: EMAIL_HINT });
+    }
+    if (d.email && d.email !== target.email) {
+      if (db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(d.email, id)) {
         return res.status(409).json({ error: 'Diese E-Mail-Adresse ist bereits vergeben.' });
       }
     }
@@ -128,7 +134,7 @@ router.patch(
     if (d.rank !== undefined) set('rank', d.rank || null);
     if (d.active !== undefined) set('active', d.active ? 1 : 0);
     if (d.displayName !== undefined) set('display_name', d.displayName);
-    if (d.email !== undefined) set('email', d.email.toLowerCase());
+    if (d.email !== undefined) set('email', d.email);
     if (!sets.length) return res.json({ user: userRow(target) });
 
     tx(() => {

@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const express = require('express');
 const { z } = require('zod');
 const { db, tx, nextCaseNumber, randomPin } = require('../db');
-const { requireAuth, requireAdmin, isStaff } = require('../auth');
+const { requireAuth, requireAdmin, isStaff, findUserByLogin } = require('../auth');
 const { wrap, parseBody, idParam, AREAS, URGENCIES, CASE_STATUS, STEPS, truncate, MAX_ATTACHMENTS_PER_CASE, isBoard } = require('../helpers');
 const {
   CASE_SELECT,
@@ -110,7 +110,7 @@ const createSchema = z.object({
   area: z.enum(AREAS),
   urgency: z.enum(URGENCIES).default('normal'),
   description: z.string().trim().max(4000).default(''),
-  clientEmail: z.union([z.string().trim().email().max(120), z.literal('')]).optional(),
+  clientEmail: z.string().trim().max(120).optional(), // Login-Adresse, Teil vor dem @ oder frühere Adresse
   clientName: z.string().trim().max(80).optional(),
   clientPhone: z.string().trim().max(40).optional(),
   opponent: z.string().trim().max(120).optional(),
@@ -138,7 +138,7 @@ router.post(
     } else {
       source = 'kanzlei';
       if (d.clientEmail) {
-        const client = db.prepare('SELECT id, display_name FROM users WHERE email = ?').get(d.clientEmail.toLowerCase());
+        const client = findUserByLogin(d.clientEmail);
         if (!client) return res.status(404).json({ error: 'Kein Konto mit dieser E-Mail-Adresse gefunden. Lassen Sie das Feld leer und tragen Sie nur den Namen ein.' });
         clientId = client.id;
       } else if (!d.clientName || d.clientName.length < 2) {

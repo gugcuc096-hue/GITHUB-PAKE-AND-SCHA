@@ -16,6 +16,7 @@ Premium-Webanwendung für die GTA-RP-Kanzlei **Pake & Scha Legal Consulting**: �
 | **Rechnungen & Honorare** | Generator: Leistungen aus der Honorarordnung **einfach anhaken** (mehrere auf einmal, Menge je Leistung, Suche) – sie stehen sofort als Positionen in der Rechnung; dazu freie Positionen, Rabatt/Zuschlag, Rechnung **oder** Honorarvereinbarung, Druck-/PDF-Ansicht, Status offen/bezahlt/storniert |
 | **Team-Verwaltung** (Admin) | Mitglieder hinzufügen, umbenennen, Rang/Beschreibung ändern, sortieren, ausblenden, löschen – sofort live auf der Website · optional mit Login-Konto (Einmal-Passwort) |
 | **Benutzer** (Admin) | Rollen, Ränge, Sperren, Löschen, **Passwort-Reset per Klick** |
+| **Login-E-Mail @pake-scha.ls** | Alle Konten enden auf **@pake-scha.ls** – bei Registrierung, „Konto anlegen“, Team-Konto und Einstellung wird nur der Teil vor dem @ gewählt (Vorschlag aus dem Namen) · bestehende Konten wurden automatisch umgestellt (`john@mail.ls` → `john@pake-scha.ls`, bei Doppelungen `john2@…`), **Passwort unverändert** · Login mit neuer Adresse, nur dem Teil vor dem @ (`john`) **oder der alten Adresse** · einmaliger Hinweis im Dashboard mit der neuen Adresse · unter *Benutzer* steht „vorher: …“ (siehe [Login-E-Mail](#login-e-mail-pake-schals)) |
 | **Kooperationen** (Board of Partners) | Kooperationspartner anlegen (z. B. „Burgershot“) mit **Rabatt in %**, optional „gültig bis“, aktiv/inaktiv und interner Notiz · **Discord-Rolle(n) der Mitglieder** direkt aus der Rollenliste des Servers anhaken · beim Erstellen einer Rechnung mit Aktenbezug liest der Bot die Discord-Rollen des Mandanten und **setzt den Kooperationsrabatt automatisch** (bei mehreren der höchste; änderbar) · ohne Discord: Mandantenkonten von Hand zuordnen oder die Kooperation in der Rechnung auswählen · „Mandant prüfen“ zeigt, welche Kooperation gilt · Rechnung zeigt „Kooperationsrabatt Burgershot (15 %)“, Verlauf/Protokoll vermerken, ob per Discord-Rolle erkannt oder von Hand gewählt · Mandanten sehen ihre Vorteile unter *Mein Profil* (siehe [Kooperationen](#kooperationen)) |
 | **Honorarordnung** (Admin) | Preise/Leistungen pflegen → Website, Tarifrechner und Rechnungs-Generator |
 | **Discord** | Webhook für Kanzlei-Updates (mit Erwähnung verknüpfter Anwälte) · Konto verknüpfen · „Mit Discord anmelden“ |
@@ -160,12 +161,24 @@ cp .env.example .env    # Werte nach Bedarf ausfüllen
 npm run dev             # http://localhost:3000
 ```
 
+## Login-E-Mail @pake-scha.ls
+
+Alle Konten haben eine Adresse mit der Endung **@pake-scha.ls**. Frei wählbar ist nur der Teil davor (Buchstaben a–z, Zahlen, Punkt, Bindestrich, Unterstrich) – bei der Registrierung, unter *Benutzer → Konto anlegen*, beim Team-Konto und beim Einstellen aus einer Bewerbung (dort mit Vorschlag aus dem Namen, z. B. `lisa.mueller`). Andere Endungen werden abgelehnt.
+
+**Bestehende Konten** werden beim Start automatisch umgestellt: Der Teil vor dem @ bleibt (Umlaute werden umgeschrieben, `+…` fällt weg), z. B. `john.doe@mail.ls` → `john.doe@pake-scha.ls`; ist die Adresse schon vergeben, kommt eine Zahl dazu (`john.doe2@…`). Das **Passwort bleibt gleich**. Einloggen geht danach mit
+- der neuen Adresse (`john.doe@pake-scha.ls`),
+- nur dem Teil vor dem @ (`john.doe`) oder
+- **der alten Adresse** (`john.doe@mail.ls`) – sie bleibt als Login-Alias gültig.
+
+Nach dem ersten Login zeigt die Übersicht einmal „Ihre Login-E-Mail lautet jetzt …“. Unter *Benutzer* steht bei umgestellten Konten „vorher: …“; das Board kann die Adresse dort (Teil vor dem @) jederzeit ändern. Jede Umstellung steht im Protokoll. Die Kontakt-E-Mail in Bewerbungen und Anliegen ist davon nicht betroffen.
+
 ## Update einer bestehenden Installation
 
 Beim ersten Start der neuen Version passiert automatisch:
 - **Sicherungskopie** der Datenbank (`pake-scha.db.backup-<Datum>`) vor jedem Tabellen-Umbau
 - Umbau der Tabellen `cases`, `appointments` und `notes` ohne Datenverlust (Akten, Notizen, Termine, Nachrichten bleiben erhalten)
 - Einmalige Korrektur „Dr. Alois Parker“ → „Dr. Alois Pake“: Die Login-E-Mail wird zu `alois.pake@pake-scha.ls`, das Passwort bleibt gleich
+- Alle Login-E-Mails werden auf `@pake-scha.ls` umgestellt (Passwort bleibt, alte Adresse funktioniert weiter – siehe *Login-E-Mail*)
 - Der frühere Platzhalter „Martinez“ verschwindet von der Website. Sein Login-Konto bleibt bestehen und kann unter *Benutzer* gesperrt oder gelöscht werden.
 
 ## Hochgeladene Dateien

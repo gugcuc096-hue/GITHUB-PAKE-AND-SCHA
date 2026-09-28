@@ -254,6 +254,26 @@
   const fmtPct = (n) => String(n).replace('.', ',');
   const val = (fd, key) => String(fd.get(key) ?? '').trim();
 
+  /* Login-E-Mail: immer …@pake-scha.ls – im Formular wird nur der Teil vor dem @ eingegeben */
+  const EMAIL_DOMAIN = 'pake-scha.ls';
+  /** Vorschlag aus dem Namen: „Dr. Max Müller“ → „max.mueller“ */
+  const emailLocalFromName = (name) =>
+    String(name || '')
+      .toLowerCase()
+      .replace(/\b(dr|prof|jur|med)\.?\s*/g, '')
+      .replace(/ä/g, 'ae')
+      .replace(/ö/g, 'oe')
+      .replace(/ü/g, 'ue')
+      .replace(/ß/g, 'ss')
+      .normalize('NFKD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '.')
+      .replace(/^\.+|\.+$/g, '')
+      .slice(0, 40);
+  function emailField(name, { value = '', required = false, autofocus = false } = {}) {
+    return `<div class="email-group"><input name="${name}" class="field" ${required ? 'required' : ''} maxlength="60" value="${esc(value)}" placeholder="vorname.nachname" autocapitalize="none" autocomplete="off" spellcheck="false" ${autofocus ? 'autofocus' : ''} aria-label="E-Mail vor dem @"><span class="email-suffix">@${EMAIL_DOMAIN}</span></div>`;
+  }
+
   function toLocalInput(iso) {
     const d = parseDate(iso);
     return d ? `${dayKey(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}` : '';
@@ -780,9 +800,14 @@
       const openInvoices = st.invoices.filter((i) => i.status === 'offen');
       const openSum = openInvoices.reduce((s, i) => s + i.total, 0);
 
-      const banner = u.mustChangePassword
-        ? `<div class="banner banner-amber">${icon('alert')}<div><strong>Bitte eigenes Passwort festlegen.</strong> Sie nutzen ein automatisch erzeugtes oder zurückgesetztes Passwort. <a href="#profile" class="underline">Jetzt ändern</a></div></div>`
-        : '';
+      const banner = [
+        u.emailNotice
+          ? `<div class="banner banner-gold items-center justify-between flex-wrap"><div>${icon('mail')} <strong>Ihre Login-E-Mail lautet jetzt ${esc(u.email)}</strong>${u.emailNotice.oldEmail ? ` (vorher ${esc(u.emailNotice.oldEmail)})` : ''}. Alle Konten der Kanzlei enden auf @${EMAIL_DOMAIN}. Ihr Passwort bleibt gleich – die alte Adresse funktioniert beim Login weiterhin.</div><button class="btn-outline btn-sm" data-action="email-notice-ok">Verstanden</button></div>`
+          : '',
+        u.mustChangePassword
+          ? `<div class="banner banner-amber">${icon('alert')}<div><strong>Bitte eigenes Passwort festlegen.</strong> Sie nutzen ein automatisch erzeugtes oder zurückgesetztes Passwort. <a href="#profile" class="underline">Jetzt ändern</a></div></div>`
+          : '',
+      ].join('');
 
       const kpis = staff
         ? [
@@ -2234,7 +2259,7 @@
         ${staff ? `
           <div><label class="label" for="ncName">Mandant (Name)</label><input id="ncName" name="clientName" class="field" maxlength="80" placeholder="z. B. John Doe" autofocus></div>
           <div><label class="label" for="ncPhone">Telefon (im Spiel)</label><input id="ncPhone" name="clientPhone" class="field" maxlength="40" placeholder="555-0123"></div>
-          <div class="span-2"><label class="label" for="ncEmail">…oder E-Mail eines registrierten Mandanten (optional)</label><input id="ncEmail" name="clientEmail" type="email" class="field" placeholder="verknüpft die Akte mit dem Mandantenkonto"></div>` : ''}
+          <div class="span-2"><label class="label" for="ncEmail">…oder Login-E-Mail eines registrierten Mandanten (optional)</label><input id="ncEmail" name="clientEmail" type="text" autocapitalize="none" spellcheck="false" class="field" placeholder="z. B. max.mustermann@pake-scha.ls – verknüpft die Akte mit dem Konto"></div>` : ''}
         <div class="span-2"><label class="label" for="ncTitle">Titel</label><input id="ncTitle" name="title" class="field" required minlength="3" maxlength="120" placeholder="z. B. Festnahme am Legion Square" ${staff ? '' : 'autofocus'}></div>
         <div><label class="label">Rechtsgebiet</label><select name="area" class="field">${Object.entries(AREAS).map(([k, l]) => opt(k, l)).join('')}</select></div>
         <div><label class="label">Dringlichkeit</label><select name="urgency" class="field">${Object.entries(URGENCY).map(([k, [l]]) => opt(k, l)).join('')}</select></div>
@@ -2974,7 +2999,7 @@
            <div data-account-pane="link" class="hidden"><select name="userId" class="field"><option value="">Konto wählen …</option>${linkable.map((u) => opt(u.id, `${u.displayName} (${u.email})`)).join('')}</select></div>
            <div data-account-pane="create" class="hidden">
              <div class="form-grid cols-2">
-               <div><label class="label">E-Mail (Login)</label><input name="accountEmail" type="email" class="field" placeholder="vorname.nachname@pake-scha.ls"></div>
+               <div><label class="label">E-Mail (Login)</label>${emailField('accountEmail', { value: m ? emailLocalFromName(m.name) : '' })}</div>
                <div><label class="label">Rolle</label><select name="accountRole" class="field">${opt('anwalt', 'Anwalt')}${opt('admin', 'Board of Partners (Admin)')}</select></div>
              </div>
              <p class="form-hint">Es wird ein Einmal-Passwort erzeugt und nach dem Speichern angezeigt.</p>
@@ -3036,7 +3061,7 @@
           return `<tr>
             <td class="td-main"><div class="flex items-center gap-3">${avatarWrap(u.avatarUrl, u.displayName, u.duty, 'sm')}<div class="min-w-0">
               <div class="font-medium flex flex-wrap items-center gap-2">${esc(u.displayName)}${self ? badge('Sie', 'gold') : ''}${!u.active ? badge('Gesperrt', 'red') : ''}${u.mustChangePassword ? badge('Einmal-Passwort', 'amber') : ''}${u.dutyLabel ? badge(u.dutyLabel, 'emerald') : ''}</div>
-              <div class="text-xs text-dim break-all">${esc(u.email)}${u.phone ? ' · ' + esc(u.phone) : ''}</div></div></div></td>
+              <div class="text-xs text-dim break-all">${esc(u.email)}${u.phone ? ' · ' + esc(u.phone) : ''}</div>${u.oldEmail ? `<div class="text-xs text-dim break-all" title="Funktioniert beim Login weiterhin">vorher: ${esc(u.oldEmail)}</div>` : ''}</div></div></td>
             <td data-label="Rolle"><select class="field" style="min-width:150px" data-user-field="role" data-id="${u.id}" ${self ? 'disabled' : ''} aria-label="Rolle">${Object.entries(ROLES).map(([k, l]) => opt(k, l, u.role === k)).join('')}</select></td>
             <td data-label="Rang">${rankSelect('rank', u.rank || '', { emptyLabel: '—', attrs: `style="min-width:170px" data-user-field="rank" data-id="${u.id}" aria-label="Rang"` })}</td>
             <td data-label="Discord" class="text-sm">${u.discordUsername ? esc(u.discordUsername) : '<span class="text-dim">—</span>'}</td>
@@ -4344,7 +4369,8 @@
       <h2 class="modal-title">${esc(a.name)} einstellen</h2>
       <p class="modal-sub">Legt ein Login-Konto mit Einmal-Passwort an und auf Wunsch ein Profil im Bereich „Unser Team“ auf der Website.</p>
       <form data-form="app-hire" data-id="${a.id}" class="form-grid cols-2">
-        <div class="span-2"><label class="label">E-Mail (Login)</label><input name="email" type="email" class="field" required maxlength="120" value="${esc(a.email)}" placeholder="vorname.nachname@pake-scha.ls" autofocus></div>
+        <div class="span-2"><label class="label">E-Mail (Login)</label>${emailField('email', { value: emailLocalFromName(a.name), required: true, autofocus: true })}
+          <p class="form-hint">Vorschlag aus dem Namen – frei änderbar. Kontakt-E-Mail aus der Bewerbung: ${esc(a.email || '—')}</p></div>
         <div><label class="label">Rang</label>${rankSelect('rank', RANKS.includes(rank) && (isAdmin() || RANKS.indexOf(rank) >= RANKS.indexOf(st.user.rank)) ? rank : '', { emptyLabel: '— ohne Rang (z. B. Assistenz) —' })}
           ${isAdmin() ? '' : `<p class="form-hint">Sie können bis zu Ihrem eigenen Rang (${esc(st.user.rank || '—')}) einstellen.</p>`}</div>
         <div><label class="label">Rolle im Dashboard</label><select name="role" class="field">${opt('anwalt', 'Anwalt / Mitarbeiter', true)}${isAdmin() ? opt('admin', 'Board of Partners (Admin)') : ''}</select></div>
@@ -4723,7 +4749,7 @@
         <p class="modal-sub">Es wird ein Einmal-Passwort erzeugt. Für Teammitglieder mit Website-Profil besser unter „Team“ anlegen.</p>
         <form data-form="user-new" class="form-grid cols-2">
           <div class="span-2"><label class="label">Name</label><input name="displayName" class="field" required minlength="2" maxlength="80" autofocus></div>
-          <div class="span-2"><label class="label">E-Mail (Login)</label><input name="email" type="email" class="field" required maxlength="120"></div>
+          <div class="span-2"><label class="label">E-Mail (Login)</label>${emailField('email', { required: true })}</div>
           <div><label class="label">Rolle</label><select name="role" class="field">${Object.entries(ROLES).map(([k, l]) => opt(k, l, k === 'anwalt')).join('')}</select></div>
           <div><label class="label">Rang (optional)</label>${rankSelect('rank', '')}</div>
           <div class="span-2"><label class="label">Telefon (optional)</label><input name="phone" class="field" maxlength="40"></div>
@@ -4838,6 +4864,11 @@
       await returnOrClose();
     },
     'back-to-case': () => returnOrClose(),
+    'email-notice-ok': async () => {
+      await api.post('/api/auth/email-notice');
+      st.user.emailNotice = null;
+      renderView();
+    },
 
     // Kooperationen
     'coop-new': async () => {

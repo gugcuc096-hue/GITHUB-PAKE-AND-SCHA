@@ -3,7 +3,7 @@ const express = require('express');
 const { z } = require('zod');
 const { db, tx, getSetting } = require('../db');
 const { requireAuth, requireAdmin, hashPassword, generateTempPassword, destroyAllSessions } = require('../auth');
-const { wrap, parseBody, idParam, deriveInitials, RANKS } = require('../helpers');
+const { wrap, parseBody, idParam, deriveInitials, RANKS, firmEmail, EMAIL_HINT } = require('../helpers');
 const { teamRow, TEAM_SELECT, logActivity } = require('../models');
 const { imageBody, saveImage, removeFile } = require('../uploads');
 const personnel = require('./personnel');
@@ -30,7 +30,7 @@ const adminRouter = express.Router();
 adminRouter.use(requireAuth, requireAdmin);
 
 const accountSchema = z.object({
-  email: z.string().trim().email().max(120),
+  email: z.string().trim().min(1).max(120), // Teil vor dem @ oder Adresse mit @pake-scha.ls
   role: z.enum(['anwalt', 'admin']),
 });
 const memberSchema = z.object({
@@ -50,7 +50,12 @@ function load(id) {
 
 /** Legt ein Login-Konto für ein Teammitglied an und liefert das Einmal-Passwort zurück. */
 function createAccount(account, name, rank) {
-  const email = account.email.toLowerCase();
+  const email = firmEmail(account.email);
+  if (!email) {
+    const err = new Error(EMAIL_HINT);
+    err.status = 400;
+    throw err;
+  }
   if (db.prepare('SELECT id FROM users WHERE email = ?').get(email)) {
     const err = new Error('Diese E-Mail-Adresse ist bereits vergeben.');
     err.status = 409;

@@ -7,7 +7,7 @@
  */
 const { db, tx, getSetting, setSetting } = require('./db');
 const { hashPassword, generateStrongPassword, destroyAllSessions } = require('./auth');
-const { deriveInitials } = require('./helpers');
+const { deriveInitials, EMAIL_DOMAIN, firmLocalFrom } = require('./helpers');
 const contracts = require('./contracts');
 
 const DEFAULT_ADMIN_EMAIL = 'alois.pake@pake-scha.ls';
@@ -135,7 +135,7 @@ function ensureTeamAccounts() {
     );
     for (const seed of TEAM) {
       const env = envFor(seed);
-      const exists = db.prepare('SELECT id FROM users WHERE email = ? OR display_name = ?').get(env.email, seed.name);
+      const exists = db.prepare('SELECT id FROM users WHERE email = ? OR old_email = ? OR display_name = ?').get(env.email, env.email, seed.name);
       if (exists) continue;
       const password = env.password || generateStrongPassword();
       insert.run(env.email, hashPassword(password), seed.name, seed.role, seed.rank, env.password ? 0 : 1);
@@ -181,7 +181,7 @@ function ensureMainAdmin() {
   const email = adminEmail();
   const envPassword = process.env.ADMIN_PASSWORD || '';
   const password = envPassword || generateStrongPassword();
-  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+  const existing = db.prepare('SELECT id FROM users WHERE email = ? OR old_email = ?').get(email, email);
 
   if (existing) {
     db.prepare(
@@ -212,7 +212,7 @@ function applyEmergencyReset() {
   }
 
   const email = adminEmail();
-  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+  const existing = db.prepare('SELECT id FROM users WHERE email = ? OR old_email = ?').get(email, email);
   if (existing) {
     db.prepare(
       "UPDATE users SET role = 'admin', active = 1, password_hash = ?, must_change_password = 0 WHERE id = ?"
@@ -368,6 +368,35 @@ function backfillCaseWork() {
   });
 }
 
+/**
+ * Alle Login-Adressen auf @pake-scha.ls umstellen (läuft bei jedem Start, ändert nur Adressen mit anderer
+ * Endung). Der Teil vor dem @ bleibt möglichst gleich („john.doe@mail.ls“ → „john.doe@pake-scha.ls“), bei
+ * Doppelungen mit Zahl („john.doe2@…“). Passwörter bleiben unverändert; die alte Adresse funktioniert beim
+ * Login weiter (old_email) und das Dashboard zeigt einmal einen Hinweis mit der neuen Adresse.
+ */
+function migrateEmailDomain() {
+  const rows = db.prepare('SELECT id, email, display_name FROM users WHERE email NOT LIKE ? ORDER BY id').all(`%@${EMAIL_DOMAIN}`);
+  if (!rows.length) return;
+  const taken = new Set(db.prepare('SELECT email FROM users').all().map((r) => r.email));
+  const changed = [];
+  tx(() => {
+    for (const u of rows) {
+      const base = firmLocalFrom(u.email) || firmLocalFrom(u.display_name.replace(/\s+/g, '.')) || 'mandant';
+      let local = base;
+      for (let n = 2; taken.has(`${local}@${EMAIL_DOMAIN}`); n += 1) local = `${base}${n}`;
+      const email = `${local}@${EMAIL_DOMAIN}`;
+      taken.add(email);
+      db.prepare('UPDATE users SET old_email = ?, email = ?, email_notice = 1 WHERE id = ?').run(u.email.toLowerCase(), email, u.id);
+      db.prepare("INSERT INTO audit_log (user_id, user_name, action, entity, entity_id, details) VALUES (NULL, 'System', 'Login-E-Mail umgestellt', 'user', ?, ?)").run(
+        u.id,
+        `${u.display_name}: ${u.email} → ${email}`
+      );
+      changed.push(`${u.email} → ${email}`);
+    }
+  });
+  console.log(`Login-E-Mails auf @${EMAIL_DOMAIN} umgestellt (${changed.length}):\n  ${changed.join('\n  ')}`);
+}
+
 function runBootstrap() {
   migrateLegacyData();
   migrateRanks();
@@ -375,6 +404,7 @@ function runBootstrap() {
   ensureTeamProfiles();
   ensureMainAdmin();
   applyEmergencyReset();
+  migrateEmailDomain();
   ensureDefaultFees();
   ensureDefaultPositions();
   fixCourtWording();

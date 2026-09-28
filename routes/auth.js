@@ -12,8 +12,9 @@ const {
   publicUser,
   requireAuth,
   isStaff,
+  findUserByLogin,
 } = require('../auth');
-const { wrap, parseBody } = require('../helpers');
+const { wrap, parseBody, firmEmail, EMAIL_HINT } = require('../helpers');
 const { logActivity } = require('../models');
 const { imageBody, saveImage, removeFile } = require('../uploads');
 
@@ -39,7 +40,7 @@ const registerLimiter = rateLimit({
 // Rollen vergibt nur das Board of Partners im Dashboard.
 const registerSchema = z.object({
   displayName: z.string().trim().min(2).max(80),
-  email: z.string().trim().email().max(120),
+  email: z.string().trim().min(1).max(120), // nur der Teil vor dem @ oder komplette Adresse mit @pake-scha.ls
   password: z.string().min(10).max(200),
   phone: z.string().trim().max(40).optional(),
 });
@@ -50,7 +51,8 @@ router.post(
   wrap(async (req, res) => {
     const data = parseBody(registerSchema, req, res);
     if (!data) return;
-    const email = data.email.toLowerCase();
+    const email = firmEmail(data.email);
+    if (!email) return res.status(400).json({ error: EMAIL_HINT });
     if (db.prepare('SELECT id FROM users WHERE email = ?').get(email)) {
       return res.status(409).json({ error: 'Diese E-Mail-Adresse ist bereits registriert.' });
     }
@@ -68,7 +70,7 @@ router.post(
   wrap(async (req, res) => {
     const data = parseBody(z.object({ email: z.string().trim().min(3).max(120), password: z.string().min(1).max(200) }), req, res);
     if (!data) return;
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(data.email.toLowerCase());
+    const user = findUserByLogin(data.email);
     if (!user || !verifyPassword(data.password, user.password_hash)) {
       return res.status(401).json({ error: 'E-Mail-Adresse oder Passwort ist falsch.' });
     }
@@ -78,6 +80,12 @@ router.post(
     res.json({ success: true, user: publicUser(user) });
   })
 );
+
+// Hinweis „Ihre Login-E-Mail wurde umgestellt“ gelesen
+router.post('/email-notice', requireAuth, (req, res) => {
+  db.prepare('UPDATE users SET email_notice = 0 WHERE id = ?').run(req.user.id);
+  res.json({ success: true });
+});
 
 router.post('/logout', (req, res) => {
   destroySession(req, res);
