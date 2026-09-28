@@ -112,7 +112,7 @@
     'concerns-board': { label: 'Eingegangene Anliegen', short: 'Anliegen', icon: 'chat', board: true, section: 'Board of Partners' },
     work: { label: 'Aktenbearbeitung', icon: 'briefcase', board: true, section: 'Board of Partners' },
     team: { label: 'Team', icon: 'users', admin: true, section: 'Board of Partners' },
-    applications: { label: 'Bewerbungen', icon: 'userAdd', admin: true, section: 'Board of Partners' },
+    applications: { label: 'Bewerbungen', icon: 'userAdd', board: true, section: 'Board of Partners' },
     users: { label: 'Benutzer', icon: 'key', admin: true, section: 'Board of Partners' },
     fees: { label: 'Honorarordnung', icon: 'scale', admin: true, section: 'Board of Partners' },
     audit: { label: 'Protokoll', icon: 'list', admin: true, section: 'Board of Partners' },
@@ -428,7 +428,7 @@
       }
     },
     async appCount() {
-      if (!isAdmin()) return;
+      if (!isBoard()) return;
       const list = (await api.get('/api/admin/applications')).applications;
       st.newApplications = list.filter((a) => a.status === 'eingegangen').length;
     },
@@ -3949,7 +3949,7 @@
       <div class="form-actions section">
         ${!hiredUser ? `<button class="btn-gold btn-md" data-action="app-hire" data-id="${a.id}">${icon('userAdd', 'ico-sm')}<span>Einstellen & Konto anlegen</span></button>` : ''}
         ${a.status !== 'abgelehnt' && !hiredUser ? `<button class="btn-outline btn-md" data-action="app-status" data-id="${a.id}" data-status="abgelehnt">Absagen</button>` : ''}
-        <button class="btn-danger btn-md" data-action="app-delete" data-id="${a.id}" data-number="${esc(a.number)}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>
+        ${isAdmin() ? `<button class="btn-danger btn-md" data-action="app-delete" data-id="${a.id}" data-number="${esc(a.number)}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>` : ''}
       </div>
 
       <div class="section"><h3 class="section-title">Interne Notizen</h3>
@@ -3969,8 +3969,9 @@
       <p class="modal-sub">Legt ein Login-Konto mit Einmal-Passwort an und auf Wunsch ein Profil im Bereich „Unser Team“ auf der Website.</p>
       <form data-form="app-hire" data-id="${a.id}" class="form-grid cols-2">
         <div class="span-2"><label class="label">E-Mail (Login)</label><input name="email" type="email" class="field" required maxlength="120" value="${esc(a.email)}" placeholder="vorname.nachname@pake-scha.ls" autofocus></div>
-        <div><label class="label">Rang</label>${rankSelect('rank', RANKS.includes(rank) ? rank : '', { emptyLabel: '— ohne Rang (z. B. Assistenz) —' })}</div>
-        <div><label class="label">Rolle im Dashboard</label><select name="role" class="field">${opt('anwalt', 'Anwalt / Mitarbeiter', true)}${opt('admin', 'Board of Partners (Admin)')}</select></div>
+        <div><label class="label">Rang</label>${rankSelect('rank', RANKS.includes(rank) && (isAdmin() || RANKS.indexOf(rank) >= RANKS.indexOf(st.user.rank)) ? rank : '', { emptyLabel: '— ohne Rang (z. B. Assistenz) —' })}
+          ${isAdmin() ? '' : `<p class="form-hint">Sie können bis zu Ihrem eigenen Rang (${esc(st.user.rank || '—')}) einstellen.</p>`}</div>
+        <div><label class="label">Rolle im Dashboard</label><select name="role" class="field">${opt('anwalt', 'Anwalt / Mitarbeiter', true)}${isAdmin() ? opt('admin', 'Board of Partners (Admin)') : ''}</select></div>
         <div class="span-2"><label class="label">Kurzbeschreibung für die Website (optional)</label><textarea name="description" rows="2" maxlength="400" class="field"></textarea></div>
         <label class="check span-2"><input type="checkbox" name="createProfile" checked> Team-Profil anlegen</label>
         <label class="check span-2"><input type="checkbox" name="visible" checked> Sofort auf der Website anzeigen</label>

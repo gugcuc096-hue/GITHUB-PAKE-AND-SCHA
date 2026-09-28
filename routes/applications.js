@@ -4,7 +4,7 @@ const rateLimit = require('express-rate-limit');
 const { z } = require('zod');
 const { db, tx, nextApplicationNumber, randomPin } = require('../db');
 const { requireAuth, requireAdmin, hashPassword, generateTempPassword } = require('../auth');
-const { wrap, parseBody, idParam, isoDateTime, deriveInitials, truncate, APPLICATION_STATUS, rankField, BOARD_RANKS } = require('../helpers');
+const { wrap, parseBody, idParam, isoDateTime, deriveInitials, truncate, APPLICATION_STATUS, rankField, BOARD_RANKS, RANKS, isBoard } = require('../helpers');
 const { applicationRow, positionRow, logActivity } = require('../models');
 const discord = require('../discord');
 const personnel = require('./personnel');
@@ -104,8 +104,15 @@ publicRouter.post(
 /* ================================================================
    Board of Partners: Bewerbungen
    ================================================================ */
+// Board of Partners = Rolle „Board of Partners“ (Admin) oder ein Partner-Rang.
+function requireBoard(req, res, next) {
+  if (!req.user) return res.status(401).json({ error: 'Bitte melden Sie sich an.' });
+  if (!isBoard(req.user)) return res.status(403).json({ error: 'Nur für das Board of Partners.' });
+  next();
+}
+
 const adminRouter = express.Router();
-adminRouter.use(requireAuth, requireAdmin);
+adminRouter.use(requireAuth, requireBoard);
 
 function load(id) {
   return db.prepare('SELECT * FROM applications WHERE id = ?').get(id) || null;
@@ -226,6 +233,13 @@ adminRouter.post(
       res
     );
     if (!d) return;
+    // Partner ohne Admin-Rolle: nur als Anwalt/Mitarbeiter und höchstens bis zum eigenen Rang (wie beim Befördern)
+    if (req.user.role !== 'admin') {
+      if (d.role === 'admin') return res.status(403).json({ error: 'Konten mit der Rolle „Board of Partners“ (Admin) kann nur ein Admin anlegen.' });
+      if (d.rank && RANKS.indexOf(d.rank) < RANKS.indexOf(req.user.rank)) {
+        return res.status(403).json({ error: `Sie können höchstens bis zu Ihrem eigenen Rang (${req.user.rank}) einstellen.` });
+      }
+    }
     const email = d.email.toLowerCase();
     if (db.prepare('SELECT id FROM users WHERE email = ?').get(email)) return res.status(409).json({ error: 'Diese E-Mail-Adresse ist bereits vergeben.' });
 
@@ -255,6 +269,7 @@ adminRouter.post(
 
 adminRouter.delete(
   '/:id',
+  requireAdmin,
   wrap(async (req, res) => {
     const id = idParam(req);
     const a = id && load(id);
@@ -269,7 +284,7 @@ adminRouter.delete(
    Board of Partners: Stellenausschreibungen
    ================================================================ */
 const positionsRouter = express.Router();
-positionsRouter.use(requireAuth, requireAdmin);
+positionsRouter.use(requireAuth, requireBoard);
 
 const positionSchema = z.object({
   title: z.string().trim().min(2).max(100),

@@ -217,7 +217,7 @@ Es gibt genau sechs Ränge (Benutzer, Team-Profile und Einstellung von Bewerbern
 | Equity Partner | Associate |
 | Partner | Junior Associate |
 
-**Board of Partners** ist zugleich die Leitung der Kanzlei: Die Dashboard-Rolle „Board of Partners“ (Admin) sieht den gleichnamigen Menübereich (Aktenbearbeitung, Team, Bewerbungen, Benutzer, Honorarordnung, Protokoll, Einstellungen). Die Auswertung „Aktenbearbeitung“ sehen außerdem Konten mit Partner-Rang. Der Rang selbst vergibt keine Admin-Rechte – dafür im Menü „Benutzer“ die Rolle „Board of Partners“ wählen. Ältere Ränge „Managing Partner“ und „Managing Partner / Kanzleileitung“ wurden beim Update einmalig zu „Founding Partner“.
+**Board of Partners** ist zugleich die Leitung der Kanzlei: Die Dashboard-Rolle „Board of Partners“ (Admin) sieht den gleichnamigen Menübereich (Aktenbearbeitung, Team, Bewerbungen, Benutzer, Honorarordnung, Protokoll, Einstellungen). Die Auswertung „Aktenbearbeitung“, die eingegangenen Anliegen und die **Bewerbungen** (inkl. Stellenausschreibungen) sehen außerdem Konten mit Partner-Rang. Einstellen dürfen sie Bewerber als Anwalt/Mitarbeiter bis zum eigenen Rang; Admin-Konten anlegen und Bewerbungen löschen bleibt der Rolle „Board of Partners“ vorbehalten. Der Rang selbst vergibt keine Admin-Rechte – dafür im Menü „Benutzer“ die Rolle „Board of Partners“ wählen. Ältere Ränge „Managing Partner“ und „Managing Partner / Kanzleileitung“ wurden beim Update einmalig zu „Founding Partner“.
 
 ## Rollen und Rechte
 
@@ -238,7 +238,8 @@ Es gibt genau sechs Ränge (Benutzer, Team-Profile und Einstellung von Bewerbern
 | Stempeluhr | – | eigene Zeiten | alle Zeiten, Korrekturen |
 | Anliegen ans Board (auch ohne Konto über die Startseite) | eigene einreichen (auch anonym), Antworten lesen | eigene einreichen (auch anonym), Antworten lesen | zusätzlich „Eingegangene Anliegen“: alle ansehen, antworten, interne Notizen, Status/Zuständigkeit (Partner-Rang ebenso) |
 | Beförderungen & Einstellungen | – | ansehen | ansehen, befördern (Partner-Rang: bis zum eigenen Rang), Einträge entfernen |
-| Team, Bewerbungen, Benutzer, Honorarordnung, Protokoll, Einstellungen | – | – | ja |
+| Bewerbungen & Stellenausschreibungen | – | nur mit Partner-Rang (einstellen bis zum eigenen Rang, ohne Admin-Rolle, nicht löschen) | ja |
+| Team, Benutzer, Honorarordnung, Protokoll, Einstellungen | – | – | ja |
 
 ## Sicherheit
 
