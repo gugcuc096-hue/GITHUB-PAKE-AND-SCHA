@@ -2008,9 +2008,9 @@
     if (!t) return '';
     const open = t.url ? `<a href="${esc(t.url)}" target="_blank" rel="noopener" class="btn-discord btn-sm">${DISCORD_ICON}<span>In Discord öffnen</span></a>` : '';
     return `<div class="banner banner-discord items-center justify-between flex-wrap mt-4">
-      <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><strong>Discord-Ticket (Board)</strong>${t.exists ? (t.archived ? badge('archiviert', 'slate') : badge('aktiv', 'emerald')) : badge('noch nicht angelegt', 'amber')}</div>
+      <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><strong>Discord-Ticket (Board)</strong>${t.exists ? (t.archived ? badge('archiviert', 'slate') : badge('aktiv', 'emerald')) : t.deleted ? badge('per /delete gelöscht', 'slate') : badge('noch nicht angelegt', 'amber')}</div>
         ${t.error ? `<div class="text-xs text-red-300 mt-1">${icon('alert', 'ico-sm')} ${esc(t.error)}</div>` : ''}</div>
-      <div class="flex flex-wrap gap-2">${open}<button class="btn-outline btn-sm" data-action="board-ticket-sync" data-kind="${kind}" data-id="${id}">${t.exists ? 'Abgleichen' : 'Ticket anlegen'}</button></div></div>`;
+      <div class="flex flex-wrap gap-2">${open}<button class="btn-outline btn-sm" data-action="board-ticket-sync" data-kind="${kind}" data-id="${id}">${t.exists ? 'Abgleichen' : t.deleted ? 'Neu anlegen' : 'Ticket anlegen'}</button></div></div>`;
   }
 
   /** Discord-Ticket der Akte (nur wenn Discord-Tickets eingerichtet sind). */
@@ -2018,6 +2018,7 @@
     if (!t) return '';
     const open = t.url ? `<a href="${esc(t.url)}" target="_blank" rel="noopener" class="btn-discord btn-sm">${DISCORD_ICON}<span>In Discord öffnen</span></a>` : '';
     if (!isStaff()) {
+      if (t.deleted) return ''; // Ticket wurde von der Kanzlei gelöscht
       if (t.clientInTicket) return `<div class="banner banner-discord items-center justify-between flex-wrap"><div><strong>Ihr Discord-Ticket</strong><div class="text-sm text-muted">Alle Neuigkeiten zu dieser Akte erscheinen automatisch in Ihrem privaten Discord-Kanal.</div></div>${open}</div>`;
       if (t.clientLinked)
         return `<div class="banner banner-discord items-center justify-between flex-wrap"><div><strong>Discord-Ticket</strong><div class="text-sm text-muted">Sie werden automatisch hinzugefügt, sobald Sie auf dem Discord-Server der Kanzlei sind.</div></div><button class="btn-outline btn-sm" data-action="ticket-sync" data-id="${c.id}">Erneut prüfen</button></div>`;
@@ -2029,10 +2030,10 @@
         ? badge('Mandant nicht auf dem Server', 'amber')
         : badge(c.hasClientAccount ? 'Mandant: Discord nicht verknüpft' : 'Mandant noch nicht beigetreten', 'slate');
     return `<div class="banner banner-discord items-center justify-between flex-wrap">
-      <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><strong>Discord-Ticket</strong>${t.exists ? (t.archived ? badge('archiviert', 'slate') : badge('aktiv', 'emerald')) : badge('noch nicht angelegt', 'amber')}${t.exists ? client : ''}</div>
-        <div class="text-xs text-dim mt-1">${t.exists ? 'Status, Zuständigkeit, Nachrichten, Termine, Verträge und Rechnungen erscheinen automatisch im Kanal – interne Notizen nie.' : 'Wird automatisch angelegt; hier von Hand anlegen, falls es fehlt.'}${!t.clientInTicket && !c.hasClientAccount ? ' Mandanten ohne Konto treten auf der Website unter „Aktenstatus“ mit Aktenzeichen + Pin bei.' : ''}</div>
+      <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><strong>Discord-Ticket</strong>${t.exists ? (t.archived ? badge('archiviert', 'slate') : badge('aktiv', 'emerald')) : t.deleted ? badge('per /delete gelöscht', 'slate') : badge('noch nicht angelegt', 'amber')}${t.exists ? client : ''}</div>
+        <div class="text-xs text-dim mt-1">${t.exists ? 'Status, Zuständigkeit, Nachrichten, Termine, Verträge und Rechnungen erscheinen automatisch im Kanal – interne Notizen nie.' : t.deleted ? 'Das Ticket wurde im Discord gelöscht und wird nicht automatisch neu angelegt. „Neu anlegen“ erstellt einen frischen Kanal.' : 'Wird automatisch angelegt; hier von Hand anlegen, falls es fehlt.'}${!t.clientInTicket && !c.hasClientAccount ? ' Mandanten ohne Konto treten auf der Website unter „Aktenstatus“ mit Aktenzeichen + Pin bei.' : ''}</div>
         ${t.error ? `<div class="text-xs text-red-300 mt-1">${icon('alert', 'ico-sm')} ${esc(t.error)}</div>` : ''}</div>
-      <div class="flex flex-wrap gap-2">${open}<button class="btn-outline btn-sm" data-action="ticket-sync" data-id="${c.id}">${t.exists ? 'Abgleichen' : 'Ticket anlegen'}</button></div></div>`;
+      <div class="flex flex-wrap gap-2">${open}<button class="btn-outline btn-sm" data-action="ticket-sync" data-id="${c.id}">${t.exists ? 'Abgleichen' : t.deleted ? 'Neu anlegen' : 'Ticket anlegen'}</button></div></div>`;
   }
 
   /** Darf das Mandanten-Konto der Akte verknüpfen/lösen: zuständige Anwälte und Board of Partners. */
@@ -3403,7 +3404,7 @@
             <li>In Discord die Kategorien anlegen: z. B. „Mandatsanfragen“ (Akten) und „Board of Partners“ (Bewerbungen, Anliegen), optional je eine fürs Archiv. IDs kopieren: Einstellungen → Erweitert → Entwicklermodus an, dann Rechtsklick → „ID kopieren“.</li>
             <li>Rechts Server-ID, Kategorien und Rollen eintragen, speichern und „Verbindung testen“.</li>
             <li>Einschalten – neue Akten, Bewerbungen und Anliegen bekommen ab dann automatisch ein Ticket. Bestehende offene: „Offene nachholen“.</li>
-            <li>${ok(t.panel && t.panel.interactive)} <strong>Buttons im Ticket</strong> („Akte übernehmen“, „Akte schließen“, „Wieder öffnen“, „Anliegen erledigt“): Developer Portal → eure App → <em>General Information</em> → „Public Key“ kopieren → in Render als <code class="font-mono text-xs text-gold">DISCORD_PUBLIC_KEY</code> eintragen → Deploy. <strong>Danach</strong> im Developer Portal bei „Interactions Endpoint URL“ eintragen und speichern: <code class="font-mono text-xs text-gold break-all">${esc((t.panel && t.panel.publicUrl ? t.panel.interactionsUrl : location.origin + '/api/discord/interactions'))}</code>. Zum Schluss „Offene nachholen“ – dann bekommen auch bestehende Tickets die Buttons. Klicken dürfen nur Teammitglieder mit verknüpftem Discord und denselben Rechten wie im Dashboard. Damit stehen auch die Befehle <code class="font-mono text-xs text-gold">/add @Person</code> und <code class="font-mono text-xs text-gold">/remove @Person</code> bereit, um externe Personen ins Ticket zu holen bzw. zu entfernen.</li>
+            <li>${ok(t.panel && t.panel.interactive)} <strong>Buttons im Ticket</strong> („Akte übernehmen“, „Akte schließen“, „Wieder öffnen“, „Anliegen erledigt“): Developer Portal → eure App → <em>General Information</em> → „Public Key“ kopieren → in Render als <code class="font-mono text-xs text-gold">DISCORD_PUBLIC_KEY</code> eintragen → Deploy. <strong>Danach</strong> im Developer Portal bei „Interactions Endpoint URL“ eintragen und speichern: <code class="font-mono text-xs text-gold break-all">${esc((t.panel && t.panel.publicUrl ? t.panel.interactionsUrl : location.origin + '/api/discord/interactions'))}</code>. Zum Schluss „Offene nachholen“ – dann bekommen auch bestehende Tickets die Buttons. Klicken dürfen nur Teammitglieder mit verknüpftem Discord und denselben Rechten wie im Dashboard. Damit stehen auch die Befehle bereit: im Ticket <code class="font-mono text-xs text-gold">/add</code>, <code class="font-mono text-xs text-gold">/remove</code>, <code class="font-mono text-xs text-gold">/delete</code>; überall <code class="font-mono text-xs text-gold">/passwort</code> (neues Passwort per Direktnachricht), <code class="font-mono text-xs text-gold">/akte</code>, <code class="font-mono text-xs text-gold">/termine</code>, <code class="font-mono text-xs text-gold">/imdienst</code>, <code class="font-mono text-xs text-gold">/hilfe</code> und für die Kanzlei <code class="font-mono text-xs text-gold">/dienst</code> und <code class="font-mono text-xs text-gold">/notiz</code>.</li>
           </ol>
           ${t.oauthConfigured ? '' : '<div class="banner banner-amber mt-3 mb-0">' + icon('alert') + '<div>Der <strong>Discord-Login</strong> ist noch nicht eingerichtet. Ohne ihn können Mandanten ihr Discord nicht verknüpfen und werden nicht automatisch ins Ticket aufgenommen.</div></div>'}
         </div>

@@ -58,6 +58,26 @@ function setDuty(userId, status, note) {
   });
 }
 
+/** Dienststatus ändern und Beginn/Ende im Discord melden (Dashboard und /dienst im Discord). */
+function changeDuty(u, status, note) {
+  closeStaleSessions();
+  const result = setDuty(u.id, status, note);
+  if (result.started) {
+    discord.notify('duty.changed', {
+      title: `🟢 ${u.display_name} ist jetzt im Dienst`,
+      description: note || undefined,
+      fields: [{ name: 'Status', value: DUTY_STATUS[status] }],
+    });
+  } else if (result.ended) {
+    discord.notify('duty.changed', {
+      title: `⚪ ${u.display_name} hat den Dienst beendet`,
+      fields: [{ name: 'Dauer', value: fmtDuration(result.duration) }],
+      color: 0x64748b,
+    });
+  }
+  return result;
+}
+
 function statePayload(userId) {
   const me = db.prepare('SELECT duty_status, duty_note, duty_since FROM users WHERE id = ?').get(userId);
   return {
@@ -76,23 +96,8 @@ router.post(
   wrap(async (req, res) => {
     const d = parseBody(z.object({ status: z.enum(Object.keys(DUTY_STATUS)), note: z.string().trim().max(120).optional() }), req, res);
     if (!d) return;
-    closeStaleSessions();
-    const result = setDuty(req.user.id, d.status, d.note);
-    const u = req.user;
-    if (result.started) {
-      discord.notify('duty.changed', {
-        title: `🟢 ${u.display_name} ist jetzt im Dienst`,
-        description: d.note || undefined,
-        fields: [{ name: 'Status', value: DUTY_STATUS[d.status] }],
-      });
-    } else if (result.ended) {
-      discord.notify('duty.changed', {
-        title: `⚪ ${u.display_name} hat den Dienst beendet`,
-        fields: [{ name: 'Dauer', value: fmtDuration(result.duration) }],
-        color: 0x64748b,
-      });
-    }
-    res.json(statePayload(u.id));
+    changeDuty(req.user, d.status, d.note);
+    res.json(statePayload(req.user.id));
   })
 );
 
@@ -219,3 +224,5 @@ router.post(
 
 module.exports = router;
 module.exports.closeStaleSessions = closeStaleSessions;
+module.exports.changeDuty = changeDuty;
+module.exports.fmtDuration = fmtDuration;
