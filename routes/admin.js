@@ -9,6 +9,7 @@ const { removeFile } = require('../uploads');
 const discord = require('../discord');
 const fivenet = require('../fivenet');
 const personnel = require('./personnel');
+const tickets = require('../tickets');
 
 const ROLE_LABEL = { mandant: 'Mandant', anwalt: 'Anwalt', admin: 'Board of Partners' };
 
@@ -160,6 +161,8 @@ router.patch(
     if (d.rank !== undefined && (d.rank || null) !== target.rank) changes.push(`Rang: ${d.rank || '—'}`);
     if (d.displayName !== undefined && d.displayName !== target.display_name) changes.push(`Name: ${d.displayName}`);
     if (changes.length) logActivity(req.user, 'Konto geändert', 'user', id, `${target.display_name}: ${changes.join(', ')}`);
+    // Rolle, Rang oder Sperre ändern ggf. die Zugehörigkeit zum Board → Board-Tickets abgleichen
+    if (d.role !== undefined || d.rank !== undefined || d.active !== undefined) tickets.syncBoardAll();
     res.json({ user: userRow(db.prepare('SELECT * FROM users WHERE id = ?').get(id)) });
   })
 );

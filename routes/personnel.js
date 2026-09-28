@@ -19,6 +19,7 @@ const { requireAuth, requireStaff, userAvatarUrl } = require('../auth');
 const { wrap, parseBody, idParam, isBoard, RANKS, BOARD_RANKS, RANK_ORDER_SQL, truncate } = require('../helpers');
 const { logActivity } = require('../models');
 const discord = require('../discord');
+const tickets = require('../tickets');
 
 const TYPES = { einstellung: 'Einstellung', befoerderung: 'Beförderung', rueckstufung: 'Rückstufung', rangaenderung: 'Rangänderung' };
 const SLATE = 0x64748b;
@@ -199,6 +200,7 @@ router.post(
     });
     const type = changeType(target.rank, d.rank);
     logActivity(u, TYPES[type], 'user', target.id, `${target.display_name}: ${target.rank || '—'} → ${d.rank}${d.note ? ` (${truncate(d.note, 120)})` : ''}`);
+    tickets.syncBoardAll(); // wer ins Board kommt (oder es verlässt), sieht die Board-Tickets (nicht mehr)
     res.status(201).json({ success: true, id, type, typeLabel: TYPES[type] });
   })
 );

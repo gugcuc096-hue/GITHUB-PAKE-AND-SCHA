@@ -473,6 +473,13 @@ addColumn('cases', 'discord_members', 'TEXT');
 addColumn('cases', 'discord_client_id', 'TEXT');
 addColumn('cases', 'discord_archived', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('cases', 'discord_error', 'TEXT');
+// Board-Tickets (Discord-Kanal je Bewerbung bzw. Anliegen, nur für das Board of Partners)
+for (const table of ['applications', 'concerns']) {
+  addColumn(table, 'discord_channel_id', 'TEXT');
+  addColumn(table, 'discord_members', 'TEXT');
+  addColumn(table, 'discord_archived', 'INTEGER NOT NULL DEFAULT 0');
+  addColumn(table, 'discord_error', 'TEXT');
+}
 // Reihenfolge in der Akte (per Ziehen festgelegt); NULL = noch nicht einsortiert, erscheint oben.
 addColumn('case_external_docs', 'sort_order', 'INTEGER');
 addColumn('case_attachments', 'external_doc_id', 'INTEGER REFERENCES case_external_docs(id) ON DELETE SET NULL');

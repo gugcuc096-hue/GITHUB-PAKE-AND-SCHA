@@ -440,11 +440,12 @@ function send(channelId, payload) {
 
 /* ---------------------------------------------------------------- Warteschlange */
 const queues = new Map();
-function enqueue(key, job) {
+function enqueue(key, job, onError) {
   const prev = queues.get(key) || Promise.resolve();
   const next = prev.then(job).catch((err) => {
     console.warn(`Discord-Tickets (${key}): ${err.message}`);
-    if (typeof key === 'number') {
+    if (onError) onError(err);
+    else if (typeof key === 'number') {
       try {
         saveState(key, { discord_error: truncate(err.message, 300) });
       } catch {
@@ -584,14 +585,315 @@ function syncUser(userId) {
 
 /** Tickets für alle offenen Akten ohne Kanal anlegen (nach der Einrichtung). */
 async function backfill() {
-  if (!active()) throw new Error('Discord-Tickets sind nicht vollständig eingerichtet.');
-  const rows = db.prepare("SELECT id FROM cases WHERE discord_channel_id IS NULL AND status != 'geschlossen' ORDER BY id").all();
+  const kinds = Object.keys(BOARD_KINDS).filter(boardActive);
+  if (!active() && !kinds.length) throw new Error('Discord-Tickets sind nicht vollständig eingerichtet.');
   let created = 0;
-  for (const r of rows) {
-    await caseCreated(r.id, { quiet: true });
-    if (getCase(r.id)?.discord_channel_id) created += 1;
+  let total = 0;
+  if (active()) {
+    const rows = db.prepare("SELECT id FROM cases WHERE discord_channel_id IS NULL AND status != 'geschlossen' ORDER BY id").all();
+    total += rows.length;
+    for (const r of rows) {
+      await caseCreated(r.id, { quiet: true });
+      if (getCase(r.id)?.discord_channel_id) created += 1;
+    }
   }
-  return { created, total: rows.length };
+  // Offene Bewerbungen und Anliegen ohne Ticket
+  for (const kind of kinds) {
+    const t = BOARD_KINDS[kind];
+    const rows = db.prepare(`SELECT id FROM ${t.table} WHERE discord_channel_id IS NULL AND status NOT IN (${t.closed.map(() => '?').join(',')}) ORDER BY id`).all(...t.closed);
+    total += rows.length;
+    for (const r of rows) {
+      await boardCreated(kind, r.id, { quiet: true });
+      if (boardRow(kind, r.id)?.discord_channel_id) created += 1;
+    }
+  }
+  return { created, total };
+}
+
+/* ================================================================
+   Board-Tickets: Bewerbungen und Anliegen ans Board of Partners
+   ================================================================
+ * Eigene Kategorie (z. B. „Board of Partners“), sichtbar nur für die Board-Rolle(n) und die
+ * Board-Mitglieder mit verknüpftem Discord (Rolle „Board of Partners“ oder Partner-Rang).
+ * Anders als Mandats-Tickets sind das interne Kanäle: Bewerber bzw. Einreichende sind nicht drin,
+ * deshalb erscheinen hier auch interne Notizen. Anonyme Anliegen bleiben anonym.
+ */
+const BOARD_RANK_LIST = ['Founding Partner', 'Equity Partner', 'Partner'];
+const BOARD_KINDS = {
+  application: { table: 'applications', closed: ['angenommen', 'abgelehnt'], flag: 'discord_ticket_board_apps', label: 'Bewerbung' },
+  concern: { table: 'concerns', closed: ['erledigt', 'abgelehnt'], flag: 'discord_ticket_board_concerns', label: 'Anliegen' },
+};
+
+function boardConfig() {
+  return {
+    categoryId: getSetting('discord_ticket_board_category', ''),
+    archiveId: getSetting('discord_ticket_board_archive', ''),
+    roleIds: String(getSetting('discord_ticket_board_roles', '') || '')
+      .split(/[\s,;]+/)
+      .filter(isId),
+    applications: getSetting('discord_ticket_board_apps', '1') === '1',
+    concerns: getSetting('discord_ticket_board_concerns', '1') === '1',
+  };
+}
+
+/** Board-Tickets dieser Art eingeschaltet und eingerichtet? */
+function boardActive(kind) {
+  const c = config();
+  const b = boardConfig();
+  if (!c.enabled || !token() || !isId(c.guildId) || !isId(b.categoryId)) return false;
+  return kind === 'application' ? b.applications : kind === 'concern' ? b.concerns : false;
+}
+
+const boardRow = (kind, id) => db.prepare(`SELECT * FROM ${BOARD_KINDS[kind].table} WHERE id = ?`).get(id) || null;
+function saveBoard(kind, id, fields) {
+  const keys = Object.keys(fields);
+  if (keys.length) db.prepare(`UPDATE ${BOARD_KINDS[kind].table} SET ${keys.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...keys.map((k) => fields[k]), id);
+}
+const boardClosed = (kind, r) => BOARD_KINDS[kind].closed.includes(r.status);
+const boardArchive = () => boardConfig().archiveId || config().archiveId;
+
+/** Discord-IDs aller Board-Mitglieder (Rolle „Board of Partners“ oder Partner-Rang) mit verknüpftem Discord. */
+function boardMemberIds() {
+  return db
+    .prepare(`SELECT discord_id FROM users WHERE active = 1 AND (role = 'admin' OR (role = 'anwalt' AND rank IN (${BOARD_RANK_LIST.map(() => '?').join(',')})))`)
+    .all(...BOARD_RANK_LIST)
+    .map((u) => u.discord_id)
+    .filter(isId);
+}
+
+const CONCERN_CATEGORY = {
+  personal: 'Personal & Beförderung',
+  beschwerde: 'Beschwerde / Konflikt',
+  betreuung: 'Betreuung meines Mandats',
+  abrechnung: 'Rechnung & Honorar',
+  kooperation: 'Anfrage / Zusammenarbeit',
+  vorschlag: 'Vorschlag / Lob / Idee',
+  organisation: 'Organisation & Abläufe',
+  finanzen: 'Gehalt & Finanzen',
+  sonstiges: 'Sonstiges',
+};
+const CONCERN_GROUP = { mitarbeiter: 'Mitarbeiter', mandant: 'Mandant', extern: 'über die Website' };
+const APP_STATUS_LABEL = { eingegangen: 'Eingegangen', in_pruefung: 'In Prüfung', gespraech: 'Einladung zum Gespräch', angenommen: 'Angenommen', abgelehnt: 'Abgelehnt' };
+const CONCERN_STATUS_LABEL = { offen: 'Offen', in_bearbeitung: 'In Bearbeitung', erledigt: 'Erledigt', abgelehnt: 'Abgelehnt' };
+/** Absender eines Anliegens – bei anonymen Anliegen nie der Name. */
+const concernFrom = (k) => `${k.anonymous ? 'Anonym' : k.author_name} (${CONCERN_GROUP[k.author_group] || 'Mitarbeiter'})`;
+
+function boardChannelName(kind, r) {
+  return kind === 'application'
+    ? [String(r.number).toLowerCase(), slug(r.name)].filter(Boolean).join('-').slice(0, 90)
+    : [String(r.reference || `an-${r.id}`).toLowerCase(), slug(r.subject)].filter(Boolean).join('-').slice(0, 90);
+}
+
+function boardIntro(kind, r) {
+  if (kind === 'application') {
+    return embed({
+      title: `📝 Bewerbung ${r.number}: ${truncate(r.name, 150)}`,
+      description: r.motivation ? truncate(r.motivation, 1500) : undefined,
+      color: COLORS.gold,
+      fields: [
+        { name: 'Stelle', value: r.position_title },
+        { name: 'Alter', value: r.age ? String(r.age) : '—' },
+        { name: 'Discord', value: r.discord || '—' },
+        { name: 'Telefon', value: r.phone || '—' },
+        ...(r.experience ? [{ name: 'Erfahrung', value: truncate(r.experience, 1000), inline: false }] : []),
+        ...(r.availability ? [{ name: 'Verfügbarkeit', value: truncate(r.availability, 300), inline: false }] : []),
+        { name: 'Status', value: APP_STATUS_LABEL[r.status] || r.status },
+      ],
+    });
+  }
+  return embed({
+    title: `📨 Anliegen ${r.reference || ''}: ${truncate(r.subject, 180)}`,
+    description: truncate(r.body, 2000),
+    color: r.urgency === 'dringend' ? COLORS.red : COLORS.gold,
+    fields: [
+      { name: 'Kategorie', value: CONCERN_CATEGORY[r.category] || r.category },
+      { name: 'Dringlichkeit', value: r.urgency === 'dringend' ? 'Dringend' : 'Normal' },
+      { name: 'Von', value: concernFrom(r) },
+      ...(!r.anonymous && r.contact ? [{ name: 'Kontakt', value: truncate(r.contact, 100) }] : []),
+      { name: 'Status', value: CONCERN_STATUS_LABEL[r.status] || r.status },
+    ],
+  });
+}
+
+async function createBoardChannel(kind, r, { quiet = false } = {}) {
+  const cfg = config();
+  const b = boardConfig();
+  await identifyOnce();
+  const bot = await botId();
+  const closed = boardClosed(kind, r);
+  const added = [];
+  const overwrites = [
+    { id: cfg.guildId, type: 0, allow: '0', deny: String(P.VIEW_CHANNEL) },
+    { id: bot, type: 1, allow: String(BOT_ALLOW), deny: '0' },
+    ...b.roleIds.map((id) => ({ id, type: 0, allow: String(MEMBER_ALLOW), deny: '0' })),
+  ];
+  for (const id of boardMemberIds()) {
+    if (id === bot || !(await isMember(cfg.guildId, id))) continue;
+    overwrites.push({ id, type: 1, allow: String(MEMBER_ALLOW), deny: '0' });
+    added.push(id);
+  }
+  const archive = boardArchive();
+  const channel = await rest('POST', `/guilds/${cfg.guildId}/channels`, {
+    name: boardChannelName(kind, r),
+    type: 0,
+    parent_id: closed && isId(archive) ? archive : b.categoryId,
+    topic: truncate(`${BOARD_KINDS[kind].label} ${kind === 'application' ? r.number : r.reference || ''} – nur für das Board of Partners`, 1000),
+    permission_overwrites: overwrites,
+  });
+  saveBoard(kind, r.id, { discord_channel_id: String(channel.id), discord_members: JSON.stringify(added), discord_archived: closed ? 1 : 0, discord_error: null });
+  const ping = cfg.pingRoles && !quiet && b.roleIds.length;
+  const msg = await send(channel.id, {
+    content: ping ? b.roleIds.map((id) => `<@&${id}>`).join(' ') : undefined,
+    embeds: [boardIntro(kind, r)],
+    allowed_mentions: { parse: [], roles: ping ? b.roleIds : [] },
+  });
+  if (msg && msg.id) rest('PUT', `/channels/${channel.id}/pins/${msg.id}`).catch(() => {});
+}
+
+/** Kanal sicherstellen, Board-Mitglieder und Archiv abgleichen. Liefert die frische Zeile oder null. */
+async function ensureBoard(kind, id) {
+  let r = boardRow(kind, id);
+  if (!r) return null;
+  if (!r.discord_channel_id) {
+    await createBoardChannel(kind, r);
+    return boardRow(kind, id);
+  }
+  const cfg = config();
+  const bot = await botId();
+  const wanted = new Set(boardMemberIds().filter((m) => m !== bot));
+  const current = new Set(parseMembers(r));
+  try {
+    for (const m of wanted) {
+      if (current.has(m) || !(await isMember(cfg.guildId, m))) continue;
+      await rest('PUT', `/channels/${r.discord_channel_id}/permissions/${m}`, { type: 1, allow: String(MEMBER_ALLOW), deny: '0' });
+      current.add(m);
+    }
+    for (const m of [...current]) {
+      if (wanted.has(m)) continue;
+      await rest('DELETE', `/channels/${r.discord_channel_id}/permissions/${m}`).catch((err) => {
+        if (err.status !== 404) throw err;
+      });
+      current.delete(m);
+    }
+  } catch (err) {
+    if (err.code !== 10003) throw err;
+    saveBoard(kind, id, { discord_channel_id: null, discord_members: null, discord_archived: 0 });
+    r = boardRow(kind, id);
+    await createBoardChannel(kind, r);
+    return boardRow(kind, id);
+  }
+  saveBoard(kind, id, { discord_members: JSON.stringify([...current]), discord_error: null });
+  return boardRow(kind, id);
+}
+
+async function syncBoardArchive(kind, r) {
+  const closed = boardClosed(kind, r);
+  if (!!r.discord_archived === closed) return;
+  const archive = boardArchive();
+  const parent = closed ? (isId(archive) ? archive : null) : boardConfig().categoryId;
+  if (parent) await rest('PATCH', `/channels/${r.discord_channel_id}`, { parent_id: parent, lock_permissions: false });
+  saveBoard(kind, r.id, { discord_archived: closed ? 1 : 0 });
+}
+
+const boardKey = (kind, id) => `${kind}-${id}`;
+const boardError = (kind, id) => (err) => {
+  try {
+    saveBoard(kind, id, { discord_error: truncate(err.message, 300) });
+  } catch {
+    /* evtl. gelöscht */
+  }
+};
+
+/** Neue Bewerbung / neues Anliegen → Board-Ticket anlegen. */
+function boardCreated(kind, id, opts = {}) {
+  if (!boardActive(kind)) return Promise.resolve();
+  return enqueue(
+    boardKey(kind, id),
+    async () => {
+      const r = boardRow(kind, id);
+      if (r && !r.discord_channel_id) await createBoardChannel(kind, r, opts);
+    },
+    boardError(kind, id)
+  );
+}
+
+/** Nachricht ins Board-Ticket; danach Archiv-Zustand angleichen. msg wie bei post(). */
+function boardPost(kind, id, msg) {
+  if (!boardActive(kind)) return Promise.resolve();
+  return enqueue(
+    boardKey(kind, id),
+    async () => {
+      let r = await ensureBoard(kind, id);
+      if (!r) return;
+      if (!boardClosed(kind, r) && r.discord_archived) {
+        await syncBoardArchive(kind, r);
+        r = boardRow(kind, id);
+      }
+      const payload = {
+        embeds: [embed({ ...msg, footer: msg.by ? `${msg.by} · Board of Partners` : 'Board of Partners' })],
+        allowed_mentions: { parse: [] },
+      };
+      try {
+        await send(r.discord_channel_id, payload);
+      } catch (err) {
+        if (err.code !== 10003) throw err;
+        saveBoard(kind, id, { discord_channel_id: null, discord_members: null, discord_archived: 0 });
+        r = await ensureBoard(kind, id);
+        await send(r.discord_channel_id, payload);
+      }
+      await syncBoardArchive(kind, boardRow(kind, id));
+    },
+    boardError(kind, id)
+  );
+}
+
+/** Mitglieder/Archiv eines Board-Tickets abgleichen (legt es an, falls es fehlt). */
+function boardSync(kind, id) {
+  if (!boardActive(kind)) return Promise.resolve();
+  return enqueue(
+    boardKey(kind, id),
+    async () => {
+      const r = await ensureBoard(kind, id);
+      if (r) await syncBoardArchive(kind, r);
+    },
+    boardError(kind, id)
+  );
+}
+
+/** Nach Beförderung, Rollenwechsel oder Discord-Verknüpfung: alle offenen Board-Tickets abgleichen. */
+function syncBoardAll() {
+  const jobs = [];
+  for (const kind of Object.keys(BOARD_KINDS)) {
+    if (!boardActive(kind)) continue;
+    const t = BOARD_KINDS[kind];
+    const rows = db.prepare(`SELECT id FROM ${t.table} WHERE discord_channel_id IS NOT NULL AND status NOT IN (${t.closed.map(() => '?').join(',')})`).all(...t.closed);
+    rows.forEach((r) => jobs.push(boardSync(kind, r.id)));
+  }
+  return Promise.all(jobs);
+}
+
+/** Bewerbung/Anliegen gelöscht → Hinweis und ins Archiv (Verlauf bleibt). */
+function boardDeleted(kind, r, by) {
+  if (!boardActive(kind) || !r.discord_channel_id) return Promise.resolve();
+  return enqueue(`deleted-${kind}-${r.id}`, async () => {
+    await send(r.discord_channel_id, {
+      embeds: [embed({ title: `🗑️ ${BOARD_KINDS[kind].label} ${kind === 'application' ? r.number : r.reference || ''} wurde gelöscht`, description: 'Der Kanal bleibt zur Nachverfolgung im Archiv.', color: COLORS.slate, footer: by ? `${by} · Board of Partners` : undefined })],
+      allowed_mentions: { parse: [] },
+    }).catch(() => {});
+    const archive = boardArchive();
+    if (isId(archive)) await rest('PATCH', `/channels/${r.discord_channel_id}`, { parent_id: archive, lock_permissions: false }).catch(() => {});
+  });
+}
+
+/** Infos für Bewerbung/Anliegen im Dashboard (nur Board). */
+function boardTicketInfo(kind, r) {
+  if (!boardActive(kind) || !r) return null;
+  return {
+    url: r.discord_channel_id && isId(config().guildId) ? `https://discord.com/channels/${config().guildId}/${r.discord_channel_id}` : null,
+    exists: !!r.discord_channel_id,
+    archived: !!r.discord_archived,
+    error: r.discord_error || null,
+  };
 }
 
 /** Infos für die Akte im Dashboard / auf der Website. */
@@ -660,13 +962,27 @@ async function test() {
   } catch (err) {
     add(false, 'Berechtigungen des Bots', err.message);
   }
-  for (const [label, id, required] of [
-    ['Ticket-Kategorie', cfg.categoryId, true],
-    ['Archiv-Kategorie', cfg.archiveId, false],
+  const b = boardConfig();
+  if (b.roleIds.length) {
+    try {
+      const names = (guild.roles || []).filter((r) => b.roleIds.includes(r.id)).map((r) => r.name);
+      const unknown = b.roleIds.filter((id) => !(guild.roles || []).some((r) => r.id === id));
+      add(!unknown.length, 'Board-Rollen', unknown.length ? `Unbekannte Rollen-ID: ${unknown.join(', ')}` : names.join(', '));
+    } catch (err) {
+      add(false, 'Board-Rollen', err.message);
+    }
+  } else if (isId(b.categoryId)) {
+    add(false, 'Board-Rollen', 'Keine Rolle eingetragen – dann sehen nur Board-Mitglieder mit verknüpftem Discord die Board-Tickets.');
+  }
+  for (const [label, id, required, emptyText] of [
+    ['Kategorie Mandats-Tickets', cfg.categoryId, false, 'keine – Mandats-Tickets sind aus'],
+    ['Archiv-Kategorie', cfg.archiveId, false, 'keine – geschlossene Tickets bleiben in ihrer Kategorie (Mandant nur noch lesend)'],
+    ['Kategorie Board-Tickets', b.categoryId, false, 'keine – Board-Tickets (Bewerbungen, Anliegen) sind aus'],
+    ['Board-Archiv', b.archiveId, false, 'keine – geschlossene Board-Tickets wandern ins allgemeine Archiv (bleiben privat)'],
   ]) {
     if (!isId(id)) {
       if (required) add(false, label, 'Kategorie-ID fehlt.');
-      else add(true, label, 'keine – geschlossene Tickets bleiben in der Ticket-Kategorie (Mandant nur noch lesend)');
+      else add(true, label, emptyText);
       continue;
     }
     try {
@@ -677,7 +993,8 @@ async function test() {
       add(false, label, err.message);
     }
   }
-  const ok = checks.every((c) => c.ok || c.label === 'Team-Rollen');
+  if (!isId(cfg.categoryId) && !isId(b.categoryId)) add(false, 'Kategorien', 'Mindestens eine Kategorie (Mandate oder Board) eintragen.');
+  const ok = checks.every((c) => c.ok || c.label === 'Team-Rollen' || c.label === 'Board-Rollen');
   setSetting('discord_ticket_last_test', JSON.stringify({ at: new Date().toISOString(), ok }));
   return { ok, checks };
 }
@@ -698,11 +1015,23 @@ function status() {
     inviteUrl: inviteUrl(),
     lastTest,
     ...cfg,
+    board: { ...boardConfig(), activeApplications: boardActive('application'), activeConcerns: boardActive('concern') },
     counts: db.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN discord_channel_id IS NOT NULL THEN 1 ELSE 0 END) AS withTicket FROM cases WHERE status != 'geschlossen'").get(),
+    boardCounts: {
+      applications: db.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN discord_channel_id IS NOT NULL THEN 1 ELSE 0 END) AS withTicket FROM applications WHERE status NOT IN ('angenommen','abgelehnt')").get(),
+      concerns: db.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN discord_channel_id IS NOT NULL THEN 1 ELSE 0 END) AS withTicket FROM concerns WHERE status NOT IN ('erledigt','abgelehnt')").get(),
+    },
   };
 }
 
 module.exports = {
+  boardActive,
+  boardCreated,
+  boardPost,
+  boardSync,
+  boardDeleted,
+  syncBoardAll,
+  boardTicketInfo,
   active,
   config,
   status,
