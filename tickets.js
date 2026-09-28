@@ -1238,6 +1238,8 @@ async function registerCommands({ force = false } = {}) {
 }
 
 module.exports = {
+  rest, // für Kooperationen (Discord-Rollen lesen)
+  hasToken: () => !!token(),
   markMember,
   ticketByChannel,
   fixedMemberRole,

@@ -7,6 +7,7 @@ const { wrap, parseBody, idParam, dateOnly, truncate } = require('../helpers');
 const { INVOICE_SELECT, invoiceRow, getCase, addSystemNote, logActivity } = require('../models');
 const discord = require('../discord');
 const tickets = require('../tickets');
+const coop = require('../cooperations');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -58,18 +59,25 @@ const createSchema = z.object({
   subject: z.string().trim().max(200).optional(),
   items: z.array(itemSchema).min(1).max(50),
   discountPct: z.number().min(0).max(100).default(0),
+  cooperationId: z.number().int().positive().nullable().optional(),
   surchargePct: z.number().min(0).max(100).default(0),
   dueDate: dateOnly.nullable().optional(),
   notes: z.string().trim().max(3000).optional(),
 });
 
-/** Berechnung wie im Tarifrechner der Startseite: erst Rabatt, dann Zuschlag. */
-function computeTotals(items, discountPct, surchargePct) {
+/**
+ * Berechnung wie im Tarifrechner der Startseite: erst Rabatte, dann Zuschlag.
+ * Kooperationsrabatt und sonstiger Rabatt beziehen sich beide auf die Zwischensumme (zusammen höchstens 100 %).
+ */
+function computeTotals(items, discountPct, surchargePct, coopPct = 0) {
   const subtotal = items.reduce((sum, it) => sum + it.quantity * it.unitPrice, 0);
-  const discountAmount = Math.round((subtotal * discountPct) / 100);
-  const surchargeAmount = Math.round(((subtotal - discountAmount) * surchargePct) / 100);
-  return { subtotal, discountAmount, surchargeAmount, total: subtotal - discountAmount + surchargeAmount };
+  const coopAmount = Math.round((subtotal * coopPct) / 100);
+  const discountAmount = Math.min(subtotal - coopAmount, Math.round((subtotal * discountPct) / 100));
+  const net = subtotal - coopAmount - discountAmount;
+  const surchargeAmount = Math.round((net * surchargePct) / 100);
+  return { subtotal, coopAmount, discountAmount, surchargeAmount, total: net + surchargeAmount };
 }
+const VIA_LABEL = { discord: 'Discord-Rolle erkannt', konto: 'Konto zugeordnet', manuell: 'von Hand gewählt' };
 
 router.post(
   '/',
@@ -88,16 +96,29 @@ router.post(
     if (!clientName || clientName.length < 2) return res.status(400).json({ error: 'Bitte den Rechnungsempfänger angeben.' });
     const clientContact = d.clientContact || (c ? c.client_phone || c.client_account_phone || c.client_email || '' : '');
 
+    // Kooperationsrabatt: Satz immer aus der Kooperation (nicht aus dem Formular); festhalten, wie er zustande kam
+    let k = null;
+    let via = '';
+    if (d.cooperationId) {
+      k = db.prepare('SELECT * FROM cooperations WHERE id = ?').get(d.cooperationId);
+      if (!k || !coop.isValid(k)) return res.status(400).json({ error: 'Die gewählte Kooperation gibt es nicht oder sie ist nicht (mehr) aktiv.' });
+      via = 'manuell';
+      if (c) {
+        const found = await coop.detectForCase(c).catch(() => null);
+        const hit = found && found.matches.find((m) => m.id === k.id);
+        if (hit) via = hit.via;
+      }
+    }
     const items = d.items.map((it) => ({ ...it, total: it.quantity * it.unitPrice }));
-    const t = computeTotals(items, d.discountPct, d.surchargePct);
+    const t = computeTotals(items, d.discountPct, d.surchargePct, k ? k.discount_pct : 0);
     const number = nextInvoiceNumber(d.kind);
 
     const info = db
       .prepare(
         `INSERT INTO invoices (number, kind, case_id, client_name, client_contact, subject, items_json, subtotal,
                                discount_pct, discount_amount, surcharge_pct, surcharge_amount, total, notes, due_date,
-                               issued_by, issuer_name, issuer_rank)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                               issued_by, issuer_name, issuer_rank, cooperation_id, coop_name, coop_pct, coop_amount, coop_via)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         number,
@@ -117,18 +138,25 @@ router.post(
         d.dueDate || null,
         u.id,
         u.display_name,
-        u.rank || ''
+        u.rank || '',
+        k ? k.id : null,
+        k ? k.name : '',
+        k ? k.discount_pct : 0,
+        t.coopAmount,
+        via
       );
 
     const label = d.kind === 'rechnung' ? 'Rechnung' : 'Honorarvereinbarung';
-    if (c) addSystemNote(c.id, u, `${label} ${number} über ${money(t.total)} erstellt.`, true);
-    logActivity(u, `${label} erstellt`, 'invoice', Number(info.lastInsertRowid), `${number} · ${clientName} · ${money(t.total)}`);
+    const coopText = k ? `Kooperationsrabatt ${k.name} ${k.discount_pct} % (${VIA_LABEL[via]})` : '';
+    if (c) addSystemNote(c.id, u, `${label} ${number} über ${money(t.total)} erstellt.${k ? ` ${coopText}.` : ''}`, true);
+    logActivity(u, `${label} erstellt`, 'invoice', Number(info.lastInsertRowid), `${number} · ${clientName} · ${money(t.total)}${k ? ` · ${coopText}` : ''}`);
     discord.notify('invoice.created', {
       title: `🧾 ${label} ${number}`,
       description: d.subject ? truncate(d.subject, 300) : undefined,
       fields: [
         { name: 'Empfänger', value: clientName },
         { name: 'Betrag', value: money(t.total) },
+        ...(k ? [{ name: 'Kooperationsrabatt', value: `${k.name} · ${k.discount_pct} % (− ${money(t.coopAmount)}, ${VIA_LABEL[via]})` }] : []),
         { name: 'Akte', value: c ? c.case_number : '—' },
         { name: 'Erstellt von', value: u.display_name },
       ],
@@ -140,6 +168,7 @@ router.post(
         description: `${d.subject ? `${truncate(d.subject, 300)}\n` : ''}Im Mandantenportal unter „Rechnungen“ abrufbar.`,
         fields: [
           { name: 'Betrag', value: money(t.total) },
+          ...(k ? [{ name: 'Kooperationsrabatt', value: `${k.name} · ${k.discount_pct} %` }] : []),
           ...(d.dueDate ? [{ name: 'Fällig am', value: new Date(`${d.dueDate}T12:00:00`).toLocaleDateString('de-DE') }] : []),
         ],
         mention: 'client',
