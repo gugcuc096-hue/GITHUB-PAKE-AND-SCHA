@@ -3205,6 +3205,7 @@
             <li>In Discord die Kategorien anlegen: z. B. „Mandatsanfragen“ (Akten) und „Board of Partners“ (Bewerbungen, Anliegen), optional je eine fürs Archiv. IDs kopieren: Einstellungen → Erweitert → Entwicklermodus an, dann Rechtsklick → „ID kopieren“.</li>
             <li>Rechts Server-ID, Kategorien und Rollen eintragen, speichern und „Verbindung testen“.</li>
             <li>Einschalten – neue Akten, Bewerbungen und Anliegen bekommen ab dann automatisch ein Ticket. Bestehende offene: „Offene nachholen“.</li>
+            <li>${ok(t.panel && t.panel.interactive)} <strong>Buttons im Ticket</strong> („Akte übernehmen“, „Akte schließen“, „Wieder öffnen“, „Anliegen erledigt“): Developer Portal → eure App → <em>General Information</em> → „Public Key“ kopieren → in Render als <code class="font-mono text-xs text-gold">DISCORD_PUBLIC_KEY</code> eintragen → Deploy. <strong>Danach</strong> im Developer Portal bei „Interactions Endpoint URL“ eintragen und speichern: <code class="font-mono text-xs text-gold break-all">${esc((t.panel && t.panel.publicUrl ? t.panel.interactionsUrl : location.origin + '/api/discord/interactions'))}</code>. Zum Schluss „Offene nachholen“ – dann bekommen auch bestehende Tickets die Buttons. Klicken dürfen nur Teammitglieder mit verknüpftem Discord und denselben Rechten wie im Dashboard.</li>
           </ol>
           ${t.oauthConfigured ? '' : '<div class="banner banner-amber mt-3 mb-0">' + icon('alert') + '<div>Der <strong>Discord-Login</strong> ist noch nicht eingerichtet. Ohne ihn können Mandanten ihr Discord nicht verknüpfen und werden nicht automatisch ins Ticket aufgenommen.</div></div>'}
         </div>
@@ -4579,7 +4580,7 @@
       if (!(await ask('Für alle offenen Akten, Bewerbungen und Anliegen ohne Discord-Ticket wird jetzt ein Kanal angelegt.', { title: 'Tickets nachholen?', confirmText: 'Anlegen' }))) return;
       const r = await api.post('/api/tickets/backfill', {});
       st.ticketSettings = r.status;
-      toast(`${r.created} von ${r.total} Tickets angelegt (Akten, Bewerbungen, Anliegen).`);
+      toast(`${r.created} von ${r.total} Tickets angelegt (Akten, Bewerbungen, Anliegen)${r.panels ? ` · ${r.panels} bestehende Tickets abgeglichen` : ''}.`);
       renderView();
     },
 
