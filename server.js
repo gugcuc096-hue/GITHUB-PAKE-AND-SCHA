@@ -82,6 +82,8 @@ app.use('/api/work', require('./routes/work').router);
 app.use('/api/concerns', concernRoutes.router);
 app.use('/api/personnel', require('./routes/personnel').router);
 app.use('/api/cooperations', require('./routes/cooperations').router);
+app.use('/api/memberships', require('./routes/memberships').router);
+app.use('/api/name-requests', require('./routes/nameRequests').router);
 app.use('/api/contract-templates', contractRoutes.templatesRouter);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/messages', require('./routes/messages'));
@@ -135,6 +137,8 @@ const reminderTimer = setInterval(() => {
   try {
     calendarRoutes.sendDueReminders();
     dutyRoutes.closeStaleSessions();
+    // VIP: abgelaufene Mitgliedschaften beenden, Erinnerung vor Ablauf
+    require('./memberships').sweep().catch((err) => console.warn('VIP-Ablauf fehlgeschlagen:', err.message));
   } catch (err) {
     console.warn('Hintergrundaufgabe fehlgeschlagen:', err.message);
   }

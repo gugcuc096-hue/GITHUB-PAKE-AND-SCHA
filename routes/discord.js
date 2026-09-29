@@ -133,11 +133,15 @@ router.get(
       await within(tickets.syncUser(req.user.id), 8000);
     }
     tickets.syncBoardAll(); // Board-Mitglieder kommen in die Board-Tickets
+    require('../memberships').syncUser(req.user.id).catch(() => {}); // VIP-/Perma-Rolle vergeben
     res.redirect('/dashboard.html?discord=linked#profile');
   })
 );
 
-router.post('/unlink', requireAuth, (req, res) => {
+router.post('/unlink', requireAuth, async (req, res) => {
+  // VIP-/Perma-Rolle entfernen, solange die Discord-ID noch bekannt ist
+  const m = require('../memberships').activeFor(req.user.id);
+  if (m && m.discord_role_id) await require('../memberships').setRole(req.user.id, m.discord_role_id, false).catch(() => {});
   db.prepare('UPDATE users SET discord_id = NULL, discord_username = NULL, discord_avatar = NULL WHERE id = ?').run(req.user.id);
   tickets.syncUser(req.user.id); // aus den Tickets entfernen
   tickets.syncBoardAll();

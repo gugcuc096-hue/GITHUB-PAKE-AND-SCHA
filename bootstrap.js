@@ -397,6 +397,26 @@ function migrateEmailDomain() {
   console.log(`Login-E-Mails auf @${EMAIL_DOMAIN} umgestellt (${changed.length}):\n  ${changed.join('\n  ')}`);
 }
 
+/** Erststart: Beispiel-Stufen für VIP und Perma-Mandat (Preise und Rabatte ändert das Board im Dashboard). */
+function ensureMembershipTiers() {
+  if (getSetting('seeded_membership_tiers')) return;
+  if (!db.prepare('SELECT COUNT(*) AS n FROM membership_tiers').get().n) {
+    const insert = db.prepare('INSERT INTO membership_tiers (name, kind, price, duration_days, discount_pct, benefits, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    insert.run('VIP Silber', 'vip', 250000, 30, 15, 'Bevorzugte Bearbeitung, 15 % Rabatt auf alle Leistungen', 1);
+    insert.run('VIP Gold', 'vip', 750000, 30, 25, 'Fester Hausanwalt, Notfall-Priorität, 25 % Rabatt auf alle Leistungen', 2);
+    insert.run(
+      'Perma-Mandat',
+      'perma',
+      2000000,
+      null,
+      100,
+      'Alle Anwaltsleistungen (Beratung und Vertretung) für diesen einen Charakter abgedeckt – solange er existiert. Nicht übertragbar. Nicht enthalten: Kautionen, Geldstrafen, Gerichtsgebühren. Kein Anspruch auf einen bestimmten Anwalt; bei Missbrauch kündbar.',
+      3
+    );
+  }
+  setSetting('seeded_membership_tiers', new Date().toISOString());
+}
+
 function runBootstrap() {
   migrateLegacyData();
   migrateRanks();
@@ -405,6 +425,7 @@ function runBootstrap() {
   ensureMainAdmin();
   applyEmergencyReset();
   migrateEmailDomain();
+  ensureMembershipTiers();
   ensureDefaultFees();
   ensureDefaultPositions();
   fixCourtWording();

@@ -112,9 +112,9 @@ router.patch(
     const data = parseBody(schema, req, res);
     if (!data) return;
     if (data.phone !== undefined) db.prepare('UPDATE users SET phone = ? WHERE id = ?').run(data.phone || null, req.user.id);
-    // Namen des Teams pflegt das Board of Partners (Team-Verwaltung), Mandanten ändern ihren selbst.
-    if (data.displayName !== undefined && req.user.role === 'mandant') {
-      db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run(data.displayName, req.user.id);
+    // Namen ändert niemand mehr selbst: Antrag im Profil → Entscheidung durch das Board of Partners (routes/nameRequests.js)
+    if (data.displayName !== undefined && data.displayName !== req.user.display_name) {
+      return res.status(400).json({ error: 'Namensänderungen bitte im Profil beim Board of Partners beantragen.' });
     }
     res.json({ user: publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id)) });
   })

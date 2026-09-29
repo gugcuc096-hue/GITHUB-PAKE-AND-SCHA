@@ -8,6 +8,7 @@ const { INVOICE_SELECT, invoiceRow, getCase, addSystemNote, logActivity } = requ
 const discord = require('../discord');
 const tickets = require('../tickets');
 const coop = require('../cooperations');
+const memberships = require('../memberships');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -24,14 +25,14 @@ function firmInfo() {
 }
 
 function visibleTo(inv, u) {
-  return isStaff(u) || (inv.case_client_id && inv.case_client_id === u.id);
+  return isStaff(u) || (inv.case_client_id && inv.case_client_id === u.id) || (inv.client_user_id && inv.client_user_id === u.id);
 }
 
 router.get('/', (req, res) => {
   const u = req.user;
   const rows = isStaff(u)
     ? db.prepare(`${INVOICE_SELECT} ORDER BY i.created_at DESC, i.id DESC`).all()
-    : db.prepare(`${INVOICE_SELECT} WHERE c.client_id = ? ORDER BY i.created_at DESC, i.id DESC`).all(u.id);
+    : db.prepare(`${INVOICE_SELECT} WHERE c.client_id = ? OR i.client_user_id = ? ORDER BY i.created_at DESC, i.id DESC`).all(u.id, u.id);
   res.json({ invoices: rows.map(invoiceRow) });
 });
 
@@ -60,6 +61,7 @@ const createSchema = z.object({
   items: z.array(itemSchema).min(1).max(50),
   discountPct: z.number().min(0).max(100).default(0),
   cooperationId: z.number().int().positive().nullable().optional(),
+  membershipId: z.number().int().positive().nullable().optional(), // VIP / Perma-Mandat
   surchargePct: z.number().min(0).max(100).default(0),
   dueDate: dateOnly.nullable().optional(),
   notes: z.string().trim().max(3000).optional(),
@@ -67,15 +69,22 @@ const createSchema = z.object({
 
 /**
  * Berechnung wie im Tarifrechner der Startseite: erst Rabatte, dann Zuschlag.
- * Kooperationsrabatt und sonstiger Rabatt beziehen sich beide auf die Zwischensumme (zusammen höchstens 100 %).
+ * VIP-/Perma-Rabatt, Kooperationsrabatt und sonstiger Rabatt beziehen sich auf die Zwischensumme
+ * (zusammen höchstens 100 %); der Zuschlag auf den Betrag danach.
  */
-function computeTotals(items, discountPct, surchargePct, coopPct = 0) {
+function computeTotals(items, discountPct, surchargePct, coopPct = 0, memberPct = 0) {
   const subtotal = items.reduce((sum, it) => sum + it.quantity * it.unitPrice, 0);
-  const coopAmount = Math.round((subtotal * coopPct) / 100);
-  const discountAmount = Math.min(subtotal - coopAmount, Math.round((subtotal * discountPct) / 100));
-  const net = subtotal - coopAmount - discountAmount;
-  const surchargeAmount = Math.round((net * surchargePct) / 100);
-  return { subtotal, coopAmount, discountAmount, surchargeAmount, total: net + surchargeAmount };
+  let rest = subtotal;
+  const take = (pct) => {
+    const amount = Math.min(rest, Math.round((subtotal * pct) / 100));
+    rest -= amount;
+    return amount;
+  };
+  const memberAmount = take(memberPct);
+  const coopAmount = take(coopPct);
+  const discountAmount = take(discountPct);
+  const surchargeAmount = Math.round((rest * surchargePct) / 100);
+  return { subtotal, memberAmount, coopAmount, discountAmount, surchargeAmount, total: rest + surchargeAmount };
 }
 const VIA_LABEL = { discord: 'Discord-Rolle erkannt', konto: 'Konto zugeordnet', manuell: 'von Hand gewählt' };
 
@@ -109,16 +118,29 @@ router.post(
         if (hit) via = hit.via;
       }
     }
+    // VIP / Perma-Mandat: Satz aus der (aktiven) Mitgliedschaft
+    let ms = null;
+    if (d.membershipId) {
+      ms = db.prepare("SELECT * FROM memberships WHERE id = ? AND status = 'aktiv' AND (expires_at IS NULL OR expires_at > ?)").get(d.membershipId, new Date().toISOString());
+      if (!ms) return res.status(400).json({ error: 'Die gewählte VIP-/Perma-Mitgliedschaft ist nicht (mehr) aktiv.' });
+    }
+    // VIP/Perma und Kooperation werden nicht addiert – es gilt der höhere Rabatt
+    if (ms && k) {
+      if (ms.discount_pct >= k.discount_pct) k = null;
+      else ms = null;
+    }
     const items = d.items.map((it) => ({ ...it, total: it.quantity * it.unitPrice }));
-    const t = computeTotals(items, d.discountPct, d.surchargePct, k ? k.discount_pct : 0);
+    const t = computeTotals(items, d.discountPct, d.surchargePct, k ? k.discount_pct : 0, ms ? ms.discount_pct : 0);
+    const clientUserId = ms ? ms.user_id : c ? c.client_id || null : null;
     const number = nextInvoiceNumber(d.kind);
 
     const info = db
       .prepare(
         `INSERT INTO invoices (number, kind, case_id, client_name, client_contact, subject, items_json, subtotal,
                                discount_pct, discount_amount, surcharge_pct, surcharge_amount, total, notes, due_date,
-                               issued_by, issuer_name, issuer_rank, cooperation_id, coop_name, coop_pct, coop_amount, coop_via)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                               issued_by, issuer_name, issuer_rank, cooperation_id, coop_name, coop_pct, coop_amount, coop_via,
+                               membership_id, member_name, member_pct, member_amount, client_user_id, status, paid_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         number,
@@ -143,19 +165,33 @@ router.post(
         k ? k.name : '',
         k ? k.discount_pct : 0,
         t.coopAmount,
-        via
+        via,
+        ms ? ms.id : null,
+        ms ? ms.tier_name : '',
+        ms ? ms.discount_pct : 0,
+        t.memberAmount,
+        clientUserId,
+        // 0 $ (z. B. Perma-Mandat): gilt sofort als beglichen; die Positionen dokumentieren den Wert der Arbeit
+        t.total === 0 ? 'bezahlt' : 'offen',
+        t.total === 0 ? new Date().toISOString() : null
       );
 
     const label = d.kind === 'rechnung' ? 'Rechnung' : 'Honorarvereinbarung';
-    const coopText = k ? `Kooperationsrabatt ${k.name} ${k.discount_pct} % (${VIA_LABEL[via]})` : '';
-    if (c) addSystemNote(c.id, u, `${label} ${number} über ${money(t.total)} erstellt.${k ? ` ${coopText}.` : ''}`, true);
-    logActivity(u, `${label} erstellt`, 'invoice', Number(info.lastInsertRowid), `${number} · ${clientName} · ${money(t.total)}${k ? ` · ${coopText}` : ''}`);
+    const coopText = [
+      ms ? `${ms.tier_name} ${ms.discount_pct} % (Wert ${money(t.subtotal)}, abgedeckt ${money(t.memberAmount)})` : '',
+      k ? `Kooperationsrabatt ${k.name} ${k.discount_pct} % (${VIA_LABEL[via]})` : '',
+    ]
+      .filter(Boolean)
+      .join(' · ');
+    if (c) addSystemNote(c.id, u, `${label} ${number} über ${money(t.total)} erstellt.${coopText ? ` ${coopText}.` : ''}`, true);
+    logActivity(u, `${label} erstellt`, 'invoice', Number(info.lastInsertRowid), `${number} · ${clientName} · ${money(t.total)}${coopText ? ` · ${coopText}` : ''}`);
     discord.notify('invoice.created', {
       title: `🧾 ${label} ${number}`,
       description: d.subject ? truncate(d.subject, 300) : undefined,
       fields: [
         { name: 'Empfänger', value: clientName },
         { name: 'Betrag', value: money(t.total) },
+        ...(ms ? [{ name: ms.tier_name, value: `${ms.discount_pct} % (− ${money(t.memberAmount)}, Wert der Leistungen ${money(t.subtotal)})` }] : []),
         ...(k ? [{ name: 'Kooperationsrabatt', value: `${k.name} · ${k.discount_pct} % (− ${money(t.coopAmount)}, ${VIA_LABEL[via]})` }] : []),
         { name: 'Akte', value: c ? c.case_number : '—' },
         { name: 'Erstellt von', value: u.display_name },
@@ -168,6 +204,7 @@ router.post(
         description: `${d.subject ? `${truncate(d.subject, 300)}\n` : ''}Im Mandantenportal unter „Rechnungen“ abrufbar.`,
         fields: [
           { name: 'Betrag', value: money(t.total) },
+          ...(ms ? [{ name: ms.tier_name, value: t.total === 0 ? 'vollständig abgedeckt' : `${ms.discount_pct} %` }] : []),
           ...(k ? [{ name: 'Kooperationsrabatt', value: `${k.name} · ${k.discount_pct} %` }] : []),
           ...(d.dueDate ? [{ name: 'Fällig am', value: new Date(`${d.dueDate}T12:00:00`).toLocaleDateString('de-DE') }] : []),
         ],

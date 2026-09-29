@@ -28,6 +28,15 @@ function logActivity(user, action, entity = '', entityId = null, details = '') {
 /* ================================================================
    Akten
    ================================================================ */
+const parseJson = (v) => {
+  if (!v) return null;
+  try {
+    return JSON.parse(v);
+  } catch {
+    return null;
+  }
+};
+
 const CASE_SELECT = `
   SELECT c.*,
          cu.display_name AS client_account_name, cu.email AS client_email, cu.phone AS client_account_phone,
@@ -35,7 +44,12 @@ const CASE_SELECT = `
          (SELECT group_concat(e.external_id, ' ') FROM case_external_docs e WHERE e.case_id = c.id) AS external_doc_ids,
          (SELECT json_group_array(json_object('id', x.id, 'name', x.display_name, 'discordId', x.discord_id))
             FROM (SELECT u2.id, u2.display_name, u2.discord_id FROM case_lawyers cl JOIN users u2 ON u2.id = cl.user_id
-                  WHERE cl.case_id = c.id ORDER BY cl.added_at, u2.id) x) AS co_lawyers_json
+                  WHERE cl.case_id = c.id ORDER BY cl.added_at, u2.id) x) AS co_lawyers_json,
+         -- VIP / Perma-Mandat des Mandanten (aktive Mitgliedschaft)
+         (SELECT json_object('id', m.id, 'name', m.tier_name, 'kind', m.kind, 'discountPct', m.discount_pct, 'expiresAt', m.expires_at)
+            FROM memberships m WHERE m.user_id = c.client_id AND m.status = 'aktiv'
+              AND (m.expires_at IS NULL OR m.expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+            ORDER BY m.discount_pct DESC LIMIT 1) AS membership_json
   FROM cases c
   LEFT JOIN users cu ON cu.id = c.client_id
   LEFT JOIN users lu ON lu.id = c.lawyer_id`;
@@ -122,6 +136,7 @@ function caseRow(c, u) {
     clientEmail: staff ? c.client_email || null : undefined,
     clientPhone: staff ? c.client_phone || c.client_account_phone || '' : undefined,
     hasClientAccount: !!c.client_id,
+    membership: parseJson(c.membership_json), // VIP / Perma-Mandat des Mandanten
     opponent: c.opponent,
     courtRef: c.court_ref,
     lawyerId: c.lawyer_id,
@@ -374,6 +389,9 @@ function invoiceRow(i) {
     subtotal: i.subtotal,
     discountPct: i.discount_pct,
     discountAmount: i.discount_amount,
+    membershipName: i.member_name || '',
+    memberPct: i.member_pct || 0,
+    memberAmount: i.member_amount || 0,
     cooperationName: i.coop_name || '',
     coopPct: i.coop_pct || 0,
     coopAmount: i.coop_amount || 0,

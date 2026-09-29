@@ -486,6 +486,66 @@ for (const table of ['applications', 'concerns']) {
   addColumn(table, 'discord_panel_state', 'TEXT');
   addColumn(table, 'discord_extra', 'TEXT');
 }
+// VIP & Perma-Mandat: Stufen (Preis, Laufzeit, Rabatt – pflegt das Board of Partners) und vergebene Mitgliedschaften
+db.exec(`
+  CREATE TABLE IF NOT EXISTS membership_tiers (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    name           TEXT NOT NULL,
+    kind           TEXT NOT NULL DEFAULT 'vip',     -- vip (auf Zeit) | perma (unbefristet)
+    price          INTEGER NOT NULL DEFAULT 0,
+    duration_days  INTEGER,                          -- NULL = unbefristet
+    discount_pct   REAL NOT NULL DEFAULT 0,
+    benefits       TEXT NOT NULL DEFAULT '',
+    discord_role_id TEXT NOT NULL DEFAULT '',
+    active         INTEGER NOT NULL DEFAULT 1,
+    sort_order     INTEGER NOT NULL DEFAULT 0,
+    created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS memberships (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    tier_id         INTEGER REFERENCES membership_tiers(id) ON DELETE SET NULL,
+    tier_name       TEXT NOT NULL,                   -- festgehalten, falls die Stufe später geändert wird
+    kind            TEXT NOT NULL,
+    discount_pct    REAL NOT NULL,
+    price_paid      INTEGER NOT NULL DEFAULT 0,      -- Summe inkl. Verlängerungen
+    starts_at       TEXT NOT NULL,
+    expires_at      TEXT,                            -- NULL = unbefristet (Perma)
+    status          TEXT NOT NULL DEFAULT 'aktiv',   -- aktiv | abgelaufen | beendet
+    note            TEXT NOT NULL DEFAULT '',
+    discord_role_id TEXT NOT NULL DEFAULT '',
+    reminded_at     TEXT,
+    ended_at        TEXT,
+    ended_by_name   TEXT,
+    end_reason      TEXT,
+    created_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_by_name TEXT NOT NULL DEFAULT '',
+    created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_memberships_user ON memberships(user_id, status);
+
+  -- Namensänderung: Antrag im Profil, Entscheidung durch das Board of Partners
+  CREATE TABLE IF NOT EXISTS name_requests (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    old_name        TEXT NOT NULL,
+    new_name        TEXT NOT NULL,
+    reason          TEXT NOT NULL DEFAULT '',
+    status          TEXT NOT NULL DEFAULT 'offen',   -- offen | genehmigt | abgelehnt | zurueckgezogen
+    decided_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    decided_by_name TEXT,
+    decision_note   TEXT NOT NULL DEFAULT '',
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    decided_at      TEXT
+  );
+`);
+// Rechnung: angewandte Mitgliedschaft (VIP/Perma) und Rechnungsempfänger-Konto (z. B. Rechnung für die Mitgliedschaft selbst)
+addColumn('invoices', 'membership_id', 'INTEGER REFERENCES memberships(id) ON DELETE SET NULL');
+addColumn('invoices', 'member_name', "TEXT NOT NULL DEFAULT ''");
+addColumn('invoices', 'member_pct', 'REAL NOT NULL DEFAULT 0');
+addColumn('invoices', 'member_amount', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('invoices', 'client_user_id', 'INTEGER REFERENCES users(id) ON DELETE SET NULL');
 // Login-E-Mail: alle Konten auf @pake-scha.ls; die vorherige Adresse bleibt als Login-Alias gültig
 addColumn('users', 'old_email', 'TEXT');
 addColumn('users', 'email_notice', 'INTEGER NOT NULL DEFAULT 0'); // 1 = Hinweis „Ihre E-Mail wurde umgestellt“ zeigen
