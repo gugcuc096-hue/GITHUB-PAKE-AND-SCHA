@@ -397,7 +397,7 @@ function migrateEmailDomain() {
   console.log(`Login-E-Mails auf @${EMAIL_DOMAIN} umgestellt (${changed.length}):\n  ${changed.join('\n  ')}`);
 }
 
-/** Erststart: Beispiel-Stufen für VIP und Perma-Mandat (Preise und Rabatte ändert das Board im Dashboard). */
+/** Erststart: Beispiel-Stufen für VIP und Lifetime (Preise und Rabatte ändert das Board im Dashboard). */
 function ensureMembershipTiers() {
   if (getSetting('seeded_membership_tiers')) return;
   if (!db.prepare('SELECT COUNT(*) AS n FROM membership_tiers').get().n) {
@@ -405,7 +405,7 @@ function ensureMembershipTiers() {
     insert.run('VIP Silber', 'vip', 250000, 30, 15, 'Bevorzugte Bearbeitung, 15 % Rabatt auf alle Leistungen', 1);
     insert.run('VIP Gold', 'vip', 750000, 30, 25, 'Fester Hausanwalt, Notfall-Priorität, 25 % Rabatt auf alle Leistungen', 2);
     insert.run(
-      'Perma-Mandat',
+      'Lifetime',
       'perma',
       2000000,
       null,
@@ -417,6 +417,14 @@ function ensureMembershipTiers() {
   setSetting('seeded_membership_tiers', new Date().toISOString());
 }
 
+/** „Perma-Mandat“ heißt jetzt „Lifetime“ – gespeicherte Stufe und Mitgliedschaften einmalig umbenennen. */
+function renameLifetime() {
+  if (getSetting('renamed_lifetime')) return;
+  db.prepare("UPDATE membership_tiers SET name = 'Lifetime' WHERE name = 'Perma-Mandat'").run();
+  db.prepare("UPDATE memberships SET tier_name = 'Lifetime' WHERE tier_name = 'Perma-Mandat'").run();
+  setSetting('renamed_lifetime', new Date().toISOString());
+}
+
 function runBootstrap() {
   migrateLegacyData();
   migrateRanks();
@@ -426,6 +434,7 @@ function runBootstrap() {
   applyEmergencyReset();
   migrateEmailDomain();
   ensureMembershipTiers();
+  renameLifetime();
   ensureDefaultFees();
   ensureDefaultPositions();
   fixCourtWording();

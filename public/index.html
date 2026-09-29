@@ -301,10 +301,11 @@
             </a>
 
             <nav class="hidden xl:flex items-center gap-5 text-[0.7rem] uppercase tracking-wider font-medium text-[var(--text-muted)]" aria-label="Hauptnavigation">
+                <a href="#team" data-section="team" class="nav-link hover:text-[var(--gold-500)] transition-colors">Team</a>
                 <a href="#raenge" data-section="raenge" class="nav-link hover:text-[var(--gold-500)] transition-colors">Kanzleiränge</a>
                 <a href="#honorar" data-section="honorar" class="nav-link hover:text-[var(--gold-500)] transition-colors">Honorarordnung</a>
                 <a href="#rechner" data-section="rechner" class="nav-link hover:text-[var(--gold-500)] transition-colors">Tarifrechner</a>
-                <a href="#team" data-section="team" class="nav-link hover:text-[var(--gold-500)] transition-colors">Team</a>
+                <a href="#vip" data-section="vip" class="nav-link hover:text-[var(--gold-500)] transition-colors">VIP &amp; Lifetime</a>
                 <a href="#akte" data-section="akte" class="nav-link hover:text-[var(--gold-500)] transition-colors">Aktenstatus</a>
                 <a href="#kontakt" data-section="kontakt" class="nav-link hover:text-[var(--gold-500)] transition-colors">Kontakt</a>
             </nav>
@@ -331,10 +332,11 @@
         <div id="mobileMenu" class="xl:hidden border-t border-[var(--glass-border)]">
             <nav class="flex flex-col px-6 py-4 gap-1 text-sm uppercase tracking-widest text-[var(--text-muted)]" aria-label="Mobile Navigation">
                 <a href="#start" onclick="toggleMobileMenu()" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Startseite</a>
+                <a href="#team" onclick="toggleMobileMenu()" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Team</a>
                 <a href="#raenge" onclick="toggleMobileMenu()" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Kanzleiränge</a>
                 <a href="#honorar" onclick="toggleMobileMenu()" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Honorarordnung</a>
                 <a href="#rechner" onclick="toggleMobileMenu()" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Tarifrechner</a>
-                <a href="#team" onclick="toggleMobileMenu()" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Team</a>
+                <a href="#vip" onclick="toggleMobileMenu()" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">VIP &amp; Lifetime</a>
                 <a href="#akte" onclick="toggleMobileMenu()" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Aktenstatus</a>
                 <a href="#kontakt" onclick="toggleMobileMenu()" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Kontakt</a>
                 <a href="/karriere.html" class="py-3 hover:text-[var(--gold-500)] flex items-center justify-between">Karriere <span class="text-[0.6rem] normal-case tracking-normal px-2 py-0.5 rounded-full border border-emerald-500/40 text-emerald-300">Wir stellen ein</span></a>
@@ -404,6 +406,22 @@
                     <div class="font-serif text-2xl sm:text-3xl font-bold text-white">Würfelpark</div>
                     <div class="text-xs text-[var(--text-muted)] mt-1">Zentrale Kanzlei in Los Santos</div>
                 </div>
+            </div>
+        </section>
+
+        <!-- TEAM SECTION -->
+        <section id="team" class="max-w-6xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
+            <div class="text-center max-w-3xl mx-auto mb-16">
+                <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Ansprechpartner</div>
+                <h2 class="font-serif text-4xl md:text-5xl font-semibold mb-4">Unser Team</h2>
+                <p class="text-[var(--text-muted)] text-base leading-relaxed">
+                    Ausgewählte Mitglieder unseres Führungsgremiums und der operativen Anwaltschaft — Ihre direkten Ansprechpartner je nach Rechtsgebiet.
+                </p>
+            </div>
+
+            <!-- Wird live aus der Datenbank geladen (Dashboard → Team-Verwaltung). -->
+            <div id="teamGrid" class="flex flex-wrap justify-center gap-6">
+                <p class="w-full text-center text-sm text-[var(--text-muted)] py-8">Team wird geladen …</p>
             </div>
         </section>
 
@@ -538,6 +556,37 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- VERFAHRENSABLAUF SECTION -->
+        <section id="ablauf" class="max-w-6xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
+            <div class="text-center max-w-3xl mx-auto mb-16">
+                <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Transparenter Ablauf</div>
+                <h2 class="font-serif text-4xl md:text-5xl font-semibold mb-4">In 4 Schritten zum Recht</h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="glass-card p-6 text-left">
+                    <div class="font-mono text-3xl font-bold text-[var(--gold-500)] mb-3">01</div>
+                    <h3 class="font-serif text-xl font-semibold text-white mb-2">Mandat Einreichen</h3>
+                    <p class="text-xs text-[var(--text-muted)] leading-relaxed">Senden Sie uns Ihre Anfrage per Ticket oder kontaktieren Sie unseren 24/7 Notdienst.</p>
+                </div>
+                <div class="glass-card p-6 text-left">
+                    <div class="font-mono text-3xl font-bold text-[var(--gold-500)] mb-3">02</div>
+                    <h3 class="font-serif text-xl font-semibold text-white mb-2">Erstberatung & Akte</h3>
+                    <p class="text-xs text-[var(--text-muted)] leading-relaxed">Wir prüfen den Sachverhalt, fordern behördliche Akten an und bewerten die Beweislage.</p>
+                </div>
+                <div class="glass-card p-6 text-left">
+                    <div class="font-mono text-3xl font-bold text-[var(--gold-500)] mb-3">03</div>
+                    <h3 class="font-serif text-xl font-semibold text-white mb-2">Strategieentwicklung</h3>
+                    <p class="text-xs text-[var(--text-muted)] leading-relaxed">Entwicklung einer maßgeschneiderten Verteidigung oder Klageschrift für Ihren Fall.</p>
+                </div>
+                <div class="glass-card p-6 text-left">
+                    <div class="font-mono text-3xl font-bold text-[var(--gold-500)] mb-3">04</div>
+                    <h3 class="font-serif text-xl font-semibold text-white mb-2">Gerichtsvertretung</h3>
+                    <p class="text-xs text-[var(--text-muted)] leading-relaxed">Konsequente Vertretung Ihrer Interessen vor Gericht oder in Vergleichsverhandlungen.</p>
                 </div>
             </div>
         </section>
@@ -817,20 +866,57 @@
             </div>
         </section>
 
-        <!-- TEAM SECTION -->
-        <section id="team" class="max-w-6xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
-            <div class="text-center max-w-3xl mx-auto mb-16">
-                <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Ansprechpartner</div>
-                <h2 class="font-serif text-4xl md:text-5xl font-semibold mb-4">Unser Team</h2>
+        <!-- VIP & LIFETIME SECTION -->
+        <section id="vip" class="max-w-6xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
+            <div class="text-center max-w-3xl mx-auto mb-14">
+                <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Exklusiv für Mandanten</div>
+                <h2 class="font-serif text-4xl md:text-5xl font-semibold mb-4">VIP &amp; Lifetime</h2>
                 <p class="text-[var(--text-muted)] text-base leading-relaxed">
-                    Ausgewählte Mitglieder unseres Führungsgremiums und der operativen Anwaltschaft — Ihre direkten Ansprechpartner je nach Rechtsgebiet.
+                    Für Mandanten, die uns öfter brauchen: dauerhafter Rabatt auf alle Leistungen der Honorarordnung – als VIP-Mitgliedschaft auf Zeit oder einmalig und unbefristet als Lifetime.
                 </p>
             </div>
-
-            <!-- Wird live aus der Datenbank geladen (Dashboard → Team-Verwaltung). -->
-            <div id="teamGrid" class="flex flex-wrap justify-center gap-6">
-                <p class="w-full text-center text-sm text-[var(--text-muted)] py-8">Team wird geladen …</p>
+            <!-- Wird von site.js live aus den Stufen des Board of Partners befüllt (Dashboard → VIP & Lifetime). -->
+            <div id="vipTiers" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <p class="md:col-span-3 text-center text-sm text-[var(--text-muted)] py-8">Angebote werden geladen …</p>
             </div>
+            <p class="text-xs text-center text-[var(--text-muted)] mt-8 max-w-3xl mx-auto leading-relaxed">
+                So funktioniert's: Angebot anfragen (Mandantenkonto nötig) → das Board of Partners bestätigt und stellt die Rechnung aus → Sie bezahlen im Spiel → die Mitgliedschaft wird automatisch freigeschaltet. Den Stand sehen Sie jederzeit im Mandantenportal.
+            </p>
+        </section>
+
+        <!-- MANDANTENSTIMMEN / TESTIMONIALS -->
+        <section id="stimmen" class="max-w-5xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
+            <div class="text-center max-w-3xl mx-auto mb-12">
+                <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Erfahrungsberichte</div>
+                <h2 class="font-serif text-4xl md:text-5xl font-semibold mb-4">Mandantenstimmen</h2>
+            </div>
+
+            <div class="relative overflow-hidden">
+                <div id="testimonialTrack" class="flex">
+                    <div class="w-full shrink-0 px-2">
+                        <div class="glass-card p-8 md:p-10 text-center max-w-3xl mx-auto">
+                            <div class="flex justify-center gap-1 mb-5 text-[var(--gold-500)]">★★★★★</div>
+                            <p class="font-serif text-xl sm:text-2xl italic text-white leading-relaxed mb-6">„Innerhalb weniger Minuten war ein Anwalt bei der Verhaftung vor Ort. Die Vertretung im Verhör hat den Unterschied gemacht."</p>
+                            <div class="text-sm text-[var(--gold-light)] font-medium">— Mandant, U-Haft-Vertretung</div>
+                        </div>
+                    </div>
+                    <div class="w-full shrink-0 px-2">
+                        <div class="glass-card p-8 md:p-10 text-center max-w-3xl mx-auto">
+                            <div class="flex justify-center gap-1 mb-5 text-[var(--gold-500)]">★★★★★</div>
+                            <p class="font-serif text-xl sm:text-2xl italic text-white leading-relaxed mb-6">„Die Verfassungsbeschwerde wurde strategisch klug und mit beeindruckender Präzision vorbereitet und vertreten."</p>
+                            <div class="text-sm text-[var(--gold-light)] font-medium">— Fraktionsvertretung, Grundsatzverfahren</div>
+                        </div>
+                    </div>
+                    <div class="w-full shrink-0 px-2">
+                        <div class="glass-card p-8 md:p-10 text-center max-w-3xl mx-auto">
+                            <div class="flex justify-center gap-1 mb-5 text-[var(--gold-500)]">★★★★★</div>
+                            <p class="font-serif text-xl sm:text-2xl italic text-white leading-relaxed mb-6">„Transparente Honorarordnung, klare Kommunikation über den Aktenstatus — so stellt man sich anwaltliche Betreuung vor."</p>
+                            <div class="text-sm text-[var(--gold-light)] font-medium">— Unternehmensmandant, Vertragsrecht</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-center gap-2 mt-6" id="testimonialDots"></div>
         </section>
 
         <!-- AKTENSTATUS TRACKER SECTION -->
@@ -895,72 +981,6 @@
                 <div id="caseEmpty" class="text-center py-8 text-[var(--text-dim)] text-sm italic">Noch keine Abfrage durchgeführt.</div>
                 <div id="caseNotFound" class="hidden text-center py-8 text-red-300 text-sm">Kein Mandat mit diesen Angaben gefunden. Bitte prüfen Sie Aktenzeichen und Aktenpin.</div>
             </div>
-        </section>
-
-        <!-- VERFAHRENSABLAUF SECTION -->
-        <section id="ablauf" class="max-w-6xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
-            <div class="text-center max-w-3xl mx-auto mb-16">
-                <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Transparenter Ablauf</div>
-                <h2 class="font-serif text-4xl md:text-5xl font-semibold mb-4">In 4 Schritten zum Recht</h2>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div class="glass-card p-6 text-left">
-                    <div class="font-mono text-3xl font-bold text-[var(--gold-500)] mb-3">01</div>
-                    <h3 class="font-serif text-xl font-semibold text-white mb-2">Mandat Einreichen</h3>
-                    <p class="text-xs text-[var(--text-muted)] leading-relaxed">Senden Sie uns Ihre Anfrage per Ticket oder kontaktieren Sie unseren 24/7 Notdienst.</p>
-                </div>
-                <div class="glass-card p-6 text-left">
-                    <div class="font-mono text-3xl font-bold text-[var(--gold-500)] mb-3">02</div>
-                    <h3 class="font-serif text-xl font-semibold text-white mb-2">Erstberatung & Akte</h3>
-                    <p class="text-xs text-[var(--text-muted)] leading-relaxed">Wir prüfen den Sachverhalt, fordern behördliche Akten an und bewerten die Beweislage.</p>
-                </div>
-                <div class="glass-card p-6 text-left">
-                    <div class="font-mono text-3xl font-bold text-[var(--gold-500)] mb-3">03</div>
-                    <h3 class="font-serif text-xl font-semibold text-white mb-2">Strategieentwicklung</h3>
-                    <p class="text-xs text-[var(--text-muted)] leading-relaxed">Entwicklung einer maßgeschneiderten Verteidigung oder Klageschrift für Ihren Fall.</p>
-                </div>
-                <div class="glass-card p-6 text-left">
-                    <div class="font-mono text-3xl font-bold text-[var(--gold-500)] mb-3">04</div>
-                    <h3 class="font-serif text-xl font-semibold text-white mb-2">Gerichtsvertretung</h3>
-                    <p class="text-xs text-[var(--text-muted)] leading-relaxed">Konsequente Vertretung Ihrer Interessen vor Gericht oder in Vergleichsverhandlungen.</p>
-                </div>
-            </div>
-        </section>
-
-        <!-- MANDANTENSTIMMEN / TESTIMONIALS -->
-        <section id="stimmen" class="max-w-5xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
-            <div class="text-center max-w-3xl mx-auto mb-12">
-                <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Erfahrungsberichte</div>
-                <h2 class="font-serif text-4xl md:text-5xl font-semibold mb-4">Mandantenstimmen</h2>
-            </div>
-
-            <div class="relative overflow-hidden">
-                <div id="testimonialTrack" class="flex">
-                    <div class="w-full shrink-0 px-2">
-                        <div class="glass-card p-8 md:p-10 text-center max-w-3xl mx-auto">
-                            <div class="flex justify-center gap-1 mb-5 text-[var(--gold-500)]">★★★★★</div>
-                            <p class="font-serif text-xl sm:text-2xl italic text-white leading-relaxed mb-6">„Innerhalb weniger Minuten war ein Anwalt bei der Verhaftung vor Ort. Die Vertretung im Verhör hat den Unterschied gemacht."</p>
-                            <div class="text-sm text-[var(--gold-light)] font-medium">— Mandant, U-Haft-Vertretung</div>
-                        </div>
-                    </div>
-                    <div class="w-full shrink-0 px-2">
-                        <div class="glass-card p-8 md:p-10 text-center max-w-3xl mx-auto">
-                            <div class="flex justify-center gap-1 mb-5 text-[var(--gold-500)]">★★★★★</div>
-                            <p class="font-serif text-xl sm:text-2xl italic text-white leading-relaxed mb-6">„Die Verfassungsbeschwerde wurde strategisch klug und mit beeindruckender Präzision vorbereitet und vertreten."</p>
-                            <div class="text-sm text-[var(--gold-light)] font-medium">— Fraktionsvertretung, Grundsatzverfahren</div>
-                        </div>
-                    </div>
-                    <div class="w-full shrink-0 px-2">
-                        <div class="glass-card p-8 md:p-10 text-center max-w-3xl mx-auto">
-                            <div class="flex justify-center gap-1 mb-5 text-[var(--gold-500)]">★★★★★</div>
-                            <p class="font-serif text-xl sm:text-2xl italic text-white leading-relaxed mb-6">„Transparente Honorarordnung, klare Kommunikation über den Aktenstatus — so stellt man sich anwaltliche Betreuung vor."</p>
-                            <div class="text-sm text-[var(--gold-light)] font-medium">— Unternehmensmandant, Vertragsrecht</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="flex justify-center gap-2 mt-6" id="testimonialDots"></div>
         </section>
 
         <!-- FAQ SECTION -->
@@ -1070,11 +1090,12 @@
             </div>
             <div class="flex flex-wrap justify-center gap-x-6 gap-y-3 uppercase tracking-wider text-[0.7rem]">
                 <a href="#start" class="hover:text-[var(--gold-500)] transition-colors">Startseite</a>
-                <a href="#honorar" class="hover:text-[var(--gold-500)] transition-colors">Honorarordnung</a>
                 <a href="#raenge" class="hover:text-[var(--gold-500)] transition-colors">Kanzleiränge</a>
+                <a href="#honorar" class="hover:text-[var(--gold-500)] transition-colors">Honorarordnung</a>
+                <a href="#vip" class="hover:text-[var(--gold-500)] transition-colors">VIP &amp; Lifetime</a>
+                <a href="/karriere.html" class="hover:text-[var(--gold-500)] transition-colors">Karriere</a>
                 <a href="#kontakt" class="hover:text-[var(--gold-500)] transition-colors">Kontakt</a>
                 <a href="#anliegen" class="hover:text-[var(--gold-500)] transition-colors">Anliegen ans Board</a>
-                <a href="/karriere.html" class="hover:text-[var(--gold-500)] transition-colors">Karriere</a>
                 <a href="/login.html" data-auth-link class="text-[var(--gold-500)] hover:text-[var(--gold-light)] transition-colors"><span data-auth-label data-auth-out="Mandantenportal" data-auth-in="Dashboard">Mandantenportal</span></a>
             </div>
         </div>

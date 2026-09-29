@@ -40,7 +40,7 @@ const EVENTS = {
   'concern.updated': 'Anliegen ans Board: Rückmeldung der einreichenden Person / Statusänderung',
   'personnel.changed': 'Beförderung / Einstellung (Personalprotokoll)',
   'task.assigned': 'Aufgabe einem anderen Teammitglied zugewiesen',
-  'membership.changed': 'VIP / Perma-Mandat vergeben, verlängert, beendet oder abgelaufen',
+  'membership.changed': 'VIP / Lifetime vergeben, verlängert, beendet oder abgelaufen',
   'name.requested': 'Namensänderung beantragt bzw. vom Board entschieden',
 };
 

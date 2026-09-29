@@ -525,6 +525,28 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_memberships_user ON memberships(user_id, status);
 
+  -- Anfrage eines Mandanten (Startseite / Portal) → Board nimmt an (Rechnung) → bezahlt → Mitgliedschaft aktiv
+  CREATE TABLE IF NOT EXISTS membership_requests (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    tier_id         INTEGER REFERENCES membership_tiers(id) ON DELETE SET NULL,
+    tier_name       TEXT NOT NULL,
+    kind            TEXT NOT NULL,
+    price           INTEGER NOT NULL,
+    duration_days   INTEGER,
+    discount_pct    REAL NOT NULL,
+    discord_role_id TEXT NOT NULL DEFAULT '',
+    message         TEXT NOT NULL DEFAULT '',
+    status          TEXT NOT NULL DEFAULT 'offen',   -- offen | angenommen (Rechnung offen) | aktiv | abgelehnt | zurueckgezogen
+    invoice_id      INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
+    membership_id   INTEGER REFERENCES memberships(id) ON DELETE SET NULL,
+    decided_by_name TEXT,
+    decision_note   TEXT NOT NULL DEFAULT '',
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    decided_at      TEXT,
+    activated_at    TEXT
+  );
+
   -- Namensänderung: Antrag im Profil, Entscheidung durch das Board of Partners
   CREATE TABLE IF NOT EXISTS name_requests (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,

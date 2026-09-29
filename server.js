@@ -103,6 +103,7 @@ app.use('/api/tickets', require('./routes/tickets'));
 app.use('/api/public', require('./routes/public'));
 app.use('/api/public', applications.publicRouter);
 app.use('/api/public', concernRoutes.publicRouter);
+app.use('/api/public', require('./routes/memberships').publicRouter);
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Schnittstelle nicht gefunden.' }));
 
