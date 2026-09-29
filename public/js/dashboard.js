@@ -109,6 +109,7 @@
     concerns: { label: 'Anliegen ans Board', short: 'Anliegen', icon: 'chat' },
     board: { label: 'Pinnwand', icon: 'pin', staff: true },
     invoices: { label: 'Rechnungen', icon: 'receipt' },
+    'vip-angebot': { label: 'VIP & Lifetime', short: 'VIP', icon: 'crown', client: true },
     duty: { label: 'Dienstzeiten', icon: 'clock', staff: true },
     personnel: { label: 'Beförderungen & Einstellungen', short: 'Personal', icon: 'star', staff: true },
     'concerns-board': { label: 'Eingegangene Anliegen', short: 'Anliegen', icon: 'chat', board: true, section: 'Board of Partners' },
@@ -116,7 +117,7 @@
     team: { label: 'Team', icon: 'users', admin: true, section: 'Board of Partners' },
     applications: { label: 'Bewerbungen', icon: 'userAdd', board: true, section: 'Board of Partners' },
     cooperations: { label: 'Kooperationen', icon: 'tag', board: true, section: 'Board of Partners' },
-    vip: { label: 'VIP & Perma-Mandat', short: 'VIP', icon: 'crown', board: true, section: 'Board of Partners' },
+    vip: { label: 'VIP & Lifetime', short: 'VIP', icon: 'crown', board: true, section: 'Board of Partners' },
     'name-requests': { label: 'Namensänderungen', short: 'Namen', icon: 'edit', board: true, section: 'Board of Partners' },
     users: { label: 'Benutzer', icon: 'key', admin: true, section: 'Board of Partners' },
     fees: { label: 'Honorarordnung', icon: 'scale', admin: true, section: 'Board of Partners' },
@@ -332,6 +333,7 @@
     if (v.admin && !isAdmin()) return false;
     if (v.board && !isBoard()) return false;
     if (v.staff && !isStaff()) return false;
+    if (v.client && isStaff()) return false; // nur für Mandanten (z. B. VIP & Lifetime anfragen)
     return true;
   }
   function viewLabel(view, short = false) {
@@ -476,6 +478,10 @@
     async nameCount() {
       if (isBoard()) st.nameOpen = (await api.get('/api/name-requests')).open;
     },
+    /** Board: offene VIP-/Lifetime-Anfragen */
+    async vipCount() {
+      if (isBoard()) st.vipReqOpen = (await api.get('/api/memberships/requests')).open;
+    },
     async personnelCount() {
       if (isStaff()) st.personnelNew = st.view === 'personnel' ? 0 : (await api.get('/api/personnel/counts')).unseen;
     },
@@ -496,7 +502,7 @@
         section = v.section;
         html += `<div class="nav-section">${esc(section)}</div>`;
       }
-      const count = { mail: st.unread, applications: st.newApplications, tasks: st.dueTasks, concerns: st.concernUnseen, 'concerns-board': st.concernOpen, personnel: st.personnelNew, 'name-requests': st.nameOpen }[key] || 0;
+      const count = { mail: st.unread, applications: st.newApplications, tasks: st.dueTasks, concerns: st.concernUnseen, 'concerns-board': st.concernOpen, personnel: st.personnelNew, 'name-requests': st.nameOpen, vip: st.vipReqOpen }[key] || 0;
       const active = st.view === key || (key === 'invoices' && st.view === 'invoice-new');
       html += `<a href="#${key}" class="nav-item ${active ? 'active' : ''}" ${active ? 'aria-current="page"' : ''}>${icon(v.icon)}<span>${esc(viewLabel(key))}</span>${count ? `<span class="nav-count">${count > 99 ? '99+' : count}</span>` : ''}</a>`;
     }
@@ -622,7 +628,7 @@
 
   function handleError(e) {
     if (e && e.status === 401) {
-      location.href = '/login.html?next=' + encodeURIComponent('/dashboard.html' + location.hash);
+      location.href = '/login.html?next=' + encodeURIComponent('/dashboard.html' + location.search + location.hash);
       return;
     }
     toast(e?.message || 'Unbekannter Fehler.', 'error');
@@ -898,12 +904,12 @@
   function caseCount(f) {
     return st.cases.filter((c) => f === 'alle' || (f === 'aktiv' ? c.status !== 'geschlossen' : c.status === f)).length;
   }
-  /** VIP / Perma-Mandat des Mandanten als Badge. */
+  /** VIP / Lifetime des Mandanten als Badge. */
   function memberBadge(m) {
     if (!m) return '';
-    return m.kind === 'perma' ? badge('👑 Perma-Mandat', 'gold') : badge(`⭐ ${m.name}`, 'sky');
+    return m.kind === 'perma' ? badge('👑 Lifetime', 'gold') : badge(`⭐ ${m.name}`, 'sky');
   }
-  // Offene Akten von Perma- und VIP-Mandanten stehen oben (sonst bleibt die Reihenfolge)
+  // Offene Akten von Lifetime- und VIP-Mandanten stehen oben (sonst bleibt die Reihenfolge)
   const memberRank = (c) => (c.status === 'geschlossen' || !c.membership ? 0 : c.membership.kind === 'perma' ? 2 : 1);
 
   function caseTable() {
@@ -2678,7 +2684,7 @@
       surchargePct: 0,
       coopId: null, // Kooperation (Rabatt-Satz kommt aus der Kooperation)
       coopAuto: false, // automatisch aus der Erkennung gesetzt
-      memberId: null, // VIP / Perma-Mandat (Rabatt-Satz kommt aus der Mitgliedschaft)
+      memberId: null, // VIP / Lifetime (Rabatt-Satz kommt aus der Mitgliedschaft)
       dueDate: dayKey(new Date(Date.now() + 7 * 864e5)),
       notes: '',
     };
@@ -2687,7 +2693,7 @@
   }
   function applyCaseToDraft(d, caseId, force = false) {
     const c = caseId ? st.cases.find((x) => x.id === caseId) : null;
-    // VIP / Perma des Mandanten automatisch übernehmen (änderbar)
+    // VIP / Lifetime des Mandanten automatisch übernehmen (änderbar)
     if (c && c.membership) d.memberId = c.membership.id;
     else if (force || c) d.memberId = null;
     if (!c) return;
@@ -2706,7 +2712,7 @@
     const subtotal = d.items.reduce((s, it) => s + (Math.max(1, Math.round(Number(it.quantity) || 1))) * Math.max(0, Math.round(Number(it.unitPrice) || 0)), 0);
     let k = draftCoop(d);
     let m = draftMember(d);
-    // VIP/Perma und Kooperation werden nicht addiert – es gilt der höhere Rabatt (wie auf dem Server)
+    // VIP/Lifetime und Kooperation werden nicht addiert – es gilt der höhere Rabatt (wie auf dem Server)
     const coopDropped = !!(k && m && m.discountPct >= k.discountPct);
     if (k && m) {
       if (coopDropped) k = null;
@@ -2792,7 +2798,7 @@
       ${t.sp ? `<div class="sum-row" style="color:#fcd34d"><span>Zuschlag (${fmtPct(t.sp)} %)</span><span class="v">+ ${money(t.surcharge)}</span></div>` : ''}
       <div class="sum-row sum-total"><span class="font-semibold">Gesamtbetrag</span><span class="v">${money(t.total)}</span></div>
       ${t.mp && !t.total ? `<p class="form-hint">Vollständig abgedeckt – die Rechnung dokumentiert den Wert der Arbeit (${money(t.subtotal)}) und gilt sofort als bezahlt.</p>` : ''}
-      ${t.coopDropped ? '<p class="form-hint">Kooperationsrabatt entfällt – der VIP-/Perma-Rabatt ist höher (Rabatte werden nicht addiert).</p>' : ''}`;
+      ${t.coopDropped ? '<p class="form-hint">Kooperationsrabatt entfällt – der VIP-/Lifetime-Rabatt ist höher (Rabatte werden nicht addiert).</p>' : ''}`;
   }
   function summaryHtml() {
     return `
@@ -2831,7 +2837,7 @@
       <select name="cooperationId" class="field"><option value="">Keine Kooperation</option>${list.map((k) => opt(k.id, `${k.name} – ${fmtPct(k.discountPct)} % Rabatt${k.valid ? '' : ' (nicht mehr aktiv)'}`, k.id === d.coopId)).join('')}</select>
       ${info}</div>`;
   }
-  /** VIP / Perma-Mandat im Rechnungsformular. */
+  /** VIP / Lifetime im Rechnungsformular. */
   function memberBoxHtml() {
     const d = st.draft;
     const list = st.memberList || [];
@@ -2839,8 +2845,8 @@
     const m = draftMember(d);
     const info = m
       ? `<div class="text-sm mt-2" style="color:#fcd34d">${m.kind === 'perma' ? '👑' : '⭐'} <strong>${esc(m.clientName)}</strong> hat <strong>${esc(m.name)}</strong> · ${fmtPct(m.discountPct)} % ${m.discountPct >= 100 ? '– Leistungen vollständig abgedeckt' : 'Rabatt'}${m.expiresAt ? ` <span class="text-dim">(bis ${esc(fmtDateOnly(String(m.expiresAt).slice(0, 10)))})</span>` : ''}</div>`
-      : '<div class="form-hint">Hat der Mandant ein VIP- oder Perma-Mandat, wird es mit Aktenbezug automatisch gewählt.</div>';
-    return `<div class="span-2"><label class="label">VIP / Perma-Mandat</label>
+      : '<div class="form-hint">Hat der Mandant VIP oder Lifetime, wird das mit Aktenbezug automatisch gewählt.</div>';
+    return `<div class="span-2"><label class="label">VIP / Lifetime</label>
       <select name="membershipId" class="field"><option value="">Keins</option>${list.map((x) => opt(x.id, `${x.clientName} – ${x.name} (${fmtPct(x.discountPct)} %)`, x.id === d.memberId)).join('')}</select>${info}</div>`;
   }
   function refreshMemberBox() {
@@ -3617,16 +3623,16 @@
       ${state}</section>`;
   }
 
-  /** Profil des Mandanten: eigene VIP-/Perma-Mitgliedschaft. */
+  /** Profil des Mandanten: eigene VIP-/Lifetime-Mitgliedschaft. */
   function membershipPanel(m) {
     return `<section class="panel panel-pad" style="border-color:var(--gold-hairline)">
-      <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('crown')} ${m.kind === 'perma' ? 'Ihr Perma-Mandat' : 'Ihre VIP-Mitgliedschaft'}</h2>${memberBadge(m)}</div>
+      <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('crown')} ${m.kind === 'perma' ? 'Ihre Lifetime-Mitgliedschaft' : 'Ihre VIP-Mitgliedschaft'}</h2>${memberBadge(m)}</div>
       <div class="flex flex-wrap items-center gap-2 mb-2">${badge(`${fmtPct(m.discountPct)} % Rabatt`, 'gold')}<span class="text-sm text-muted">${m.expiresAt ? `gültig bis ${esc(fmtDateOnly(String(m.expiresAt).slice(0, 10)))}` : 'unbefristet'}</span></div>
       ${m.benefits ? `<p class="text-sm text-muted whitespace-pre-wrap">${esc(m.benefits)}</p>` : ''}
       <p class="form-hint mt-3">Der Rabatt wird bei jeder Rechnung der Kanzlei automatisch berücksichtigt.</p></section>`;
   }
 
-  /* ---------------------------------------------------------------- VIP & Perma-Mandat (Board of Partners) */
+  /* ---------------------------------------------------------------- VIP & Lifetime (Board of Partners) */
   const MS_STATUS = { aktiv: ['aktiv', 'emerald'], abgelaufen: ['abgelaufen', 'amber'], beendet: ['beendet', 'slate'] };
   const tierPeriod = (t) => (t.durationDays ? `${t.durationDays} Tage` : 'unbefristet');
 
@@ -3647,16 +3653,37 @@
 
   function tierCardHtml(t) {
     return `<div class="list-row wrap">
-      <div class="main"><div class="title flex flex-wrap items-center gap-2">${esc(t.name)} ${t.kind === 'perma' ? badge('👑 Perma', 'gold') : badge('⭐ VIP', 'sky')}${t.active ? '' : badge('inaktiv', 'slate')}</div>
+      <div class="main"><div class="title flex flex-wrap items-center gap-2">${esc(t.name)} ${t.kind === 'perma' ? badge('👑 Lifetime', 'gold') : badge('⭐ VIP', 'sky')}${t.active ? '' : badge('inaktiv', 'slate')}</div>
         <div class="meta"><strong class="text-white">${money(t.price)}</strong> · ${tierPeriod(t)} · <strong class="text-gold">${fmtPct(t.discountPct)} % Rabatt</strong> · ${t.activeMembers} aktiv${t.discordRoleId ? ' · Discord-Rolle' : ''}</div>
         ${t.benefits ? `<div class="meta whitespace-pre-wrap">${esc(t.benefits)}</div>` : ''}</div>
       <div class="flex flex-wrap gap-2 shrink-0"><button class="btn-outline btn-sm" data-action="tier-edit" data-id="${t.id}">${icon('edit', 'ico-sm')}<span>Bearbeiten</span></button><button class="btn-ghost btn-sm" data-action="tier-delete" data-id="${t.id}" aria-label="Stufe löschen">${icon('trash', 'ico-sm')}</button></div></div>`;
   }
 
+  const REQ_BADGE = { offen: ['offen', 'amber'], angenommen: ['wartet auf Zahlung', 'sky'], aktiv: ['freigeschaltet', 'emerald'], abgelehnt: ['abgelehnt', 'red'], zurueckgezogen: ['zurückgezogen', 'slate'] };
+  function vipRequestHtml(r) {
+    const [bl, bc] = REQ_BADGE[r.status] || [r.status, 'slate'];
+    return `<div class="list-row wrap">
+      <div class="main"><div class="title flex flex-wrap items-center gap-2">${esc(r.name)} ${memberBadge({ kind: r.kind, name: r.tierName })}${badge(bl, bc)}</div>
+        <div class="meta">${esc(r.email)} · ${money(r.price)} · ${fmtPct(r.discountPct)} % · ${r.durationDays ? `${r.durationDays} Tage` : 'unbefristet'} · angefragt ${esc(fmtDate(r.createdAt))}${r.discordLinked ? '' : ' · kein Discord'}</div>
+        ${r.message ? `<div class="meta">Nachricht: ${esc(r.message)}</div>` : ''}
+        ${r.invoice ? `<div class="meta">Rechnung <a class="text-gold underline" href="/invoice.html?id=${r.invoice.id}" target="_blank" rel="noopener">${esc(r.invoice.number)}</a> · ${esc(r.invoice.status)}</div>` : ''}
+        ${r.decisionNote ? `<div class="meta">${r.status === 'abgelehnt' ? 'Grund' : 'Hinweis'}: ${esc(r.decisionNote)}</div>` : ''}</div>
+      <div class="flex flex-wrap gap-2 shrink-0">
+        ${r.status === 'offen' ? `<button class="btn-gold btn-sm" data-action="vipreq-accept" data-id="${r.id}">${icon('check', 'ico-sm')}<span>Annehmen</span></button><button class="btn-ghost btn-sm" data-action="vipreq-decline" data-id="${r.id}">Ablehnen</button>` : ''}
+        ${r.status === 'angenommen' && r.invoice ? `<button class="btn-gold btn-sm" data-action="vipreq-paid" data-id="${r.id}">${icon('check', 'ico-sm')}<span>Bezahlt – freischalten</span></button>` : ''}
+      </div></div>`;
+  }
+
   views.vip = {
     async load() {
-      const [m, t] = await Promise.all([api.get('/api/memberships' + (st.vipAll ? '?status=alle' : '')), api.get('/api/memberships/tiers')]);
-      st.vip = { memberships: m.memberships, tiers: t.tiers };
+      const [m, t, q] = await Promise.all([
+        api.get('/api/memberships' + (st.vipAll ? '?status=alle' : '')),
+        api.get('/api/memberships/tiers'),
+        api.get('/api/memberships/requests' + (st.vipReqAll ? '?status=alle' : '')),
+      ]);
+      st.vip = { memberships: m.memberships, tiers: t.tiers, requests: q.requests };
+      st.vipReqOpen = q.open;
+      renderNav();
     },
     render() {
       const { memberships, tiers } = st.vip;
@@ -3664,15 +3691,21 @@
       const sum = (list, f) => list.reduce((s, m) => s + f(m), 0);
       return `
         <div class="page-head">
-          <div><h1 class="page-title">VIP &amp; Perma-Mandat</h1><p class="page-sub">Mitgliedschaften für einzelne Mandanten – Rabatt in jeder Rechnung, Badge in Akten, auf Wunsch Discord-Rolle. Preise und Rabatte legt das Board fest.</p></div>
+          <div><h1 class="page-title">VIP &amp; Lifetime</h1><p class="page-sub">Mitgliedschaften für einzelne Mandanten – Rabatt in jeder Rechnung, Badge in Akten, auf Wunsch Discord-Rolle. Preise und Rabatte legt das Board fest.</p></div>
           <div class="page-actions"><button class="btn-gold btn-md" data-action="vip-grant">${icon('crown')}<span>Mitgliedschaft vergeben</span></button></div>
         </div>
         <div class="kpi-grid">
-          <div class="panel kpi"><div class="kpi-label">${icon('crown', 'ico-sm')}Perma-Mandate</div><div class="kpi-value">${active.filter((m) => m.kind === 'perma').length}</div><div class="kpi-sub">aktiv</div></div>
+          <div class="panel kpi"><div class="kpi-label">${icon('crown', 'ico-sm')}Lifetime</div><div class="kpi-value">${active.filter((m) => m.kind === 'perma').length}</div><div class="kpi-sub">aktiv</div></div>
           <div class="panel kpi"><div class="kpi-label">${icon('star', 'ico-sm')}VIP</div><div class="kpi-value">${active.filter((m) => m.kind === 'vip').length}</div><div class="kpi-sub">aktiv</div></div>
           <div class="panel kpi"><div class="kpi-label">${icon('receipt', 'ico-sm')}Eingenommen</div><div class="kpi-value">${money(sum(active, (m) => m.pricePaid))}</div><div class="kpi-sub">aktive Mitgliedschaften</div></div>
           <div class="panel kpi"><div class="kpi-label">${icon('scale', 'ico-sm')}Abgedeckte Leistungen</div><div class="kpi-value">${money(sum(active, (m) => m.usage.covered))}</div><div class="kpi-sub">Rabatt auf Rechnungen</div></div>
         </div>
+        <section class="panel panel-pad mb-4">
+          <div class="panel-head"><h2 class="panel-title">Anfragen von der Website</h2>
+            <div class="chip-row"><button class="chip ${st.vipReqAll ? '' : 'active'}" data-action="vipreq-filter" data-value="offen">Offen <span class="chip-count">${st.vipReqOpen || 0}</span></button><button class="chip ${st.vipReqAll ? 'active' : ''}" data-action="vipreq-filter" data-value="alle">Alle</button></div></div>
+          <p class="text-sm text-muted mb-3">Mandanten fragen auf der Startseite oder im Portal an. <strong class="text-white">Annehmen</strong> erstellt die Rechnung über den Preis – sobald sie auf „bezahlt“ steht (hier oder unter Rechnungen), wird die Mitgliedschaft automatisch freigeschaltet.</p>
+          ${st.vip.requests.length ? st.vip.requests.map(vipRequestHtml).join('') : empty(st.vipReqAll ? 'Noch keine Anfragen.' : 'Keine offenen Anfragen.', 'crown')}
+        </section>
         <section class="panel panel-pad mb-4">
           <div class="panel-head"><h2 class="panel-title">Mitglieder</h2>
             <div class="chip-row"><button class="chip ${st.vipAll ? '' : 'active'}" data-action="vip-filter" data-value="aktiv">Aktiv</button><button class="chip ${st.vipAll ? 'active' : ''}" data-action="vip-filter" data-value="alle">Alle</button></div></div>
@@ -3680,7 +3713,7 @@
         </section>
         <section class="panel panel-pad">
           <div class="panel-head"><h2 class="panel-title">Stufen, Preise &amp; Rabatte</h2><button class="btn-outline btn-sm" data-action="tier-new">${icon('plus', 'ico-sm')}<span>Neue Stufe</span></button></div>
-          <p class="text-sm text-muted mb-3">Preis, Laufzeit und Rabatt gelten für neu vergebene Mitgliedschaften und Verlängerungen – laufende behalten ihren Rabatt. Perma-Mandate sind unbefristet.</p>
+          <p class="text-sm text-muted mb-3">Preis, Laufzeit und Rabatt gelten für neu vergebene Mitgliedschaften und Verlängerungen – laufende behalten ihren Rabatt. Lifetime ist unbefristet.</p>
           ${tiers.length ? tiers.map(tierCardHtml).join('') : empty('Noch keine Stufen.', 'crown')}
         </section>`;
     },
@@ -3690,10 +3723,10 @@
     const kind = t ? t.kind : 'vip';
     return `
       <h2 id="modalTitle" class="modal-title">${t ? `${esc(t.name)} bearbeiten` : 'Neue Stufe'}</h2>
-      <p class="modal-sub">VIP gilt für eine Laufzeit (z. B. 30 Tage) und wird verlängert; ein Perma-Mandat ist unbefristet und gilt nur für diese eine Person.</p>
+      <p class="modal-sub">VIP gilt für eine Laufzeit (z. B. 30 Tage) und wird verlängert; Lifetime ist unbefristet und gilt nur für diese eine Person.</p>
       <form data-form="tier" ${t ? `data-id="${t.id}"` : ''} class="form-grid cols-2">
         <div><label class="label">Name</label><input name="name" class="field" required minlength="2" maxlength="60" value="${esc(t ? t.name : '')}" placeholder="z. B. VIP Gold" autofocus></div>
-        <div><label class="label">Art</label><select name="kind" class="field" id="tierKind">${opt('vip', 'VIP (auf Zeit)', kind === 'vip')}${opt('perma', 'Perma-Mandat (unbefristet)', kind === 'perma')}</select></div>
+        <div><label class="label">Art</label><select name="kind" class="field" id="tierKind">${opt('vip', 'VIP (auf Zeit)', kind === 'vip')}${opt('perma', 'Lifetime (unbefristet)', kind === 'perma')}</select></div>
         <div><label class="label">Preis ($)</label><input name="price" type="number" inputmode="numeric" min="0" step="1000" class="field" required value="${esc(t ? t.price : 250000)}"></div>
         <div><label class="label">Rabatt auf alle Leistungen (%)</label><input name="discountPct" type="number" inputmode="decimal" min="0" max="100" step="0.5" class="field" required value="${esc(t ? t.discountPct : 15)}"></div>
         <div id="tierDuration" ${kind === 'perma' ? 'class="hidden"' : ''}><label class="label">Laufzeit (Tage)</label><input name="durationDays" type="number" inputmode="numeric" min="1" max="3650" class="field" value="${esc(t && t.durationDays ? t.durationDays : 30)}"></div>
@@ -3743,6 +3776,64 @@
           .join('')
       : '<p class="text-sm text-dim">Kein Mandantenkonto gefunden.</p>';
   }
+
+  /* ---------------------------------------------------------------- Mandant: VIP & Lifetime anfragen */
+  function offerCardHtml(t, busy) {
+    const life = t.kind === 'perma';
+    return `<div class="panel panel-pad flex flex-col" style="border-top:2px solid ${life ? 'var(--gold-500)' : 'rgba(56,189,248,.6)'}">
+      <div class="flex items-center justify-between mb-3">${memberBadge({ kind: t.kind, name: life ? 'Lifetime' : 'VIP' })}<span class="text-xs text-dim font-mono">${life ? 'unbefristet' : `${t.durationDays} Tage`}</span></div>
+      <h3 class="font-serif text-2xl font-semibold">${esc(t.name)}</h3>
+      <div class="font-mono text-2xl text-gold font-semibold mt-1">${money(t.price)}</div>
+      <div class="text-xs text-dim mb-3">${life ? 'einmalig · gilt unbefristet' : `für ${t.durationDays} Tage · verlängerbar`}</div>
+      <div class="text-sm font-semibold mb-2" style="color:var(--gold-light)">${fmtPct(t.discountPct)} % Rabatt auf alle Leistungen</div>
+      ${t.benefits ? `<p class="text-sm text-muted whitespace-pre-line mb-4" style="flex:1">${esc(t.benefits)}</p>` : '<div style="flex:1"></div>'}
+      <button class="${life ? 'btn-gold' : 'btn-outline'} btn-md w-full" data-action="vip-request" data-id="${t.id}" ${busy ? 'disabled' : ''}>${busy ? 'Anfrage läuft' : 'Jetzt anfragen'}</button></div>`;
+  }
+  function vipRequestModal(t) {
+    const cur = st.offers && st.offers.membership;
+    openModal(`
+      <h2 class="modal-title">${esc(t.name)} anfragen</h2>
+      <p class="modal-sub">${money(t.price)} · ${t.durationDays ? `${t.durationDays} Tage` : 'unbefristet'} · ${fmtPct(t.discountPct)} % Rabatt auf alle Leistungen. Das Board of Partners bestätigt Ihre Anfrage und stellt die Rechnung aus; nach der Zahlung im Spiel wird die Mitgliedschaft automatisch freigeschaltet.${cur ? ` Ihre aktuelle Mitgliedschaft (${esc(cur.name)}) wird dabei ${cur.name === t.name ? 'verlängert' : 'ersetzt'}.` : ''}</p>
+      <form data-form="vip-request" data-id="${t.id}" class="form-grid">
+        <div><label class="label">Nachricht an das Board <span class="text-dim font-normal normal-case tracking-normal">(optional)</span></label><textarea name="message" rows="3" maxlength="500" class="field" placeholder="z. B. Wann und wo kann ich bezahlen?"></textarea></div>
+        <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('send', 'ico-sm')}<span>Anfrage senden</span></button></div>
+      </form>`);
+  }
+  views['vip-angebot'] = {
+    async load() {
+      st.offers = await api.get('/api/memberships/offers');
+      // Von der Startseite: ?vip=<Stufe> öffnet die Anfrage direkt
+      const want = Number(new URLSearchParams(location.search).get('vip'));
+      if (want) {
+        st.vipAutoTier = want;
+        history.replaceState(null, '', '/dashboard.html' + location.hash);
+      }
+    },
+    render() {
+      const d = st.offers;
+      const running = d.requests.find((r) => r.status === 'offen' || r.status === 'angenommen');
+      const last = d.requests.find((r) => r.status === 'abgelehnt' || r.status === 'aktiv');
+      if (st.vipAutoTier) {
+        const t = d.tiers.find((x) => x.id === st.vipAutoTier);
+        st.vipAutoTier = null;
+        if (t && !running) setTimeout(() => vipRequestModal(t), 0);
+        else if (running) setTimeout(() => toast('Sie haben bereits eine laufende Anfrage – den Stand sehen Sie hier.'), 0);
+      }
+      const status = running
+        ? running.status === 'offen'
+          ? `<div class="banner banner-amber items-center justify-between flex-wrap"><div><strong>Anfrage gesendet: ${esc(running.tierName)}</strong> (${money(running.price)}) · ${esc(fmtDate(running.createdAt))}<div class="text-xs text-dim">Das Board of Partners meldet sich – danach erhalten Sie die Rechnung.</div></div><button class="btn-ghost btn-sm" data-action="vip-request-withdraw" data-id="${running.id}">Zurückziehen</button></div>`
+          : `<div class="banner banner-gold items-center justify-between flex-wrap"><div><strong>Angenommen: ${esc(running.tierName)}</strong> – bitte die Rechnung ${running.invoice ? `<strong>${esc(running.invoice.number)}</strong> ` : ''}über <strong>${money(running.price)}</strong> im Spiel bezahlen. Danach wird Ihre Mitgliedschaft automatisch freigeschaltet.${running.decisionNote ? `<div class="text-xs mt-1">${esc(running.decisionNote)}</div>` : ''}</div>${running.invoice ? `<a class="btn-outline btn-sm" href="/invoice.html?id=${running.invoice.id}" target="_blank" rel="noopener">${icon('receipt', 'ico-sm')}<span>Rechnung</span></a>` : ''}</div>`
+        : last && last.status === 'abgelehnt'
+          ? `<div class="banner banner-red">${icon('alert')}<div>Ihre letzte Anfrage (${esc(last.tierName)}) wurde abgelehnt.${last.decisionNote ? ` Grund: ${esc(last.decisionNote)}` : ''}</div></div>`
+          : '';
+      return `
+        <div class="page-head"><div><h1 class="page-title">VIP &amp; Lifetime</h1><p class="page-sub">Dauerhafter Rabatt auf alle Leistungen der Kanzlei – als VIP auf Zeit oder einmalig als Lifetime.</p></div></div>
+        ${status}
+        ${d.membership ? `<div class="mb-4">${membershipPanel(d.membership)}</div>` : ''}
+        ${d.tiers.length ? `<div class="grid grid-cols-1 md:grid-cols-3 gap-4">${d.tiers.map((t) => offerCardHtml(t, !!running || (d.membership && d.membership.kind === 'perma'))).join('')}</div>` : `<div class="panel">${empty('Aktuell gibt es keine Angebote.', 'crown')}</div>`}
+        <p class="form-hint mt-4">Ablauf: anfragen → das Board of Partners bestätigt und stellt die Rechnung aus → Zahlung im Spiel → automatische Freischaltung (mit Discord-Nachricht, falls Ihr Discord verknüpft ist).</p>`;
+    },
+  };
 
   /* ---------------------------------------------------------------- Namensänderungen (Board of Partners) */
   views['name-requests'] = {
@@ -5110,7 +5201,55 @@
     },
     'back-to-case': () => returnOrClose(),
 
-    // VIP & Perma
+    // VIP & Lifetime – Anfragen
+    'vipreq-filter': async (el) => {
+      st.vipReqAll = el.dataset.value === 'alle';
+      await refreshBehind();
+    },
+    'vipreq-accept': (el) => {
+      const r = st.vip.requests.find((x) => x.id === Number(el.dataset.id));
+      if (!r) return;
+      openModal(`
+        <h2 class="modal-title">Anfrage annehmen</h2>
+        <p class="modal-sub">${esc(r.name)} · ${esc(r.tierName)} · ${money(r.price)}. Es wird eine Rechnung über den Preis erstellt (im Portal des Mandanten sichtbar). Sobald sie bezahlt ist, wird die Mitgliedschaft automatisch freigeschaltet.</p>
+        <form data-form="vipreq-accept" data-id="${r.id}" class="form-grid">
+          <label class="check"><input type="checkbox" name="paid"> Zahlung bereits erhalten – sofort freischalten</label>
+          <div><label class="label">Hinweis an den Mandanten <span class="text-dim font-normal normal-case tracking-normal">(optional)</span></label><input name="note" class="field" maxlength="500" placeholder="z. B. Zahlung bitte bei Dr. Alois Pake in der Kanzlei"></div>
+          <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Annehmen</span></button></div>
+        </form>`);
+    },
+    'vipreq-decline': (el) => {
+      const r = st.vip.requests.find((x) => x.id === Number(el.dataset.id));
+      if (!r) return;
+      openModal(`
+        <h2 class="modal-title">Anfrage ablehnen</h2>
+        <p class="modal-sub">${esc(r.name)} · ${esc(r.tierName)}. Der Grund wird dem Mandanten angezeigt.</p>
+        <form data-form="vipreq-decline" data-id="${r.id}" class="form-grid">
+          <div><label class="label">Grund</label><input name="reason" class="field" required minlength="2" maxlength="500" autofocus></div>
+          <div class="form-actions"><button type="submit" class="btn-danger btn-md">Ablehnen</button></div>
+        </form>`);
+    },
+    'vipreq-paid': async (el) => {
+      const r = st.vip.requests.find((x) => x.id === Number(el.dataset.id));
+      if (!r || !r.invoice) return;
+      if (!(await ask(`Rechnung ${r.invoice.number} über ${money(r.price)} als bezahlt markieren? ${r.name} erhält ${r.tierName} sofort.`, { title: 'Bezahlt – freischalten?', confirmText: 'Freischalten' }))) return;
+      const res = await api.patch(`/api/invoices/${r.invoice.id}`, { status: 'bezahlt' });
+      toast(`${r.tierName} für ${r.name} freigeschaltet.`);
+      (res.warnings || []).forEach((w) => toast(w, 'error'));
+      await refreshBehind();
+    },
+    'vip-request': (el) => {
+      const t = st.offers.tiers.find((x) => x.id === Number(el.dataset.id));
+      if (t) vipRequestModal(t);
+    },
+    'vip-request-withdraw': async (el) => {
+      if (!(await ask('Die Anfrage wird zurückgezogen.', { title: 'Anfrage zurückziehen?', confirmText: 'Zurückziehen' }))) return;
+      await api.del(`/api/memberships/requests/${el.dataset.id}`);
+      toast('Anfrage zurückgezogen.');
+      await refreshBehind();
+    },
+
+    // VIP & Lifetime
     'vip-filter': async (el) => {
       st.vipAll = el.dataset.value === 'alle';
       await refreshBehind();
@@ -5837,6 +5976,28 @@
       closeModal();
       await refreshBehind();
     },
+    'vipreq-accept': async (f) => {
+      const fd = new FormData(f);
+      const res = await api.post(`/api/memberships/requests/${f.dataset.id}/accept`, { paid: fd.get('paid') === 'on', note: val(fd, 'note') || undefined });
+      toast(res.request.status === 'aktiv' ? `Angenommen und freigeschaltet · Rechnung ${res.invoice.number}.` : `Angenommen · Rechnung ${res.invoice.number} – freigeschaltet wird nach Zahlung.`);
+      (res.warnings || []).forEach((w) => toast(w, 'error'));
+      closeModal();
+      await refreshBehind();
+    },
+    'vipreq-decline': async (f) => {
+      const fd = new FormData(f);
+      await api.post(`/api/memberships/requests/${f.dataset.id}/decline`, { reason: val(fd, 'reason') });
+      toast('Anfrage abgelehnt.');
+      closeModal();
+      await refreshBehind();
+    },
+    'vip-request': async (f) => {
+      const fd = new FormData(f);
+      await api.post('/api/memberships/requests', { tierId: Number(f.dataset.id), message: val(fd, 'message') || undefined });
+      toast('Anfrage gesendet – das Board of Partners meldet sich.');
+      closeModal();
+      await refreshBehind();
+    },
     tier: async (f) => {
       const fd = new FormData(f);
       const kind = val(fd, 'kind');
@@ -6344,7 +6505,7 @@
   // Ungelesene Post, neue Bewerbungen und Dienststatus regelmäßig aktualisieren (Badges in der Navigation)
   setInterval(() => {
     if (document.hidden || !st.user) return;
-    Promise.all([load.unread(), load.appCount(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {})])
+    Promise.all([load.unread(), load.appCount(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {})])
       .then(renderNav)
       .catch(() => {});
   }, 30000);
@@ -6363,7 +6524,7 @@
     try {
       st.user = (await api.get('/api/auth/me')).user;
     } catch {
-      location.href = '/login.html?next=' + encodeURIComponent('/dashboard.html' + location.hash);
+      location.href = '/login.html?next=' + encodeURIComponent('/dashboard.html' + location.search + location.hash);
       return;
     }
     renderUser();
@@ -6375,7 +6536,7 @@
     if (discordState && DISCORD_MSG[discordState]) toast(...DISCORD_MSG[discordState]);
 
     try {
-      await Promise.all([load.unread(), load.appCount(), load.duty(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {})]);
+      await Promise.all([load.unread(), load.appCount(), load.duty(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {})]);
       renderUser();
     } catch {
       /* Badges und Dienststatus sind nicht kritisch */

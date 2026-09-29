@@ -286,6 +286,47 @@
     }
   }
 
+  /* ---------------------------------------------------------------- VIP & Lifetime (Angebot aus dem Dashboard) */
+  const pct = (n) => String(n).replace('.', ',');
+  function renderVip(tiers) {
+    const grid = document.getElementById('vipTiers');
+    if (!grid) return;
+    if (!tiers.length) {
+      grid.innerHTML = '<p class="md:col-span-3 text-center text-sm text-[var(--text-muted)] py-8">Aktuell gibt es keine VIP- oder Lifetime-Angebote.</p>';
+      return;
+    }
+    // Wenige Angebote mittig statt links im Raster
+    if (tiers.length === 1) grid.className = 'grid grid-cols-1 gap-6 max-w-md mx-auto';
+    else if (tiers.length === 2) grid.className = 'grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto';
+    grid.innerHTML = tiers
+      .map((t) => {
+        const life = t.kind === 'perma';
+        return `
+        <article class="glass-card p-8 border-t-2 ${life ? 'border-t-[var(--gold-500)] shadow-[0_0_40px_rgba(212,175,55,0.12)]' : 'border-t-sky-400/60'} flex flex-col">
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-[0.65rem] font-mono px-3 py-1 rounded-full uppercase font-semibold ${life ? 'bg-[rgba(212,175,55,0.15)] text-[var(--gold-light)] border border-[var(--gold-hairline)]' : 'bg-sky-500/10 text-sky-300 border border-sky-500/20'}">${life ? '👑 Lifetime' : '⭐ VIP'}</span>
+            <span class="text-xs text-[var(--text-muted)] font-mono">${life ? 'unbefristet' : `${Number(t.durationDays)} Tage`}</span>
+          </div>
+          <h3 class="font-serif text-3xl font-semibold text-white mb-2">${esc(t.name)}</h3>
+          <div class="font-mono text-3xl text-[var(--gold-500)] font-semibold">${money(t.price)}</div>
+          <div class="text-xs text-[var(--text-muted)] mb-5">${life ? 'einmalig · gilt unbefristet' : `für ${Number(t.durationDays)} Tage · verlängerbar`}</div>
+          <div class="text-sm text-[var(--gold-light)] font-semibold mb-3">${pct(t.discountPct)} % Rabatt auf alle Leistungen</div>
+          <p class="text-sm text-[var(--text-muted)] leading-relaxed mb-6 whitespace-pre-line flex-grow">${esc(t.benefits || '')}</p>
+          <button type="button" data-vip-tier="${Number(t.id)}" class="${life ? 'btn-gold' : 'btn-outline'} py-3 text-sm uppercase tracking-wider w-full">Jetzt anfragen</button>
+        </article>`;
+      })
+      .join('');
+  }
+  // Anfragen läuft im Mandantenportal (Konto nötig): ohne Anmeldung erst Login bzw. Registrierung, danach direkt weiter
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest && e.target.closest('[data-vip-tier]');
+    if (!btn) return;
+    const target = `/dashboard.html?vip=${btn.dataset.vipTier}#vip-angebot`;
+    if (me && me.role !== 'mandant') location.href = '/dashboard.html#vip'; // Team: Verwaltung im Dashboard
+    else if (me) location.href = target;
+    else location.href = '/login.html?next=' + encodeURIComponent(target);
+  });
+
   /* ---------------------------------------------------------------- Start */
   api.get('/api/auth/session')
     .then((r) => (me = r?.user ?? null))
@@ -302,6 +343,13 @@
   api.get('/api/fees')
     .then((r) => renderFees(r.fees || []))
     .catch(() => {});
+
+  api.get('/api/public/memberships')
+    .then((r) => renderVip(r.tiers || []))
+    .catch(() => {
+      const grid = document.getElementById('vipTiers');
+      if (grid) grid.innerHTML = '<p class="md:col-span-3 text-center text-sm text-[var(--text-muted)] py-8">Angebote konnten nicht geladen werden.</p>';
+    });
 
   /* ---------------------------------------------------------------- Eilnotdienst live */
   function renderDuty(d) {

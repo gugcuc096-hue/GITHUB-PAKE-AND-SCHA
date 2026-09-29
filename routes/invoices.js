@@ -61,7 +61,7 @@ const createSchema = z.object({
   items: z.array(itemSchema).min(1).max(50),
   discountPct: z.number().min(0).max(100).default(0),
   cooperationId: z.number().int().positive().nullable().optional(),
-  membershipId: z.number().int().positive().nullable().optional(), // VIP / Perma-Mandat
+  membershipId: z.number().int().positive().nullable().optional(), // VIP / Lifetime
   surchargePct: z.number().min(0).max(100).default(0),
   dueDate: dateOnly.nullable().optional(),
   notes: z.string().trim().max(3000).optional(),
@@ -69,7 +69,7 @@ const createSchema = z.object({
 
 /**
  * Berechnung wie im Tarifrechner der Startseite: erst Rabatte, dann Zuschlag.
- * VIP-/Perma-Rabatt, Kooperationsrabatt und sonstiger Rabatt beziehen sich auf die Zwischensumme
+ * VIP-/Lifetime-Rabatt, Kooperationsrabatt und sonstiger Rabatt beziehen sich auf die Zwischensumme
  * (zusammen höchstens 100 %); der Zuschlag auf den Betrag danach.
  */
 function computeTotals(items, discountPct, surchargePct, coopPct = 0, memberPct = 0) {
@@ -118,13 +118,13 @@ router.post(
         if (hit) via = hit.via;
       }
     }
-    // VIP / Perma-Mandat: Satz aus der (aktiven) Mitgliedschaft
+    // VIP / Lifetime: Satz aus der (aktiven) Mitgliedschaft
     let ms = null;
     if (d.membershipId) {
       ms = db.prepare("SELECT * FROM memberships WHERE id = ? AND status = 'aktiv' AND (expires_at IS NULL OR expires_at > ?)").get(d.membershipId, new Date().toISOString());
-      if (!ms) return res.status(400).json({ error: 'Die gewählte VIP-/Perma-Mitgliedschaft ist nicht (mehr) aktiv.' });
+      if (!ms) return res.status(400).json({ error: 'Die gewählte VIP-/Lifetime-Mitgliedschaft ist nicht (mehr) aktiv.' });
     }
-    // VIP/Perma und Kooperation werden nicht addiert – es gilt der höhere Rabatt
+    // VIP/Lifetime und Kooperation werden nicht addiert – es gilt der höhere Rabatt
     if (ms && k) {
       if (ms.discount_pct >= k.discount_pct) k = null;
       else ms = null;
@@ -171,7 +171,7 @@ router.post(
         ms ? ms.discount_pct : 0,
         t.memberAmount,
         clientUserId,
-        // 0 $ (z. B. Perma-Mandat): gilt sofort als beglichen; die Positionen dokumentieren den Wert der Arbeit
+        // 0 $ (z. B. Lifetime): gilt sofort als beglichen; die Positionen dokumentieren den Wert der Arbeit
         t.total === 0 ? 'bezahlt' : 'offen',
         t.total === 0 ? new Date().toISOString() : null
       );
@@ -233,7 +233,15 @@ router.patch(
       inv.id
     );
     if (d.status !== inv.status) logActivity(req.user, 'Rechnungsstatus geändert', 'invoice', inv.id, `${inv.number}: ${inv.status} → ${d.status}`);
-    res.json({ invoice: invoiceRow(db.prepare(`${INVOICE_SELECT} WHERE i.id = ?`).get(inv.id)) });
+    // VIP/Lifetime-Anfrage: bezahlt → Mitgliedschaft freischalten, storniert → Anfrage abgelehnt
+    let warnings = [];
+    if (d.status !== inv.status && d.status === 'bezahlt') {
+      const a = await memberships.activateRequestByInvoice(inv.id, req.user);
+      if (a) warnings = a.warnings;
+    } else if (d.status !== inv.status && d.status === 'storniert') {
+      memberships.cancelRequestByInvoice(inv.id, req.user);
+    }
+    res.json({ invoice: invoiceRow(db.prepare(`${INVOICE_SELECT} WHERE i.id = ?`).get(inv.id)), warnings });
   })
 );
 
