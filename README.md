@@ -18,6 +18,8 @@ Premium-Webanwendung für die GTA-RP-Kanzlei **Pake & Scha Legal Consulting**: �
 | **Benutzer** (Admin) | Rollen, Ränge, Sperren, Löschen, **Passwort-Reset per Klick** |
 | **Login-E-Mail @pake-scha.ls** | Alle Konten enden auf **@pake-scha.ls** – bei Registrierung, „Konto anlegen“, Team-Konto und Einstellung wird nur der Teil vor dem @ gewählt (Vorschlag aus dem Namen) · bestehende Konten wurden automatisch umgestellt (`john@mail.ls` → `john@pake-scha.ls`, bei Doppelungen `john2@…`), **Passwort unverändert** · Login mit neuer Adresse, nur dem Teil vor dem @ (`john`) **oder der alten Adresse** · einmaliger Hinweis im Dashboard mit der neuen Adresse · unter *Benutzer* steht „vorher: …“ (siehe [Login-E-Mail](#login-e-mail-pake-schals)) |
 | **Kooperationen** (Board of Partners) | Kooperationspartner anlegen (z. B. „Burgershot“) mit **Rabatt in %**, optional „gültig bis“, aktiv/inaktiv und interner Notiz · **Discord-Rolle(n) der Mitglieder** direkt aus der Rollenliste des Servers anhaken · beim Erstellen einer Rechnung mit Aktenbezug liest der Bot die Discord-Rollen des Mandanten und **setzt den Kooperationsrabatt automatisch** (bei mehreren der höchste; änderbar) · ohne Discord: Mandantenkonten von Hand zuordnen oder die Kooperation in der Rechnung auswählen · „Mandant prüfen“ zeigt, welche Kooperation gilt · Rechnung zeigt „Kooperationsrabatt Burgershot (15 %)“, Verlauf/Protokoll vermerken, ob per Discord-Rolle erkannt oder von Hand gewählt · Mandanten sehen ihre Vorteile unter *Mein Profil* (siehe [Kooperationen](#kooperationen)) |
+| **VIP & Perma-Mandat** (Board of Partners) | Mitgliedschaften für **einzelne Mandanten**: VIP auf Zeit (z. B. 30 Tage, verlängerbar) oder **Perma-Mandat** (unbefristet, z. B. 100 %) · **Stufen, Preise & Rabatte** stellt das Board selbst ein (Name, Art, Preis, Laufzeit, Rabatt, Leistungen/Bedingungen, optional Discord-Rolle) · Vergeben an ein Mandantenkonto, auf Wunsch mit Rechnung über den Preis · Rabatt automatisch in jeder Rechnung (Perma 100 % → 0 $, gilt sofort als bezahlt, die Positionen dokumentieren den Wert der Arbeit) · Badge „👑 Perma-Mandat“ / „⭐ VIP“ in Akten, diese Akten stehen oben · Bot vergibt/entfernt die Discord-Rolle, erinnert 3 Tage vor Ablauf per DM · Übersicht: gezahlt vs. Wert der abgedeckten Leistungen (siehe [VIP & Perma-Mandat](#vip--perma-mandat)) |
+| **Namensänderung** | Jeder Benutzer beantragt im Profil einen neuen Namen (mit Begründung) – das **Board of Partners** genehmigt oder lehnt ab (Menü „Namensänderungen“ mit Zähler) · genehmigt → neuer Name sofort im Konto, in Akten und im Team-Profil der Website · niemand entscheidet über den eigenen Antrag · Benachrichtigung per Discord-DM und Ereignis „Namensänderung“ |
 | **Honorarordnung** (Admin) | Preise/Leistungen pflegen → Website, Tarifrechner und Rechnungs-Generator |
 | **Discord** | Webhook für Kanzlei-Updates (mit Erwähnung verknüpfter Anwälte) · Konto verknüpfen · „Mit Discord anmelden“ |
 | **Profilbilder** | Jedes Konto kann ein Profilbild hochladen (im Browser zugeschnitten und verkleinert). Team-Profile können zusätzlich ein eigenes Foto für die Website bekommen. |
@@ -161,6 +163,20 @@ cp .env.example .env    # Werte nach Bedarf ausfüllen
 npm run dev             # http://localhost:3000
 ```
 
+## VIP & Perma-Mandat
+
+Unter **Board of Partners → VIP & Perma-Mandat** (Admin-Rolle oder Partner-Rang):
+
+1. **Stufen, Preise & Rabatte:** Beim ersten Start gibt es drei Beispiele – *VIP Silber* (250.000 $, 30 Tage, 15 %), *VIP Gold* (750.000 $, 30 Tage, 25 %) und *Perma-Mandat* (2.000.000 $, unbefristet, 100 %). Name, Art (VIP auf Zeit / Perma unbefristet), Preis, Laufzeit, Rabatt, Leistungen/Bedingungen und eine optionale Discord-Rolle sind frei änderbar; „Aktiv“ abwählen, um eine Stufe nicht mehr zu vergeben. Änderungen gelten für neue Mitgliedschaften und Verlängerungen – laufende behalten ihren Rabatt.
+2. **Mitgliedschaft vergeben:** Mandantenkonto suchen, Stufe wählen, auf Wunsch „Rechnung über den Preis erstellen“ (erscheint im Portal des Mandanten). Hat der Mandant schon eine, fragt das Dashboard, ob sie ersetzt werden soll. Der Mandant bekommt eine Discord-DM und sieht die Mitgliedschaft unter *Mein Profil*.
+3. **Rechnungen:** Mit Aktenbezug wird die Mitgliedschaft des Mandanten automatisch gewählt (ohne Akte von Hand). Der Satz kommt immer vom Server. VIP/Perma und Kooperation werden **nicht addiert** – es gilt der höhere Rabatt. Beim Perma-Mandat (100 %) ist die Rechnung 0 $ und gilt sofort als bezahlt; die Positionen zeigen den eigentlichen Wert der Arbeit (z. B. zur Bezahlung der Anwälte aus dem Perma-Preis).
+4. **Übersicht:** je Mitglied gezahlter Preis, Anzahl Rechnungen, Wert der Leistungen und abgedeckter Betrag – „Arbeit übersteigt Preis“ zeigt, wann sich ein Perma-Mandat nicht mehr lohnt. **Verlängern** (VIP, ab Ablaufdatum bzw. heute, optional mit Rechnung) und **Beenden** (mit Grund, z. B. Missbrauch oder CK).
+5. **Automatisch:** Badge in Akten (Perma/VIP stehen in der Aktenliste oben), Discord-Rolle beim Start vergeben und beim Ende/Ablauf entfernt (die Bot-Rolle muss dafür in den Server-Einstellungen **über** der VIP-Rolle stehen), Erinnerung per DM 3 Tage vor Ablauf, Ablauf → Status „abgelaufen“. Ereignis „VIP / Perma-Mandat“ unter Einstellungen → Discord-Ereignisse einschalten, um das Team zu informieren.
+
+## Namensänderung
+
+Namen ändert niemand mehr selbst: Unter *Mein Profil → Name ändern* stellt jeder Benutzer (Mandant oder Mitarbeiter) einen Antrag mit optionaler Begründung und sieht dort den Status (offen, genehmigt, abgelehnt mit Grund) – offene Anträge lassen sich zurückziehen. Das **Board of Partners** entscheidet unter *Namensänderungen* (Zähler im Menü); eine Ablehnung braucht einen Grund, über den eigenen Antrag entscheidet ein anderes Board-Mitglied. Genehmigt → der neue Name gilt sofort im Konto, in allen Akten und im Team-Profil der Website. Die Person erhält eine Discord-DM; das Ereignis „Namensänderung“ meldet Anträge und Entscheidungen im Discord. Das Board kann Namen weiterhin direkt unter *Benutzer* ändern.
+
 ## Login-E-Mail @pake-scha.ls
 
 Alle Konten haben eine Adresse mit der Endung **@pake-scha.ls**. Frei wählbar ist nur der Teil davor (Buchstaben a–z, Zahlen, Punkt, Bindestrich, Unterstrich) – bei der Registrierung, unter *Benutzer → Konto anlegen*, beim Team-Konto und beim Einstellen aus einer Bewerbung (dort mit Vorschlag aus dem Namen, z. B. `lisa.mueller`). Andere Endungen werden abgelehnt.
@@ -270,6 +286,8 @@ Es gibt genau sechs Ränge (Benutzer, Team-Profile und Einstellung von Bewerbern
 | Equity Partner | Associate |
 | Partner | Junior Associate |
 
+**Vor Gericht gibt es keine Unterschiede:** Jeder Anwalt darf – unabhängig vom Rang – vor jedem Gericht verteidigen und vertreten. Die Ränge regeln Verantwortung, Führung und Erfahrung (so steht es auch auf der Website unter „Kanzleiränge“).
+
 **Board of Partners** ist zugleich die Leitung der Kanzlei: Die Dashboard-Rolle „Board of Partners“ (Admin) sieht den gleichnamigen Menübereich (Aktenbearbeitung, Team, Bewerbungen, Benutzer, Honorarordnung, Protokoll, Einstellungen). Die Auswertung „Aktenbearbeitung“, die eingegangenen Anliegen und die **Bewerbungen** (inkl. Stellenausschreibungen) sehen außerdem Konten mit Partner-Rang. Einstellen dürfen sie Bewerber als Anwalt/Mitarbeiter bis zum eigenen Rang; Admin-Konten anlegen und Bewerbungen löschen bleibt der Rolle „Board of Partners“ vorbehalten. Der Rang selbst vergibt keine Admin-Rechte – dafür im Menü „Benutzer“ die Rolle „Board of Partners“ wählen. Ältere Ränge „Managing Partner“ und „Managing Partner / Kanzleileitung“ wurden beim Update einmalig zu „Founding Partner“.
 
 ## Rollen und Rechte
@@ -287,6 +305,8 @@ Es gibt genau sechs Ränge (Benutzer, Team-Profile und Einstellung von Bewerbern
 | Kanzlei-Post | an die Kanzlei | an alle + Rundschreiben | an alle + Rundschreiben |
 | Rechnungen | eigene ansehen/drucken | erstellen, Status | erstellen, Status, löschen |
 | Kooperationen (Rabatte) | eigene Vorteile im Profil | in Rechnungen anwenden | anlegen, Rollen, Konten zuordnen (Partner-Rang ebenso) |
+| VIP & Perma-Mandat | eigene Mitgliedschaft im Profil | in Rechnungen anwenden, Badge sehen | Stufen/Preise/Rabatte, vergeben, verlängern, beenden (Partner-Rang ebenso) |
+| Namensänderung | beantragen | beantragen | beantragen; Anträge anderer genehmigen/ablehnen (Partner-Rang ebenso) |
 | Beweismittel | eigene hochladen, öffentliche ansehen | alles (auch intern) | alles |
 | Externe Dokumente (FiveNet, Google Docs, Google Sheets) | freigegebene ansehen, Abschrift herunterladen | verknüpfen, Bilder übernehmen; eigene bzw. in zugewiesenen Akten bearbeiten/entfernen | alles |
 | Aufgaben & Wiedervorlagen | – | alle ansehen, anlegen, abhaken; eigene/zugewiesene löschen | alles |
@@ -318,6 +338,7 @@ discord.js       Webhooks & OAuth2
 tickets.js       Discord-Tickets: je Akte ein privater Kanal (Bot, REST-API)
 botCommands.js   Befehle des Kanzlei-Bots (/passwort, /akte, /notiz, /dienst, /imdienst, /termine, /hilfe), Antworten als Embed
 cooperations.js  Kooperationen: Rabatt-Erkennung über Discord-Rollen bzw. zugeordnete Konten
+memberships.js   VIP & Perma-Mandat: aktive Mitgliedschaft, Discord-Rolle, Ablauf und Erinnerung
 fivenet.js       FiveNet: Schnittstellenprüfung, Link-Erkennung, Instanz-Einstellung
 gdocs.js         Google Docs: Link-Erkennung, Export freigegebener Dokumente, Bildadressen
 gsheets.js       Google Sheets: Link-Erkennung, CSV-Export freigegebener Tabellenblätter
@@ -326,6 +347,6 @@ remote.js        Abrufe externer Quellen mit Zeit-, Größen- und Weiterleitungs
 uploads.js       Bild-Uploads (Formatprüfung anhand der Dateisignatur)
 helpers.js       Konstanten, Validierung
 models.js        Datenabfragen, Zeilen-Mapping, Zugriffsregeln, Protokoll
-routes/          auth, cases, calendar, messages, board, invoices, fees, team, admin, discord, public, duty, applications, fivenet, external, tasks, concerns, personnel, tickets, interactions, cooperations
+routes/          auth, cases, calendar, messages, board, invoices, fees, team, admin, discord, public, duty, applications, fivenet, external, tasks, concerns, personnel, tickets, interactions, cooperations, memberships, nameRequests
 public/          index.html, karriere.html, login.html, register.html, dashboard.html, invoice.html, css/, js/
 ```
