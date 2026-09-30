@@ -3329,6 +3329,16 @@
     </section>`;
   }
 
+  /** Ping-Pause in Tickets: dieselbe Person höchstens alle N Minuten erwähnen (0 = immer, -1 = nie). */
+  const PING_COOLDOWNS = [
+    [60, 'Wenige – je Person höchstens einmal pro Stunde (empfohlen)'],
+    [180, 'Sehr wenige – je Person höchstens alle 3 Stunden'],
+    [1440, 'Minimal – je Person höchstens einmal am Tag'],
+    [30, 'Etwas mehr – je Person höchstens alle 30 Minuten'],
+    [0, 'Bei jeder Nachricht, die die Person betrifft'],
+    [-1, 'Keine – nur beim Eröffnen des Tickets'],
+  ];
+
   /* ---------------------------------------------------------------- Einstellungen: Vertragsvorlagen */
   const TPL_HELP = [
     ['# Titel', 'großer Dokumenttitel'],
@@ -3558,6 +3568,8 @@
             <div><label class="label" for="tkBRoles">Board-Rolle(n) (IDs)</label><input id="tkBRoles" name="boardRoleIds" class="field font-mono text-xs" value="${esc((b.roleIds || []).join(', '))}" autocomplete="off" placeholder="z. B. Rolle „Board of Partners“"><p class="form-hint">Zusätzlich kommen alle Board-Mitglieder (Rolle „Board of Partners“ oder Partner-Rang) mit verknüpftem Discord einzeln hinein – normale Anwälte nicht.</p></div>
           </fieldset>
           <label class="check"><input type="checkbox" name="pingRoles" ${t.pingRoles ? 'checked' : ''}> Rolle bei neuem Ticket erwähnen (Team- bzw. Board-Rolle)</label>
+          <div><label class="label" for="tkPing">Pings in Mandats-Tickets</label><select id="tkPing" name="pingCooldownMin" class="field">${PING_COOLDOWNS.map(([v, label]) => opt(v, label, v === (t.pingCooldownMin ?? 60))).join('')}</select>
+            <p class="form-hint">Dieselbe Person (Mandant oder Anwalt) wird im selben Ticket höchstens so oft erwähnt – die Nachrichten selbst erscheinen immer. Gepingt wird ohnehin nur, wer gerade etwas tun soll (z. B. der Mandant einmal, wenn er den Vertrag unterschreiben soll).</p></div>
           <div class="form-actions">
             <button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button>
             <button type="button" class="btn-outline btn-md" data-action="tickets-test" ${t.tokenSet ? '' : 'disabled'}>Verbindung testen</button>
@@ -5799,6 +5811,7 @@
         archiveId: val(fd, 'archiveId'),
         roleIds: val(fd, 'roleIds'),
         pingRoles: fd.has('pingRoles'),
+        pingCooldownMin: Number(fd.get('pingCooldownMin')),
         boardCategoryId: val(fd, 'boardCategoryId'),
         boardArchiveId: val(fd, 'boardArchiveId'),
         boardRoleIds: val(fd, 'boardRoleIds'),

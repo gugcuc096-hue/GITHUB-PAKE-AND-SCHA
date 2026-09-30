@@ -164,18 +164,29 @@ function saveCoLawyers(contractId, list) {
   list.forEach((x, i) => ins.run(contractId, x.lawyer.id, x.lawyer.display_name, x.lawyer.rank || '', x.birth, i + 1));
 }
 
-/** Alle Anwälte des Vertrags für Anzeigen: [{ name, signature, signedAt }] – der erste zuerst. */
+/** Alle Anwälte des Vertrags für Anzeigen: [{ userId, name, signature, signedAt }] – der erste zuerst. */
 function allLawyers(k) {
   return [
-    { name: parseData(k.data).anwalt || k.lawyer_name || '—', signature: k.lawyer_signature, signedAt: k.lawyer_signed_at },
-    ...(Number(k.co_count || 0) ? coLawyersOf(k.id) : []).map((l) => ({ name: l.name, signature: l.signature, signedAt: l.signed_at })),
+    { userId: k.lawyer_id, name: parseData(k.data).anwalt || k.lawyer_name || '—', signature: k.lawyer_signature, signedAt: k.lawyer_signed_at },
+    ...(Number(k.co_count || 0) ? coLawyersOf(k.id) : []).map((l) => ({ userId: l.user_id, name: l.name, signature: l.signature, signedAt: l.signed_at })),
   ];
 }
 const lawyerNames = (k) => allLawyers(k).map((l) => l.name).join(', ');
 
-function notifySigned(c, k, who, user) {
+/** Discord-IDs von Vertragsanwälten (z. B. denen, die noch unterschreiben müssen). */
+function discordIdsOf(lawyers) {
+  const ids = lawyers.map((l) => l.userId).filter(Boolean);
+  if (!ids.length) return [];
+  return db
+    .prepare(`SELECT discord_id FROM users WHERE id IN (${ids.map(() => '?').join(',')}) AND discord_id IS NOT NULL AND discord_id != ''`)
+    .all(...ids)
+    .map((r) => r.discord_id);
+}
+
+function notifySigned(c, k, who, user, pingIds) {
   const full = fullySigned(k);
   const lawyers = allLawyers(k);
+  const viaTicket = tickets.active() && !!c.discord_channel_id;
   discord.notify('contract.signed', {
     title: `${c.case_number}: ${k.template_name} ${full ? 'vollständig unterschrieben' : `vom ${who} unterschrieben`}`,
     description: truncate(c.title, 300),
@@ -185,9 +196,7 @@ function notifySigned(c, k, who, user) {
       { name: lawyers.length > 1 ? 'Anwälte' : 'Anwalt', value: lawyers.map((l) => `${l.signedAt ? '✅' : '⏳'} ${l.name}`).join('\n') },
       { name: 'Unterschrift', value: who === 'Mandanten' && k.client_signed_via === 'kanzlei' ? `im Spiel (erfasst von ${user.display_name})` : user.display_name },
     ],
-    mentionIds: caseLawyers(c)
-      .filter((l) => l.discordId && l.id !== user.id)
-      .map((l) => l.discordId),
+    mentionIds: viaTicket ? [] : pingIds.filter((id) => id !== user.discord_id),
   });
 }
 
@@ -408,7 +417,9 @@ caseRouter.post(
       title: `📝 ${t.name} erstellt`,
       description: `Der Vertrag liegt im Mandantenportal unter der Akte ${c.case_number} bereit – bitte prüfen und unterschreiben.`,
       fields: [{ name: names.length > 1 ? 'Unterzeichnende Anwälte' : 'Unterzeichnender Anwalt', value: names.join('\n') }],
+      // Einmal pingen: der Mandant (soll unterschreiben) und die übrigen unterzeichnenden Anwälte
       mention: 'client',
+      mentionIds: discordIdsOf([{ userId: lawyer.id }, ...co.list.map((x) => ({ userId: x.lawyer.id }))]),
       by: req.user.display_name,
       byDiscordId: req.user.discord_id,
     });
@@ -558,9 +569,12 @@ router.post(
       addSystemNote(c.id, u, note + (full ? ' Der Vertrag ist vollständig unterschrieben.' : ''));
       db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(c.id);
     });
-    notifySigned(c, updated, d.as === 'anwalt' ? 'Anwalt' : 'Mandanten', u);
     const lawyers = allLawyers(updated);
     const openLawyers = lawyers.filter((l) => !l.signedAt).map((l) => l.name);
+    // Wenige Pings: Unterschreibt ein Anwalt, wird niemand erwähnt (der Mandant wurde beim Erstellen gepingt).
+    // Unterschreibt der Mandant, werden nur die Anwälte erwähnt, deren Unterschrift noch fehlt.
+    const pingIds = d.as === 'anwalt' ? [] : discordIdsOf(lawyers.filter((l) => !l.signedAt));
+    notifySigned(c, updated, d.as === 'anwalt' ? 'Anwalt' : 'Mandanten', u, pingIds);
     tickets.post(c.id, {
       title: full ? `✅ ${k.template_name} vollständig unterschrieben` : `✍️ ${k.template_name} vom ${d.as === 'anwalt' ? 'Anwalt' : 'Mandanten'} unterschrieben`,
       description: full
@@ -574,8 +588,7 @@ router.post(
         { name: lawyers.length > 1 ? 'Anwälte' : 'Anwalt', value: lawyers.map((l) => (l.signedAt ? `✅ ${l.signature}` : `⏳ ${l.name} – offen`)).join('\n') },
         { name: 'Mandant', value: updated.client_signed_at ? `✅ ${updated.client_signature}${updated.client_signed_via === 'kanzlei' ? ' (im Spiel)' : ''}` : '⏳ offen' },
       ],
-      // Mandant erwähnen, solange seine Unterschrift fehlt und gerade ein Anwalt unterschrieben hat – sonst die Anwälte
-      mention: d.as === 'anwalt' && !updated.client_signed_at ? 'client' : 'lawyers',
+      mentionIds: pingIds,
       by: u.display_name,
       byDiscordId: u.discord_id,
     });
