@@ -18,6 +18,7 @@ const APPLICATION_STATUS = {
 
 // Deutsche Feldnamen für Validierungsfehler
 const FIELD_LABELS = {
+  coLawyers: 'Weitere Anwälte (höchstens 4)',
   displayName: 'Name',
   name: 'Name',
   email: 'E-Mail-Adresse',

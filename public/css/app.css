@@ -763,6 +763,13 @@ details.edit-box[open] > summary::after { content: '–'; }
 .svc-sum { display: flex; justify-content: space-between; align-items: baseline; margin-top: 0.5rem; padding: 0.55rem 0.8rem; border-radius: 10px; background: var(--gold-soft); border: 1px solid var(--gold-hairline); font-size: 0.875rem; }
 .svc-sum strong { font-family: 'JetBrains Mono', ui-monospace, monospace; color: var(--gold-light); font-size: 1rem; }
 @media (max-width: 480px) { .svc { grid-template-columns: auto 1fr 3.6rem; } .svc-price { grid-column: 2 / 4; text-align: left; } }
+/* Vertrag: weitere unterzeichnende Anwälte */
+.co-row { grid-template-columns: auto 1fr 10rem; }
+.co-row:has(.co-check:checked) { color: var(--text-main); background: rgba(212, 175, 55, 0.06); }
+.co-row:has(.co-check:disabled) { cursor: default; opacity: 0.6; }
+.co-birth { padding: 0.3rem 0.5rem; font-size: 0.85rem; }
+.co-birth:disabled { opacity: 0.35; }
+@media (max-width: 480px) { .co-row { grid-template-columns: auto 1fr; } .co-birth { grid-column: 2; } }
 .contract-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem 1rem; padding: 0.85rem 1rem; border: 1px solid var(--glass-border); border-left: 3px solid var(--gold-500); border-radius: 14px; background: rgba(15, 23, 42, 0.45); }
 .contract-main { min-width: 0; flex: 1 1 16rem; }
 .contract-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; }

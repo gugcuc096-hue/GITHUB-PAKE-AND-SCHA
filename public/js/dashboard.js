@@ -1083,13 +1083,20 @@
   /* ---------------------------------------------------------------- Verträge (Mandatsvertrag u. a.) */
   const CONTRACT_STATUS = { entwurf: ['Entwurf', 'slate'], teilweise: ['Teilweise unterschrieben', 'amber'], unterschrieben: ['Unterschrieben', 'emerald'] };
 
+  /** Alle unterzeichnenden Anwälte eines Vertrags – der erste zuerst. */
+  const contractLawyers = (k) => [
+    { userId: k.lawyerId, name: k.lawyerName || k.data.anwalt || '—', signature: k.lawyerSignature, signedAt: k.lawyerSignedAt },
+    ...(k.coLawyers || []),
+  ];
+
   function contractCard(k, c) {
     const staff = isStaff();
+    const lawyers = contractLawyers(k);
     const signs = [
-      k.lawyerSignedAt ? `✓ Anwalt (${esc(k.lawyerSignature)})` : `Anwalt: ${esc(k.lawyerName || '—')} – offen`,
+      ...lawyers.map((l) => (l.signedAt ? `✓ Anwalt (${esc(l.signature)})` : `Anwalt: ${esc(l.name)} – offen`)),
       k.clientSignedAt ? `✓ Mandant (${esc(k.clientSignature)}${k.clientSignedVia === 'kanzlei' ? ', im Spiel' : ''})` : 'Mandant – offen',
     ].join(' · ');
-    const mine = staff && k.lawyerId === st.user.id && !k.lawyerSignedAt;
+    const mine = staff && lawyers.some((l) => l.userId === st.user.id && !l.signedAt);
     const clientCanSign = !staff && !k.clientSignedAt;
     return `<div class="contract-row">
       <div class="contract-main">
@@ -1112,7 +1119,7 @@
       <h3 class="section-title">Verträge ${staff && c.canEdit ? `<span class="ext-add"><button type="button" class="btn-outline btn-sm" data-action="contract-new" data-case-id="${c.id}">${icon('doc', 'ico-sm')}<span>Mandatsvertrag erstellen</span></button></span>` : ''}</h3>
       ${list.length
         ? `<div class="stack">${list.map((k) => contractCard(k, c)).join('')}</div>`
-        : `<p class="text-sm text-dim">Noch kein Vertrag. „Mandatsvertrag erstellen“ füllt die Vorlage der Kanzlei mit den Daten dieser Akte – danach unterschreiben Anwalt und Mandant (im Portal oder im Spiel), und der Vertrag lässt sich drucken oder als PDF speichern.</p>`}
+        : `<p class="text-sm text-dim">Noch kein Vertrag. „Mandatsvertrag erstellen“ füllt die Vorlage der Kanzlei mit den Daten dieser Akte – danach unterschreiben Anwalt (auf Wunsch mehrere Anwälte) und Mandant (im Portal oder im Spiel), und der Vertrag lässt sich drucken oder als PDF speichern.</p>`}
       ${!staff && list.some((k) => !k.clientSignedAt) ? '<p class="form-hint">Bitte lesen Sie den Vertrag und unterschreiben Sie ihn über „Ansehen &amp; unterschreiben“.</p>' : ''}
     </div>`;
   }
@@ -1123,6 +1130,23 @@
     const team = defaults.team || [];
     const lawyers = isAdmin() ? st.lawyers.map((l) => ({ id: l.id, name: l.displayName })) : team;
     const lawyerId = k ? k.lawyerId : defaults.lawyerId;
+    st.contractBirths = defaults.births || {};
+    // Weitere unterzeichnende Anwälte: gleiche Auswahl wie oben; bereits eingetragene bleiben sichtbar
+    const savedCo = k ? k.coLawyers || [] : [];
+    const coCandidates = [...lawyers, ...savedCo.filter((x) => x.userId && !lawyers.some((l) => l.id === x.userId)).map((x) => ({ id: x.userId, name: x.name }))];
+    const rankOf = (id) => (st.lawyers.find((l) => l.id === id) || savedCo.find((x) => x.userId === id) || {}).rank || '';
+    const coRows = coCandidates
+      .map((l) => {
+        const sel = savedCo.find((x) => x.userId === l.id);
+        const isMain = l.id === lawyerId;
+        const on = !!sel && !isMain;
+        const birth = sel ? sel.birth : st.contractBirths[l.id] || '';
+        return `<label class="svc co-row"><input type="checkbox" class="co-check" value="${l.id}" ${on ? 'checked' : ''} ${isMain ? 'disabled' : ''}>
+          <span class="svc-name">${esc(l.name)}${rankOf(l.id) ? ` <span class="text-dim">· ${esc(rankOf(l.id))}</span>` : ''} <span class="co-main text-dim" ${isMain ? '' : 'hidden'}>(erster Anwalt)</span></span>
+          <input class="field co-birth" maxlength="40" placeholder="Geb. (IC) TT.MM.JJJJ" value="${esc(birth)}" aria-label="Geburtsdatum ${esc(l.name)}" ${on ? '' : 'disabled'}></label>`;
+      })
+      .join('');
+    const maxCo = defaults.maxCoLawyers || 4;
     const field = (name, label, attrs = '', span = false) =>
       `<div class="${span ? 'span-2' : ''}"><label class="label" for="kf_${name}">${esc(label)}</label><input id="kf_${name}" name="${name}" class="field" maxlength="${name.includes('gebuehr') ? 200 : 120}" value="${esc(v[name] || '')}" ${attrs}></div>`;
     // Leistungen aus der Honorarordnung (Mehrfachauswahl, Menge je Leistung); gespeicherte Auswahl beim Bearbeiten wiederherstellen
@@ -1153,11 +1177,16 @@
         ${!k && templates.length > 1 ? `<div class="span-2"><label class="label">Vorlage</label><select name="templateId" class="field">${templates.map((t) => opt(t.id, t.name)).join('')}</select></div>` : !k ? `<input type="hidden" name="templateId" value="${templates[0] ? templates[0].id : ''}">` : ''}
         <div class="span-2 form-sub">Anwalt</div>
         <div class="span-2"><label class="label" for="kf_lawyer">Unterzeichnender Anwalt</label><select id="kf_lawyer" name="lawyerId" class="field">${lawyers.map((l) => opt(l.id, l.name, l.id === lawyerId)).join('')}</select>
-          <p class="form-hint">Nur dieser Anwalt kann den Vertrag unterschreiben.</p></div>
+          <p class="form-hint">Unterschreibt den Vertrag selbst${coCandidates.length > 1 ? ' – weitere unterzeichnende Anwälte lassen sich unten ergänzen' : ''}.</p></div>
         ${field('anwalt', 'Name im Vertrag')}
         ${field('anwalt_rang', 'Rang', 'placeholder="z. B. Senior Associate"')}
         ${field('anwalt_geburtsdatum', 'Geburtsdatum (IC)', 'placeholder="TT.MM.JJJJ"')}
         <div></div>
+        <div class="span-2 form-sub">Weitere unterzeichnende Anwälte <span class="text-dim font-normal normal-case tracking-normal">– optional</span></div>
+        ${coCandidates.length > 1
+          ? `<div class="span-2"><div class="svc-list co-list" id="coList" data-max="${maxCo}">${coRows}</div>
+            <p class="form-hint">Bis zu ${maxCo} weitere Anwälte. Jeder unterschreibt selbst; vollständig unterschrieben ist der Vertrag erst, wenn alle Anwälte und der Mandant unterschrieben haben. Name und Rang kommen aus dem Profil, das Geburtsdatum (IC) erscheint im Vertrag.</p></div>`
+          : `<p class="span-2 form-hint">Weitere Anwälte können mitunterschreiben, sobald sie der Akte zugewiesen sind (Aktenteam unter „Anwälte der Akte“).</p>`}
         <div class="span-2 form-sub">Mandant</div>
         ${field('mandant', 'Name des Mandanten')}
         ${field('mandant_geburtsdatum', 'Geburtsdatum (IC)', 'placeholder="TT.MM.JJJJ"')}
@@ -1212,6 +1241,11 @@
     ['anwalt', 'anwalt_rang', 'anwalt_geburtsdatum', 'mandant', 'mandant_geburtsdatum', 'grundgebuehr', 'zusatzgebuehr', 'datum', 'ort'].forEach((k) => (data[k] = val(fd, k)));
     const body = { lawyerId: Number(fd.get('lawyerId')), data };
     if (f.querySelector('#svcList')) body.services = contractServices(f);
+    if (f.querySelector('#coList')) {
+      body.coLawyers = [...f.querySelectorAll('.co-check:checked')]
+        .filter((box) => !box.disabled)
+        .map((box) => ({ id: Number(box.value), birth: box.closest('.co-row').querySelector('.co-birth').value.trim() }));
+    }
     return body;
   }
 
@@ -3306,6 +3340,7 @@
     ['**fett**  *kursiv*', 'Hervorhebung'],
     ['===', 'neue Seite'],
     ['[Unterschriften]', 'Unterschriftsfeld (sonst am Ende)'],
+    ['[Weitere Anwälte]', 'weitere unterzeichnende Anwälte bei den Parteien (entfällt, wenn es keine gibt)'],
   ];
 
   function contractTemplatesPanel() {
@@ -6464,13 +6499,35 @@
     }
     // Team-Profil: Board-Ränge erscheinen auf der Website in der goldenen Ebene
     if (t.id === 'tmRank' && $('#tmTier')) $('#tmTier').value = RANK_GROUPS['Board of Partners'].includes(t.value) ? 'leitung' : 'anwalt';
-    // Vertrag: anderer unterzeichnender Anwalt → Name und Rang übernehmen
+    // Vertrag: anderer unterzeichnender Anwalt → Name, Rang und (bekanntes) Geburtsdatum übernehmen;
+    // derselbe kann nicht zugleich weiterer Anwalt sein.
     if (t.id === 'kf_lawyer') {
       const l = st.lawyers.find((x) => x.id === Number(t.value));
+      const coRow = t.form.querySelector(`.co-check[value="${Number(t.value)}"]`)?.closest('.co-row');
+      const coBirth = coRow && coRow.querySelector('.co-check').checked ? coRow.querySelector('.co-birth').value.trim() : '';
       if (l) {
         t.form.elements.anwalt.value = l.displayName;
         t.form.elements.anwalt_rang.value = l.rank || '';
+        t.form.elements.anwalt_geburtsdatum.value = coBirth || (st.contractBirths || {})[l.id] || '';
       }
+      t.form.querySelectorAll('.co-row').forEach((row) => {
+        const box = row.querySelector('.co-check');
+        const isMain = box.value === t.value;
+        box.disabled = isMain;
+        if (isMain) box.checked = false;
+        row.querySelector('.co-birth').disabled = !box.checked;
+        row.querySelector('.co-main').hidden = !isMain;
+      });
+    }
+    // Vertrag: weiterer Anwalt an-/abgewählt → Geburtsdatum freischalten, Höchstzahl beachten
+    if (t.classList.contains('co-check')) {
+      const list = t.closest('#coList');
+      const max = Number(list.dataset.max) || 4;
+      if (t.checked && list.querySelectorAll('.co-check:checked').length > max) {
+        t.checked = false;
+        toast(`Höchstens ${max} weitere Anwälte pro Vertrag.`, 'error');
+      }
+      t.closest('.co-row').querySelector('.co-birth').disabled = !t.checked;
     }
     // Federführender Anwalt gewählt: derselbe kann nicht zugleich „weiterer Anwalt“ sein.
     if (t.id === 'teamLead') {

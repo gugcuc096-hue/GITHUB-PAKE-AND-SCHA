@@ -440,6 +440,20 @@ db.exec(`
     created_at        TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
   );
+
+  -- Weitere unterzeichnende Anwälte eines Vertrags (der erste steht in case_contracts.lawyer_id).
+  -- Name und Rang werden beim Eintragen festgehalten, damit der Vertrag später gleich bleibt.
+  CREATE TABLE IF NOT EXISTS case_contract_lawyers (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    contract_id INTEGER NOT NULL REFERENCES case_contracts(id) ON DELETE CASCADE,
+    user_id     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    name        TEXT NOT NULL DEFAULT '',
+    rank        TEXT NOT NULL DEFAULT '',
+    birth       TEXT NOT NULL DEFAULT '',
+    signature   TEXT,
+    signed_at   TEXT,
+    sort_order  INTEGER NOT NULL DEFAULT 0
+  );
 `);
 
 /* ================================================================
@@ -704,6 +718,8 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_cases_lawyer ON cases(lawyer_id);
   CREATE INDEX IF NOT EXISTS idx_case_lawyers_user ON case_lawyers(user_id);
   CREATE INDEX IF NOT EXISTS idx_contracts_case ON case_contracts(case_id);
+  CREATE INDEX IF NOT EXISTS idx_contract_lawyers ON case_contract_lawyers(contract_id);
+  CREATE INDEX IF NOT EXISTS idx_contract_lawyers_user ON case_contract_lawyers(user_id);
   CREATE INDEX IF NOT EXISTS idx_absences_dates ON absences(end_date, start_date);
   CREATE INDEX IF NOT EXISTS idx_concerns_status ON concerns(status, updated_at);
   CREATE UNIQUE INDEX IF NOT EXISTS idx_concerns_reference ON concerns(reference);

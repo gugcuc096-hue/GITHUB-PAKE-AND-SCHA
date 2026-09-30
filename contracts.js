@@ -10,7 +10,7 @@
 
 /** Platzhalter, die beim Erstellen eines Vertrags ausgefüllt werden. */
 const FIELDS = {
-  anwalt: 'Name des unterzeichnenden Anwalts',
+  anwalt: 'Name des (ersten) unterzeichnenden Anwalts',
   anwalt_rang: 'Rang des Anwalts',
   anwalt_geburtsdatum: 'Geburtsdatum des Anwalts',
   mandant: 'Name des Mandanten',
@@ -40,6 +40,7 @@ const MANDATSVERTRAG = `# Mandatsvertrag
 | **{{anwalt}}**
 | **{{anwalt_rang}}, Pake & Scha**
 | geb. am {{anwalt_geburtsdatum}}
+[Weitere Anwälte]
 | (im Folgenden als „Anwalt“ bezeichnet)
 |
 | - und -
@@ -86,9 +87,13 @@ Durch ihre eigenhändige Unterschrift erklären die Vertragsparteien ihr ausdrü
 const DEFAULT_TEMPLATES = [{ key: 'mandatsvertrag', name: 'Mandatsvertrag', body: MANDATSVERTRAG }];
 
 /** Frühere Fassungen der mitgelieferten Vorlagen – unverändert übernommene werden automatisch aktualisiert. */
+const WITHOUT_CO_LAWYERS = MANDATSVERTRAG.replace('[Weitere Anwälte]\n', '');
 const PREVIOUS_VERSIONS = {
-  mandatsvertrag: [MANDATSVERTRAG.replace('    *Vereinbarte Leistungen:*\n    {{leistungen}}\n', '')],
+  mandatsvertrag: [WITHOUT_CO_LAWYERS, WITHOUT_CO_LAWYERS.replace('    *Vereinbarte Leistungen:*\n    {{leistungen}}\n', '')],
 };
+
+/** Höchstzahl weiterer unterzeichnender Anwälte (zusätzlich zum ersten). */
+const MAX_CO_LAWYERS = 4;
 
 const MAX_BODY = 30000;
 
@@ -99,4 +104,4 @@ function unknownPlaceholders(body) {
   return [...new Set(found.filter((f) => !known.has(f)))];
 }
 
-module.exports = { FIELDS, AUTO_FIELDS, DEFAULT_HEADER, DEFAULT_PLACE, DEFAULT_TEMPLATES, PREVIOUS_VERSIONS, MAX_BODY, unknownPlaceholders };
+module.exports = { FIELDS, AUTO_FIELDS, DEFAULT_HEADER, DEFAULT_PLACE, DEFAULT_TEMPLATES, PREVIOUS_VERSIONS, MAX_BODY, MAX_CO_LAWYERS, unknownPlaceholders };
