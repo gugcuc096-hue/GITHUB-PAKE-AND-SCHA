@@ -32,6 +32,7 @@ router.patch(
         archiveId: idField.optional(),
         roleIds: z.string().trim().max(300).optional(),
         pingRoles: z.boolean().optional(),
+        pingCooldownMin: z.number().int().min(-1).max(10080).optional(),
         boardCategoryId: idField.optional(),
         boardArchiveId: idField.optional(),
         boardRoleIds: z.string().trim().max(300).optional(),
@@ -55,6 +56,7 @@ router.patch(
       archiveId: 'discord_ticket_archive',
       roleIds: 'discord_ticket_roles',
       pingRoles: 'discord_ticket_ping',
+      pingCooldownMin: 'discord_ticket_ping_cooldown',
       boardCategoryId: 'discord_ticket_board_category',
       boardArchiveId: 'discord_ticket_board_archive',
       boardRoleIds: 'discord_ticket_board_roles',
@@ -63,7 +65,7 @@ router.patch(
     };
     for (const [k, key] of Object.entries(map)) {
       if (d[k] === undefined) continue;
-      setSetting(key, typeof d[k] === 'boolean' ? (d[k] ? '1' : '0') : d[k]);
+      setSetting(key, typeof d[k] === 'boolean' ? (d[k] ? '1' : '0') : String(d[k]));
     }
     logActivity(req.user, 'Einstellungen geändert', 'settings', null, `Discord-Tickets: ${Object.keys(d).join(', ')}`);
     tickets.registerCommands().catch((err) => console.warn('Discord-Befehle nicht angemeldet:', err.message)); // Slash-Befehle

@@ -73,7 +73,39 @@ function config() {
       .split(/[\s,;]+/)
       .filter(isId),
     pingRoles: getSetting('discord_ticket_ping', '1') === '1',
+    pingCooldownMin: pingCooldown(),
   };
+}
+
+/* ---------------------------------------------------------------- Ping-Pause */
+/**
+ * Dieselbe Person wird im selben Ticket höchstens alle N Minuten erwähnt (Einstellung, Standard 60).
+ * 0 = bei jeder Nachricht, -1 = nie (nur beim Eröffnen des Tickets). Die Nachrichten selbst kommen immer an.
+ */
+const DEFAULT_PING_COOLDOWN = 60;
+function pingCooldown() {
+  const n = Number(getSetting('discord_ticket_ping_cooldown', String(DEFAULT_PING_COOLDOWN)));
+  return Number.isInteger(n) && n >= -1 ? n : DEFAULT_PING_COOLDOWN;
+}
+const lastPing = new Map(); // `${caseId}:${discordId}` → Zeitpunkt (ms); nach einem Neustart leer – dann höchstens ein Ping extra
+
+/** Erwähnungen festhalten (auch die beim Eröffnen), damit gleich danach nicht erneut gepingt wird. */
+function notePings(caseId, ids) {
+  const at = Date.now();
+  for (const id of ids) lastPing.set(`${caseId}:${id}`, at);
+  if (lastPing.size > 5000) {
+    for (const [key, t] of lastPing) if (at - t > 7 * 24 * 3600e3) lastPing.delete(key);
+  }
+}
+
+/** Nur die IDs, die gerade (wieder) gepingt werden dürfen – und diese als gepingt vermerken. */
+function throttlePings(caseId, ids) {
+  const minutes = pingCooldown();
+  if (minutes < 0) return [];
+  const now = Date.now();
+  const due = minutes === 0 ? ids : ids.filter((id) => now - (lastPing.get(`${caseId}:${id}`) || 0) >= minutes * 60e3);
+  notePings(caseId, due);
+  return due;
 }
 
 /** Sind Tickets eingeschaltet und vollständig eingerichtet? */
@@ -387,6 +419,7 @@ async function createChannel(c, { quiet = false } = {}) {
     ],
     allowed_mentions: { parse: [], users: [...(clientIn ? [client] : []), ...lawyerIds], roles: pingRoles ? cfg.roleIds : [] },
   });
+  notePings(c.id, [...(clientIn ? [client] : []), ...lawyerIds]);
   if (msg && msg.id) {
     saveState(c.id, { discord_panel_id: String(msg.id), discord_panel_state: panel.state });
     rest('PUT', `/channels/${channel.id}/pins/${msg.id}`).catch(() => {});
@@ -582,6 +615,7 @@ async function ensure(caseId) {
         ],
         allowed_mentions: { parse: [], users: [clientJoined.id] },
       });
+      notePings(c.id, [clientJoined.id]);
     }
   } catch (err) {
     if (err.code !== 10003) throw err;
@@ -619,7 +653,8 @@ function syncCase(caseId, { recreate = false } = {}) {
 }
 
 /**
- * Nachricht ins Ticket der Akte. msg: { title, description, fields, color, mention: 'client'|'lawyers'|'all', by }
+ * Nachricht ins Ticket der Akte. msg: { title, description, fields, color, mention: 'client'|'lawyers'|'all', mentionIds, by }
+ * Erwähnt wird nur, wer gerade etwas tun soll – und dieselbe Person höchstens alle N Minuten (Ping-Pause).
  * Der Archiv-Zustand wird danach angeglichen (Schließen: erst Nachricht, dann ins Archiv).
  */
 function post(caseId, msg) {
@@ -641,7 +676,7 @@ function post(caseId, msg) {
       const ids = Array.isArray(msg.mentionIds) ? msg.mentionIds : caseLawyers(c).map((l) => l.discordId);
       ids.filter((id) => isId(id) && members.includes(id) && id !== msg.byDiscordId).forEach((id) => mentions.push(id));
     }
-    const unique = [...new Set(mentions)];
+    const unique = throttlePings(c.id, [...new Set(mentions)]);
     const payload = {
       content: unique.length ? unique.map((id) => `<@${id}>`).join(' ') : undefined,
       embeds: [embed({ ...msg, footer: msg.by ? `${msg.by} · Pake & Scha Legal Consulting` : undefined })],
