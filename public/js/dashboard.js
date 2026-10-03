@@ -3452,6 +3452,7 @@
       st.ticketSettings = tk;
       st.bot = bot;
       if (st.settingsTab === 'bot' && bot && !st.botDiscord) await loadBotDiscord();
+      if (st.settingsTab === 'bot' && bot) await loadBotMessages().catch(() => {});
     },
     render() {
       const s = st.settings;
@@ -3542,7 +3543,9 @@
     ['tickets', 'Tickets', 'folder'],
     ['ranks', 'Rang-Sync', 'users'],
     ['connections', 'Role Connections', 'link'],
+    ['joinroles', 'Join- & Standardrollen', 'userAdd'],
     ['welcome', 'Willkommen & Abschied', 'mail'],
+    ['messages', 'Nachrichten', 'chat'],
   ];
   const BOT_STATE = {
     verbunden: ['Verbunden', 'emerald'],
@@ -3605,7 +3608,9 @@
       tickets: st.ticketSettings && st.ticketSettings.active,
       ranks: b.rankSync.enabled,
       connections: b.connections.enabled,
+      joinroles: b.joinRoles && (b.joinRoles.enabled || b.joinRoles.alwaysEnabled),
       welcome: b.welcome.enabled,
+      messages: !!(st.botMessages && st.botMessages.templates.some((t) => t.jobs.some((j) => j.enabled))),
     };
     const cur = st.botModule || 'overview';
     return `<nav class="bot-nav" aria-label="Bot-Module">${BOT_MODULES.map(
@@ -3832,7 +3837,6 @@
 
   function botWelcome() {
     const w = st.bot.welcome;
-    const roles = botRoleList();
     const chips = Object.entries(st.bot.placeholders)
       .map(([k, l]) => `<button type="button" class="tpl-chip" data-action="wl-insert" data-text="${esc(k)}" title="${esc(l)}">${esc(k)}</button>`)
       .join('');
@@ -3851,15 +3855,6 @@
         </div>
       </div>`;
     };
-    const joinRoles = roles
-      ? `<div class="svc-list jr-list">${roles
-          .filter((r) => !r.managed)
-          .map(
-            (r) => `<label class="svc jr-row"><input type="checkbox" class="jr-check" value="${r.id}" ${w.joinRoles.includes(r.id) ? 'checked' : ''}>
-              <span class="flex items-center gap-2"><span class="role-dot" style="background:${r.color || 'transparent'}"></span>${esc(r.name)}${r.assignable ? '' : ' <span class="text-amber-300 text-xs">⚠ über der Bot-Rolle</span>'}</span></label>`
-          )
-          .join('')}</div>`
-      : `<input class="field font-mono text-xs" id="jrIds" value="${esc(w.joinRoles.join(', '))}" placeholder="Rollen-IDs, mit Komma getrennt">`;
     return `<section class="panel panel-pad">
       <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('mail')} Willkommen &amp; Abschied</h2>${w.enabled ? badge('An', 'emerald') : badge('Aus', 'slate')}</div>
       <p class="text-sm text-muted">Begrüßt neue Mitglieder automatisch – mit eigenem Text und Embed, auf Wunsch zusätzlich per Direktnachricht – und vergibt Rollen beim Beitritt. Platzhalter anklicken, um sie ins zuletzt gewählte Feld einzufügen.</p>
@@ -3869,7 +3864,7 @@
         ${part('join', w, { title: 'Willkommensnachricht', channel: true })}
         ${part('dm', w.dm, { title: 'Direktnachricht an das neue Mitglied', toggle: 'senden', mention: false, hint: 'Kommt nur an, wenn das Mitglied Direktnachrichten von Servermitgliedern erlaubt.' })}
         <div class="wl-part"><div class="wl-head"><h3 class="wl-title">Rollen beim Beitritt</h3></div>
-          <p class="form-hint -mt-1 mb-2">Bis zu 10 Rollen, die jedes neue Mitglied sofort bekommt (z. B. „Bürger“). Rang-Rollen kommen zusätzlich über den Rang-Sync.</p>${joinRoles}</div>
+          <p class="text-sm text-muted">Stellst du im eigenen Modul <button type="button" class="text-gold underline" data-action="bot-module" data-module="joinroles">Join Roles</button> ein – mit Rollen für Bots, Verzögerung und „erst nach Bestätigung der Serverregeln“.</p></div>
         ${part('leave', w.leave, { title: 'Abschiedsnachricht', toggle: 'senden', channel: true, mention: false, hint: 'Wenn jemand den Server verlässt. {user} erscheint hier ohne Ping.' })}
         <div class="form-actions wl-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button>
           <button type="button" class="btn-outline btn-md" data-action="bot-welcome-test" data-kind="join">${icon('send', 'ico-sm')}<span>Test: Willkommen</span></button>
@@ -3881,10 +3876,341 @@
   }
 
   function botWelcomeBody(form) {
-    const w = collectForm(form);
-    const ids = form.querySelector('#jrIds');
-    w.joinRoles = ids ? ids.value.split(/[\s,;]+/).filter(Boolean) : [...form.querySelectorAll('.jr-check:checked')].map((b) => b.value);
-    return w;
+    return collectForm(form);
+  }
+
+  /* Join Roles – Rollen für neue Mitglieder bzw. Bots */
+  function roleChecklist(cls, selected) {
+    const roles = botRoleList();
+    if (!roles) return `<input class="field font-mono text-xs" data-ids="${cls}" value="${esc(selected.join(', '))}" placeholder="Rollen-IDs, mit Komma getrennt">`;
+    return `<div class="svc-list jr-list" data-max="${st.bot.limits.joinRoles || 10}">${roles
+      .filter((r) => !r.managed)
+      .map(
+        (r) => `<label class="svc jr-row"><input type="checkbox" class="${cls}" value="${r.id}" ${selected.includes(r.id) ? 'checked' : ''}>
+          <span class="flex items-center gap-2"><span class="role-dot" style="background:${r.color || 'transparent'}"></span>${esc(r.name)}${r.assignable ? '' : ' <span class="text-amber-300 text-xs">⚠ über der Bot-Rolle</span>'}</span></label>`
+      )
+      .join('')}</div>`;
+  }
+  const pickedRoles = (form, cls) => {
+    const ids = form.querySelector(`[data-ids="${cls}"]`);
+    return ids ? ids.value.split(/[\s,;]+/).filter(Boolean) : [...form.querySelectorAll(`.${cls}:checked`)].map((b) => b.value);
+  };
+  const JOIN_DELAYS = [
+    [0, 'Sofort beim Beitritt'],
+    [1, 'nach 1 Minute'],
+    [5, 'nach 5 Minuten'],
+    [10, 'nach 10 Minuten'],
+    [30, 'nach 30 Minuten'],
+    [60, 'nach 1 Stunde'],
+    [360, 'nach 6 Stunden'],
+    [1440, 'nach 24 Stunden'],
+  ];
+  function botJoinRoles() {
+    const j = st.bot.joinRoles;
+    const delays = JOIN_DELAYS.some(([v]) => v === j.delayMinutes) ? JOIN_DELAYS : [...JOIN_DELAYS, [j.delayMinutes, `nach ${j.delayMinutes} Minuten`]];
+    const waiting = st.bot.status.joinQueue || 0;
+    const max = st.bot.limits.joinRoles || 10;
+    return `<section class="panel panel-pad">
+      <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('userAdd')} Join- &amp; Standardrollen</h2>${j.enabled || j.alwaysEnabled ? badge('An', 'emerald') : badge('Aus', 'slate')}</div>
+      <p class="text-sm text-muted"><strong>Standardrollen</strong> hat jedes Mitglied dauerhaft – auch alle, die schon auf dem Server sind. <strong>Join Roles</strong> gibt es nur einmal beim Beitritt (z. B. eine Neuling-Rolle, die später wieder weg darf). Rang-Rollen kommen zusätzlich über den Rang-Sync; Role Connections dürfen auf beides aufbauen.</p>
+      <form data-form="bot-joinroles" class="form-grid mt-3" id="joinRolesForm">
+        <div class="wl-part">
+          <div class="wl-head"><h3 class="wl-title">Standardrollen – hat jeder</h3><label class="check"><input type="checkbox" data-k="alwaysEnabled" ${j.alwaysEnabled ? 'checked' : ''}> einschalten</label></div>
+          <p class="form-hint -mt-1 mb-2">Bisherige Mitglieder bekommen sie beim Speichern, neue beim Beitritt – und wem sie jemand wegnimmt, bekommt sie automatisch zurück. Bis zu ${max} Rollen. Abwählen heißt: wird nicht mehr erzwungen (niemandem weggenommen).</p>
+          ${roleChecklist('jr-always', j.always)}
+          <label class="check mt-2"><input type="checkbox" data-k="alwaysBots" ${j.alwaysBots ? 'checked' : ''}> auch für Bots</label>
+        </div>
+        <div class="wl-part">
+          <div class="wl-head"><h3 class="wl-title">Join Roles – nur beim Beitritt</h3><label class="check"><input type="checkbox" data-k="enabled" ${j.enabled ? 'checked' : ''}> einschalten</label></div>
+          <div class="form-sub">Neue Mitglieder <span class="text-dim normal-case tracking-normal">– bis zu ${max} Rollen</span></div>
+          ${roleChecklist('jr-human', j.humans)}
+          <div class="form-sub mt-3">Neue Bots <span class="text-dim normal-case tracking-normal">– optional</span></div>
+          ${roleChecklist('jr-bot', j.bots)}
+          <div class="emb-grid mt-3"><div><label class="label" for="jrDelay">Rollen vergeben</label><select id="jrDelay" data-k="delayMinutes" class="field">${delays.map(([v, l]) => opt(v, l, v === j.delayMinutes)).join('')}</select></div>
+            <label class="check self-end"><input type="checkbox" data-k="waitScreening" ${j.waitScreening ? 'checked' : ''}> Erst nach Bestätigung der Serverregeln</label></div>
+          <p class="form-hint mt-2">„Erst nach Bestätigung der Serverregeln“ wirkt, wenn in Discord die Regel-Abfrage für neue Mitglieder aktiv ist: Die Rollen kommen, sobald das Mitglied die Regeln akzeptiert hat. Verzögerung und Wartezeit überstehen einen Neustart; war der Bot offline, holt er Beitritte der letzten 24 Stunden nach.</p>
+          ${waiting ? `<p class="text-sm text-muted mt-2">${icon('clock', 'ico-sm')} ${waiting} Beitritt(e) warten gerade auf ihre Rollen.</p>` : ''}
+          <div class="form-actions mt-3"><button type="button" class="btn-outline btn-md" data-action="bot-join-apply" data-target="humans">Join Roles an alle bisherigen Mitglieder</button>
+            <button type="button" class="btn-ghost btn-md" data-action="bot-join-apply" data-target="bots">… an alle Bots</button></div>
+        </div>
+        <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button></div>
+      </form>
+    </section>`;
+  }
+  function botJoinRolesBody(form) {
+    const d = collectForm(form);
+    return {
+      enabled: !!d.enabled,
+      humans: pickedRoles(form, 'jr-human'),
+      bots: pickedRoles(form, 'jr-bot'),
+      delayMinutes: Number(d.delayMinutes) || 0,
+      waitScreening: !!d.waitScreening,
+      alwaysEnabled: !!d.alwaysEnabled,
+      always: pickedRoles(form, 'jr-always'),
+      alwaysBots: !!d.alwaysBots,
+    };
+  }
+
+  /* Nachrichten – eigene Vorlagen (Text + Embed + Link-Buttons), senden, Zeitplan, alle X Nachrichten */
+  const MSG_DEFAULT = () => ({
+    content: '',
+    allowMentions: false,
+    embed: { enabled: true, author: '', title: '', url: '', description: '', color: '#d4af37', thumbnail: 'server', thumbnailUrl: '', image: '', footer: 'Pake & Scha Legal Consulting', timestamp: true, fields: [] },
+    buttons: [],
+  });
+  const channelName = (id) => {
+    const c = st.botDiscord && st.botDiscord.channels && st.botDiscord.channels.find((x) => x.id === id);
+    return c ? `#${c.name}` : `Kanal ${id}`;
+  };
+  function fmtInterval(min) {
+    if (min % 1440 === 0) return min === 1440 ? 'täglich' : `alle ${min / 1440} Tage`;
+    if (min % 60 === 0) return min === 60 ? 'stündlich' : `alle ${min / 60} Std.`;
+    return `alle ${min} Min.`;
+  }
+  const jobLabel = (j) => (j.kind === 'zeitplan' ? `⏱ ${fmtInterval(j.intervalMinutes)}` : `📌 alle ${j.everyMessages} Nachricht${j.everyMessages === 1 ? '' : 'en'}`);
+
+  async function loadBotMessages() {
+    const r = await api.get('/api/bot/messages');
+    st.botMessages = r;
+  }
+
+  function botMessagesModule() {
+    const m = st.botMessages;
+    if (!m) return '<div class="panel panel-pad text-sm text-muted">Vorlagen werden geladen …</div>';
+    const list = m.templates;
+    return `<section class="panel panel-pad">
+      <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('chat')} Nachrichten</h2>${badge(`${list.length}/${m.limits.templates}`, 'slate')}</div>
+      <p class="text-sm text-muted">Eigene Nachrichten mit Embed, Bildern, Feldern und Link-Buttons gestalten, von Hand in einen Kanal schicken und später dort aktualisieren – oder automatisch posten lassen: nach <strong>Zeitplan</strong> (z. B. täglich um 18 Uhr) oder <strong>alle X Nachrichten</strong> im Kanal (optional bleibt sie immer unten).</p>
+      <div class="form-actions mt-3"><button type="button" class="btn-gold btn-md" data-action="msg-new" ${list.length >= m.limits.templates ? 'disabled' : ''}>${icon('plus', 'ico-sm')}<span>Neue Vorlage</span></button></div>
+      <div class="msg-list mt-4">${
+        list.length
+          ? list
+              .map((t) => {
+                const e = t.data.embed || {};
+                const summary = [t.data.content ? 'Text' : '', e.enabled ? `Embed${e.title ? ` „${e.title}“` : ''}` : '', (t.data.buttons || []).length ? `${t.data.buttons.length} Button(s)` : ''].filter(Boolean).join(' · ');
+                return `<div class="msg-card">
+                  <div class="msg-main"><div class="flex flex-wrap items-center gap-2"><span class="font-medium">${esc(t.name)}</span>${t.jobs
+                    .map((j) => badge(`${jobLabel(j)} → ${channelName(j.channelId)}${j.enabled ? '' : ' (pausiert)'}`, j.enabled ? (j.lastError ? 'red' : 'emerald') : 'slate'))
+                    .join('')}</div>
+                    <div class="text-xs text-dim mt-1">${esc(summary || 'leer')} · geändert ${esc(fmtDate(t.updatedAt))}${t.updatedByName ? ` von ${esc(t.updatedByName)}` : ''}${t.sent.length ? ` · ${t.sent.length}× gesendet` : ''}</div></div>
+                  <div class="msg-actions">
+                    <button type="button" class="btn-outline btn-sm" data-action="msg-open" data-id="${t.id}" data-tab="use">${icon('send', 'ico-sm')}<span>Verwenden</span></button>
+                    <button type="button" class="btn-ghost btn-sm" data-action="msg-open" data-id="${t.id}" data-tab="edit">${icon('edit', 'ico-sm')}<span>Bearbeiten</span></button>
+                    <button type="button" class="btn-ghost btn-sm fn-danger" data-action="msg-delete" data-id="${t.id}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>
+                  </div></div>`;
+              })
+              .join('')
+          : '<p class="text-sm text-dim">Noch keine Vorlage – „Neue Vorlage“ anlegen, z. B. eine Ankündigung, Regeln oder ein Hinweis auf die Website.</p>'
+      }</div>
+    </section>`;
+  }
+
+  /* Editor */
+  const msgFieldRow = (f = {}) => `<div class="mf-row">
+    <input class="field mf-name" maxlength="256" placeholder="Name" value="${esc(f.name || '')}" aria-label="Name des Feldes">
+    <textarea class="field mf-value" rows="2" maxlength="1024" placeholder="Wert" aria-label="Wert des Feldes">${esc(f.value || '')}</textarea>
+    <label class="check mf-inline"><input type="checkbox" class="mf-inl" ${f.inline ? 'checked' : ''}> nebeneinander</label>
+    <button type="button" class="icon-btn sm" data-action="msg-del-row" aria-label="Feld entfernen" title="Feld entfernen">${icon('x', 'ico-sm')}</button></div>`;
+  const msgButtonRow = (b = {}) => `<div class="mb-row">
+    <input class="field mb-label" maxlength="80" placeholder="Beschriftung, z. B. Zur Website" value="${esc(b.label || '')}" aria-label="Beschriftung des Buttons">
+    <input class="field mb-url" maxlength="500" placeholder="https://…" value="${esc(b.url || '')}" aria-label="Link des Buttons">
+    <button type="button" class="icon-btn sm" data-action="msg-del-row" aria-label="Button entfernen" title="Button entfernen">${icon('x', 'ico-sm')}</button></div>`;
+
+  function msgEditor(t) {
+    const d = t ? t.data : MSG_DEFAULT();
+    const e = { ...MSG_DEFAULT().embed, ...(d.embed || {}) };
+    const chips = Object.entries(st.botMessages.placeholders)
+      .map(([k, l]) => `<button type="button" class="tpl-chip" data-action="wl-insert" data-text="${esc(k)}" title="${esc(l)}">${esc(k)}</button>`)
+      .join('');
+    const th = [
+      ['server', 'Server-Symbol'],
+      ['url', 'eigenes Bild (Link)'],
+      ['none', 'keins'],
+    ];
+    return `<form data-form="msg-save" id="msgForm" class="msg-edit" ${t ? `data-id="${t.id}"` : ''}>
+      <div class="wl-grid">
+        <div class="wl-editor">
+          <div><label class="label" for="msgName">Name der Vorlage</label><input id="msgName" data-k="name" class="field" required minlength="2" maxlength="80" value="${esc(t ? t.name : '')}" placeholder="z. B. Ankündigung Öffnungszeiten"></div>
+          <div class="tpl-chips">${chips}</div>
+          <div><label class="label">Nachricht</label><textarea data-k="data.content" class="field" rows="3" maxlength="2000" placeholder="Text über dem Embed (optional) – **fett**, *kursiv*, Links …">${esc(d.content || '')}</textarea></div>
+          <label class="check"><input type="checkbox" data-k="data.allowMentions" ${d.allowMentions ? 'checked' : ''}> Erwähnungen pingen (@everyone, @Rolle, @Person im Text)</label>
+          <div class="emb-edit">
+            <label class="check"><input type="checkbox" data-k="data.embed.enabled" data-emb-toggle ${e.enabled ? 'checked' : ''}> Embed anhängen</label>
+            <div class="emb-fields" ${e.enabled ? '' : 'hidden'}>
+              <div><label class="label">Autor (Zeile über dem Titel)</label><input data-k="data.embed.author" class="field" maxlength="256" value="${esc(e.author)}" placeholder="z. B. Pake & Scha Legal Consulting"></div>
+              <div class="emb-row"><div class="grow"><label class="label">Titel</label><input data-k="data.embed.title" class="field" maxlength="256" value="${esc(e.title)}"></div>
+                <div><label class="label">Farbe</label><input type="color" data-k="data.embed.color" class="field color-field" value="${esc(e.color || '#d4af37')}" aria-label="Farbe des Embeds"></div></div>
+              <div><label class="label">Titel-Link (optional)</label><input data-k="data.embed.url" class="field" maxlength="500" value="${esc(e.url)}" placeholder="https://…"></div>
+              <div><label class="label">Beschreibung</label><textarea data-k="data.embed.description" class="field" rows="5" maxlength="4000">${esc(e.description)}</textarea></div>
+              <div class="emb-grid"><div><label class="label">Kleines Bild (rechts)</label><select data-k="data.embed.thumbnail" class="field" data-thumb-select>${th.map(([v, l]) => opt(v, l, e.thumbnail === v)).join('')}</select></div>
+                <div ${e.thumbnail === 'url' ? '' : 'hidden'} data-thumb-url><label class="label">Link zum kleinen Bild</label><input data-k="data.embed.thumbnailUrl" class="field" maxlength="500" value="${esc(e.thumbnailUrl)}" placeholder="https://…"></div></div>
+              <div><label class="label">Großes Bild (Link)</label><input data-k="data.embed.image" class="field" maxlength="500" value="${esc(e.image)}" placeholder="https://… (z. B. Banner)"></div>
+              <div><div class="label">Felder <span class="text-dim normal-case tracking-normal">– bis zu 10</span></div><div class="mf-list" id="msgFields">${(e.fields || []).map(msgFieldRow).join('')}</div>
+                <button type="button" class="rc-add mt-2" data-action="msg-add-field">${icon('plus', 'ico-sm')}<span>Feld hinzufügen</span></button></div>
+              <div class="emb-grid"><div><label class="label">Fußzeile</label><input data-k="data.embed.footer" class="field" maxlength="2048" value="${esc(e.footer)}"></div>
+                <label class="check self-end"><input type="checkbox" data-k="data.embed.timestamp" ${e.timestamp ? 'checked' : ''}> Zeitstempel</label></div>
+            </div>
+          </div>
+          <div><div class="label">Link-Buttons <span class="text-dim normal-case tracking-normal">– bis zu 5, unter der Nachricht</span></div><div class="mb-list" id="msgButtons">${(d.buttons || []).map(msgButtonRow).join('')}</div>
+            <button type="button" class="rc-add mt-2" data-action="msg-add-button">${icon('plus', 'ico-sm')}<span>Button hinzufügen</span></button></div>
+        </div>
+        <div class="msg-preview-col"><div class="label">Vorschau</div><div class="wl-preview" id="msgPreview">${msgPreviewHtml(d)}</div></div>
+      </div>
+      <div class="form-actions mt-4"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>${t ? 'Speichern' : 'Vorlage anlegen'}</span></button>
+        <button type="button" class="btn-ghost btn-md" data-action="close-modal">Schließen</button></div>
+    </form>`;
+  }
+
+  function msgBody(form) {
+    const d = collectForm(form);
+    d.data.embed.fields = [...form.querySelectorAll('.mf-row')]
+      .map((r) => ({ name: r.querySelector('.mf-name').value.trim(), value: r.querySelector('.mf-value').value.trim(), inline: r.querySelector('.mf-inl').checked }))
+      .filter((f) => f.name || f.value);
+    d.data.buttons = [...form.querySelectorAll('.mb-row')].map((r) => ({ label: r.querySelector('.mb-label').value.trim(), url: r.querySelector('.mb-url').value.trim() })).filter((b) => b.label || b.url);
+    return d;
+  }
+
+  /** Vorschau einer Vorlage im Discord-Look (Platzhalter mit Beispielwerten). */
+  function msgPreviewHtml(d) {
+    const g = st.botDiscord && st.botDiscord.guild;
+    const vars = {
+      '{server}': (g && g.name) || 'Pake & Scha | Legal Consulting',
+      '{membercount}': g && g.memberCount ? String(g.memberCount) : '128',
+      '{date}': new Date().toLocaleDateString('de-DE'),
+      '{time}': new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+      '{website}': location.origin,
+    };
+    const f = (s) => String(s || '').replace(/\{(?:server|membercount|date|time|website)\}/g, (m) => vars[m] ?? m).trim();
+    const md = (s) => dcMarkdown(f(s), '');
+    const bot = (st.botDiscord && st.botDiscord.bot) || { name: 'Pake & Scha | Legal Consulting', avatar: '/apple-touch-icon.png' };
+    const e = d.embed || {};
+    let embed = '';
+    if (e.enabled) {
+      const fields = (e.fields || []).filter((x) => f(x.name) && f(x.value));
+      const thumb = e.thumbnail === 'server' && g ? g.icon : e.thumbnail === 'url' && /^https:\/\//i.test(e.thumbnailUrl || '') ? e.thumbnailUrl : '';
+      const parts = [
+        f(e.author) ? `<div class="dc-author">${esc(f(e.author))}</div>` : '',
+        f(e.title) ? `<div class="dc-title${/^https:\/\//i.test(e.url || '') ? ' dc-link' : ''}">${md(e.title)}</div>` : '',
+        f(e.description) ? `<div class="dc-desc">${md(e.description)}</div>` : '',
+        fields.length ? `<div class="dc-fields">${fields.map((x) => `<div class="dc-field ${x.inline ? 'inline' : ''}"><div class="dc-fname">${md(x.name)}</div><div class="dc-fvalue">${md(x.value)}</div></div>`).join('')}</div>` : '',
+        /^https:\/\//i.test(e.image || '') ? `<img class="dc-image" src="${esc(e.image)}" alt="">` : '',
+        f(e.footer) || e.timestamp ? `<div class="dc-footer">${esc(f(e.footer))}${f(e.footer) && e.timestamp ? ' • ' : ''}${e.timestamp ? 'Heute um ' + vars['{time}'] : ''}</div>` : '',
+      ].join('');
+      if (parts.replace(/<div class="dc-footer">.*<\/div>/, '') || thumb) embed = `<div class="dc-embed" style="border-left-color:${esc(e.color || '#d4af37')}"><div class="dc-embed-main">${parts}</div>${thumb ? `<img class="dc-thumb" src="${esc(thumb)}" alt="">` : ''}</div>`;
+    }
+    const buttons = (d.buttons || []).filter((b) => b.label);
+    const content = f(d.content);
+    if (!content && !embed) return '<div class="dc-empty">Leer – bitte Text oder Embed ausfüllen.</div>';
+    return `<div class="dc-msg"><img class="dc-avatar" src="${esc(bot.avatar)}" alt="">
+      <div class="dc-body"><div class="dc-head"><span class="dc-name">${esc(bot.name)}</span><span class="dc-app">APP</span><span class="dc-time">Heute um ${vars['{time}']}</span></div>
+      ${content ? `<div class="dc-content">${md(d.content)}</div>` : ''}${embed}
+      ${buttons.length ? `<div class="dc-buttons">${buttons.map((b) => `<span class="dc-button">${esc(b.label)} ${icon('external', 'ico-sm')}</span>`).join('')}</div>` : ''}</div></div>`;
+  }
+
+  /* Verwenden: Senden · Gesendet · Zeitplan · Alle X Nachrichten */
+  function nextFullHour() {
+    const d = new Date(Date.now() + 60 * 60 * 1000);
+    d.setMinutes(0, 0, 0);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:00`;
+  }
+  function msgUse(t) {
+    const tab = st.msgUseTab || 'send';
+    const jobs = (kind) => t.jobs.filter((j) => j.kind === kind);
+    const tabs = [
+      ['send', 'Senden'],
+      ['sent', `Gesendet (${t.sent.length})`],
+      ['zeitplan', `Zeitplan (${jobs('zeitplan').length})`],
+      ['nachrichten', `Alle X Nachrichten (${jobs('nachrichten').length})`],
+    ];
+    const jobList = (kind) =>
+      jobs(kind).length
+        ? `<div class="msg-jobs">${jobs(kind)
+            .map(
+              (j) => `<div class="msg-job ${j.enabled ? '' : 'off'}"><div class="min-w-0">
+                <div class="font-medium">${esc(jobLabel(j))} → ${esc(channelName(j.channelId))}</div>
+                <div class="text-xs text-dim">${j.kind === 'zeitplan' ? `nächster Versand ${esc(fmtDate(j.nextRunAt))}` : `${j.counter}/${j.everyMessages} Nachrichten gezählt`}${j.replacePrevious ? ' · vorige Kopie wird gelöscht' : ''}${j.lastSentAt ? ` · zuletzt ${esc(fmtDate(j.lastSentAt))}` : ''}</div>
+                ${j.lastError ? `<div class="text-xs text-red-300">${esc(j.lastError)}</div>` : ''}</div>
+                <div class="msg-actions"><button type="button" class="btn-ghost btn-sm" data-action="msg-job-toggle" data-id="${j.id}" data-on="${j.enabled ? 0 : 1}">${j.enabled ? 'Pausieren' : 'Fortsetzen'}</button>
+                  <button type="button" class="icon-btn sm fn-danger" data-action="msg-job-delete" data-id="${j.id}" aria-label="Automatik löschen" title="Automatik löschen">${icon('trash', 'ico-sm')}</button></div></div>`
+            )
+            .join('')}</div>`
+        : '<p class="text-sm text-dim">Noch keine.</p>';
+    let pane = '';
+    if (tab === 'send') {
+      pane = `<p class="text-sm text-muted">Die gespeicherte Fassung der Vorlage in einen Kanal schicken. Später lässt sie sich unter „Gesendet“ auf den neuesten Stand bringen.</p>
+        <div class="msg-inline mt-3"><div class="grow"><label class="label">Kanal</label>${channelSelect('id="msgSendChannel" aria-label="Kanal"', st.msgLastChannel || '')}</div>
+          <button type="button" class="btn-gold btn-md self-end" data-action="msg-send" data-id="${t.id}">${icon('send', 'ico-sm')}<span>Jetzt senden</span></button></div>`;
+    } else if (tab === 'sent') {
+      pane = t.sent.length
+        ? `<div class="msg-jobs">${t.sent
+            .map(
+              (s) => `<div class="msg-job"><div class="min-w-0"><div class="font-medium">${esc(channelName(s.channelId))}</div>
+                <div class="text-xs text-dim">gesendet ${esc(fmtDate(s.sentAt))}${s.sentByName ? ` von ${esc(s.sentByName)}` : ''}${s.updatedAt ? ` · aktualisiert ${esc(fmtDate(s.updatedAt))}` : ''}</div></div>
+                <div class="msg-actions"><button type="button" class="btn-outline btn-sm" data-action="msg-sent-update" data-id="${t.id}" data-sid="${s.id}">Auf aktuellen Stand bringen</button>
+                  <button type="button" class="btn-ghost btn-sm fn-danger" data-action="msg-sent-delete" data-id="${t.id}" data-sid="${s.id}">In Discord löschen</button></div></div>`
+            )
+            .join('')}</div><p class="form-hint mt-2">„Auf aktuellen Stand bringen“ ersetzt Text, Embed und Buttons der Nachricht in Discord durch die gespeicherte Vorlage.</p>`
+        : '<p class="text-sm text-dim">Diese Vorlage wurde noch nicht von Hand gesendet.</p>';
+    } else if (tab === 'zeitplan') {
+      pane = `${jobList('zeitplan')}
+        <div class="msg-add mt-4"><div class="form-sub">Neuer Zeitplan</div>
+          <div class="msg-grid">
+            <div><label class="label">Kanal</label>${channelSelect('id="jobChannelZ" aria-label="Kanal"', st.msgLastChannel || '')}</div>
+            <div><label class="label">Erster Versand</label><input type="datetime-local" id="jobStart" class="field" value="${nextFullHour()}"></div>
+            <div><label class="label">Wiederholen alle</label><div class="flex gap-2"><input type="number" id="jobEvery" class="field" min="1" max="999" value="1" aria-label="Anzahl">
+              <select id="jobUnit" class="field" aria-label="Einheit">${[[1, 'Minuten'], [60, 'Stunden'], [1440, 'Tage']].map(([v, l]) => opt(v, l, v === 1440)).join('')}</select></div></div>
+            <label class="check self-end"><input type="checkbox" id="jobReplaceZ" checked> vorige Nachricht löschen</label>
+          </div>
+          <div class="form-actions mt-3"><button type="button" class="btn-gold btn-md" data-action="msg-job-add" data-kind="zeitplan" data-id="${t.id}">${icon('plus', 'ico-sm')}<span>Zeitplan anlegen</span></button></div>
+          <p class="form-hint">Mindestens alle ${st.botMessages.limits.minInterval} Minuten. Beispiel: täglich um 18:00 → erster Versand heute 18:00, alle 1 Tage. War der Server zum Termin aus, wird einmal nachgeholt.</p></div>`;
+    } else {
+      // „verbindet“/„getrennt“ = meldet sich gerade (neu) an – nur bei Fehler oder aus warnen
+      const connected = !st.bot || !['fehler', 'aus'].includes(st.bot.status.state);
+      pane = `${jobList('nachrichten')}
+        <div class="msg-add mt-4"><div class="form-sub">Neue Automatik</div>
+          <div class="msg-grid">
+            <div><label class="label">Kanal</label>${channelSelect('id="jobChannelN" aria-label="Kanal"', st.msgLastChannel || '')}</div>
+            <div><label class="label">Erneut posten nach</label><div class="flex items-center gap-2"><input type="number" id="jobMessages" class="field" min="1" max="1000" value="20" aria-label="Anzahl Nachrichten"><span class="text-sm text-muted whitespace-nowrap">Nachrichten</span></div></div>
+            <label class="check self-end span-2"><input type="checkbox" id="jobReplaceN" checked> vorige Kopie löschen – die Nachricht bleibt so immer unten im Kanal („Sticky“)</label>
+          </div>
+          <div class="form-actions mt-3"><button type="button" class="btn-gold btn-md" data-action="msg-job-add" data-kind="nachrichten" data-id="${t.id}">${icon('plus', 'ico-sm')}<span>Automatik anlegen</span></button></div>
+          <p class="form-hint">Gezählt werden Nachrichten von Mitgliedern (keine Bots). Höchstens alle 15 Sekunden ein neuer Post. Der Bot muss dafür verbunden sein${connected ? '' : ' – <strong>gerade ist er es nicht</strong> (siehe Übersicht)'}; den Inhalt fremder Nachrichten liest er nicht.</p></div>`;
+    }
+    return `<div class="chip-row msg-subtabs" role="tablist">${tabs
+      .map(([k, l]) => `<button type="button" class="chip ${tab === k ? 'active' : ''}" role="tab" aria-selected="${tab === k}" data-action="msg-use-tab" data-tab="${k}" data-id="${t.id}">${esc(l)}</button>`)
+      .join('')}</div><div class="mt-3">${pane}</div>`;
+  }
+
+  /** Modal: Bearbeiten | Verwenden (wie Sapphire). */
+  function msgModal(t) {
+    const tab = t ? st.msgTab || 'edit' : 'edit';
+    return `<h2 id="modalTitle" class="modal-title">${t ? esc(t.name) : 'Neue Nachrichten-Vorlage'}</h2>
+      <div class="chip-row msg-tabs" role="tablist">
+        <button type="button" class="chip ${tab === 'edit' ? 'active' : ''}" role="tab" data-action="msg-tab" data-tab="edit">${icon('edit', 'ico-sm')}<span>Bearbeiten &amp; Vorschau</span></button>
+        <button type="button" class="chip ${tab === 'use' ? 'active' : ''}" role="tab" data-action="msg-tab" data-tab="use" ${t ? '' : 'disabled title="Erst speichern"'}>${icon('send', 'ico-sm')}<span>Verwenden</span></button>
+      </div>
+      <div data-msg-pane="edit" ${tab === 'edit' ? '' : 'hidden'}>${msgEditor(t)}</div>
+      <div data-msg-pane="use" id="msgUse" ${tab === 'use' ? '' : 'hidden'}>${t ? msgUse(t) : ''}</div>`;
+  }
+  function updateMsgPreview(form) {
+    const el = $('#msgPreview');
+    if (el && form) el.innerHTML = msgPreviewHtml(msgBody(form).data);
+  }
+  function msgCurrent() {
+    return st.botMessages && st.botMessages.templates.find((x) => x.id === st.msgId);
+  }
+  /** Nach Änderungen: Liste im Hintergrund und den „Verwenden“-Bereich neu zeichnen (Editor bleibt, wie er ist). */
+  function msgRefresh(r) {
+    st.botMessages = { templates: r.templates, placeholders: r.placeholders, limits: r.limits };
+    if (r.status && st.bot) st.bot.status = r.status;
+    const use = $('#msgUse');
+    const t = msgCurrent();
+    if (use && t) use.innerHTML = msgUse(t);
+    if (st.view === 'settings' && st.botModule === 'messages') {
+      const main = $('.bot-main');
+      if (main) main.innerHTML = botMessagesModule();
+    }
   }
 
   function botSettings() {
@@ -3894,7 +4220,19 @@
       ? `<div class="banner banner-amber">${icon('alert')}<div>Rollen und Kanäle konnten nicht aus Discord geladen werden: ${esc(st.botDiscord.error)} – Auswahl daher als ID-Feld.</div></div>`
       : '';
     const body =
-      cur === 'tickets' ? ticketSettingsPanel(st.ticketSettings) : cur === 'ranks' ? botRanks() : cur === 'connections' ? botConnections() : cur === 'welcome' ? botWelcome() : botOverview();
+      cur === 'tickets'
+        ? ticketSettingsPanel(st.ticketSettings)
+        : cur === 'ranks'
+          ? botRanks()
+          : cur === 'connections'
+            ? botConnections()
+            : cur === 'joinroles'
+              ? botJoinRoles()
+              : cur === 'welcome'
+                ? botWelcome()
+                : cur === 'messages'
+                  ? botMessagesModule()
+                  : botOverview();
     return `<div class="bot-layout">${botNav()}<div class="bot-main">${discordErr}${body}</div></div>`;
   }
 
@@ -5868,8 +6206,9 @@
       if (st.settingsTab === 'bot' && st.bot && !st.botDiscord) await loadBotDiscord();
       renderView();
     },
-    'bot-module': (el) => {
+    'bot-module': async (el) => {
       st.botModule = el.dataset.module;
+      if (st.botModule === 'messages' && !st.botMessages) await loadBotMessages();
       renderView();
       const main = $('.bot-main');
       if (main && main.getBoundingClientRect().top < 0) main.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -5924,11 +6263,129 @@
       rcRenumber(rule);
     },
     'wl-insert': (el) => {
-      const field = st.wlField && st.wlField.isConnected ? st.wlField : $('#welcomeForm textarea[data-k="content"]');
+      const inForm = el.closest('form');
+      const remembered = st.wlField && st.wlField.isConnected && st.wlField.closest('form') === inForm ? st.wlField : null;
+      const field = remembered || (inForm && inForm.querySelector('textarea[data-k="content"], textarea[data-k="data.content"]'));
       if (!field) return;
       field.focus();
       field.setRangeText(el.dataset.text, field.selectionStart, field.selectionEnd, 'end');
-      updateWelcomePreview(field.closest('form'));
+      if (inForm.id === 'msgForm') updateMsgPreview(inForm);
+      else updateWelcomePreview(inForm);
+    },
+    'bot-join-apply': async (el) => {
+      const bots = el.dataset.target === 'bots';
+      const form = el.closest('form');
+      if (!(await ask(`Alle ${bots ? 'Bots' : 'Mitglieder'}, die schon auf dem Server sind, bekommen die ausgewählten Join Roles. Fehlende Rollen werden ergänzt, nichts wird entfernt. Die Einstellungen werden vorher gespeichert.`, { title: 'Join Roles an alle vergeben?', confirmText: 'Speichern & vergeben' }))) return;
+      st.bot = await api.put('/api/bot/join-roles', botJoinRolesBody(form));
+      const r = await api.post('/api/bot/join-roles/apply', { target: el.dataset.target });
+      st.bot = r;
+      renderView();
+      const x = r.stats;
+      toast(`${x.added} Rolle(n) an ${x.changed} ${bots ? 'Bot(s)' : 'Mitglied(er)'} vergeben${x.skipped ? ` · ${x.skipped} warten noch auf die Regel-Bestätigung` : ''}${x.errors.length ? ` · ${x.errors.length} Fehler (siehe Übersicht)` : ''}.`, x.errors.length ? 'error' : 'ok');
+    },
+    'msg-new': () => {
+      st.msgId = null;
+      st.msgTab = 'edit';
+      openModal(msgModal(null), { wide: true });
+    },
+    'msg-open': async (el) => {
+      if (!st.botMessages) await loadBotMessages();
+      st.msgId = Number(el.dataset.id);
+      st.msgTab = el.dataset.tab || 'edit';
+      const t = msgCurrent();
+      if (t) openModal(msgModal(t), { wide: true });
+    },
+    'msg-tab': (el) => {
+      st.msgTab = el.dataset.tab;
+      $$('.msg-tabs .chip').forEach((c) => c.classList.toggle('active', c.dataset.tab === st.msgTab));
+      $$('[data-msg-pane]').forEach((pane) => (pane.hidden = pane.dataset.msgPane !== st.msgTab));
+      const t = msgCurrent();
+      if (st.msgTab === 'use' && t) $('#msgUse').innerHTML = msgUse(t);
+    },
+    'msg-use-tab': (el) => {
+      st.msgUseTab = el.dataset.tab;
+      const t = msgCurrent();
+      if (t) $('#msgUse').innerHTML = msgUse(t);
+    },
+    'msg-delete': async (el) => {
+      const t = st.botMessages.templates.find((x) => x.id === Number(el.dataset.id));
+      if (!t) return;
+      if (!(await askDelete(`„${t.name}“ löschen?`, `${t.jobs.length ? `Auch die ${t.jobs.length} Automatik(en) dieser Vorlage enden. ` : ''}Bereits gesendete Nachrichten bleiben in Discord.`, 'Löschen'))) return;
+      msgRefresh(await api.del(`/api/bot/messages/${t.id}`));
+      renderView();
+      toast('Vorlage gelöscht.');
+    },
+    'msg-add-field': () => {
+      const list = $('#msgFields');
+      if (list.children.length >= 10) return toast('Höchstens 10 Felder.', 'error');
+      list.insertAdjacentHTML('beforeend', msgFieldRow({}));
+      list.lastElementChild.querySelector('input').focus();
+    },
+    'msg-add-button': () => {
+      const list = $('#msgButtons');
+      if (list.children.length >= 5) return toast('Höchstens 5 Buttons.', 'error');
+      list.insertAdjacentHTML('beforeend', msgButtonRow({}));
+      list.lastElementChild.querySelector('input').focus();
+    },
+    'msg-del-row': (el) => {
+      const form = el.closest('form');
+      el.closest('.mf-row, .mb-row').remove();
+      updateMsgPreview(form);
+    },
+    'msg-send': async (el) => {
+      const ch = $('#msgSendChannel').value.trim();
+      if (!ch) throw new Error('Bitte einen Kanal wählen.');
+      st.msgLastChannel = ch;
+      el.disabled = true;
+      try {
+        msgRefresh(await api.post(`/api/bot/messages/${el.dataset.id}/send`, { channelId: ch }));
+        toast(`Gesendet in ${channelName(ch)}.`);
+      } finally {
+        el.disabled = false;
+      }
+    },
+    'msg-sent-update': async (el) => {
+      try {
+        msgRefresh(await api.post(`/api/bot/messages/${el.dataset.id}/sent/${el.dataset.sid}/update`, {}));
+        toast('Nachricht in Discord aktualisiert.');
+      } catch (e) {
+        await loadBotMessages();
+        msgRefresh({ ...st.botMessages });
+        throw e;
+      }
+    },
+    'msg-sent-delete': async (el) => {
+      if (!(await askDelete('Nachricht in Discord löschen?', 'Sie wird im Kanal entfernt. Die Vorlage bleibt erhalten.', 'Löschen'))) return;
+      msgRefresh(await api.del(`/api/bot/messages/${el.dataset.id}/sent/${el.dataset.sid}`));
+      toast('In Discord gelöscht.');
+    },
+    'msg-job-add': async (el) => {
+      const kind = el.dataset.kind;
+      let body;
+      if (kind === 'zeitplan') {
+        const ch = $('#jobChannelZ').value.trim();
+        const start = $('#jobStart').value;
+        if (!ch) throw new Error('Bitte einen Kanal wählen.');
+        if (!start) throw new Error('Bitte Datum und Uhrzeit für den ersten Versand angeben.');
+        const minutes = (Number($('#jobEvery').value) || 0) * Number($('#jobUnit').value);
+        if (minutes < st.botMessages.limits.minInterval) throw new Error(`Bitte mindestens alle ${st.botMessages.limits.minInterval} Minuten.`);
+        body = { kind, channelId: ch, startAt: new Date(start).toISOString(), intervalMinutes: minutes, replacePrevious: $('#jobReplaceZ').checked };
+      } else {
+        const ch = $('#jobChannelN').value.trim();
+        if (!ch) throw new Error('Bitte einen Kanal wählen.');
+        body = { kind, channelId: ch, everyMessages: Number($('#jobMessages').value) || 0, replacePrevious: $('#jobReplaceN').checked };
+      }
+      st.msgLastChannel = body.channelId;
+      msgRefresh(await api.post(`/api/bot/messages/${el.dataset.id}/jobs`, body));
+      toast(kind === 'zeitplan' ? 'Zeitplan angelegt.' : 'Automatik angelegt – der Bot zählt ab jetzt mit.');
+    },
+    'msg-job-toggle': async (el) => {
+      msgRefresh(await api.patch(`/api/bot/messages/jobs/${el.dataset.id}`, { enabled: el.dataset.on === '1' }));
+    },
+    'msg-job-delete': async (el) => {
+      if (!(await askDelete('Automatik löschen?', 'Es wird nichts mehr automatisch gepostet. Bereits gesendete Nachrichten bleiben.', 'Löschen'))) return;
+      msgRefresh(await api.del(`/api/bot/messages/jobs/${el.dataset.id}`));
+      toast('Automatik gelöscht.');
     },
     'bot-welcome-test': async (el) => {
       const form = $('#welcomeForm');
@@ -6276,6 +6733,28 @@
       st.bot = await api.put('/api/bot/connections', { enabled: !!d.enabled, rules });
       toast(d.enabled ? `${rules.length} Regel(n) gespeichert – alle Mitglieder werden jetzt abgeglichen.` : 'Role Connections gespeichert (aus).');
       renderView();
+    },
+    'bot-joinroles': async (f) => {
+      const body = botJoinRolesBody(f);
+      st.bot = await api.put('/api/bot/join-roles', body);
+      toast(body.alwaysEnabled ? 'Gespeichert – die Standardrollen werden jetzt an alle vergeben.' : 'Join- und Standardrollen gespeichert.');
+      renderView();
+    },
+    'msg-save': async (f) => {
+      const isNew = !f.dataset.id;
+      const body = msgBody(f);
+      const r = isNew ? await api.post('/api/bot/messages', body) : await api.put(`/api/bot/messages/${f.dataset.id}`, body);
+      st.msgId = r.template.id;
+      msgRefresh(r);
+      if (isNew) {
+        st.msgTab = 'use';
+        st.msgUseTab = 'send';
+        replaceModal(msgModal(r.template));
+        toast('Vorlage angelegt – jetzt senden oder automatisch posten lassen.');
+      } else {
+        $('#modalTitle').textContent = r.template.name;
+        toast('Vorlage gespeichert.');
+      }
     },
     'bot-welcome': async (f) => {
       st.bot = await api.put('/api/bot/welcome', botWelcomeBody(f));
@@ -6889,7 +7368,7 @@
   // Willkommensnachricht: zuletzt gewähltes Textfeld (Platzhalter landen dort)
   document.addEventListener('focusin', (e) => {
     const t = e.target;
-    if (t.closest && t.closest('#welcomeForm') && (t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && t.type === 'text'))) st.wlField = t;
+    if (t.closest && t.closest('#welcomeForm, #msgForm') && (t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && t.type === 'text'))) st.wlField = t;
   });
 
   document.addEventListener('submit', (e) => {
@@ -6951,6 +7430,9 @@
     } else if (t.closest('#welcomeForm')) {
       clearTimeout(st.wlTimer);
       st.wlTimer = setTimeout(() => updateWelcomePreview(t.closest('#welcomeForm')), 120);
+    } else if (t.closest('#msgForm')) {
+      clearTimeout(st.wlTimer);
+      st.wlTimer = setTimeout(() => updateMsgPreview(t.closest('#msgForm')), 120);
     } else if (t.closest('#invoiceForm') && t.type !== 'radio' && t.tagName !== 'SELECT') {
       onInvoiceInput(t);
     }
@@ -7028,6 +7510,17 @@
     }
     if (t.matches && t.matches('[data-emb-toggle]')) t.closest('.emb-edit').querySelector('.emb-fields').hidden = !t.checked;
     if (t.closest && t.closest('#welcomeForm')) updateWelcomePreview(t.closest('#welcomeForm'));
+    if (t.matches && t.matches('[data-thumb-select]')) t.closest('.emb-grid').querySelector('[data-thumb-url]').hidden = t.value !== 'url';
+    if (t.closest && t.closest('#msgForm')) updateMsgPreview(t.closest('#msgForm'));
+    // Join Roles: höchstens N Rollen je Gruppe
+    if (t.matches && t.matches('.jr-human, .jr-bot, .jr-always') && t.checked) {
+      const list = t.closest('.jr-list');
+      const max = Number(list.dataset.max) || 10;
+      if (list.querySelectorAll('input:checked').length > max) {
+        t.checked = false;
+        toast(`Höchstens ${max} Rollen je Gruppe.`, 'error');
+      }
+    }
     // Vertrag: weiterer Anwalt an-/abgewählt → Geburtsdatum freischalten, Höchstzahl beachten
     if (t.classList.contains('co-check')) {
       const list = t.closest('#coList');

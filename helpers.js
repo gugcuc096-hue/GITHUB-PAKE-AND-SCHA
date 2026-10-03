@@ -18,6 +18,14 @@ const APPLICATION_STATUS = {
 
 // Deutsche Feldnamen für Validierungsfehler
 const FIELD_LABELS = {
+  intervalMinutes: 'Abstand (mindestens 5 Minuten, höchstens 30 Tage)',
+  everyMessages: 'Anzahl Nachrichten (1–1000)',
+  channelId: 'Kanal',
+  startAt: 'Erster Versand',
+  humans: 'Join Roles für Mitglieder',
+  bots: 'Join Roles für Bots',
+  always: 'Standardrollen',
+  delayMinutes: 'Verzögerung',
   pingCooldownMin: 'Pings in Tickets',
   coLawyers: 'Weitere Anwälte (höchstens 4)',
   displayName: 'Name',

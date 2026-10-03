@@ -934,3 +934,46 @@ body.ps-dialog-open { overflow: hidden; }
   .rc-mode { min-width: 0; width: 100%; }
   .emb-grid { grid-template-columns: minmax(0, 1fr); }
 }
+/* Discord-Bot: Nachrichten-Vorlagen */
+.msg-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.msg-card, .msg-job { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem 1rem; padding: 0.8rem 1rem; border: 1px solid var(--glass-border); border-left: 3px solid var(--gold-500, #d4af37); border-radius: 14px; background: rgba(15, 23, 42, 0.45); }
+.msg-job { border-left-color: #34d399; padding: 0.65rem 0.85rem; }
+.msg-job.off { border-left-color: rgba(148, 163, 184, 0.5); opacity: 0.8; }
+.msg-main { min-width: 0; flex: 1 1 18rem; }
+.msg-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.msg-jobs { display: flex; flex-direction: column; gap: 0.5rem; }
+.msg-tabs { margin: 0.75rem 0 1rem; }
+.msg-tabs .chip, .msg-subtabs .chip { display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
+.msg-tabs .chip:disabled { opacity: 0.45; cursor: not-allowed; }
+.msg-inline { display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; }
+.msg-inline .grow { flex: 1 1 16rem; min-width: 0; }
+.msg-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
+.msg-grid .span-2 { grid-column: 1 / -1; }
+.msg-add { padding: 0.85rem 1rem 1rem; border: 1px dashed var(--line); border-radius: 14px; }
+.msg-preview-col { position: sticky; top: 0.5rem; min-width: 0; }
+.mf-list, .mb-list { display: flex; flex-direction: column; gap: 0.45rem; }
+.mf-list:not(:empty), .mb-list:not(:empty) { margin-top: 0.35rem; }
+.mf-row { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr) auto auto; gap: 0.45rem; align-items: start; }
+.mf-row .mf-value { min-height: 2.65rem; }
+.mf-inline { align-self: center; font-size: 0.8rem; white-space: nowrap; }
+.mb-row { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr) auto; gap: 0.45rem; align-items: center; }
+.dc-author { font-size: 0.8rem; font-weight: 600; color: #f2f3f5; }
+.dc-fields { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; margin-top: 0.2rem; }
+.dc-field { flex: 1 1 100%; min-width: 0; }
+.dc-field.inline { flex: 1 1 28%; }
+.dc-fname { font-size: 0.8rem; font-weight: 600; color: #f2f3f5; }
+.dc-fvalue { font-size: 0.85rem; }
+.dc-buttons { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.45rem; }
+.dc-button { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.8rem; border-radius: 4px; background: #4e5058; color: #fff; font-size: 0.82rem; font-weight: 500; }
+.dc-button .ico { width: 13px; height: 13px; }
+@media (max-width: 1100px) { .msg-preview-col { position: static; } }
+@media (max-width: 640px) {
+  .msg-grid { grid-template-columns: minmax(0, 1fr); }
+  .mf-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .mf-row .mf-value { grid-column: 1 / 2; }
+  .mf-row .mf-inline { grid-column: 1 / 2; }
+  .mf-row [data-action="msg-del-row"] { grid-row: 1; grid-column: 2; }
+  .mb-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .mb-row .mb-url { grid-column: 1 / 2; }
+  .mb-row [data-action="msg-del-row"] { grid-row: 1; grid-column: 2; }
+}
