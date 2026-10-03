@@ -154,21 +154,25 @@ function describeError(status, body) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function rest(method, path, body, attempt = 0) {
+/** opts.reason: Begründung im Discord-Audit-Log (z. B. bei Rollenänderungen durch den Bot). */
+async function rest(method, path, body, opts = {}) {
+  const attempt = opts.attempt || 0;
+  const headers = {
+    Authorization: `Bot ${token()}`,
+    'Content-Type': 'application/json',
+    'User-Agent': 'DiscordBot (https://pake-scha.ls, 1.0) PakeScha-Kanzlei',
+  };
+  if (opts.reason) headers['X-Audit-Log-Reason'] = encodeURIComponent(truncate(opts.reason, 400));
   const res = await fetch(API + path, {
     method,
-    headers: {
-      Authorization: `Bot ${token()}`,
-      'Content-Type': 'application/json',
-      'User-Agent': 'DiscordBot (https://pake-scha.ls, 1.0) PakeScha-Kanzlei',
-    },
+    headers,
     body: body === undefined ? undefined : JSON.stringify(body),
     signal: AbortSignal.timeout(12000),
   });
   if (res.status === 429 && attempt < 3) {
     const info = await res.json().catch(() => ({}));
     await sleep(Math.min(15, Number(info.retry_after) || 1) * 1000 + 250);
-    return rest(method, path, body, attempt + 1);
+    return rest(method, path, body, { ...opts, attempt: attempt + 1 });
   }
   if (res.status === 204) return null;
   const text = await res.text().catch(() => '');
@@ -1367,6 +1371,7 @@ module.exports = {
   siteBase,
   COMMANDS,
   hasToken: () => !!token(),
+  botToken: () => token(), // nur serverseitig (Gateway-Anmeldung des Kanzlei-Bots)
   markMember,
   ticketByChannel,
   fixedMemberRole,

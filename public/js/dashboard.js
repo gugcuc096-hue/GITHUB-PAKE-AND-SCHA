@@ -3435,15 +3435,39 @@
 
   views.settings = {
     async load() {
-      const [r, tpl, tk] = await Promise.all([api.get('/api/admin/settings'), api.get('/api/contract-templates?all=1'), api.get('/api/tickets/settings'), load.fivenet(true)]);
+      const q = new URLSearchParams(location.search).get('tab');
+      if (['general', 'bot', 'contracts'].includes(q)) st.settingsTab = q;
+      const modul = new URLSearchParams(location.search).get('modul');
+      if (BOT_MODULES.some(([k]) => k === modul)) st.botModule = modul;
+      if (modul) history.replaceState(null, '', `${location.pathname}?tab=${st.settingsTab || 'general'}#settings`);
+      const [r, tpl, tk, bot] = await Promise.all([
+        api.get('/api/admin/settings'),
+        api.get('/api/contract-templates?all=1'),
+        api.get('/api/tickets/settings'),
+        api.get('/api/bot').catch(() => null),
+        load.fivenet(true),
+      ]);
       st.settings = r.settings;
       st.contractTemplates = tpl;
       st.ticketSettings = tk;
+      st.bot = bot;
+      if (st.settingsTab === 'bot' && bot && !st.botDiscord) await loadBotDiscord();
     },
     render() {
       const s = st.settings;
-      return `
-        <div class="page-head"><div><h1 class="page-title">Einstellungen</h1><p class="page-sub">Discord-Anbindung, Rechnungsdaten und Notfall-Zugang.</p></div></div>
+      const tab = st.settingsTab || 'general';
+      const tabs = [
+        ['general', 'Allgemein', icon('cog', 'ico-sm')],
+        ['bot', 'Discord-Bot', DISCORD_ICON],
+        ['contracts', 'Vertragsvorlagen', icon('doc', 'ico-sm')],
+      ];
+      const head = `<div class="page-head"><div><h1 class="page-title">Einstellungen</h1><p class="page-sub">Discord-Bot, Rechnungsdaten, Vertragsvorlagen und Notfall-Zugang.</p></div></div>
+        <div class="chip-row settings-tabs" role="tablist" aria-label="Bereiche der Einstellungen">${tabs
+          .map(([k, label, ic]) => `<button type="button" class="chip ${tab === k ? 'active' : ''}" role="tab" aria-selected="${tab === k}" data-action="settings-tab" data-tab="${k}">${ic}<span>${label}</span></button>`)
+          .join('')}</div>`;
+      if (tab === 'bot') return head + botSettings();
+      if (tab === 'contracts') return head + contractTemplatesPanel();
+      return `${head}
         <div class="grid-2">
           <section class="panel panel-pad">
             <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${DISCORD_ICON} Discord-Webhook</h2>${s.discordWebhookActive ? badge('Aktiv', 'emerald') : badge('Nicht verbunden', 'slate')}</div>
@@ -3499,9 +3523,7 @@
             </section>
           </div>
         </div>
-        ${ticketSettingsPanel(st.ticketSettings)}
         ${fivenetSettingsPanel(s)}
-        ${contractTemplatesPanel()}
         <section class="panel panel-pad mt-4 lg:mt-5">
           <div class="panel-head"><h2 class="panel-title">Rechnungsdaten der Kanzlei</h2></div>
           <form data-form="settings-firm" class="form-grid cols-2">
@@ -3513,6 +3535,368 @@
         </section>`;
     },
   };
+
+  /* ---------------------------------------------------------------- Einstellungen: Discord-Bot (wie Sapphire, im eigenen Bot) */
+  const BOT_MODULES = [
+    ['overview', 'Übersicht', 'home'],
+    ['tickets', 'Tickets', 'folder'],
+    ['ranks', 'Rang-Sync', 'users'],
+    ['connections', 'Role Connections', 'link'],
+    ['welcome', 'Willkommen & Abschied', 'mail'],
+  ];
+  const BOT_STATE = {
+    verbunden: ['Verbunden', 'emerald'],
+    verbindet: ['Verbindet …', 'amber'],
+    getrennt: ['Getrennt – verbindet neu', 'amber'],
+    fehler: ['Fehler', 'red'],
+    aus: ['Aus', 'slate'],
+  };
+
+  async function loadBotDiscord(refresh = false) {
+    try {
+      st.botDiscord = await api.get('/api/bot/discord' + (refresh ? '?refresh=1' : ''));
+    } catch (e) {
+      st.botDiscord = { error: e.message };
+    }
+  }
+  const botRoleList = () => (st.botDiscord && st.botDiscord.roles) || null;
+
+  /** Rollen-Auswahl mit Farbpunkt (Rollen aus Discord) – ohne Verbindung ein Feld für die Rollen-ID. assign: Bot muss die Rolle vergeben können. */
+  function roleSelect(attrs, value, { empty = '— keine Rolle —', assign = false } = {}) {
+    const roles = botRoleList();
+    if (!roles) return `<input ${attrs} class="field font-mono text-xs" value="${esc(value || '')}" inputmode="numeric" placeholder="Rollen-ID" autocomplete="off">`;
+    const list = roles.filter((r) => !assign || !r.managed || r.id === value);
+    const sel = roles.find((r) => r.id === value);
+    return `<span class="role-pick"><span class="role-dot" style="background:${sel && sel.color ? sel.color : 'transparent'}"></span><select ${attrs} class="field" data-role-select>
+      <option value="">${esc(empty)}</option>
+      ${value && !sel ? `<option value="${esc(value)}" selected>Unbekannte Rolle (${esc(value)})</option>` : ''}
+      ${list.map((r) => `<option value="${r.id}" data-color="${r.color || ''}" ${r.id === value ? 'selected' : ''}>${esc(r.name)}${assign && !r.assignable ? ' ⚠ über der Bot-Rolle' : ''}</option>`).join('')}
+    </select></span>`;
+  }
+
+  function channelSelect(attrs, value) {
+    const chans = st.botDiscord && st.botDiscord.channels;
+    if (!chans) return `<input ${attrs} class="field font-mono text-xs" value="${esc(value || '')}" inputmode="numeric" placeholder="Kanal-ID" autocomplete="off">`;
+    const groups = new Map();
+    chans.forEach((c) => groups.set(c.category, [...(groups.get(c.category) || []), c]));
+    const known = !value || chans.some((c) => c.id === value);
+    return `<select ${attrs} class="field"><option value="">— Kanal wählen —</option>
+      ${known ? '' : `<option value="${esc(value)}" selected>Unbekannter Kanal (${esc(value)})</option>`}
+      ${[...groups.entries()]
+        .map(([cat, list]) => `<optgroup label="${esc(cat || 'Ohne Kategorie')}">${list.map((c) => `<option value="${c.id}" ${c.id === value ? 'selected' : ''}># ${esc(c.name)}</option>`).join('')}</optgroup>`)
+        .join('')}</select>`;
+  }
+
+  /** Formularwerte mit data-k="a.b.c" in ein verschachteltes Objekt. */
+  function collectForm(form) {
+    const out = {};
+    form.querySelectorAll('[data-k]').forEach((el) => {
+      const path = el.dataset.k.split('.');
+      let o = out;
+      path.slice(0, -1).forEach((p) => (o = o[p] = o[p] || {}));
+      o[path[path.length - 1]] = el.type === 'checkbox' ? el.checked : el.tagName === 'TEXTAREA' ? el.value : el.value.trim();
+    });
+    return out;
+  }
+
+  function botNav() {
+    const b = st.bot;
+    const on = {
+      tickets: st.ticketSettings && st.ticketSettings.active,
+      ranks: b.rankSync.enabled,
+      connections: b.connections.enabled,
+      welcome: b.welcome.enabled,
+    };
+    const cur = st.botModule || 'overview';
+    return `<nav class="bot-nav" aria-label="Bot-Module">${BOT_MODULES.map(
+      ([k, label, ic]) => `<button type="button" class="bot-nav-item ${cur === k ? 'active' : ''}" data-action="bot-module" data-module="${k}" ${cur === k ? 'aria-current="page"' : ''}>
+        ${icon(ic, 'ico-sm')}<span>${esc(label)}</span>${k === 'overview' ? '' : `<span class="bot-dot ${on[k] ? 'on' : ''}" title="${on[k] ? 'eingeschaltet' : 'aus'}"></span>`}</button>`
+    ).join('')}</nav>`;
+  }
+
+  function botStatusBadge(s) {
+    const [label, color] = BOT_STATE[s.state] || BOT_STATE.aus;
+    return badge(s.wanted || s.state !== 'aus' ? label : 'Aus (kein Modul an)', color);
+  }
+
+  function botOverview() {
+    const s = st.bot.status;
+    const d = st.botDiscord || {};
+    const ok = (b) => `<span class="inline-flex shrink-0 ${b ? 'text-emerald-300' : 'text-amber-300'}">${icon(b ? 'check' : 'alert', 'ico-sm')}</span>`;
+    const intentProblem = s.error && /INTENT/i.test(s.error);
+    const notAssignable = (d.roles || []).filter((r) => !r.managed && !r.assignable).length;
+    const scanStats = s.lastScan;
+    const linked = st.bot.linked || {};
+    return `<section class="panel panel-pad">
+      <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${DISCORD_ICON} Kanzlei-Bot</h2>${botStatusBadge(s)}</div>
+      <p class="text-sm text-muted">Derselbe Bot wie bei den Tickets – zusätzlich mit dauerhafter Verbindung zu Discord für <strong>Rang-Sync</strong>, <strong>Role Connections</strong> und <strong>Willkommensnachrichten</strong>. Er verbindet sich, sobald eines dieser Module eingeschaltet ist.</p>
+      ${s.error ? `<div class="banner ${s.state === 'fehler' ? 'banner-red' : 'banner-amber'} mt-3 mb-0">${icon('alert')}<div>${esc(s.error)}</div></div>` : ''}
+      <div class="bot-checks mt-4">
+        <div>${ok(s.tokenSet)}<div><strong>Bot-Token</strong><span class="text-muted"> – ${s.tokenSet ? 'gesetzt (DISCORD_BOT_TOKEN)' : 'fehlt: in Render unter „Environment“ DISCORD_BOT_TOKEN setzen'}</span></div></div>
+        <div>${ok(!!s.guildId)}<div><strong>Discord-Server</strong><span class="text-muted"> – ${s.guildId ? esc((d.guild && d.guild.name) || s.guildId) : 'Server-ID fehlt: unter „Tickets“ eintragen'}</span></div></div>
+        <div>${ok(!intentProblem && s.state === 'verbunden')}<div><strong>Verbindung &amp; „Server Members Intent“</strong><span class="text-muted"> – ${s.state === 'verbunden' ? `verbunden seit ${esc(fmtDate(s.since))}` : intentProblem ? 'Intent fehlt (siehe oben)' : 'Developer Portal → Bot → „Privileged Gateway Intents“ → „SERVER MEMBERS INTENT“ einschalten'}</span></div></div>
+        <div>${ok(!d.error && !notAssignable)}<div><strong>Rollen-Reihenfolge</strong><span class="text-muted"> – ${d.error ? esc(d.error) : notAssignable ? `${notAssignable} Rolle(n) stehen über der Bot-Rolle und können nicht vergeben werden. Servereinstellungen → Rollen → Bot-Rolle nach oben ziehen.` : 'der Bot kann alle normalen Rollen vergeben'}</span></div></div>
+        <div>${ok((linked.staffLinked || 0) > 0)}<div><strong>Verknüpfte Konten</strong><span class="text-muted"> – ${linked.staffLinked || 0} von ${linked.staff || 0} Mitarbeitern und ${linked.clientsLinked || 0} Mandanten haben ihr Discord verknüpft (Profil → „Discord verbinden“). Nur sie bekommen Rang-Rollen.</span></div></div>
+      </div>
+      <div class="form-actions mt-4">
+        <button type="button" class="btn-gold btn-md" data-action="bot-scan" ${s.wanted ? '' : 'disabled'}>${icon('users', 'ico-sm')}<span>${s.scanning ? 'Abgleich läuft …' : 'Alle Mitglieder abgleichen'}</span></button>
+        <button type="button" class="btn-outline btn-md" data-action="bot-reconnect" ${s.tokenSet ? '' : 'disabled'}>Neu verbinden</button>
+        <button type="button" class="btn-ghost btn-md" data-action="bot-refresh-discord">Rollen &amp; Kanäle neu laden</button>
+      </div>
+      ${scanStats
+        ? `<div class="bot-scan mt-4"><div class="text-xs uppercase tracking-wider text-dim mb-1">Letzter Abgleich</div>
+          <div class="text-sm">${esc(fmtDate(scanStats.finishedAt || scanStats.startedAt))} (${esc(scanStats.trigger)}) · ${scanStats.members} Mitglieder geprüft · <strong>${scanStats.added}</strong> Rollen vergeben · <strong>${scanStats.removed}</strong> entfernt${scanStats.welcomed ? ` · ${scanStats.welcomed} begrüßt` : ''}</div>
+          ${scanStats.error ? `<p class="text-sm text-red-300 mt-1">${esc(scanStats.error)}</p>` : ''}
+          ${(scanStats.errors || []).length ? `<ul class="bot-errors">${scanStats.errors.map((e) => `<li>${esc(e)}</li>`).join('')}</ul>` : ''}</div>`
+        : ''}
+      ${s.errors && s.errors.length ? `<details class="edit-box mt-4"><summary>Letzte Fehler (${s.errors.length})</summary><ul class="bot-errors">${s.errors.map((e) => `<li><span class="text-dim">${esc(fmtDate(e.at))}</span> ${esc(e.message)}</li>`).join('')}</ul></details>` : ''}
+      <details class="edit-box mt-4"><summary>Einrichtung (einmalig)</summary>
+        <ol class="text-sm text-muted list-decimal pl-5 space-y-1 mt-2">
+          <li>Discord Developer Portal → deine Anwendung → <strong>Bot</strong> → „Privileged Gateway Intents“ → <strong>SERVER MEMBERS INTENT</strong> einschalten → speichern.</li>
+          <li>Discord → Servereinstellungen → Rollen: die <strong>Bot-Rolle über alle Rollen ziehen</strong>, die der Bot vergeben soll (Rang-, Gruppen- und Beitrittsrollen).</li>
+          <li>Hier die Module einschalten und speichern. Der Bot verbindet sich automatisch und gleicht alle Mitglieder ab.</li>
+          <li>Render: Der Bot läuft, solange der Server läuft. Schläft der Dienst (kostenloser Tarif), verpasst er in der Zeit Beitritte; Rollen werden beim nächsten Abgleich (alle 10 Minuten) nachgezogen.</li>
+        </ol></details>
+    </section>`;
+  }
+
+  function botRanks() {
+    const c = st.bot.rankSync;
+    const row = (label, key, value, hint = '') => `<div class="rs-row"><div><div class="rs-label">${esc(label)}</div>${hint ? `<div class="text-xs text-dim">${esc(hint)}</div>` : ''}</div>${roleSelect(`data-k="${esc(key)}" aria-label="Discord-Rolle für ${esc(label)}"`, value, { assign: true })}</div>`;
+    return `<section class="panel panel-pad">
+      <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('users')} Rang-Sync: Website → Discord</h2>${c.enabled ? badge('An', 'emerald') : badge('Aus', 'slate')}</div>
+      <p class="text-sm text-muted">Wer auf der Website einen Rang hat, bekommt automatisch die passende Discord-Rolle – bei Beförderung, Rückstufung, Sperre und beim Verknüpfen/Trennen von Discord sofort, sonst beim Abgleich alle 10 Minuten. Alte Rang-Rollen werden entfernt. Gilt für alle mit verknüpftem Discord.</p>
+      <form data-form="bot-ranks" class="form-grid mt-3">
+        <label class="check"><input type="checkbox" data-k="enabled" ${c.enabled ? 'checked' : ''}> Rang-Sync einschalten</label>
+        <div class="form-sub">Ränge</div>
+        <div class="rs-list">${st.bot.ranks.map((r) => row(r, `ranks.${r}`, c.ranks[r] || '')).join('')}</div>
+        <div class="form-sub">Gruppen</div>
+        <div class="rs-list">
+          ${row('Alle Mitarbeiter', 'staff', c.staff, 'alle Anwälte inkl. Board of Partners')}
+          ${row('Board of Partners', 'board', c.board, 'Founding Partner, Equity Partner, Partner')}
+          ${row('Associate Attorneys', 'associates', c.associates, 'Senior Associate, Associate, Junior Associate')}
+          ${row('Mandanten', 'client', c.client, 'alle Mandanten-Konten mit verknüpftem Discord')}
+        </div>
+        <label class="check"><input type="checkbox" data-k="strict" ${c.strict ? 'checked' : ''}> Streng: diese Rollen auch Mitgliedern <em>ohne</em> verknüpftes Website-Konto entfernen (die Website ist die einzige Quelle)</label>
+        <p class="form-hint">VIP- und Lifetime-Rollen stellst du bei den Stufen unter „VIP &amp; Lifetime“ ein; Kooperationsrollen werden nur gelesen. Für Rollen wie „| Pake &amp; Scha“ oder Trenner-Rollen eignen sich zusätzlich die Role Connections.</p>
+        <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button>
+          <button type="button" class="btn-outline btn-md" data-action="bot-scan" ${st.bot.status.wanted ? '' : 'disabled'}>Alle Mitglieder jetzt abgleichen</button></div>
+      </form>
+    </section>`;
+  }
+
+  /* Role Connections – Regeln wie bei Sapphire */
+  function rcCondHtml(c = {}, i = 0) {
+    return `<div class="rc-cond"><span class="rc-num">${i + 1}</span><span class="rc-word">Mitglied</span>
+      <select class="field rc-has" aria-label="hat / hat nicht"><option value="1" ${c.has !== false ? 'selected' : ''}>hat</option><option value="0" ${c.has === false ? 'selected' : ''}>hat nicht</option></select>
+      ${roleSelect('data-rc="cond" aria-label="Rolle der Bedingung"', c.roleId || '', { empty: '— Rolle wählen —' })}
+      <button type="button" class="icon-btn" data-action="rc-del-cond" aria-label="Bedingung entfernen" title="Bedingung entfernen">${icon('x', 'ico-sm')}</button></div>`;
+  }
+  function rcRuleHtml(r = {}) {
+    const conds = r.conditions && r.conditions.length ? r.conditions : [{}];
+    const max = st.bot.limits.conditions;
+    return `<div class="rc-rule" data-id="${esc(r.id || '')}">
+      <div class="rc-top"><span class="rc-cap">Hauptrolle</span><button type="button" class="icon-btn fn-danger" data-action="rc-del-rule" aria-label="Regel löschen" title="Regel löschen">${icon('trash', 'ico-sm')}</button></div>
+      ${roleSelect('data-rc="role" aria-label="Hauptrolle"', r.roleId || '', { empty: '— Rolle wählen —', assign: true })}
+      <p class="rc-text">wird automatisch vergeben (und entfernt), wenn die folgenden Bedingungen zutreffen (bzw. nicht mehr zutreffen):</p>
+      <div class="rc-bar"><span class="rc-cap">Bedingungen <span class="rc-count">${conds.length}/${max}</span></span>
+        <select class="field rc-mode" data-rc="mode" aria-label="Verknüpfung"><option value="or" ${r.mode !== 'and' ? 'selected' : ''}>ODER – eine reicht</option><option value="and" ${r.mode === 'and' ? 'selected' : ''}>UND – alle müssen zutreffen</option></select></div>
+      <div class="rc-conds">${conds.map((c, i) => rcCondHtml(c, i)).join('')}</div>
+      <button type="button" class="rc-add" data-action="rc-add-cond" ${conds.length >= max ? 'disabled' : ''}>${icon('plus', 'ico-sm')}<span>Bedingung hinzufügen</span></button>
+    </div>`;
+  }
+  function rcRenumber(rule) {
+    const conds = rule.querySelectorAll('.rc-cond');
+    conds.forEach((el, i) => (el.querySelector('.rc-num').textContent = i + 1));
+    rule.querySelector('.rc-count').textContent = `${conds.length}/${st.bot.limits.conditions}`;
+    rule.querySelector('[data-action="rc-add-cond"]').disabled = conds.length >= st.bot.limits.conditions;
+  }
+  function rcCollect(form) {
+    return [...form.querySelectorAll('.rc-rule')].map((rule) => ({
+      id: rule.dataset.id || undefined,
+      roleId: rule.querySelector('[data-rc="role"]').value.trim(),
+      mode: rule.querySelector('[data-rc="mode"]').value,
+      conditions: [...rule.querySelectorAll('.rc-cond')]
+        .map((c) => ({ has: c.querySelector('.rc-has').value === '1', roleId: c.querySelector('[data-rc="cond"]').value.trim() }))
+        .filter((c) => c.roleId),
+    }));
+  }
+
+  function botConnections() {
+    const c = st.bot.connections;
+    return `<section class="panel panel-pad">
+      <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('link')} Role Connections</h2>${c.enabled ? badge('An', 'emerald') : badge('Aus', 'slate')}</div>
+      <p class="text-sm text-muted">Eine <strong>Hauptrolle</strong> wird automatisch vergeben – und wieder entfernt –, je nachdem ob ein Mitglied bestimmte Rollen hat. Beispiel: „| Pake &amp; Scha“, wenn das Mitglied <em>Founding Partner</em> ODER <em>Senior Associate</em> ODER … hat. Regeln dürfen aufeinander aufbauen; von Hand vergebene Hauptrollen werden entfernt, wenn die Bedingungen nicht zutreffen.</p>
+      <form data-form="bot-connections" class="form-grid mt-3">
+        <label class="check"><input type="checkbox" data-k="enabled" ${c.enabled ? 'checked' : ''}> Role Connections einschalten</label>
+        <div class="rc-list" id="rcList">${c.rules.map((r) => rcRuleHtml(r)).join('')}</div>
+        <button type="button" class="btn-outline btn-md self-start" data-action="rc-add-rule" ${c.rules.length >= st.bot.limits.rules ? 'disabled' : ''}>${icon('plus', 'ico-sm')}<span>Regel hinzufügen</span></button>
+        <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button>
+          <button type="button" class="btn-outline btn-md" data-action="bot-scan" ${st.bot.status.wanted ? '' : 'disabled'}>Alle Mitglieder scannen und anwenden</button></div>
+      </form>
+    </section>`;
+  }
+
+  /* Willkommen & Abschied – Editor mit Live-Vorschau */
+  function embedEditor(prefix, e) {
+    const th = [
+      ['avatar', 'Profilbild des Mitglieds'],
+      ['server', 'Server-Symbol'],
+      ['none', 'keins'],
+    ];
+    return `<div class="emb-edit">
+      <label class="check"><input type="checkbox" data-k="${prefix}.enabled" data-emb-toggle ${e.enabled ? 'checked' : ''}> Embed anhängen</label>
+      <div class="emb-fields" ${e.enabled ? '' : 'hidden'}>
+        <div class="emb-row"><div class="grow"><label class="label">Titel</label><input data-k="${prefix}.title" class="field" maxlength="256" value="${esc(e.title)}"></div>
+          <div><label class="label">Farbe</label><input type="color" data-k="${prefix}.color" class="field color-field" value="${esc(e.color || '#d4af37')}" aria-label="Farbe des Embeds"></div></div>
+        <div><label class="label">Beschreibung</label><textarea data-k="${prefix}.description" class="field" rows="4" maxlength="4000">${esc(e.description)}</textarea></div>
+        <div class="emb-grid"><div><label class="label">Kleines Bild (rechts)</label><select data-k="${prefix}.thumbnail" class="field">${th.map(([v, l]) => opt(v, l, e.thumbnail === v)).join('')}</select></div>
+          <div><label class="label">Großes Bild (Link)</label><input data-k="${prefix}.image" class="field" maxlength="500" value="${esc(e.image)}" placeholder="https://… (z. B. Banner)"></div></div>
+        <div class="emb-grid"><div><label class="label">Fußzeile</label><input data-k="${prefix}.footer" class="field" maxlength="2048" value="${esc(e.footer)}"></div>
+          <label class="check self-end"><input type="checkbox" data-k="${prefix}.timestamp" ${e.timestamp ? 'checked' : ''}> Zeitstempel</label></div>
+      </div></div>`;
+  }
+
+  function sampleVars() {
+    const g = st.botDiscord && st.botDiscord.guild;
+    const u = st.user;
+    return {
+      '{user}': '\u0001',
+      '{user.name}': u.displayName,
+      '{user.username}': (u.discord && u.discord.username) || 'mitglied',
+      '{user.id}': (u.discord && u.discord.id) || '123456789012345678',
+      '{user.avatar}': (u.discord && u.discord.avatarUrl) || u.avatarUrl || '',
+      '{server}': (g && g.name) || 'Pake & Scha | Legal Consulting',
+      '{membercount}': g && g.memberCount ? String(g.memberCount + 1) : '128',
+      '{date}': new Date().toLocaleDateString('de-DE'),
+      '{website}': location.origin,
+    };
+  }
+  const fillVars = (text, vars) => String(text || '').replace(/\{(?:user(?:\.(?:name|username|id|avatar))?|server|membercount|date|website)\}/g, (m) => vars[m] ?? m);
+  /** Discord-Markdown für die Vorschau (Text ist escaped). */
+  function dcMarkdown(text, mentionName) {
+    return esc(text)
+      .replace(/\u0001/g, `<span class="dc-mention">@${esc(mentionName)}</span>`)
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/__(.+?)__/g, '<u>$1</u>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/~~(.+?)~~/g, '<s>$1</s>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/(https?:\/\/[^\s<]+)/g, '<span class="dc-link">$1</span>')
+      .replace(/\n/g, '<br>');
+  }
+
+  function previewHtml(part, { mention = true } = {}) {
+    const vars = sampleVars();
+    if (!mention) vars['{user}'] = `@${st.user.displayName}`;
+    const name = st.user.displayName;
+    const bot = (st.botDiscord && st.botDiscord.bot) || { name: 'Pake & Scha | Legal Consulting', avatar: '/apple-touch-icon.png' };
+    const content = fillVars(part.content, vars).trim();
+    const e = part.embed || {};
+    let embed = '';
+    if (e.enabled) {
+      const title = fillVars(e.title, vars).trim();
+      const desc = fillVars(e.description, vars).trim();
+      const image = fillVars(e.image, vars).trim();
+      const footer = fillVars(e.footer, vars).trim();
+      const g = st.botDiscord && st.botDiscord.guild;
+      const thumb = e.thumbnail === 'avatar' ? vars['{user.avatar}'] : e.thumbnail === 'server' && g ? g.icon : '';
+      if (title || desc || image || thumb) {
+        embed = `<div class="dc-embed" style="border-left-color:${esc(e.color || '#d4af37')}">
+          <div class="dc-embed-main">
+            ${title ? `<div class="dc-title">${dcMarkdown(title, name)}</div>` : ''}
+            ${desc ? `<div class="dc-desc">${dcMarkdown(desc, name)}</div>` : ''}
+            ${/^https:\/\//i.test(image) ? `<img class="dc-image" src="${esc(image)}" alt="">` : ''}
+            ${footer || e.timestamp ? `<div class="dc-footer">${esc(footer)}${footer && e.timestamp ? ' • ' : ''}${e.timestamp ? 'Heute um ' + new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : ''}</div>` : ''}
+          </div>
+          ${thumb ? `<img class="dc-thumb" src="${esc(thumb)}" alt="">` : ''}</div>`;
+      }
+    }
+    if (!content && !embed) return '<div class="dc-empty">Leer – diese Nachricht wird nicht gesendet.</div>';
+    return `<div class="dc-msg"><img class="dc-avatar" src="${esc(bot.avatar)}" alt="">
+      <div class="dc-body"><div class="dc-head"><span class="dc-name">${esc(bot.name)}</span><span class="dc-app">APP</span><span class="dc-time">Heute um ${new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</span></div>
+      ${content ? `<div class="dc-content">${dcMarkdown(content, name)}</div>` : ''}${embed}</div></div>`;
+  }
+
+  /** Vorschau neu zeichnen (beim Tippen). */
+  function updateWelcomePreview(form) {
+    const w = collectForm(form);
+    const set = (key, part, opts) => {
+      const el = form.querySelector(`[data-preview="${key}"]`);
+      if (el) el.innerHTML = previewHtml(part, opts);
+    };
+    set('join', w);
+    set('dm', w.dm, { mention: false });
+    set('leave', w.leave, { mention: false });
+  }
+
+  function botWelcome() {
+    const w = st.bot.welcome;
+    const roles = botRoleList();
+    const chips = Object.entries(st.bot.placeholders)
+      .map(([k, l]) => `<button type="button" class="tpl-chip" data-action="wl-insert" data-text="${esc(k)}" title="${esc(l)}">${esc(k)}</button>`)
+      .join('');
+    const part = (key, p, { title, toggle, channel, mention = true, hint = '' }) => {
+      const pre = key === 'join' ? '' : `${key}.`;
+      return `<div class="wl-part">
+        <div class="wl-head"><h3 class="wl-title">${esc(title)}</h3>${toggle ? `<label class="check"><input type="checkbox" data-k="${pre}enabled" ${p.enabled ? 'checked' : ''}> ${esc(toggle)}</label>` : ''}</div>
+        ${hint ? `<p class="form-hint -mt-1 mb-2">${hint}</p>` : ''}
+        <div class="wl-grid">
+          <div class="wl-editor">
+            ${channel ? `<div><label class="label">Kanal</label>${channelSelect(`data-k="${pre}channelId" aria-label="Kanal für: ${esc(title)}"`, p.channelId)}</div>` : ''}
+            <div><label class="label">Nachricht</label><textarea data-k="${pre}content" class="field" rows="3" maxlength="2000" placeholder="Text über dem Embed (optional)">${esc(p.content)}</textarea></div>
+            ${embedEditor(`${pre}embed`, p.embed)}
+          </div>
+          <div><div class="label">Vorschau</div><div class="wl-preview" data-preview="${key}">${previewHtml(p, { mention })}</div></div>
+        </div>
+      </div>`;
+    };
+    const joinRoles = roles
+      ? `<div class="svc-list jr-list">${roles
+          .filter((r) => !r.managed)
+          .map(
+            (r) => `<label class="svc jr-row"><input type="checkbox" class="jr-check" value="${r.id}" ${w.joinRoles.includes(r.id) ? 'checked' : ''}>
+              <span class="flex items-center gap-2"><span class="role-dot" style="background:${r.color || 'transparent'}"></span>${esc(r.name)}${r.assignable ? '' : ' <span class="text-amber-300 text-xs">⚠ über der Bot-Rolle</span>'}</span></label>`
+          )
+          .join('')}</div>`
+      : `<input class="field font-mono text-xs" id="jrIds" value="${esc(w.joinRoles.join(', '))}" placeholder="Rollen-IDs, mit Komma getrennt">`;
+    return `<section class="panel panel-pad">
+      <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('mail')} Willkommen &amp; Abschied</h2>${w.enabled ? badge('An', 'emerald') : badge('Aus', 'slate')}</div>
+      <p class="text-sm text-muted">Begrüßt neue Mitglieder automatisch – mit eigenem Text und Embed, auf Wunsch zusätzlich per Direktnachricht – und vergibt Rollen beim Beitritt. Platzhalter anklicken, um sie ins zuletzt gewählte Feld einzufügen.</p>
+      <form data-form="bot-welcome" class="form-grid mt-3" id="welcomeForm">
+        <label class="check"><input type="checkbox" data-k="enabled" ${w.enabled ? 'checked' : ''}> Willkommensnachrichten einschalten</label>
+        <div class="tpl-chips">${chips}</div>
+        ${part('join', w, { title: 'Willkommensnachricht', channel: true })}
+        ${part('dm', w.dm, { title: 'Direktnachricht an das neue Mitglied', toggle: 'senden', mention: false, hint: 'Kommt nur an, wenn das Mitglied Direktnachrichten von Servermitgliedern erlaubt.' })}
+        <div class="wl-part"><div class="wl-head"><h3 class="wl-title">Rollen beim Beitritt</h3></div>
+          <p class="form-hint -mt-1 mb-2">Bis zu 10 Rollen, die jedes neue Mitglied sofort bekommt (z. B. „Bürger“). Rang-Rollen kommen zusätzlich über den Rang-Sync.</p>${joinRoles}</div>
+        ${part('leave', w.leave, { title: 'Abschiedsnachricht', toggle: 'senden', channel: true, mention: false, hint: 'Wenn jemand den Server verlässt. {user} erscheint hier ohne Ping.' })}
+        <div class="form-actions wl-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button>
+          <button type="button" class="btn-outline btn-md" data-action="bot-welcome-test" data-kind="join">${icon('send', 'ico-sm')}<span>Test: Willkommen</span></button>
+          <button type="button" class="btn-ghost btn-md" data-action="bot-welcome-test" data-kind="dm">Test: DM</button>
+          <button type="button" class="btn-ghost btn-md" data-action="bot-welcome-test" data-kind="leave">Test: Abschied</button></div>
+        <p class="form-hint">Der Test speichert zuerst und nutzt dann <strong>Sie selbst</strong> (verknüpftes Discord) als neues Mitglied.</p>
+      </form>
+    </section>`;
+  }
+
+  function botWelcomeBody(form) {
+    const w = collectForm(form);
+    const ids = form.querySelector('#jrIds');
+    w.joinRoles = ids ? ids.value.split(/[\s,;]+/).filter(Boolean) : [...form.querySelectorAll('.jr-check:checked')].map((b) => b.value);
+    return w;
+  }
+
+  function botSettings() {
+    if (!st.bot) return '<div class="panel panel-pad text-sm text-muted">Bot-Einstellungen werden geladen …</div>';
+    const cur = st.botModule || 'overview';
+    const discordErr = st.botDiscord && st.botDiscord.error && cur !== 'overview' && cur !== 'tickets'
+      ? `<div class="banner banner-amber">${icon('alert')}<div>Rollen und Kanäle konnten nicht aus Discord geladen werden: ${esc(st.botDiscord.error)} – Auswahl daher als ID-Feld.</div></div>`
+      : '';
+    const body =
+      cur === 'tickets' ? ticketSettingsPanel(st.ticketSettings) : cur === 'ranks' ? botRanks() : cur === 'connections' ? botConnections() : cur === 'welcome' ? botWelcome() : botOverview();
+    return `<div class="bot-layout">${botNav()}<div class="bot-main">${discordErr}${body}</div></div>`;
+  }
 
   /* ---------------------------------------------------------------- Discord-Tickets (Einstellungen) */
   function ticketSettingsPanel(t) {
@@ -3607,7 +3991,7 @@
         : st.discordOAuth
           ? `<p class="text-sm text-muted mb-4">Verbinden Sie Ihr Discord-Konto, um sich künftig mit einem Klick anzumelden${isStaff() ? ' und bei Fristen oder neuen Akten im Kanzlei-Discord erwähnt zu werden' : ''}.</p>
              <a class="btn-discord btn-md" href="/api/discord/connect">${DISCORD_ICON}<span>Mit Discord verbinden</span></a>`
-          : `<p class="text-sm text-muted">Das Board of Partners hat die Discord-Anmeldung noch nicht eingerichtet.${isAdmin() ? ' <a href="#settings" class="text-gold underline">Einstellungen → Discord-Login</a> zeigt, was fehlt.' : ''}</p>`;
+          : `<p class="text-sm text-muted">Das Board of Partners hat die Discord-Anmeldung noch nicht eingerichtet.${isAdmin() ? ' <a href="/dashboard.html?tab=general#settings" class="text-gold underline">Einstellungen → Discord-Login</a> zeigt, was fehlt.' : ''}</p>`;
       return `
         ${u.mustChangePassword ? `<div class="banner banner-amber">${icon('alert')}<div><strong>Bitte jetzt ein eigenes Passwort festlegen.</strong> Ihr aktuelles Passwort wurde automatisch erzeugt oder vom Board of Partners zurückgesetzt.</div></div>` : ''}
         <div class="page-head"><div><h1 class="page-title">Mein Profil</h1><p class="page-sub">Kontaktdaten, Passwort, Discord${isStaff() ? ' und FiveNet' : ''}.</p></div></div>
@@ -4217,7 +4601,7 @@
       const warn = !d.discord.bot
         ? `<div class="banner banner-amber">${icon('alert')}<div>Es ist kein Discord-Bot eingerichtet (<code>DISCORD_BOT_TOKEN</code>). Discord-Rollen werden dann nicht erkannt – es gelten nur von Hand zugeordnete Konten.</div></div>`
         : !d.discord.defaultGuild
-          ? `<div class="banner banner-amber">${icon('alert')}<div>Kein Discord-Server hinterlegt: unter <a href="#settings" class="text-gold underline">Einstellungen → Discord-Tickets</a> die Server-ID eintragen oder bei jeder Kooperation den Server angeben.</div></div>`
+          ? `<div class="banner banner-amber">${icon('alert')}<div>Kein Discord-Server hinterlegt: unter <a href="/dashboard.html?tab=bot&amp;modul=tickets#settings" class="text-gold underline">Einstellungen → Discord-Bot → Tickets</a> die Server-ID eintragen oder bei jeder Kooperation den Server angeben.</div></div>`
           : '';
       return `
         <div class="page-head">
@@ -5478,6 +5862,80 @@
       const x = st.contractTemplates.templates.find((t) => t.id === Number(el.dataset.id));
       if (x) openModal(templateForm(x), { wide: true });
     },
+    'settings-tab': async (el) => {
+      st.settingsTab = el.dataset.tab;
+      history.replaceState(null, '', `${location.pathname}?tab=${st.settingsTab}#settings`);
+      if (st.settingsTab === 'bot' && st.bot && !st.botDiscord) await loadBotDiscord();
+      renderView();
+    },
+    'bot-module': (el) => {
+      st.botModule = el.dataset.module;
+      renderView();
+      const main = $('.bot-main');
+      if (main && main.getBoundingClientRect().top < 0) main.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    },
+    'bot-refresh-discord': async () => {
+      await loadBotDiscord(true);
+      st.bot = await api.get('/api/bot');
+      renderView();
+      if (st.botDiscord.error) toast(st.botDiscord.error, 'error');
+      else toast(`${st.botDiscord.roles.length} Rollen und ${st.botDiscord.channels.length} Kanäle geladen.`);
+    },
+    'bot-reconnect': async () => {
+      st.bot = await api.post('/api/bot/reconnect', {});
+      renderView();
+      toast('Verbindung wird neu aufgebaut …');
+      setTimeout(() => guard(async () => {
+        st.bot = await api.get('/api/bot');
+        if (st.view === 'settings') renderView();
+      }), 3500);
+    },
+    'bot-scan': async (el) => {
+      el.disabled = true;
+      toast('Abgleich läuft – das kann bei vielen Mitgliedern kurz dauern …');
+      const r = await api.post('/api/bot/scan', {});
+      st.bot = r;
+      const s = r.stats || {};
+      renderView();
+      if (s.error) toast(s.error, 'error');
+      else toast(`Abgleich fertig: ${s.members} Mitglieder geprüft, ${s.added} Rollen vergeben, ${s.removed} entfernt${(s.errors || []).length ? ` – ${s.errors.length} Fehler (siehe Übersicht)` : ''}.`, (s.errors || []).length ? 'error' : 'ok');
+    },
+    'rc-add-rule': (el) => {
+      const list = $('#rcList');
+      list.insertAdjacentHTML('beforeend', rcRuleHtml({}));
+      el.disabled = list.querySelectorAll('.rc-rule').length >= st.bot.limits.rules;
+      list.lastElementChild.querySelector('select').focus();
+    },
+    'rc-del-rule': (el) => {
+      el.closest('.rc-rule').remove();
+      const add = $('[data-action="rc-add-rule"]');
+      if (add) add.disabled = false;
+    },
+    'rc-add-cond': (el) => {
+      const rule = el.closest('.rc-rule');
+      const conds = rule.querySelector('.rc-conds');
+      conds.insertAdjacentHTML('beforeend', rcCondHtml({}, conds.children.length));
+      rcRenumber(rule);
+    },
+    'rc-del-cond': (el) => {
+      const rule = el.closest('.rc-rule');
+      if (rule.querySelectorAll('.rc-cond').length <= 1) return toast('Eine Regel braucht mindestens eine Bedingung – sonst die ganze Regel löschen.', 'error');
+      el.closest('.rc-cond').remove();
+      rcRenumber(rule);
+    },
+    'wl-insert': (el) => {
+      const field = st.wlField && st.wlField.isConnected ? st.wlField : $('#welcomeForm textarea[data-k="content"]');
+      if (!field) return;
+      field.focus();
+      field.setRangeText(el.dataset.text, field.selectionStart, field.selectionEnd, 'end');
+      updateWelcomePreview(field.closest('form'));
+    },
+    'bot-welcome-test': async (el) => {
+      const form = $('#welcomeForm');
+      st.bot = await api.put('/api/bot/welcome', botWelcomeBody(form));
+      const r = await api.post('/api/bot/welcome/test', { kind: el.dataset.kind });
+      toast(`Gespeichert und Testnachricht gesendet – ${r.where}.`);
+    },
     'tpl-insert': (el) => {
       const area = $('#tplBody');
       if (!area) return;
@@ -5802,6 +6260,28 @@
      Formulare
      ================================================================ */
   const forms = {
+    'bot-ranks': async (f) => {
+      const d = collectForm(f);
+      const ranks = {};
+      st.bot.ranks.forEach((r) => (ranks[r] = (d.ranks && d.ranks[r]) || ''));
+      st.bot = await api.put('/api/bot/rank-sync', { enabled: !!d.enabled, ranks, staff: d.staff || '', board: d.board || '', associates: d.associates || '', client: d.client || '', strict: !!d.strict });
+      toast(d.enabled ? 'Rang-Sync gespeichert – alle Mitglieder werden jetzt abgeglichen.' : 'Rang-Sync gespeichert (aus).');
+      renderView();
+    },
+    'bot-connections': async (f) => {
+      const d = collectForm(f);
+      const rules = rcCollect(f);
+      const bad = rules.findIndex((r) => !r.roleId || !r.conditions.length);
+      if (bad >= 0) throw new Error(`Regel ${bad + 1}: bitte eine Hauptrolle und mindestens eine Bedingung wählen.`);
+      st.bot = await api.put('/api/bot/connections', { enabled: !!d.enabled, rules });
+      toast(d.enabled ? `${rules.length} Regel(n) gespeichert – alle Mitglieder werden jetzt abgeglichen.` : 'Role Connections gespeichert (aus).');
+      renderView();
+    },
+    'bot-welcome': async (f) => {
+      st.bot = await api.put('/api/bot/welcome', botWelcomeBody(f));
+      toast('Willkommensnachrichten gespeichert.');
+      renderView();
+    },
     'settings-tickets': async (f) => {
       const fd = new FormData(f);
       st.ticketSettings = await api.patch('/api/tickets/settings', {
@@ -6406,6 +6886,12 @@
     if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.closest('#invoiceForm')) e.preventDefault();
   });
 
+  // Willkommensnachricht: zuletzt gewähltes Textfeld (Platzhalter landen dort)
+  document.addEventListener('focusin', (e) => {
+    const t = e.target;
+    if (t.closest && t.closest('#welcomeForm') && (t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && t.type === 'text'))) st.wlField = t;
+  });
+
   document.addEventListener('submit', (e) => {
     const f = e.target.closest('form[data-form]');
     if (!f || !forms[f.dataset.form]) return;
@@ -6462,6 +6948,9 @@
           if (st.view === 'audit') $('#auditList').innerHTML = auditTable();
         });
       }, 300);
+    } else if (t.closest('#welcomeForm')) {
+      clearTimeout(st.wlTimer);
+      st.wlTimer = setTimeout(() => updateWelcomePreview(t.closest('#welcomeForm')), 120);
     } else if (t.closest('#invoiceForm') && t.type !== 'radio' && t.tagName !== 'SELECT') {
       onInvoiceInput(t);
     }
@@ -6532,6 +7021,13 @@
         row.querySelector('.co-main').hidden = !isMain;
       });
     }
+    // Discord-Bot: Farbpunkt der gewählten Rolle, Embed-Felder ein-/ausblenden, Vorschau
+    if (t.matches && t.matches('[data-role-select]')) {
+      const dot = t.parentElement.querySelector('.role-dot');
+      if (dot) dot.style.background = (t.selectedOptions[0] && t.selectedOptions[0].dataset.color) || 'transparent';
+    }
+    if (t.matches && t.matches('[data-emb-toggle]')) t.closest('.emb-edit').querySelector('.emb-fields').hidden = !t.checked;
+    if (t.closest && t.closest('#welcomeForm')) updateWelcomePreview(t.closest('#welcomeForm'));
     // Vertrag: weiterer Anwalt an-/abgewählt → Geburtsdatum freischalten, Höchstzahl beachten
     if (t.classList.contains('co-check')) {
       const list = t.closest('#coList');

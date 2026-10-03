@@ -33,7 +33,7 @@ const memberRoleCache = new Map(); // guildId:userId → { until, roles: [id] | 
 
 async function guildRoles(guildId, { fresh = false } = {}) {
   if (!tickets.hasToken()) throw new Error('Kein Bot-Token hinterlegt (DISCORD_BOT_TOKEN auf dem Server setzen).');
-  if (!tickets.isId(guildId)) throw new Error('Keine Discord-Server-ID – unter Einstellungen → Discord-Tickets den Server eintragen oder bei der Kooperation angeben.');
+  if (!tickets.isId(guildId)) throw new Error('Keine Discord-Server-ID – unter Einstellungen → Discord-Bot → Tickets den Server eintragen oder bei der Kooperation angeben.');
   const hit = roleCache.get(guildId);
   if (!fresh && hit && hit.until > Date.now()) return hit.roles;
   const list = await tickets.rest('GET', `/guilds/${guildId}/roles`);

@@ -116,6 +116,7 @@ adminRouter.post(
     logActivity(req.user, 'Teammitglied hinzugefügt', 'team', id, `${d.name} (${d.roleTitle})${credentials ? ' inkl. Login-Konto' : ''}`);
     if (credentials) personnel.recordHire({ userId: credentials.userId, name: d.name, rank: d.roleTitle, by: req.user });
     else if (linkedBefore) personnel.recordRankChange({ userId: d.userId, name: d.name, oldRank: linkedBefore.rank, newRank: d.roleTitle, by: req.user });
+    if (d.userId) require('../discordBot').syncUser(d.userId); // Rang am verknüpften Konto → Discord-Rolle
     res.status(201).json({
       member: teamRow(load(id), true),
       credentials: credentials ? { email: credentials.email, password: credentials.password } : null,
@@ -167,6 +168,7 @@ adminRouter.patch(
     });
 
     logActivity(req.user, 'Teammitglied geändert', 'team', m.id, d.name && d.name !== m.name ? `${m.name} → ${d.name}` : m.name);
+    if (linkId) require('../discordBot').syncUser(linkId); // Rang am verknüpften Konto → Discord-Rolle
     const newName = d.name ?? m.name;
     const newTitle = d.roleTitle ?? m.role_title;
     if (credentials) personnel.recordHire({ userId: credentials.userId, name: newName, rank: newTitle, by: req.user });
@@ -205,6 +207,7 @@ adminRouter.post(
     const saved = saveImage(req, 'team');
     db.prepare('UPDATE team_members SET photo = ? WHERE id = ?').run(saved.file, m.id);
     removeFile('team', m.photo);
+    if (lockAccount) require('../discordBot').syncUser(m.user_id); // gesperrt → Rang-Rollen entfernen
     logActivity(req.user, 'Team-Foto geändert', 'team', m.id, m.name);
     res.json({ member: teamRow(load(m.id), true) });
   })

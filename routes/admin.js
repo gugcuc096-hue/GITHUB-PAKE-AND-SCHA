@@ -153,6 +153,7 @@ router.patch(
         ).run(d.rank, BOARD_RANKS.includes(d.rank) ? 1 : 0, id);
       }
     });
+    if (d.role !== undefined || d.rank !== undefined || d.active !== undefined) require('../discordBot').syncUser(id); // Rang-Sync nach Discord
     // Personalprotokoll: Mandant → Mitarbeiter ist eine Einstellung, sonst ggf. Beförderung/Rangänderung.
     const nowRole = d.role ?? target.role;
     const nowRank = d.rank !== undefined ? d.rank || null : target.rank;
@@ -213,6 +214,7 @@ router.delete(
     }
     removeFile('avatars', target.avatar);
     logActivity(req.user, 'Konto gelöscht', 'user', id, `${target.display_name} (${target.email})`);
+    require('../discordBot').syncUser(id, { previousDiscordId: target.discord_id }); // Rang-Rollen in Discord entfernen
     res.json({ success: true });
   })
 );

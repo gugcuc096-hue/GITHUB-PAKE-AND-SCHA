@@ -441,6 +441,14 @@ db.exec(`
     updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  -- Discord-Bot: bereits begrüßte Beitritte (ein Beitritt = Mitglied + Beitrittszeitpunkt; verhindert doppelte Begrüßung)
+  CREATE TABLE IF NOT EXISTS discord_welcomes (
+    member_id  TEXT NOT NULL,
+    joined_at  TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (member_id, joined_at)
+  );
+
   -- Weitere unterzeichnende Anwälte eines Vertrags (der erste steht in case_contracts.lawyer_id).
   -- Name und Rang werden beim Eintragen festgehalten, damit der Vertrag später gleich bleibt.
   CREATE TABLE IF NOT EXISTS case_contract_lawyers (
