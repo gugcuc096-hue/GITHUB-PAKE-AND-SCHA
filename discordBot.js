@@ -6,7 +6,8 @@
  *    Beförderung, Rückstufung, Deaktivierung, Verknüpfen/Trennen wirken sofort; zusätzlich alle 10 Minuten ein Abgleich.
  *  - Role Connections: Rolle X wird automatisch vergeben (und entfernt), wenn die Bedingungen zutreffen
  *    (Mitglied hat / hat nicht Rolle Y; verknüpft mit ODER bzw. UND). Regeln dürfen aufeinander aufbauen.
- *  - Willkommen & Abschied: Nachricht im Kanal (Text + Embed), optional Direktnachricht und Rollen beim Beitritt.
+ *  - Join Roles: Rollen für neue Mitglieder bzw. Bots – sofort, verzögert oder erst nach Bestätigung der Serverregeln.
+ *  - Willkommen & Abschied: Nachricht im Kanal (Text + Embed), optional Direktnachricht.
  *
  * Server = Server-ID aus den Discord-Ticket-Einstellungen. Token nur aus DISCORD_BOT_TOKEN (nie in der Datenbank,
  * nie im Frontend). Für Beitritte und Rollenänderungen braucht der Bot im Discord Developer Portal → Bot den
@@ -18,7 +19,9 @@ const { ASSOCIATE_RANKS, isBoard, truncate } = require('./helpers');
 const tickets = require('./tickets');
 
 const { isId } = tickets;
-const INTENTS = (1 << 0) | (1 << 1); // GUILDS, GUILD_MEMBERS (privilegiert)
+const botMessages = require('./botMessages');
+// GUILDS + GUILD_MEMBERS (privilegiert); GUILD_MESSAGES nur, wenn eine „alle X Nachrichten“-Automatik aktiv ist
+const intents = () => (1 << 0) | (1 << 1) | (botMessages.hasMessageJobs() ? 1 << 9 : 0);
 const SCAN_EVERY = 10 * 60 * 1000;
 const MAX_RULES = 25;
 const MAX_CONDITIONS = 10;
@@ -72,7 +75,6 @@ const WELCOME_DEFAULT = {
   },
   dm: { enabled: false, content: '', embed: { ...EMBED_DEFAULT, enabled: true, title: 'Willkommen bei Pake & Scha', description: 'Hallo {user.name}, schön, dass du auf **{server}** bist!' } },
   leave: { enabled: false, channelId: '', content: '**{user.name}** hat den Server verlassen.', embed: { ...EMBED_DEFAULT } },
-  joinRoles: [],
   since: null,
 };
 function welcomeConfig() {
@@ -84,12 +86,47 @@ function welcomeConfig() {
     embed: { ...WELCOME_DEFAULT.embed, ...(c.embed || {}) },
     dm: part(WELCOME_DEFAULT.dm, c.dm),
     leave: part(WELCOME_DEFAULT.leave, c.leave),
-    joinRoles: Array.isArray(c.joinRoles) ? c.joinRoles.filter(isId) : [],
   };
 }
 
-const anyRoleModule = () => rankSyncConfig().enabled || connectionsConfig().enabled;
-const wanted = () => tickets.hasToken() && isId(guildId()) && (anyRoleModule() || welcomeConfig().enabled);
+/** Join Roles: Rollen für neue Mitglieder (humans) bzw. Bots, optional verzögert und erst nach Regel-Bestätigung. */
+const MAX_JOIN_ROLES = 10;
+function joinRolesConfig() {
+  const c = readJson('bot_join_roles');
+  const ids = (v) => (Array.isArray(v) ? v.filter(isId).slice(0, MAX_JOIN_ROLES) : []);
+  const delay = Number(c.delayMinutes);
+  return {
+    enabled: !!c.enabled,
+    humans: ids(c.humans),
+    bots: ids(c.bots),
+    delayMinutes: Number.isInteger(delay) && delay >= 0 && delay <= 1440 ? delay : 0,
+    waitScreening: c.waitScreening !== false,
+    since: c.since || null,
+    // Standardrollen: jedes Mitglied hat sie dauerhaft (auch bisherige; werden zurückgegeben, wenn jemand sie entfernt)
+    alwaysEnabled: !!c.alwaysEnabled,
+    always: ids(c.always),
+    alwaysBots: !!c.alwaysBots,
+  };
+}
+/** Standardrollen, die ein Mitglied haben muss (leer, wenn aus). */
+function alwaysRoles(isBot = false) {
+  const jr = joinRolesConfig();
+  return jr.alwaysEnabled && (!isBot || jr.alwaysBots) ? jr.always : [];
+}
+
+/** Frühere „Rollen beim Beitritt“ aus dem Willkommens-Modul einmalig in Join Roles übernehmen. */
+function migrateJoinRoles() {
+  if (getSetting('bot_join_roles', '')) return;
+  const w = readJson('bot_welcome');
+  const roles = Array.isArray(w.joinRoles) ? w.joinRoles.filter(isId) : [];
+  if (!roles.length) return;
+  saveJson('bot_join_roles', { enabled: !!w.enabled, humans: roles, bots: [], delayMinutes: 0, waitScreening: false, since: w.since || now() });
+  saveJson('bot_welcome', { ...w, joinRoles: [] });
+}
+
+const anyRoleModule = () => rankSyncConfig().enabled || connectionsConfig().enabled || alwaysRoles().length > 0;
+const wanted = () =>
+  tickets.hasToken() && isId(guildId()) && (anyRoleModule() || welcomeConfig().enabled || joinRolesConfig().enabled || botMessages.hasMessageJobs());
 
 /* ================================================================ Warteschlange & Fehler */
 let chain = Promise.resolve();
@@ -168,8 +205,11 @@ function desiredRoles(discordId, roles, { forceRemove = false } = {}) {
       for (const r of want || []) desired.add(r);
     }
   }
+  // Standardrollen: vor den Role Connections (sie dürfen darauf aufbauen) und danach noch einmal – sie gelten immer
+  for (const r of alwaysRoles()) desired.add(r);
   const rc = connectionsConfig();
   if (rc.enabled) desired = evaluate(rc.rules, desired);
+  for (const r of alwaysRoles()) desired.add(r);
   desired.delete(guildId()); // @everyone
   return desired;
 }
@@ -270,7 +310,16 @@ function scan(trigger = 'manuell') {
     try {
       const members = await listMembers();
       for (const m of members) {
-        if (!m.user || m.user.bot) continue;
+        if (!m.user) continue;
+        if (m.user.bot) {
+          // Bots: nur Standardrollen (falls „auch für Bots“), sonst nichts
+          const missing = alwaysRoles(true).filter((r) => !(m.roles || []).includes(r));
+          if (missing.length) {
+            stats.changed++;
+            await changeRoles(m.user.id, missing, [], stats);
+          }
+          continue;
+        }
         stats.members++;
         if (!anyRoleModule()) continue;
         const { add, remove } = diff(m.roles || [], desiredRoles(m.user.id, m.roles || []));
@@ -279,7 +328,7 @@ function scan(trigger = 'manuell') {
           await changeRoles(m.user.id, add, remove, stats);
         }
       }
-      await welcomeCatchUp(members, stats);
+      await catchUpJoins(members, stats);
     } catch (err) {
       stats.error = err.code === 50001 || err.status === 403 ? `${err.message} Für die Mitgliederliste braucht der Bot den „SERVER MEMBERS INTENT“ (Developer Portal → Bot).` : err.message;
     }
@@ -369,42 +418,148 @@ async function sendDm(userId, payload) {
   return tickets.rest('POST', `/channels/${ch.id}/messages`, payload);
 }
 
-/** Begrüßen (einmal je Beitritt) und Beitrittsrollen vergeben. */
-async function handleJoin(member, stats) {
-  const user = member.user;
-  if (!user || user.bot) return;
+/** Begrüßen – genau einmal je Beitritt. */
+async function welcomeMember(member, joinedAt, stats) {
   const w = welcomeConfig();
-  if (w.enabled) {
-    const joinedAt = member.joined_at || now();
-    const fresh = db.prepare('INSERT OR IGNORE INTO discord_welcomes (member_id, joined_at) VALUES (?, ?)').run(user.id, joinedAt).changes > 0;
-    if (fresh) {
-      const guild = await guildInfo(true).catch(() => null);
-      const msg = isId(w.channelId) ? buildMessage(w, user, guild) : null;
-      if (msg) await tickets.rest('POST', `/channels/${w.channelId}/messages`, msg).catch((err) => noteError(err, 'Willkommensnachricht'));
-      const dm = w.dm.enabled ? buildMessage(w.dm, user, guild, { mention: false }) : null;
-      if (dm) await sendDm(user.id, dm).catch(() => {}); // DMs geschlossen → still
-      if (stats) stats.welcomed++;
-    }
-  }
-  // Rollen: Beitrittsrollen + Rang-Sync + Role Connections in einem Schritt
+  if (!w.enabled) return;
+  const user = member.user;
+  const fresh = db.prepare('INSERT OR IGNORE INTO discord_welcomes (member_id, joined_at) VALUES (?, ?)').run(user.id, joinedAt).changes > 0;
+  if (!fresh) return;
+  const guild = await guildInfo(true).catch(() => null);
+  const msg = isId(w.channelId) ? buildMessage(w, user, guild) : null;
+  if (msg) await tickets.rest('POST', `/channels/${w.channelId}/messages`, msg).catch((err) => noteError(err, 'Willkommensnachricht'));
+  const dm = w.dm.enabled ? buildMessage(w.dm, user, guild, { mention: false }) : null;
+  if (dm) await sendDm(user.id, dm).catch(() => {}); // DMs geschlossen → still
+  if (stats) stats.welcomed++;
+}
+
+const markJoinDone = (memberId, joinedAt, result) =>
+  db.prepare('UPDATE discord_join_roles SET done_at = ?, result = ? WHERE member_id = ? AND joined_at = ?').run(now(), result, memberId, joinedAt);
+
+/**
+ * Join Roles für einen Beitritt vormerken (einmal je Beitritt). Liefert die Rollen, die sofort mitvergeben
+ * werden können – sonst [] (dann später über die Warteschlange: Verzögerung bzw. Regel-Bestätigung).
+ */
+function queueJoinRoles(member, joinedAt) {
+  const jr = joinRolesConfig();
+  const list = jr.enabled ? (member.user.bot ? jr.bots : jr.humans) : [];
+  if (!list.length) return [];
+  const due = new Date((Date.parse(joinedAt) || Date.now()) + jr.delayMinutes * 60e3).toISOString();
+  const fresh = db
+    .prepare('INSERT OR IGNORE INTO discord_join_roles (member_id, joined_at, is_bot, due_at) VALUES (?, ?, ?, ?)')
+    .run(member.user.id, joinedAt, member.user.bot ? 1 : 0, due).changes > 0;
+  if (!fresh || Date.parse(due) > Date.now() || (jr.waitScreening && member.pending)) return [];
+  markJoinDone(member.user.id, joinedAt, 'beim Beitritt vergeben');
+  return list;
+}
+
+/**
+ * Neues Mitglied: begrüßen, Join Roles (sofort oder vorgemerkt), dazu Rang-Sync und Role Connections –
+ * alle Rollen in einem Schritt. opts.welcome / opts.join: beim Nachholen nur den jeweils fälligen Teil.
+ */
+async function handleJoin(member, stats, { welcome = true, join = true } = {}) {
+  const user = member.user;
+  if (!user) return;
+  const joinedAt = member.joined_at || now();
+  if (welcome && !user.bot) await welcomeMember(member, joinedAt, stats);
+  const joinNow = join ? queueJoinRoles(member, joinedAt) : [];
   const base = member.roles || [];
-  const withJoin = [...new Set([...base, ...(w.enabled ? w.joinRoles : [])])];
-  const desired = anyRoleModule() ? desiredRoles(user.id, withJoin) : new Set(withJoin);
+  const withJoin = [...new Set([...base, ...joinNow])];
+  const desired = !user.bot && anyRoleModule() ? desiredRoles(user.id, withJoin) : new Set([...withJoin, ...(user.bot ? alwaysRoles(true) : [])]);
   const { add, remove } = diff(base, desired);
   if (add.length || remove.length) await changeRoles(user.id, add, remove, stats);
 }
 
-/** Beim Abgleich: Beitritte der letzten 24 h (seit dem Einschalten) nachholen, falls der Bot offline war. */
-async function welcomeCatchUp(members, stats) {
-  const w = welcomeConfig();
-  if (!w.enabled || !w.since) return;
-  const from = Math.max(Date.parse(w.since) || 0, Date.now() - 24 * 3600e3);
-  const seen = db.prepare('SELECT 1 FROM discord_welcomes WHERE member_id = ? AND joined_at = ?');
-  for (const m of members) {
-    if (!m.user || m.user.bot || !m.joined_at || Date.parse(m.joined_at) <= from) continue;
-    if (seen.get(m.user.id, m.joined_at)) continue;
-    await handleJoin(m, stats);
+/**
+ * Fällige Join Roles vergeben (Verzögerung abgelaufen, Regeln bestätigt). memberId: nur dieses Mitglied
+ * (z. B. direkt nach der Regel-Bestätigung). Wer die Regeln nach 7 Tagen nicht bestätigt hat, fällt heraus.
+ */
+async function processJoinQueue({ memberId = null, stats = null } = {}) {
+  const jr = joinRolesConfig();
+  if (!jr.enabled || !tickets.hasToken() || !isId(guildId())) return;
+  const recheck = new Date(Date.now() - 60e3).toISOString();
+  const rows = memberId
+    ? db.prepare('SELECT * FROM discord_join_roles WHERE member_id = ? AND done_at IS NULL AND due_at <= ?').all(memberId, now())
+    : db
+        .prepare('SELECT * FROM discord_join_roles WHERE done_at IS NULL AND due_at <= ? AND (checked_at IS NULL OR checked_at <= ?) ORDER BY due_at LIMIT 50')
+        .all(now(), recheck);
+  for (const r of rows) {
+    let m;
+    try {
+      m = await tickets.rest('GET', `/guilds/${guildId()}/members/${r.member_id}`);
+    } catch (err) {
+      if (err.status === 404) {
+        markJoinDone(r.member_id, r.joined_at, 'nicht mehr auf dem Server');
+        continue;
+      }
+      throw err;
+    }
+    if (m.joined_at && m.joined_at !== r.joined_at) {
+      markJoinDone(r.member_id, r.joined_at, 'erneut beigetreten');
+      continue;
+    }
+    if (jr.waitScreening && m.pending) {
+      if (Date.now() - Date.parse(r.joined_at) > 7 * 24 * 3600e3) markJoinDone(r.member_id, r.joined_at, 'Regeln nach 7 Tagen nicht bestätigt');
+      else db.prepare('UPDATE discord_join_roles SET checked_at = ? WHERE member_id = ? AND joined_at = ?').run(now(), r.member_id, r.joined_at);
+      continue;
+    }
+    const base = m.roles || [];
+    const withJoin = [...new Set([...base, ...(r.is_bot ? jr.bots : jr.humans)])];
+    const desired = !r.is_bot && anyRoleModule() ? desiredRoles(r.member_id, withJoin) : new Set(withJoin);
+    const { add, remove } = diff(base, desired);
+    if (add.length || remove.length) await changeRoles(r.member_id, add, remove, stats);
+    markJoinDone(r.member_id, r.joined_at, 'vergeben');
   }
+}
+const joinQueueDue = () =>
+  joinRolesConfig().enabled &&
+  !!db.prepare('SELECT 1 FROM discord_join_roles WHERE done_at IS NULL AND due_at <= ? AND (checked_at IS NULL OR checked_at <= ?) LIMIT 1').get(now(), new Date(Date.now() - 60e3).toISOString());
+
+/** Beim Abgleich: Beitritte der letzten 24 h (seit dem Einschalten) nachholen, falls der Bot offline war. */
+async function catchUpJoins(members, stats) {
+  const w = welcomeConfig();
+  const jr = joinRolesConfig();
+  const from = (on, since) => (on && since ? Math.max(Date.parse(since) || 0, Date.now() - 24 * 3600e3) : Infinity);
+  const fromWelcome = from(w.enabled, w.since);
+  const fromJoin = from(jr.enabled, jr.since);
+  if (fromWelcome === Infinity && fromJoin === Infinity) return;
+  const welcomed = db.prepare('SELECT 1 FROM discord_welcomes WHERE member_id = ? AND joined_at = ?');
+  const queued = db.prepare('SELECT 1 FROM discord_join_roles WHERE member_id = ? AND joined_at = ?');
+  for (const m of members) {
+    if (!m.user || !m.joined_at) continue;
+    const t = Date.parse(m.joined_at);
+    const welcome = !m.user.bot && t > fromWelcome && !welcomed.get(m.user.id, m.joined_at);
+    const join = t > fromJoin && !queued.get(m.user.id, m.joined_at);
+    if (welcome || join) await handleJoin(m, stats, { welcome, join });
+  }
+  await processJoinQueue({ stats });
+}
+
+/** Join Roles an alle bisherigen Mitglieder (target: humans | bots) – nur fehlende Rollen, nie entfernen. */
+function joinRolesToAll(target = 'humans') {
+  return enqueue(async () => {
+    const jr = joinRolesConfig();
+    const stats = { members: 0, changed: 0, added: 0, removed: 0, skipped: 0, errors: [] };
+    try {
+      for (const m of await listMembers()) {
+        if (!m.user || !!m.user.bot !== (target === 'bots')) continue;
+        if (jr.waitScreening && m.pending) {
+          stats.skipped++;
+          continue;
+        }
+        stats.members++;
+        const missing = (target === 'bots' ? jr.bots : jr.humans).filter((r) => !(m.roles || []).includes(r));
+        if (missing.length) {
+          stats.changed++;
+          await changeRoles(m.user.id, missing, [], stats);
+        }
+      }
+    } catch (err) {
+      stats.error = err.message;
+    }
+    stats.errors = stats.errors.slice(0, 10);
+    return stats;
+  }, 'Join Roles an alle');
 }
 
 async function handleLeave(user) {
@@ -441,7 +596,7 @@ async function testWelcome(kind, discordId) {
 }
 
 /* ================================================================ Gateway */
-const gw = { ws: null, state: 'aus', error: null, since: null, seq: null, sessionId: null, resumeUrl: null, heartbeat: null, jitter: null, acked: true, retry: 0, reconnectTimer: null, lastEvent: null };
+const gw = { ws: null, intents: 0, state: 'aus', error: null, since: null, seq: null, sessionId: null, resumeUrl: null, heartbeat: null, jitter: null, acked: true, retry: 0, reconnectTimer: null, lastEvent: null };
 const FATAL = {
   4004: 'Der Bot-Token ist ungültig (DISCORD_BOT_TOKEN prüfen).',
   4010: 'Ungültiger Shard.',
@@ -583,7 +738,10 @@ function onMessage(ws, raw, resuming) {
       if (gw.jitter.unref) gw.jitter.unref();
       const token = tickets.botToken();
       if (resuming && gw.sessionId) send(ws, { op: 6, d: { token, session_id: gw.sessionId, seq: gw.seq } });
-      else send(ws, { op: 2, d: { token, intents: INTENTS, properties: { os: 'linux', browser: 'pake-scha', device: 'pake-scha' } } });
+      else {
+        gw.intents = intents();
+        send(ws, { op: 2, d: { token, intents: gw.intents, properties: { os: 'linux', browser: 'pake-scha', device: 'pake-scha' } } });
+      }
       break;
     }
     case 11:
@@ -648,8 +806,15 @@ function dispatch(t, d) {
   }
   if (!d || d.guild_id !== guildId()) return;
   if (t === 'GUILD_MEMBER_ADD') enqueue(() => handleJoin(d), 'Beitritt');
-  else if (t === 'GUILD_MEMBER_UPDATE' && d.user && !d.user.bot) queueMember(d.user.id, d.roles || []);
+  else if (t === 'GUILD_MEMBER_UPDATE' && d.user) {
+    // Serverregeln bestätigt → vorgemerkte Join Roles sofort vergeben
+    if (d.pending === false && db.prepare('SELECT 1 FROM discord_join_roles WHERE member_id = ? AND done_at IS NULL').get(d.user.id)) {
+      enqueue(() => processJoinQueue({ memberId: d.user.id }), 'Join Roles');
+    }
+    if (!d.user.bot) queueMember(d.user.id, d.roles || []);
+  }
   else if (t === 'GUILD_MEMBER_REMOVE') enqueue(() => handleLeave(d.user), 'Abschiedsnachricht');
+  else if (t === 'MESSAGE_CREATE') botMessages.onMessage(d);
 }
 
 /** Nach Einstellungsänderungen: verbinden, wenn ein Modul an ist – sonst trennen. */
@@ -661,7 +826,10 @@ function refresh() {
   if (gw.state === 'fehler' || (!gw.ws && !gw.reconnectTimer)) {
     gw.retry = 0;
     connect(false);
+    return;
   }
+  // Benötigte Intents geändert (z. B. erste „alle X Nachrichten“-Automatik) → neu anmelden
+  if (gw.state === 'verbunden' && gw.intents !== intents()) restart();
 }
 
 function restart() {
@@ -673,14 +841,22 @@ function restart() {
 
 let timer = null;
 /** Beim Serverstart: verbinden und regelmäßig abgleichen (Sicherheitsnetz, falls Ereignisse verloren gehen). */
+let queueTimer = null;
 function start() {
+  migrateJoinRoles();
+  botMessages.start(); // Zeitpläne der Nachrichten-Vorlagen
   refresh();
   if (timer) return;
   timer = setInterval(() => {
     refresh();
-    if (wanted() && (anyRoleModule() || welcomeConfig().enabled)) scan('automatisch').catch(() => {});
+    if (wanted()) scan('automatisch').catch(() => {});
   }, SCAN_EVERY);
   timer.unref();
+  // Join Roles mit Verzögerung bzw. nach Regel-Bestätigung
+  queueTimer = setInterval(() => {
+    if (wanted() && joinQueueDue()) enqueue(() => processJoinQueue(), 'Join Roles');
+  }, 15 * 1000);
+  queueTimer.unref();
 }
 
 function status() {
@@ -698,6 +874,8 @@ function status() {
       return s.startedAt ? s : null;
     })(),
     errors: lastErrors.slice(0, 10),
+    joinQueue: db.prepare("SELECT COUNT(*) AS n FROM discord_join_roles WHERE done_at IS NULL").get().n,
+    messageIntent: !!(gw.intents & (1 << 9)),
   };
 }
 
@@ -761,6 +939,9 @@ module.exports = {
   rankSyncConfig,
   connectionsConfig,
   welcomeConfig,
+  joinRolesConfig,
+  joinRolesToAll,
+  MAX_JOIN_ROLES,
   saveJson,
   evaluate,
   desiredRoles,

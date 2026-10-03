@@ -449,6 +449,59 @@ db.exec(`
     PRIMARY KEY (member_id, joined_at)
   );
 
+  -- Discord-Bot, Join Roles: Warteschlange je Beitritt (Verzögerung / Regel-Bestätigung abwarten; übersteht Neustarts)
+  CREATE TABLE IF NOT EXISTS discord_join_roles (
+    member_id  TEXT NOT NULL,
+    joined_at  TEXT NOT NULL,
+    is_bot     INTEGER NOT NULL DEFAULT 0,
+    due_at     TEXT NOT NULL,
+    checked_at TEXT,
+    done_at    TEXT,
+    result     TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (member_id, joined_at)
+  );
+  CREATE INDEX IF NOT EXISTS idx_join_roles_open ON discord_join_roles(done_at, due_at);
+
+  -- Discord-Bot, Nachrichten: eigene Vorlagen (Text + Embed + Link-Buttons)
+  CREATE TABLE IF NOT EXISTS bot_messages (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    name            TEXT NOT NULL,
+    data            TEXT NOT NULL DEFAULT '{}',
+    updated_by_name TEXT NOT NULL DEFAULT '',
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  -- Automatik je Vorlage: 'zeitplan' (alle N Minuten ab Startzeit) oder 'nachrichten' (alle N Nachrichten im Kanal)
+  CREATE TABLE IF NOT EXISTS bot_message_jobs (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    template_id      INTEGER NOT NULL REFERENCES bot_messages(id) ON DELETE CASCADE,
+    kind             TEXT NOT NULL CHECK (kind IN ('zeitplan', 'nachrichten')),
+    channel_id       TEXT NOT NULL,
+    enabled          INTEGER NOT NULL DEFAULT 1,
+    interval_minutes INTEGER,
+    next_run_at      TEXT,
+    every_messages   INTEGER,
+    counter          INTEGER NOT NULL DEFAULT 0,
+    replace_previous INTEGER NOT NULL DEFAULT 1,
+    last_message_id  TEXT,
+    last_sent_at     TEXT,
+    last_error       TEXT,
+    created_by_name  TEXT NOT NULL DEFAULT '',
+    created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_bot_jobs_template ON bot_message_jobs(template_id);
+  -- Von Hand gesendete Vorlagen (zum späteren Aktualisieren oder Löschen in Discord)
+  CREATE TABLE IF NOT EXISTS bot_message_sent (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    template_id        INTEGER NOT NULL REFERENCES bot_messages(id) ON DELETE CASCADE,
+    channel_id         TEXT NOT NULL,
+    discord_message_id TEXT NOT NULL,
+    sent_by_name       TEXT NOT NULL DEFAULT '',
+    sent_at            TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at         TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_bot_sent_template ON bot_message_sent(template_id);
+
   -- Weitere unterzeichnende Anwälte eines Vertrags (der erste steht in case_contracts.lawyer_id).
   -- Name und Rang werden beim Eintragen festgehalten, damit der Vertrag später gleich bleibt.
   CREATE TABLE IF NOT EXISTS case_contract_lawyers (
