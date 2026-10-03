@@ -121,6 +121,7 @@ router.get(
     if (!req.user) return res.redirect('/login.html?discord=session');
     const other = db.prepare('SELECT id FROM users WHERE discord_id = ? AND id != ?').get(profile.id, req.user.id);
     if (other) return fail('taken');
+    const previousDiscordId = req.user.discord_id;
     db.prepare('UPDATE users SET discord_id = ?, discord_username = ?, discord_avatar = ? WHERE id = ?').run(
       profile.id,
       profile.username,
@@ -134,6 +135,7 @@ router.get(
     }
     tickets.syncBoardAll(); // Board-Mitglieder kommen in die Board-Tickets
     require('../memberships').syncUser(req.user.id).catch(() => {}); // VIP-/Perma-Rolle vergeben
+    require('../discordBot').syncUser(req.user.id, { previousDiscordId }); // Rang-Rollen (Rang-Sync)
     res.redirect('/dashboard.html?discord=linked#profile');
   })
 );
@@ -143,6 +145,7 @@ router.post('/unlink', requireAuth, async (req, res) => {
   const m = require('../memberships').activeFor(req.user.id);
   if (m && m.discord_role_id) await require('../memberships').setRole(req.user.id, m.discord_role_id, false).catch(() => {});
   db.prepare('UPDATE users SET discord_id = NULL, discord_username = NULL, discord_avatar = NULL WHERE id = ?').run(req.user.id);
+  require('../discordBot').syncUser(req.user.id, { previousDiscordId: req.user.discord_id }); // Rang-Rollen entfernen
   tickets.syncUser(req.user.id); // aus den Tickets entfernen
   tickets.syncBoardAll();
   res.json({ user: publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id)) });

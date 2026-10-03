@@ -100,6 +100,7 @@ app.use('/api/admin/positions', applications.positionsRouter);
 app.use('/api/admin', admin.router);
 app.use('/api/discord', require('./routes/discord'));
 app.use('/api/tickets', require('./routes/tickets'));
+app.use('/api/bot', require('./routes/bot').router);
 app.use('/api/public', require('./routes/public'));
 app.use('/api/public', applications.publicRouter);
 app.use('/api/public', concernRoutes.publicRouter);
@@ -149,6 +150,8 @@ reminderTimer.unref();
 app.listen(PORT, () => {
   // Discord-Befehle (/add, /remove, /delete, /passwort, /akte …) anmelden (nur wenn Bot-Token, Server und Public Key eingerichtet sind)
   setTimeout(() => require('./tickets').registerCommands().catch((err) => console.warn('Discord-Befehle nicht angemeldet:', err.message)), 3000).unref();
+  // Kanzlei-Bot: dauerhafte Verbindung für Rang-Sync, Role Connections und Willkommensnachrichten (nur wenn eingeschaltet)
+  setTimeout(() => require('./discordBot').start(), 4000).unref();
   console.log(`Pake & Scha Server läuft unter http://localhost:${PORT}`);
   console.log(`Datenbank: ${DB_PATH}`);
   if (process.env.RENDER && !process.env.DB_PATH) {

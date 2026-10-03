@@ -198,6 +198,7 @@ router.post(
       ).run(d.rank, BOARD_RANKS.includes(d.rank) ? 1 : 0, target.id);
       id = recordRankChange({ userId: target.id, name: target.display_name, oldRank: target.rank, newRank: d.rank, note: d.note, by: u });
     });
+    require('../discordBot').syncUser(target.id); // neuer Rang → Discord-Rolle
     const type = changeType(target.rank, d.rank);
     logActivity(u, TYPES[type], 'user', target.id, `${target.display_name}: ${target.rank || '—'} → ${d.rank}${d.note ? ` (${truncate(d.note, 120)})` : ''}`);
     tickets.syncBoardAll(); // wer ins Board kommt (oder es verlässt), sieht die Board-Tickets (nicht mehr)

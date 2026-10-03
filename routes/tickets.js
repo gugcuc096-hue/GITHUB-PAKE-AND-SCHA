@@ -68,6 +68,7 @@ router.patch(
       setSetting(key, typeof d[k] === 'boolean' ? (d[k] ? '1' : '0') : String(d[k]));
     }
     logActivity(req.user, 'Einstellungen geändert', 'settings', null, `Discord-Tickets: ${Object.keys(d).join(', ')}`);
+    require('../discordBot').refresh(); // Server-ID gilt auch für Rang-Sync & Co.
     tickets.registerCommands().catch((err) => console.warn('Discord-Befehle nicht angemeldet:', err.message)); // Slash-Befehle
     res.json(tickets.status());
   })
