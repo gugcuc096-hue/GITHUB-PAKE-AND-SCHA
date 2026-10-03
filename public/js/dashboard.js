@@ -3779,17 +3779,111 @@
   }
   const fillVars = (text, vars) => String(text || '').replace(/\{(?:user(?:\.(?:name|username|id|avatar))?|server|membercount|date|website)\}/g, (m) => vars[m] ?? m);
   /** Discord-Markdown für die Vorschau (Text ist escaped). */
-  function dcMarkdown(text, mentionName) {
+  /** Discord-Formatierung innerhalb einer Zeile (fett, kursiv, Code, Links, Spoiler …). Alles wird escaped. */
+  function dcInline(text, mentionName = '') {
+    const keep = [];
+    const stash = (html) => `\u0002${keep.push(html) - 1}\u0003`;
     return esc(text)
+      .replace(/`([^`\n]+)`/g, (m, c) => stash(`<code>${c}</code>`))
+      .replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, (m, t, u) => stash(`<span class="dc-link" title="${u}">${t}</span>`))
+      .replace(/https?:\/\/[^\s<]+/g, (m) => stash(`<span class="dc-link">${m}</span>`))
       .replace(/\u0001/g, `<span class="dc-mention">@${esc(mentionName)}</span>`)
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/__(.+?)__/g, '<u>$1</u>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/(^|[^\w])_(.+?)_(?!\w)/g, '$1<em>$2</em>')
       .replace(/~~(.+?)~~/g, '<s>$1</s>')
-      .replace(/`([^`]+)`/g, '<code>$1</code>')
-      .replace(/(https?:\/\/[^\s<]+)/g, '<span class="dc-link">$1</span>')
-      .replace(/\n/g, '<br>');
+      .replace(/\|\|(.+?)\|\|/g, '<span class="dc-spoiler">$1</span>')
+      .replace(/\u0002(\d+)\u0003/g, (m, i) => keep[Number(i)]);
   }
+
+  /** Zeilen: Überschriften (#, ##, ###), Kleintext (-#), Zitate (> und >>>), Aufzählungen (- , 1.). */
+  function dcLines(text, mentionName) {
+    const lines = text.split('\n');
+    const out = [];
+    let list = null;
+    let quote = null;
+    const inl = (t) => dcInline(t, mentionName);
+    const flushList = () => {
+      if (list) out.push(`<${list.type} class="dc-list"${list.start ? ` start="${list.start}"` : ''}>${list.items.map((x) => `<li>${x}</li>`).join('')}</${list.type}>`);
+      list = null;
+    };
+    const flushQuote = () => {
+      if (quote) out.push(`<div class="dc-quote">${quote.join('<br>')}</div>`);
+      quote = null;
+    };
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      let m;
+      if ((m = line.match(/^>>> ?(.*)$/))) {
+        flushList();
+        quote = [...(quote || []), ...[m[1], ...lines.slice(i + 1)].map(inl)];
+        break;
+      }
+      if ((m = line.match(/^> ?(.*)$/))) {
+        flushList();
+        (quote = quote || []).push(inl(m[1]));
+        continue;
+      }
+      flushQuote();
+      if ((m = line.match(/^(#{1,3}) +(.+)$/))) {
+        flushList();
+        out.push(`<div class="dc-h${m[1].length}">${inl(m[2])}</div>`);
+      } else if ((m = line.match(/^-# +(.+)$/))) {
+        flushList();
+        out.push(`<div class="dc-sub">${inl(m[1])}</div>`);
+      } else if ((m = line.match(/^\s*[-*] +(.+)$/))) {
+        if (!list || list.type !== 'ul') {
+          flushList();
+          list = { type: 'ul', items: [] };
+        }
+        list.items.push(inl(m[1]));
+      } else if ((m = line.match(/^\s*(\d{1,3})\. +(.+)$/))) {
+        if (!list || list.type !== 'ol') {
+          flushList();
+          list = { type: 'ol', items: [], start: m[1] === '1' ? null : m[1] };
+        }
+        list.items.push(inl(m[2]));
+      } else {
+        flushList();
+        out.push(`<div class="dc-line">${line ? inl(line) : '<br>'}</div>`);
+      }
+    }
+    flushQuote();
+    flushList();
+    return out.join('');
+  }
+
+  /** Discord-Markdown für die Vorschau (Nachrichtentext, Beschreibung, Feld-Werte) – so, wie Discord es anzeigt. */
+  function dcMarkdown(text, mentionName = '') {
+    const parts = String(text || '').replace(/\r/g, '').split('```');
+    // Unvollständiger Codeblock (``` ohne Ende) bleibt Text – wie in Discord
+    if (parts.length % 2 === 0) parts[parts.length - 2] += '```' + parts.pop();
+    return parts
+      .map((part, i) => (i % 2 ? `<pre class="dc-codeblock">${esc(part.replace(/^[a-z0-9+#-]*\n/i, '').replace(/\n$/, ''))}</pre>` : dcLines(part.replace(/^\n|\n$/g, ''), mentionName)))
+      .join('');
+  }
+
+  /** Kurzhilfe: Discord-Formatierung (für Nachricht, Beschreibung und Felder). */
+  const DC_FORMAT_HELP = [
+    ['# Überschrift', 'sehr groß (am Zeilenanfang)'],
+    ['## Überschrift', 'groß'],
+    ['### Überschrift', 'etwas größer'],
+    ['-# Text', 'klein und grau'],
+    ['**fett**', 'fett'],
+    ['*kursiv*', 'kursiv'],
+    ['__unterstrichen__', 'unterstrichen'],
+    ['~~durchgestrichen~~', 'durchgestrichen'],
+    ['> Zitat', 'Zitat (>>> für alles darunter)'],
+    ['- Punkt', 'Aufzählung (1. für Nummern)'],
+    ['`Code`', 'Code im Text'],
+    ['```Block```', 'Codeblock'],
+    ['||Spoiler||', 'verdeckt bis zum Anklicken'],
+    ['[Text](https://…)', 'Link mit eigenem Text'],
+  ];
+  const dcFormatHelp = () => `<details class="edit-box dc-help"><summary>Formatierung (Überschriften, fett, Listen …)</summary>
+    <div class="tpl-help">${DC_FORMAT_HELP.map(([code, what]) => `<code>${esc(code)}</code><span>${esc(what)}</span>`).join('')}</div>
+    <p class="form-hint">Gilt für Nachricht, Beschreibung und Feld-Werte. Der Titel hat in Discord immer dieselbe Größe.</p></details>`;
 
   function previewHtml(part, { mention = true } = {}) {
     const vars = sampleVars();
@@ -3809,7 +3903,7 @@
       if (title || desc || image || thumb) {
         embed = `<div class="dc-embed" style="border-left-color:${esc(e.color || '#d4af37')}">
           <div class="dc-embed-main">
-            ${title ? `<div class="dc-title">${dcMarkdown(title, name)}</div>` : ''}
+            ${title ? `<div class="dc-title">${dcInline(title, name)}</div>` : ''}
             ${desc ? `<div class="dc-desc">${dcMarkdown(desc, name)}</div>` : ''}
             ${/^https:\/\//i.test(image) ? `<img class="dc-image" src="${esc(image)}" alt="">` : ''}
             ${footer || e.timestamp ? `<div class="dc-footer">${esc(footer)}${footer && e.timestamp ? ' • ' : ''}${e.timestamp ? 'Heute um ' + new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : ''}</div>` : ''}
@@ -3861,6 +3955,7 @@
       <form data-form="bot-welcome" class="form-grid mt-3" id="welcomeForm">
         <label class="check"><input type="checkbox" data-k="enabled" ${w.enabled ? 'checked' : ''}> Willkommensnachrichten einschalten</label>
         <div class="tpl-chips">${chips}</div>
+        ${dcFormatHelp()}
         ${part('join', w, { title: 'Willkommensnachricht', channel: true })}
         ${part('dm', w.dm, { title: 'Direktnachricht an das neue Mitglied', toggle: 'senden', mention: false, hint: 'Kommt nur an, wenn das Mitglied Direktnachrichten von Servermitgliedern erlaubt.' })}
         <div class="wl-part"><div class="wl-head"><h3 class="wl-title">Rollen beim Beitritt</h3></div>
@@ -4041,7 +4136,7 @@
               <div class="emb-row"><div class="grow"><label class="label">Titel</label><input data-k="data.embed.title" class="field" maxlength="256" value="${esc(e.title)}"></div>
                 <div><label class="label">Farbe</label><input type="color" data-k="data.embed.color" class="field color-field" value="${esc(e.color || '#d4af37')}" aria-label="Farbe des Embeds"></div></div>
               <div><label class="label">Titel-Link (optional)</label><input data-k="data.embed.url" class="field" maxlength="500" value="${esc(e.url)}" placeholder="https://…"></div>
-              <div><label class="label">Beschreibung</label><textarea data-k="data.embed.description" class="field" rows="5" maxlength="4000">${esc(e.description)}</textarea></div>
+              <div><label class="label">Beschreibung</label><textarea data-k="data.embed.description" class="field" rows="5" maxlength="4000">${esc(e.description)}</textarea>${dcFormatHelp()}</div>
               <div class="emb-grid"><div><label class="label">Kleines Bild (rechts)</label><select data-k="data.embed.thumbnail" class="field" data-thumb-select>${th.map(([v, l]) => opt(v, l, e.thumbnail === v)).join('')}</select></div>
                 <div ${e.thumbnail === 'url' ? '' : 'hidden'} data-thumb-url><label class="label">Link zum kleinen Bild</label><input data-k="data.embed.thumbnailUrl" class="field" maxlength="500" value="${esc(e.thumbnailUrl)}" placeholder="https://…"></div></div>
               <div><label class="label">Großes Bild (Link)</label><input data-k="data.embed.image" class="field" maxlength="500" value="${esc(e.image)}" placeholder="https://… (z. B. Banner)"></div>
@@ -4090,9 +4185,9 @@
       const thumb = e.thumbnail === 'server' && g ? g.icon : e.thumbnail === 'url' && /^https:\/\//i.test(e.thumbnailUrl || '') ? e.thumbnailUrl : '';
       const parts = [
         f(e.author) ? `<div class="dc-author">${esc(f(e.author))}</div>` : '',
-        f(e.title) ? `<div class="dc-title${/^https:\/\//i.test(e.url || '') ? ' dc-link' : ''}">${md(e.title)}</div>` : '',
+        f(e.title) ? `<div class="dc-title${/^https:\/\//i.test(e.url || '') ? ' dc-link' : ''}">${dcInline(f(e.title))}</div>` : '',
         f(e.description) ? `<div class="dc-desc">${md(e.description)}</div>` : '',
-        fields.length ? `<div class="dc-fields">${fields.map((x) => `<div class="dc-field ${x.inline ? 'inline' : ''}"><div class="dc-fname">${md(x.name)}</div><div class="dc-fvalue">${md(x.value)}</div></div>`).join('')}</div>` : '',
+        fields.length ? `<div class="dc-fields">${fields.map((x) => `<div class="dc-field ${x.inline ? 'inline' : ''}"><div class="dc-fname">${dcInline(f(x.name))}</div><div class="dc-fvalue">${md(x.value)}</div></div>`).join('')}</div>` : '',
         /^https:\/\//i.test(e.image || '') ? `<img class="dc-image" src="${esc(e.image)}" alt="">` : '',
         f(e.footer) || e.timestamp ? `<div class="dc-footer">${esc(f(e.footer))}${f(e.footer) && e.timestamp ? ' • ' : ''}${e.timestamp ? 'Heute um ' + vars['{time}'] : ''}</div>` : '',
       ].join('');
