@@ -25,6 +25,8 @@
     3: ['Hoch', 'amber', 'Hohe Priorität'],
     4: ['Kritisch', 'red', 'Kritische Priorität'],
   };
+  // Start-Priorität einer neuen Akte aus der Dringlichkeit (Angabe des Mandanten) – wie auf dem Server
+  const PRIORITY_FROM_URGENCY = { normal: 2, eilig: 3, notfall: 4 };
   const CASE_SORTS = { aktualisiert: 'Zuletzt geändert', prioritaet: 'Priorität', neueste: 'Neueste zuerst', aelteste: 'Älteste zuerst' };
   const SOURCES = { portal: 'Mandantenportal', web: 'Website-Formular', kanzlei: 'Kanzlei' };
   const EVENT_TYPES = { gericht: 'Gerichtstermin', frist: 'Frist', mandant: 'Mandantengespräch', intern: 'Intern' };
@@ -750,10 +752,18 @@
       <span class="ev-side">${side}</span></button>`;
   }
 
+  /** Kanzlei: Priorität; Mandant: seine angegebene Dringlichkeit (nur wenn nicht „Normal“). */
+  function caseLevelText(c) {
+    if (isStaff()) return PRIORITY[c.priority] ? ` · ${esc(PRIORITY[c.priority][2])}` : '';
+    return c.urgency !== 'normal' && URGENCY[c.urgency] ? ` · ${esc(URGENCY[c.urgency][0])}` : '';
+  }
+  /** Badge neben der Akte: Kanzlei sieht nur die Priorität, der Mandant seine Dringlichkeit. */
+  const caseLevelBadge = (c) => (isStaff() ? priorityBadge(c) : c.urgency !== 'normal' && URGENCY[c.urgency] ? badge(...URGENCY[c.urgency]) : '');
+
   function caseListRow(c, extra = '') {
     return `<div class="list-row" data-action="open-case" data-id="${c.id}" role="button" tabindex="0">
       <div class="main"><div class="title">${esc(c.title)}</div>
-        <div class="meta"><span class="font-mono text-gold">${esc(c.caseNumber)}</span> · ${esc(c.clientName)}${c.urgency !== 'normal' ? ' · ' + esc(URGENCY[c.urgency][0]) : ''}</div></div>
+        <div class="meta"><span class="font-mono text-gold">${esc(c.caseNumber)}</span> · ${esc(c.clientName)}${caseLevelText(c)}</div></div>
       <div class="flex items-center gap-2 shrink-0">${extra || statusBadge(CASE_STATUS, c.status)}</div></div>`;
   }
 
@@ -968,7 +978,7 @@
         .map(
           (c) => `<tr class="row" data-action="open-case" data-id="${c.id}">
           <td class="td-main"><div class="font-mono text-gold text-xs">${esc(c.caseNumber)}</div><div class="font-medium">${esc(c.title)}</div>
-            <div class="text-xs text-dim mt-1 flex flex-wrap items-center gap-2">${esc(AREAS[c.area] || c.area)}${staff ? priorityBadge(c) : ''}${c.urgency !== 'normal' ? badge(...URGENCY[c.urgency]) : ''}</div></td>
+            <div class="text-xs text-dim mt-1 flex flex-wrap items-center gap-2">${esc(AREAS[c.area] || c.area)}${caseLevelBadge(c)}</div></td>
           ${staff ? `<td data-label="Mandant">${esc(c.clientName)}${c.membership ? `<div class="mt-1">${memberBadge(c.membership)}</div>` : ''}</td>` : ''}
           <td data-label="Zuständig">${c.lawyerName ? `${esc(c.lawyerName)}${(c.coLawyers || []).length ? `<div class="text-xs text-dim">+ ${esc(c.coLawyers.map((l) => l.name).join(', '))}</div>` : ''}` : badge('Unbesetzt', 'amber')}</td>
           <td data-label="Status">${statusBadge(CASE_STATUS, c.status)}</td>
@@ -2274,7 +2284,7 @@
       staff ? ['Kontakt', [c.clientPhone, c.clientEmail].filter(Boolean).join(' · ') || '—'] : null,
       [caseTeam(c).length > 1 ? 'Zuständige Anwälte' : 'Zuständig', teamText(c)],
       ['Rechtsgebiet', AREAS[c.area] || c.area],
-      ['Dringlichkeit', (URGENCY[c.urgency] || [c.urgency])[0]],
+      [staff ? 'Dringlichkeit (Angabe Mandant)' : 'Dringlichkeit', (URGENCY[c.urgency] || [c.urgency])[0]],
       c.opponent ? ['Gegenpartei', c.opponent] : null,
       c.courtRef ? ['Gerichtsaktenzeichen', c.courtRef] : null,
       ['Eröffnet', fmtDate(c.createdAt)],
@@ -2328,7 +2338,7 @@
           <form data-form="case-edit" data-id="${c.id}" class="form-grid cols-2">
             <div class="span-2"><label class="label">Titel</label><input name="title" class="field" required minlength="3" maxlength="120" value="${esc(c.title)}"></div>
             <div><label class="label">Rechtsgebiet</label><select name="area" class="field">${Object.entries(AREAS).map(([k, l]) => opt(k, l, c.area === k)).join('')}</select></div>
-            <div><label class="label">Dringlichkeit</label><select name="urgency" class="field">${Object.entries(URGENCY).map(([k, [l]]) => opt(k, l, c.urgency === k)).join('')}</select></div>
+            <div><label class="label">Dringlichkeit (Angabe Mandant)</label><select name="urgency" class="field">${Object.entries(URGENCY).map(([k, [l]]) => opt(k, l, c.urgency === k)).join('')}</select></div>
             <div><label class="label">Verfahrensstand</label><select name="step" class="field">${STEPS.map((s, i) => opt(i, s, c.step === i)).join('')}</select></div>
             ${staff ? `<div><label class="label">Priorität (nur intern)</label><select name="priority" class="field">${Object.entries(PRIORITY).map(([k, [l]]) => opt(k, l, Number(k) === (c.priority || 2))).join('')}</select></div>` : ''}
             ${c.hasClientAccount && canLinkClient(c) ? `<div class="span-2 flex flex-wrap items-center justify-between gap-2 text-sm"><div><span class="text-xs uppercase tracking-widest text-dim mr-1">Mandanten-Konto</span> <strong>${esc(c.clientName)}</strong>${c.clientEmail ? ` <span class="text-dim">· ${esc(c.clientEmail)}</span>` : ''}</div><div class="flex flex-wrap gap-2"><button type="button" class="btn-outline btn-sm" data-action="case-client-search" data-id="${c.id}">Anderes Konto</button><button type="button" class="btn-ghost btn-sm" data-action="case-unlink-client" data-id="${c.id}">Verknüpfung lösen</button></div></div>` : ''}
@@ -2372,7 +2382,7 @@
       <div class="flex flex-wrap items-start justify-between gap-3 mb-5 pr-12">
         <div class="min-w-0"><div class="font-mono text-gold text-sm">${esc(c.caseNumber)}</div>
           <h2 id="modalTitle" class="font-serif text-2xl md:text-3xl font-semibold leading-tight">${esc(c.title)}</h2></div>
-        <div class="flex flex-wrap gap-2">${memberBadge(c.membership)}${statusBadge(CASE_STATUS, c.status)}${staff ? priorityBadge(c) : ''}${c.urgency !== 'normal' ? badge(...URGENCY[c.urgency]) : ''}</div>
+        <div class="flex flex-wrap gap-2">${memberBadge(c.membership)}${statusBadge(CASE_STATUS, c.status)}${caseLevelBadge(c)}</div>
       </div>
       ${statusSeg}
       ${track}
@@ -2419,7 +2429,9 @@
           <div class="span-2"><label class="label" for="ncEmail">…oder Login-E-Mail eines registrierten Mandanten (optional)</label><input id="ncEmail" name="clientEmail" type="text" autocapitalize="none" spellcheck="false" class="field" placeholder="z. B. max.mustermann@pake-scha.ls – verknüpft die Akte mit dem Konto"></div>` : ''}
         <div class="span-2"><label class="label" for="ncTitle">Titel</label><input id="ncTitle" name="title" class="field" required minlength="3" maxlength="120" placeholder="z. B. Festnahme am Legion Square" ${staff ? '' : 'autofocus'}></div>
         <div><label class="label">Rechtsgebiet</label><select name="area" class="field">${Object.entries(AREAS).map(([k, l]) => opt(k, l)).join('')}</select></div>
-        <div><label class="label">Dringlichkeit</label><select name="urgency" class="field">${Object.entries(URGENCY).map(([k, [l]]) => opt(k, l)).join('')}</select></div>
+        <div><label class="label">${staff ? 'Dringlichkeit (Angabe Mandant)' : 'Dringlichkeit'}</label><select name="urgency" class="field">${Object.entries(URGENCY).map(([k, [l]]) => opt(k, l)).join('')}</select></div>
+        ${staff ? `<div><label class="label">Priorität (nur intern)</label><select name="priority" class="field">${opt('', 'Automatisch – nach Dringlichkeit', true)}${Object.entries(PRIORITY).map(([k, [l]]) => opt(k, l)).join('')}</select></div>
+          <div class="self-end text-xs text-dim pb-2">Normal → Normale, Eilig → Hohe, Notfall → Kritische Priorität. Später jederzeit in der Akte änderbar.</div>` : ''}
         ${staff ? `<div><label class="label">Gegenpartei</label><input name="opponent" class="field" maxlength="120" placeholder="optional"></div>
           <div><label class="label">Gerichtsaktenzeichen</label><input name="courtRef" class="field" maxlength="60" placeholder="optional"></div>` : ''}
         ${staff ? lawyerPicker({ leadId: st.user.id, withLead: isAdmin(), emptyLead: 'Noch niemand (offene Anfrage)' }) : ''}
@@ -7064,6 +7076,7 @@
         });
         if (f.elements.lawyerId) body.lawyerId = val(fd, 'lawyerId') ? Number(val(fd, 'lawyerId')) : null;
         if (f.querySelector('[data-team]')) body.coLawyerIds = fd.getAll('coLawyerIds').map(Number);
+        if (val(fd, 'priority')) body.priority = Number(val(fd, 'priority'));
       }
       const res = await api.post('/api/cases', body);
       toast(`Akte ${res.case.caseNumber} angelegt.`);
@@ -7696,6 +7709,14 @@
     }
     if (t.dataset.casePriority !== undefined) {
       guard(() => setCasePriority(t));
+      return;
+    }
+    // Akte bearbeiten: Dringlichkeit geändert → Priorität zieht mit, solange sie noch dem automatischen Wert entspricht
+    if (t.name === 'urgency' && t.form && t.form.dataset.form === 'case-edit' && t.form.elements.priority) {
+      const prio = t.form.elements.priority;
+      const prev = t.dataset.prev || [...t.options].find((o) => o.defaultSelected)?.value || 'normal';
+      if (Number(prio.value) === PRIORITY_FROM_URGENCY[prev]) prio.value = String(PRIORITY_FROM_URGENCY[t.value] || 2);
+      t.dataset.prev = t.value;
       return;
     }
     if (t.id === 'tierKind') {

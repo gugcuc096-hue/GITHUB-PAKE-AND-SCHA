@@ -18,7 +18,7 @@
  */
 const crypto = require('crypto');
 const { db, getSetting, setSetting } = require('./db');
-const { truncate, CASE_STATUS, STEPS } = require('./helpers');
+const { truncate, CASE_STATUS, STEPS, URGENCY_LABEL } = require('./helpers');
 const { getCase, caseLawyers } = require('./models');
 const discord = require('./discord');
 
@@ -342,7 +342,6 @@ function memberOverwrite(id, kind, closed) {
   return { id, type: 1, allow: String(MEMBER_ALLOW), deny: '0' };
 }
 
-const URGENCY_LABEL = { normal: 'Normal', eilig: 'Eilig', notfall: '🚨 Notfall' };
 const AREA_LABEL = { strafrecht: 'Strafrecht', zivilrecht: 'Zivilrecht', verfassungsrecht: 'Verfassungsrecht', vertragsrecht: 'Vertragsrecht', sonstiges: 'Sonstiges' };
 
 function lawyerText(c) {
@@ -403,7 +402,8 @@ async function createChannel(c, { quiet = false } = {}) {
         fields: [
           { name: 'Mandant', value: c.client_account_name || c.client_name || '—' },
           { name: 'Rechtsgebiet', value: AREA_LABEL[c.area] || c.area || '—' },
-          { name: 'Dringlichkeit', value: URGENCY_LABEL[c.urgency] || c.urgency },
+          // Der Mandant liest mit: nur seine eigene Angabe – die Priorität der Kanzlei bleibt intern.
+          { name: 'Dringlichkeit (Angabe Mandant)', value: URGENCY_LABEL[c.urgency] || c.urgency },
           { name: 'Status', value: `${CASE_STATUS[c.status]} · ${STEPS[c.step] || STEPS[0]}` },
           { name: 'Zuständig', value: lawyerText(c), inline: false },
           ...(clientIn

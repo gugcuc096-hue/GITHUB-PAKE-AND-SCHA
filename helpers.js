@@ -5,6 +5,12 @@ const STEPS = ['Eingang', 'Akteneinsicht', 'Strategie', 'Verhandlung'];
 const CASE_STATUS = { offen: 'Offen', in_bearbeitung: 'In Bearbeitung', geschlossen: 'Geschlossen' };
 const AREAS = ['strafrecht', 'zivilrecht', 'verfassungsrecht', 'vertragsrecht', 'sonstiges'];
 const URGENCIES = ['normal', 'eilig', 'notfall'];
+// Dringlichkeit = Angabe des Mandanten beim Einreichen; Priorität = Einschätzung der Kanzlei (nur intern).
+const URGENCY_LABEL = { normal: 'Normal', eilig: 'Eilig', notfall: '🚨 Notfall' };
+const PRIORITIES = { 1: 'Niedrig', 2: 'Normal', 3: 'Hoch', 4: 'Kritisch' };
+const PRIORITY_DISCORD = { 1: '⚪ Niedrige Priorität', 2: '🔵 Normale Priorität', 3: '🟠 Hohe Priorität', 4: '🔴 Kritische Priorität' };
+// Start-Priorität einer neuen Akte aus der Dringlichkeit – danach legen die Anwälte sie fest.
+const PRIORITY_FROM_URGENCY = { normal: 2, eilig: 3, notfall: 4 };
 const EVENT_TYPES = { mandant: 'Mandantengespräch', gericht: 'Gerichtstermin', frist: 'Frist', intern: 'Intern' };
 const FEE_CATEGORIES = ['rechtsberatung', 'strafrecht', 'notfall', 'gericht', 'vertraege'];
 const DUTY_STATUS = { dienst: 'Im Dienst', gericht: 'Im Gericht', pause: 'Pause', off: 'Außer Dienst' };
@@ -253,6 +259,10 @@ module.exports = {
   CASE_STATUS,
   AREAS,
   URGENCIES,
+  URGENCY_LABEL,
+  PRIORITIES,
+  PRIORITY_DISCORD,
+  PRIORITY_FROM_URGENCY,
   EVENT_TYPES,
   FEE_CATEGORIES,
   DUTY_STATUS,

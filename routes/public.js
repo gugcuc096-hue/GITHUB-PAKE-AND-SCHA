@@ -3,7 +3,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { z } = require('zod');
 const { db, tx, nextCaseNumber, randomPin, getSetting } = require('../db');
-const { wrap, parseBody, AREAS, URGENCIES, STEPS, CASE_STATUS, truncate } = require('../helpers');
+const { wrap, parseBody, AREAS, URGENCIES, URGENCY_LABEL, PRIORITY_DISCORD, PRIORITY_FROM_URGENCY, STEPS, CASE_STATUS, truncate } = require('../helpers');
 const { addSystemNote, getCase, onDutyMembers } = require('../models');
 const discord = require('../discord');
 const tickets = require('../tickets');
@@ -100,10 +100,11 @@ router.post(
     const id = tx(() => {
       const info = db
         .prepare(
-          `INSERT INTO cases (case_number, access_pin, title, area, urgency, description, client_id, client_name, client_phone, status, source)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'offen', 'web')`
+          `INSERT INTO cases (case_number, access_pin, title, area, urgency, priority, description, client_id, client_name, client_phone, status, source)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'offen', 'web')`
         )
-        .run(nextCaseNumber(), pin, title, d.area, d.urgency, d.description, account ? account.id : null, account ? '' : d.name, d.phone || '');
+        // Start-Priorität aus der Dringlichkeit, die der Mandant angibt (die Kanzlei passt sie danach an)
+        .run(nextCaseNumber(), pin, title, d.area, d.urgency, PRIORITY_FROM_URGENCY[d.urgency] || 2, d.description, account ? account.id : null, account ? '' : d.name, d.phone || '');
       const newId = Number(info.lastInsertRowid);
       addSystemNote(newId, null, 'Mandatsanfrage über das Website-Formular eingegangen.');
       return newId;
@@ -118,7 +119,8 @@ router.post(
         { name: 'Mandant', value: account ? account.display_name : d.name },
         { name: 'Telefon', value: d.phone || '—' },
         { name: 'Rechtsgebiet', value: AREA_TITLES[d.area] },
-        { name: 'Dringlichkeit', value: d.urgency },
+        { name: 'Priorität', value: PRIORITY_DISCORD[c.priority] || PRIORITY_DISCORD[2] },
+        { name: 'Dringlichkeit (Angabe Mandant)', value: URGENCY_LABEL[d.urgency] || d.urgency },
       ],
     });
 
