@@ -4,7 +4,22 @@ const express = require('express');
 const { z } = require('zod');
 const { db, tx, nextCaseNumber, randomPin } = require('../db');
 const { requireAuth, requireAdmin, isStaff, findUserByLogin } = require('../auth');
-const { wrap, parseBody, idParam, AREAS, URGENCIES, CASE_STATUS, STEPS, truncate, MAX_ATTACHMENTS_PER_CASE, isBoard } = require('../helpers');
+const {
+  wrap,
+  parseBody,
+  idParam,
+  AREAS,
+  URGENCIES,
+  URGENCY_LABEL,
+  PRIORITIES,
+  PRIORITY_DISCORD,
+  PRIORITY_FROM_URGENCY,
+  CASE_STATUS,
+  STEPS,
+  truncate,
+  MAX_ATTACHMENTS_PER_CASE,
+  isBoard,
+} = require('../helpers');
 const {
   CASE_SELECT,
   getCase,
@@ -35,7 +50,6 @@ const { imageBody, saveImage, removeFile, evidencePath } = require('../uploads')
 const router = express.Router();
 router.use(requireAuth);
 
-const URGENCY_LABEL = { normal: 'Normal', eilig: 'Eilig', notfall: '🚨 Notfall' };
 const MAX_CO_LAWYERS = 10;
 
 /** „Anna Pake (federführend), Ben Scha“ – für Discord und Verlauf. */
@@ -65,10 +79,12 @@ function notifyCreated(c, user) {
   discord.notify('case.created', {
     title: `Neue Akte ${c.case_number}`,
     description: truncate(c.title, 300),
-    color: c.urgency === 'notfall' ? discord.RED : discord.GOLD,
+    color: c.priority >= 4 ? discord.RED : discord.GOLD,
     fields: [
       { name: 'Mandant', value: c.client_account_name || c.client_name || '—' },
-      { name: 'Dringlichkeit', value: URGENCY_LABEL[c.urgency] || c.urgency },
+      // Team-Kanal (nur Kanzlei): Priorität + was der Mandant angegeben hat
+      { name: 'Priorität', value: PRIORITY_DISCORD[c.priority] || PRIORITY_DISCORD[2] },
+      { name: 'Dringlichkeit (Angabe Mandant)', value: URGENCY_LABEL[c.urgency] || c.urgency },
       { name: 'Zuständig', value: lawyerNames(c) },
       { name: 'Angelegt von', value: user ? user.display_name : 'Website-Formular' },
     ],
@@ -117,6 +133,7 @@ const createSchema = z.object({
   courtRef: z.string().trim().max(60).optional(),
   lawyerId: z.number().int().positive().nullable().optional(),
   coLawyerIds: z.array(z.number().int().positive()).max(MAX_CO_LAWYERS).optional(),
+  priority: z.number().int().min(1).max(4).optional(), // nur Kanzlei; sonst aus der Dringlichkeit
 });
 
 router.post(
@@ -164,9 +181,9 @@ router.post(
     const id = tx(() => {
       const info = db
         .prepare(
-          `INSERT INTO cases (case_number, access_pin, title, area, urgency, description, client_id, client_name, client_phone,
+          `INSERT INTO cases (case_number, access_pin, title, area, urgency, priority, description, client_id, client_name, client_phone,
                               opponent, court_ref, lawyer_id, status, source)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .run(
           nextCaseNumber(),
@@ -174,6 +191,7 @@ router.post(
           d.title,
           d.area,
           d.urgency,
+          (isStaff(u) && d.priority) || PRIORITY_FROM_URGENCY[d.urgency] || 2,
           d.description,
           clientId,
           clientName,
@@ -361,8 +379,6 @@ const updateSchema = z.object({
   coLawyerIds: z.array(z.number().int().positive()).max(MAX_CO_LAWYERS).optional(),
 });
 
-const PRIORITY = { 1: 'Niedrig', 2: 'Normal', 3: 'Hoch', 4: 'Kritisch' };
-
 const FIELD_COLUMNS = {
   title: 'title',
   area: 'area',
@@ -495,7 +511,7 @@ router.patch(
     if (d.priority !== undefined && d.priority !== (c.priority || 2)) {
       sets.push('priority = ?');
       values.push(d.priority);
-      internalHistory.push(`Priorität: ${PRIORITY[d.priority]}`);
+      internalHistory.push(`Priorität: ${PRIORITIES[d.priority]}`);
     }
     if (newStatus && newStatus !== c.status) {
       sets.push('status = ?');

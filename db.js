@@ -859,6 +859,20 @@ function setSetting(key, value) {
   db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, String(value));
 }
 
+// Einmalig: offene Akten mit „Eilig“/„Notfall“ bekommen die passende Start-Priorität (Hoch/Kritisch) –
+// nur wo noch „Normal“ steht und niemand die Priorität bisher von Hand geändert hat.
+if (!getSetting('migrated_priority_from_urgency')) {
+  const n = db
+    .prepare(
+      `UPDATE cases SET priority = CASE urgency WHEN 'notfall' THEN 4 ELSE 3 END
+       WHERE status != 'geschlossen' AND priority = 2 AND urgency IN ('eilig', 'notfall')
+         AND NOT EXISTS (SELECT 1 FROM notes n WHERE n.case_id = cases.id AND n.system = 1 AND n.body LIKE 'Priorität:%')`
+    )
+    .run().changes;
+  setSetting('migrated_priority_from_urgency', new Date().toISOString());
+  if (n) console.log(`Priorität aus der Dringlichkeit übernommen: ${n} Akte(n).`);
+}
+
 // Ältere Anliegen (vor Einführung der Vorgangsnummer) nachträglich nummerieren.
 for (const row of db.prepare('SELECT id FROM concerns WHERE reference IS NULL ORDER BY id').all()) {
   db.prepare('UPDATE concerns SET reference = ?, access_pin = ? WHERE id = ?').run(nextConcernNumber(), randomPin(), row.id);

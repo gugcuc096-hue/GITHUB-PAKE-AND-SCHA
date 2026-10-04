@@ -13,7 +13,7 @@
  */
 const { db } = require('./db');
 const { isStaff, hashPassword, generateTempPassword, destroyAllSessions } = require('./auth');
-const { truncate, CASE_STATUS, STEPS, EVENT_TYPES, DUTY_STATUS } = require('./helpers');
+const { truncate, CASE_STATUS, STEPS, EVENT_TYPES, DUTY_STATUS, URGENCY_LABEL, PRIORITY_DISCORD } = require('./helpers');
 const { getCase, caseAccess, caseLawyers, onDutyMembers, APPT_SELECT, logActivity } = require('./models');
 const tickets = require('./tickets');
 
@@ -168,10 +168,14 @@ function akteCommand(body, u) {
   return respond(
     {
       title: `📁 ${c.case_number}: ${c.title}`,
-      color: c.status === 'geschlossen' ? COLORS.slate : c.urgency === 'notfall' ? COLORS.red : COLORS.gold,
+      color: c.status === 'geschlossen' ? COLORS.slate : (staff ? c.priority >= 4 : c.urgency === 'notfall') ? COLORS.red : COLORS.gold,
       fields: [
         { name: 'Status', value: CASE_STATUS[c.status] || c.status },
         { name: 'Verfahrensstand', value: STEPS[c.step] || STEPS[0] },
+        // Antwort sieht nur, wer fragt: die Kanzlei bekommt die (interne) Priorität, der Mandant seine Angabe
+        staff
+          ? { name: 'Priorität', value: PRIORITY_DISCORD[c.priority] || PRIORITY_DISCORD[2] }
+          : { name: 'Dringlichkeit', value: URGENCY_LABEL[c.urgency] || c.urgency },
         { name: 'Mandant', value: c.client_account_name || c.client_name || '—' },
         { name: 'Zuständig', value: lawyers.length ? lawyers.join(', ') : 'noch niemand', inline: false },
         next ? { name: 'Nächster Termin', value: `${EVENT_TYPES[next.type] || 'Termin'}: ${next.title} – ${ts(next.starts_at)} (${ts(next.starts_at, 'R')})`, inline: false } : null,
