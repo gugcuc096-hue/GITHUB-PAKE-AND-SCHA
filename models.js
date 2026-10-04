@@ -150,6 +150,9 @@ function caseRow(c, u) {
     closed: c.status === 'geschlossen',
     publicNote: c.public_note,
     source: c.source,
+    // Nur für die Kanzlei: Priorität und Prozessticket (z. B. Kanal beim DOJ)
+    priority: staff ? c.priority || 2 : undefined,
+    processTicket: staff && c.process_ticket_url ? { url: c.process_ticket_url, label: c.process_ticket_label || '' } : undefined,
     // Für die Aktensuche per FiveNet-/Google-Docs-Link oder Dokument-ID (nur Team).
     externalDocIds: staff ? String(c.external_doc_ids || '').split(' ').filter(Boolean) : undefined,
     createdAt: c.created_at,

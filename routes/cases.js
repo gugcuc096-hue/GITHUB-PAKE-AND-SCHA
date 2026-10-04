@@ -354,11 +354,14 @@ const updateSchema = z.object({
   courtRef: z.string().trim().max(60).optional(),
   status: z.enum(Object.keys(CASE_STATUS)).optional(),
   step: z.number().int().min(0).max(3).optional(),
+  priority: z.number().int().min(1).max(4).optional(), // nur Kanzlei, intern
   publicNote: z.string().trim().max(500).optional(),
   lawyerId: z.number().int().positive().nullable().optional(),
   // Vollständige Liste der weiteren Anwälte (ersetzt die bisherige)
   coLawyerIds: z.array(z.number().int().positive()).max(MAX_CO_LAWYERS).optional(),
 });
+
+const PRIORITY = { 1: 'Niedrig', 2: 'Normal', 3: 'Hoch', 4: 'Kritisch' };
 
 const FIELD_COLUMNS = {
   title: 'title',
@@ -474,7 +477,8 @@ router.patch(
     }
 
     const editFields = Object.keys(FIELD_COLUMNS).filter((k) => d[k] !== undefined);
-    const wantsEdit = editFields.length > 0 || d.status !== undefined;
+    const wantsEdit = editFields.length > 0 || d.status !== undefined || d.priority !== undefined;
+    if (d.priority !== undefined && !isStaff(u)) return res.status(403).json({ error: 'Die Priorität legen nur die Anwälte fest.' });
     // Wer die Akte gerade selbst übernommen hat, darf im selben Schritt weiterarbeiten.
     const canEditNow = access.canEdit || (lawyerChanged && leadAfter === u.id);
     if (wantsEdit && !canEditNow) {
@@ -486,6 +490,13 @@ router.patch(
       values.push(d[key]);
     }
     if (d.step !== undefined && d.step !== c.step) history.push(`Verfahrensstand: ${STEPS[d.step]}`);
+    // Priorität ist intern: eigener (interner) Verlaufseintrag, nichts davon im Ticket oder für den Mandanten
+    const internalHistory = [];
+    if (d.priority !== undefined && d.priority !== (c.priority || 2)) {
+      sets.push('priority = ?');
+      values.push(d.priority);
+      internalHistory.push(`Priorität: ${PRIORITY[d.priority]}`);
+    }
     if (newStatus && newStatus !== c.status) {
       sets.push('status = ?');
       values.push(newStatus);
@@ -504,6 +515,7 @@ router.patch(
         coAfter.filter((id) => !coBefore.includes(id)).forEach((id) => addCo.run(c.id, id, u.id));
       }
       if (history.length) addSystemNote(c.id, u, history.join(' · '));
+      if (internalHistory.length) addSystemNote(c.id, u, internalHistory.join(' · '), true);
       if (lawyerChanged || coChanged || (newStatus && newStatus !== c.status)) {
         const workReason =
           c.lawyer_id === u.id && leadAfter !== u.id ? 'abgegeben' : coBefore.includes(u.id) && !coAfter.includes(u.id) && leadAfter !== u.id ? 'Mitarbeit beendet' : 'nicht mehr zuständig';
@@ -514,7 +526,7 @@ router.patch(
     const updated = getCase(c.id);
     const newlyAssigned = [...(lawyerChanged && leadAfter && leadAfter !== c.lawyer_id && !coBefore.includes(leadAfter) ? [leadAfter] : []), ...coAdded];
     notifyAssigned(updated, u, newlyAssigned);
-    if (history.length) logActivity(u, 'Akte geändert', 'case', c.id, `${c.case_number}: ${history.join(' · ')}`);
+    if (history.length || internalHistory.length) logActivity(u, 'Akte geändert', 'case', c.id, `${c.case_number}: ${[...history, ...internalHistory].join(' · ')}`);
     if (newStatus && newStatus !== c.status) {
       discord.notify('case.status', {
         title: `${updated.case_number}: ${CASE_STATUS[newStatus]}`,
@@ -527,6 +539,55 @@ router.patch(
       });
     }
     ticketUpdate(c, updated, u, { history, editFields, d, newStatus, newlyAssigned });
+    res.json({ case: { ...caseRow(updated, u), ...caseAccess(updated, u) } });
+  })
+);
+
+/* ---------------------------------------------------------------- Prozessticket (Kanal auf einem anderen Discord, z. B. DOJ) */
+// Nur Links auf einen Discord-Kanal (discord.com/channels/<Server>/<Kanal>[/<Nachricht>]) – keine anderen Adressen.
+const PROCESS_TICKET_RE = /^https:\/\/(?:(?:ptb|canary)\.)?discord(?:app)?\.com\/channels\/(\d{15,25})\/(\d{15,25})(?:\/(\d{15,25}))?\/?$/i;
+
+router.put(
+  '/:id/process-ticket',
+  wrap(async (req, res) => {
+    const u = req.user;
+    const id = idParam(req);
+    const c = id && getCase(id);
+    if (!c || !isStaff(u)) return res.status(404).json({ error: 'Akte nicht gefunden.' });
+    if (!caseAccess(c, u).canEdit) return res.status(403).json({ error: 'Nur die zuständigen Anwälte und das Board of Partners können das Prozessticket hinterlegen.' });
+    const d = parseBody(z.object({ url: z.string().trim().max(300), label: z.string().trim().max(80).optional() }), req, res);
+    if (!d) return;
+    const m = d.url.match(PROCESS_TICKET_RE);
+    if (!m) return res.status(400).json({ error: 'Bitte einen Discord-Kanal-Link einfügen (Rechtsklick auf den Kanal → „Link kopieren“), z. B. https://discord.com/channels/123…/456….' });
+    const url = `https://discord.com/channels/${m[1]}/${m[2]}${m[3] ? `/${m[3]}` : ''}`;
+    const label = d.label || '';
+    const had = !!c.process_ticket_url;
+    tx(() => {
+      db.prepare("UPDATE cases SET process_ticket_url = ?, process_ticket_label = ?, updated_at = datetime('now') WHERE id = ?").run(url, label, c.id);
+      addSystemNote(c.id, u, `Prozessticket ${had ? 'geändert' : 'hinterlegt'}${label ? `: ${label}` : ''}`, true);
+    });
+    logActivity(u, `Prozessticket ${had ? 'geändert' : 'hinterlegt'}`, 'case', c.id, `${c.case_number}${label ? `: ${label}` : ''}`);
+    const updated = getCase(c.id);
+    res.json({ case: { ...caseRow(updated, u), ...caseAccess(updated, u) } });
+  })
+);
+
+router.delete(
+  '/:id/process-ticket',
+  wrap(async (req, res) => {
+    const u = req.user;
+    const id = idParam(req);
+    const c = id && getCase(id);
+    if (!c || !isStaff(u)) return res.status(404).json({ error: 'Akte nicht gefunden.' });
+    if (!caseAccess(c, u).canEdit) return res.status(403).json({ error: 'Nur die zuständigen Anwälte und das Board of Partners können das Prozessticket entfernen.' });
+    if (c.process_ticket_url) {
+      tx(() => {
+        db.prepare("UPDATE cases SET process_ticket_url = NULL, process_ticket_label = NULL, updated_at = datetime('now') WHERE id = ?").run(c.id);
+        addSystemNote(c.id, u, 'Prozessticket entfernt', true);
+      });
+      logActivity(u, 'Prozessticket entfernt', 'case', c.id, c.case_number);
+    }
+    const updated = getCase(c.id);
     res.json({ case: { ...caseRow(updated, u), ...caseAccess(updated, u) } });
   })
 );

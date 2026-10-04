@@ -17,6 +17,9 @@
   const AREAS = { strafrecht: 'Strafrecht', zivilrecht: 'Zivilrecht', verfassungsrecht: 'Verfassungsrecht', vertragsrecht: 'Vertragsrecht', sonstiges: 'Sonstiges' };
   const URGENCY = { normal: ['Normal', 'slate'], eilig: ['Eilig', 'amber'], notfall: ['Notfall', 'red'] };
   const CASE_STATUS = { offen: ['Offen', 'amber'], in_bearbeitung: ['In Bearbeitung', 'sky'], geschlossen: ['Geschlossen', 'slate'] };
+  // Priorität einer Akte (nur für die Kanzlei sichtbar)
+  const PRIORITY = { 1: ['Niedrig', 'slate'], 2: ['Normal', 'slate'], 3: ['Hoch', 'amber'], 4: ['Kritisch', 'red'] };
+  const CASE_SORTS = { aktualisiert: 'Zuletzt geändert', prioritaet: 'Priorität', neueste: 'Neueste zuerst', aelteste: 'Älteste zuerst' };
   const SOURCES = { portal: 'Mandantenportal', web: 'Website-Formular', kanzlei: 'Kanzlei' };
   const EVENT_TYPES = { gericht: 'Gerichtstermin', frist: 'Frist', mandant: 'Mandantengespräch', intern: 'Intern' };
   const EVENT_COLORS = { mandant: '#34d399', gericht: '#d4af37', frist: '#f87171', intern: '#7dd3fc' };
@@ -154,6 +157,13 @@
     caseFilter: 'aktiv',
     caseQuery: '',
     caseMine: false,
+    caseSort: (() => {
+      try {
+        return localStorage.getItem('ps.caseSort') || 'aktualisiert';
+      } catch {
+        return 'aktualisiert';
+      }
+    })(),
     userFilter: 'alle',
     userQuery: '',
     invFilter: 'alle',
@@ -911,9 +921,32 @@
   }
   // Offene Akten von Lifetime- und VIP-Mandanten stehen oben (sonst bleibt die Reihenfolge)
   const memberRank = (c) => (c.status === 'geschlossen' || !c.membership ? 0 : c.membership.kind === 'perma' ? 2 : 1);
+  /** Prioritäts-Badge (nur Kanzlei; „Normal“ wird nicht extra angezeigt). */
+  const priorityBadge = (c) => (c.priority && c.priority !== 2 && PRIORITY[c.priority] ? badge(`Prio ${PRIORITY[c.priority][0].toLowerCase()}`, PRIORITY[c.priority][1]) : '');
+  const caseTime = (c, key) => parseDate(c[key])?.getTime() || 0;
+  const URGENCY_RANK = { normal: 0, eilig: 1, notfall: 2 };
+
+  /** Sortierung der Aktenliste (Auswahl über der Liste, wird im Browser gemerkt). */
+  function sortCases(list) {
+    const mode = st.caseSort === 'prioritaet' && !isStaff() ? 'aktualisiert' : st.caseSort;
+    const byUpdated = (a, b) => caseTime(b, 'updatedAt') - caseTime(a, 'updatedAt');
+    const sorters = {
+      aktualisiert: (a, b) => memberRank(b) - memberRank(a) || byUpdated(a, b),
+      // Offene Akten vor geschlossenen, dann Priorität, Dringlichkeit, VIP/Lifetime, zuletzt geändert
+      prioritaet: (a, b) =>
+        (a.status === 'geschlossen') - (b.status === 'geschlossen') ||
+        (b.priority || 2) - (a.priority || 2) ||
+        URGENCY_RANK[b.urgency] - URGENCY_RANK[a.urgency] ||
+        memberRank(b) - memberRank(a) ||
+        byUpdated(a, b),
+      neueste: (a, b) => caseTime(b, 'createdAt') - caseTime(a, 'createdAt'),
+      aelteste: (a, b) => caseTime(a, 'createdAt') - caseTime(b, 'createdAt'),
+    };
+    return list.sort(sorters[mode] || sorters.aktualisiert);
+  }
 
   function caseTable() {
-    const rows = filteredCases().sort((a, b) => memberRank(b) - memberRank(a));
+    const rows = sortCases(filteredCases());
     const staff = isStaff();
     if (!rows.length) {
       return empty(st.cases.length ? 'Keine Akten für diese Auswahl.' : staff ? 'Noch keine Akten angelegt.' : 'Sie haben noch kein Mandat eingereicht.', 'folder');
@@ -924,7 +957,7 @@
         .map(
           (c) => `<tr class="row" data-action="open-case" data-id="${c.id}">
           <td class="td-main"><div class="font-mono text-gold text-xs">${esc(c.caseNumber)}</div><div class="font-medium">${esc(c.title)}</div>
-            <div class="text-xs text-dim mt-1 flex flex-wrap items-center gap-2">${esc(AREAS[c.area] || c.area)}${c.urgency !== 'normal' ? badge(...URGENCY[c.urgency]) : ''}</div></td>
+            <div class="text-xs text-dim mt-1 flex flex-wrap items-center gap-2">${esc(AREAS[c.area] || c.area)}${staff ? priorityBadge(c) : ''}${c.urgency !== 'normal' ? badge(...URGENCY[c.urgency]) : ''}</div></td>
           ${staff ? `<td data-label="Mandant">${esc(c.clientName)}${c.membership ? `<div class="mt-1">${memberBadge(c.membership)}</div>` : ''}</td>` : ''}
           <td data-label="Zuständig">${c.lawyerName ? `${esc(c.lawyerName)}${(c.coLawyers || []).length ? `<div class="text-xs text-dim">+ ${esc(c.coLawyers.map((l) => l.name).join(', '))}</div>` : ''}` : badge('Unbesetzt', 'amber')}</td>
           <td data-label="Status">${statusBadge(CASE_STATUS, c.status)}</td>
@@ -953,6 +986,10 @@
             ${staff ? `<button class="chip ${st.caseMine ? 'active' : ''}" data-action="case-mine">${icon('user', 'ico-sm')}Nur meine</button>` : ''}
           </div>
         </div>
+        <div class="list-bar"><label class="case-sort"><span>Sortieren</span><select id="caseSort" class="field" aria-label="Akten sortieren">${Object.entries(CASE_SORTS)
+          .filter(([k]) => staff || k !== 'prioritaet')
+          .map(([k, l]) => opt(k, l, st.caseSort === k))
+          .join('')}</select></label></div>
         <div id="caseList" class="panel p-2 md:p-3">${caseTable()}</div>`;
     },
   };
@@ -2116,6 +2153,30 @@
       <div class="flex flex-wrap gap-2">${open}<button class="btn-outline btn-sm" data-action="ticket-sync" data-id="${c.id}">${t.exists ? 'Abgleichen' : t.deleted ? 'Neu anlegen' : 'Ticket anlegen'}</button></div></div>`;
   }
 
+  /** Prozessticket: Link zum Kanal auf einem anderen Discord (z. B. DOJ) – nur für die Kanzlei. */
+  function processTicketBanner(c) {
+    if (!isStaff()) return '';
+    const pt = c.processTicket;
+    const form = c.canEdit
+      ? `<div id="ptBox" class="pt-box" hidden>
+          <form data-form="process-ticket" data-id="${c.id}" class="form-grid cols-2">
+            <div class="span-2"><label class="label" for="ptUrl">Link zum Kanal des Prozesstickets</label><input id="ptUrl" name="url" class="field" required maxlength="300" inputmode="url" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://discord.com/channels/…/…" value="${esc(pt ? pt.url : '')}"></div>
+            <div class="span-2"><label class="label" for="ptLabel">Bezeichnung (optional)</label><input id="ptLabel" name="label" class="field" maxlength="80" placeholder="z. B. DOJ – Hauptverhandlung" value="${esc(pt ? pt.label : '')}"></div>
+            <p class="span-2 text-xs text-dim">Im Discord des DOJ: Rechtsklick auf den Kanal (am Handy lange drücken) → „Link kopieren“ und hier einfügen. Nur für die Kanzlei sichtbar – der Mandant sieht das Prozessticket nicht.</p>
+            <div class="span-2 form-actions"><button type="button" class="btn-ghost btn-sm" data-action="pt-toggle">Abbrechen</button><button type="submit" class="btn-discord btn-sm">${DISCORD_ICON}<span>${pt ? 'Speichern' : 'Prozessticket hinzufügen'}</span></button></div>
+          </form></div>`
+      : '';
+    if (!pt) return form;
+    return `<div class="banner banner-discord items-center justify-between flex-wrap">
+      <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><strong>Prozessticket</strong>${badge('DOJ-Discord', 'sky')}</div>
+        ${pt.label ? `<div class="text-sm mt-1 break-words">${esc(pt.label)}</div>` : ''}
+        <div class="text-xs text-dim mt-1">Kanal auf einem anderen Discord-Server · nur für die Kanzlei sichtbar</div></div>
+      <div class="flex flex-wrap gap-2"><a href="${esc(pt.url)}" target="_blank" rel="noopener noreferrer" class="btn-discord btn-sm">${DISCORD_ICON}<span>Prozessticket öffnen</span></a>${
+        c.canEdit ? `<button class="btn-outline btn-sm" data-action="pt-toggle">Ändern</button><button class="btn-ghost btn-sm" data-action="pt-remove" data-id="${c.id}">Entfernen</button>` : ''
+      }</div>
+      ${form}</div>`;
+  }
+
   /** Darf das Mandanten-Konto der Akte verknüpfen/lösen: zuständige Anwälte und Board of Partners. */
   const canLinkClient = (c) => isStaff() && (c.canEdit || isBoard());
 
@@ -2162,19 +2223,40 @@
     if (input.isConnected && input.value.trim() === q) $('#clientAccList').innerHTML = clientAccountList(c, accounts);
   }
 
+  /** Priorität direkt in der Akte ändern (Auswahl neben dem Status). */
+  async function setCasePriority(sel) {
+    const id = Number(sel.dataset.id);
+    const priority = Number(sel.value);
+    try {
+      await api.patch('/api/cases/' + id, { priority });
+    } catch (err) {
+      sel.value = sel.dataset.value;
+      throw err;
+    }
+    toast(`Priorität: ${PRIORITY[priority][0]}`);
+    await reloadCase(id);
+  }
+
   function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, clientSuggestions }) {
     const staff = isStaff();
     const admin = isAdmin();
     const me = st.user.id;
     const ratio = c.closed ? 1 : c.step / 3;
 
+    // Bearbeitungsstand: zuständige Anwälte klicken den gewünschten Schritt direkt an
+    const stepEditable = c.canEdit && !c.closed;
     const track = `
-      <div class="track-line mb-6"><div class="track-fill" style="width:${ratio * 75}%"></div>
+      <div class="track ${stepEditable ? 'is-editable' : ''} mb-6">
+        ${stepEditable ? '<div class="track-head"><span>Bearbeitungsstand</span><span class="track-hint">Schritt anklicken, um ihn zu ändern</span></div>' : ''}
+        <div class="track-line"><div class="track-fill" style="width:${ratio * 75}%"></div>
         <div class="grid grid-cols-4">${STEPS.map((s, i) => {
           const done = c.closed || i < c.step;
           const cur = !c.closed && i === c.step;
-          return `<div class="flex flex-col items-center gap-2"><div class="track-node ${done ? 'done' : cur ? 'current' : ''}">${done ? '✓' : i + 1}</div><span class="text-[0.7rem] sm:text-xs text-muted text-center">${s}</span></div>`;
-        }).join('')}</div></div>`;
+          const inner = `<div class="track-node ${done ? 'done' : cur ? 'current' : ''}">${done ? '✓' : i + 1}</div><span class="track-label text-[0.7rem] sm:text-xs text-muted text-center">${s}</span>`;
+          return stepEditable && !cur
+            ? `<button type="button" class="track-step" data-action="case-step" data-id="${c.id}" data-step="${i}" title="Bearbeitungsstand: ${esc(s)}" aria-label="Bearbeitungsstand auf „${esc(s)}“ setzen">${inner}</button>`
+            : `<div class="track-step" ${cur ? 'aria-current="step"' : ''}>${inner}</div>`;
+        }).join('')}</div></div></div>`;
 
     const info = [
       ['Mandant', c.clientName + (staff && !c.hasClientAccount ? ' (ohne Konto)' : '')],
@@ -2199,9 +2281,15 @@
       : '';
 
     const statusSeg = c.canEdit
-      ? `<div class="chip-row mb-5" role="group" aria-label="Status ändern">${Object.entries(CASE_STATUS)
+      ? `<div class="case-controls mb-5"><div class="chip-row" role="group" aria-label="Status ändern">${Object.entries(CASE_STATUS)
           .map(([k, [l]]) => `<button type="button" class="chip ${c.status === k ? 'active' : ''}" data-action="case-status" data-id="${c.id}" data-status="${k}">${esc(l)}</button>`)
-          .join('')}</div>`
+          .join('')}</div>${
+          staff
+            ? `<label class="case-prio prio-${c.priority || 2}"><span>Priorität</span><select class="field" data-case-priority data-id="${c.id}" data-value="${c.priority || 2}" aria-label="Priorität der Akte">${Object.entries(PRIORITY)
+                .map(([k, [l]]) => opt(k, l, Number(k) === (c.priority || 2)))
+                .join('')}</select></label>`
+            : ''
+        }</div>`
       : '';
 
     const claim = c.canClaim
@@ -2212,6 +2300,7 @@
     if (staff) {
       quick.push(`<button class="btn-outline btn-sm" data-action="new-event" data-case-id="${c.id}" data-return-case="${c.id}">${icon('calendar', 'ico-sm')}<span>Frist / Termin</span></button>`);
       quick.push(`<button class="btn-outline btn-sm" data-action="new-invoice" data-case-id="${c.id}">${icon('receipt', 'ico-sm')}<span>Rechnung</span></button>`);
+      if (!c.processTicket && c.canEdit) quick.push(`<button class="btn-outline btn-sm" data-action="pt-toggle">${icon('plus', 'ico-sm')}<span>Prozessticket (DOJ)</span></button>`);
       if (!c.hasClientAccount && canLinkClient(c)) quick.push(`<button class="btn-outline btn-sm" data-action="case-client-search" data-id="${c.id}">${icon('user', 'ico-sm')}<span>Mandanten-Konto verknüpfen</span></button>`);
       if (c.clientId) quick.push(`<button class="btn-outline btn-sm" data-action="compose" data-recipient="${c.clientId}" data-case-id="${c.id}" data-return-case="${c.id}">${icon('mail', 'ico-sm')}<span>Mandant anschreiben</span></button>`);
       if (c.lawyerId === me) quick.push(`<button class="btn-ghost btn-sm" data-action="release-case" data-id="${c.id}">Akte abgeben</button>`);
@@ -2230,6 +2319,7 @@
             <div><label class="label">Rechtsgebiet</label><select name="area" class="field">${Object.entries(AREAS).map(([k, l]) => opt(k, l, c.area === k)).join('')}</select></div>
             <div><label class="label">Dringlichkeit</label><select name="urgency" class="field">${Object.entries(URGENCY).map(([k, [l]]) => opt(k, l, c.urgency === k)).join('')}</select></div>
             <div><label class="label">Verfahrensstand</label><select name="step" class="field">${STEPS.map((s, i) => opt(i, s, c.step === i)).join('')}</select></div>
+            ${staff ? `<div><label class="label">Priorität (nur intern)</label><select name="priority" class="field">${Object.entries(PRIORITY).map(([k, [l]]) => opt(k, l, Number(k) === (c.priority || 2))).join('')}</select></div>` : ''}
             ${c.hasClientAccount && canLinkClient(c) ? `<div class="span-2 flex flex-wrap items-center justify-between gap-2 text-sm"><div><span class="text-xs uppercase tracking-widest text-dim mr-1">Mandanten-Konto</span> <strong>${esc(c.clientName)}</strong>${c.clientEmail ? ` <span class="text-dim">· ${esc(c.clientEmail)}</span>` : ''}</div><div class="flex flex-wrap gap-2"><button type="button" class="btn-outline btn-sm" data-action="case-client-search" data-id="${c.id}">Anderes Konto</button><button type="button" class="btn-ghost btn-sm" data-action="case-unlink-client" data-id="${c.id}">Verknüpfung lösen</button></div></div>` : ''}
             ${!c.hasClientAccount ? `<div><label class="label">Mandant</label><input name="clientName" class="field" maxlength="80" value="${esc(c.clientName === '—' ? '' : c.clientName)}"></div>` : ''}
             <div><label class="label">Telefon Mandant</label><input name="clientPhone" class="field" maxlength="40" value="${esc(c.clientPhone || '')}"></div>
@@ -2271,7 +2361,7 @@
       <div class="flex flex-wrap items-start justify-between gap-3 mb-5 pr-12">
         <div class="min-w-0"><div class="font-mono text-gold text-sm">${esc(c.caseNumber)}</div>
           <h2 id="modalTitle" class="font-serif text-2xl md:text-3xl font-semibold leading-tight">${esc(c.title)}</h2></div>
-        <div class="flex flex-wrap gap-2">${memberBadge(c.membership)}${statusBadge(CASE_STATUS, c.status)}${c.urgency !== 'normal' ? badge(...URGENCY[c.urgency]) : ''}</div>
+        <div class="flex flex-wrap gap-2">${memberBadge(c.membership)}${statusBadge(CASE_STATUS, c.status)}${staff ? priorityBadge(c) : ''}${c.urgency !== 'normal' ? badge(...URGENCY[c.urgency]) : ''}</div>
       </div>
       ${statusSeg}
       ${track}
@@ -2281,6 +2371,7 @@
       ${pin}
       ${clientLinkBanner(c, clientSuggestions)}
       ${ticketBanner(c, ticket)}
+      ${processTicketBanner(c)}
       ${quick.length ? `<div class="form-actions mb-2">${quick.join('')}</div>` : ''}
       ${editForm}
       <div class="section"><h3 class="section-title">Sachverhalt</h3><p class="text-sm whitespace-pre-wrap text-muted">${esc(c.description || '—')}</p></div>
@@ -5715,6 +5806,36 @@
       toast(`Status: ${CASE_STATUS[el.dataset.status][0]}`);
       await reloadCase(id);
     },
+    'case-step': async (el) => {
+      const id = Number(el.dataset.id);
+      const step = Number(el.dataset.step);
+      const steps = $$('button.track-step');
+      steps.forEach((b) => (b.disabled = true)); // kein Doppelklick während des Speicherns
+      try {
+        await api.patch('/api/cases/' + id, { step });
+      } finally {
+        steps.forEach((b) => (b.disabled = false));
+      }
+      toast(`Bearbeitungsstand: ${STEPS[step]}`);
+      await reloadCase(id);
+    },
+    'pt-toggle': () => {
+      const box = $('#ptBox');
+      if (!box) return;
+      box.hidden = !box.hidden;
+      if (box.hidden) return;
+      const input = box.querySelector('[name="url"]');
+      input.focus();
+      input.select();
+      box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    },
+    'pt-remove': async (el) => {
+      const id = Number(el.dataset.id);
+      if (!(await askDelete('Prozessticket entfernen?', 'Der Link wird aus der Akte entfernt. Der Kanal im Discord des DOJ bleibt davon unberührt.', 'Entfernen'))) return;
+      await api.del(`/api/cases/${id}/process-ticket`);
+      toast('Prozessticket entfernt.');
+      await reloadCase(id);
+    },
     'claim-case': async (el) => {
       const id = Number(el.dataset.id);
       await api.patch('/api/cases/' + id, { lawyerId: st.user.id });
@@ -6947,10 +7068,18 @@
         if (f.elements[k]) body[k] = val(fd, k);
       });
       if (f.elements.step) body.step = Number(fd.get('step'));
+      if (f.elements.priority) body.priority = Number(fd.get('priority'));
       if (f.elements.lawyerId) body.lawyerId = fd.get('lawyerId') ? Number(fd.get('lawyerId')) : null;
       if (f.querySelector('[data-team]')) body.coLawyerIds = fd.getAll('coLawyerIds').map(Number);
       await api.patch('/api/cases/' + id, body);
       toast('Akte gespeichert.');
+      await reloadCase(id);
+    },
+    'process-ticket': async (f) => {
+      const fd = new FormData(f);
+      const id = Number(f.dataset.id);
+      await api.put(`/api/cases/${id}/process-ticket`, { url: val(fd, 'url'), label: val(fd, 'label') });
+      toast('Prozessticket gespeichert.');
       await reloadCase(id);
     },
     'add-note': async (f) => {
@@ -7542,6 +7671,20 @@
     }
     if (t.closest('#invoiceForm')) {
       onInvoiceChange(t);
+      return;
+    }
+    if (t.id === 'caseSort') {
+      st.caseSort = t.value;
+      try {
+        localStorage.setItem('ps.caseSort', t.value);
+      } catch {
+        /* nur Komfort – ohne Speicher gilt die Auswahl bis zum Neuladen */
+      }
+      $('#caseList').innerHTML = caseTable();
+      return;
+    }
+    if (t.dataset.casePriority !== undefined) {
+      guard(() => setCasePriority(t));
       return;
     }
     if (t.id === 'tierKind') {
