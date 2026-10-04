@@ -18,7 +18,13 @@
   const URGENCY = { normal: ['Normal', 'slate'], eilig: ['Eilig', 'amber'], notfall: ['Notfall', 'red'] };
   const CASE_STATUS = { offen: ['Offen', 'amber'], in_bearbeitung: ['In Bearbeitung', 'sky'], geschlossen: ['Geschlossen', 'slate'] };
   // Priorität einer Akte (nur für die Kanzlei sichtbar)
-  const PRIORITY = { 1: ['Niedrig', 'slate'], 2: ['Normal', 'slate'], 3: ['Hoch', 'amber'], 4: ['Kritisch', 'red'] };
+  // [Auswahl, Farbe, Anzeige]
+  const PRIORITY = {
+    1: ['Niedrig', 'slate', 'Niedrige Priorität'],
+    2: ['Normal', 'sky', 'Normale Priorität'],
+    3: ['Hoch', 'amber', 'Hohe Priorität'],
+    4: ['Kritisch', 'red', 'Kritische Priorität'],
+  };
   const CASE_SORTS = { aktualisiert: 'Zuletzt geändert', prioritaet: 'Priorität', neueste: 'Neueste zuerst', aelteste: 'Älteste zuerst' };
   const SOURCES = { portal: 'Mandantenportal', web: 'Website-Formular', kanzlei: 'Kanzlei' };
   const EVENT_TYPES = { gericht: 'Gerichtstermin', frist: 'Frist', mandant: 'Mandantengespräch', intern: 'Intern' };
@@ -921,8 +927,13 @@
   }
   // Offene Akten von Lifetime- und VIP-Mandanten stehen oben (sonst bleibt die Reihenfolge)
   const memberRank = (c) => (c.status === 'geschlossen' || !c.membership ? 0 : c.membership.kind === 'perma' ? 2 : 1);
-  /** Prioritäts-Badge (nur Kanzlei; „Normal“ wird nicht extra angezeigt). */
-  const priorityBadge = (c) => (c.priority && c.priority !== 2 && PRIORITY[c.priority] ? badge(`Prio ${PRIORITY[c.priority][0].toLowerCase()}`, PRIORITY[c.priority][1]) : '');
+  /** Prioritäts-Badge (nur Kanzlei), z. B. „Hohe Priorität“ mit Stufen-Anzeige. */
+  function priorityBadge(c) {
+    const p = PRIORITY[c.priority] ? c.priority : 2;
+    const [, color, text] = PRIORITY[p];
+    const bars = [1, 2, 3, 4].map((i) => `<i class="${i <= p ? 'on' : ''}"></i>`).join('');
+    return `<span class="badge badge-${color} prio-badge"><span class="prio-bars" aria-hidden="true">${bars}</span>${esc(text)}</span>`;
+  }
   const caseTime = (c, key) => parseDate(c[key])?.getTime() || 0;
   const URGENCY_RANK = { normal: 0, eilig: 1, notfall: 2 };
 
