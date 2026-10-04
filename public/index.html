@@ -1473,17 +1473,22 @@
         setInterval(updateClock, 1000);
 
         /* ---------- Scrollspy Navigation ---------- */
-        const sections = ['start', 'raenge', 'honorar', 'rechner', 'team', 'akte', 'kontakt'];
-        const navLinks = document.querySelectorAll('.nav-link');
+        // Abschnitte kommen aus den Menüpunkten selbst (data-section) – unabhängig von der Reihenfolge auf der Seite.
+        // Markiert wird der Menüpunkt des Abschnitts, in dem man gerade liest; ganz unten der letzte (Kontakt).
+        const navLinks = document.querySelectorAll('.nav-link[data-section]');
+        const spySections = [...navLinks].map(link => document.getElementById(link.dataset.section)).filter(Boolean);
         function updateScrollspy() {
-            let current = sections[0];
-            const scrollY = window.scrollY + 140;
-            sections.forEach(id => {
-                const el = document.getElementById(id);
-                if (el && el.offsetTop <= scrollY) current = id;
+            const y = window.scrollY + 140;
+            const tops = spySections.map(el => ({ id: el.id, top: el.getBoundingClientRect().top + window.scrollY }));
+            let current = null;
+            let best = -Infinity;
+            tops.forEach(s => {
+                if (s.top <= y && s.top > best) { best = s.top; current = s.id; }
             });
+            const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
+            if (atBottom && tops.length) current = tops.reduce((a, b) => (b.top > a.top ? b : a)).id;
             navLinks.forEach(link => {
-                link.classList.toggle('nav-active', link.getAttribute('data-section') === current);
+                link.classList.toggle('nav-active', link.dataset.section === current);
             });
         }
 
@@ -1503,6 +1508,9 @@
             updateScrollspy();
             document.getElementById('backToTop').classList.toggle('show', window.scrollY > 600);
         });
+        // Team, Honorarordnung & Co. werden nachgeladen und verschieben die Abschnitte
+        window.addEventListener('load', updateScrollspy);
+        window.addEventListener('resize', updateScrollspy);
         updateScrollspy();
     </script>
     <!-- Backend-Anbindung: Login-Button, Mandatsanfrage, Aktenstatus, Team & Honorarordnung live -->
