@@ -551,6 +551,11 @@ addColumn('cases', 'discord_error', 'TEXT');
 addColumn('cases', 'discord_panel_id', 'TEXT'); // Nachricht mit den Buttons (Übernehmen, Schließen …)
 addColumn('cases', 'discord_panel_state', 'TEXT');
 addColumn('cases', 'discord_extra', 'TEXT'); // per /add hinzugefügte Personen (Discord-IDs)
+// Priorität (nur intern, für die Kanzlei): 1 niedrig · 2 normal · 3 hoch · 4 kritisch
+addColumn('cases', 'priority', 'INTEGER NOT NULL DEFAULT 2');
+// Prozessticket: Link zum Kanal auf einem anderen Discord (z. B. DOJ) – nur für die Kanzlei sichtbar
+addColumn('cases', 'process_ticket_url', 'TEXT');
+addColumn('cases', 'process_ticket_label', 'TEXT');
 // Board-Tickets (Discord-Kanal je Bewerbung bzw. Anliegen, nur für das Board of Partners)
 for (const table of ['applications', 'concerns']) {
   addColumn(table, 'discord_channel_id', 'TEXT');

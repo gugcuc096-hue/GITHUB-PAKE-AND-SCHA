@@ -225,6 +225,27 @@ input[type="datetime-local"].field, input[type="date"].field { color-scheme: dar
 }
 .track-node.done { border-color: var(--gold-500); background: var(--gold-500); color: #02050e; font-weight: 700; }
 .track-node.current { border-color: var(--gold-500); box-shadow: 0 0 0 5px rgba(212, 175, 55, 0.15); }
+/* Bearbeitungsstand direkt anklicken (zuständige Anwälte) */
+.track-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.25rem 0.75rem; margin-bottom: 0.75rem; font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); }
+.track-head .track-hint { letter-spacing: normal; text-transform: none; font-size: 0.75rem; }
+.track-step { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; min-width: 0; padding: 0 0.15rem 0.2rem; background: none; border: 0; color: inherit; font: inherit; border-radius: 12px; }
+.track-step .track-node { transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background-color 0.15s ease; }
+button.track-step { cursor: pointer; }
+button.track-step:hover .track-node, button.track-step:focus-visible .track-node { border-color: var(--gold-500); box-shadow: 0 0 0 5px rgba(212, 175, 55, 0.22); transform: scale(1.1); }
+button.track-step:hover .track-label, button.track-step:focus-visible .track-label { color: var(--gold-light); }
+button.track-step:focus-visible { outline: 2px solid var(--gold-500); outline-offset: 3px; }
+button.track-step:disabled { cursor: progress; opacity: 0.7; }
+/* Status + Priorität über der Leiste */
+.case-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem 1rem; }
+.case-controls .chip-row { min-width: 0; }
+.case-prio { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: var(--text-dim); }
+.case-prio .field { width: auto; min-height: 34px; padding: 0.3rem 2.1rem 0.3rem 0.75rem; font-size: 0.8rem; border-radius: 999px; }
+.case-prio.prio-3 .field { border-color: rgba(245, 158, 11, 0.55); color: #fde68a; }
+.case-prio.prio-4 .field { border-color: rgba(239, 68, 68, 0.6); color: #fecaca; }
+/* Aktenliste: Sortierung */
+.case-sort { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: var(--text-dim); white-space: nowrap; }
+.case-sort .field { width: auto; min-height: 36px; padding: 0.35rem 2.1rem 0.35rem 0.8rem; font-size: 0.8rem; border-radius: 999px; }
+.list-bar { display: flex; justify-content: flex-end; margin: -0.35rem 0 0.6rem; }
 
 /* ---------------------------------------------------------------- Toasts */
 .ps-toast-root { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 90; display: flex; flex-direction: column; gap: 0.6rem; max-width: calc(100vw - 2rem); }
@@ -995,3 +1016,7 @@ body.ps-dialog-open { overflow: hidden; }
 .wl-preview .dc-spoiler { background: #1e1f22; color: transparent; border-radius: 3px; cursor: pointer; }
 .wl-preview .dc-spoiler:hover { color: inherit; background: rgba(255, 255, 255, 0.08); }
 .dc-help { margin-top: 0.4rem; }
+/* Prozessticket (Kanal auf dem DOJ-Discord) */
+.pt-box { width: 100%; margin-bottom: 1.25rem; padding: 0.9rem 1rem; border-radius: 14px; border: 1px solid rgba(88, 101, 242, 0.45); background: rgba(88, 101, 242, 0.08); }
+.pt-box[hidden] { display: none !important; }
+.banner .pt-box { flex-basis: 100%; margin: 0.25rem 0 0; padding: 0.85rem 0 0; border: 0; border-top: 1px solid rgba(88, 101, 242, 0.35); border-radius: 0; background: none; }
