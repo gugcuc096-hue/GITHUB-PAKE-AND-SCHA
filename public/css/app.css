@@ -242,6 +242,16 @@ button.track-step:disabled { cursor: progress; opacity: 0.7; }
 .case-prio .field { width: auto; min-height: 34px; padding: 0.3rem 2.1rem 0.3rem 0.75rem; font-size: 0.8rem; border-radius: 999px; }
 .case-prio.prio-3 .field { border-color: rgba(245, 158, 11, 0.55); color: #fde68a; }
 .case-prio.prio-4 .field { border-color: rgba(239, 68, 68, 0.6); color: #fecaca; }
+.case-prio.prio-2 .field { border-color: rgba(56, 189, 248, 0.45); }
+/* Prioritäts-Badge mit kleiner Stufen-Anzeige (1–4 Balken) */
+.prio-badge { gap: 0.4rem; }
+.prio-bars { display: inline-flex; align-items: flex-end; gap: 1.5px; height: 10px; }
+.prio-bars i { width: 2.5px; border-radius: 1px; background: currentColor; opacity: 0.25; }
+.prio-bars i:nth-child(1) { height: 4px; }
+.prio-bars i:nth-child(2) { height: 6px; }
+.prio-bars i:nth-child(3) { height: 8px; }
+.prio-bars i:nth-child(4) { height: 10px; }
+.prio-bars i.on { opacity: 1; }
 /* Aktenliste: Sortierung */
 .case-sort { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: var(--text-dim); white-space: nowrap; }
 .case-sort .field { width: auto; min-height: 36px; padding: 0.35rem 2.1rem 0.35rem 0.8rem; font-size: 0.8rem; border-radius: 999px; }
