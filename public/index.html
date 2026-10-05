@@ -291,11 +291,11 @@
             </a>
 
             <nav class="hidden xl:flex items-center gap-5 text-[0.7rem] uppercase tracking-wider font-medium text-[var(--text-muted)]" aria-label="Hauptnavigation">
+                <a href="#rechner" data-section="rechner" class="nav-link hover:text-[var(--gold-500)] transition-colors">Tarifrechner</a>
+                <a href="#honorar" data-section="honorar" class="nav-link hover:text-[var(--gold-500)] transition-colors">Honorarordnung</a>
+                <a href="#vip" data-section="vip" class="nav-link hover:text-[var(--gold-500)] transition-colors">VIP &amp; Lifetime</a>
                 <a href="#team" data-section="team" class="nav-link hover:text-[var(--gold-500)] transition-colors">Team</a>
                 <a href="#raenge" data-section="raenge" class="nav-link hover:text-[var(--gold-500)] transition-colors">Kanzleiränge</a>
-                <a href="#honorar" data-section="honorar" class="nav-link hover:text-[var(--gold-500)] transition-colors">Honorarordnung</a>
-                <a href="#rechner" data-section="rechner" class="nav-link hover:text-[var(--gold-500)] transition-colors">Tarifrechner</a>
-                <a href="#vip" data-section="vip" class="nav-link hover:text-[var(--gold-500)] transition-colors">VIP &amp; Lifetime</a>
                 <a href="#kontakt" data-section="kontakt" class="nav-link hover:text-[var(--gold-500)] transition-colors">Kontakt</a>
             </nav>
 
@@ -321,11 +321,11 @@
         <div id="mobileMenu" class="xl:hidden border-t border-[var(--glass-border)]">
             <nav class="flex flex-col px-6 py-4 gap-1 text-sm uppercase tracking-widest text-[var(--text-muted)]" aria-label="Mobile Navigation">
                 <a href="#start" onclick="toggleMobileMenu()" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Startseite</a>
+                <a href="#rechner" onclick="toggleMobileMenu()" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Tarifrechner</a>
+                <a href="#honorar" onclick="toggleMobileMenu()" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Honorarordnung</a>
+                <a href="#vip" onclick="toggleMobileMenu()" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">VIP &amp; Lifetime</a>
                 <a href="#team" onclick="toggleMobileMenu()" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Team</a>
                 <a href="#raenge" onclick="toggleMobileMenu()" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Kanzleiränge</a>
-                <a href="#honorar" onclick="toggleMobileMenu()" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Honorarordnung</a>
-                <a href="#rechner" onclick="toggleMobileMenu()" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Tarifrechner</a>
-                <a href="#vip" onclick="toggleMobileMenu()" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">VIP &amp; Lifetime</a>
                 <a href="#kontakt" onclick="toggleMobileMenu()" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Kontakt</a>
                 <a href="/karriere.html" class="py-3 hover:text-[var(--gold-500)] flex items-center justify-between">Karriere <span class="text-[0.6rem] normal-case tracking-normal px-2 py-0.5 rounded-full border border-emerald-500/40 text-emerald-300">Wir stellen ein</span></a>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 normal-case tracking-normal">
@@ -397,157 +397,6 @@
             </div>
         </section>
 
-        <!-- TEAM SECTION -->
-        <section id="team" class="max-w-6xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
-            <div class="text-center max-w-3xl mx-auto mb-16">
-                <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Ansprechpartner</div>
-                <h2 class="font-serif text-4xl md:text-5xl font-semibold mb-4">Unser Team</h2>
-                <p class="text-[var(--text-muted)] text-base leading-relaxed">
-                    Ausgewählte Mitglieder unseres Führungsgremiums und der operativen Anwaltschaft — Ihre direkten Ansprechpartner je nach Rechtsgebiet.
-                </p>
-            </div>
-
-            <!-- Wird live aus der Datenbank geladen (Dashboard → Team-Verwaltung). -->
-            <div id="teamGrid" class="flex flex-wrap justify-center gap-6">
-                <p class="w-full text-center text-sm text-[var(--text-muted)] py-8">Team wird geladen …</p>
-            </div>
-        </section>
-
-        <!-- KANZLEIRÄNGE SECTION -->
-        <section id="raenge" class="max-w-6xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
-            <div class="text-center max-w-3xl mx-auto mb-16">
-                <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Struktur & Verfassungsgefüge</div>
-                <h2 class="font-serif text-4xl md:text-5xl font-semibold mb-4">Hierarchie & Kanzleiränge</h2>
-                <p class="text-[var(--text-muted)] text-base leading-relaxed">
-                    Die Kanzlei gliedert sich in zwei funktionale Führungsebenen. Jeder unserer Anwälte darf Sie vor jedem Gericht vertreten – die Ränge regeln Verantwortung, Führung und Erfahrung, nicht die Zulassung.
-                </p>
-            </div>
-
-            <div class="space-y-16">
-                <!-- BOARD OF PARTNERS -->
-                <div>
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8 pb-3 border-b border-[var(--gold-hairline)]">
-                        <div>
-                            <span class="text-[0.65rem] uppercase tracking-[0.25em] text-[var(--gold-500)] font-semibold block mb-1">Ebene I — Leitende Gesellschafter</span>
-                            <h3 class="font-serif text-3xl text-[var(--gold-light)] font-semibold tracking-wide">Board of Partners</h3>
-                        </div>
-                        <span class="self-start sm:self-auto text-xs font-mono text-[var(--gold-500)] px-3 py-1 rounded-full border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.05)]">Höchste Entscheidungsgewalt</span>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div class="glass-card p-8 border-t-2 border-t-[var(--gold-500)] flex flex-col justify-between">
-                            <div>
-                                <div class="flex items-center justify-between mb-4">
-                                    <span class="text-[0.65rem] font-mono px-3 py-1 rounded-full bg-[rgba(212,175,55,0.15)] text-[var(--gold-light)] border border-[var(--gold-hairline)] uppercase font-semibold">Grundsatzebene</span>
-                                    <span class="text-xs text-[var(--text-muted)] font-mono">Rang 01</span>
-                                </div>
-                                <h4 class="font-serif text-2xl font-semibold text-white mb-3">Founding Partner</h4>
-                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-6">
-                                    Gründer, Inhaber und Leitung der Kanzlei. Trägt die Gesamtverantwortung für Strategie, Personal und Qualität, führt Grundsatz- und Großmandate und vertritt staatliche Institutionen, Unternehmen und Privatpersonen vor jedem Gericht.
-                                </p>
-                            </div>
-                            <div class="pt-4 border-t border-[var(--glass-border)] text-[0.7rem] font-mono text-[var(--gold-500)]">
-                                Vollmacht: Alle Gerichte · Kanzleileitung
-                            </div>
-                        </div>
-
-                        <div class="glass-card p-8 border-t-2 border-t-[var(--gold-500)] flex flex-col justify-between">
-                            <div>
-                                <div class="flex items-center justify-between mb-4">
-                                    <span class="text-[0.65rem] font-mono px-3 py-1 rounded-full bg-[rgba(212,175,55,0.15)] text-[var(--gold-light)] border border-[var(--gold-hairline)] uppercase font-semibold">Gesellschafter</span>
-                                    <span class="text-xs text-[var(--text-muted)] font-mono">Rang 02</span>
-                                </div>
-                                <h4 class="font-serif text-2xl font-semibold text-white mb-3">Equity Partner</h4>
-                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-6">
-                                    Kapitalführender Partner mit Leitungsverantwortung für spezifische Rechtsbereiche (z. B. Wirtschaftsstrafrecht oder Verwaltungsrecht). Führt Großmandate, verantwortet die interne Qualitätssicherung und leitet strategische Vergleichsverhandlungen.
-                                </p>
-                            </div>
-                            <div class="pt-4 border-t border-[var(--glass-border)] text-[0.7rem] font-mono text-[var(--gold-500)]">
-                                Vollmacht: Alle Gerichte · Fachbereichsleitung
-                            </div>
-                        </div>
-
-                        <div class="glass-card p-8 border-t-2 border-t-[var(--gold-500)] flex flex-col justify-between">
-                            <div>
-                                <div class="flex items-center justify-between mb-4">
-                                    <span class="text-[0.65rem] font-mono px-3 py-1 rounded-full bg-[rgba(212,175,55,0.15)] text-[var(--gold-light)] border border-[var(--gold-hairline)] uppercase font-semibold">Partner</span>
-                                    <span class="text-xs text-[var(--text-muted)] font-mono">Rang 03</span>
-                                </div>
-                                <h4 class="font-serif text-2xl font-semibold text-white mb-3">Partner</h4>
-                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-6">
-                                    Vollwertiges Mitglied des Führungsgremiums. Eigenständige Mandatsübernahme, Fachführung von Associate-Teams und Vertretung in hochkomplexen Hauptverhandlungen sowie Notfalleinsätzen.
-                                </p>
-                            </div>
-                            <div class="pt-4 border-t border-[var(--glass-border)] text-[0.7rem] font-mono text-[var(--gold-500)]">
-                                Vollmacht: Alle Gerichte · Teamführung
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ASSOCIATE ATTORNEYS -->
-                <div>
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8 pb-3 border-b border-slate-700">
-                        <div>
-                            <span class="text-[0.65rem] uppercase tracking-[0.25em] text-slate-400 font-semibold block mb-1">Ebene II — Angestellte Anwaltschaft</span>
-                            <h3 class="font-serif text-3xl text-slate-200 font-semibold tracking-wide">Associate Attorneys</h3>
-                        </div>
-                        <span class="self-start sm:self-auto text-xs font-mono text-slate-400 px-3 py-1 rounded-full border border-slate-700 bg-slate-800/40">Operative Anwaltschaft</span>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div class="glass-card p-8 border-t-2 border-t-amber-500/60 flex flex-col justify-between">
-                            <div>
-                                <div class="flex items-center justify-between mb-4">
-                                    <span class="text-[0.65rem] font-mono px-3 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 uppercase font-semibold">Senior Level</span>
-                                    <span class="text-xs text-[var(--text-muted)] font-mono">Rang 04</span>
-                                </div>
-                                <h4 class="font-serif text-2xl font-semibold text-white mb-3">Senior Associate</h4>
-                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-6">
-                                    Erfahrene Anwälte mit umfassender Praxiserfahrung. Eigenverantwortliche Betreuung von Haftprüfungsterminen, U-Haft-Vertretungen vor Ort, Akteneinsichten und Prozessführung vor jedem Gericht.
-                                </p>
-                            </div>
-                            <div class="pt-4 border-t border-[var(--glass-border)] text-[0.7rem] font-mono text-amber-300">
-                                Befugnis: Alle Gerichte · Eigenverantwortlich
-                            </div>
-                        </div>
-
-                        <div class="glass-card p-8 border-t-2 border-t-slate-500 flex flex-col justify-between">
-                            <div>
-                                <div class="flex items-center justify-between mb-4">
-                                    <span class="text-[0.65rem] font-mono px-3 py-1 rounded-full bg-slate-500/10 text-slate-300 border border-slate-500/20 uppercase font-semibold">Mid Level</span>
-                                    <span class="text-xs text-[var(--text-muted)] font-mono">Rang 05</span>
-                                </div>
-                                <h4 class="font-serif text-2xl font-semibold text-white mb-3">Associate</h4>
-                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-6">
-                                    Approbierte Juristen für das Tagesgeschäft. Bearbeitung eingehender Mandatstickets, Prüfung von Verträgen, Verfassung von Klageschriften und eigenständige Vertretung von Mandanten vor Gericht.
-                                </p>
-                            </div>
-                            <div class="pt-4 border-t border-[var(--glass-border)] text-[0.7rem] font-mono text-slate-300">
-                                Befugnis: Alle Gerichte · Tagesgeschäft
-                            </div>
-                        </div>
-
-                        <div class="glass-card p-8 border-t-2 border-t-slate-600 flex flex-col justify-between">
-                            <div>
-                                <div class="flex items-center justify-between mb-4">
-                                    <span class="text-[0.65rem] font-mono px-3 py-1 rounded-full bg-slate-600/10 text-slate-400 border border-slate-600/20 uppercase font-semibold">Junior Level</span>
-                                    <span class="text-xs text-[var(--text-muted)] font-mono">Rang 06</span>
-                                </div>
-                                <h4 class="font-serif text-2xl font-semibold text-white mb-3">Junior Associate</h4>
-                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-6">
-                                    Junge Rechtsanwälte im Mentoring. Vertreten Mandanten vor jedem Gericht – auf Wunsch mit Rückendeckung erfahrener Kollegen – und übernehmen Recherchen, Ermittlungsakten und Beweisanträge.
-                                </p>
-                            </div>
-                            <div class="pt-4 border-t border-[var(--glass-border)] text-[0.7rem] font-mono text-slate-400">
-                                Befugnis: Alle Gerichte · im Mentoring
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
         <!-- VERFAHRENSABLAUF SECTION -->
         <section id="ablauf" class="max-w-6xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
             <div class="text-center max-w-3xl mx-auto mb-16">
@@ -575,6 +424,116 @@
                     <div class="font-mono text-3xl font-bold text-[var(--gold-500)] mb-3">04</div>
                     <h3 class="font-serif text-xl font-semibold text-white mb-2">Gerichtsvertretung</h3>
                     <p class="text-xs text-[var(--text-muted)] leading-relaxed">Konsequente Vertretung Ihrer Interessen vor Gericht oder in Vergleichsverhandlungen.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- INTERAKTIVER TARIFRECHNER SECTION -->
+        <section id="rechner" class="max-w-6xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
+            <div class="text-center max-w-3xl mx-auto mb-12">
+                <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Transparente Kostenplanung</div>
+                <h2 class="font-serif text-4xl md:text-5xl font-semibold mb-4">Interaktiver Tarifrechner</h2>
+                <p class="text-[var(--text-muted)] text-base">
+                    Stellen Sie sich Ihre benötigten juristischen Leistungen zusammen und erhalten Sie eine sofortige Kostenschätzung — inklusive Mandatsbündel-Rabatt.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Auswahl-Optionen -->
+                <div class="lg:col-span-2 glass-card p-6 md:p-8 space-y-3">
+                    <h3 class="text-lg font-semibold text-white mb-2 border-b border-[var(--glass-border)] pb-2">Leistungen auswählen</h3>
+
+                    <!-- Wird von site.js live aus der Honorarordnung befüllt; statischer Inhalt dient als Rückfall. -->
+                    <div id="calcOptions" class="space-y-3">
+                    <label class="flex items-center justify-between p-3.5 rounded-xl border border-[var(--glass-border)] bg-slate-900/40 hover:bg-slate-900/70 cursor-pointer transition-all">
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" class="calc-check accent-[var(--gold-500)] w-4 h-4" value="15000" data-name="Rechtliche Beratung per Ticket" onchange="calculateTotal()">
+                            <span class="text-sm font-medium text-white">Rechtliche Beratung per Ticket</span>
+                        </div>
+                        <span class="font-mono text-xs text-[var(--gold-500)]">15.000 $</span>
+                    </label>
+
+                    <label class="flex items-center justify-between p-3.5 rounded-xl border border-[var(--glass-border)] bg-slate-900/40 hover:bg-slate-900/70 cursor-pointer transition-all">
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" class="calc-check accent-[var(--gold-500)] w-4 h-4" value="25000" data-name="Persönliche Rechtsberatung" onchange="calculateTotal()">
+                            <span class="text-sm font-medium text-white">Persönliche Rechtsberatung</span>
+                        </div>
+                        <span class="font-mono text-xs text-[var(--gold-500)]">25.000 $</span>
+                    </label>
+
+                    <label class="flex items-center justify-between p-3.5 rounded-xl border border-[var(--glass-border)] bg-slate-900/40 hover:bg-slate-900/70 cursor-pointer transition-all">
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" class="calc-check accent-[var(--gold-500)] w-4 h-4" value="50000" data-name="U-Haft-Vertretung vor Ort" onchange="calculateTotal()">
+                            <span class="text-sm font-medium text-white">U-Haft-Vertretung vor Ort</span>
+                        </div>
+                        <span class="font-mono text-xs text-[var(--gold-500)]">50.000 $</span>
+                    </label>
+
+                    <label class="flex items-center justify-between p-3.5 rounded-xl border border-[var(--glass-border)] bg-slate-900/40 hover:bg-slate-900/70 cursor-pointer transition-all">
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" class="calc-check accent-[var(--gold-500)] w-4 h-4" value="60000" data-name="Strafrechtliche Vertretung" onchange="calculateTotal()">
+                            <span class="text-sm font-medium text-white">Strafrechtliche Vertretung</span>
+                        </div>
+                        <span class="font-mono text-xs text-[var(--gold-500)]">60.000 $</span>
+                    </label>
+
+                    <label class="flex items-center justify-between p-3.5 rounded-xl border border-[var(--glass-border)] bg-slate-900/40 hover:bg-slate-900/70 cursor-pointer transition-all">
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" class="calc-check accent-[var(--gold-500)] w-4 h-4" value="100000" data-name="Vertretung Hauptverhandlung" onchange="calculateTotal()">
+                            <span class="text-sm font-medium text-white">Vertretung Hauptverhandlung (alle Gerichte)</span>
+                        </div>
+                        <span class="font-mono text-xs text-[var(--gold-500)]">100.000 $</span>
+                    </label>
+
+                    <label class="flex items-center justify-between p-3.5 rounded-xl border border-[var(--glass-border)] bg-slate-900/40 hover:bg-slate-900/70 cursor-pointer transition-all">
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" class="calc-check accent-[var(--gold-500)] w-4 h-4" value="35000" data-name="Vertragsentwurf (Standard)" onchange="calculateTotal()">
+                            <span class="text-sm font-medium text-white">Vertragsentwurf (Standard)</span>
+                        </div>
+                        <span class="font-mono text-xs text-[var(--gold-500)]">35.000 $</span>
+                    </label>
+
+                    <label class="flex items-center justify-between p-3.5 rounded-xl border border-[var(--glass-border)] bg-slate-900/40 hover:bg-slate-900/70 cursor-pointer transition-all">
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" class="calc-check accent-[var(--gold-500)] w-4 h-4" value="75000" data-name="24/7 Eilnotdiensteinsatz" onchange="calculateTotal()">
+                            <span class="text-sm font-medium text-white">24/7 Eilnotdiensteinsatz</span>
+                        </div>
+                        <span class="font-mono text-xs text-[var(--gold-500)]">75.000 $</span>
+                    </label>
+
+                    </div>
+
+                    <label class="flex items-center justify-between p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10 cursor-pointer transition-all mt-2">
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" id="priorityAddon" class="calc-check accent-amber-400 w-4 h-4" onchange="calculateTotal()">
+                            <div>
+                                <span class="text-sm font-medium text-white block">Priorisierte Bearbeitung (+15 %)</span>
+                                <span class="text-[0.65rem] text-amber-300/80">Vorrangige Terminierung innerhalb von 2 Stunden</span>
+                            </div>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Zusammenfassung -->
+                <div class="glass-card p-6 md:p-8 flex flex-col justify-between border-t-2 border-t-[var(--gold-500)]">
+                    <div>
+                        <h3 class="text-lg font-semibold text-white mb-4 border-b border-[var(--glass-border)] pb-2">Kostenschätzung</h3>
+                        <ul id="selectedList" class="text-xs text-[var(--text-muted)] space-y-2 mb-4 min-h-[100px]">
+                            <li class="italic text-gray-500">Keine Leistungen ausgewählt</li>
+                        </ul>
+                        <div id="discountRow" class="hidden text-xs text-emerald-400 flex justify-between border-t border-[var(--glass-border)] pt-2 mb-2">
+                            <span>Mandatsbündel-Rabatt (10 %)</span>
+                            <span id="discountAmount" class="font-mono">− 0 $</span>
+                        </div>
+                    </div>
+                    <div class="pt-4 border-t border-[var(--glass-border)]">
+                        <div class="text-xs uppercase tracking-wider text-[var(--text-muted)] mb-1">Geschätztes Gesamthonorar</div>
+                        <div id="totalAmount" class="font-mono text-3xl font-bold text-[var(--gold-500)] mb-1">0 $</div>
+                        <div id="totalNote" class="text-[0.65rem] text-[var(--text-dim)] mb-5 h-3"></div>
+                        <button onclick="openTicketModal('calc')" class="btn-gold w-full py-3 text-xs uppercase tracking-wider">
+                            Mandat mit dieser Auswahl anfragen
+                        </button>
+                    </div>
                 </div>
             </div>
         </section>
@@ -744,116 +703,6 @@
             </div>
         </section>
 
-        <!-- INTERAKTIVER TARIFRECHNER SECTION -->
-        <section id="rechner" class="max-w-6xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
-            <div class="text-center max-w-3xl mx-auto mb-12">
-                <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Transparente Kostenplanung</div>
-                <h2 class="font-serif text-4xl md:text-5xl font-semibold mb-4">Interaktiver Tarifrechner</h2>
-                <p class="text-[var(--text-muted)] text-base">
-                    Stellen Sie sich Ihre benötigten juristischen Leistungen zusammen und erhalten Sie eine sofortige Kostenschätzung — inklusive Mandatsbündel-Rabatt.
-                </p>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <!-- Auswahl-Optionen -->
-                <div class="lg:col-span-2 glass-card p-6 md:p-8 space-y-3">
-                    <h3 class="text-lg font-semibold text-white mb-2 border-b border-[var(--glass-border)] pb-2">Leistungen auswählen</h3>
-
-                    <!-- Wird von site.js live aus der Honorarordnung befüllt; statischer Inhalt dient als Rückfall. -->
-                    <div id="calcOptions" class="space-y-3">
-                    <label class="flex items-center justify-between p-3.5 rounded-xl border border-[var(--glass-border)] bg-slate-900/40 hover:bg-slate-900/70 cursor-pointer transition-all">
-                        <div class="flex items-center gap-3">
-                            <input type="checkbox" class="calc-check accent-[var(--gold-500)] w-4 h-4" value="15000" data-name="Rechtliche Beratung per Ticket" onchange="calculateTotal()">
-                            <span class="text-sm font-medium text-white">Rechtliche Beratung per Ticket</span>
-                        </div>
-                        <span class="font-mono text-xs text-[var(--gold-500)]">15.000 $</span>
-                    </label>
-
-                    <label class="flex items-center justify-between p-3.5 rounded-xl border border-[var(--glass-border)] bg-slate-900/40 hover:bg-slate-900/70 cursor-pointer transition-all">
-                        <div class="flex items-center gap-3">
-                            <input type="checkbox" class="calc-check accent-[var(--gold-500)] w-4 h-4" value="25000" data-name="Persönliche Rechtsberatung" onchange="calculateTotal()">
-                            <span class="text-sm font-medium text-white">Persönliche Rechtsberatung</span>
-                        </div>
-                        <span class="font-mono text-xs text-[var(--gold-500)]">25.000 $</span>
-                    </label>
-
-                    <label class="flex items-center justify-between p-3.5 rounded-xl border border-[var(--glass-border)] bg-slate-900/40 hover:bg-slate-900/70 cursor-pointer transition-all">
-                        <div class="flex items-center gap-3">
-                            <input type="checkbox" class="calc-check accent-[var(--gold-500)] w-4 h-4" value="50000" data-name="U-Haft-Vertretung vor Ort" onchange="calculateTotal()">
-                            <span class="text-sm font-medium text-white">U-Haft-Vertretung vor Ort</span>
-                        </div>
-                        <span class="font-mono text-xs text-[var(--gold-500)]">50.000 $</span>
-                    </label>
-
-                    <label class="flex items-center justify-between p-3.5 rounded-xl border border-[var(--glass-border)] bg-slate-900/40 hover:bg-slate-900/70 cursor-pointer transition-all">
-                        <div class="flex items-center gap-3">
-                            <input type="checkbox" class="calc-check accent-[var(--gold-500)] w-4 h-4" value="60000" data-name="Strafrechtliche Vertretung" onchange="calculateTotal()">
-                            <span class="text-sm font-medium text-white">Strafrechtliche Vertretung</span>
-                        </div>
-                        <span class="font-mono text-xs text-[var(--gold-500)]">60.000 $</span>
-                    </label>
-
-                    <label class="flex items-center justify-between p-3.5 rounded-xl border border-[var(--glass-border)] bg-slate-900/40 hover:bg-slate-900/70 cursor-pointer transition-all">
-                        <div class="flex items-center gap-3">
-                            <input type="checkbox" class="calc-check accent-[var(--gold-500)] w-4 h-4" value="100000" data-name="Vertretung Hauptverhandlung" onchange="calculateTotal()">
-                            <span class="text-sm font-medium text-white">Vertretung Hauptverhandlung (alle Gerichte)</span>
-                        </div>
-                        <span class="font-mono text-xs text-[var(--gold-500)]">100.000 $</span>
-                    </label>
-
-                    <label class="flex items-center justify-between p-3.5 rounded-xl border border-[var(--glass-border)] bg-slate-900/40 hover:bg-slate-900/70 cursor-pointer transition-all">
-                        <div class="flex items-center gap-3">
-                            <input type="checkbox" class="calc-check accent-[var(--gold-500)] w-4 h-4" value="35000" data-name="Vertragsentwurf (Standard)" onchange="calculateTotal()">
-                            <span class="text-sm font-medium text-white">Vertragsentwurf (Standard)</span>
-                        </div>
-                        <span class="font-mono text-xs text-[var(--gold-500)]">35.000 $</span>
-                    </label>
-
-                    <label class="flex items-center justify-between p-3.5 rounded-xl border border-[var(--glass-border)] bg-slate-900/40 hover:bg-slate-900/70 cursor-pointer transition-all">
-                        <div class="flex items-center gap-3">
-                            <input type="checkbox" class="calc-check accent-[var(--gold-500)] w-4 h-4" value="75000" data-name="24/7 Eilnotdiensteinsatz" onchange="calculateTotal()">
-                            <span class="text-sm font-medium text-white">24/7 Eilnotdiensteinsatz</span>
-                        </div>
-                        <span class="font-mono text-xs text-[var(--gold-500)]">75.000 $</span>
-                    </label>
-
-                    </div>
-
-                    <label class="flex items-center justify-between p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10 cursor-pointer transition-all mt-2">
-                        <div class="flex items-center gap-3">
-                            <input type="checkbox" id="priorityAddon" class="calc-check accent-amber-400 w-4 h-4" onchange="calculateTotal()">
-                            <div>
-                                <span class="text-sm font-medium text-white block">Priorisierte Bearbeitung (+15 %)</span>
-                                <span class="text-[0.65rem] text-amber-300/80">Vorrangige Terminierung innerhalb von 2 Stunden</span>
-                            </div>
-                        </div>
-                    </label>
-                </div>
-
-                <!-- Zusammenfassung -->
-                <div class="glass-card p-6 md:p-8 flex flex-col justify-between border-t-2 border-t-[var(--gold-500)]">
-                    <div>
-                        <h3 class="text-lg font-semibold text-white mb-4 border-b border-[var(--glass-border)] pb-2">Kostenschätzung</h3>
-                        <ul id="selectedList" class="text-xs text-[var(--text-muted)] space-y-2 mb-4 min-h-[100px]">
-                            <li class="italic text-gray-500">Keine Leistungen ausgewählt</li>
-                        </ul>
-                        <div id="discountRow" class="hidden text-xs text-emerald-400 flex justify-between border-t border-[var(--glass-border)] pt-2 mb-2">
-                            <span>Mandatsbündel-Rabatt (10 %)</span>
-                            <span id="discountAmount" class="font-mono">− 0 $</span>
-                        </div>
-                    </div>
-                    <div class="pt-4 border-t border-[var(--glass-border)]">
-                        <div class="text-xs uppercase tracking-wider text-[var(--text-muted)] mb-1">Geschätztes Gesamthonorar</div>
-                        <div id="totalAmount" class="font-mono text-3xl font-bold text-[var(--gold-500)] mb-1">0 $</div>
-                        <div id="totalNote" class="text-[0.65rem] text-[var(--text-dim)] mb-5 h-3"></div>
-                        <button onclick="openTicketModal('calc')" class="btn-gold w-full py-3 text-xs uppercase tracking-wider">
-                            Mandat mit dieser Auswahl anfragen
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </section>
-
         <!-- VIP & LIFETIME SECTION -->
         <section id="vip" class="max-w-6xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
             <div class="text-center max-w-3xl mx-auto mb-14">
@@ -870,6 +719,22 @@
             <p class="text-xs text-center text-[var(--text-muted)] mt-8 max-w-3xl mx-auto leading-relaxed">
                 So funktioniert's: Angebot anfragen (Mandantenkonto nötig) → das Board of Partners bestätigt und stellt die Rechnung aus → Sie bezahlen im Spiel → die Mitgliedschaft wird automatisch freigeschaltet. Den Stand sehen Sie jederzeit im Mandantenportal.
             </p>
+        </section>
+
+        <!-- TEAM SECTION -->
+        <section id="team" class="max-w-6xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
+            <div class="text-center max-w-3xl mx-auto mb-16">
+                <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Ansprechpartner</div>
+                <h2 class="font-serif text-4xl md:text-5xl font-semibold mb-4">Unser Team</h2>
+                <p class="text-[var(--text-muted)] text-base leading-relaxed">
+                    Ausgewählte Mitglieder unseres Führungsgremiums und der operativen Anwaltschaft — Ihre direkten Ansprechpartner je nach Rechtsgebiet.
+                </p>
+            </div>
+
+            <!-- Wird live aus der Datenbank geladen (Dashboard → Team-Verwaltung). -->
+            <div id="teamGrid" class="flex flex-wrap justify-center gap-6">
+                <p class="w-full text-center text-sm text-[var(--text-muted)] py-8">Team wird geladen …</p>
+            </div>
         </section>
 
         <!-- MANDANTENSTIMMEN / TESTIMONIALS -->
@@ -946,6 +811,141 @@
             </div>
         </section>
 
+        <!-- KANZLEIRÄNGE SECTION -->
+        <section id="raenge" class="max-w-6xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
+            <div class="text-center max-w-3xl mx-auto mb-16">
+                <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Struktur & Verfassungsgefüge</div>
+                <h2 class="font-serif text-4xl md:text-5xl font-semibold mb-4">Hierarchie & Kanzleiränge</h2>
+                <p class="text-[var(--text-muted)] text-base leading-relaxed">
+                    Die Kanzlei gliedert sich in zwei funktionale Führungsebenen. Jeder unserer Anwälte darf Sie vor jedem Gericht vertreten – die Ränge regeln Verantwortung, Führung und Erfahrung, nicht die Zulassung.
+                </p>
+            </div>
+
+            <div class="space-y-16">
+                <!-- BOARD OF PARTNERS -->
+                <div>
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8 pb-3 border-b border-[var(--gold-hairline)]">
+                        <div>
+                            <span class="text-[0.65rem] uppercase tracking-[0.25em] text-[var(--gold-500)] font-semibold block mb-1">Ebene I — Leitende Gesellschafter</span>
+                            <h3 class="font-serif text-3xl text-[var(--gold-light)] font-semibold tracking-wide">Board of Partners</h3>
+                        </div>
+                        <span class="self-start sm:self-auto text-xs font-mono text-[var(--gold-500)] px-3 py-1 rounded-full border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.05)]">Höchste Entscheidungsgewalt</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="glass-card p-8 border-t-2 border-t-[var(--gold-500)] flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center justify-between mb-4">
+                                    <span class="text-[0.65rem] font-mono px-3 py-1 rounded-full bg-[rgba(212,175,55,0.15)] text-[var(--gold-light)] border border-[var(--gold-hairline)] uppercase font-semibold">Grundsatzebene</span>
+                                    <span class="text-xs text-[var(--text-muted)] font-mono">Rang 01</span>
+                                </div>
+                                <h4 class="font-serif text-2xl font-semibold text-white mb-3">Founding Partner</h4>
+                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-6">
+                                    Gründer, Inhaber und Leitung der Kanzlei. Trägt die Gesamtverantwortung für Strategie, Personal und Qualität, führt Grundsatz- und Großmandate und vertritt staatliche Institutionen, Unternehmen und Privatpersonen vor jedem Gericht.
+                                </p>
+                            </div>
+                            <div class="pt-4 border-t border-[var(--glass-border)] text-[0.7rem] font-mono text-[var(--gold-500)]">
+                                Vollmacht: Alle Gerichte · Kanzleileitung
+                            </div>
+                        </div>
+
+                        <div class="glass-card p-8 border-t-2 border-t-[var(--gold-500)] flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center justify-between mb-4">
+                                    <span class="text-[0.65rem] font-mono px-3 py-1 rounded-full bg-[rgba(212,175,55,0.15)] text-[var(--gold-light)] border border-[var(--gold-hairline)] uppercase font-semibold">Gesellschafter</span>
+                                    <span class="text-xs text-[var(--text-muted)] font-mono">Rang 02</span>
+                                </div>
+                                <h4 class="font-serif text-2xl font-semibold text-white mb-3">Equity Partner</h4>
+                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-6">
+                                    Kapitalführender Partner mit Leitungsverantwortung für spezifische Rechtsbereiche (z. B. Wirtschaftsstrafrecht oder Verwaltungsrecht). Führt Großmandate, verantwortet die interne Qualitätssicherung und leitet strategische Vergleichsverhandlungen.
+                                </p>
+                            </div>
+                            <div class="pt-4 border-t border-[var(--glass-border)] text-[0.7rem] font-mono text-[var(--gold-500)]">
+                                Vollmacht: Alle Gerichte · Fachbereichsleitung
+                            </div>
+                        </div>
+
+                        <div class="glass-card p-8 border-t-2 border-t-[var(--gold-500)] flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center justify-between mb-4">
+                                    <span class="text-[0.65rem] font-mono px-3 py-1 rounded-full bg-[rgba(212,175,55,0.15)] text-[var(--gold-light)] border border-[var(--gold-hairline)] uppercase font-semibold">Partner</span>
+                                    <span class="text-xs text-[var(--text-muted)] font-mono">Rang 03</span>
+                                </div>
+                                <h4 class="font-serif text-2xl font-semibold text-white mb-3">Partner</h4>
+                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-6">
+                                    Vollwertiges Mitglied des Führungsgremiums. Eigenständige Mandatsübernahme, Fachführung von Associate-Teams und Vertretung in hochkomplexen Hauptverhandlungen sowie Notfalleinsätzen.
+                                </p>
+                            </div>
+                            <div class="pt-4 border-t border-[var(--glass-border)] text-[0.7rem] font-mono text-[var(--gold-500)]">
+                                Vollmacht: Alle Gerichte · Teamführung
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ASSOCIATE ATTORNEYS -->
+                <div>
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8 pb-3 border-b border-slate-700">
+                        <div>
+                            <span class="text-[0.65rem] uppercase tracking-[0.25em] text-slate-400 font-semibold block mb-1">Ebene II — Angestellte Anwaltschaft</span>
+                            <h3 class="font-serif text-3xl text-slate-200 font-semibold tracking-wide">Associate Attorneys</h3>
+                        </div>
+                        <span class="self-start sm:self-auto text-xs font-mono text-slate-400 px-3 py-1 rounded-full border border-slate-700 bg-slate-800/40">Operative Anwaltschaft</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="glass-card p-8 border-t-2 border-t-amber-500/60 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center justify-between mb-4">
+                                    <span class="text-[0.65rem] font-mono px-3 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 uppercase font-semibold">Senior Level</span>
+                                    <span class="text-xs text-[var(--text-muted)] font-mono">Rang 04</span>
+                                </div>
+                                <h4 class="font-serif text-2xl font-semibold text-white mb-3">Senior Associate</h4>
+                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-6">
+                                    Erfahrene Anwälte mit umfassender Praxiserfahrung. Eigenverantwortliche Betreuung von Haftprüfungsterminen, U-Haft-Vertretungen vor Ort, Akteneinsichten und Prozessführung vor jedem Gericht.
+                                </p>
+                            </div>
+                            <div class="pt-4 border-t border-[var(--glass-border)] text-[0.7rem] font-mono text-amber-300">
+                                Befugnis: Alle Gerichte · Eigenverantwortlich
+                            </div>
+                        </div>
+
+                        <div class="glass-card p-8 border-t-2 border-t-slate-500 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center justify-between mb-4">
+                                    <span class="text-[0.65rem] font-mono px-3 py-1 rounded-full bg-slate-500/10 text-slate-300 border border-slate-500/20 uppercase font-semibold">Mid Level</span>
+                                    <span class="text-xs text-[var(--text-muted)] font-mono">Rang 05</span>
+                                </div>
+                                <h4 class="font-serif text-2xl font-semibold text-white mb-3">Associate</h4>
+                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-6">
+                                    Approbierte Juristen für das Tagesgeschäft. Bearbeitung eingehender Mandatstickets, Prüfung von Verträgen, Verfassung von Klageschriften und eigenständige Vertretung von Mandanten vor Gericht.
+                                </p>
+                            </div>
+                            <div class="pt-4 border-t border-[var(--glass-border)] text-[0.7rem] font-mono text-slate-300">
+                                Befugnis: Alle Gerichte · Tagesgeschäft
+                            </div>
+                        </div>
+
+                        <div class="glass-card p-8 border-t-2 border-t-slate-600 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center justify-between mb-4">
+                                    <span class="text-[0.65rem] font-mono px-3 py-1 rounded-full bg-slate-600/10 text-slate-400 border border-slate-600/20 uppercase font-semibold">Junior Level</span>
+                                    <span class="text-xs text-[var(--text-muted)] font-mono">Rang 06</span>
+                                </div>
+                                <h4 class="font-serif text-2xl font-semibold text-white mb-3">Junior Associate</h4>
+                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-6">
+                                    Junge Rechtsanwälte im Mentoring. Vertreten Mandanten vor jedem Gericht – auf Wunsch mit Rückendeckung erfahrener Kollegen – und übernehmen Recherchen, Ermittlungsakten und Beweisanträge.
+                                </p>
+                            </div>
+                            <div class="pt-4 border-t border-[var(--glass-border)] text-[0.7rem] font-mono text-slate-400">
+                                Befugnis: Alle Gerichte · im Mentoring
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- KARRIERE SECTION -->
         <section id="karriere" class="max-w-6xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
             <div class="glass-card p-8 md:p-12 flex flex-col md:flex-row md:items-center justify-between gap-8">
@@ -1014,9 +1014,9 @@
             </div>
             <div class="flex flex-wrap justify-center gap-x-6 gap-y-3 uppercase tracking-wider text-[0.7rem]">
                 <a href="#start" class="hover:text-[var(--gold-500)] transition-colors">Startseite</a>
-                <a href="#raenge" class="hover:text-[var(--gold-500)] transition-colors">Kanzleiränge</a>
                 <a href="#honorar" class="hover:text-[var(--gold-500)] transition-colors">Honorarordnung</a>
                 <a href="#vip" class="hover:text-[var(--gold-500)] transition-colors">VIP &amp; Lifetime</a>
+                <a href="#raenge" class="hover:text-[var(--gold-500)] transition-colors">Kanzleiränge</a>
                 <a href="/karriere.html" class="hover:text-[var(--gold-500)] transition-colors">Karriere</a>
                 <a href="#kontakt" class="hover:text-[var(--gold-500)] transition-colors">Kontakt</a>
                 <a href="#anliegen" class="hover:text-[var(--gold-500)] transition-colors">Anliegen ans Board</a>
