@@ -1032,3 +1032,11 @@ body.ps-dialog-open { overflow: hidden; }
 .pt-box { width: 100%; margin-bottom: 1.25rem; padding: 0.9rem 1rem; border-radius: 14px; border: 1px solid rgba(88, 101, 242, 0.45); background: rgba(88, 101, 242, 0.08); }
 .pt-box[hidden] { display: none !important; }
 .banner .pt-box { flex-basis: 100%; margin: 0.25rem 0 0; padding: 0.85rem 0 0; border: 0; border-top: 1px solid rgba(88, 101, 242, 0.35); border-radius: 0; background: none; }
+/* Installierbare App (PWA): Knöpfe nur, wenn der Browser die Installation anbietet (siehe js/pwa.js) */
+.pwa-only { display: none !important; }
+html.pwa-can-install .pwa-only { display: inline-flex !important; }
+html.pwa-standalone .pwa-hide-standalone { display: none !important; }
+.pwa-steps { display: grid; gap: 0.45rem; margin: 0; padding: 0; list-style: none; }
+.pwa-steps li { display: grid; grid-template-columns: 7.5rem 1fr; gap: 0.75rem; }
+.pwa-steps li strong { color: var(--text-muted); font-weight: 600; }
+@media (max-width: 520px) { .pwa-steps li { grid-template-columns: 1fr; gap: 0.1rem; } }

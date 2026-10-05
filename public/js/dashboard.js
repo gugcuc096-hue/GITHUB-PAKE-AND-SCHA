@@ -4595,6 +4595,7 @@
             ${discord}
           </section>
           ${namePanel(u)}
+          ${appPanel()}
           ${!isStaff() && st.myMembership ? membershipPanel(st.myMembership) : ''}
           ${!isStaff() && st.myCoops.length ? `<section class="panel panel-pad">
             <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('tag')} Ihre Kooperationsvorteile</h2></div>
@@ -4605,6 +4606,23 @@
         </div>`;
     },
   };
+
+  /** Profil: Dashboard als App installieren (PC: eigenes Fenster + Taskleiste, Handy: Startbildschirm). */
+  function appPanel() {
+    const standalone = !!(window.PSApp && window.PSApp.isStandalone());
+    return `<section class="panel panel-pad">
+      <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('download')} Als App installieren</h2>${standalone ? badge('Sie nutzen die App', 'emerald') : ''}</div>
+      <p class="text-sm text-muted">Das Dashboard lässt sich wie ein Programm installieren – am PC mit eigenem Fenster und Symbol in Taskleiste bzw. Startmenü, am Handy auf dem Startbildschirm. Login, Inhalte und Funktionen bleiben gleich; Updates kommen automatisch.</p>
+      <div class="form-actions mt-3 pwa-hide-standalone"><button type="button" class="btn-gold btn-md pwa-only" data-action="install-app">${icon('download', 'ico-sm')}<span>Jetzt installieren</span></button></div>
+      <ul class="pwa-steps text-sm text-muted mt-3 pwa-hide-standalone">
+        <li><strong>PC (Chrome, Edge)</strong><span>In der Adressleiste rechts auf das Symbol „App installieren“ (Bildschirm mit Pfeil) klicken – oder im Browser-Menü „App installieren“ bzw. „Diese Website als App installieren“ wählen.</span></li>
+        <li><strong>Mac (Safari)</strong><span>Menü „Ablage“ → „Zum Dock hinzufügen“.</span></li>
+        <li><strong>iPhone, iPad</strong><span>In Safari auf „Teilen“ tippen → „Zum Home-Bildschirm“.</span></li>
+        <li><strong>Android</strong><span>In Chrome Menü ⋮ → „App installieren“.</span></li>
+        <li><strong>Firefox</strong><span>Unterstützt keine App-Installation – dafür Chrome oder Edge verwenden.</span></li>
+      </ul>
+    </section>`;
+  }
 
   /** Profil: Namensänderung beim Board of Partners beantragen (Status des letzten Antrags). Das Board ändert direkt. */
   function namePanel(u) {
@@ -6402,6 +6420,13 @@
       await api.del(`/api/name-requests/${el.dataset.id}`);
       toast('Antrag zurückgezogen.');
       await refreshBehind();
+    },
+    'install-app': async () => {
+      if (!window.PSApp || !window.PSApp.canInstall()) {
+        toast('Die Installation bietet Ihr Browser gerade nicht an – Anleitung unter „Mein Profil“.');
+        return;
+      }
+      if (await window.PSApp.install()) toast('App installiert – Sie finden „Pake & Scha“ jetzt bei Ihren Programmen.');
     },
     'backup-now': async (el) => {
       el.disabled = true;

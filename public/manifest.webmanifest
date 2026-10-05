@@ -1,0 +1,24 @@
+{
+  "id": "/dashboard.html",
+  "name": "Pake & Scha Legal Consulting",
+  "short_name": "Pake & Scha",
+  "description": "Kanzlei-Dashboard und Mandantenportal von Pake & Scha Legal Consulting",
+  "lang": "de",
+  "dir": "ltr",
+  "start_url": "/dashboard.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#02050e",
+  "theme_color": "#02050e",
+  "categories": ["business", "productivity"],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Akten", "url": "/dashboard.html#cases", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Kalender & Fristen", "short_name": "Kalender", "url": "/dashboard.html#calendar", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Kanzlei-Post", "short_name": "Post", "url": "/dashboard.html#mail", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

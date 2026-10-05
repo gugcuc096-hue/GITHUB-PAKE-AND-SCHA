@@ -200,6 +200,15 @@ npm run dev             # http://localhost:3000
 
 **Design (Tailwind):** Tailwind CSS v3 ist fest eingebaut (`public/css/tailwind.css`, vorher das Play-CDN `cdn.tailwindcss.com`, das nicht für den Produktivbetrieb gedacht ist). Nach neuen Tailwind-Klassen in HTML oder JavaScript `npm run build:css` ausführen und die Datei mit committen. Sind die Build-Werkzeuge installiert (devDependencies, auf Render bei `npm install` normalerweise der Fall), frischt der Server die Datei beim Start zusätzlich selbst auf. Die Datei wird wie zuvor das CDN als letztes Stylesheet im `<head>` geladen – das Aussehen ist identisch (geprüft: berechnete Styles aller Elemente auf allen Seiten, PC und Handy).
 
+## App für PC und Handy (PWA)
+
+Website und Dashboard lassen sich als **App installieren** – ohne App-Store, direkt aus dem Browser:
+
+- **PC (Chrome, Edge):** Symbol „App installieren“ rechts in der Adressleiste, im Dashboard zusätzlich der Knopf **„App installieren“** oben rechts (erscheint, sobald der Browser die Installation anbietet). Danach öffnet sich Pake & Scha in einem eigenen Fenster mit Symbol in Taskleiste und Startmenü; Rechtsklick auf das Symbol bietet Abkürzungen zu Akten, Kalender und Kanzlei-Post.
+- **Mac (Safari):** Ablage → „Zum Dock hinzufügen“ · **iPhone/iPad:** Safari → Teilen → „Zum Home-Bildschirm“ · **Android:** Chrome-Menü → „App installieren“. Firefox unterstützt keine Installation.
+- Eine Anleitung steht für alle unter *Mein Profil → Als App installieren*.
+- Technik: `public/manifest.webmanifest` (Start: Dashboard), `public/sw.js` (Service Worker) und `public/js/pwa.js`. Der Service Worker speichert bewusst nichts außer einer Offline-Seite (`offline.html`) – Inhalte kommen immer frisch vom Server, Updates sind sofort da. Installation setzt HTTPS voraus (auf Render gegeben).
+
 ## Datensicherung
 
 - **Automatisch jeden Tag** (kurz nach dem Start, danach stündliche Prüfung) eine Kopie der Datenbank in `backups/` neben der Datenbank – auf Render also auf der Disk (`/var/data/backups`). Aufbewahrt: alle Sicherungen der letzten 7 Tage, danach die neueste je Woche bis 5 Wochen zurück; ältere werden gelöscht. Ist zu wenig Speicher frei, wird keine Sicherung angelegt (Warnung im Log).
