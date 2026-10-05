@@ -274,6 +274,53 @@
       if (grid) grid.innerHTML = '<p class="md:col-span-3 text-center text-sm text-[var(--text-muted)] py-8">Angebote konnten nicht geladen werden.</p>';
     });
 
+  /* ---------------------------------------------------------------- Mandantenstimmen */
+  // Karussell; ab drei vom Board freigegebenen Bewertungen ersetzen echte Stimmen die bisherigen Texte.
+  const track = document.getElementById('testimonialTrack');
+  const dotsRoot = document.getElementById('testimonialDots');
+  let tIndex = 0;
+  const tCount = () => (track ? track.children.length : 0);
+  function renderDots() {
+    if (!dotsRoot) return;
+    dotsRoot.innerHTML = '';
+    for (let i = 0; i < tCount(); i++) {
+      const dot = document.createElement('span');
+      dot.className = 'dot-btn' + (i === tIndex ? ' active' : '');
+      dot.addEventListener('click', () => {
+        tIndex = i;
+        updateTestimonial();
+      });
+      dotsRoot.appendChild(dot);
+    }
+  }
+  function updateTestimonial() {
+    track.style.transform = `translateX(-${tIndex * 100}%)`;
+    renderDots();
+  }
+  const reviewSlide = (r) => `<div class="w-full shrink-0 px-2">
+      <div class="glass-card p-8 md:p-10 text-center max-w-3xl mx-auto">
+        <div class="flex justify-center gap-1 mb-5 text-[var(--gold-500)]" aria-label="${r.rating} von 5 Sternen">${'★'.repeat(r.rating)}<span style="opacity:.25">${'★'.repeat(5 - r.rating)}</span></div>
+        <p class="font-serif text-xl sm:text-2xl italic text-white leading-relaxed mb-6">„${esc(r.body)}“</p>
+        <div class="text-sm text-[var(--gold-light)] font-medium">— ${esc(r.name)}${r.area ? `, ${esc(r.area)}` : ''}</div>
+      </div>
+    </div>`;
+  if (track) {
+    renderDots();
+    setInterval(() => {
+      if (!tCount()) return;
+      tIndex = (tIndex + 1) % tCount();
+      updateTestimonial();
+    }, 6000);
+    api.get('/api/public/reviews')
+      .then(({ reviews }) => {
+        if (!reviews || reviews.length < 3) return; // bis dahin bleiben die bisherigen Texte
+        track.innerHTML = reviews.slice(0, 8).map(reviewSlide).join('');
+        tIndex = 0;
+        updateTestimonial();
+      })
+      .catch(() => {});
+  }
+
   /* ---------------------------------------------------------------- Eilnotdienst live */
   function renderDuty(d) {
     const label = document.getElementById('dutyLabel');

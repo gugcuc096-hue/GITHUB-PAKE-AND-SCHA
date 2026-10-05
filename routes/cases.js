@@ -396,6 +396,8 @@ router.get(
       work: isBoard(req.user) ? { rows: workForCase(c.id), closedAt: c.closed_at || null } : undefined,
       tasks: staff ? tasks.map(taskRow) : undefined,
       ticket: tickets.ticketInfo(c, req.user),
+      // Mandant: eigene Bewertung der (abgeschlossenen) Akte
+      review: require('./reviews').reviewForCase(c, req.user),
       // Team: passende Mandantenkonten, solange die Akte noch keins hat (z. B. Mandant hat sich später registriert)
       clientSuggestions: staff && !c.client_id ? clientSuggestions(c) : undefined,
     });

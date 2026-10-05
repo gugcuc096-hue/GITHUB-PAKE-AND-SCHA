@@ -129,6 +129,7 @@
     'concerns-board': { label: 'Eingegangene Anliegen', short: 'Anliegen', icon: 'chat', board: true, section: 'Board of Partners' },
     applications: { label: 'Bewerbungen', icon: 'userAdd', board: true, section: 'Board of Partners' },
     'name-requests': { label: 'Namensänderungen', short: 'Namen', icon: 'edit', board: true, section: 'Board of Partners' },
+    reviews: { label: 'Mandantenstimmen', short: 'Stimmen', icon: 'star', board: true, section: 'Board of Partners' },
     team: { label: 'Team', icon: 'users', admin: true, section: 'Board of Partners' },
     users: { label: 'Benutzer', icon: 'key', admin: true, section: 'Board of Partners' },
     work: { label: 'Aktenbearbeitung', icon: 'briefcase', board: true, section: 'Board of Partners' },
@@ -514,6 +515,10 @@
     async nameCount() {
       if (isBoard()) st.nameOpen = (await api.get('/api/name-requests')).open;
     },
+    /** Board: neue Mandantenstimmen (warten auf Freigabe) */
+    async reviewCount() {
+      if (isBoard()) st.reviewOpen = (await api.get('/api/reviews?status=neu')).open;
+    },
     /** Board: offene VIP-/Lifetime-Anfragen */
     async vipCount() {
       if (isBoard()) st.vipReqOpen = (await api.get('/api/memberships/requests')).open;
@@ -538,7 +543,7 @@
         section = v.section;
         html += `<div class="nav-section">${esc(section)}</div>`;
       }
-      const count = { mail: st.unread, applications: st.newApplications, tasks: st.dueTasks, concerns: st.concernUnseen, 'concerns-board': st.concernOpen, personnel: st.personnelNew, 'name-requests': st.nameOpen, vip: st.vipReqOpen }[key] || 0;
+      const count = { mail: st.unread, applications: st.newApplications, tasks: st.dueTasks, concerns: st.concernUnseen, 'concerns-board': st.concernOpen, personnel: st.personnelNew, 'name-requests': st.nameOpen, vip: st.vipReqOpen, reviews: st.reviewOpen }[key] || 0;
       const active = st.view === key || (key === 'invoices' && st.view === 'invoice-new');
       html += `<a href="#${key}" class="nav-item ${active ? 'active' : ''}" ${active ? 'aria-current="page"' : ''}>${icon(v.icon)}<span>${esc(viewLabel(key))}</span>${count ? `<span class="nav-count">${count > 99 ? '99+' : count}</span>` : ''}</a>`;
     }
@@ -873,6 +878,12 @@
         ),
         u.emailNotice
           ? `<div class="banner banner-gold items-center justify-between flex-wrap"><div>${icon('mail')} <strong>Ihre Login-E-Mail lautet jetzt ${esc(u.email)}</strong>${u.emailNotice.oldEmail ? ` (vorher ${esc(u.emailNotice.oldEmail)})` : ''}. Alle Konten der Kanzlei enden auf @${EMAIL_DOMAIN}. Ihr Passwort bleibt gleich – die alte Adresse funktioniert beim Login weiterhin.</div><button class="btn-outline btn-sm" data-action="email-notice-ok">Verstanden</button></div>`
+          : '',
+        !staff && st.cases.some((c) => c.status === 'geschlossen' && !c.reviewed)
+          ? (() => {
+              const c = st.cases.find((x) => x.status === 'geschlossen' && !x.reviewed);
+              return `<div class="banner banner-gold items-center justify-between flex-wrap"><div>${icon('star')} <strong>Wie zufrieden waren Sie mit uns?</strong> Ihre Akte ${esc(c.caseNumber)} ist abgeschlossen – über eine kurze Bewertung freuen wir uns.</div><button class="btn-outline btn-sm" data-action="open-case" data-id="${c.id}">Jetzt bewerten</button></div>`;
+            })()
           : '',
         u.mustChangePassword
           ? `<div class="banner banner-amber">${icon('alert')}<div><strong>Bitte eigenes Passwort festlegen.</strong> Sie nutzen ein automatisch erzeugtes oder zurückgesetztes Passwort. <a href="#profile" class="underline">Jetzt ändern</a></div></div>`
@@ -2576,7 +2587,7 @@
     await reloadCase(id);
   }
 
-  function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, clientSuggestions }) {
+  function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, clientSuggestions, review }) {
     const staff = isStaff();
     const admin = isAdmin();
     const me = st.user.id;
@@ -2707,6 +2718,7 @@
       ${processTicketBanner(c)}
       ${quick.length ? `<div class="form-actions mb-2">${quick.join('')}</div>` : ''}
       ${editForm}
+      ${staff ? '' : reviewSection(c, review)}
       <div class="section"><h3 class="section-title">Sachverhalt</h3><p class="text-sm whitespace-pre-wrap text-muted">${esc(c.description || '—')}</p></div>
       ${c.publicNote ? `<div class="section"><h3 class="section-title">Statushinweis</h3><div class="banner banner-gold mb-0"><p class="text-sm whitespace-pre-wrap">${esc(c.publicNote)}</p></div></div>` : ''}
       <div class="section" id="secEvents"><h3 class="section-title">Termine & Fristen</h3>${apptList}</div>
@@ -5270,6 +5282,65 @@
     },
   };
 
+  /* ---------------------------------------------------------------- Mandantenstimmen (Bewertungen) */
+  const REVIEW_STATUS = { neu: ['Wartet auf Freigabe', 'amber'], freigegeben: ['Veröffentlicht', 'emerald'], abgelehnt: ['Nicht veröffentlicht', 'slate'] };
+  const NAME_MODES = { initialen: 'Initialen (z. B. „J. D.“)', voll: 'Vollständiger Name', anonym: 'Anonym („Mandant“)' };
+  const reviewStars = (n) => `<span class="nowrap" aria-label="${n} von 5 Sternen"><span class="text-gold">${'★'.repeat(n)}</span><span class="text-dim" aria-hidden="true">${'★'.repeat(5 - n)}</span></span>`;
+
+  views.reviews = {
+    async load() {
+      st.reviews = await api.get('/api/reviews' + (st.reviewFilter && st.reviewFilter !== 'alle' ? `?status=${st.reviewFilter}` : ''));
+      st.reviewOpen = st.reviews.open;
+      renderNav();
+    },
+    render() {
+      const f = st.reviewFilter || 'neu';
+      const list = st.reviews.reviews;
+      const item = (r) => `<div class="list-row wrap flex-col sm:flex-row">
+        <div class="main">
+          <div class="title flex flex-wrap items-center gap-2">${reviewStars(r.rating)} ${statusBadge(REVIEW_STATUS, r.status)}</div>
+          <p class="text-sm mt-1 whitespace-pre-wrap">„${esc(r.body)}“</p>
+          <div class="meta">Auf der Website: <strong>${esc(r.displayName)}</strong>${r.area ? `, ${esc(r.area)}` : ''} · von ${esc(r.authorName || '—')}${r.caseNumber ? ` · <button class="text-gold font-mono hover:underline" data-action="open-case" data-id="${r.caseId}">${esc(r.caseNumber)}</button>` : ''} · ${esc(fmtDate(r.updatedAt || r.createdAt))}${r.decidedBy ? ` · ${r.status === 'freigegeben' ? 'veröffentlicht' : 'abgelehnt'} von ${esc(r.decidedBy)}` : ''}</div>
+        </div>
+        <div class="flex flex-wrap gap-2 shrink-0">
+          ${r.status !== 'freigegeben' ? `<button class="btn-gold btn-sm" data-action="review-decide" data-id="${r.id}" data-status="freigegeben">${icon('check', 'ico-sm')}<span>Veröffentlichen</span></button>` : ''}
+          ${r.status !== 'abgelehnt' ? `<button class="btn-ghost btn-sm" data-action="review-decide" data-id="${r.id}" data-status="abgelehnt">${r.status === 'freigegeben' ? 'Von der Website nehmen' : 'Ablehnen'}</button>` : ''}
+          <button class="btn-ghost btn-sm fn-danger" data-action="review-delete" data-id="${r.id}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>
+        </div></div>`;
+      return `
+        <div class="page-head"><div><h1 class="page-title">Mandantenstimmen</h1><p class="page-sub">Bewertungen abgeschlossener Akten durch die Mandanten. Auf der Website (Bereich „Mandantenstimmen“) erscheinen nur veröffentlichte – solange es weniger als drei gibt, zeigt die Startseite weiter die bisherigen Texte.</p></div></div>
+        <div class="chip-row mb-4">${[['neu', 'Neu'], ['freigegeben', 'Veröffentlicht'], ['abgelehnt', 'Abgelehnt'], ['alle', 'Alle']]
+          .map(([k, l]) => `<button class="chip ${f === k ? 'active' : ''}" data-action="reviews-filter" data-value="${k}">${l}${k === 'neu' ? ` <span class="chip-count">${st.reviews.open}</span>` : ''}</button>`)
+          .join('')}</div>
+        <div class="panel p-2 md:p-3">${list.length ? list.map(item).join('') : empty(f === 'neu' ? 'Keine neuen Bewertungen.' : 'Keine Bewertungen.', 'star')}</div>`;
+    },
+  };
+
+  /** Akte (Mandant): Bewertung abgeben bzw. eigene Bewertung ansehen. */
+  function reviewSection(c, info) {
+    if (!info || (!info.canReview && !info.review)) return '';
+    const r = info.review;
+    const editing = !r || st.reviewEdit === r.id;
+    if (!editing) {
+      return `<div class="section" id="secReview"><h3 class="section-title">Ihre Bewertung</h3>
+        <div class="panel panel-pad"><div class="flex flex-wrap items-center gap-2 text-lg">${reviewStars(r.rating)} ${statusBadge(REVIEW_STATUS, r.status)}</div>
+          <p class="text-sm mt-2 whitespace-pre-wrap">„${esc(r.body)}“</p>
+          <p class="form-hint mt-1">Anzeige: ${esc(r.displayName)}${r.area ? `, ${esc(r.area)}` : ''}${r.status === 'neu' ? ' · Das Board of Partners prüft Ihre Bewertung, bevor sie auf der Website erscheint.' : ''}</p>
+          <div class="form-actions mt-3"><button type="button" class="btn-outline btn-sm" data-action="review-edit" data-id="${r.id}">${icon('edit', 'ico-sm')}<span>Ändern</span></button><button type="button" class="btn-ghost btn-sm fn-danger" data-action="review-delete" data-id="${r.id}" data-case-id="${c.id}">${icon('trash', 'ico-sm')}<span>Löschen</span></button></div></div></div>`;
+    }
+    const cur = r ? r.rating : 0;
+    return `<div class="section" id="secReview"><h3 class="section-title">${r ? 'Bewertung ändern' : 'Wie zufrieden waren Sie?'}</h3>
+      <form data-form="review" data-case-id="${c.id}" ${r ? `data-id="${r.id}"` : ''} class="panel panel-pad form-grid cols-2">
+        <div class="span-2"><div class="label">Ihre Bewertung</div><div class="stars-input" role="radiogroup" aria-label="Sterne">${[5, 4, 3, 2, 1]
+          .map((n) => `<input type="radio" id="rv${n}" name="rating" value="${n}" ${n === cur ? 'checked' : ''} required><label for="rv${n}" title="${n} ${n === 1 ? 'Stern' : 'Sterne'}">★</label>`)
+          .join('')}</div></div>
+        <div class="span-2"><label class="label" for="rvBody">Ihr Erfahrungsbericht</label><textarea id="rvBody" name="body" rows="4" minlength="10" maxlength="1000" class="field" required placeholder="Wie hat Ihnen die Vertretung durch Pake &amp; Scha gefallen?">${esc(r ? r.body : '')}</textarea></div>
+        <div><label class="label" for="rvName">Name auf der Website</label><select id="rvName" name="nameMode" class="field">${Object.entries(NAME_MODES).map(([k, l]) => opt(k, l, (r ? r.nameMode : 'initialen') === k)).join('')}</select></div>
+        <p class="form-hint self-end">Ihre Bewertung erscheint nach Prüfung durch das Board of Partners auf der Startseite unter „Mandantenstimmen“.</p>
+        <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('star', 'ico-sm')}<span>${r ? 'Speichern' : 'Bewertung abschicken'}</span></button>${r ? '<button type="button" class="btn-ghost btn-md" data-action="review-cancel">Abbrechen</button>' : ''}</div>
+      </form></div>`;
+  }
+
   /** Suchergebnis „Name eines Mandanten korrigieren“. */
   function nameAccList() {
     const q = (st.nameAccQ || '').trim();
@@ -6360,6 +6431,30 @@
     },
     'case-trash': () => openTrash(),
     'global-search': () => openSearch(),
+    'reviews-filter': async (el) => {
+      st.reviewFilter = el.dataset.value;
+      await refreshBehind();
+    },
+    'review-decide': async (el) => {
+      await api.post(`/api/reviews/${el.dataset.id}/decide`, { status: el.dataset.status });
+      toast(el.dataset.status === 'freigegeben' ? 'Veröffentlicht – erscheint auf der Startseite.' : 'Nicht (mehr) auf der Website.');
+      await refreshBehind();
+    },
+    'review-delete': async (el) => {
+      if (!(await askDelete('Bewertung löschen?', 'Die Bewertung wird endgültig entfernt.'))) return;
+      await api.del('/api/reviews/' + el.dataset.id);
+      toast('Bewertung gelöscht.');
+      if (el.dataset.caseId) await reloadCase(Number(el.dataset.caseId));
+      else await refreshBehind();
+    },
+    'review-edit': async (el) => {
+      st.reviewEdit = Number(el.dataset.id);
+      if (st.modalCaseId) await reloadCase(st.modalCaseId);
+    },
+    'review-cancel': async () => {
+      st.reviewEdit = null;
+      if (st.modalCaseId) await reloadCase(st.modalCaseId);
+    },
     'gs-open': (el) => openSearchResult(el.dataset.type, Number(el.dataset.id)),
     'trash-restore': async (el) => {
       const r = await api.post(`/api/cases/trash/${el.dataset.id}/restore`);
@@ -8084,6 +8179,16 @@
       toast('Vertrag gespeichert.');
       await returnOrClose();
     },
+    review: async (f) => {
+      const fd = new FormData(f);
+      const body = { rating: Number(fd.get('rating')), body: val(fd, 'body'), nameMode: val(fd, 'nameMode') };
+      if (!body.rating) throw new Error('Bitte wählen Sie 1 bis 5 Sterne.');
+      if (f.dataset.id) await api.patch('/api/reviews/' + f.dataset.id, body);
+      else await api.post('/api/reviews', { ...body, caseId: Number(f.dataset.caseId) });
+      st.reviewEdit = null;
+      toast('Vielen Dank für Ihre Bewertung! Sie erscheint nach Prüfung auf der Website.');
+      await reloadCase(Number(f.dataset.caseId));
+    },
     'brief-new': async (f) => {
       const caseId = Number(f.dataset.caseId);
       const vis = $('#bf_visible', f);
@@ -8461,7 +8566,7 @@
   // Ungelesene Post, neue Bewerbungen und Dienststatus regelmäßig aktualisieren (Badges in der Navigation)
   setInterval(() => {
     if (document.hidden || !st.user) return;
-    Promise.all([load.unread(), load.appCount(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {})])
+    Promise.all([load.unread(), load.appCount(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {})])
       .then(renderNav)
       .catch(() => {});
   }, 30000);
@@ -8492,7 +8597,7 @@
     if (discordState && DISCORD_MSG[discordState]) toast(...DISCORD_MSG[discordState]);
 
     try {
-      await Promise.all([load.unread(), load.appCount(), load.duty(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {})]);
+      await Promise.all([load.unread(), load.appCount(), load.duty(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {})]);
       renderUser();
     } catch {
       /* Badges und Dienststatus sind nicht kritisch */

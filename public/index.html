@@ -1368,28 +1368,7 @@
             }
         }
 
-        /* ---------- Testimonial Carousel ---------- */
-        let testimonialIndex = 0;
-        const testimonialCount = 3;
-        function renderDots() {
-            const dotsRoot = document.getElementById('testimonialDots');
-            dotsRoot.innerHTML = '';
-            for (let i = 0; i < testimonialCount; i++) {
-                const dot = document.createElement('span');
-                dot.className = 'dot-btn' + (i === testimonialIndex ? ' active' : '');
-                dot.onclick = () => { testimonialIndex = i; updateTestimonial(); };
-                dotsRoot.appendChild(dot);
-            }
-        }
-        function updateTestimonial() {
-            document.getElementById('testimonialTrack').style.transform = `translateX(-${testimonialIndex * 100}%)`;
-            renderDots();
-        }
-        renderDots();
-        setInterval(() => {
-            testimonialIndex = (testimonialIndex + 1) % testimonialCount;
-            updateTestimonial();
-        }, 6000);
+        /* ---------- Mandantenstimmen: Karussell und echte Bewertungen siehe js/site.js ---------- */
 
         /* ---------- Copy Email ---------- */
         function copyEmail() {

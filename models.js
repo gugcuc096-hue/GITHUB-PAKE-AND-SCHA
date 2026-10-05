@@ -49,7 +49,8 @@ const CASE_SELECT = `
          (SELECT json_object('id', m.id, 'name', m.tier_name, 'kind', m.kind, 'discountPct', m.discount_pct, 'expiresAt', m.expires_at)
             FROM memberships m WHERE m.user_id = c.client_id AND m.status = 'aktiv'
               AND (m.expires_at IS NULL OR m.expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-            ORDER BY m.discount_pct DESC LIMIT 1) AS membership_json
+            ORDER BY m.discount_pct DESC LIMIT 1) AS membership_json,
+         (SELECT r.id FROM reviews r WHERE r.case_id = c.id) AS review_id
   FROM cases c
   LEFT JOIN users cu ON cu.id = c.client_id
   LEFT JOIN users lu ON lu.id = c.lawyer_id`;
@@ -155,6 +156,7 @@ function caseRow(c, u) {
     externalDocIds: staff ? String(c.external_doc_ids || '').split(' ').filter(Boolean) : undefined,
     createdAt: c.created_at,
     updatedAt: c.updated_at,
+    reviewed: !!c.review_id, // Mandantenstimme zu dieser Akte abgegeben
   };
 }
 

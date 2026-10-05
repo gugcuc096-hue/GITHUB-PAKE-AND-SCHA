@@ -43,11 +43,12 @@ const EVENTS = {
   'membership.changed': 'VIP / Lifetime vergeben, verlängert, beendet oder abgelaufen',
   'name.requested': 'Namensänderung beantragt bzw. vom Board entschieden',
   'system.alert': 'Systemwarnung: Kanzlei-Bot offline, Datensicherung fehlgeschlagen, Speicher fast voll, Absturz',
+  'review.created': 'Neue Mandantenstimme (Bewertung) zur Freigabe',
 };
 
 // Ereignisse, die nach dem Speichern der Auswahl dazugekommen sind, sind eingeschaltet (bis jemand sie abwählt).
 // discord_events_known = Ereignisse, die es beim letzten Speichern gab; ältere Speicherstände kennen alle außer diesen:
-const ADDED_LATER = ['system.alert'];
+const ADDED_LATER = ['system.alert', 'review.created'];
 
 function isValidWebhookUrl(url) {
   return WEBHOOK_RE.test(String(url || '').trim());

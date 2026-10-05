@@ -413,6 +413,13 @@ a:hover > .brand-logo { transform: scale(1.04); }
 .list-row.wrap { cursor: default; align-items: flex-start; }
 .list-row.wrap .title, .list-row.wrap .meta { white-space: normal; }
 .list-row.wrap:hover { background: transparent; }
+/* Sterne-Auswahl (Mandantenstimmen) – Reihenfolge 5…1, gewählte und kleinere Werte leuchten */
+.stars-input { display: inline-flex; flex-direction: row-reverse; gap: 0.15rem; position: relative; }
+.stars-input input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.stars-input label { font-size: 2rem; line-height: 1; color: rgba(255, 255, 255, 0.18); cursor: pointer; transition: color 0.15s ease, transform 0.15s ease; padding: 0 0.05rem; }
+.stars-input input:checked ~ label, .stars-input label:hover, .stars-input label:hover ~ label { color: var(--gold-500); }
+.stars-input label:hover { transform: scale(1.08); }
+.stars-input input:focus-visible + label { outline: 2px solid var(--gold-hairline); border-radius: 6px; }
 /* Zahlungserinnerung in der Rechnungsliste (Spalte Datum) */
 .remind-link { display: inline-flex; align-items: center; gap: 0.25rem; margin-top: 0.2rem; padding: 0; border: 0; background: none; color: var(--text-dim); font: inherit; cursor: pointer; }
 .remind-link:hover, .remind-link:focus-visible { color: var(--gold-light); }

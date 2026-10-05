@@ -97,6 +97,7 @@ app.use('/api/gdocs', externalRoutes.gdocsRouter);
 app.use('/api/gsheets', externalRoutes.gsheetsRouter);
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/search', require('./routes/search'));
+app.use('/api/reviews', require('./routes/reviews').router);
 app.use('/api/contracts', contractRoutes.router);
 app.use('/api/absences', require('./routes/absences').router);
 app.use('/api/work', require('./routes/work').router);
@@ -125,6 +126,7 @@ app.use('/api/bot', require('./routes/bot').router);
 app.use('/api/public', require('./routes/public'));
 app.use('/api/public', applications.publicRouter);
 app.use('/api/public', concernRoutes.publicRouter);
+app.use('/api/public', require('./routes/reviews').publicRouter);
 app.use('/api/public', require('./routes/memberships').publicRouter);
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Schnittstelle nicht gefunden.' }));
