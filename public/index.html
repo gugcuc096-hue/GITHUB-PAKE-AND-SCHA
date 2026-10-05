@@ -21,7 +21,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
     <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
 
     <style>
         :root {
@@ -255,6 +254,8 @@
         #backToTop { opacity: 0; pointer-events: none; transition: all 0.3s ease; transform: translateY(8px); }
         #backToTop.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
     </style>
+    <!-- Tailwind fest gebaut (npm run build:css) – zuletzt eingebunden wie zuvor beim Play-CDN -->
+    <link rel="stylesheet" href="/css/tailwind.css">
 </head>
 <body class="min-h-screen flex flex-col justify-between">
 
@@ -1236,6 +1237,27 @@
             document.getElementById('menuIconClose').classList.toggle('hidden', !open);
             document.getElementById('menuToggle').setAttribute('aria-expanded', open);
         }
+
+        // Mobil-Menü: erst zuklappen lassen, dann zum Abschnitt springen. Sonst wird der Sprung berechnet,
+        // solange das Menü noch offen ist, und die Seite landet nach dem Zuklappen deutlich zu tief.
+        document.querySelectorAll('#mobileMenu a[href^="#"]').forEach(link => {
+            link.addEventListener('click', (e) => {
+                const hash = link.getAttribute('href');
+                const target = hash.length > 1 && document.querySelector(hash);
+                if (!target) return;
+                e.preventDefault();
+                const menu = document.getElementById('mobileMenu');
+                let done = false;
+                const jump = () => {
+                    if (done) return;
+                    done = true;
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    history.pushState(null, '', hash);
+                };
+                menu.addEventListener('transitionend', jump, { once: true });
+                setTimeout(jump, 450); // falls kein Übergang läuft (z. B. reduzierte Bewegung)
+            });
+        });
 
         /* ---------- Category Filter ---------- */
         function setCategory(cat) {

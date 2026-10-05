@@ -13,7 +13,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/css/app.css">
     <style>
         html { scroll-padding-top: 88px; }
@@ -23,6 +22,8 @@
         .counter { font-size: 0.72rem; color: var(--text-dim); text-align: right; margin-top: 0.25rem; }
         .counter.ok { color: #6ee7b7; }
     </style>
+    <!-- Tailwind fest gebaut (npm run build:css) – zuletzt eingebunden wie zuvor beim Play-CDN -->
+    <link rel="stylesheet" href="/css/tailwind.css">
 </head>
 <body class="min-h-screen flex flex-col">
     <div class="ambient-bg"><div class="glow-orb orb-1"></div><div class="glow-orb orb-2"></div></div>

@@ -21,6 +21,27 @@ for (const dir of [path.join(PUBLIC_MEDIA_DIR, 'avatars'), path.join(PUBLIC_MEDI
   fs.mkdirSync(dir, { recursive: true });
 }
 
+// Wiederherstellen: Liegt beim Start eine Datei „restore.db“ neben der Datenbank (z. B. eine Sicherung aus
+// backups/), ersetzt sie die aktuelle Datenbank. Die bisherige bleibt als „….before-restore-<Zeit>“ erhalten.
+const RESTORE_PATH = path.join(path.dirname(DB_PATH), 'restore.db');
+if (fs.existsSync(RESTORE_PATH)) {
+  const head = Buffer.alloc(16);
+  const fd = fs.openSync(RESTORE_PATH, 'r');
+  fs.readSync(fd, head, 0, 16, 0);
+  fs.closeSync(fd);
+  if (head.toString('latin1') !== 'SQLite format 3\0') {
+    fs.renameSync(RESTORE_PATH, `${RESTORE_PATH}.ungueltig`);
+    console.warn('restore.db ist keine SQLite-Datenbank – nicht eingespielt (umbenannt in restore.db.ungueltig).');
+  } else {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    for (const ext of ['', '-wal', '-shm']) {
+      if (fs.existsSync(DB_PATH + ext)) fs.renameSync(DB_PATH + ext, `${DB_PATH}.before-restore-${stamp}${ext}`);
+    }
+    fs.renameSync(RESTORE_PATH, DB_PATH);
+    console.log(`Datenbank aus restore.db wiederhergestellt – die vorherige liegt unter ${path.basename(DB_PATH)}.before-restore-${stamp}.`);
+  }
+}
+
 const db = new DatabaseSync(DB_PATH);
 db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
 

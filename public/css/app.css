@@ -357,6 +357,8 @@ a:hover > .brand-logo { transform: scale(1.04); }
 }
 .toolbar { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1rem; }
 @media (min-width: 900px) { .toolbar { flex-direction: row; align-items: center; } .toolbar .search { width: 320px; flex-shrink: 0; } }
+/* Am PC umbrechen statt rechts abgeschnitten (am Handy bleiben die Filter seitlich wischbar) */
+@media (min-width: 900px) { .toolbar .chip-row { flex-wrap: wrap; overflow: visible; } }
 .search { position: relative; display: block; }
 .search .ico { position: absolute; left: 0.8rem; top: 50%; transform: translateY(-50%); color: var(--text-dim); pointer-events: none; }
 .search .field { padding-left: 2.5rem; }

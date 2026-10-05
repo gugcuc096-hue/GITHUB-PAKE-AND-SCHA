@@ -5,3 +5,6 @@ data/*.db-shm
 data/*.db-wal
 data/*.backup-*
 data/uploads/
+data/backups/
+data/restore.db*
+data/*.before-restore-*
