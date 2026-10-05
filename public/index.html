@@ -13,7 +13,7 @@
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Pake & Scha Legal Consulting">
     <meta property="og:title" content="Pake & Scha – Recht haben. Recht bekommen.">
-    <meta property="og:description" content="Ihre Kanzlei für Zivil-, Straf- und Verfassungsrecht in Los Santos. Mandat online anfragen, Aktenstatus abfragen, Termine vereinbaren.">
+    <meta property="og:description" content="Ihre Kanzlei für Zivil-, Straf- und Verfassungsrecht in Los Santos. Mandat online anfragen, Termine vereinbaren.">
 
     <!-- Typografie: Cormorant Garamond (Serif), Inter (Sans), JetBrains Mono (Zahlen) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -213,7 +213,7 @@
         @media (min-width: 1024px) { .team-card { width: calc(33.333% - 1rem); } }
 
         /* Formularfelder im Mandats-Dialog: 16px verhindert Auto-Zoom auf iOS */
-        @media (max-width: 767px) { #ticketModal input, #ticketModal select, #ticketModal textarea, #akte input, #honorar input { font-size: 16px; } }
+        @media (max-width: 767px) { #ticketModal input, #ticketModal select, #ticketModal textarea, #honorar input { font-size: 16px; } }
 
         /* Reveal-on-scroll (single orchestrated entrance) */
         .reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.7s cubic-bezier(0.16,1,0.3,1), transform 0.7s cubic-bezier(0.16,1,0.3,1); }
@@ -242,16 +242,6 @@
         @keyframes toast-in { from { opacity: 0; transform: translateY(10px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
         .toast.leaving { animation: toast-out 0.3s ease forwards; }
         @keyframes toast-out { to { opacity: 0; transform: translateX(20px); } }
-
-        /* Case tracker progress */
-        .track-line { position: relative; }
-        .track-line::before {
-            content: ''; position: absolute; top: 15px; left: 12.5%; right: 12.5%; height: 2px; background: rgba(255,255,255,0.08); z-index: 0;
-        }
-        .track-fill { position: absolute; top: 15px; left: 12.5%; height: 2px; background: linear-gradient(90deg, var(--gold-600), var(--gold-500)); z-index: 1; transition: width 0.8s cubic-bezier(0.16,1,0.3,1); }
-        .track-node { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative; z-index: 2; border: 2px solid rgba(255,255,255,0.15); background: var(--navy-950); font-size: 0.7rem; transition: all 0.4s ease; }
-        .track-node.done { border-color: var(--gold-500); background: var(--gold-500); color: #02050e; }
-        .track-node.current { border-color: var(--gold-500); box-shadow: 0 0 0 5px rgba(212,175,55,0.15); }
 
         /* Copy button */
         .copy-btn { transition: all 0.2s ease; }
@@ -306,7 +296,6 @@
                 <a href="#honorar" data-section="honorar" class="nav-link hover:text-[var(--gold-500)] transition-colors">Honorarordnung</a>
                 <a href="#rechner" data-section="rechner" class="nav-link hover:text-[var(--gold-500)] transition-colors">Tarifrechner</a>
                 <a href="#vip" data-section="vip" class="nav-link hover:text-[var(--gold-500)] transition-colors">VIP &amp; Lifetime</a>
-                <a href="#akte" data-section="akte" class="nav-link hover:text-[var(--gold-500)] transition-colors">Aktenstatus</a>
                 <a href="#kontakt" data-section="kontakt" class="nav-link hover:text-[var(--gold-500)] transition-colors">Kontakt</a>
             </nav>
 
@@ -337,7 +326,6 @@
                 <a href="#honorar" onclick="toggleMobileMenu()" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Honorarordnung</a>
                 <a href="#rechner" onclick="toggleMobileMenu()" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Tarifrechner</a>
                 <a href="#vip" onclick="toggleMobileMenu()" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">VIP &amp; Lifetime</a>
-                <a href="#akte" onclick="toggleMobileMenu()" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Aktenstatus</a>
                 <a href="#kontakt" onclick="toggleMobileMenu()" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Kontakt</a>
                 <a href="/karriere.html" class="py-3 hover:text-[var(--gold-500)] flex items-center justify-between">Karriere <span class="text-[0.6rem] normal-case tracking-normal px-2 py-0.5 rounded-full border border-emerald-500/40 text-emerald-300">Wir stellen ein</span></a>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 normal-case tracking-normal">
@@ -919,70 +907,6 @@
             <div class="flex justify-center gap-2 mt-6" id="testimonialDots"></div>
         </section>
 
-        <!-- AKTENSTATUS TRACKER SECTION -->
-        <section id="akte" class="max-w-5xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
-            <div class="text-center max-w-3xl mx-auto mb-12">
-                <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Mandantenportal</div>
-                <h2 class="font-serif text-4xl md:text-5xl font-semibold mb-4">Aktenstatus abfragen</h2>
-                <p class="text-[var(--text-muted)] text-base">
-                    Geben Sie Aktenzeichen und Aktenpin ein, um den aktuellen Bearbeitungsstand Ihres Mandats einzusehen. Beides erhalten Sie beim Einreichen Ihres Mandats.
-                </p>
-            </div>
-
-            <div class="glass-card p-5 sm:p-6 md:p-10 border-t-2 border-t-[var(--gold-500)]">
-                <div class="flex flex-col sm:flex-row gap-3 mb-3">
-                    <input type="text" id="caseInput" autocomplete="off" autocapitalize="characters" placeholder="Aktenzeichen, z. B. PS-2026-0001" aria-label="Aktenzeichen" class="flex-1 min-w-0 bg-slate-900/80 border border-[var(--glass-border)] rounded-lg px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[var(--gold-500)]">
-                    <input type="text" id="casePin" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Aktenpin (6 Ziffern)" aria-label="Aktenpin" class="sm:w-52 bg-slate-900/80 border border-[var(--glass-border)] rounded-lg px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[var(--gold-500)] font-mono tracking-widest">
-                    <button onclick="lookupCase()" class="btn-gold px-8 py-3 text-xs uppercase tracking-wider whitespace-nowrap">Status prüfen</button>
-                </div>
-                <p class="text-[0.7rem] text-[var(--text-dim)] mb-8">Mandanten mit Konto sehen alle Details im <a href="/login.html" data-auth-link class="text-[var(--gold-500)] hover:underline">Mandantenportal</a>.</p>
-
-                <div id="caseResult" class="hidden">
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8 pb-4 border-b border-[var(--glass-border)]">
-                        <div>
-                            <div class="text-[0.65rem] uppercase tracking-widest text-[var(--text-muted)]">Aktenzeichen</div>
-                            <div id="caseNumber" class="font-mono text-lg text-white"></div>
-                        </div>
-                        <div>
-                            <div id="caseLawyerLabel" class="text-[0.65rem] uppercase tracking-widest text-[var(--text-muted)]">Zuständiger Anwalt</div>
-                            <div id="caseLawyer" class="font-serif text-lg text-[var(--gold-light)]"></div>
-                        </div>
-                        <div id="caseBadge" class="px-4 py-1.5 rounded-full text-xs font-semibold border whitespace-nowrap self-start sm:self-auto"></div>
-                    </div>
-
-                    <div class="track-line grid grid-cols-4 gap-2 mb-4">
-                        <div class="track-fill" id="trackFill" style="width:0%"></div>
-                        <div class="flex flex-col items-center gap-2">
-                            <div class="track-node" id="node-0"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg></div>
-                            <span class="text-[0.65rem] text-[var(--text-muted)] text-center">Eingang</span>
-                        </div>
-                        <div class="flex flex-col items-center gap-2">
-                            <div class="track-node" id="node-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg></div>
-                            <span class="text-[0.65rem] text-[var(--text-muted)] text-center">Akteneinsicht</span>
-                        </div>
-                        <div class="flex flex-col items-center gap-2">
-                            <div class="track-node" id="node-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg></div>
-                            <span class="text-[0.65rem] text-[var(--text-muted)] text-center">Strategie</span>
-                        </div>
-                        <div class="flex flex-col items-center gap-2">
-                            <div class="track-node" id="node-3"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg></div>
-                            <span class="text-[0.65rem] text-[var(--text-muted)] text-center">Verhandlung</span>
-                        </div>
-                    </div>
-
-                    <p id="caseNote" class="text-xs text-[var(--text-muted)] mt-8 leading-relaxed bg-slate-900/40 border border-[var(--glass-border)] rounded-xl p-4"></p>
-                    <!-- Discord-Ticket der Akte (nur wenn eingerichtet) -->
-                    <div id="caseTicket" class="hidden mt-4 flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-[#5865F2]/40 bg-[#5865F2]/10 p-4">
-                        <div class="flex-1 text-xs text-[var(--text-muted)] leading-relaxed" id="caseTicketText"></div>
-                        <button type="button" id="caseTicketBtn" class="inline-flex items-center justify-center gap-2 rounded-full bg-[#5865F2] hover:bg-[#4752c4] text-white text-xs uppercase tracking-wider font-semibold px-5 py-2.5 transition-colors"><svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.37a19.79 19.79 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.865-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.74 19.74 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.1 13.1 0 01-1.872-.892.077.077 0 01-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 01.078-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.009c.12.1.246.198.373.292a.077.077 0 01-.006.127 12.3 12.3 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.84 19.84 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg><span>Discord-Ticket beitreten</span></button>
-                    </div>
-                </div>
-
-                <div id="caseEmpty" class="text-center py-8 text-[var(--text-dim)] text-sm italic">Noch keine Abfrage durchgeführt.</div>
-                <div id="caseNotFound" class="hidden text-center py-8 text-red-300 text-sm">Kein Mandat mit diesen Angaben gefunden. Bitte prüfen Sie Aktenzeichen und Aktenpin.</div>
-            </div>
-        </section>
-
         <!-- FAQ SECTION -->
         <section id="faq" class="max-w-4xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
             <div class="text-center max-w-3xl mx-auto mb-12">
@@ -1010,7 +934,7 @@
                         <span class="font-medium text-white text-base pr-4">Wie kann ich den Status meines Mandats einsehen?</span>
                         <svg class="faq-icon w-5 h-5 text-[var(--gold-500)] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     </button>
-                    <div class="faq-answer"><p class="text-sm text-[var(--text-muted)] pb-5 leading-relaxed pr-8">Nutzen Sie unseren Aktenstatus-Bereich und geben Sie Aktenzeichen und Aktenpin ein – beides erhalten Sie beim Einreichen Ihres Mandats. Dort sehen Sie den aktuellen Bearbeitungsschritt sowie den zuständigen Anwalt. Mit einem Mandantenkonto sehen Sie zusätzlich Termine, Nachrichten und Rechnungen.</p></div>
+                    <div class="faq-answer"><p class="text-sm text-[var(--text-muted)] pb-5 leading-relaxed pr-8">Mit einem Mandantenkonto sehen Sie im Mandantenportal jederzeit den Bearbeitungsstand, den zuständigen Anwalt, Termine, Nachrichten und Rechnungen. Über Ihr privates Discord-Ticket erhalten Sie außerdem alle Neuigkeiten zu Ihrer Akte automatisch.</p></div>
                 </div>
                 <div class="faq-item" onclick="toggleFaq(this)">
                     <button class="w-full flex items-center justify-between py-5 text-left" aria-expanded="false">
@@ -1117,7 +1041,7 @@
             </button>
             <div id="ticketFormWrap">
             <h3 id="ticketTitle" class="font-serif text-2xl font-semibold text-white mb-2 pr-10">Mandat Einreichen</h3>
-            <p class="text-xs text-[var(--text-muted)] mb-6">Bitte füllen Sie das Formular aus. Ein Anwalt wird Ihre Anfrage umgehend prüfen. Sie erhalten sofort ein Aktenzeichen und einen Aktenpin für die Statusabfrage – ganz ohne Konto.</p>
+            <p class="text-xs text-[var(--text-muted)] mb-6">Bitte füllen Sie das Formular aus. Ein Anwalt wird Ihre Anfrage umgehend prüfen. Sie erhalten sofort ein Aktenzeichen – ganz ohne Konto.</p>
 
             <form id="ticketForm" onsubmit="handleFormSubmit(event)" class="space-y-4" novalidate>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1438,8 +1362,6 @@
             updateTestimonial();
         }, 6000);
 
-        /* ---------- Aktenstatus: Abfrage (lookupCase) liefert /js/site.js ---------- */
-
         /* ---------- Copy Email ---------- */
         function copyEmail() {
             const btn = document.getElementById('emailCopyBtn');
@@ -1513,7 +1435,7 @@
         window.addEventListener('resize', updateScrollspy);
         updateScrollspy();
     </script>
-    <!-- Backend-Anbindung: Login-Button, Mandatsanfrage, Aktenstatus, Team & Honorarordnung live -->
+    <!-- Backend-Anbindung: Login-Button, Mandatsanfrage, Team & Honorarordnung live -->
     <script src="/js/api.js"></script>
     <script src="/js/site.js"></script>
 </body>

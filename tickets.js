@@ -413,7 +413,7 @@ async function createChannel(c, { quiet = false } = {}) {
                   name: 'Mandant im Ticket',
                   value: client
                     ? '⏳ Noch nicht auf dem Discord-Server – wird automatisch hinzugefügt, sobald er beitritt (Akte → „Discord abgleichen“).'
-                    : '⏳ Noch kein Discord verknüpft. Mandant: im Portal „Mein Profil → Discord verbinden“ oder auf der Website unter „Aktenstatus“ mit Aktenzeichen + Pin „Discord-Ticket beitreten“.',
+                    : '⏳ Noch kein Discord verknüpft. Mandant: im Portal „Mein Profil → Discord verbinden“ – oder die Kanzlei fügt ihn hier mit `/add` hinzu.',
                   inline: false,
                 },
               ]),

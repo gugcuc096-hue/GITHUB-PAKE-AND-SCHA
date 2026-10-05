@@ -2169,7 +2169,7 @@
         : badge(c.hasClientAccount ? 'Mandant: Discord nicht verknüpft' : 'Mandant noch nicht beigetreten', 'slate');
     return `<div class="banner banner-discord items-center justify-between flex-wrap">
       <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><strong>Discord-Ticket</strong>${t.exists ? (t.archived ? badge('archiviert', 'slate') : badge('aktiv', 'emerald')) : t.deleted ? badge('per /delete gelöscht', 'slate') : badge('noch nicht angelegt', 'amber')}${t.exists ? client : ''}</div>
-        <div class="text-xs text-dim mt-1">${t.exists ? 'Status, Zuständigkeit, Nachrichten, Termine, Verträge und Rechnungen erscheinen automatisch im Kanal – interne Notizen nie.' : t.deleted ? 'Das Ticket wurde im Discord gelöscht und wird nicht automatisch neu angelegt. „Neu anlegen“ erstellt einen frischen Kanal.' : 'Wird automatisch angelegt; hier von Hand anlegen, falls es fehlt.'}${!t.clientInTicket && !c.hasClientAccount ? ' Mandanten ohne Konto treten auf der Website unter „Aktenstatus“ mit Aktenzeichen + Pin bei.' : ''}</div>
+        <div class="text-xs text-dim mt-1">${t.exists ? 'Status, Zuständigkeit, Nachrichten, Termine, Verträge und Rechnungen erscheinen automatisch im Kanal – interne Notizen nie.' : t.deleted ? 'Das Ticket wurde im Discord gelöscht und wird nicht automatisch neu angelegt. „Neu anlegen“ erstellt einen frischen Kanal.' : 'Wird automatisch angelegt; hier von Hand anlegen, falls es fehlt.'}${!t.clientInTicket && !c.hasClientAccount ? ' Mandanten ohne Konto treten direkt nach dem Einreichen auf der Website bei – sonst im Ticket mit /add hinzufügen.' : ''}</div>
         ${t.error ? `<div class="text-xs text-red-300 mt-1">${icon('alert', 'ico-sm')} ${esc(t.error)}</div>` : ''}</div>
       <div class="flex flex-wrap gap-2">${open}<button class="btn-outline btn-sm" data-action="ticket-sync" data-id="${c.id}">${t.exists ? 'Abgleichen' : t.deleted ? 'Neu anlegen' : 'Ticket anlegen'}</button></div></div>`;
   }
@@ -2294,13 +2294,6 @@
       .map(([k, v]) => `<div><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`)
       .join('');
 
-    const pin = c.accessPin
-      ? `<div class="banner banner-gold items-center justify-between flex-wrap">
-          <div><div class="text-xs uppercase tracking-widest opacity-80">Aktenpin für die Statusabfrage</div><div class="text-sm text-muted">Aktenzeichen + Pin auf der Startseite unter „Aktenstatus“ eingeben.</div></div>
-          <div class="flex items-center gap-2"><span class="font-mono text-2xl tracking-[0.25em] text-gold">${esc(c.accessPin)}</span>
-          <button class="icon-btn sm" data-action="copy" data-text="${esc(`Aktenzeichen: ${c.caseNumber}\nAktenpin: ${c.accessPin}`)}" aria-label="Kopieren">${icon('copy', 'ico-sm')}</button></div></div>`
-      : '';
-
     const statusSeg = c.canEdit
       ? `<div class="case-controls mb-5"><div class="chip-row" role="group" aria-label="Status ändern">${Object.entries(CASE_STATUS)
           .map(([k, [l]]) => `<button type="button" class="chip ${c.status === k ? 'active' : ''}" data-action="case-status" data-id="${c.id}" data-status="${k}">${esc(l)}</button>`)
@@ -2389,7 +2382,6 @@
       ${claim}
       ${staff ? caseStats(c, { appointments, attachments, externalDocs, tasks }) : ''}
       <div class="info-grid mb-5">${info}</div>
-      ${pin}
       ${clientLinkBanner(c, clientSuggestions)}
       ${ticketBanner(c, ticket)}
       ${processTicketBanner(c)}
@@ -6417,7 +6409,7 @@
     'case-unlink-client': async (el) => {
       const id = Number(el.dataset.id);
       const c = st.caseInfo && st.caseInfo.id === id ? st.caseInfo : null;
-      if (!(await askDelete('Verknüpfung lösen?', `${c ? c.clientName : 'Der Mandant'} sieht die Akte danach nicht mehr im Portal (Aktenstatus mit Aktenzeichen + Pin bleibt möglich). Der Name bleibt in der Akte eingetragen.`, 'Verknüpfung lösen'))) return;
+      if (!(await askDelete('Verknüpfung lösen?', `${c ? c.clientName : 'Der Mandant'} sieht die Akte danach nicht mehr im Portal. Der Name bleibt in der Akte eingetragen.`, 'Verknüpfung lösen'))) return;
       await api.put(`/api/cases/${id}/client`, { clientId: null });
       toast('Verknüpfung gelöst.');
       await reloadCase(id);
