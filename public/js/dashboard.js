@@ -3547,13 +3547,15 @@
       const modul = new URLSearchParams(location.search).get('modul');
       if (BOT_MODULES.some(([k]) => k === modul)) st.botModule = modul;
       if (modul) history.replaceState(null, '', `${location.pathname}?tab=${st.settingsTab || 'general'}#settings`);
-      const [r, tpl, tk, bot] = await Promise.all([
+      const [r, tpl, tk, bot, backups] = await Promise.all([
         api.get('/api/admin/settings'),
         api.get('/api/contract-templates?all=1'),
         api.get('/api/tickets/settings'),
         api.get('/api/bot').catch(() => null),
+        api.get('/api/admin/backups').catch(() => null),
         load.fivenet(true),
       ]);
+      st.backups = backups;
       st.settings = r.settings;
       st.contractTemplates = tpl;
       st.ticketSettings = tk;
@@ -3640,9 +3642,39 @@
             <div><label class="label">Kontakt</label><input name="firmContact" maxlength="120" class="field" value="${esc(s.firmContact)}"></div>
             <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button></div>
           </form>
-        </section>`;
+        </section>
+        ${backupPanel()}`;
     },
   };
+
+  /** Einstellungen → Allgemein: tägliche Datensicherung, „Jetzt sichern“, Herunterladen. */
+  const fmtBytes = (n) =>
+    n == null
+      ? '–'
+      : n >= 1024 ** 3
+        ? `${(n / 1024 ** 3).toFixed(1).replace('.', ',')} GB`
+        : n >= 1024 * 1024
+          ? `${(n / 1024 / 1024).toFixed(1).replace('.', ',')} MB`
+          : `${Math.max(1, Math.round(n / 1024))} KB`;
+  function backupPanel() {
+    const b = st.backups;
+    if (!b) return '';
+    const last = b.backups[0];
+    return `<section class="panel panel-pad mt-4 lg:mt-5">
+      <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('shield')} Datensicherung</h2>${last ? badge(`zuletzt ${fmtDate(last.createdAt)}`, 'emerald') : badge('noch keine Sicherung', 'amber')}</div>
+      <p class="text-sm text-muted">Jeden Tag wird automatisch eine Kopie der Datenbank angelegt – Akten, Konten, Verträge, Rechnungen, Nachrichten und Einstellungen (ohne Login-Sitzungen). Aufbewahrt werden die letzten ${b.keepDays} Tage, danach eine Sicherung je Woche bis ${Math.round(b.keepWeeklyDays / 7)} Wochen zurück. Laden Sie regelmäßig eine Sicherung herunter, damit es auch eine Kopie außerhalb von Render gibt. Bilder (Profilbilder, Beweismittel) sind nicht enthalten.</p>
+      <p class="form-hint mt-2">Datenbank ${fmtBytes(b.dbSize)} · freier Speicher auf der Disk ${fmtBytes(b.free)} · Wiederherstellen: Sicherung als <span class="font-mono">restore.db</span> neben die Datenbank legen und den Dienst neu starten (Anleitung im README).</p>
+      <div class="form-actions mt-3"><button type="button" class="btn-outline btn-md" data-action="backup-now">${icon('shield', 'ico-sm')}<span>Jetzt sichern</span></button></div>
+      <div class="mt-3">${b.backups.length
+        ? b.backups
+            .map(
+              (x) => `<div class="list-row wrap"><div class="main"><div class="title font-mono text-sm">${esc(x.name)}</div><div class="meta">${esc(fmtDate(x.createdAt))} · ${esc(fmtBytes(x.size))}</div></div>
+                <a class="btn-ghost btn-sm shrink-0" href="/api/admin/backups/${encodeURIComponent(x.name)}" download>${icon('download', 'ico-sm')}<span>Herunterladen</span></a></div>`
+            )
+            .join('')
+        : '<p class="text-sm text-dim">Die erste Sicherung entsteht automatisch kurz nach dem Start des Servers.</p>'}</div>
+    </section>`;
+  }
 
   /* ---------------------------------------------------------------- Einstellungen: Discord-Bot (wie Sapphire, im eigenen Bot) */
   const BOT_MODULES = [
@@ -6370,6 +6402,17 @@
       await api.del(`/api/name-requests/${el.dataset.id}`);
       toast('Antrag zurückgezogen.');
       await refreshBehind();
+    },
+    'backup-now': async (el) => {
+      el.disabled = true;
+      try {
+        const res = await api.post('/api/admin/backups', {});
+        st.backups = res;
+        toast(`Sicherung angelegt: ${res.backup.name}.`);
+        renderView();
+      } finally {
+        el.disabled = false;
+      }
     },
     'name-direct': (el) => {
       st.returnCase = el.dataset.returnCase ? Number(el.dataset.returnCase) : null;

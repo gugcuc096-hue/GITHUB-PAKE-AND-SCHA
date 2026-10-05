@@ -3,6 +3,7 @@ require('dotenv').config();
 const path = require('path');
 const express = require('express');
 const helmet = require('helmet');
+const compression = require('compression');
 const cookieParser = require('cookie-parser');
 
 const { DB_PATH, PUBLIC_MEDIA_DIR } = require('./db');
@@ -28,9 +29,26 @@ app.disable('x-powered-by');
 
 app.use(
   helmet({
-    // Die Seiten laden Tailwind (CDN), Google Fonts und Discord-Avatare extern
-    // und nutzen Inline-Skripte; eine strenge Standard-CSP würde das blockieren.
-    contentSecurityPolicy: false,
+    // Content-Security-Policy: Skripte nur von der eigenen Domain (Tailwind ist fest eingebaut, kein CDN mehr),
+    // keine Plugins, keine fremden Frames, Formulare nur an die eigene Seite bzw. die Discord-Anmeldung.
+    // Inline-Skripte und onclick-Handler der Seiten bleiben erlaubt; Google Fonts und Bilder (z. B. Discord-Avatare,
+    // Embed-Vorschauen) kommen weiterhin von außen.
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrcAttr: ["'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+        imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+        connectSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'", 'https://discord.com'],
+        frameAncestors: ["'self'"],
+      },
+    },
     crossOriginEmbedderPolicy: false,
     // „same-origin“ statt „no-referrer“: fremde Seiten erfahren weiterhin nichts, aber Formulare der
     // eigenen Seite (z. B. „Discord-Ticket beitreten“) senden ihre Herkunft mit (sonst „Origin: null“).
@@ -40,6 +58,8 @@ app.use(
 // Discord-Button-Klicks (Ticket-Panel): brauchen den unveränderten Rohtext für die Signaturprüfung –
 // deshalb vor express.json().
 app.use('/api/discord/interactions', require('./routes/interactions'));
+// Antworten komprimiert ausliefern (gzip) – das Dashboard-Skript wird so ca. fünfmal kleiner
+app.use(compression());
 app.use(express.json({ limit: '300kb' }));
 app.use(cookieParser());
 app.use(loadUser);
@@ -148,6 +168,10 @@ const reminderTimer = setInterval(() => {
 reminderTimer.unref();
 
 app.listen(PORT, () => {
+  // Tailwind-CSS auffrischen, falls die Build-Werkzeuge installiert sind (sonst gilt die fertige Datei)
+  require('./scripts/build-css').refreshOnStart();
+  // Tägliche Datensicherung (backups/ neben der Datenbank)
+  require('./backup').start();
   // Discord-Befehle (/add, /remove, /delete, /passwort, /akte …) anmelden (nur wenn Bot-Token, Server und Public Key eingerichtet sind)
   setTimeout(() => require('./tickets').registerCommands().catch((err) => console.warn('Discord-Befehle nicht angemeldet:', err.message)), 3000).unref();
   // Kanzlei-Bot: dauerhafte Verbindung für Rang-Sync, Role Connections und Willkommensnachrichten (nur wenn eingeschaltet)

@@ -198,6 +198,15 @@ cp .env.example .env    # Werte nach Bedarf ausfüllen
 npm run dev             # http://localhost:3000
 ```
 
+**Design (Tailwind):** Tailwind CSS v3 ist fest eingebaut (`public/css/tailwind.css`, vorher das Play-CDN `cdn.tailwindcss.com`, das nicht für den Produktivbetrieb gedacht ist). Nach neuen Tailwind-Klassen in HTML oder JavaScript `npm run build:css` ausführen und die Datei mit committen. Sind die Build-Werkzeuge installiert (devDependencies, auf Render bei `npm install` normalerweise der Fall), frischt der Server die Datei beim Start zusätzlich selbst auf. Die Datei wird wie zuvor das CDN als letztes Stylesheet im `<head>` geladen – das Aussehen ist identisch (geprüft: berechnete Styles aller Elemente auf allen Seiten, PC und Handy).
+
+## Datensicherung
+
+- **Automatisch jeden Tag** (kurz nach dem Start, danach stündliche Prüfung) eine Kopie der Datenbank in `backups/` neben der Datenbank – auf Render also auf der Disk (`/var/data/backups`). Aufbewahrt: alle Sicherungen der letzten 7 Tage, danach die neueste je Woche bis 5 Wochen zurück; ältere werden gelöscht. Ist zu wenig Speicher frei, wird keine Sicherung angelegt (Warnung im Log).
+- Enthalten ist die komplette Datenbank (Akten, Konten, Verträge, Rechnungen, Nachrichten, Einstellungen) – **ohne Login-Sitzungen** (die Tokens werden restlos entfernt). **Nicht** enthalten: hochgeladene Bilder (`uploads/`: Profilbilder, Team-Fotos, Beweismittel).
+- **Board of Partners (Admin):** *Einstellungen → Allgemein → Datensicherung* – Liste aller Sicherungen, **„Jetzt sichern“** und **„Herunterladen“** (am besten regelmäßig, damit es eine Kopie außerhalb von Render gibt). Erstellen und Herunterladen stehen im Protokoll.
+- **Wiederherstellen:** Sicherung als `restore.db` neben die Datenbank legen und den Dienst neu starten – z. B. in der Render-Shell `cp /var/data/backups/pake-scha-2026-10-05.db /var/data/restore.db`, danach *Manual Deploy → Restart service*. Beim Start wird sie eingespielt; die bisherige Datenbank bleibt als `pake-scha.db.before-restore-<Zeit>` liegen. Eine Datei, die keine SQLite-Datenbank ist, wird nicht eingespielt (`restore.db.ungueltig`). Nach dem Einspielen müssen sich alle neu anmelden.
+
 ## VIP & Lifetime
 
 Unter **Board of Partners → VIP & Lifetime** (Admin-Rolle oder Partner-Rang):
@@ -367,13 +376,17 @@ Es gibt genau sechs Ränge (Benutzer, Team-Profile und Einstellung von Bewerbern
 - Alle Nutzertexte werden im Frontend escaped (XSS) · Discord-Nachrichten pingen nie `@everyone`
 - FiveNet: keine Passwörter, keine Sitzungs-Tokens, kein Scraping · „In FiveNet öffnen“ verlinkt immer auf die aus Instanz und Dokument-ID gebaute Adresse, nie auf die eingefügte
 - Discord-Bot: jede Interaktion ist von Discord signiert (`DISCORD_PUBLIC_KEY`), Bot-Token nur in Render · `/passwort` schickt das Einmal-Passwort ausschließlich per Direktnachricht an das verknüpfte Discord (nie in einen Kanal), beendet alle Sitzungen und erzwingt ein eigenes Passwort beim Login
+- **Content-Security-Policy:** Skripte nur von der eigenen Domain (kein CDN mehr), keine Plugins, keine fremden Frames, Formulare nur an die eigene Seite bzw. die Discord-Anmeldung; Google Fonts und Bilder (z. B. Discord-Avatare) weiterhin erlaubt · Antworten werden komprimiert (gzip) ausgeliefert
+- Datensicherungen enthalten keine Login-Sitzungen; Herunterladen nur für die Rolle „Board of Partners“ (Admin)
 - Bitte nur **In-Character-Daten** speichern und keine echten Passwörter wiederverwenden
 
 ## Projektstruktur
 
 ```
 server.js        App-Setup, Routen, Start
-db.js            SQLite-Schema, Migrationen, Helfer
+db.js            SQLite-Schema, Migrationen, Helfer, Wiederherstellen aus restore.db
+backup.js        Tägliche Datensicherung (backups/), Aufbewahrung, Download für das Board
+scripts/         build-css.js (Tailwind fest bauen: npm run build:css), seed-admin.js
 auth.js          Sessions, Passwörter, Rollen-Middleware
 bootstrap.js     Team-Seed, Notfall-Admin, Passwort-Reset, Datenmigration
 discord.js       Webhooks & OAuth2
@@ -392,5 +405,5 @@ uploads.js       Bild-Uploads (Formatprüfung anhand der Dateisignatur)
 helpers.js       Konstanten, Validierung
 models.js        Datenabfragen, Zeilen-Mapping, Zugriffsregeln, Protokoll
 routes/          auth, cases, calendar, messages, board, invoices, fees, team, admin, discord, public, duty, applications, fivenet, external, tasks, concerns, personnel, tickets, interactions, cooperations, memberships, nameRequests
-public/          index.html, karriere.html, login.html, register.html, dashboard.html, invoice.html, css/, js/
+public/          index.html, karriere.html, login.html, register.html, dashboard.html, invoice.html, vertrag.html, css/ (app.css, tailwind.css), js/
 ```

@@ -10,6 +10,7 @@ const discord = require('../discord');
 const fivenet = require('../fivenet');
 const personnel = require('./personnel');
 const tickets = require('../tickets');
+const backup = require('../backup');
 
 const ROLE_LABEL = { mandant: 'Mandant', anwalt: 'Anwalt', admin: 'Board of Partners' };
 
@@ -363,5 +364,37 @@ router.post(
     res.json({ success: true, sent: result.sent, pinged: result.pinged });
   })
 );
+
+/* ---------------------------------------------------------------- Datensicherung (nur Board of Partners / Admin) */
+const backupInfo = () => ({
+  backups: backup.list(),
+  free: backup.freeBytes(),
+  dbSize: backup.dbBytes(),
+  keepDays: backup.KEEP_DAILY_DAYS,
+  keepWeeklyDays: backup.KEEP_WEEKLY_DAYS,
+});
+
+router.get('/backups', (req, res) => res.json(backupInfo()));
+
+router.post(
+  '/backups',
+  wrap(async (req, res) => {
+    let b;
+    try {
+      b = backup.create('manual');
+    } catch (err) {
+      return res.status(507).json({ error: `Sicherung fehlgeschlagen: ${err.message}` });
+    }
+    logActivity(req.user, 'Datensicherung erstellt', 'settings', null, b.name);
+    res.status(201).json({ backup: b, ...backupInfo() });
+  })
+);
+
+router.get('/backups/:name', (req, res) => {
+  const file = backup.fileOf(req.params.name);
+  if (!file) return res.status(404).json({ error: 'Sicherung nicht gefunden.' });
+  logActivity(req.user, 'Datensicherung heruntergeladen', 'settings', null, req.params.name);
+  res.download(file, req.params.name);
+});
 
 module.exports = { router, directoryRouter };
