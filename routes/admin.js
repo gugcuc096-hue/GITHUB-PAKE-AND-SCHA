@@ -11,6 +11,7 @@ const fivenet = require('../fivenet');
 const personnel = require('./personnel');
 const tickets = require('../tickets');
 const backup = require('../backup');
+const media = require('../mediaBackup');
 
 const ROLE_LABEL = { mandant: 'Mandant', anwalt: 'Anwalt', admin: 'Board of Partners' };
 
@@ -372,6 +373,8 @@ const backupInfo = () => ({
   dbSize: backup.dbBytes(),
   keepDays: backup.KEEP_DAILY_DAYS,
   keepWeeklyDays: backup.KEEP_WEEKLY_DAYS,
+  media: media.stats(),
+  pendingRestore: media.pendingRestore(),
 });
 
 router.get('/backups', (req, res) => res.json(backupInfo()));
@@ -389,6 +392,57 @@ router.post(
     res.status(201).json({ backup: b, ...backupInfo() });
   })
 );
+
+/** Alle hochgeladenen Bilder (Profilbilder, Team-Fotos, Beweismittel) als .tar.gz. */
+router.get('/backups/media', (req, res) => {
+  const name = `pake-scha-bilder-${new Date().toISOString().slice(0, 10)}.tar.gz`;
+  res.set({ 'Content-Type': 'application/gzip', 'Content-Disposition': `attachment; filename="${name}"` });
+  logActivity(req.user, 'Bilder-Sicherung heruntergeladen', 'settings', null, name);
+  media.writeArchive(res).catch((err) => {
+    console.warn('Bilder-Sicherung abgebrochen:', err.message);
+    res.destroy();
+  });
+});
+
+/** Sicherung hochladen: Datenbank (.db) → beim nächsten Start einspielen, Bilder (.tar.gz) → sofort ergänzen. */
+router.post(
+  '/backups/upload',
+  wrap(async (req, res) => {
+    let result;
+    try {
+      result = await media.receiveUpload(req);
+    } catch (err) {
+      if (err.status) return res.status(err.status).json({ error: err.message }); // auch 507 (Speicher voll) mit Klartext
+      throw err;
+    }
+    if (result.kind === 'datenbank') {
+      logActivity(req.user, 'Datensicherung zum Einspielen hochgeladen', 'settings', null, `${Math.round(result.size / 1024)} KB – wird beim nächsten Neustart eingespielt`);
+    } else {
+      logActivity(req.user, 'Bilder eingespielt', 'settings', null, `${result.added} neu, ${result.existing} schon vorhanden, ${result.skipped} übersprungen`);
+    }
+    res.json({ result, ...backupInfo() });
+  })
+);
+
+/** Gespeicherte Sicherung für den nächsten Start vormerken. */
+router.post(
+  '/backups/:name/restore',
+  wrap(async (req, res) => {
+    const file = backup.fileOf(req.params.name);
+    if (!file) return res.status(404).json({ error: 'Sicherung nicht gefunden.' });
+    media.stageBackup(file);
+    logActivity(req.user, 'Datensicherung zum Einspielen vorgemerkt', 'settings', null, req.params.name);
+    res.json(backupInfo());
+  })
+);
+
+router.delete('/backups/pending', (req, res) => {
+  if (media.pendingRestore()) {
+    media.cancelRestore();
+    logActivity(req.user, 'Einspielen der Datensicherung abgebrochen', 'settings', null, null);
+  }
+  res.json(backupInfo());
+});
 
 router.get('/backups/:name', (req, res) => {
   const file = backup.fileOf(req.params.name);

@@ -3685,19 +3685,33 @@
     const b = st.backups;
     if (!b) return '';
     const last = b.backups[0];
+    const pending = b.pendingRestore;
     return `<section class="panel panel-pad mt-4 lg:mt-5">
       <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('shield')} Datensicherung</h2>${last ? badge(`zuletzt ${fmtDate(last.createdAt)}`, 'emerald') : badge('noch keine Sicherung', 'amber')}</div>
-      <p class="text-sm text-muted">Jeden Tag wird automatisch eine Kopie der Datenbank angelegt – Akten, Konten, Verträge, Rechnungen, Nachrichten und Einstellungen (ohne Login-Sitzungen). Aufbewahrt werden die letzten ${b.keepDays} Tage, danach eine Sicherung je Woche bis ${Math.round(b.keepWeeklyDays / 7)} Wochen zurück. Laden Sie regelmäßig eine Sicherung herunter, damit es auch eine Kopie außerhalb von Render gibt. Bilder (Profilbilder, Beweismittel) sind nicht enthalten.</p>
-      <p class="form-hint mt-2">Datenbank ${fmtBytes(b.dbSize)} · freier Speicher auf der Disk ${fmtBytes(b.free)} · Wiederherstellen: Sicherung als <span class="font-mono">restore.db</span> neben die Datenbank legen und den Dienst neu starten (Anleitung im README).</p>
+      <p class="text-sm text-muted">Jeden Tag wird automatisch eine Kopie der Datenbank angelegt – Akten, Konten, Verträge, Rechnungen, Nachrichten und Einstellungen (ohne Login-Sitzungen). Aufbewahrt werden die letzten ${b.keepDays} Tage, danach eine Sicherung je Woche bis ${Math.round(b.keepWeeklyDays / 7)} Wochen zurück. Laden Sie regelmäßig eine Sicherung herunter, damit es auch eine Kopie außerhalb von Render gibt. Bilder (Profilbilder, Team-Fotos, Beweismittel) gibt es unten als eigenes Archiv.</p>
+      <p class="form-hint mt-2">Datenbank ${fmtBytes(b.dbSize)} · freier Speicher auf der Disk ${fmtBytes(b.free)}</p>
+      ${
+        pending
+          ? `<div class="banner banner-amber is-stack mt-3 mb-0"><strong>Eine Datenbank-Sicherung ist zum Einspielen vorgemerkt</strong> (${esc(fmtBytes(pending.size))}, ${esc(fmtDate(pending.stagedAt))}). Sie ersetzt die aktuelle Datenbank beim nächsten Neustart des Dienstes – auf Render: Dienst öffnen → <em>Manual Deploy</em> → <em>Restart service</em>. Die aktuelle Datenbank bleibt als Kopie erhalten; danach müssen sich alle neu anmelden.
+              <div class="mt-2"><button type="button" class="btn-ghost btn-sm" data-action="backup-cancel-restore">${icon('x', 'ico-sm')}<span>Vormerkung aufheben</span></button></div></div>`
+          : ''
+      }
       <div class="form-actions mt-3"><button type="button" class="btn-outline btn-md" data-action="backup-now">${icon('shield', 'ico-sm')}<span>Jetzt sichern</span></button></div>
       <div class="mt-3">${b.backups.length
         ? b.backups
             .map(
-              (x) => `<div class="list-row wrap"><div class="main"><div class="title font-mono text-sm">${esc(x.name)}</div><div class="meta">${esc(fmtDate(x.createdAt))} · ${esc(fmtBytes(x.size))}</div></div>
-                <a class="btn-ghost btn-sm shrink-0" href="/api/admin/backups/${encodeURIComponent(x.name)}" download>${icon('download', 'ico-sm')}<span>Herunterladen</span></a></div>`
+              (x) => `<div class="list-row wrap flex-col sm:flex-row"><div class="main"><div class="title font-mono text-sm">${esc(x.name)}</div><div class="meta">${esc(fmtDate(x.createdAt))} · ${esc(fmtBytes(x.size))}</div></div>
+                <div class="flex flex-wrap gap-2 shrink-0"><a class="btn-ghost btn-sm" href="/api/admin/backups/${encodeURIComponent(x.name)}" download>${icon('download', 'ico-sm')}<span>Herunterladen</span></a>
+                <button type="button" class="btn-ghost btn-sm" data-action="backup-restore" data-name="${esc(x.name)}">${icon('restore', 'ico-sm')}<span>Einspielen</span></button></div></div>`
             )
             .join('')
         : '<p class="text-sm text-dim">Die erste Sicherung entsteht automatisch kurz nach dem Start des Servers.</p>'}</div>
+      <h3 class="section-title mt-6">Bilder &amp; Anhänge</h3>
+      <p class="text-sm text-muted">${b.media.files} ${b.media.files === 1 ? 'Bild' : 'Bilder'} (Profilbilder, Team-Fotos, Beweismittel der Akten) · ${esc(fmtBytes(b.media.bytes))}. Das Archiv enthält alle Bilder mit ihren Ordnern; laden Sie es zusammen mit einer Datenbank-Sicherung herunter.</p>
+      <div class="form-actions mt-3"><a class="btn-outline btn-md" href="/api/admin/backups/media" download>${icon('download', 'ico-sm')}<span>Bilder herunterladen (.tar.gz)</span></a></div>
+      <h3 class="section-title mt-6">Sicherung einspielen</h3>
+      <p class="text-sm text-muted">Eine heruntergeladene Sicherung wieder hochladen – z. B. nach einem Umzug oder wenn die Disk verloren ging: <strong>Bilder-Archiv (.tar.gz)</strong> wird sofort ergänzt (vorhandene Bilder bleiben unverändert). Eine <strong>Datenbank-Sicherung (.db)</strong> – hochgeladen oder oben per „Einspielen“ – wird beim nächsten Neustart eingespielt und ersetzt dann die aktuelle Datenbank.</p>
+      <div class="form-actions mt-3"><label class="btn-outline btn-md file-btn">${icon('restore', 'ico-sm')}<span>Sicherung hochladen …</span><input type="file" accept=".db,.gz,.tgz,application/gzip,application/x-sqlite3" data-upload="backup" aria-label="Sicherung hochladen"></label></div>
     </section>`;
   }
 
@@ -5877,6 +5891,21 @@
     input.value = '';
     if (!files.length) return;
 
+    if (kind === 'backup') {
+      // Sicherung (Datenbank oder Bilder-Archiv) unverändert als Binärdaten hochladen
+      toast('Sicherung wird hochgeladen …');
+      const res = await api.upload('/api/admin/backups/upload', new Blob([files[0]], { type: 'application/octet-stream' }));
+      const r = res.result;
+      st.backups = res;
+      toast(
+        r.kind === 'datenbank'
+          ? 'Datenbank-Sicherung vorgemerkt – sie wird beim nächsten Neustart eingespielt.'
+          : `Bilder eingespielt: ${r.added} neu, ${r.existing} schon vorhanden${r.skipped ? `, ${r.skipped} übersprungen` : ''}.`
+      );
+      renderView();
+      return;
+    }
+
     if (kind === 'avatar') {
       const blob = await resizeImage(files[0], { max: 512, square: true });
       const res = await api.upload('/api/auth/avatar', blob);
@@ -6465,6 +6494,23 @@
         return;
       }
       if (await window.PSApp.install()) toast('App installiert – Sie finden „Pake & Scha“ jetzt bei Ihren Programmen.');
+    },
+    'backup-restore': async (el) => {
+      if (
+        !(await ask(
+          `Beim nächsten Neustart des Dienstes ersetzt die Sicherung „${el.dataset.name}“ die aktuelle Datenbank. Alles, was seitdem geändert wurde, ist danach nicht mehr da (die aktuelle Datenbank bleibt als Kopie erhalten); alle müssen sich neu anmelden.`,
+          { title: 'Sicherung einspielen?', confirmText: 'Vormerken', danger: true }
+        ))
+      )
+        return;
+      st.backups = await api.post(`/api/admin/backups/${encodeURIComponent(el.dataset.name)}/restore`);
+      toast('Vorgemerkt – jetzt den Dienst neu starten.');
+      renderView();
+    },
+    'backup-cancel-restore': async () => {
+      st.backups = await api.del('/api/admin/backups/pending');
+      toast('Vormerkung aufgehoben – die aktuelle Datenbank bleibt.');
+      renderView();
     },
     'backup-now': async (el) => {
       el.disabled = true;

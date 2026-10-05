@@ -213,9 +213,14 @@ Website und Dashboard lassen sich als **App installieren** – ohne App-Store, d
 ## Datensicherung
 
 - **Automatisch jeden Tag** (kurz nach dem Start, danach stündliche Prüfung) eine Kopie der Datenbank in `backups/` neben der Datenbank – auf Render also auf der Disk (`/var/data/backups`). Aufbewahrt: alle Sicherungen der letzten 7 Tage, danach die neueste je Woche bis 5 Wochen zurück; ältere werden gelöscht. Ist zu wenig Speicher frei, wird keine Sicherung angelegt (Warnung im Log).
-- Enthalten ist die komplette Datenbank (Akten, Konten, Verträge, Rechnungen, Nachrichten, Einstellungen) – **ohne Login-Sitzungen** (die Tokens werden restlos entfernt). **Nicht** enthalten: hochgeladene Bilder (`uploads/`: Profilbilder, Team-Fotos, Beweismittel).
-- **Board of Partners (Admin):** *Einstellungen → Allgemein → Datensicherung* – Liste aller Sicherungen, **„Jetzt sichern“** und **„Herunterladen“** (am besten regelmäßig, damit es eine Kopie außerhalb von Render gibt). Erstellen und Herunterladen stehen im Protokoll.
-- **Wiederherstellen:** Sicherung als `restore.db` neben die Datenbank legen und den Dienst neu starten – z. B. in der Render-Shell `cp /var/data/backups/pake-scha-2026-10-05.db /var/data/restore.db`, danach *Manual Deploy → Restart service*. Beim Start wird sie eingespielt; die bisherige Datenbank bleibt als `pake-scha.db.before-restore-<Zeit>` liegen. Eine Datei, die keine SQLite-Datenbank ist, wird nicht eingespielt (`restore.db.ungueltig`). Nach dem Einspielen müssen sich alle neu anmelden.
+- Enthalten ist die komplette Datenbank (Akten, Konten, Verträge, Rechnungen, Nachrichten, Einstellungen, Papierkorb) – **ohne Login-Sitzungen** (die Tokens werden restlos entfernt). Hochgeladene Bilder (`uploads/`: Profilbilder, Team-Fotos, Beweismittel) liegen nicht in der Datenbank – dafür gibt es ein eigenes Archiv (siehe unten).
+- **Board of Partners (Admin):** *Einstellungen → Allgemein → Datensicherung* – Liste aller Sicherungen, **„Jetzt sichern“** und **„Herunterladen“** (am besten regelmäßig, damit es eine Kopie außerhalb von Render gibt). Erstellen, Herunterladen und Einspielen stehen im Protokoll.
+- **Bilder & Anhänge:** **„Bilder herunterladen (.tar.gz)“** lädt alle Bilder mit ihren Ordnern als ein Archiv (`uploads/public/avatars`, `uploads/public/team`, `uploads/evidence`) – am besten zusammen mit einer Datenbank-Sicherung herunterladen.
+- **Wiederherstellen im Dashboard:** bei einer Sicherung in der Liste **„Einspielen“** (vormerken) oder unter *Sicherung einspielen* eine heruntergeladene Datei hochladen:
+  - **Datenbank (`.db`)** wird geprüft (lesbar, unbeschädigt, Datenbank dieser Anwendung) und als `restore.db` vorgemerkt – ein Hinweis zeigt das an, „Vormerkung aufheben“ macht es rückgängig. Eingespielt wird beim nächsten Neustart: auf Render Dienst öffnen → *Manual Deploy* → *Restart service*.
+  - **Bilder-Archiv (`.tar.gz`)** wird sofort ergänzt: nur Bilder (geprüft anhand der Dateisignatur) in die drei bekannten Ordner, vorhandene Dateien bleiben unverändert; Links, fremde Pfade und andere Dateien werden übersprungen. Auch mit `tar -czf bilder.tar.gz uploads` (im Ordner der Datenbank) gebaute Archive funktionieren.
+- **Wiederherstellen per Shell:** Sicherung als `restore.db` neben die Datenbank legen und den Dienst neu starten – z. B. in der Render-Shell `cp /var/data/backups/pake-scha-2026-10-05.db /var/data/restore.db`, danach *Manual Deploy → Restart service*. Bilder: `tar -xzf pake-scha-bilder-….tar.gz -C /var/data`.
+- Beim Start wird `restore.db` eingespielt; die bisherige Datenbank bleibt als `pake-scha.db.before-restore-<Zeit>` liegen. Eine Datei, die keine SQLite-Datenbank ist, wird nicht eingespielt (`restore.db.ungueltig`). Nach dem Einspielen müssen sich alle neu anmelden.
 
 ## Papierkorb für Akten
 
@@ -404,6 +409,7 @@ Es gibt genau sechs Ränge (Benutzer, Team-Profile und Einstellung von Bewerbern
 server.js        App-Setup, Routen, Start
 db.js            SQLite-Schema, Migrationen, Helfer, Wiederherstellen aus restore.db
 backup.js        Tägliche Datensicherung (backups/), Aufbewahrung, Download für das Board
+mediaBackup.js   Bilder als .tar.gz sichern, Sicherungen hochladen und einspielen (restore.db, Bilder-Archiv)
 trash.js         Papierkorb für Akten: Momentaufnahme beim Löschen, Wiederherstellen, endgültig löschen nach 30 Tagen
 scripts/         build-css.js (Tailwind fest bauen: npm run build:css), seed-admin.js
 auth.js          Sessions, Passwörter, Rollen-Middleware
