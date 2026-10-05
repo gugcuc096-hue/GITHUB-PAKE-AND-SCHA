@@ -23,7 +23,7 @@ function stateCookieOptions() {
 function startFlow(req, res, mode, extra = '') {
   const cfg = discord.oauthConfig(req);
   if (!cfg) {
-    const target = mode === 'login' ? '/login.html?discord=disabled' : mode === 'case' ? '/?discord=disabled#akte' : '/dashboard.html?discord=disabled#profile';
+    const target = mode === 'login' ? '/login.html?discord=disabled' : mode === 'case' ? '/?discord=disabled' : '/dashboard.html?discord=disabled#profile';
     return res.redirect(target);
   }
   const state = crypto.randomBytes(24).toString('hex');
@@ -46,11 +46,11 @@ router.get('/connect', (req, res) => {
 router.get('/login', (req, res) => startFlow(req, res, 'login'));
 
 /*
- * Discord-Ticket beitreten ohne Konto: Aktenzeichen + Aktenpin (Formular auf der Startseite, POST –
+ * Discord-Ticket beitreten ohne Konto: direkt nach dem Einreichen eines Mandats (Aktenzeichen + Pin aus der Antwort, POST –
  * der Pin steht so nicht in der Adresszeile). Danach Discord-Anmeldung; der Mandant wird dem Server
  * und dem Ticket seiner Akte hinzugefügt.
  */
-const joinLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 15, standardHeaders: true, legacyHeaders: false, handler: (req, res) => res.redirect('/?ticket=limit#akte') });
+const joinLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 15, standardHeaders: true, legacyHeaders: false, handler: (req, res) => res.redirect('/?ticket=limit') });
 router.post('/case-join', express.urlencoded({ extended: false, limit: '2kb' }), joinLimiter, (req, res) => {
   // Nur Formulare der eigenen Website (Schutz vor fremden Seiten, die den Ablauf anstoßen)
   const origin = req.get('origin');
@@ -61,13 +61,13 @@ router.post('/case-join', express.urlencoded({ extended: false, limit: '2kb' }),
     } catch {
       host = '';
     }
-    if (host !== req.get('host')) return res.redirect('/?ticket=error#akte');
+    if (host !== req.get('host')) return res.redirect('/?ticket=error');
   }
   const number = String(req.body?.caseNumber || '').trim().toUpperCase().slice(0, 30);
   const pin = String(req.body?.pin || '').trim().slice(0, 10);
-  if (!tickets.active()) return res.redirect('/?ticket=disabled#akte');
+  if (!tickets.active()) return res.redirect('/?ticket=disabled');
   const c = number && pin ? db.prepare('SELECT id FROM cases WHERE case_number = ? AND access_pin = ?').get(number, pin) : null;
-  if (!c) return res.redirect('/?ticket=notfound#akte');
+  if (!c) return res.redirect('/?ticket=notfound');
   startFlow(req, res, 'case', String(c.id));
 });
 
@@ -81,7 +81,7 @@ router.get(
     res.clearCookie(STATE_COOKIE, stateCookieOptions());
     const [mode, expected, extra] = raw.split('.');
     const failTarget = mode === 'login' ? '/login.html' : mode === 'case' ? '/' : '/dashboard.html';
-    const fail = (code) => res.redirect(`${failTarget}?${mode === 'case' ? 'ticket' : 'discord'}=${code}${mode === 'login' ? '' : mode === 'case' ? '#akte' : '#profile'}`);
+    const fail = (code) => res.redirect(`${failTarget}?${mode === 'case' ? 'ticket' : 'discord'}=${code}${mode === 'login' || mode === 'case' ? '' : '#profile'}`);
 
     if (!expected || req.query.state !== expected) return fail('state');
     if (req.query.error) return fail('denied');
@@ -115,7 +115,7 @@ router.get(
       await within(tickets.syncCase(c.id), 8000);
       const info = tickets.ticketInfo(db.prepare('SELECT * FROM cases WHERE id = ?').get(c.id), null);
       if (info && info.url && info.clientInTicket) return res.redirect(info.url);
-      return res.redirect('/?ticket=pending#akte');
+      return res.redirect('/?ticket=pending');
     }
 
     if (!req.user) return res.redirect('/login.html?discord=session');

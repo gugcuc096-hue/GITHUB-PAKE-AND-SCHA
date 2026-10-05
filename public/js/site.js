@@ -1,6 +1,6 @@
 /*
  * Verbindet die öffentliche Startseite (index.html) mit dem Backend:
- * Login-/Dashboard-Button, Mandatsanfrage, Aktenstatus-Abfrage, Anliegen an das Board of Partners sowie Team und
+ * Login-/Dashboard-Button, Mandatsanfrage, Anliegen an das Board of Partners sowie Team und
  * Honorarordnung live aus der Datenbank (vom Dashboard aus pflegbar).
  * Wird NACH dem Inline-Skript der Startseite geladen.
  */
@@ -45,42 +45,30 @@
     const wrap = document.getElementById('ticketFormWrap');
     const box = document.getElementById('ticketSuccess');
     if (!wrap || !box) return;
-    const text = `Aktenzeichen: ${res.caseNumber}\nAktenpin: ${res.pin}`;
     box.innerHTML = `
       <div class="w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center justify-center mx-auto mb-4">
         <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg></div>
       <h3 class="font-serif text-2xl font-semibold text-white text-center mb-2">Mandat eingegangen</h3>
       <p class="text-sm text-[var(--text-muted)] text-center mb-5">Ein Anwalt der Kanzlei wurde benachrichtigt und meldet sich umgehend.${res.linkedToAccount ? ' Die Akte wurde Ihrem Konto hinzugefügt.' : ''}</p>
-      <div class="grid grid-cols-2 gap-3 mb-3">
-        <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3 text-center"><div class="text-[0.6rem] uppercase tracking-widest text-[var(--text-muted)]">Aktenzeichen</div><div class="font-mono text-lg text-[var(--gold-light)]">${esc(res.caseNumber)}</div></div>
-        <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3 text-center"><div class="text-[0.6rem] uppercase tracking-widest text-[var(--text-muted)]">Aktenpin</div><div class="font-mono text-lg tracking-[0.2em] text-[var(--gold-light)]">${esc(res.pin)}</div></div>
-      </div>
-      <p class="text-xs text-amber-300/90 text-center mb-5">Bitte notieren Sie beide Angaben – damit fragen Sie jederzeit den Stand Ihrer Akte ab.</p>
+      <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3 text-center mb-3"><div class="text-[0.6rem] uppercase tracking-widest text-[var(--text-muted)]">Ihr Aktenzeichen</div><div class="font-mono text-lg text-[var(--gold-light)]">${esc(res.caseNumber)}</div></div>
+      <p class="text-xs text-[var(--text-muted)] text-center mb-5">Bitte geben Sie das Aktenzeichen bei Rückfragen an.${res.linkedToAccount ? '' : ' Mit einem Mandantenkonto sehen Sie den Stand Ihrer Akte jederzeit im Mandantenportal.'}</p>
       <div class="flex flex-col sm:flex-row gap-2">
-        <button type="button" id="ticketCopy" class="btn-outline flex-1 py-3 text-xs uppercase tracking-wider">Daten kopieren</button>
-        ${res.linkedToAccount && res.caseId
-          ? `<a href="/dashboard.html?case=${Number(res.caseId)}" class="btn-gold flex-1 py-3 text-xs uppercase tracking-wider">Zur Akte</a>`
-          : '<button type="button" id="ticketCheck" class="btn-gold flex-1 py-3 text-xs uppercase tracking-wider">Status ansehen</button>'}
+        <button type="button" id="ticketCopy" class="btn-outline flex-1 py-3 text-xs uppercase tracking-wider">Aktenzeichen kopieren</button>
+        ${res.linkedToAccount && res.caseId ? `<a href="/dashboard.html?case=${Number(res.caseId)}" class="btn-gold flex-1 py-3 text-xs uppercase tracking-wider">Zur Akte</a>` : ''}
       </div>
       ${res.discordTicket
         ? `<button type="button" id="ticketDiscord" class="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-full bg-[#5865F2] hover:bg-[#4752c4] text-white text-xs uppercase tracking-wider font-semibold py-3 transition-colors">Discord-Ticket beitreten</button>
-           <p class="text-[0.7rem] text-center text-[var(--text-dim)] mt-2">Ihr privates Ticket auf dem Discord der Kanzlei – alle Neuigkeiten zu Ihrer Akte automatisch.</p>`
+           <p class="text-[0.7rem] text-center text-[var(--text-dim)] mt-2">Ihr privates Ticket auf dem Discord der Kanzlei – alle Neuigkeiten zu Ihrer Akte automatisch. Am besten gleich beitreten.</p>`
         : ''}`;
     wrap.classList.add('hidden');
     box.classList.remove('hidden');
 
     document.getElementById('ticketCopy').addEventListener('click', async () => {
-      const ok = await copy(text);
-      showToast(ok ? 'Kopiert' : 'Nicht möglich', ok ? 'Aktenzeichen und Pin sind in der Zwischenablage.' : 'Bitte die Angaben notieren.');
+      const ok = await copy(res.caseNumber);
+      showToast(ok ? 'Kopiert' : 'Nicht möglich', ok ? 'Das Aktenzeichen ist in der Zwischenablage.' : 'Bitte das Aktenzeichen notieren.');
     });
+    // Beitritt nur direkt nach dem Einreichen: Aktenzeichen + Pin bleiben im Hintergrund (der Pin wird nicht angezeigt)
     document.getElementById('ticketDiscord')?.addEventListener('click', () => joinTicket(res.caseNumber, res.pin));
-    document.getElementById('ticketCheck')?.addEventListener('click', () => {
-      closeTicketModal();
-      document.getElementById('caseInput').value = res.caseNumber;
-      document.getElementById('casePin').value = res.pin;
-      document.getElementById('akte').scrollIntoView({ behavior: 'smooth' });
-      window.lookupCase();
-    });
   }
 
   window.handleFormSubmit = async function (e) {
@@ -124,26 +112,13 @@
     f.elements.pin.value = pin;
     f.submit();
   }
-  function showCaseTicket(t, number, pin) {
-    const box = document.getElementById('caseTicket');
-    if (!box) return;
-    box.classList.toggle('hidden', !t);
-    if (!t) return;
-    document.getElementById('caseTicketText').textContent = t.joined
-      ? 'Sie sind bereits im Discord-Ticket Ihrer Akte. Dort erscheinen alle Neuigkeiten automatisch.'
-      : 'Alle Neuigkeiten zu Ihrer Akte – Status, Termine, Verträge – auch als privates Discord-Ticket. Mit Ihrem Discord anmelden und automatisch beitreten.';
-    const btn = document.getElementById('caseTicketBtn');
-    btn.querySelector('span').textContent = t.joined ? 'Erneut verbinden' : 'Discord-Ticket beitreten';
-    btn.onclick = () => joinTicket(number, pin);
-  }
-
-  // Rückmeldung nach dem Discord-Beitritt (…/?ticket=…#akte)
+  // Rückmeldung nach dem Discord-Beitritt (…/?ticket=…)
   (() => {
     const code = new URLSearchParams(location.search).get('ticket');
     if (!code) return;
     const MSG = {
       pending: ['Discord verbunden', 'Sie werden dem Ticket hinzugefügt, sobald Sie auf dem Discord-Server der Kanzlei sind.'],
-      notfound: ['Nicht gefunden', 'Kein Mandat mit diesen Angaben – bitte Aktenzeichen und Aktenpin prüfen.'],
+      notfound: ['Nicht gefunden', 'Die Akte wurde nicht gefunden. Bitte wenden Sie sich an die Kanzlei.'],
       limit: ['Zu viele Versuche', 'Bitte in ein paar Minuten erneut versuchen.'],
       disabled: ['Nicht verfügbar', 'Discord-Tickets sind derzeit nicht eingerichtet.'],
       denied: ['Abgebrochen', 'Die Discord-Anmeldung wurde abgebrochen.'],
@@ -154,58 +129,6 @@
     history.replaceState(null, '', location.pathname + location.hash);
     setTimeout(() => showToast(title, text), 300);
   })();
-
-  /* ---------------------------------------------------------------- Aktenstatus */
-  window.lookupCase = async function () {
-    const number = document.getElementById('caseInput').value.trim().toUpperCase();
-    const pin = document.getElementById('casePin').value.trim();
-    const result = document.getElementById('caseResult');
-    const emptyEl = document.getElementById('caseEmpty');
-    const notFound = document.getElementById('caseNotFound');
-
-    if (!number || !pin) {
-      showToast('Angaben fehlen', 'Bitte Aktenzeichen und Aktenpin eingeben.');
-      return;
-    }
-    emptyEl.classList.add('hidden');
-
-    try {
-      const d = await api.post('/api/public/case-status', { caseNumber: number, pin });
-      notFound.classList.add('hidden');
-      result.classList.remove('hidden');
-
-      document.getElementById('caseNumber').textContent = d.caseNumber;
-      document.getElementById('caseLawyer').textContent = d.lawyer;
-      document.getElementById('caseLawyerLabel').textContent = d.lawyerCount > 1 ? 'Zuständige Anwälte' : 'Zuständiger Anwalt';
-      document.getElementById('caseNote').textContent = d.note || 'Zu Ihrer Akte liegt aktuell kein zusätzlicher Hinweis vor.';
-
-      const badgeClass = d.closed
-        ? 'text-slate-300 border-slate-500/40 bg-slate-500/10'
-        : [
-            'text-amber-300 border-amber-500/40 bg-amber-500/10',
-            'text-amber-300 border-amber-500/40 bg-amber-500/10',
-            'text-[var(--gold-light)] border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.1)]',
-            'text-emerald-300 border-emerald-500/40 bg-emerald-500/10',
-          ][d.step] || '';
-      const badge = document.getElementById('caseBadge');
-      badge.textContent = d.status;
-      badge.className = 'px-4 py-1.5 rounded-full text-xs font-semibold border whitespace-nowrap self-start sm:self-auto ' + badgeClass;
-
-      for (let i = 0; i < 4; i++) {
-        const node = document.getElementById('node-' + i);
-        node.classList.remove('done', 'current');
-        if (d.closed || i < d.step) node.classList.add('done');
-        else if (i === d.step) node.classList.add('current');
-      }
-      document.getElementById('trackFill').style.width = (d.closed ? 75 : (d.step / 3) * 75) + '%';
-      showCaseTicket(d.discordTicket, number, pin);
-    } catch (err) {
-      result.classList.add('hidden');
-      notFound.classList.remove('hidden');
-      notFound.textContent =
-        err.status === 429 ? err.message : 'Kein Mandat mit diesen Angaben gefunden. Bitte prüfen Sie Aktenzeichen und Aktenpin.';
-    }
-  };
 
   /* ---------------------------------------------------------------- Team (live aus dem Dashboard) */
   function renderTeam(team) {
@@ -601,9 +524,4 @@
     btn.disabled = false;
   });
 
-  ['caseInput', 'casePin'].forEach((id) => {
-    document.getElementById(id)?.addEventListener('keydown', (ev) => {
-      if (ev.key === 'Enter') window.lookupCase();
-    });
-  });
 })();

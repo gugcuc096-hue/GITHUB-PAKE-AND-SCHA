@@ -8,7 +8,7 @@ Premium-Webanwendung für die GTA-RP-Kanzlei **Pake & Scha Legal Consulting**: �
 
 | Bereich | Was es kann |
 |---|---|
-| **Website** | Login-/Dashboard-Button in Kopfzeile, Top-Leiste und Mobil-Menü · Team und Honorarordnung live aus der Datenbank · Mandat einreichen **ohne Konto** (liefert Aktenzeichen + Aktenpin) · Aktenstatus-Abfrage · Tarifrechner übergibt die Auswahl ans Mandatsformular · **VIP & Lifetime** mit Preisen und „Jetzt anfragen“ (live aus den Board-Einstellungen) · Reihenfolge: Team → Kanzleiränge → Ablauf → Honorarordnung → Tarifrechner → VIP & Lifetime → Mandantenstimmen → Aktenstatus → FAQ → Karriere → Kontakt |
+| **Website** | Login-/Dashboard-Button in Kopfzeile, Top-Leiste und Mobil-Menü · Team und Honorarordnung live aus der Datenbank · Mandat einreichen **ohne Konto** (liefert ein Aktenzeichen, danach direkt „Discord-Ticket beitreten“) · Tarifrechner übergibt die Auswahl ans Mandatsformular · **VIP & Lifetime** mit Preisen und „Jetzt anfragen“ (live aus den Board-Einstellungen) · Reihenfolge: Team → Kanzleiränge → Ablauf → Honorarordnung → Tarifrechner → VIP & Lifetime → Mandantenstimmen → FAQ → Karriere → Kontakt |
 | **Akten (Case Files)** | Aktenzeichen, Mandant (mit oder ohne Website-Konto), Gegenpartei, Gerichtsaktenzeichen, Status *Offen / In Bearbeitung / Geschlossen*, Verfahrensstand, öffentlicher Statushinweis, interne und öffentliche Notizen, automatischer Verlauf · **Bearbeitungsstand per Klick:** zuständige Anwälte klicken in der Leiste (Eingang → Akteneinsicht → Strategie → Verhandlung) direkt auf den gewünschten Schritt |
 | **Priorität & Dringlichkeit** | **Dringlichkeit** (*Normal / Eilig / Notfall*) ist die Angabe des Mandanten beim Einreichen – er sieht sie im Portal und im Discord-Ticket. **Priorität** (*Niedrig / Normal / Hoch / Kritisch*) ist die Einschätzung der Kanzlei, nur intern; für das Team zählt nur sie · neue Akten starten automatisch mit der passenden Priorität (Normal → Normal, Eilig → Hoch, Notfall → Kritisch), die Kanzlei kann sie beim Anlegen auch direkt wählen · bestehende offene Akten mit „Eilig“/„Notfall“ wurden beim Update einmalig auf Hoch/Kritisch gesetzt (von Hand geänderte Prioritäten bleiben) · ändern: direkt neben dem Status oder unter „Akte bearbeiten“ (zuständige Anwälte und Board of Partners); wird dort die Dringlichkeit geändert, zieht die Priorität mit, solange sie noch auf dem automatischen Wert steht · im Dashboard zeigt die Kanzlei nur die Priorität als Badge, die Dringlichkeit steht in der Akte als „Dringlichkeit (Angabe Mandant)“ · Discord: die Team-Meldung „Neue Akte“ und `/akte` (für die Kanzlei) zeigen die Priorität; das Mandats-Ticket zeigt nur „Dringlichkeit (Angabe Mandant)“, weil der Mandant mitliest · Badge in Akte und Aktenliste – „Niedrige“, „Normale“, „Hohe“ oder „Kritische Priorität“ mit kleiner Stufen-Anzeige · Aktenliste **sortierbar** (Zuletzt geändert, Priorität, Neueste, Älteste – die Auswahl merkt sich der Browser); „Priorität“ zeigt offene Akten zuerst, dann nach Priorität, Dringlichkeit und VIP/Lifetime · Mandanten sehen die Priorität nie, Änderungen stehen nur als interner Vermerk im Verlauf |
 | **Prozessticket** (nur Kanzlei) | Prozesstickets liegen beim DOJ auf einem anderen Discord-Server: In der Akte **„Prozessticket (DOJ)“** → Link zum Kanal einfügen (in Discord Rechtsklick auf den Kanal bzw. am Handy lange drücken → „Link kopieren“) und optional eine Bezeichnung (z. B. „DOJ – Hauptverhandlung“) · danach steht in der Akte eine Karte wie beim Discord-Ticket mit **„Prozessticket öffnen“**, „Ändern“ und „Entfernen“ · nur echte Discord-Kanal-Links (`https://discord.com/channels/<Server>/<Kanal>`) werden angenommen · nur für die Kanzlei sichtbar, nicht für den Mandanten und nicht im Mandats-Ticket · der Bot tritt dem DOJ-Server dafür nicht bei – es wird nur der Link gespeichert |
@@ -133,7 +133,10 @@ Antworten auf Befehle sind nur für die ausführende Person sichtbar – außer 
 
 **Wer ist im Ticket?** Die eingestellten Team-Rollen (z. B. „Anwälte“), zusätzlich die zuständigen Anwälte mit verknüpftem Discord und der **Mandant – automatisch**, sobald
 - sein Portal-Konto mit Discord verknüpft ist (*Mein Profil → Discord verbinden*; alle seine Akten), oder
-- er auf der Website unter *Aktenstatus* bzw. direkt nach dem Einreichen eines Mandats mit Aktenzeichen + Aktenpin „**Discord-Ticket beitreten**“ klickt (ohne Konto, Discord-Anmeldung mit Bestätigung).
+- er direkt nach dem Einreichen eines Mandats auf der Website „**Discord-Ticket beitreten**“ klickt (ohne Konto, Discord-Anmeldung mit Bestätigung), oder
+- die Kanzlei ihn im Ticket mit `/add` hinzufügt.
+
+Eine öffentliche Aktenstatus-Abfrage (Aktenzeichen + Pin) gibt es nicht mehr; den Stand sehen Mandanten im Portal und im Discord-Ticket.
 
 Ist er noch nicht auf dem Discord-Server, fügt der Bot ihn beim Verknüpfen automatisch hinzu (Discord fragt dafür einmal um Erlaubnis, „guilds.join“). In der Akte zeigt das Dashboard den Ticket-Status („Mandant im Ticket“, „In Discord öffnen“, „Abgleichen“).
 
@@ -353,8 +356,8 @@ Es gibt genau sechs Ränge (Benutzer, Team-Profile und Einstellung von Bewerbern
 
 - Passwörter mit bcrypt, Mindestlänge 10 · Session-Cookie `httpOnly`, `SameSite=Lax`, in Produktion `Secure`
 - CSRF: SameSite-Cookie + Origin-Prüfung bei schreibenden Anfragen
-- Rate-Limits auf Login, Registrierung, Mandatsanfrage, Statusabfrage und Nachrichten · Honeypot gegen Spam-Formulare
-- Fremde Akten liefern 404 statt 403 · Aktenstatus nur mit 6-stelligem Aktenpin
+- Rate-Limits auf Login, Registrierung, Mandatsanfrage, Discord-Beitritt und Nachrichten · Honeypot gegen Spam-Formulare
+- Fremde Akten liefern 404 statt 403 · Discord-Beitritt ohne Konto nur mit Aktenzeichen + 6-stelligem Pin aus der Antwort auf das eingereichte Mandat
 - Alle Nutzertexte werden im Frontend escaped (XSS) · Discord-Nachrichten pingen nie `@everyone`
 - FiveNet: keine Passwörter, keine Sitzungs-Tokens, kein Scraping · „In FiveNet öffnen“ verlinkt immer auf die aus Instanz und Dokument-ID gebaute Adresse, nie auf die eingefügte
 - Discord-Bot: jede Interaktion ist von Discord signiert (`DISCORD_PUBLIC_KEY`), Bot-Token nur in Render · `/passwort` schickt das Einmal-Passwort ausschließlich per Direktnachricht an das verknüpfte Discord (nie in einen Kanal), beendet alle Sitzungen und erzwingt ein eigenes Passwort beim Login

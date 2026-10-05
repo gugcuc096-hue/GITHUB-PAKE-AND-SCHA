@@ -3,7 +3,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { z } = require('zod');
 const { db, tx, nextCaseNumber, randomPin, getSetting } = require('../db');
-const { wrap, parseBody, AREAS, URGENCIES, URGENCY_LABEL, PRIORITY_DISCORD, PRIORITY_FROM_URGENCY, STEPS, CASE_STATUS, truncate } = require('../helpers');
+const { wrap, parseBody, AREAS, URGENCIES, URGENCY_LABEL, PRIORITY_DISCORD, PRIORITY_FROM_URGENCY, truncate } = require('../helpers');
 const { addSystemNote, getCase, onDutyMembers } = require('../models');
 const discord = require('../discord');
 const tickets = require('../tickets');
@@ -20,7 +20,6 @@ const limit = (windowMs, max, message, skipFailedRequests = false) =>
     handler: (req, res) => res.status(429).json({ error: message }),
   });
 
-const statusLimiter = limit(15 * 60 * 1000, 15, 'Zu viele Versuche. Bitte in ein paar Minuten erneut versuchen.');
 // Nur erfolgreich eingereichte Mandate zählen; Tippfehler im Formular verbrauchen kein Kontingent.
 const requestLimiter = limit(60 * 60 * 1000, 5, 'Sie haben bereits mehrere Anfragen gesendet. Bitte versuchen Sie es später erneut.', true);
 
@@ -31,43 +30,9 @@ router.get('/on-duty', (req, res) => {
   res.json({ visible: true, count: members.length, members });
 });
 
-/* Aktenstatus: Aktenzeichen + 6-stelliger Aktenpin (Aktenzeichen allein sind erratbar). */
-router.post(
-  '/case-status',
-  statusLimiter,
-  wrap(async (req, res) => {
-    const d = parseBody(z.object({ caseNumber: z.string().trim().min(1).max(30), pin: z.string().trim().min(1).max(10) }), req, res);
-    if (!d) return;
-    const c = db
-      .prepare(
-        `SELECT c.*, u.display_name AS lawyer_name FROM cases c LEFT JOIN users u ON u.id = c.lawyer_id
-         WHERE c.case_number = ? AND c.access_pin = ?`
-      )
-      .get(d.caseNumber.toUpperCase(), d.pin);
-    if (!c) return res.status(404).json({ error: 'Kein Mandat mit diesen Angaben gefunden.' });
-    const co = db
-      .prepare('SELECT u.display_name FROM case_lawyers cl JOIN users u ON u.id = cl.user_id WHERE cl.case_id = ? ORDER BY cl.added_at, u.id')
-      .all(c.id)
-      .map((r) => r.display_name);
-    res.json({
-      caseNumber: c.case_number,
-      lawyer: c.lawyer_name ? [c.lawyer_name, ...co].join(', ') : 'Noch nicht zugewiesen',
-      lawyerCount: c.lawyer_name ? 1 + co.length : 0,
-      status: c.status === 'geschlossen' ? 'Abgeschlossen' : c.status === 'offen' ? 'Eingegangen' : STEPS[c.step] || STEPS[0],
-      statusLabel: CASE_STATUS[c.status],
-      step: c.step,
-      closed: c.status === 'geschlossen',
-      note: c.public_note || null,
-      updatedAt: c.updated_at,
-      // Discord-Ticket: beitreten per Discord-Anmeldung (Aktenzeichen + Pin), sofern eingerichtet
-      discordTicket: tickets.active() && discord.oauthConfigured() ? { joined: !!tickets.ticketInfo(c, null)?.clientInTicket } : null,
-    });
-  })
-);
-
 /*
  * Mandat einreichen direkt von der Startseite -- auch ohne Konto. Der Besucher
- * erhält Aktenzeichen + Aktenpin für die Statusabfrage; das Team wird per
+ * erhält das Aktenzeichen (der Pin dient nur dem direkten Beitritt zum Discord-Ticket); das Team wird per
  * Discord benachrichtigt. Angemeldete Mandanten bekommen die Akte ins Konto.
  */
 const requestSchema = z.object({

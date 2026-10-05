@@ -122,11 +122,9 @@ function caseAccess(c, u) {
 
 function caseRow(c, u) {
   const staff = isStaff(u);
-  const owner = u && c.client_id === u.id;
   return {
     id: c.id,
     caseNumber: c.case_number,
-    accessPin: staff || owner ? c.access_pin : undefined,
     title: c.title,
     area: c.area,
     urgency: c.urgency,
