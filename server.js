@@ -31,14 +31,16 @@ app.use(
   helmet({
     // Content-Security-Policy: Skripte nur von der eigenen Domain (Tailwind ist fest eingebaut, kein CDN mehr),
     // keine Plugins, keine fremden Frames, Formulare nur an die eigene Seite bzw. die Discord-Anmeldung.
-    // Inline-Skripte und onclick-Handler der Seiten bleiben erlaubt; Google Fonts und Bilder (z. B. Discord-Avatare,
-    // Embed-Vorschauen) kommen weiterhin von außen.
+    // Alle Skripte liegen als Dateien unter /js (keine Inline-Skripte, keine onclick-Attribute) – eingeschleuster
+    // Skriptcode würde nicht ausgeführt. Google Fonts und Bilder (z. B. Discord-Avatare, Embed-Vorschauen) kommen
+    // weiterhin von außen.
     contentSecurityPolicy: {
       useDefaults: false,
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
-        scriptSrcAttr: ["'unsafe-inline'"],
+        // Strenge Richtlinie: nur Skriptdateien der eigenen Domain – keine Inline-Skripte, keine onclick-Attribute
+        scriptSrc: ["'self'"],
+        scriptSrcAttr: ["'none'"],
         styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
         imgSrc: ["'self'", 'data:', 'blob:', 'https:'],

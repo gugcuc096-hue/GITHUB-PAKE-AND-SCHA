@@ -198,7 +198,7 @@
           (f) => `
         <label class="flex items-center justify-between gap-3 p-3.5 rounded-xl border border-[var(--glass-border)] bg-slate-900/40 hover:bg-slate-900/70 cursor-pointer transition-all">
           <span class="flex items-center gap-3 min-w-0">
-            <input type="checkbox" class="calc-check accent-[var(--gold-500)] w-4 h-4 shrink-0" value="${Number(f.price)}" data-name="${esc(f.name)}" onchange="calculateTotal()">
+            <input type="checkbox" class="calc-check accent-[var(--gold-500)] w-4 h-4 shrink-0" value="${Number(f.price)}" data-name="${esc(f.name)}">
             <span class="text-sm font-medium text-white">${esc(f.name)}</span>
           </span>
           <span class="font-mono text-xs text-[var(--gold-500)] whitespace-nowrap">${money(f.price)}</span>

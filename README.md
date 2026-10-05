@@ -426,7 +426,7 @@ Es gibt genau sechs Ränge (Benutzer, Team-Profile und Einstellung von Bewerbern
 - Alle Nutzertexte werden im Frontend escaped (XSS) · Discord-Nachrichten pingen nie `@everyone`
 - FiveNet: keine Passwörter, keine Sitzungs-Tokens, kein Scraping · „In FiveNet öffnen“ verlinkt immer auf die aus Instanz und Dokument-ID gebaute Adresse, nie auf die eingefügte
 - Discord-Bot: jede Interaktion ist von Discord signiert (`DISCORD_PUBLIC_KEY`), Bot-Token nur in Render · `/passwort` schickt das Einmal-Passwort ausschließlich per Direktnachricht an das verknüpfte Discord (nie in einen Kanal), beendet alle Sitzungen und erzwingt ein eigenes Passwort beim Login
-- **Content-Security-Policy:** Skripte nur von der eigenen Domain (kein CDN mehr), keine Plugins, keine fremden Frames, Formulare nur an die eigene Seite bzw. die Discord-Anmeldung; Google Fonts und Bilder (z. B. Discord-Avatare) weiterhin erlaubt · Antworten werden komprimiert (gzip) ausgeliefert
+- **Content-Security-Policy (streng):** Skripte nur als Dateien von der eigenen Domain (kein CDN, keine Inline-Skripte, keine `onclick`-Attribute – eingeschleuster Skriptcode würde vom Browser nicht ausgeführt), keine Plugins, keine fremden Frames, Formulare nur an die eigene Seite bzw. die Discord-Anmeldung; Google Fonts und Bilder (z. B. Discord-Avatare) weiterhin erlaubt · Antworten werden komprimiert (gzip) ausgeliefert
 - Datensicherungen enthalten keine Login-Sitzungen; Herunterladen nur für die Rolle „Board of Partners“ (Admin)
 - Bitte nur **In-Character-Daten** speichern und keine echten Passwörter wiederverwenden
 
@@ -460,4 +460,6 @@ helpers.js       Konstanten, Validierung
 models.js        Datenabfragen, Zeilen-Mapping, Zugriffsregeln, Protokoll
 routes/          auth, cases, search, reviews, calendar, messages, board, invoices, fees, team, admin, discord, public, duty, applications, fivenet, external, tasks, concerns, personnel, tickets, interactions, cooperations, memberships, nameRequests
 public/          index.html, karriere.html, login.html, register.html, dashboard.html, invoice.html, vertrag.html, aktenauszug.html, css/ (app.css, tailwind.css), js/
+public/js/       je Seite ein Skript (home.js, login.js, register.js, karriere.js, invoice.js, vertrag.js, aktenauszug.js …) – Bedienelemente per data-act/addEventListener statt onclick
+public/js/dashboard/  das Dashboard in 12 Teilen (01-basis … 12-start), von dashboard.html in dieser Reihenfolge geladen
 ```
