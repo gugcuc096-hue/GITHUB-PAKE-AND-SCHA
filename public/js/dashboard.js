@@ -85,6 +85,7 @@
     clock: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
     more: 'M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z',
     printer: 'M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z',
+    restore: 'M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3',
     trash: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16',
     edit: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z',
     reply: 'M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6',
@@ -988,6 +989,30 @@
         .join('')}</tbody></table></div>`;
   }
 
+  /* ---------------------------------------------------------------- Papierkorb (gelöschte Akten, nur Admins) */
+  function trashHtml(t) {
+    return `
+      <h2 class="modal-title">Papierkorb</h2>
+      <p class="modal-sub">Gelöschte Akten bleiben ${t.keepDays} Tage hier und lassen sich vollständig wiederherstellen – mit Notizen, Aufgaben, Anhängen, Verträgen und Bearbeitungszeiten; Termine und Rechnungen bekommen ihren Aktenbezug zurück. Danach werden sie endgültig gelöscht.</p>
+      ${
+        t.items.length
+          ? t.items
+              .map(
+                (x) => `<div class="list-row wrap flex-col sm:flex-row"><div class="main"><div class="title"><span class="font-mono text-gold">${esc(x.caseNumber)}</span> · ${esc(x.title)}</div>
+                  <div class="meta">${esc(x.clientName)} · gelöscht ${esc(fmtDate(x.deletedAt))}${x.deletedBy ? ` von ${esc(x.deletedBy)}` : ''} · endgültig weg am ${esc(fmtDate(x.purgeAt))}</div></div>
+                  <div class="flex flex-wrap gap-2 shrink-0"><button type="button" class="btn-outline btn-sm" data-action="trash-restore" data-id="${x.id}" data-number="${esc(x.caseNumber)}">${icon('restore', 'ico-sm')}<span>Wiederherstellen</span></button>
+                  <button type="button" class="btn-ghost btn-sm fn-danger" data-action="trash-purge" data-id="${x.id}" data-number="${esc(x.caseNumber)}">${icon('trash', 'ico-sm')}<span>Endgültig löschen</span></button></div></div>`
+              )
+              .join('')
+          : empty('Der Papierkorb ist leer.', 'trash')
+      }
+      <div class="form-actions mt-4"><button type="button" class="btn-ghost btn-md" data-action="close-modal">Schließen</button></div>`;
+  }
+  async function openTrash(replace = false) {
+    const t = await api.get('/api/cases/trash');
+    (replace ? replaceModal : openModal)(trashHtml(t));
+  }
+
   views.cases = {
     async load() {
       await Promise.all([load.cases(), load.lawyers()]);
@@ -999,7 +1024,7 @@
         <div class="page-head">
           <div><h1 class="page-title">${staff ? 'Aktenverwaltung' : 'Meine Akten'}</h1>
             <p class="page-sub">${staff ? 'Alle Mandate der Kanzlei – Aktenzeichen, Mandanten, Status, Notizen und Verlauf.' : 'Ihre Mandate bei Pake & Scha. Tippen Sie auf eine Akte für Details.'}</p></div>
-          <div class="page-actions"><button class="btn-gold btn-md" data-action="new-case">${icon('plus')}<span>${staff ? 'Neue Akte' : 'Mandat einreichen'}</span></button></div>
+          <div class="page-actions">${isAdmin() ? `<button class="btn-ghost btn-md" data-action="case-trash">${icon('trash')}<span>Papierkorb</span></button>` : ''}<button class="btn-gold btn-md" data-action="new-case">${icon('plus')}<span>${staff ? 'Neue Akte' : 'Mandat einreichen'}</span></button></div>
         </div>
         <div class="toolbar">
           <label class="search">${icon('search')}<input id="caseSearch" class="field" type="search" placeholder="${staff ? 'Aktenzeichen, Mandant, FiveNet-/Docs-Link …' : 'Aktenzeichen, Titel …'}" value="${esc(st.caseQuery)}" aria-label="Akten durchsuchen"></label>
@@ -5987,11 +6012,24 @@
       await reloadCase(id);
     },
     'delete-case': async (el) => {
-      if (!(await askDelete(`Akte ${el.dataset.number} löschen?`, 'Notizen, Aufgaben und verknüpfte externe Dokumente werden mitgelöscht, Termine und Rechnungen verlieren den Aktenbezug. Das lässt sich nicht rückgängig machen.', 'Endgültig löschen'))) return;
+      if (!(await askDelete(`Akte ${el.dataset.number} löschen?`, 'Die Akte kommt mit Notizen, Aufgaben, Anhängen und Verträgen 30 Tage in den Papierkorb (Aktenverwaltung → Papierkorb) und lässt sich bis dahin wiederherstellen. Danach wird sie endgültig gelöscht.', 'Löschen'))) return;
       await api.del('/api/cases/' + el.dataset.id);
-      toast('Akte gelöscht.');
+      toast('Akte gelöscht – 30 Tage im Papierkorb.');
       closeModal();
       await refreshBehind();
+    },
+    'case-trash': () => openTrash(),
+    'trash-restore': async (el) => {
+      const r = await api.post(`/api/cases/trash/${el.dataset.id}/restore`);
+      toast(`Akte ${el.dataset.number} wiederhergestellt.`);
+      await refreshBehind();
+      await openCase(r.case.id);
+    },
+    'trash-purge': async (el) => {
+      if (!(await askDelete(`Akte ${el.dataset.number} endgültig löschen?`, 'Die Akte und ihre Anhänge werden sofort und unwiderruflich gelöscht.', 'Endgültig löschen'))) return;
+      await api.del('/api/cases/trash/' + el.dataset.id);
+      toast('Endgültig gelöscht.');
+      await openTrash(true);
     },
     'delete-note': async (el) => {
       if (!(await askDelete('Notiz löschen?', 'Die Notiz wird aus dem Verlauf der Akte entfernt.'))) return;

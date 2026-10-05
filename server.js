@@ -172,6 +172,8 @@ app.listen(PORT, () => {
   require('./scripts/build-css').refreshOnStart();
   // Tägliche Datensicherung (backups/ neben der Datenbank)
   require('./backup').start();
+  // Papierkorb: Akten nach 30 Tagen endgültig löschen
+  require('./trash').start();
   // Discord-Befehle (/add, /remove, /delete, /passwort, /akte …) anmelden (nur wenn Bot-Token, Server und Public Key eingerichtet sind)
   setTimeout(() => require('./tickets').registerCommands().catch((err) => console.warn('Discord-Befehle nicht angemeldet:', err.message)), 3000).unref();
   // Kanzlei-Bot: dauerhafte Verbindung für Rang-Sync, Role Connections und Willkommensnachrichten (nur wenn eingeschaltet)

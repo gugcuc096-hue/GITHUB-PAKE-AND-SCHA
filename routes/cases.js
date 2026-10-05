@@ -43,6 +43,7 @@ const {
 } = require('../models');
 const discord = require('../discord');
 const tickets = require('../tickets');
+const trash = require('../trash');
 const { contractsForCase } = require('./contracts');
 const { workForCase } = require('./work');
 const { imageBody, saveImage, removeFile, evidencePath } = require('../uploads');
@@ -264,6 +265,47 @@ router.get('/client-accounts', (req, res) => {
     .map((u) => accountRow(u));
   res.json({ accounts: [...suggestions, ...found] });
 });
+
+/* ---------------------------------------------------------------- Papierkorb (nur Admins) */
+router.get('/trash', requireAdmin, (req, res) => {
+  res.json({ items: trash.list(), keepDays: trash.KEEP_DAYS });
+});
+
+router.post(
+  '/trash/:id/restore',
+  requireAdmin,
+  wrap(async (req, res) => {
+    const id = idParam(req);
+    if (!id) return res.status(404).json({ error: 'Eintrag nicht im Papierkorb.' });
+    const { caseId } = trash.restore(id);
+    const c = getCase(caseId);
+    // Beim Löschen kam das Ticket ins Archiv (Mandant nur lesend) – beim nächsten Abgleich wieder herrichten
+    if (c.discord_channel_id) db.prepare('UPDATE cases SET discord_archived = 1 WHERE id = ?').run(c.id);
+    addSystemNote(c.id, req.user, 'Akte aus dem Papierkorb wiederhergestellt', true);
+    tickets.post(c.id, {
+      title: '♻️ Akte wiederhergestellt',
+      description: `Die Akte **${c.case_number}** ist wieder da – das Ticket geht wie gewohnt weiter.`,
+      color: tickets.COLORS.green,
+      by: req.user.display_name,
+      byDiscordId: req.user.discord_id,
+    });
+    logActivity(req.user, 'Akte wiederhergestellt', 'case', c.id, `${c.case_number} – ${c.title}`);
+    const updated = getCase(c.id);
+    res.json({ case: { ...caseRow(updated, req.user), ...caseAccess(updated, req.user) } });
+  })
+);
+
+router.delete(
+  '/trash/:id',
+  requireAdmin,
+  wrap(async (req, res) => {
+    const t = trash.get(idParam(req));
+    if (!t) return res.status(404).json({ error: 'Eintrag nicht im Papierkorb.' });
+    trash.purge(t.id);
+    logActivity(req.user, 'Akte endgültig gelöscht', 'case', t.caseId, `${t.caseNumber} – ${t.title}`);
+    res.json({ success: true });
+  })
+);
 
 /** Mandanten-Konto mit der Akte verknüpfen (clientId) oder die Verknüpfung lösen (null). */
 router.put(
@@ -664,12 +706,11 @@ router.delete(
     const id = idParam(req);
     const c = id && getCase(id);
     if (!c) return res.status(404).json({ error: 'Akte nicht gefunden.' });
-    const files = db.prepare('SELECT file FROM case_attachments WHERE case_id = ?').all(c.id);
-    db.prepare('DELETE FROM cases WHERE id = ?').run(c.id);
-    files.forEach((f) => removeFile('evidence', f.file));
+    // Erst in den Papierkorb (30 Tage wiederherstellbar) – Bilddateien bleiben bis zum endgültigen Löschen liegen
+    trash.trashCase(c.id, req.user);
     tickets.caseDeleted(c, req.user.display_name);
-    logActivity(req.user, 'Akte gelöscht', 'case', c.id, `${c.case_number} – ${c.title}`);
-    res.json({ success: true });
+    logActivity(req.user, 'Akte gelöscht', 'case', c.id, `${c.case_number} – ${c.title} (Papierkorb)`);
+    res.json({ success: true, keepDays: trash.KEEP_DAYS });
   })
 );
 
