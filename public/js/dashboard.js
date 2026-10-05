@@ -86,6 +86,7 @@
     more: 'M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z',
     printer: 'M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z',
     restore: 'M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3',
+    eye: 'M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z',
     bell: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9',
     trash: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16',
     edit: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z',
@@ -1491,6 +1492,125 @@
     if (list.length && form.elements.grundgebuehr) form.elements.grundgebuehr.value = money(sum);
   }
 
+  /* ---------------------------------------------------------------- Schriftsätze (Vollmacht, Akteneinsicht, Haftbeschwerde …) */
+  // Felder, die in Schriftsätzen vorkommen können (sichtbar sind nur die der gewählten Vorlage)
+  const BRIEF_FIELDS = [
+    ['empfaenger', 'Empfänger', 'textarea', 'z. B. District Court San Andreas\nStaatsanwaltschaft Los Santos'],
+    ['betreff', 'Betreff / Bezug', 'input', ''],
+    ['anwalt', 'Anwalt im Dokument', 'input', ''],
+    ['anwalt_rang', 'Rang', 'input', 'z. B. Senior Associate'],
+    ['anwalt_geburtsdatum', 'Geburtsdatum Anwalt (IC)', 'input', 'TT.MM.JJJJ'],
+    ['mandant', 'Name des Mandanten', 'input', ''],
+    ['mandant_geburtsdatum', 'Geburtsdatum Mandant (IC)', 'input', 'TT.MM.JJJJ'],
+    ['festnahme', 'Festnahme bzw. Haft', 'input', 'z. B. Festnahme am 01.10.2026, Mission Row'],
+    ['begruendung', 'Begründung / eigener Text', 'textarea', 'Leer lassen, wenn der Absatz entfallen soll.'],
+    ['datum', 'Datum', 'input', 'TT.MM.JJJJ'],
+    ['ort', 'Ort', 'input', ''],
+  ];
+  /** Wie auf dem Server: wer muss unterschreiben? */
+  function signatureNeeds(body, kind) {
+    const lines = String(body || '').split('\n').map((l) => l.trim().toLowerCase());
+    const both = lines.includes('[unterschriften]');
+    const lawyer = both || lines.includes('[unterschrift anwalt]');
+    const client = both || lines.includes('[unterschrift mandant]');
+    if (!lawyer && !client) return kind === 'schriftsatz' ? { lawyer: true, client: false } : { lawyer: true, client: true };
+    return { lawyer, client };
+  }
+  const usedFields = (body) => new Set([...String(body || '').matchAll(/\{\{\s*([a-z_]+)\s*\}\}/gi)].map((m) => m[1].toLowerCase()));
+
+  function briefCard(k, c) {
+    const staff = isStaff();
+    const lawyers = k.needsLawyer ? contractLawyers(k) : [];
+    const signs = [
+      ...lawyers.map((l) => (l.signedAt ? `✓ Anwalt (${esc(l.signature)})` : `Anwalt: ${esc(l.name)} – offen`)),
+      ...(k.needsClient ? [k.clientSignedAt ? `✓ Mandant (${esc(k.clientSignature)}${k.clientSignedVia === 'kanzlei' ? ', im Spiel' : ''})` : 'Mandant – offen'] : []),
+    ].join(' · ');
+    const mine = staff && lawyers.some((l) => l.userId === st.user.id && !l.signedAt);
+    const clientCanSign = !staff && k.needsClient && !k.clientSignedAt;
+    return `<div class="contract-row">
+      <div class="contract-main">
+        <div class="flex flex-wrap items-center gap-2"><span class="font-medium">${esc(k.templateName)}</span>${statusBadge(CONTRACT_STATUS, k.status)}${staff ? (k.internal ? badge('nur intern', 'amber') : badge('für Mandant sichtbar', 'sky')) : ''}</div>
+        <div class="text-xs text-dim mt-1">${signs ? signs + ' · ' : ''}erstellt ${esc(fmtDate(k.createdAt))}${k.createdByName ? ' von ' + esc(k.createdByName) : ''}</div>
+      </div>
+      <div class="contract-actions">
+        <a class="${clientCanSign || mine ? 'btn-gold' : 'btn-outline'} btn-sm" href="/vertrag.html?id=${k.id}" target="_blank" rel="noopener">${icon(clientCanSign || mine ? 'edit' : 'printer', 'ico-sm')}<span>${clientCanSign || mine ? 'Ansehen & unterschreiben' : 'Ansehen / PDF'}</span></a>
+        ${staff && c.canEdit && !k.locked ? `<button type="button" class="btn-ghost btn-sm" data-action="brief-edit" data-id="${k.id}">${icon('edit', 'ico-sm')}<span>Bearbeiten</span></button>` : ''}
+        ${staff && c.canEdit && !k.needsClient ? `<button type="button" class="btn-ghost btn-sm" data-action="brief-visibility" data-id="${k.id}" data-case-id="${c.id}">${icon(k.internal ? 'eye' : 'shield', 'ico-sm')}<span>${k.internal ? 'Für Mandant freigeben' : 'Nur intern'}</span></button>` : ''}
+        ${staff && c.canEdit && k.needsClient && !k.clientSignedAt ? `<button type="button" class="btn-ghost btn-sm" data-action="contract-record" data-id="${k.id}" data-case-id="${c.id}">${icon('check', 'ico-sm')}<span>Unterschrift Mandant erfassen</span></button>` : ''}
+        ${staff && (isAdmin() || (c.canEdit && !k.locked)) ? `<button type="button" class="btn-ghost btn-sm fn-danger" data-action="contract-delete" data-id="${k.id}" data-case-id="${c.id}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>` : ''}
+      </div>
+    </div>`;
+  }
+
+  function briefsSection(c, list) {
+    const staff = isStaff();
+    if (!staff && !list.length) return '';
+    return `<div class="section" id="secBriefs">
+      <h3 class="section-title">Schriftsätze ${staff && c.canEdit ? `<span class="ext-add"><button type="button" class="btn-outline btn-sm" data-action="brief-new" data-case-id="${c.id}">${icon('doc', 'ico-sm')}<span>Schriftsatz erstellen</span></button></span>` : ''}</h3>
+      ${list.length
+        ? `<div class="stack">${list.map((k) => briefCard(k, c)).join('')}</div>`
+        : '<p class="text-sm text-dim">Noch keine Schriftsätze. „Schriftsatz erstellen“ füllt eine Vorlage der Kanzlei – z. B. Vollmacht, Antrag auf Akteneinsicht oder Haftbeschwerde – mit den Daten dieser Akte; danach drucken oder als PDF speichern. Schriftsätze sind zunächst nur für die Kanzlei sichtbar (außer der Mandant muss unterschreiben, z. B. bei der Vollmacht).</p>'}
+      ${!staff && list.some((k) => k.needsClient && !k.clientSignedAt) ? '<p class="form-hint">Bitte lesen und unterschreiben Sie das Dokument über „Ansehen &amp; unterschreiben“.</p>' : ''}
+    </div>`;
+  }
+
+  function briefForm(c, { templates, defaults, k = null }) {
+    const v = k ? k.data : defaults.data;
+    const team = defaults.team || [];
+    const lawyers = isAdmin() ? st.lawyers.map((l) => ({ id: l.id, name: l.displayName })) : team;
+    const lawyerId = k ? k.lawyerId : defaults.lawyerId;
+    const field = ([name, label, type, ph]) =>
+      `<div class="${type === 'textarea' ? 'span-2' : ''}" data-bf="${name}"><label class="label" for="bf_${name}">${esc(label)}</label>${
+        type === 'textarea'
+          ? `<textarea id="bf_${name}" name="${name}" rows="${name === 'begruendung' ? 6 : 3}" maxlength="${name === 'begruendung' ? 6000 : 400}" class="field" placeholder="${esc(ph)}">${esc(v[name] || '')}</textarea>`
+          : `<input id="bf_${name}" name="${name}" class="field" maxlength="200" value="${esc(v[name] || '')}" placeholder="${esc(ph)}">`
+      }</div>`;
+    return `
+      <h2 id="modalTitle" class="modal-title">${k ? `${esc(k.templateName)} bearbeiten` : 'Schriftsatz erstellen'}</h2>
+      <p class="modal-sub"><span class="font-mono text-gold">${esc(c.caseNumber)}</span> · ${esc(c.title)}</p>
+      <form data-form="${k ? 'brief-edit' : 'brief-new'}" data-case-id="${c.id}" ${k ? `data-id="${k.id}"` : ''} class="form-grid cols-2">
+        ${!k ? `<div class="span-2"><label class="label" for="bf_tpl">Vorlage</label><select id="bf_tpl" name="templateId" class="field">${templates.map((t) => opt(t.id, t.name)).join('')}</select></div>` : ''}
+        <div class="span-2"><label class="label" for="bf_lawyer">Zuständiger Anwalt</label><select id="bf_lawyer" name="lawyerId" class="field">${lawyers.map((l) => opt(l.id, l.name, l.id === lawyerId)).join('')}</select>
+          <p class="form-hint" data-bf-hint="lawyer">Unterschreibt den Schriftsatz selbst (in der Druckansicht).</p></div>
+        ${BRIEF_FIELDS.map(field).join('')}
+        ${!k ? `<label class="check span-2"><input type="checkbox" name="visible" id="bf_visible"> Für den Mandanten sichtbar (Mandantenportal und Ticket)</label>` : ''}
+        <p class="span-2 form-hint">Angezeigt werden nur die Felder, die in der Vorlage vorkommen. Leere Felder erscheinen als Linie zum handschriftlichen Ausfüllen. Nach der ersten Unterschrift ist der Inhalt nicht mehr änderbar.</p>
+        <div class="span-2 form-actions">
+          <button type="submit" class="btn-gold btn-md">${icon('check', 'ico-sm')}<span>${k ? 'Speichern' : 'Schriftsatz erstellen'}</span></button>
+          <button type="button" class="btn-ghost btn-md" data-action="back-to-case">Abbrechen</button>
+        </div>
+      </form>`;
+  }
+  /** Nur die Felder der gewählten Vorlage zeigen; Sichtbarkeit nach Unterschriften (Mandant muss unterschreiben → sichtbar). */
+  function syncBriefForm(form) {
+    if (!form) return;
+    const id = Number(form.elements.templateId ? form.elements.templateId.value : 0);
+    const k = form.dataset.id ? (st.caseContracts || []).find((x) => x.id === Number(form.dataset.id)) : null;
+    const tpl = k ? { body: k.body || '', kind: 'schriftsatz' } : (st.briefTemplates || []).find((t) => t.id === id);
+    if (!tpl) return;
+    const needs = signatureNeeds(tpl.body, 'schriftsatz');
+    // Unterschriftsfeld nutzt Ort/Datum sowie Name (und Rang) der Unterzeichnenden – auch wenn sie im Text nicht vorkommen
+    const used = new Set([...usedFields(tpl.body), 'datum', 'ort', ...(needs.lawyer ? ['anwalt', 'anwalt_rang'] : []), ...(needs.client ? ['mandant'] : [])]);
+    $$('[data-bf]', form).forEach((el) => (el.hidden = !used.has(el.dataset.bf)));
+    const hint = $('[data-bf-hint="lawyer"]', form);
+    if (hint) hint.textContent = needs.lawyer ? 'Unterschreibt den Schriftsatz selbst (in der Druckansicht).' : 'Steht im Dokument; unterschreiben muss nur der Mandant.';
+    const vis = $('#bf_visible', form);
+    if (vis) {
+      vis.checked = needs.client ? true : vis.dataset.touched ? vis.checked : false;
+      vis.disabled = needs.client;
+      vis.closest('label').title = needs.client ? 'Der Mandant muss unterschreiben – deshalb immer sichtbar.' : '';
+    }
+  }
+  function briefBody(f) {
+    const fd = new FormData(f);
+    const data = {};
+    BRIEF_FIELDS.forEach(([k]) => {
+      const box = f.querySelector(`[data-bf="${k}"]`);
+      if (box && !box.hidden) data[k] = String(fd.get(k) || '').trim();
+    });
+    return { lawyerId: Number(fd.get('lawyerId')), data };
+  }
+
   function contractBody(f) {
     const fd = new FormData(f);
     const data = {};
@@ -2591,7 +2711,8 @@
       ${c.publicNote ? `<div class="section"><h3 class="section-title">Statushinweis</h3><div class="banner banner-gold mb-0"><p class="text-sm whitespace-pre-wrap">${esc(c.publicNote)}</p></div></div>` : ''}
       <div class="section" id="secEvents"><h3 class="section-title">Termine & Fristen</h3>${apptList}</div>
       ${staff ? caseTasksSection(c, tasks) : ''}
-      ${contractsSection(c, contracts)}
+      ${contractsSection(c, contracts.filter((k) => k.kind !== 'schriftsatz'))}
+      ${briefsSection(c, contracts.filter((k) => k.kind === 'schriftsatz'))}
       ${invoiceList ? `<div class="section"><h3 class="section-title">Rechnungen & Honorare</h3>${invoiceList}</div>` : ''}
       ${externalSection(c, externalDocs)}
       ${attachmentsSection(c, attachments)}
@@ -3665,7 +3786,10 @@
     ['    Text', 'eingerückte Zeile (4 Leerzeichen)'],
     ['**fett**  *kursiv*', 'Hervorhebung'],
     ['===', 'neue Seite'],
-    ['[Unterschriften]', 'Unterschriftsfeld (sonst am Ende)'],
+    ['[Unterschriften]', 'Unterschriftsfeld Anwälte und Mandant (sonst am Ende)'],
+    ['[Unterschrift Anwalt]', 'nur der Anwalt unterschreibt (Schriftsätze: Standard)'],
+    ['[Unterschrift Mandant]', 'nur der Mandant unterschreibt (z. B. Vollmacht)'],
+    ['{{begruendung}}', 'allein in einer Zeile: Absatz entfällt, wenn leer'],
     ['[Weitere Anwälte]', 'weitere unterzeichnende Anwälte bei den Parteien (entfällt, wenn es keine gibt)'],
   ];
 
@@ -3676,7 +3800,7 @@
       ? t.templates
           .map(
             (x) => `<div class="contract-row">
-              <div class="contract-main"><div class="flex flex-wrap items-center gap-2"><span class="font-medium">${esc(x.name)}</span>${x.active ? badge('aktiv', 'emerald') : badge('inaktiv', 'slate')}${x.isDefault ? badge('mitgeliefert', 'gold') : ''}</div>
+              <div class="contract-main"><div class="flex flex-wrap items-center gap-2"><span class="font-medium">${esc(x.name)}</span>${badge(x.kind === 'schriftsatz' ? 'Schriftsatz' : 'Vertrag', x.kind === 'schriftsatz' ? 'sky' : 'gold')}${x.active ? badge('aktiv', 'emerald') : badge('inaktiv', 'slate')}${x.isDefault ? badge('mitgeliefert', 'slate') : ''}</div>
                 <div class="text-xs text-dim mt-1">Zuletzt geändert ${esc(fmtDate(x.updatedAt))}${x.updatedByName ? ' von ' + esc(x.updatedByName) : ''} · ${x.body.length.toLocaleString('de-DE')} Zeichen</div></div>
               <div class="contract-actions">
                 <button type="button" class="btn-outline btn-sm" data-action="tpl-edit" data-id="${x.id}">${icon('edit', 'ico-sm')}<span>Bearbeiten</span></button>
@@ -3690,7 +3814,7 @@
     return `<section class="panel panel-pad mt-4 lg:mt-5" id="secTemplates">
       <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('doc')} Vertragsvorlagen</h2>
         <button type="button" class="btn-outline btn-sm" data-action="tpl-new">${icon('plus', 'ico-sm')}<span>Neue Vorlage</span></button></div>
-      <p class="text-sm text-muted mb-4">Grundlage für „Mandatsvertrag erstellen“ in der Akte. Änderungen gelten für neue Verträge – bereits erstellte Verträge behalten ihren Text.</p>
+      <p class="text-sm text-muted mb-4">Grundlage für „Mandatsvertrag erstellen“ (Art „Vertrag“) und „Schriftsatz erstellen“ (Art „Schriftsatz“, z. B. Vollmacht, Antrag auf Akteneinsicht, Haftbeschwerde) in der Akte. Änderungen gelten für neue Dokumente – bereits erstellte behalten ihren Text.</p>
       <div class="stack">${rows}</div>
       <form data-form="contract-header" class="form-grid cols-2 mt-5">
         <div><label class="label">Kopfzeile rechts (jede Vertragsseite)</label><textarea name="header" rows="2" maxlength="300" class="field">${esc(t.header)}</textarea></div>
@@ -3708,6 +3832,7 @@
       <form data-form="tpl-save" ${x ? `data-id="${x.id}"` : ''} class="form-grid cols-2">
         <div><label class="label" for="tplName">Name</label><input id="tplName" name="name" class="field" required minlength="2" maxlength="80" value="${esc(x ? x.name : '')}" placeholder="z. B. Vollmacht"></div>
         <label class="check self-end"><input type="checkbox" name="active" ${!x || x.active ? 'checked' : ''}> Aktiv (in Akten auswählbar)</label>
+        <div><label class="label" for="tplKind">Art</label><select id="tplKind" name="kind" class="field">${opt('vertrag', 'Vertrag – „Mandatsvertrag erstellen“', !x || x.kind !== 'schriftsatz')}${opt('schriftsatz', 'Schriftsatz – „Schriftsatz erstellen“', !!x && x.kind === 'schriftsatz')}</select></div>
         <div class="span-2"><div class="label">Platzhalter</div><div class="tpl-chips">${Object.entries(fields)
           .map(([k, label]) => `<button type="button" class="tpl-chip" data-action="tpl-insert" data-text="{{${k}}}" title="${esc(label)}">{{${esc(k)}}}</button>`)
           .join('')}</div></div>
@@ -7154,9 +7279,37 @@
       if (!st.caseInfo) return;
       const c = st.caseInfo;
       st.returnCase = c.id;
-      const [{ templates }, defaults] = await Promise.all([api.get('/api/contract-templates'), api.get(`/api/cases/${c.id}/contracts/defaults`), load.lawyers(), load.fees()]);
+      const [{ templates: all }, defaults] = await Promise.all([api.get('/api/contract-templates'), api.get(`/api/cases/${c.id}/contracts/defaults`), load.lawyers(), load.fees()]);
+      const templates = all.filter((t) => t.kind !== 'schriftsatz');
       if (!templates.length) throw new Error('Es gibt keine aktive Vertragsvorlage. Das Board of Partners kann sie unter Einstellungen → Vertragsvorlagen anlegen.');
       openModal(contractForm(c, { templates, defaults }));
+    },
+    'brief-new': async () => {
+      if (!st.caseInfo) return;
+      const c = st.caseInfo;
+      st.returnCase = c.id;
+      const [{ templates: all }, defaults] = await Promise.all([api.get('/api/contract-templates'), api.get(`/api/cases/${c.id}/contracts/defaults`), load.lawyers()]);
+      st.briefTemplates = all.filter((t) => t.kind === 'schriftsatz');
+      if (!st.briefTemplates.length) throw new Error('Es gibt keine aktive Schriftsatz-Vorlage. Das Board of Partners kann sie unter Einstellungen → Vertragsvorlagen anlegen (Art „Schriftsatz“).');
+      openModal(briefForm(c, { templates: st.briefTemplates, defaults }));
+      syncBriefForm($('form[data-form="brief-new"]'));
+    },
+    'brief-edit': async (el) => {
+      const k = (st.caseContracts || []).find((x) => x.id === Number(el.dataset.id));
+      if (!k || !st.caseInfo) return;
+      st.returnCase = st.caseInfo.id;
+      const [full, defaults] = await Promise.all([api.get(`/api/contracts/${k.id}`), api.get(`/api/cases/${st.caseInfo.id}/contracts/defaults`), load.lawyers()]);
+      k.body = full.contract.body;
+      openModal(briefForm(st.caseInfo, { templates: [], defaults, k }));
+      syncBriefForm($('form[data-form="brief-edit"]'));
+    },
+    'brief-visibility': async (el) => {
+      const k = (st.caseContracts || []).find((x) => x.id === Number(el.dataset.id));
+      if (!k) return;
+      if (k.internal && !(await ask(`„${k.templateName}“ wird im Mandantenportal sichtbar, und im Ticket erscheint ein Hinweis.`, { title: 'Für den Mandanten freigeben?', confirmText: 'Freigeben' }))) return;
+      await api.patch(`/api/contracts/${k.id}`, { internal: !k.internal });
+      toast(k.internal ? 'Für den Mandanten freigegeben.' : 'Nur noch für die Kanzlei sichtbar.');
+      await reloadCase(Number(el.dataset.caseId));
     },
     'contract-edit': async (el) => {
       const k = (st.caseContracts || []).find((x) => x.id === Number(el.dataset.id));
@@ -7168,7 +7321,7 @@
     'contract-record': async (el) => {
       const k = (st.caseContracts || []).find((x) => x.id === Number(el.dataset.id));
       if (!k) return;
-      if (!(await ask(`Bitte nur bestätigen, wenn ${k.data.mandant || 'der Mandant'} den Vertrag im Spiel tatsächlich unterschrieben hat. Die Erfassung wird mit Ihrem Namen im Aktenverlauf vermerkt.`, { title: 'Unterschrift des Mandanten erfassen?', confirmText: 'Erfassen' }))) return;
+      if (!(await ask(`Bitte nur bestätigen, wenn ${k.data.mandant || 'der Mandant'} ${k.kind === 'schriftsatz' ? 'das Dokument' : 'den Vertrag'} im Spiel tatsächlich unterschrieben hat. Die Erfassung wird mit Ihrem Namen im Aktenverlauf vermerkt.`, { title: 'Unterschrift des Mandanten erfassen?', confirmText: 'Erfassen' }))) return;
       await api.post(`/api/contracts/${k.id}/sign`, { as: 'erfassen' });
       toast('Unterschrift des Mandanten erfasst.');
       await reloadCase(Number(el.dataset.caseId));
@@ -7176,9 +7329,13 @@
     'contract-delete': async (el) => {
       const k = (st.caseContracts || []).find((x) => x.id === Number(el.dataset.id));
       if (!k) return;
-      if (!(await askDelete(`${k.templateName} löschen?`, k.locked ? 'Der Vertrag ist bereits unterschrieben. Er wird endgültig entfernt; im Aktenverlauf bleibt ein Vermerk.' : 'Der Entwurf wird entfernt.', 'Löschen'))) return;
+      const signedMsg =
+        k.kind === 'schriftsatz'
+          ? 'Das Dokument ist bereits unterschrieben. Es wird endgültig entfernt; im Aktenverlauf bleibt ein Vermerk.'
+          : 'Der Vertrag ist bereits unterschrieben. Er wird endgültig entfernt; im Aktenverlauf bleibt ein Vermerk.';
+      if (!(await askDelete(`${k.templateName} löschen?`, k.locked ? signedMsg : 'Der Entwurf wird entfernt.', 'Löschen'))) return;
       await api.del(`/api/contracts/${k.id}`);
-      toast('Vertrag gelöscht.');
+      toast(k.kind === 'schriftsatz' ? 'Schriftsatz gelöscht.' : 'Vertrag gelöscht.');
       await reloadCase(Number(el.dataset.caseId));
     },
     'gd-add': async (el) => {
@@ -7902,7 +8059,7 @@
     },
     'tpl-save': async (f) => {
       const fd = new FormData(f);
-      const body = { name: val(fd, 'name'), body: String(fd.get('body') || ''), active: fd.get('active') === 'on' };
+      const body = { name: val(fd, 'name'), body: String(fd.get('body') || ''), active: fd.get('active') === 'on', kind: val(fd, 'kind') || 'vertrag' };
       if (f.dataset.id) await api.patch(`/api/contract-templates/${f.dataset.id}`, body);
       else await api.post('/api/contract-templates', body);
       toast('Vorlage gespeichert.');
@@ -7925,6 +8082,20 @@
     'contract-edit': async (f) => {
       await api.patch(`/api/contracts/${f.dataset.id}`, contractBody(f));
       toast('Vertrag gespeichert.');
+      await returnOrClose();
+    },
+    'brief-new': async (f) => {
+      const caseId = Number(f.dataset.caseId);
+      const vis = $('#bf_visible', f);
+      const res = await api.post(`/api/cases/${caseId}/contracts`, { templateId: Number(new FormData(f).get('templateId')), ...briefBody(f), internal: vis ? !vis.checked : true });
+      toast(res.contract.needsClient ? 'Erstellt – der Mandant kann jetzt im Portal unterschreiben.' : 'Schriftsatz erstellt – jetzt ansehen, unterschreiben und drucken.');
+      st.contractTabAt = Date.now();
+      window.open(`/vertrag.html?id=${res.contract.id}`, '_blank', 'noopener');
+      await returnOrClose();
+    },
+    'brief-edit': async (f) => {
+      await api.patch(`/api/contracts/${f.dataset.id}`, briefBody(f));
+      toast('Schriftsatz gespeichert.');
       await returnOrClose();
     },
     'ext-edit': async (f) => {
@@ -8140,6 +8311,11 @@
   document.addEventListener('change', (e) => {
     if (e.target.id === 'prUser' || e.target.id === 'prRank') updatePromotePreview();
     const t = e.target;
+    if (t.id === 'bf_tpl') {
+      syncBriefForm(t.form);
+      return;
+    }
+    if (t.id === 'bf_visible') t.dataset.touched = '1';
     if (t.dataset.upload) {
       guard(() => handleUpload(t));
       return;

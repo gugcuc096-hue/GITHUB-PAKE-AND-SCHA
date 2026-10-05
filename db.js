@@ -718,6 +718,10 @@ addColumn('invoices', 'coop_name', "TEXT NOT NULL DEFAULT ''");
 addColumn('invoices', 'coop_pct', 'REAL NOT NULL DEFAULT 0');
 addColumn('invoices', 'coop_amount', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('invoices', 'coop_via', "TEXT NOT NULL DEFAULT ''"); // discord | konto | manuell
+// Schriftsätze: Vorlagen und Dokumente der Art „schriftsatz“ (sonst „vertrag“); interne Schriftsätze sieht der Mandant nicht
+addColumn('contract_templates', 'kind', "TEXT NOT NULL DEFAULT 'vertrag'");
+addColumn('case_contracts', 'kind', "TEXT NOT NULL DEFAULT 'vertrag'");
+addColumn('case_contracts', 'internal', 'INTEGER NOT NULL DEFAULT 0');
 // Zahlungserinnerungen (paymentReminders.js): zuletzt erinnert, Anzahl der Erinnerungen
 addColumn('invoices', 'reminded_at', 'TEXT');
 addColumn('invoices', 'reminder_count', 'INTEGER NOT NULL DEFAULT 0');

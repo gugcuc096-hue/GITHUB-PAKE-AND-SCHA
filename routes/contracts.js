@@ -24,7 +24,7 @@ const contracts = require('../contracts');
 const header = () => getSetting('contract_header', contracts.DEFAULT_HEADER);
 const AREA_LABEL = { strafrecht: 'Strafrecht', zivilrecht: 'Zivilrecht', verfassungsrecht: 'Verfassungsrecht', vertragsrecht: 'Vertragsrecht', sonstiges: 'Sonstiges' };
 const text = (max) => z.string().trim().max(max);
-const FIELD_MAX = { grundgebuehr: 200, zusatzgebuehr: 200, leistungen: 3000 };
+const FIELD_MAX = { grundgebuehr: 200, zusatzgebuehr: 200, leistungen: 3000, empfaenger: 400, betreff: 200, festnahme: 200, begruendung: 6000 };
 const fieldSchema = z.object(Object.fromEntries(Object.keys(contracts.FIELDS).map((k) => [k, text(FIELD_MAX[k] || 120).optional()])));
 // Aus der Honorarordnung gewählte Leistungen (Mehrfachauswahl mit Menge)
 const servicesSchema = z
@@ -67,7 +67,13 @@ const coLawyersOf = (contractId) => db.prepare('SELECT * FROM case_contract_lawy
 /** Alle Anwälte haben unterschrieben (der erste und alle weiteren). */
 const lawyersDone = (k) => !!k.lawyer_signed_at && Number(k.co_signed || 0) >= Number(k.co_count || 0);
 const anySigned = (k) => !!(k.lawyer_signed_at || k.client_signed_at || Number(k.co_signed || 0) > 0);
-const fullySigned = (k) => lawyersDone(k) && !!k.client_signed_at;
+/** Wer muss unterschreiben (Vertrag: beide; Schriftsatz meist nur der Anwalt, Vollmacht nur der Mandant)? */
+const needsOf = (k) => contracts.signatureNeeds(k.body, k.kind);
+const fullySigned = (k) => {
+  const n = needsOf(k);
+  return (!n.lawyer || lawyersDone(k)) && (!n.client || !!k.client_signed_at);
+};
+const KIND_LABEL = (k) => (k.kind === 'schriftsatz' ? 'Schriftsatz' : 'Vertrag');
 
 function statusOf(k) {
   if (fullySigned(k)) return 'unterschrieben';
@@ -95,15 +101,23 @@ function contractRow(k, { withBody = false } = {}) {
     clientRecordedByName: k.client_recorded_by_name || '',
     status: statusOf(k),
     locked: anySigned(k),
+    kind: k.kind || 'vertrag',
+    internal: !!k.internal, // nur für die Kanzlei sichtbar (Schriftsatz-Entwurf o. Ä.)
+    needsLawyer: needsOf(k).lawyer,
+    needsClient: needsOf(k).client,
     createdByName: k.created_by_name,
     createdAt: k.created_at,
     updatedAt: k.updated_at,
   };
 }
 
-/** Für die Aktenansicht: alle Verträge der Akte (Mandanten sehen die Verträge ihrer eigenen Akte). */
-function contractsForCase(caseId) {
-  return db.prepare(`${CONTRACT_SELECT} WHERE k.case_id = ? ORDER BY k.created_at DESC, k.id DESC`).all(caseId).map((k) => contractRow(k));
+/** Für die Aktenansicht: Verträge und Schriftsätze der Akte (Mandanten: ihre eigene Akte, ohne interne Schriftsätze). */
+function contractsForCase(caseId, u = null) {
+  return db
+    .prepare(`${CONTRACT_SELECT} WHERE k.case_id = ? ORDER BY k.created_at DESC, k.id DESC`)
+    .all(caseId)
+    .filter((k) => !k.internal || (u && isStaff(u)))
+    .map((k) => contractRow(k));
 }
 
 /**
@@ -122,16 +136,18 @@ function lawyerSlot(k, u) {
 function permissions(k, c, u) {
   const access = caseAccess(c, u);
   const locked = anySigned(k);
-  const slot = lawyerSlot(k, u);
+  const needs = needsOf(k);
+  const slot = needs.lawyer ? lawyerSlot(k, u) : null;
   return {
     canView: access.canView,
     canEdit: access.canEdit && !locked,
     canDelete: u.role === 'admin' || (access.canEdit && !locked),
     canSignLawyer: !!slot,
     lawyerSignName: slot ? slot.name : null,
-    canSignClient: u.role === 'mandant' && c.client_id === u.id && !k.client_signed_at,
-    canRecordClient: access.canEdit && !k.client_signed_at,
+    canSignClient: needs.client && !k.internal && u.role === 'mandant' && c.client_id === u.id && !k.client_signed_at,
+    canRecordClient: needs.client && access.canEdit && !k.client_signed_at,
     canReset: u.role === 'admin' && locked,
+    canToggleInternal: access.canEdit && isStaff(u),
   };
 }
 
@@ -185,15 +201,15 @@ function discordIdsOf(lawyers) {
 
 function notifySigned(c, k, who, user, pingIds) {
   const full = fullySigned(k);
-  const lawyers = allLawyers(k);
-  const viaTicket = tickets.active() && !!c.discord_channel_id;
+  const lawyers = needsOf(k).lawyer ? allLawyers(k) : [];
+  const viaTicket = tickets.active() && !!c.discord_channel_id && !k.internal;
   discord.notify('contract.signed', {
     title: `${c.case_number}: ${k.template_name} ${full ? 'vollständig unterschrieben' : `vom ${who} unterschrieben`}`,
     description: truncate(c.title, 300),
     color: full ? 0x10b981 : discord.GOLD,
     fields: [
       { name: 'Mandant', value: parseData(k.data).mandant || c.client_account_name || c.client_name || '—' },
-      { name: lawyers.length > 1 ? 'Anwälte' : 'Anwalt', value: lawyers.map((l) => `${l.signedAt ? '✅' : '⏳'} ${l.name}`).join('\n') },
+      ...(lawyers.length ? [{ name: lawyers.length > 1 ? 'Anwälte' : 'Anwalt', value: lawyers.map((l) => `${l.signedAt ? '✅' : '⏳'} ${l.name}`).join('\n') }] : []),
       { name: 'Unterschrift', value: who === 'Mandanten' && k.client_signed_via === 'kanzlei' ? `im Spiel (erfasst von ${user.display_name})` : user.display_name },
     ],
     mentionIds: viaTicket ? [] : pingIds.filter((id) => id !== user.discord_id),
@@ -208,6 +224,7 @@ const templateRow = (t) => ({
   id: t.id,
   key: t.key,
   name: t.name,
+  kind: t.kind || 'vertrag',
   body: t.body,
   active: !!t.active,
   isDefault: !!t.key,
@@ -223,6 +240,7 @@ templatesRouter.get('/', (req, res) => {
     header: header(),
     fields: contracts.FIELDS,
     autoFields: contracts.AUTO_FIELDS,
+    kinds: contracts.KINDS,
     defaultPlace: contracts.DEFAULT_PLACE,
   });
 });
@@ -230,6 +248,7 @@ templatesRouter.get('/', (req, res) => {
 const templateSchema = z.object({
   name: z.string().trim().min(2).max(80),
   body: z.string().max(contracts.MAX_BODY),
+  kind: z.enum(Object.keys(contracts.KINDS)).optional(),
   active: z.boolean().optional(),
 });
 
@@ -254,9 +273,9 @@ templatesRouter.post(
     if (!d || !checkBody(d.body, res)) return;
     const order = db.prepare('SELECT COALESCE(MAX(sort_order), 0) + 1 AS n FROM contract_templates').get().n;
     const info = db
-      .prepare('INSERT INTO contract_templates (name, body, active, sort_order, updated_by_name) VALUES (?, ?, ?, ?, ?)')
-      .run(d.name, d.body, d.active === false ? 0 : 1, order, req.user.display_name);
-    logActivity(req.user, 'Vertragsvorlage angelegt', 'contract_template', Number(info.lastInsertRowid), d.name);
+      .prepare('INSERT INTO contract_templates (name, body, active, sort_order, updated_by_name, kind) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(d.name, d.body, d.active === false ? 0 : 1, order, req.user.display_name, d.kind || 'vertrag');
+    logActivity(req.user, d.kind === 'schriftsatz' ? 'Schriftsatz-Vorlage angelegt' : 'Vertragsvorlage angelegt', 'contract_template', Number(info.lastInsertRowid), d.name);
     res.status(201).json({ template: templateRow(db.prepare('SELECT * FROM contract_templates WHERE id = ?').get(Number(info.lastInsertRowid))) });
   })
 );
@@ -272,8 +291,8 @@ templatesRouter.patch(
     if (!d) return;
     if (d.body !== undefined && !checkBody(d.body, res)) return;
     db.prepare(
-      "UPDATE contract_templates SET name = ?, body = ?, active = ?, updated_by_name = ?, updated_at = datetime('now') WHERE id = ?"
-    ).run(d.name ?? t.name, d.body ?? t.body, d.active === undefined ? t.active : d.active ? 1 : 0, req.user.display_name, t.id);
+      "UPDATE contract_templates SET name = ?, body = ?, active = ?, kind = ?, updated_by_name = ?, updated_at = datetime('now') WHERE id = ?"
+    ).run(d.name ?? t.name, d.body ?? t.body, d.active === undefined ? t.active : d.active ? 1 : 0, d.kind ?? t.kind ?? 'vertrag', req.user.display_name, t.id);
     logActivity(req.user, 'Vertragsvorlage geändert', 'contract_template', t.id, d.name ?? t.name);
     res.json({ template: templateRow(db.prepare('SELECT * FROM contract_templates WHERE id = ?').get(t.id)) });
   })
@@ -288,9 +307,10 @@ templatesRouter.post(
     const t = tid && db.prepare('SELECT * FROM contract_templates WHERE id = ?').get(tid);
     const def = t && contracts.DEFAULT_TEMPLATES.find((x) => x.key === t.key);
     if (!def) return res.status(404).json({ error: 'Nur mitgelieferte Vorlagen lassen sich zurücksetzen.' });
-    db.prepare("UPDATE contract_templates SET name = ?, body = ?, updated_by_name = ?, updated_at = datetime('now') WHERE id = ?").run(
+    db.prepare("UPDATE contract_templates SET name = ?, body = ?, kind = ?, updated_by_name = ?, updated_at = datetime('now') WHERE id = ?").run(
       def.name,
       def.body,
+      def.kind || 'vertrag',
       req.user.display_name,
       t.id
     );
@@ -378,6 +398,7 @@ caseRouter.get('/defaults', (req, res) => {
       zusatzgebuehr: '',
       datum: new Date().toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', year: 'numeric' }),
       ort: contracts.DEFAULT_PLACE,
+      betreff: c.title || '',
     },
   });
 });
@@ -389,30 +410,58 @@ caseRouter.post(
     if (!c) return;
     if (!caseAccess(c, req.user).canEdit) return res.status(403).json({ error: 'Verträge erstellen dürfen die zuständigen Anwälte und das Board of Partners.' });
     const d = parseBody(
-      z.object({ templateId: z.number().int().positive(), lawyerId: z.number().int().positive(), coLawyers: coLawyersSchema.optional(), data: fieldSchema, services: servicesSchema.optional() }),
+      z.object({
+        templateId: z.number().int().positive(),
+        lawyerId: z.number().int().positive(),
+        coLawyers: coLawyersSchema.optional(),
+        data: fieldSchema,
+        services: servicesSchema.optional(),
+        internal: z.boolean().optional(),
+      }),
       req,
       res
     );
     if (!d) return;
     const t = db.prepare('SELECT * FROM contract_templates WHERE id = ? AND active = 1').get(d.templateId);
     if (!t) return res.status(404).json({ error: 'Vorlage nicht gefunden.' });
+    const kind = t.kind || 'vertrag';
+    const needs = contracts.signatureNeeds(t.body, kind);
+    // Schriftsätze sind zunächst intern – außer der Mandant muss unterschreiben (z. B. Vollmacht)
+    const internal = kind === 'schriftsatz' ? (d.internal === undefined ? !needs.client : d.internal) : false;
+    if (internal && needs.client) return res.status(400).json({ error: `${t.name} muss der Mandant unterschreiben – bitte für den Mandanten sichtbar anlegen.` });
     const { lawyer, error } = checkLawyer(d.lawyerId, c, req.user);
     if (error) return res.status(400).json({ error });
     const co = checkCoLawyers(d.coLawyers || [], lawyer.id, c, req.user);
     if (co.error) return res.status(400).json({ error: co.error });
     const names = [lawyer.display_name, ...co.list.map((x) => x.lawyer.display_name)];
-    const count = db.prepare('SELECT COUNT(*) AS n FROM case_contracts WHERE case_id = ?').get(c.id).n;
-    if (count >= 20) return res.status(400).json({ error: 'Pro Akte sind höchstens 20 Verträge möglich.' });
+    const count = db.prepare('SELECT COUNT(*) AS n FROM case_contracts WHERE case_id = ? AND kind = ?').get(c.id, kind).n;
+    if (count >= (kind === 'schriftsatz' ? 50 : 20)) return res.status(400).json({ error: `Pro Akte sind höchstens ${kind === 'schriftsatz' ? '50 Schriftsätze' : '20 Verträge'} möglich.` });
     const id = tx(() => {
       const info = db
-        .prepare('INSERT INTO case_contracts (case_id, template_name, body, data, lawyer_id, created_by, created_by_name) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .run(c.id, t.name, t.body, JSON.stringify(applyServices(d.data, d.services)), lawyer.id, req.user.id, req.user.display_name);
+        .prepare('INSERT INTO case_contracts (case_id, template_name, body, data, lawyer_id, created_by, created_by_name, kind, internal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(c.id, t.name, t.body, JSON.stringify(applyServices(d.data, d.services)), lawyer.id, req.user.id, req.user.display_name, kind, internal ? 1 : 0);
       saveCoLawyers(Number(info.lastInsertRowid), co.list);
-      addSystemNote(c.id, req.user, `${t.name} erstellt (${names.length > 1 ? `unterzeichnende Anwälte: ${names.join(', ')}` : `unterzeichnender Anwalt: ${lawyer.display_name}`}).`);
+      const who = kind === 'schriftsatz' ? (needs.lawyer ? `Anwalt: ${names.join(', ')}` : `für ${d.data.mandant || 'den Mandanten'}`) : names.length > 1 ? `unterzeichnende Anwälte: ${names.join(', ')}` : `unterzeichnender Anwalt: ${lawyer.display_name}`;
+      addSystemNote(c.id, req.user, `${t.name} erstellt (${who}${internal ? ', nur intern' : ''}).`, internal);
       db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(c.id);
       return Number(info.lastInsertRowid);
     });
-    logActivity(req.user, 'Vertrag erstellt', 'case', c.id, `${c.case_number}: ${t.name}`);
+    logActivity(req.user, kind === 'schriftsatz' ? 'Schriftsatz erstellt' : 'Vertrag erstellt', 'case', c.id, `${c.case_number}: ${t.name}`);
+    if (kind === 'schriftsatz') {
+      // Interne Schriftsätze erscheinen nicht im Ticket; muss der Mandant unterschreiben, wird er einmal erwähnt
+      if (!internal) {
+        tickets.post(c.id, {
+          title: `📄 ${t.name} erstellt`,
+          description: needs.client
+            ? `Das Dokument liegt im Mandantenportal unter der Akte ${c.case_number} bereit – bitte prüfen und unterschreiben.`
+            : `Das Dokument ist im Mandantenportal unter der Akte ${c.case_number} abrufbar.`,
+          mention: needs.client ? 'client' : undefined,
+          by: req.user.display_name,
+          byDiscordId: req.user.discord_id,
+        });
+      }
+      return res.status(201).json({ contract: contractRow(db.prepare(`${CONTRACT_SELECT} WHERE k.id = ?`).get(id)) });
+    }
     tickets.post(c.id, {
       title: `📝 ${t.name} erstellt`,
       description: `Der Vertrag liegt im Mandantenportal unter der Akte ${c.case_number} bereit – bitte prüfen und unterschreiben.`,
@@ -435,8 +484,8 @@ function loadContract(req, res) {
   const cid = idParam(req, 'cid');
   const k = cid && db.prepare(`${CONTRACT_SELECT} WHERE k.id = ?`).get(cid);
   const c = k && getCase(k.case_id);
-  if (!k || !c || !caseAccess(c, req.user).canView) {
-    res.status(404).json({ error: 'Vertrag nicht gefunden.' });
+  if (!k || !c || !caseAccess(c, req.user).canView || (k.internal && !isStaff(req.user))) {
+    res.status(404).json({ error: 'Dokument nicht gefunden.' });
     return {};
   }
   return { k, c, can: permissions(k, c, req.user) };
@@ -447,7 +496,7 @@ router.get('/:cid', (req, res) => {
   if (!k) return;
   res.json({
     contract: contractRow(k, { withBody: true }),
-    case: { id: c.id, caseNumber: c.case_number, title: c.title, area: AREA_LABEL[c.area] || c.area },
+    case: { id: c.id, caseNumber: c.case_number, title: c.title, area: AREA_LABEL[c.area] || c.area, courtRef: c.court_ref || '', opponent: c.opponent || '' },
     header: header(),
     can,
   });
@@ -459,8 +508,29 @@ router.patch(
   wrap(async (req, res) => {
     const { k, c, can } = loadContract(req, res);
     if (!k) return;
+    // Nur Sichtbarkeit umschalten (Schriftsatz für den Mandanten freigeben bzw. wieder intern) – auch nach Unterschrift
+    if (req.body && Object.keys(req.body).length === 1 && typeof req.body.internal === 'boolean') {
+      if (!can.canToggleInternal || k.kind !== 'schriftsatz') return res.status(403).json({ error: 'Keine Berechtigung.' });
+      if (req.body.internal && needsOf(k).client) return res.status(400).json({ error: `${k.template_name} muss der Mandant unterschreiben und bleibt deshalb für ihn sichtbar.` });
+      if (!!k.internal !== req.body.internal) {
+        tx(() => {
+          db.prepare("UPDATE case_contracts SET internal = ?, updated_at = datetime('now') WHERE id = ?").run(req.body.internal ? 1 : 0, k.id);
+          addSystemNote(c.id, req.user, `${k.template_name} ${req.body.internal ? 'wieder nur intern' : 'für den Mandanten freigegeben'}.`, true);
+        });
+        logActivity(req.user, req.body.internal ? 'Schriftsatz auf intern gestellt' : 'Schriftsatz freigegeben', 'case', c.id, `${c.case_number}: ${k.template_name}`);
+        if (!req.body.internal) {
+          tickets.post(c.id, {
+            title: `📄 ${k.template_name} freigegeben`,
+            description: `Das Dokument ist jetzt im Mandantenportal unter der Akte ${c.case_number} abrufbar.`,
+            by: req.user.display_name,
+            byDiscordId: req.user.discord_id,
+          });
+        }
+      }
+      return res.json({ contract: contractRow(db.prepare(`${CONTRACT_SELECT} WHERE k.id = ?`).get(k.id)) });
+    }
     if (!can.canEdit) {
-      return res.status(403).json({ error: anySigned(k) ? 'Der Vertrag ist bereits unterschrieben und kann nicht mehr geändert werden.' : 'Keine Berechtigung.' });
+      return res.status(403).json({ error: anySigned(k) ? `Das Dokument ist bereits unterschrieben und kann nicht mehr geändert werden.` : 'Keine Berechtigung.' });
     }
     const d = parseBody(
       z.object({ lawyerId: z.number().int().positive().optional(), coLawyers: coLawyersSchema.optional(), data: fieldSchema.optional(), services: servicesSchema.optional() }),
@@ -503,9 +573,9 @@ router.delete(
     if (!can.canDelete) return res.status(403).json({ error: 'Unterschriebene Verträge kann nur das Board of Partners löschen.' });
     tx(() => {
       db.prepare('DELETE FROM case_contracts WHERE id = ?').run(k.id);
-      addSystemNote(c.id, req.user, `${k.template_name} gelöscht${statusOf(k) !== 'entwurf' ? ' (war bereits unterschrieben)' : ''}.`);
+      addSystemNote(c.id, req.user, `${k.template_name} gelöscht${statusOf(k) !== 'entwurf' ? ' (war bereits unterschrieben)' : ''}.`, !!k.internal);
     });
-    logActivity(req.user, 'Vertrag gelöscht', 'case', c.id, `${c.case_number}: ${k.template_name}`);
+    logActivity(req.user, k.kind === 'schriftsatz' ? 'Schriftsatz gelöscht' : 'Vertrag gelöscht', 'case', c.id, `${c.case_number}: ${k.template_name}`);
     res.json({ success: true });
   })
 );
@@ -528,6 +598,7 @@ router.post(
     const data = parseData(k.data);
     let note;
     if (d.as === 'anwalt') {
+      if (!needsOf(k).lawyer) return res.status(403).json({ error: `${k.template_name} unterschreibt nur der Mandant.` });
       const slot = lawyerSlot(k, u);
       if (!slot) {
         const already = (k.lawyer_id === u.id && k.lawyer_signed_at) || db.prepare('SELECT 1 FROM case_contract_lawyers WHERE contract_id = ? AND user_id = ? AND signed_at IS NOT NULL').get(k.id, u.id);
@@ -566,27 +637,30 @@ router.post(
     const updated = db.prepare(`${CONTRACT_SELECT} WHERE k.id = ?`).get(k.id);
     const full = fullySigned(updated);
     tx(() => {
-      addSystemNote(c.id, u, note + (full ? ' Der Vertrag ist vollständig unterschrieben.' : ''));
+      addSystemNote(c.id, u, note + (full ? ` ${k.kind === 'schriftsatz' ? 'Das Dokument' : 'Der Vertrag'} ist vollständig unterschrieben.` : ''), !!updated.internal);
       db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(c.id);
     });
-    const lawyers = allLawyers(updated);
+    const needs = needsOf(updated);
+    const lawyers = needs.lawyer ? allLawyers(updated) : [];
     const openLawyers = lawyers.filter((l) => !l.signedAt).map((l) => l.name);
     // Wenige Pings: Unterschreibt ein Anwalt, wird niemand erwähnt (der Mandant wurde beim Erstellen gepingt).
     // Unterschreibt der Mandant, werden nur die Anwälte erwähnt, deren Unterschrift noch fehlt.
     const pingIds = d.as === 'anwalt' ? [] : discordIdsOf(lawyers.filter((l) => !l.signedAt));
     notifySigned(c, updated, d.as === 'anwalt' ? 'Anwalt' : 'Mandanten', u, pingIds);
-    tickets.post(c.id, {
+    if (!updated.internal) tickets.post(c.id, {
       title: full ? `✅ ${k.template_name} vollständig unterschrieben` : `✍️ ${k.template_name} vom ${d.as === 'anwalt' ? 'Anwalt' : 'Mandanten'} unterschrieben`,
       description: full
-        ? `${lawyers.length > 1 ? 'Alle' : 'Beide'} Unterschriften liegen vor – der Vertrag ist wirksam.`
+        ? k.kind === 'schriftsatz'
+          ? 'Alle nötigen Unterschriften liegen vor.'
+          : `${lawyers.length > 1 ? 'Alle' : 'Beide'} Unterschriften liegen vor – der Vertrag ist wirksam.`
         : `Jetzt fehlt noch die Unterschrift ${[
             ...(openLawyers.length ? [`${openLawyers.length > 1 ? 'der Anwälte' : 'von'} ${openLawyers.join(', ')}`] : []),
-            ...(updated.client_signed_at ? [] : ['des Mandanten (im Mandantenportal)']),
+            ...(updated.client_signed_at || !needs.client ? [] : ['des Mandanten (im Mandantenportal)']),
           ].join(' und ')}.`,
       color: full ? tickets.COLORS.green : tickets.COLORS.gold,
       fields: [
-        { name: lawyers.length > 1 ? 'Anwälte' : 'Anwalt', value: lawyers.map((l) => (l.signedAt ? `✅ ${l.signature}` : `⏳ ${l.name} – offen`)).join('\n') },
-        { name: 'Mandant', value: updated.client_signed_at ? `✅ ${updated.client_signature}${updated.client_signed_via === 'kanzlei' ? ' (im Spiel)' : ''}` : '⏳ offen' },
+        ...(lawyers.length ? [{ name: lawyers.length > 1 ? 'Anwälte' : 'Anwalt', value: lawyers.map((l) => (l.signedAt ? `✅ ${l.signature}` : `⏳ ${l.name} – offen`)).join('\n') }] : []),
+        ...(needs.client ? [{ name: 'Mandant', value: updated.client_signed_at ? `✅ ${updated.client_signature}${updated.client_signed_via === 'kanzlei' ? ' (im Spiel)' : ''}` : '⏳ offen' }] : []),
       ],
       mentionIds: pingIds,
       by: u.display_name,

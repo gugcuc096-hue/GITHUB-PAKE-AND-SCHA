@@ -391,7 +391,7 @@ router.get(
       invoices: invoices.map(invoiceRow),
       attachments: attachments.map((a) => attachmentRow(a, c.id)),
       externalDocs: externalDocsForCase(c.id, req.user),
-      contracts: contractsForCase(c.id),
+      contracts: contractsForCase(c.id, req.user),
       // Bearbeitungszeiten nur für das Board of Partners
       work: isBoard(req.user) ? { rows: workForCase(c.id), closedAt: c.closed_at || null } : undefined,
       tasks: staff ? tasks.map(taskRow) : undefined,

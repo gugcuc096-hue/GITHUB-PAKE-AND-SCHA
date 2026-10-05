@@ -24,7 +24,7 @@
     ['events', 'Termine & Fristen', true],
     ['docs', 'Externe Dokumente (FiveNet, Google)', true],
     ['docsText', 'mit Abschrift / Inhalt', false, { sub: 'docs' }],
-    ['contracts', 'Mandatsverträge', true],
+    ['contracts', 'Verträge & Schriftsätze', true],
     ['invoices', 'Rechnungen & Honorare', true],
     ['log', 'Verlauf & Notizen', true],
     ['logSystem', 'automatische Einträge (Status, Zuständigkeit …)', true, { sub: 'log' }],
@@ -159,21 +159,27 @@
     }</section>`;
   }
 
-  function contractsSection(list) {
+  function contractsSection(all, internal) {
+    const list = all.filter((k) => k.kind !== 'schriftsatz');
+    const briefs = all.filter((k) => k.kind === 'schriftsatz' && (internal || !k.internal));
+    return contractTable('Mandatsverträge', list, 'Keine Verträge.') + (briefs.length ? contractTable('Schriftsätze', briefs, '') : '');
+  }
+
+  function contractTable(title, list, emptyText) {
     const signed = (k) =>
       [
-        `${k.lawyerName || 'Anwalt'}: ${k.lawyerSignedAt ? `unterschrieben ${dateDe(k.lawyerSignedAt)}` : 'offen'}`,
-        ...(k.coLawyers || []).map((l) => `${l.name}: ${l.signedAt ? `unterschrieben ${dateDe(l.signedAt)}` : 'offen'}`),
-        `Mandant: ${k.clientSignedAt ? `unterschrieben ${dateDe(k.clientSignedAt)}` : 'offen'}`,
+        ...(k.needsLawyer === false ? [] : [`${k.lawyerName || 'Anwalt'}: ${k.lawyerSignedAt ? `unterschrieben ${dateDe(k.lawyerSignedAt)}` : 'offen'}`]),
+        ...(k.needsLawyer === false ? [] : (k.coLawyers || []).map((l) => `${l.name}: ${l.signedAt ? `unterschrieben ${dateDe(l.signedAt)}` : 'offen'}`)),
+        ...(k.needsClient === false ? [] : [`Mandant: ${k.clientSignedAt ? `unterschrieben ${dateDe(k.clientSignedAt)}` : 'offen'}`]),
       ]
         .map(esc)
         .join('<br>');
-    return `<section><h2>Mandatsverträge</h2>${
+    return `<section><h2>${esc(title)}</h2>${
       list.length
-        ? `<table><thead><tr><th>Vertrag</th><th>Erstellt</th><th>Status</th><th>Unterschriften</th></tr></thead><tbody>${list
-            .map((k) => `<tr><td>${esc(k.templateName)}</td><td class="nowrap">${esc(dateDe(k.createdAt))}</td><td>${esc(CONTRACT_STATUS[k.status] || k.status)}</td><td>${signed(k)}</td></tr>`)
+        ? `<table><thead><tr><th>Dokument</th><th>Erstellt</th><th>Status</th><th>Unterschriften</th></tr></thead><tbody>${list
+            .map((k) => `<tr><td>${esc(k.templateName)}${intPill(k.internal)}</td><td class="nowrap">${esc(dateDe(k.createdAt))}</td><td>${esc(CONTRACT_STATUS[k.status] || k.status)}</td><td>${signed(k)}</td></tr>`)
             .join('')}</tbody></table>`
-        : '<p class="empty">Keine Verträge.</p>'
+        : `<p class="empty">${esc(emptyText)}</p>`
     }</section>`;
   }
 
@@ -259,7 +265,7 @@
       ${opts.description && c.description ? `<section><h2>Sachverhalt</h2><div class="text">${esc(c.description)}</div></section>` : ''}
       ${opts.events ? eventsSection(data.appointments || [], internal) : ''}
       ${opts.docs ? docsSection(data.externalDocs || [], internal, opts.docsText) : ''}
-      ${opts.contracts ? contractsSection(data.contracts || []) : ''}
+      ${opts.contracts ? contractsSection(data.contracts || [], internal) : ''}
       ${opts.invoices ? invoicesSection(data.invoices || []) : ''}
       ${internal && opts.tasks ? tasksSection(data.tasks || []) : ''}
       ${opts.log ? logSection(data.notes || [], internal, opts.logSystem) : ''}

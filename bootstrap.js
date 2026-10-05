@@ -305,12 +305,12 @@ function ensureContractTemplates() {
       if (r.changes) console.log(`Vertragsvorlage „${t.name}“ auf die aktuelle Fassung aktualisiert.`);
     }
   }
-  const insert = db.prepare('INSERT OR IGNORE INTO contract_templates (key, name, body, sort_order) VALUES (?, ?, ?, ?)');
+  const insert = db.prepare('INSERT OR IGNORE INTO contract_templates (key, name, body, sort_order, kind) VALUES (?, ?, ?, ?, ?)');
   contracts.DEFAULT_TEMPLATES.forEach((t, i) => {
     const flag = `seeded_contract_${t.key}`;
     if (getSetting(flag)) return;
     tx(() => {
-      insert.run(t.key, t.name, t.body, i + 1);
+      insert.run(t.key, t.name, t.body, i + 1, t.kind || 'vertrag');
       setSetting(flag, new Date().toISOString());
     });
   });
