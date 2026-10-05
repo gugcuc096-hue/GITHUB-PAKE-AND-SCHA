@@ -4902,14 +4902,16 @@
   /* ---------------------------------------------------------------- Profil */
   views.profile = {
     async load() {
-      const [me, ds, coops, names, member] = await Promise.all([
+      const [me, ds, coops, names, member, sessions] = await Promise.all([
         api.get('/api/auth/me'),
         api.get('/api/discord/status'),
         isStaff() ? null : api.get('/api/cooperations/mine').catch(() => null),
         api.get('/api/name-requests/mine').catch(() => ({ requests: [] })),
         isStaff() ? null : api.get('/api/memberships/mine').catch(() => null),
+        api.get('/api/auth/sessions').catch(() => ({ others: 0 })),
         load.fivenet(),
       ]);
+      st.otherSessions = sessions.others;
       st.myCoops = coops ? coops.matches : [];
       st.myNameRequests = names.requests;
       st.myMembership = member ? member.membership : null;
@@ -4952,6 +4954,15 @@
             <div><label class="label" for="pwNew2">Neues Passwort wiederholen</label><input id="pwNew2" name="newPassword2" type="password" autocomplete="new-password" required class="field"></div>
             <div class="form-actions"><button class="btn-gold btn-md" type="submit">${icon('key', 'ico-sm')}<span>Passwort speichern</span></button></div>
           </form>
+          <section class="panel panel-pad">
+            <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('shield')} Angemeldete Geräte</h2>${st.otherSessions ? badge(`${st.otherSessions} weitere`, 'amber') : badge('nur dieses Gerät', 'emerald')}</div>
+            <p class="text-sm text-muted">${
+              st.otherSessions
+                ? `Sie sind zusätzlich auf ${st.otherSessions === 1 ? 'einem weiteren Gerät bzw. Browser' : `${st.otherSessions} weiteren Geräten bzw. Browsern`} angemeldet (z. B. Handy, App oder ein anderer PC).`
+                : 'Sie sind nur auf diesem Gerät angemeldet.'
+            } Fremdes Gerät benutzt oder Handy verloren? Hier melden Sie sich überall sonst ab – dieses Gerät bleibt angemeldet.</p>
+            <div class="form-actions mt-3"><button type="button" class="btn-outline btn-md" data-action="logout-others" ${st.otherSessions ? '' : 'disabled'}>${icon('logout', 'ico-sm')}<span>Auf allen anderen Geräten abmelden</span></button></div>
+          </section>
           <section class="panel panel-pad">
             <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${DISCORD_ICON} Discord</h2>${u.discord ? badge('Verbunden', 'emerald') : ''}</div>
             ${discord}
@@ -6431,6 +6442,13 @@
     },
     'case-trash': () => openTrash(),
     'global-search': () => openSearch(),
+    'logout-others': async () => {
+      if (!(await ask('Alle anderen Anmeldungen (andere Browser, Handy, App) werden beendet. Dieses Gerät bleibt angemeldet.', { title: 'Auf allen anderen Geräten abmelden?', confirmText: 'Abmelden' }))) return;
+      const r = await api.post('/api/auth/logout-others', {});
+      st.otherSessions = r.others;
+      toast(r.ended ? `Auf ${r.ended === 1 ? 'einem weiteren Gerät' : `${r.ended} weiteren Geräten`} abgemeldet.` : 'Es gab keine weiteren Anmeldungen.');
+      renderView();
+    },
     'reviews-filter': async (el) => {
       st.reviewFilter = el.dataset.value;
       await refreshBehind();

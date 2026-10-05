@@ -9,6 +9,7 @@ const {
   createSession,
   destroySession,
   destroyOtherSessions,
+  otherSessionCount,
   publicUser,
   requireAuth,
   isStaff,
@@ -90,6 +91,17 @@ router.post('/email-notice', requireAuth, (req, res) => {
 router.post('/logout', (req, res) => {
   destroySession(req, res);
   res.json({ success: true });
+});
+
+/** Anmeldungen auf anderen Geräten: Anzahl bzw. dort überall abmelden. */
+router.get('/sessions', requireAuth, (req, res) => {
+  res.json({ others: otherSessionCount(req, req.user.id) });
+});
+
+router.post('/logout-others', requireAuth, (req, res) => {
+  const ended = destroyOtherSessions(req, req.user.id);
+  logActivity(req.user, 'Auf anderen Geräten abgemeldet', 'user', req.user.id, `${ended} Anmeldung(en) beendet`);
+  res.json({ ended, others: 0 });
 });
 
 router.get('/me', requireAuth, (req, res) => {

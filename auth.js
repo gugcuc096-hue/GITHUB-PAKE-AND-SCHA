@@ -52,10 +52,16 @@ function destroySession(req, res) {
   res.clearCookie(SESSION_COOKIE, cookieOptions());
 }
 
-/** Löscht alle Sessions eines Nutzers außer der aktuellen (z. B. nach Passwortänderung). */
+/** Löscht alle Sessions eines Nutzers außer der aktuellen (z. B. nach Passwortänderung). Liefert die Anzahl. */
 function destroyOtherSessions(req, userId) {
   const token = req.cookies?.[SESSION_COOKIE];
-  db.prepare('DELETE FROM sessions WHERE user_id = ? AND token != ?').run(userId, token || '');
+  return db.prepare('DELETE FROM sessions WHERE user_id = ? AND token != ?').run(userId, token || '').changes;
+}
+
+/** Anzahl der übrigen gültigen Anmeldungen (andere Geräte/Browser) eines Nutzers. */
+function otherSessionCount(req, userId) {
+  const token = req.cookies?.[SESSION_COOKIE];
+  return db.prepare("SELECT COUNT(*) AS n FROM sessions WHERE user_id = ? AND token != ? AND expires_at > ?").get(userId, token || '', new Date().toISOString()).n;
 }
 
 /** Meldet einen Nutzer auf allen Geräten ab (Sperre, Passwort-Reset durch Admin). */
@@ -154,6 +160,7 @@ module.exports = {
   createSession,
   destroySession,
   destroyOtherSessions,
+  otherSessionCount,
   destroyAllSessions,
   userAvatarUrl,
   publicUser,
