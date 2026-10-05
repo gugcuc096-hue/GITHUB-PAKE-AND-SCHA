@@ -334,7 +334,10 @@ router.patch(
     tx(() => {
       if (d.showDutyPublic !== undefined) setSetting('show_duty_public', d.showDutyPublic ? '1' : '0');
       if (d.discordWebhookUrl !== undefined) setSetting('discord_webhook_url', d.discordWebhookUrl);
-      if (d.discordEvents !== undefined) setSetting('discord_events', JSON.stringify(d.discordEvents.filter((e) => discord.EVENTS[e])));
+      if (d.discordEvents !== undefined) {
+        setSetting('discord_events', JSON.stringify(d.discordEvents.filter((e) => discord.EVENTS[e])));
+        setSetting('discord_events_known', JSON.stringify(Object.keys(discord.EVENTS)));
+      }
       if (d.discordPingRole !== undefined) setSetting('discord_ping_role', d.discordPingRole);
       if (d.discordEventWebhooks !== undefined) setSetting('discord_event_webhooks', JSON.stringify(d.discordEventWebhooks));
       if (d.discordEventRoles !== undefined) setSetting('discord_event_roles', JSON.stringify(d.discordEventRoles));
@@ -392,6 +395,9 @@ router.post(
     res.status(201).json({ backup: b, ...backupInfo() });
   })
 );
+
+/* ---------------------------------------------------------------- Systemwarnungen (für die Übersicht) */
+router.get('/alerts', (req, res) => res.json({ alerts: require('../systemAlerts').active() }));
 
 /** Alle hochgeladenen Bilder (Profilbilder, Team-Fotos, Beweismittel) als .tar.gz. */
 router.get('/backups/media', (req, res) => {

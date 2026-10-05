@@ -79,7 +79,18 @@ Die Passwörter kommen aus `ADMIN_PASSWORD`, `SEED_SCHA_PASSWORD` und `SEED_LEX_
 
 ## Discord einrichten (optional)
 
-**Webhook (Kanzlei-Updates):** Discord-Kanal → Einstellungen → Integrationen → Webhooks → URL kopieren → Dashboard → *Einstellungen* → einfügen → „Testnachricht“. Dort lässt sich auch wählen, welche Ereignisse gemeldet werden – und je Ereignis ein eigener Kanal (eigener Webhook) und eine Rolle zum Pingen. Neu hinzugekommene Ereignisse (z. B. „Neues Anliegen an das Board of Partners“ oder „Beförderung / Einstellung“) sind bei bestehender Auswahl zunächst aus und müssen dort einmal angehakt werden.
+**Webhook (Kanzlei-Updates):** Discord-Kanal → Einstellungen → Integrationen → Webhooks → URL kopieren → Dashboard → *Einstellungen* → einfügen → „Testnachricht“. Dort lässt sich auch wählen, welche Ereignisse gemeldet werden – und je Ereignis ein eigener Kanal (eigener Webhook) und eine Rolle zum Pingen. Neu hinzugekommene Ereignisse (z. B. „Neues Anliegen an das Board of Partners“ oder „Beförderung / Einstellung“) sind bei bestehender Auswahl zunächst aus und müssen dort einmal angehakt werden – ausgenommen die **Systemwarnungen**, die ab sofort an sind, bis jemand sie abwählt.
+
+**Systemwarnungen ans Board:** Das Ereignis „Systemwarnung“ meldet Störungen – am besten in einen eigenen Kanal (z. B. *#system*, nur Board) mit Rollen-Ping für das Board:
+
+| Störung | Wann | Entwarnung |
+|---|---|---|
+| Kanzlei-Bot offline | eingeschaltet, aber seit 15 Minuten nicht verbunden (inkl. Grund, z. B. ungültiger Token oder fehlender Intent) | wieder verbunden (wird der Bot ausgeschaltet, endet die Warnung ohne Meldung) |
+| Datensicherung fehlgeschlagen | die tägliche Sicherung klappt nicht (z. B. Disk voll) – der Server versucht es stündlich weiter | Sicherung wieder angelegt |
+| Speicher fast voll | weniger als 300 MB frei auf der Disk | wieder über 400 MB frei |
+| Server abgestürzt | beim Neustart nach einem Absturz (mit Fehlermeldung, falls bekannt); Deploys und Neustarts über Render lösen nichts aus | – |
+
+Jede Störung wird **einmal** gemeldet (auch über Neustarts hinweg), nicht wiederholt. Solange eine Störung besteht, zeigt die Übersicht des Dashboards dem Board zusätzlich einen roten Hinweis. Fehlertexte werden ohne Links und lange Zeichenketten gesendet, damit nie ein Zugangsschlüssel in Discord landet.
 
 **Discord-Login / Konto verknüpfen:**
 1. [discord.com/developers/applications](https://discord.com/developers/applications) → *New Application*
@@ -410,6 +421,7 @@ server.js        App-Setup, Routen, Start
 db.js            SQLite-Schema, Migrationen, Helfer, Wiederherstellen aus restore.db
 backup.js        Tägliche Datensicherung (backups/), Aufbewahrung, Download für das Board
 mediaBackup.js   Bilder als .tar.gz sichern, Sicherungen hochladen und einspielen (restore.db, Bilder-Archiv)
+systemAlerts.js  Systemwarnungen ans Board (Bot offline, Sicherung, Speicher, Absturz), einmal je Störung mit Entwarnung
 trash.js         Papierkorb für Akten: Momentaufnahme beim Löschen, Wiederherstellen, endgültig löschen nach 30 Tagen
 scripts/         build-css.js (Tailwind fest bauen: npm run build:css), seed-admin.js
 auth.js          Sessions, Passwörter, Rollen-Middleware

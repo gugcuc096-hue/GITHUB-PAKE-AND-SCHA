@@ -145,6 +145,7 @@
   const st = {
     user: null,
     view: 'overview',
+    alerts: [], // Systemwarnungen (nur Board of Partners)
     navToken: 0,
     cases: [],
     events: [],
@@ -826,7 +827,17 @@
 
   views.overview = {
     async load() {
-      await Promise.all([load.cases(), load.events(), load.invoices(), load.board(), load.unread(), load.duty(), load.myTasks(), isStaff() ? api.get('/api/absences').then((r) => (st.absences = r)) : null]);
+      await Promise.all([
+        load.cases(),
+        load.events(),
+        load.invoices(),
+        load.board(),
+        load.unread(),
+        load.duty(),
+        load.myTasks(),
+        isStaff() ? api.get('/api/absences').then((r) => (st.absences = r)) : null,
+        isAdmin() ? api.get('/api/admin/alerts').then((r) => (st.alerts = r.alerts), () => (st.alerts = [])) : null,
+      ]);
     },
     render() {
       const u = st.user;
@@ -841,6 +852,9 @@
       const openSum = openInvoices.reduce((s, i) => s + i.total, 0);
 
       const banner = [
+        ...(isAdmin() ? st.alerts : []).map(
+          (a) => `<div class="banner banner-red">${icon('alert')}<div><strong>Systemwarnung: ${esc(a.title)}</strong> <span class="opacity-80">(seit ${esc(fmtDate(a.since))})</span>${a.description ? `<br>${esc(a.description)}` : ''}</div></div>`
+        ),
         u.emailNotice
           ? `<div class="banner banner-gold items-center justify-between flex-wrap"><div>${icon('mail')} <strong>Ihre Login-E-Mail lautet jetzt ${esc(u.email)}</strong>${u.emailNotice.oldEmail ? ` (vorher ${esc(u.emailNotice.oldEmail)})` : ''}. Alle Konten der Kanzlei enden auf @${EMAIL_DOMAIN}. Ihr Passwort bleibt gleich – die alte Adresse funktioniert beim Login weiterhin.</div><button class="btn-outline btn-sm" data-action="email-notice-ok">Verstanden</button></div>`
           : '',
