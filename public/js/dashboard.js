@@ -2364,6 +2364,7 @@
     if (staff) {
       quick.push(`<button class="btn-outline btn-sm" data-action="new-event" data-case-id="${c.id}" data-return-case="${c.id}">${icon('calendar', 'ico-sm')}<span>Frist / Termin</span></button>`);
       quick.push(`<button class="btn-outline btn-sm" data-action="new-invoice" data-case-id="${c.id}">${icon('receipt', 'ico-sm')}<span>Rechnung</span></button>`);
+      quick.push(`<a class="btn-outline btn-sm" href="/aktenauszug.html?id=${c.id}" target="_blank" rel="noopener">${icon('printer', 'ico-sm')}<span>Aktenauszug (PDF)</span></a>`);
       if (c.clientId) quick.push(`<button class="btn-outline btn-sm" data-action="compose" data-recipient="${c.clientId}" data-case-id="${c.id}" data-return-case="${c.id}">${icon('mail', 'ico-sm')}<span>Mandant anschreiben</span></button>`);
       if (!c.hasClientAccount && canLinkClient(c)) quick.push(`<button class="btn-outline btn-sm" data-action="case-client-search" data-id="${c.id}">${icon('user', 'ico-sm')}<span>Mandanten-Konto verknüpfen</span></button>`);
       if (!c.processTicket && c.canEdit) quick.push(`<button class="btn-outline btn-sm" data-action="pt-toggle">${icon('plus', 'ico-sm')}<span>Prozessticket (DOJ)</span></button>`);
@@ -2373,6 +2374,7 @@
     } else {
       if (!c.closed) quick.push(`<button class="btn-outline btn-sm" data-action="new-event" data-case-id="${c.id}" data-return-case="${c.id}">${icon('calendar', 'ico-sm')}<span>Termin anfragen</span></button>`);
       quick.push(`<button class="btn-outline btn-sm" data-action="compose" ${c.lawyerId ? `data-recipient="${c.lawyerId}"` : ''} data-case-id="${c.id}" data-return-case="${c.id}">${icon('mail', 'ico-sm')}<span>Nachricht zur Akte</span></button>`);
+      quick.push(`<a class="btn-outline btn-sm" href="/aktenauszug.html?id=${c.id}" target="_blank" rel="noopener">${icon('printer', 'ico-sm')}<span>Aktenauszug (PDF)</span></a>`);
     }
 
     const editForm = c.canEdit

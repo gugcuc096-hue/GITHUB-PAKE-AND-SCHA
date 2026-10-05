@@ -36,6 +36,9 @@ router.get('/', (req, res) => {
   res.json({ invoices: rows.map(invoiceRow) });
 });
 
+/** Briefkopf der Kanzlei (Anschrift, Kontakt) – z. B. für den Aktenauszug. */
+router.get('/firm', (req, res) => res.json({ firm: firmInfo() }));
+
 router.get(
   '/:id',
   wrap(async (req, res) => {
