@@ -96,6 +96,7 @@ app.use('/api/fivenet', fivenetRoutes.router);
 app.use('/api/gdocs', externalRoutes.gdocsRouter);
 app.use('/api/gsheets', externalRoutes.gsheetsRouter);
 app.use('/api/tasks', require('./routes/tasks'));
+app.use('/api/search', require('./routes/search'));
 app.use('/api/contracts', contractRoutes.router);
 app.use('/api/absences', require('./routes/absences').router);
 app.use('/api/work', require('./routes/work').router);

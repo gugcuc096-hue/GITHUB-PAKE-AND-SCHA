@@ -147,6 +147,11 @@
     user: null,
     view: 'overview',
     alerts: [], // Systemwarnungen (nur Board of Partners)
+    gsQuery: '', // globale Suche
+    gsResults: null,
+    gsActive: 0,
+    gsToken: 0,
+    gsLoading: false,
     navToken: 0,
     cases: [],
     events: [],
@@ -1011,6 +1016,149 @@
           <td data-label="Aktualisiert" class="text-dim text-xs nowrap">${esc(fmtDate(c.updatedAt))}</td></tr>`
         )
         .join('')}</tbody></table></div>`;
+  }
+
+  /* ---------------------------------------------------------------- Globale Suche (Strg + K) */
+  const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  const KEY_MOD = IS_MAC ? '⌘' : 'Strg';
+  $$('.topbar-search kbd').forEach((k) => (k.textContent = `${KEY_MOD} K`));
+  $$('.topbar-search').forEach((b) => (b.title = `Suchen (${KEY_MOD} + K)`));
+  const GS_GROUPS = [
+    ['cases', 'Akten', 'folder'],
+    ['clients', 'Mandanten', 'user'],
+    ['invoices', 'Rechnungen', 'receipt'],
+    ['tasks', 'Aufgaben', 'tasks'],
+    ['events', 'Termine & Fristen', 'calendar'],
+    ['messages', 'Kanzlei-Post', 'mail'],
+  ];
+  /** Treffer hervorheben – Text und Treffer werden einzeln escaped. */
+  function hl(text, q) {
+    const s = String(text ?? '');
+    if (!q) return esc(s);
+    const lower = s.toLowerCase();
+    const needle = q.toLowerCase();
+    let out = '';
+    let i = 0;
+    let j;
+    while (needle && (j = lower.indexOf(needle, i)) !== -1) {
+      out += `${esc(s.slice(i, j))}<mark>${esc(s.slice(j, j + needle.length))}</mark>`;
+      i = j + needle.length;
+    }
+    return out + esc(s.slice(i));
+  }
+  function gsItem(type, x, q) {
+    const line = (title, meta) => `<span class="main"><span class="title">${title}</span>${meta ? `<span class="meta">${meta}</span>` : ''}</span>`;
+    const ico = icon(GS_GROUPS.find((g) => g[0] === type)[2]);
+    let body = '';
+    if (type === 'cases')
+      body = line(`<span class="font-mono text-gold">${hl(x.caseNumber, q)}</span> · ${hl(x.title, q)}`, [hl(x.clientName, q), esc(CASE_STATUS[x.status] ? CASE_STATUS[x.status][0] : x.status), x.opponent ? `Gegenpartei: ${hl(x.opponent, q)}` : '', x.courtRef ? hl(x.courtRef, q) : ''].filter(Boolean).join(' · '));
+    else if (type === 'clients')
+      body = line(`${hl(x.name, q)}${x.active ? '' : ' <span class="text-dim">(gesperrt)</span>'}`, [hl(x.email, q), x.phone ? hl(x.phone, q) : '', `${x.caseCount} ${x.caseCount === 1 ? 'Akte' : 'Akten'}`].filter(Boolean).join(' · '));
+    else if (type === 'invoices')
+      body = line(`<span class="font-mono text-gold">${hl(x.number, q)}</span> · ${esc(money(x.total))}`, [hl(x.clientName, q), x.subject ? hl(x.subject, q) : '', x.overdueDays > 0 ? overdueText(x) : esc(INVOICE_STATUS[x.status] ? INVOICE_STATUS[x.status][0] : x.status), x.caseNumber ? esc(x.caseNumber) : ''].filter(Boolean).join(' · '));
+    else if (type === 'tasks')
+      body = line(`${x.done ? '✓ ' : ''}${hl(x.title, q)}`, [x.dueDate ? `fällig ${esc(fmtDateOnly(x.dueDate))}` : 'ohne Datum', x.assignedName ? esc(x.assignedName) : '', x.caseNumber ? esc(x.caseNumber) : '', x.done ? 'erledigt' : ''].filter(Boolean).join(' · '));
+    else if (type === 'events')
+      body = line(hl(x.title, q), [esc(fmtDate(x.startsAt)), esc(EVENT_TYPES[x.type] || x.type), x.location ? hl(x.location, q) : '', x.caseNumber ? esc(x.caseNumber) : ''].filter(Boolean).join(' · '));
+    else if (type === 'messages')
+      body = line(hl(x.subject || '(ohne Betreff)', q), [x.box === 'inbox' ? `von ${esc(x.senderName)}` : `an ${esc(x.recipientName)}`, esc(fmtDate(x.createdAt)), hl(x.preview, q)].filter(Boolean).join(' · '));
+    return `<button type="button" class="gs-item" data-action="gs-open" data-type="${type}" data-id="${x.id}">${ico}${body}</button>`;
+  }
+  function renderSearchResults() {
+    const box = $('#gsResults');
+    if (!box) return;
+    const q = st.gsQuery.trim();
+    if (q.length < 2) {
+      box.innerHTML = `<p class="gs-hint">${isStaff() ? 'Aktenzeichen, Namen, Rechnungsnummern, Termine, Aufgaben oder Nachrichten – auch FiveNet- und Google-Links.' : 'Aktenzeichen, Rechnungsnummern, Termine oder Nachrichten.'}</p>`;
+      return;
+    }
+    const r = st.gsResults || {};
+    const html = GS_GROUPS.filter(([k]) => (r[k] || []).length)
+      .map(([k, label]) => `<div class="gs-group">${esc(label)}</div>${r[k].map((x) => gsItem(k, x, q)).join('')}`)
+      .join('');
+    box.innerHTML = html || `<p class="gs-hint">${st.gsLoading ? 'Suche …' : `Keine Treffer für „${esc(q)}“.`}</p>`;
+    st.gsActive = 0;
+    markSearchActive();
+  }
+  function markSearchActive() {
+    const items = $$('#gsResults .gs-item');
+    items.forEach((el, i) => el.classList.toggle('active', i === st.gsActive));
+    if (items[st.gsActive]) items[st.gsActive].scrollIntoView({ block: 'nearest' });
+  }
+  async function runSearch() {
+    const q = st.gsQuery.trim();
+    const token = ++st.gsToken;
+    if (q.length < 2) {
+      st.gsResults = null;
+      renderSearchResults();
+      return;
+    }
+    st.gsLoading = true;
+    try {
+      const res = await api.get('/api/search?q=' + encodeURIComponent(q));
+      if (token !== st.gsToken) return; // inzwischen weitergetippt
+      st.gsResults = res.results;
+    } finally {
+      if (token === st.gsToken) st.gsLoading = false;
+    }
+    renderSearchResults();
+  }
+  function openSearch() {
+    st.gsQuery = st.gsQuery || '';
+    openModal(`
+      <h2 class="modal-title">Suchen</h2>
+      <label class="search mt-2">${icon('search')}<input id="gsInput" class="field" type="search" placeholder="${isStaff() ? 'Akten, Mandanten, Rechnungen, Termine …' : 'Akten, Rechnungen, Termine …'}" value="${esc(st.gsQuery)}" autocomplete="off" aria-label="Suchbegriff" autofocus></label>
+      <div id="gsResults" class="gs-results" role="listbox" aria-label="Suchergebnisse"></div>
+      <div class="gs-foot hidden md:flex"><span><kbd>↑</kbd> <kbd>↓</kbd> auswählen</span><span><kbd>Enter</kbd> öffnen</span><span><kbd>Esc</kbd> schließen</span><span><kbd>${KEY_MOD}</kbd> <kbd>K</kbd> Suche öffnen</span></div>`);
+    const input = $('#gsInput');
+    input.focus();
+    input.select();
+    if (st.gsQuery.trim().length >= 2) runSearch().catch(handleError);
+    else renderSearchResults();
+  }
+  async function openSearchResult(type, id) {
+    const list = (st.gsResults && st.gsResults[type]) || [];
+    const x = list.find((r) => r.id === id);
+    if (!x) return;
+    if (type === 'cases') return openCase(id);
+    if (type === 'clients') {
+      // Akten des Mandanten in der Aktenverwaltung
+      st.caseQuery = x.name;
+      st.caseFilter = 'alle';
+      st.caseMine = false;
+      closeModal();
+      return navigate('cases');
+    }
+    if (type === 'invoices') {
+      if (x.caseId) return openCase(x.caseId);
+      closeModal();
+      window.open(`/invoice.html?id=${x.id}`, '_blank', 'noopener');
+      return;
+    }
+    if (type === 'tasks') {
+      if (!st.myTasks.some((t) => t.id === x.id) && !st.tasks.some((t) => t.id === x.id)) st.tasks = [x, ...st.tasks];
+      st.returnCase = null;
+      await Promise.all([load.lawyers(), load.cases()]);
+      return taskModal(x);
+    }
+    if (type === 'events') {
+      st.eventCache.set(x.id, x);
+      return openEvent(x.id);
+    }
+    if (type === 'messages') {
+      st.mailBox = x.box;
+      st.mailSel = x.id;
+      closeModal();
+      await navigate('mail');
+      // gelesen markieren wie beim Anklicken in der Liste
+      const m = st.messages.find((n) => n.id === x.id);
+      if (m && x.box === 'inbox' && !m.isRead) {
+        m.isRead = true;
+        st.unread = Math.max(0, st.unread - 1);
+        api.patch('/api/messages/' + m.id, { isRead: true }).catch(() => {});
+        renderView();
+      }
+    }
   }
 
   /* ---------------------------------------------------------------- Papierkorb (gelöschte Akten, nur Admins) */
@@ -6086,6 +6234,8 @@
       await refreshBehind();
     },
     'case-trash': () => openTrash(),
+    'global-search': () => openSearch(),
+    'gs-open': (el) => openSearchResult(el.dataset.type, Number(el.dataset.id)),
     'trash-restore': async (el) => {
       const r = await api.post(`/api/cases/trash/${el.dataset.id}/restore`);
       toast(`Akte ${el.dataset.number} wiederhergestellt.`);
@@ -7873,6 +8023,28 @@
   });
 
   document.addEventListener('keydown', (e) => {
+    // Strg + K (Mac: ⌘ + K) öffnet die Suche – von überall im Dashboard
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'k') {
+      if (!st.user || document.body.classList.contains('ps-dialog-open')) return;
+      e.preventDefault();
+      if ($('#gsInput')) $('#gsInput').focus();
+      else guard(() => openSearch());
+      return;
+    }
+    // Pfeiltasten und Enter im Suchfenster
+    if (e.target.id === 'gsInput' && ['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) {
+      const items = $$('#gsResults .gs-item');
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (items[st.gsActive]) items[st.gsActive].click();
+        return;
+      }
+      if (!items.length) return;
+      e.preventDefault();
+      st.gsActive = (st.gsActive + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+      markSearchActive();
+      return;
+    }
     if (e.key === 'Escape') {
       if ($('#modal').classList.contains('open')) closeModal();
       else closeSidebar();
@@ -7910,6 +8082,10 @@
     if (t.id === 'caseSearch') {
       st.caseQuery = t.value;
       $('#caseList').innerHTML = caseTable();
+    } else if (t.id === 'gsInput') {
+      st.gsQuery = t.value;
+      clearTimeout(st.gsTimer);
+      st.gsTimer = setTimeout(() => runSearch().catch(handleError), 200);
     } else if (t.id === 'fnInput') {
       clearTimeout(st.fnTimer);
       st.fnTimer = setTimeout(() => checkFivenetInput(t), 300);

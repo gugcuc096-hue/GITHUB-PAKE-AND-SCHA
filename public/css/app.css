@@ -318,6 +318,25 @@ a:hover > .brand-logo { transform: scale(1.04); }
 
 .app-main { min-width: 0; min-height: 100vh; min-height: 100dvh; }
 .topbar { position: sticky; top: 0; z-index: 40; height: var(--topbar-h); display: flex; align-items: center; gap: 0.6rem; padding: 0 1rem; }
+/* Globale Suche: Knopf in der Kopfzeile (am Handy nur das Symbol) und Suchfenster */
+.topbar-search { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; height: 2.5rem; min-width: 2.5rem; padding: 0 0.7rem; border-radius: 999px; border: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.03); color: var(--text-dim); font-size: 0.85rem; cursor: pointer; transition: border-color 0.15s ease, color 0.15s ease; }
+.topbar-search:hover, .topbar-search:focus-visible { border-color: var(--gold-hairline); color: var(--text-main); }
+.topbar-search .lbl, .topbar-search kbd { display: none; }
+.topbar-search kbd { font: 500 0.68rem 'JetBrains Mono', monospace; padding: 0.1rem 0.35rem; border-radius: 5px; border: 1px solid var(--line); color: var(--text-dim); }
+@media (min-width: 900px) { .topbar-search { padding: 0 0.6rem 0 0.9rem; min-width: 13rem; justify-content: flex-start; } .topbar-search .lbl { display: inline; flex: 1; text-align: left; } .topbar-search kbd { display: inline; } }
+.gs-results { margin-top: 0.75rem; max-height: min(60vh, 34rem); overflow-y: auto; overscroll-behavior: contain; }
+.gs-hint { padding: 1.25rem 0.5rem; text-align: center; color: var(--text-dim); font-size: 0.86rem; }
+.gs-group { margin: 0.6rem 0 0.25rem; padding: 0 0.5rem; font-size: 0.66rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold-500); font-weight: 600; }
+.gs-item { display: flex; align-items: center; gap: 0.75rem; width: 100%; padding: 0.6rem 0.6rem; border: 0; border-radius: 10px; background: none; color: inherit; text-align: left; cursor: pointer; }
+.gs-item > .ico { color: var(--text-dim); flex-shrink: 0; }
+.gs-item .main { display: block; min-width: 0; flex: 1; }
+.gs-item .title { display: block; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gs-item .meta { display: block; font-size: 0.75rem; color: var(--text-dim); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gs-item:hover, .gs-item.active { background: rgba(212, 175, 55, 0.09); }
+.gs-item.active > .ico { color: var(--gold-light); }
+.gs-item mark { background: rgba(212, 175, 55, 0.28); color: inherit; border-radius: 3px; padding: 0 1px; }
+.gs-foot { margin-top: 0.6rem; padding-top: 0.6rem; border-top: 1px solid var(--line); font-size: 0.72rem; color: var(--text-dim); display: flex; gap: 1rem; flex-wrap: wrap; }
+.gs-foot kbd { font: 500 0.66rem 'JetBrains Mono', monospace; padding: 0.05rem 0.3rem; border-radius: 4px; border: 1px solid var(--line); }
 .topbar-title { font-family: 'Cormorant Garamond', serif; font-size: 1.35rem; font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dot-badge {
   position: absolute; top: -5px; right: -5px; min-width: 1.15rem; height: 1.15rem; padding: 0 0.3rem; border-radius: 999px;
