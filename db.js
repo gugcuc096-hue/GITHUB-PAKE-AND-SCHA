@@ -718,6 +718,9 @@ addColumn('invoices', 'coop_name', "TEXT NOT NULL DEFAULT ''");
 addColumn('invoices', 'coop_pct', 'REAL NOT NULL DEFAULT 0');
 addColumn('invoices', 'coop_amount', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('invoices', 'coop_via', "TEXT NOT NULL DEFAULT ''"); // discord | konto | manuell
+// Zahlungserinnerungen (paymentReminders.js): zuletzt erinnert, Anzahl der Erinnerungen
+addColumn('invoices', 'reminded_at', 'TEXT');
+addColumn('invoices', 'reminder_count', 'INTEGER NOT NULL DEFAULT 0');
 
 // NOT NULL entfernen oder ON-DELETE-Regeln ändern geht in SQLite nur über
 // einen Neuaufbau der Tabelle (offizielles 12-Schritte-Verfahren). Vorher

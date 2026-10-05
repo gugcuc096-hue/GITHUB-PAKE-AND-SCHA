@@ -394,6 +394,10 @@ a:hover > .brand-logo { transform: scale(1.04); }
 .list-row.wrap { cursor: default; align-items: flex-start; }
 .list-row.wrap .title, .list-row.wrap .meta { white-space: normal; }
 .list-row.wrap:hover { background: transparent; }
+/* Zahlungserinnerung in der Rechnungsliste (Spalte Datum) */
+.remind-link { display: inline-flex; align-items: center; gap: 0.25rem; margin-top: 0.2rem; padding: 0; border: 0; background: none; color: var(--text-dim); font: inherit; cursor: pointer; }
+.remind-link:hover, .remind-link:focus-visible { color: var(--gold-light); }
+.remind-link .ico-sm { width: 13px; height: 13px; }
 .empty { text-align: center; padding: 2.25rem 1rem; color: var(--text-dim); font-size: 0.9rem; }
 .empty .ico-lg { margin: 0 auto 0.6rem; opacity: 0.45; color: var(--gold-500); }
 .skeleton { height: 14px; border-radius: 8px; background: linear-gradient(90deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.04)); background-size: 200% 100%; animation: shimmer 1.4s infinite; }

@@ -86,6 +86,7 @@
     more: 'M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z',
     printer: 'M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z',
     restore: 'M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3',
+    bell: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9',
     trash: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16',
     edit: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z',
     reply: 'M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6',
@@ -229,6 +230,15 @@
   const isBoard = () => !!st.user && !!st.user.board;
   const badge = (text, color = 'gold') => `<span class="badge badge-${color}">${esc(text)}</span>`;
   const statusBadge = (map, key) => badge(...(map[key] || [key, 'slate']));
+  // Offene Rechnung nach dem Fälligkeitsdatum
+  const overdueText = (i) => `${i.overdueDays} ${i.overdueDays === 1 ? 'Tag' : 'Tage'} überfällig`;
+  // kurz: Tabelle („Überfällig“, Tage als Tooltip und rotes Fälligkeitsdatum), sonst mit Anzahl der Tage
+  const invoiceBadge = (i, short = false) =>
+    i.overdueDays > 0
+      ? short
+        ? `<span class="badge badge-red" title="${esc(overdueText(i))}">Überfällig</span>`
+        : badge(overdueText(i), 'red')
+      : statusBadge(INVOICE_STATUS, i.status);
   const opt = (value, label, selected = false) => `<option value="${esc(value)}" ${selected ? 'selected' : ''}>${esc(label)}</option>`;
 
   /** Auswahlliste der Ränge; ein veralteter Rang bleibt sichtbar, bis ein neuer gewählt wird. */
@@ -2394,7 +2404,7 @@
       ? invoices
           .map(
             (i) => `<div class="list-row wrap"><div class="main"><div class="title"><span class="font-mono text-gold">${esc(i.number)}</span> · ${esc(INVOICE_KIND[i.kind])}</div><div class="meta">${esc(fmtDate(i.createdAt))} · ${esc(i.issuerName)}</div></div>
-            <div class="flex items-center gap-2 shrink-0"><span class="font-mono nowrap">${money(i.total)}</span>${statusBadge(INVOICE_STATUS, i.status)}<a class="icon-btn sm" href="/invoice.html?id=${i.id}" target="_blank" rel="noopener" aria-label="Drucken / PDF">${icon('printer', 'ico-sm')}</a></div></div>`
+            <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end"><span class="font-mono nowrap">${money(i.total)}</span>${invoiceBadge(i)}<a class="icon-btn sm" href="/invoice.html?id=${i.id}" target="_blank" rel="noopener" aria-label="Drucken / PDF">${icon('printer', 'ico-sm')}</a></div></div>`
           )
           .join('')
       : '';
@@ -2812,8 +2822,16 @@
           <td data-label="Empfänger">${esc(i.clientName)}</td>
           <td data-label="Akte">${i.caseNumber ? `<button class="text-gold font-mono text-xs hover:underline" data-action="open-case" data-id="${i.caseId}">${esc(i.caseNumber)}</button>` : '—'}</td>
           <td data-label="Betrag" class="font-mono nowrap" style="text-align:right">${money(i.total)}</td>
-          <td data-label="Status">${statusBadge(INVOICE_STATUS, i.status)}</td>
-          <td data-label="Datum" class="text-xs text-dim nowrap">${esc(fmtDate(i.createdAt))}${i.dueDate && i.status === 'offen' ? `<div>fällig ${esc(fmtDateOnly(i.dueDate))}</div>` : ''}</td>
+          <td data-label="Status">${invoiceBadge(i, true)}</td>
+          <td data-label="Datum" class="text-xs text-dim nowrap"><div>${esc(fmtDate(i.createdAt))}${i.dueDate && i.status === 'offen' ? `<div${i.overdueDays > 0 ? ` class="text-red-300" title="${esc(overdueText(i))}"` : ''}>fällig ${esc(fmtDateOnly(i.dueDate))}</div>` : ''}${
+            staff && i.status === 'offen'
+              ? `<div><button type="button" class="remind-link" data-action="inv-remind" data-id="${i.id}" data-number="${esc(i.number)}" title="${esc(
+                  i.remindedAt
+                    ? `${i.reminderCount === 1 ? '1 Erinnerung' : `${i.reminderCount} Erinnerungen`}, zuletzt ${fmtDate(i.remindedAt)} – klicken, um erneut zu erinnern (Discord-DM und Ticket)`
+                    : 'Zahlungserinnerung an den Mandanten senden (Discord-DM und Ticket)'
+                )}">${icon('bell', 'ico-sm')}<span>${i.remindedAt ? `erinnert ${esc(new Date(i.remindedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }))}` : 'Erinnern'}</span></button></div>`
+              : ''
+          }</div></td>
           <td class="td-actions">
             <a class="btn-outline btn-sm" href="/invoice.html?id=${i.id}" target="_blank" rel="noopener">${icon('printer', 'ico-sm')}<span>PDF / Druck</span></a>
             ${staff && i.status === 'offen' ? `<button class="btn-gold btn-sm" data-action="inv-status" data-id="${i.id}" data-status="bezahlt">Bezahlt</button><button class="btn-ghost btn-sm" data-action="inv-status" data-id="${i.id}" data-status="storniert">Storno</button>` : ''}
@@ -2831,9 +2849,10 @@
     render() {
       const staff = isStaff();
       const f = st.invFilter;
-      const rows = st.invoices.filter((i) => f === 'alle' || i.status === f);
-      const sum = (s) => st.invoices.filter((i) => i.status === s).reduce((a, i) => a + i.total, 0);
-      const count = (s) => st.invoices.filter((i) => s === 'alle' || i.status === s).length;
+      const match = (i, s) => s === 'alle' || (s === 'ueberfaellig' ? i.overdueDays > 0 : i.status === s);
+      const rows = st.invoices.filter((i) => match(i, f));
+      const sum = (s) => st.invoices.filter((i) => match(i, s)).reduce((a, i) => a + i.total, 0);
+      const count = (s) => st.invoices.filter((i) => match(i, s)).length;
       return `
         <div class="page-head">
           <div><h1 class="page-title">${staff ? 'Rechnungen & Honorare' : 'Meine Rechnungen'}</h1>
@@ -2842,9 +2861,10 @@
         </div>
         ${staff ? `<div class="kpi-grid">
           <div class="panel kpi"><div class="kpi-label">${icon('clock', 'ico-sm')}Offene Forderungen</div><div class="kpi-value">${money(sum('offen'))}</div><div class="kpi-sub">${count('offen')} offen</div></div>
+          <div class="panel kpi"><div class="kpi-label">${icon('alert', 'ico-sm')}Überfällig</div><div class="kpi-value">${money(sum('ueberfaellig'))}</div><div class="kpi-sub">${count('ueberfaellig')} überfällig</div></div>
           <div class="panel kpi"><div class="kpi-label">${icon('check', 'ico-sm')}Bezahlt</div><div class="kpi-value">${money(sum('bezahlt'))}</div><div class="kpi-sub">${count('bezahlt')} Dokument(e)</div></div>
         </div>` : ''}
-        <div class="chip-row mb-4">${[['alle', 'Alle'], ['offen', 'Offen'], ['bezahlt', 'Bezahlt'], ['storniert', 'Storniert']]
+        <div class="chip-row mb-4">${[['alle', 'Alle'], ['offen', 'Offen'], ...(count('ueberfaellig') ? [['ueberfaellig', 'Überfällig']] : []), ['bezahlt', 'Bezahlt'], ['storniert', 'Storniert']]
           .map(([k, l]) => `<button class="chip ${f === k ? 'active' : ''}" data-action="inv-filter" data-value="${k}">${l} <span class="chip-count">${count(k)}</span></button>`)
           .join('')}</div>
         <div class="panel p-2 md:p-3">${invoiceTable(rows)}</div>`;
@@ -3679,6 +3699,8 @@
             <div><label class="label">Anschrift (Briefkopf)</label><textarea name="firmAddress" rows="3" maxlength="300" class="field">${esc(s.firmAddress)}</textarea></div>
             <div><label class="label">Zahlungshinweis</label><textarea name="firmPaymentInfo" rows="3" maxlength="300" class="field">${esc(s.firmPaymentInfo)}</textarea></div>
             <div><label class="label">Kontakt</label><input name="firmContact" maxlength="120" class="field" value="${esc(s.firmContact)}"></div>
+            <div><label class="label">Zahlungserinnerung (Tage nach Fälligkeit)</label><input type="number" name="invoiceReminderDays" min="0" max="60" step="1" class="field" value="${esc(s.invoiceReminderDays)}">
+              <p class="form-hint">Offene Rechnungen erinnern den Mandanten so viele Tage nach dem Fälligkeitsdatum einmal automatisch – per Discord-DM und im Ticket der Akte. 0 = aus. Von Hand geht es jederzeit mit „Erinnern“ an der Rechnung.</p></div>
             <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button></div>
           </form>
         </section>
@@ -6231,6 +6253,12 @@
       toast({ bezahlt: 'Als bezahlt markiert.', storniert: 'Dokument storniert.', offen: 'Wieder als offen markiert.' }[el.dataset.status]);
       await refreshBehind();
     },
+    'inv-remind': async (el) => {
+      const r = await api.post(`/api/invoices/${el.dataset.id}/remind`);
+      if (r.sent.length) toast(`Zahlungserinnerung zu ${el.dataset.number} gesendet (${r.sent.join(' und ')}).`);
+      else toast('Erinnerung vermerkt – der Mandant ist über Discord nicht erreichbar (kein verknüpftes Discord, kein Ticket). Bitte direkt ansprechen.', 'error');
+      await refreshBehind();
+    },
     'inv-delete': async (el) => {
       if (!(await askDelete(`Dokument ${el.dataset.number} löschen?`, 'Stornieren ist meist die bessere Wahl – dann bleibt das Dokument nachvollziehbar.', 'Endgültig löschen'))) return;
       await api.del('/api/invoices/' + el.dataset.id);
@@ -7790,7 +7818,12 @@
     },
     'settings-firm': async (f) => {
       const fd = new FormData(f);
-      const res = await api.patch('/api/admin/settings', { firmAddress: val(fd, 'firmAddress'), firmPaymentInfo: val(fd, 'firmPaymentInfo'), firmContact: val(fd, 'firmContact') });
+      const res = await api.patch('/api/admin/settings', {
+        firmAddress: val(fd, 'firmAddress'),
+        firmPaymentInfo: val(fd, 'firmPaymentInfo'),
+        firmContact: val(fd, 'firmContact'),
+        invoiceReminderDays: Number(val(fd, 'invoiceReminderDays') || 0),
+      });
       st.settings = res.settings;
       toast('Rechnungsdaten gespeichert.');
     },

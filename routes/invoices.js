@@ -245,6 +245,18 @@ router.patch(
   })
 );
 
+/** Zahlungserinnerung von Hand senden (Discord-DM an den Mandanten und ins Ticket der Akte). */
+router.post(
+  '/:id/remind',
+  requireStaff,
+  wrap(async (req, res) => {
+    const id = idParam(req);
+    if (!id) return res.status(404).json({ error: 'Dokument nicht gefunden.' });
+    const { sent } = await require('../paymentReminders').sendReminder(id, req.user);
+    res.json({ sent, invoice: invoiceRow(db.prepare(`${INVOICE_SELECT} WHERE i.id = ?`).get(id)) });
+  })
+);
+
 router.delete(
   '/:id',
   requireAdmin,

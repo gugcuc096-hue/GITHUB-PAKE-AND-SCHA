@@ -24,6 +24,7 @@ const APPLICATION_STATUS = {
 
 // Deutsche Feldnamen für Validierungsfehler
 const FIELD_LABELS = {
+  invoiceReminderDays: 'Zahlungserinnerung (Tage nach Fälligkeit, 0–60)',
   intervalMinutes: 'Abstand (mindestens 5 Minuten, höchstens 30 Tage)',
   everyMessages: 'Anzahl Nachrichten (1–1000)',
   channelId: 'Kanal',

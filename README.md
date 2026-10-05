@@ -15,7 +15,7 @@ Premium-Webanwendung für die GTA-RP-Kanzlei **Pake & Scha Legal Consulting**: �
 | **Kalender & Fristen** | Gerichtstermine, Fristen, Mandantengespräche, interne Termine · Monatsansicht · Live-Countdown · Terminanfragen von Mandanten bestätigen · Discord-Erinnerung 24 h vor Frist/Gerichtstermin |
 | **Kanzlei-Post** | Posteingang/Gesendet, Antworten, Aktenbezug, „wichtig“-Markierung, Rundschreiben ans ganze Team, Ungelesen-Zähler |
 | **Pinnwand** | Team-Notizen mit Farben, Anheften (erscheint in der Übersicht) |
-| **Rechnungen & Honorare** | Generator: Leistungen aus der Honorarordnung **einfach anhaken** (mehrere auf einmal, Menge je Leistung, Suche) – sie stehen sofort als Positionen in der Rechnung; dazu freie Positionen, Rabatt/Zuschlag, Rechnung **oder** Honorarvereinbarung, Druck-/PDF-Ansicht, Status offen/bezahlt/storniert |
+| **Rechnungen & Honorare** | Generator: Leistungen aus der Honorarordnung **einfach anhaken** (mehrere auf einmal, Menge je Leistung, Suche) – sie stehen sofort als Positionen in der Rechnung; dazu freie Positionen, Rabatt/Zuschlag, Rechnung **oder** Honorarvereinbarung, Druck-/PDF-Ansicht, Status offen/bezahlt/storniert · **Zahlungserinnerungen:** überfällige Rechnungen sind rot markiert („Überfällig“, Filter und Summe oben), der Mandant wird X Tage nach Fälligkeit einmal automatisch per Discord-DM und im Ticket erinnert, „Erinnern“ geht jederzeit von Hand (siehe [Zahlungserinnerungen](#zahlungserinnerungen)) |
 | **Team-Verwaltung** (Admin) | Mitglieder hinzufügen, umbenennen, Rang/Beschreibung ändern, sortieren, ausblenden, löschen – sofort live auf der Website · optional mit Login-Konto (Einmal-Passwort) |
 | **Benutzer** (Admin) | Rollen, Ränge, Sperren, Löschen, **Passwort-Reset per Klick** |
 | **Login-E-Mail @pake-scha.ls** | Alle Konten enden auf **@pake-scha.ls** – bei Registrierung, „Konto anlegen“, Team-Konto und Einstellung wird nur der Teil vor dem @ gewählt (Vorschlag aus dem Namen) · bestehende Konten wurden automatisch umgestellt (`john@mail.ls` → `john@pake-scha.ls`, bei Doppelungen `john2@…`), **Passwort unverändert** · Login mit neuer Adresse, nur dem Teil vor dem @ (`john`) **oder der alten Adresse** · einmaliger Hinweis im Dashboard mit der neuen Adresse · unter *Benutzer* steht „vorher: …“ (siehe [Login-E-Mail](#login-e-mail-pake-schals)) |
@@ -114,6 +114,7 @@ Jede Störung wird **einmal** gemeldet (auch über Neustarts hinweg), nicht wied
 | Termine/Fristen der Akte, die der Mandant sieht | Neu, Terminanfrage, bestätigt, abgesagt, verlegt, erledigt, Erinnerung 24 h vorher |
 | Mandatsvertrag | erstellt, vom Anwalt / Mandanten / vollständig unterschrieben |
 | Rechnung / Honorarvereinbarung zur Akte | Nummer, Betrag, Fälligkeit |
+| Zahlungserinnerung | Rechnung, Betrag, seit wann überfällig, Zahlungshinweis – der Mandant wird erwähnt |
 | Akte geschlossen / wieder geöffnet | Hinweis, Kanal wandert ins Archiv (Mandant nur noch lesend) bzw. zurück |
 | Akte gelöscht | Hinweis, Kanal ins Archiv (Verlauf bleibt) |
 | Akte aus dem Papierkorb wiederhergestellt | Hinweis, Kanal zurück aus dem Archiv, Mandant darf wieder schreiben |
@@ -232,6 +233,13 @@ Website und Dashboard lassen sich als **App installieren** – ohne App-Store, d
   - **Bilder-Archiv (`.tar.gz`)** wird sofort ergänzt: nur Bilder (geprüft anhand der Dateisignatur) in die drei bekannten Ordner, vorhandene Dateien bleiben unverändert; Links, fremde Pfade und andere Dateien werden übersprungen. Auch mit `tar -czf bilder.tar.gz uploads` (im Ordner der Datenbank) gebaute Archive funktionieren.
 - **Wiederherstellen per Shell:** Sicherung als `restore.db` neben die Datenbank legen und den Dienst neu starten – z. B. in der Render-Shell `cp /var/data/backups/pake-scha-2026-10-05.db /var/data/restore.db`, danach *Manual Deploy → Restart service*. Bilder: `tar -xzf pake-scha-bilder-….tar.gz -C /var/data`.
 - Beim Start wird `restore.db` eingespielt; die bisherige Datenbank bleibt als `pake-scha.db.before-restore-<Zeit>` liegen. Eine Datei, die keine SQLite-Datenbank ist, wird nicht eingespielt (`restore.db.ungueltig`). Nach dem Einspielen müssen sich alle neu anmelden.
+
+## Zahlungserinnerungen
+
+- Offene Rechnungen und Honorarvereinbarungen mit Fälligkeitsdatum gelten ab dem Tag danach als **überfällig**: roter Status „Überfällig“ (Anzahl der Tage beim Darüberfahren), rotes Fälligkeitsdatum, eigener Filter „Überfällig“ und die Summe „Überfällig“ oben in *Rechnungen*. In der Akte steht „X Tage überfällig“, Mandanten sehen die Markierung ebenfalls.
+- **Automatisch:** X Tage nach der Fälligkeit (Einstellungen → Allgemein → Rechnungsdaten der Kanzlei → *Zahlungserinnerung*, Standard 3 Tage, 0 = aus) bekommt der Mandant **einmal** eine Erinnerung – per Discord-DM (verknüpftes Discord) und im Ticket der Akte (mit Erwähnung), inklusive Betrag, Fälligkeit und Zahlungshinweis. Rechnungen, die beim Einschalten schon länger überfällig waren, werden nicht automatisch nachträglich erinnert.
+- **Von Hand:** in der Spalte *Datum* auf **„Erinnern“** (danach „erinnert TT.MM.“, erneut klickbar; höchstens alle 10 Minuten je Rechnung). Ist der Mandant über Discord nicht erreichbar (kein verknüpftes Discord, Rechnung ohne Akte/Ticket), sagt das Dashboard Bescheid – dann bitte direkt ansprechen.
+- Jede Erinnerung steht im Protokoll und als interner Vermerk im Aktenverlauf.
 
 ## Papierkorb für Akten
 
@@ -387,7 +395,7 @@ Es gibt genau sechs Ränge (Benutzer, Team-Profile und Einstellung von Bewerbern
 | Interne Notizen | – | ja | ja |
 | Kalender | eigene Termine anfragen/absagen | alles | alles |
 | Kanzlei-Post | an die Kanzlei | an alle + Rundschreiben | an alle + Rundschreiben |
-| Rechnungen | eigene ansehen/drucken | erstellen, Status | erstellen, Status, löschen |
+| Rechnungen | eigene ansehen/drucken, „überfällig“ sehen | erstellen, Status, Zahlungserinnerung senden | erstellen, Status, Zahlungserinnerung, Erinnerungs-Tage einstellen, löschen |
 | Kooperationen (Rabatte) | eigene Vorteile im Profil | in Rechnungen anwenden | anlegen, Rollen, Konten zuordnen (Partner-Rang ebenso) |
 | VIP & Lifetime | anfragen (Startseite/Portal), eigene Mitgliedschaft im Profil | in Rechnungen anwenden, Badge sehen | Stufen/Preise/Rabatte, vergeben, verlängern, beenden (Partner-Rang ebenso) |
 | Namensänderung | beantragen | beantragen | eigenen Namen direkt ändern, Namen von Mandanten direkt korrigieren; Anträge anderer genehmigen/ablehnen (Partner-Rang ebenso) |
@@ -422,6 +430,7 @@ db.js            SQLite-Schema, Migrationen, Helfer, Wiederherstellen aus restor
 backup.js        Tägliche Datensicherung (backups/), Aufbewahrung, Download für das Board
 mediaBackup.js   Bilder als .tar.gz sichern, Sicherungen hochladen und einspielen (restore.db, Bilder-Archiv)
 systemAlerts.js  Systemwarnungen ans Board (Bot offline, Sicherung, Speicher, Absturz), einmal je Störung mit Entwarnung
+paymentReminders.js  Zahlungserinnerungen: überfällige Rechnungen einmal automatisch, „Erinnern“ von Hand (Discord-DM + Ticket)
 trash.js         Papierkorb für Akten: Momentaufnahme beim Löschen, Wiederherstellen, endgültig löschen nach 30 Tagen
 scripts/         build-css.js (Tailwind fest bauen: npm run build:css), seed-admin.js
 auth.js          Sessions, Passwörter, Rollen-Middleware

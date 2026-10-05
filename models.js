@@ -370,6 +370,18 @@ const INVOICE_SELECT = `
   FROM invoices i
   LEFT JOIN cases c ON c.id = i.case_id`;
 
+/** Heutiges Datum (JJJJ-MM-TT) in deutscher Zeit – Fälligkeiten sind reine Kalendertage. */
+function berlinToday() {
+  return new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });
+}
+
+/** Tage seit Fälligkeit (0 = nicht überfällig bzw. kein Fälligkeitsdatum). */
+function overdueDays(dueDate) {
+  if (!dueDate || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return 0;
+  const diff = Math.round((Date.parse(`${berlinToday()}T00:00:00Z`) - Date.parse(`${dueDate}T00:00:00Z`)) / 864e5);
+  return diff > 0 ? diff : 0;
+}
+
 function invoiceRow(i) {
   let items = [];
   try {
@@ -406,6 +418,9 @@ function invoiceRow(i) {
     issuerRank: i.issuer_rank,
     createdAt: i.created_at,
     paidAt: i.paid_at,
+    overdueDays: i.status === 'offen' ? overdueDays(i.due_date) : 0,
+    remindedAt: i.reminded_at || null,
+    reminderCount: i.reminder_count || 0,
   };
 }
 
@@ -562,6 +577,8 @@ function onDutyMembers() {
 
 module.exports = {
   logActivity,
+  berlinToday,
+  overdueDays,
   TEAM_SELECT,
   attachmentRow,
   positionRow,

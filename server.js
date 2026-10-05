@@ -161,6 +161,8 @@ const reminderTimer = setInterval(() => {
     dutyRoutes.closeStaleSessions();
     // VIP: abgelaufene Mitgliedschaften beenden, Erinnerung vor Ablauf
     require('./memberships').sweep().catch((err) => console.warn('VIP-Ablauf fehlgeschlagen:', err.message));
+    // Zahlungserinnerung für überfällige Rechnungen (einmal je Rechnung)
+    require('./paymentReminders').sweep().catch((err) => console.warn('Zahlungserinnerungen fehlgeschlagen:', err.message));
   } catch (err) {
     console.warn('Hintergrundaufgabe fehlgeschlagen:', err.message);
   }
