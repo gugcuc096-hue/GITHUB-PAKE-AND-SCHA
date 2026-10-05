@@ -642,6 +642,8 @@ db.exec(`
     decided_at      TEXT
   );
 `);
+// Namensänderung ohne Antrag (Board of Partners: eigener Name oder Korrektur bei Mandanten)
+addColumn('name_requests', 'direct', 'INTEGER NOT NULL DEFAULT 0');
 // Rechnung: angewandte Mitgliedschaft (VIP/Perma) und Rechnungsempfänger-Konto (z. B. Rechnung für die Mitgliedschaft selbst)
 addColumn('invoices', 'membership_id', 'INTEGER REFERENCES memberships(id) ON DELETE SET NULL');
 addColumn('invoices', 'member_name', "TEXT NOT NULL DEFAULT ''");

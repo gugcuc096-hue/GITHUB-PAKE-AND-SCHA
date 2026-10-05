@@ -2335,7 +2335,7 @@
             <div><label class="label">Dringlichkeit (Angabe Mandant)</label><select name="urgency" class="field">${Object.entries(URGENCY).map(([k, [l]]) => opt(k, l, c.urgency === k)).join('')}</select></div>
             <div><label class="label">Verfahrensstand</label><select name="step" class="field">${STEPS.map((s, i) => opt(i, s, c.step === i)).join('')}</select></div>
             ${staff ? `<div><label class="label">Priorität (nur intern)</label><select name="priority" class="field">${Object.entries(PRIORITY).map(([k, [l]]) => opt(k, l, Number(k) === (c.priority || 2))).join('')}</select></div>` : ''}
-            ${c.hasClientAccount && canLinkClient(c) ? `<div class="span-2 flex flex-wrap items-center justify-between gap-2 text-sm"><div><span class="text-xs uppercase tracking-widest text-dim mr-1">Mandanten-Konto</span> <strong>${esc(c.clientName)}</strong>${c.clientEmail ? ` <span class="text-dim">· ${esc(c.clientEmail)}</span>` : ''}</div><div class="flex flex-wrap gap-2"><button type="button" class="btn-outline btn-sm" data-action="case-client-search" data-id="${c.id}">Anderes Konto</button><button type="button" class="btn-ghost btn-sm" data-action="case-unlink-client" data-id="${c.id}">Verknüpfung lösen</button></div></div>` : ''}
+            ${c.hasClientAccount && canLinkClient(c) ? `<div class="span-2 flex flex-wrap items-center justify-between gap-2 text-sm"><div><span class="text-xs uppercase tracking-widest text-dim mr-1">Mandanten-Konto</span> <strong>${esc(c.clientName)}</strong>${c.clientEmail ? ` <span class="text-dim">· ${esc(c.clientEmail)}</span>` : ''}</div><div class="flex flex-wrap gap-2">${isBoard() && c.clientId ? `<button type="button" class="btn-outline btn-sm" data-action="name-direct" data-user-id="${c.clientId}" data-name="${esc(c.clientName)}" data-email="${esc(c.clientEmail || '')}" data-return-case="${c.id}">Name korrigieren</button>` : ''}<button type="button" class="btn-outline btn-sm" data-action="case-client-search" data-id="${c.id}">Anderes Konto</button><button type="button" class="btn-ghost btn-sm" data-action="case-unlink-client" data-id="${c.id}">Verknüpfung lösen</button></div></div>` : ''}
             ${!c.hasClientAccount ? `<div><label class="label">Mandant</label><input name="clientName" class="field" maxlength="80" value="${esc(c.clientName === '—' ? '' : c.clientName)}"></div>` : ''}
             <div><label class="label">Telefon Mandant</label><input name="clientPhone" class="field" maxlength="40" value="${esc(c.clientPhone || '')}"></div>
             <div><label class="label">Gegenpartei</label><input name="opponent" class="field" maxlength="120" value="${esc(c.opponent)}"></div>
@@ -4574,15 +4574,34 @@
     },
   };
 
-  /** Profil: Namensänderung beim Board of Partners beantragen (Status des letzten Antrags). */
+  /** Profil: Namensänderung beim Board of Partners beantragen (Status des letzten Antrags). Das Board ändert direkt. */
   function namePanel(u) {
     const reqs = st.myNameRequests || [];
     const open = reqs.find((r) => r.status === 'offen');
     const last = reqs.find((r) => r.status !== 'zurueckgezogen');
+    const lastInfo =
+      last && last.status !== 'offen'
+        ? last.direct
+          ? `<p class="text-sm mb-3">${badge('Geändert', 'emerald')} „${esc(last.newName)}“ – ${last.decidedById && last.decidedById !== u.id ? `vom Board of Partners angepasst (${esc(last.decidedBy)})` : 'selbst direkt geändert'} · ${esc(fmtDate(last.decidedAt))}${last.reason ? `<span class="block text-xs text-dim mt-1">Grund: ${esc(last.reason)}</span>` : ''}</p>`
+          : `<p class="text-sm mb-3">${last.status === 'genehmigt' ? badge('Genehmigt', 'emerald') : badge('Abgelehnt', 'red')} Letzter Antrag „${esc(last.newName)}“${last.decidedBy ? ` – entschieden von ${esc(last.decidedBy)}` : ''}${last.decisionNote ? `<span class="block text-xs text-dim mt-1">Hinweis: ${esc(last.decisionNote)}</span>` : ''}</p>`
+        : '';
+    // Board of Partners: eigener Name ohne Antrag
+    if (isBoard()) {
+      return `<section class="panel panel-pad">
+        <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('edit')} Name ändern</h2></div>
+        <p class="text-sm text-muted mb-4">Ihr Name lautet <strong class="text-white">${esc(u.displayName)}</strong>. Als Mitglied des Board of Partners ändern Sie ihn direkt – ohne Antrag. Die Änderung gilt sofort überall (Konto, Akten, Team-Profil) und steht im Protokoll.</p>
+        ${open ? `<div class="banner banner-amber items-center justify-between flex-wrap"><div><strong>Älterer Antrag offen:</strong> ${esc(open.oldName)} → <strong>${esc(open.newName)}</strong></div><button class="btn-ghost btn-sm" data-action="name-withdraw" data-id="${open.id}">Zurückziehen</button></div>` : ''}
+        ${lastInfo}
+        <form data-form="name-direct" data-user-id="${u.id}" data-self="1" class="form-grid">
+          <div><label class="label">Neuer Name</label><input name="newName" class="field" required minlength="2" maxlength="80" value="${esc(u.displayName)}" placeholder="Vor- und Nachname (im Spiel)"></div>
+          <div><label class="label">Grund <span class="text-dim font-normal normal-case tracking-normal">(optional)</span></label><input name="reason" class="field" maxlength="500" placeholder="z. B. Tippfehler, neuer Charaktername"></div>
+          <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('check', 'ico-sm')}<span>Name ändern</span></button></div>
+        </form></section>`;
+    }
     const state = open
       ? `<div class="banner banner-amber is-stack mb-0"><div class="flex flex-wrap items-center justify-between gap-2"><div><strong>Antrag offen:</strong> ${esc(open.oldName)} → <strong>${esc(open.newName)}</strong><div class="text-xs text-dim">gestellt ${esc(fmtDate(open.createdAt))} · das Board of Partners entscheidet</div></div>
           <button class="btn-ghost btn-sm" data-action="name-withdraw" data-id="${open.id}">Zurückziehen</button></div></div>`
-      : `${last && last.status !== 'offen' ? `<p class="text-sm mb-3">${last.status === 'genehmigt' ? badge('Genehmigt', 'emerald') : badge('Abgelehnt', 'red')} Letzter Antrag „${esc(last.newName)}“${last.decidedBy ? ` – entschieden von ${esc(last.decidedBy)}` : ''}${last.decisionNote ? `<span class="block text-xs text-dim mt-1">Hinweis: ${esc(last.decisionNote)}</span>` : ''}</p>` : ''}
+      : `${lastInfo}
          <form data-form="name-request" class="form-grid">
            <div><label class="label">Neuer Name</label><input name="newName" class="field" required minlength="2" maxlength="80" placeholder="Vor- und Nachname (im Spiel)"></div>
            <div><label class="label">Begründung <span class="text-dim font-normal normal-case tracking-normal">(optional)</span></label><input name="reason" class="field" maxlength="500" placeholder="z. B. Heirat, Tippfehler, neuer Charaktername"></div>
@@ -4592,6 +4611,18 @@
       <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('edit')} Name ändern</h2></div>
       <p class="text-sm text-muted mb-4">Ihr Name lautet <strong class="text-white">${esc(u.displayName)}</strong>. Eine Änderung beantragen Sie hier – das Board of Partners prüft und bestätigt sie.</p>
       ${state}</section>`;
+  }
+
+  /** Board of Partners: Namen eines Mandanten (oder den eigenen) direkt ändern – ohne Antrag. */
+  function nameDirectModal({ userId, name, email, returnCase }) {
+    openModal(`
+      <h2 class="modal-title">Name korrigieren</h2>
+      <p class="modal-sub">Mandanten-Konto <strong>${esc(name)}</strong>${email ? ` · ${esc(email)}` : ''}. Der neue Name gilt sofort überall (Konto und Akten); der Mandant bekommt eine Nachricht per Discord (falls verknüpft). Die Änderung steht im Protokoll.</p>
+      <form data-form="name-direct" data-user-id="${Number(userId)}" ${returnCase ? `data-return-case="${Number(returnCase)}"` : ''} class="form-grid">
+        <div><label class="label" for="ndName">Neuer Name</label><input id="ndName" name="newName" class="field" required minlength="2" maxlength="80" value="${esc(name)}" autofocus></div>
+        <div><label class="label" for="ndReason">Grund <span class="text-dim font-normal normal-case tracking-normal">(optional)</span></label><input id="ndReason" name="reason" class="field" maxlength="500" placeholder="z. B. Groß-/Kleinschreibung"></div>
+        <div class="form-actions">${returnCase ? `<button type="button" class="btn-ghost btn-md" data-action="back-to-case">Abbrechen</button>` : '<button type="button" class="btn-ghost btn-md" data-action="close-modal">Abbrechen</button>'}<button type="submit" class="btn-gold btn-md">${icon('check', 'ico-sm')}<span>Speichern</span></button></div>
+      </form>`);
   }
 
   /** Profil des Mandanten: eigene VIP-/Lifetime-Mitgliedschaft. */
@@ -4817,10 +4848,10 @@
       const d = st.names;
       const rows = d.requests;
       const item = (r) => `<div class="list-row wrap">
-        <div class="main"><div class="title flex flex-wrap items-center gap-2">${esc(r.oldName)} → <strong class="text-gold">${esc(r.newName)}</strong> ${r.status === 'offen' ? badge('offen', 'amber') : r.status === 'genehmigt' ? badge('genehmigt', 'emerald') : badge('abgelehnt', 'red')}</div>
-          <div class="meta">${esc(r.role || '')}${r.rank ? ` · ${esc(r.rank)}` : ''} · ${esc(r.email || '')} · beantragt ${esc(fmtDate(r.createdAt))}${r.status === 'offen' && r.currentName !== r.oldName ? ` · aktueller Name: ${esc(r.currentName)}` : ''}</div>
-          ${r.reason ? `<div class="meta">Begründung: ${esc(r.reason)}</div>` : ''}
-          ${r.status !== 'offen' ? `<div class="meta">Entschieden von ${esc(r.decidedBy || '—')} · ${esc(fmtDate(r.decidedAt))}${r.decisionNote ? ` · ${esc(r.decisionNote)}` : ''}</div>` : ''}</div>
+        <div class="main"><div class="title flex flex-wrap items-center gap-2">${esc(r.oldName)} → <strong class="text-gold">${esc(r.newName)}</strong> ${r.direct ? badge('direkt geändert', 'sky') : r.status === 'offen' ? badge('offen', 'amber') : r.status === 'genehmigt' ? badge('genehmigt', 'emerald') : badge('abgelehnt', 'red')}</div>
+          <div class="meta">${esc(r.role || '')}${r.rank ? ` · ${esc(r.rank)}` : ''} · ${esc(r.email || '')} · ${r.direct ? 'ohne Antrag' : `beantragt ${esc(fmtDate(r.createdAt))}`}${r.status === 'offen' && r.currentName !== r.oldName ? ` · aktueller Name: ${esc(r.currentName)}` : ''}</div>
+          ${r.reason ? `<div class="meta">${r.direct ? 'Grund' : 'Begründung'}: ${esc(r.reason)}</div>` : ''}
+          ${r.status !== 'offen' ? `<div class="meta">${r.direct ? 'Geändert' : 'Entschieden'} von ${esc(r.decidedBy || '—')} · ${esc(fmtDate(r.decidedAt))}${r.decisionNote && !r.direct ? ` · ${esc(r.decisionNote)}` : ''}</div>` : ''}</div>
         ${r.status === 'offen'
           ? r.userId === d.me
             ? '<span class="text-xs text-dim shrink-0">Ihr eigener Antrag – entscheidet ein anderes Board-Mitglied</span>'
@@ -4829,9 +4860,35 @@
       return `
         <div class="page-head"><div><h1 class="page-title">Namensänderungen</h1><p class="page-sub">Anträge von Mandanten und Mitarbeitern. Genehmigt → der neue Name gilt sofort überall (Konto, Akten, Team-Profil der Website).</p></div></div>
         <div class="chip-row mb-4"><button class="chip ${st.namesAll ? '' : 'active'}" data-action="names-filter" data-value="offen">Offen <span class="chip-count">${d.open}</span></button><button class="chip ${st.namesAll ? 'active' : ''}" data-action="names-filter" data-value="alle">Alle</button></div>
-        <div class="panel p-2 md:p-3">${rows.length ? rows.map(item).join('') : empty(st.namesAll ? 'Noch keine Anträge.' : 'Keine offenen Anträge.', 'edit')}</div>`;
+        <div class="panel p-2 md:p-3">${rows.length ? rows.map(item).join('') : empty(st.namesAll ? 'Noch keine Anträge.' : 'Keine offenen Anträge.', 'edit')}</div>
+        <section class="panel panel-pad mt-4 lg:mt-5">
+          <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('edit')} Name eines Mandanten korrigieren</h2></div>
+          <p class="text-sm text-muted mb-3">Ohne Antrag – z. B. bei Groß-/Kleinschreibung oder Tippfehlern. Der Mandant wird per Discord benachrichtigt (falls verknüpft), die Änderung steht im Protokoll. Mitarbeiter ändern ihren Namen per Antrag im Profil; Ihren eigenen Namen ändern Sie direkt unter „Mein Profil“.</p>
+          <input id="nameAccSearch" class="field" type="search" maxlength="80" placeholder="Mandant suchen (Name oder E-Mail) …" value="${esc(st.nameAccQ || '')}" autocomplete="off" aria-label="Mandanten-Konto suchen">
+          <div id="nameAccList" class="mt-3">${nameAccList()}</div>
+        </section>`;
     },
   };
+
+  /** Suchergebnis „Name eines Mandanten korrigieren“. */
+  function nameAccList() {
+    const q = (st.nameAccQ || '').trim();
+    if (q.length < 2) return '<p class="text-sm text-dim">Mindestens zwei Zeichen eingeben.</p>';
+    const list = st.nameAccounts || [];
+    if (!list.length) return '<p class="text-sm text-dim">Kein Mandanten-Konto gefunden.</p>';
+    return list
+      .map(
+        (a) => `<div class="list-row wrap"><div class="main"><div class="title">${esc(a.name)}</div><div class="meta">${esc(a.email)}${a.createdAt ? ` · registriert ${esc(fmtDateOnly(String(a.createdAt).slice(0, 10)))}` : ''}</div></div>
+          <button type="button" class="btn-outline btn-sm shrink-0" data-action="name-direct" data-user-id="${a.id}" data-name="${esc(a.name)}" data-email="${esc(a.email)}">${icon('edit', 'ico-sm')}<span>Name korrigieren</span></button></div>`
+      )
+      .join('');
+  }
+  async function searchNameAccounts(input) {
+    const q = input.value.trim();
+    st.nameAccQ = input.value;
+    st.nameAccounts = q.length >= 2 ? (await api.get('/api/name-requests/accounts?q=' + encodeURIComponent(q))).accounts : [];
+    if (input.isConnected && input.value.trim() === q) $('#nameAccList').innerHTML = nameAccList();
+  }
 
   /* ---------------------------------------------------------------- Dienstzeiten / Stempeluhr */
   function weekRange() {
@@ -6314,6 +6371,10 @@
       toast('Antrag zurückgezogen.');
       await refreshBehind();
     },
+    'name-direct': (el) => {
+      st.returnCase = el.dataset.returnCase ? Number(el.dataset.returnCase) : null;
+      nameDirectModal({ userId: el.dataset.userId, name: el.dataset.name, email: el.dataset.email, returnCase: st.returnCase });
+    },
     'names-filter': async (el) => {
       st.namesAll = el.dataset.value === 'alle';
       await refreshBehind();
@@ -7211,6 +7272,23 @@
       closeModal();
       await refreshBehind();
     },
+    'name-direct': async (f) => {
+      const fd = new FormData(f);
+      const res = await api.post('/api/name-requests/direct', { userId: Number(f.dataset.userId), newName: val(fd, 'newName'), reason: val(fd, 'reason') || undefined });
+      toast(`Name geändert – ${res.user.displayName}.`);
+      st.lawyers = [];
+      st.contacts = null;
+      if (f.dataset.self) {
+        st.user = (await api.get('/api/auth/me')).user;
+        renderUser();
+        await refreshBehind();
+        return;
+      }
+      // Suchergebnis in „Namensänderungen“ gleich mit dem neuen Namen zeigen
+      const acc = (st.nameAccounts || []).find((a) => a.id === res.user.id);
+      if (acc) acc.name = res.user.displayName;
+      await returnOrClose();
+    },
     'name-request': async (f) => {
       const fd = new FormData(f);
       await api.post('/api/name-requests', { newName: val(fd, 'newName'), reason: val(fd, 'reason') || undefined });
@@ -7650,6 +7728,9 @@
     } else if (t.id === 'coopAccSearch') {
       clearTimeout(st.coopAccTimer);
       st.coopAccTimer = setTimeout(() => guard(() => searchCoopAccounts(t)), 250);
+    } else if (t.id === 'nameAccSearch') {
+      clearTimeout(st.nameAccTimer);
+      st.nameAccTimer = setTimeout(() => guard(() => searchNameAccounts(t)), 250);
     } else if (t.id === 'clientAccSearch') {
       clearTimeout(st.clientAccTimer);
       st.clientAccTimer = setTimeout(() => guard(() => searchClientAccounts(t)), 250);

@@ -3,6 +3,8 @@
  * Namensänderung: Jeder Benutzer beantragt im Profil einen neuen Namen, das Board of Partners genehmigt oder
  * lehnt ab. Genehmigt → neuer Name im Konto (und im Team-Profil der Website, falls verknüpft). Niemand entscheidet
  * über seinen eigenen Antrag. Benachrichtigung per Discord-Direktnachricht (falls verknüpft) und Webhook.
+ * Ohne Antrag: Das Board ändert den eigenen Namen und Namen von Mandanten (z. B. Groß-/Kleinschreibung) direkt –
+ * die Änderung steht trotzdem in der Historie, im Protokoll und wird gemeldet. Mitarbeiter-Namen nur per Antrag.
  */
 const express = require('express');
 const { z } = require('zod');
@@ -29,7 +31,9 @@ function row(r) {
     status: r.status,
     statusLabel: STATUS_LABEL[r.status] || r.status,
     decidedBy: r.decided_by_name || null,
+    decidedById: r.decided_by || null,
     decisionNote: r.decision_note || '',
+    direct: !!r.direct, // ohne Antrag direkt durch das Board geändert
     createdAt: r.created_at,
     decidedAt: r.decided_at || null,
     // nur in der Board-Liste
@@ -152,6 +156,84 @@ router.post(
       color: d.approve ? tickets.COLORS.green : tickets.COLORS.red,
     });
     res.json({ request: row({ ...db.prepare('SELECT * FROM name_requests WHERE id = ?').get(r.id), current_name: d.approve ? r.new_name : target.display_name }) });
+  })
+);
+
+/* ---------------------------------------------------------------- Direkt ändern (Board of Partners) */
+/** Mandanten-Konten für die direkte Korrektur suchen (Name oder E-Mail). */
+router.get('/accounts', (req, res) => {
+  if (!isBoard(req.user)) return res.status(403).json({ error: 'Nur für das Board of Partners.' });
+  const q = String(req.query.q || '').trim().slice(0, 80);
+  const like = `%${q.replace(/[%_\\]/g, (m) => '\\' + m)}%`;
+  const rows = db
+    .prepare(
+      `SELECT id, display_name, email, created_at FROM users
+       WHERE role = 'mandant' AND (? = '' OR display_name LIKE ? ESCAPE '\\' OR email LIKE ? ESCAPE '\\')
+       ORDER BY display_name COLLATE NOCASE LIMIT 20`
+    )
+    .all(q, like, like);
+  res.json({ accounts: rows.map((u) => ({ id: u.id, name: u.display_name, email: u.email, createdAt: u.created_at })) });
+});
+
+router.post(
+  '/direct',
+  wrap(async (req, res) => {
+    const me = req.user;
+    if (!isBoard(me)) return res.status(403).json({ error: 'Nur für das Board of Partners.' });
+    const d = parseBody(
+      z.object({ userId: z.number().int().positive(), newName: z.string().trim().min(2).max(80), reason: z.string().trim().max(500).optional() }),
+      req,
+      res
+    );
+    if (!d) return;
+    const target = db.prepare('SELECT * FROM users WHERE id = ?').get(d.userId);
+    if (!target) return res.status(404).json({ error: 'Konto nicht gefunden.' });
+    const self = target.id === me.id;
+    if (!self && target.role !== 'mandant') {
+      return res.status(403).json({ error: 'Namen von Mitarbeitern ändern sich nur per Antrag im Profil der Person.' });
+    }
+    const newName = d.newName.replace(/\s+/g, ' ');
+    if (newName === target.display_name) return res.status(400).json({ error: 'Das ist bereits der aktuelle Name.' });
+    const note = self ? 'Eigener Name – direkt geändert (Board of Partners)' : 'Direkt durch das Board of Partners geändert';
+    tx(() => {
+      db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run(newName, target.id);
+      db.prepare('UPDATE team_members SET name = ? WHERE user_id = ?').run(newName, target.id); // Team-Profil zieht mit
+      const open = db.prepare("SELECT * FROM name_requests WHERE user_id = ? AND status = 'offen'").get(target.id);
+      if (open && open.new_name === newName) {
+        // Genau der beantragte Name → Antrag gilt als genehmigt
+        db.prepare("UPDATE name_requests SET status = 'genehmigt', decided_by = ?, decided_by_name = ?, decision_note = ?, decided_at = datetime('now') WHERE id = ?").run(
+          me.id,
+          me.display_name,
+          note,
+          open.id
+        );
+      } else {
+        if (open && self) db.prepare("UPDATE name_requests SET status = 'zurueckgezogen', decided_at = datetime('now') WHERE id = ?").run(open.id);
+        // Eintrag für die Historie (Profil der Person, Liste „Namensänderungen → Alle“)
+        db.prepare(
+          `INSERT INTO name_requests (user_id, old_name, new_name, reason, status, decided_by, decided_by_name, decision_note, decided_at, direct)
+           VALUES (?, ?, ?, ?, 'genehmigt', ?, ?, ?, datetime('now'), 1)`
+        ).run(target.id, target.display_name, newName, d.reason || '', me.id, me.display_name, note);
+      }
+    });
+    logActivity(me, self ? 'Eigenen Namen geändert' : 'Name geändert', 'user', target.id, `${target.display_name} → ${newName}${d.reason ? ` (${d.reason})` : ''}`);
+    discord.notify('name.requested', {
+      title: self ? '✏️ Name geändert (Board of Partners, eigener Name)' : '✏️ Name eines Mandanten korrigiert',
+      fields: [
+        { name: 'Bisher', value: target.display_name },
+        { name: 'Neu', value: newName },
+        { name: 'Geändert von', value: me.display_name },
+        ...(d.reason ? [{ name: 'Grund', value: d.reason }] : []),
+      ],
+    });
+    if (!self) {
+      dmUser(target.id, {
+        title: '✏️ Ihr Name wurde angepasst',
+        description: `Das Board of Partners hat Ihren Namen im Portal von Pake & Scha auf **${newName}** geändert (vorher ${target.display_name}).${d.reason ? `\n\n**Grund:** ${d.reason}` : ''}`,
+        color: tickets.COLORS.gold,
+      });
+    }
+    res.json({ user: { id: target.id, displayName: newName } });
   })
 );
 
