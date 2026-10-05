@@ -116,21 +116,21 @@
     cases: { label: 'Akten', clientLabel: 'Meine Akten', icon: 'folder' },
     tasks: { label: 'Aufgaben', icon: 'tasks', staff: true },
     calendar: { label: 'Kalender & Fristen', short: 'Kalender', clientLabel: 'Termine', icon: 'calendar' },
-    mail: { label: 'Kanzlei-Post', short: 'Post', icon: 'mail' },
-    concerns: { label: 'Anliegen ans Board', short: 'Anliegen', icon: 'chat' },
-    board: { label: 'Pinnwand', icon: 'pin', staff: true },
     invoices: { label: 'Rechnungen', icon: 'receipt' },
     'vip-angebot': { label: 'VIP & Lifetime', short: 'VIP', icon: 'crown', client: true },
+    mail: { label: 'Kanzlei-Post', short: 'Post', icon: 'mail' },
+    board: { label: 'Pinnwand', icon: 'pin', staff: true },
+    concerns: { label: 'Anliegen ans Board', short: 'Anliegen', icon: 'chat' },
     duty: { label: 'Dienstzeiten', icon: 'clock', staff: true },
     personnel: { label: 'Beförderungen & Einstellungen', short: 'Personal', icon: 'star', staff: true },
     'concerns-board': { label: 'Eingegangene Anliegen', short: 'Anliegen', icon: 'chat', board: true, section: 'Board of Partners' },
-    work: { label: 'Aktenbearbeitung', icon: 'briefcase', board: true, section: 'Board of Partners' },
-    team: { label: 'Team', icon: 'users', admin: true, section: 'Board of Partners' },
     applications: { label: 'Bewerbungen', icon: 'userAdd', board: true, section: 'Board of Partners' },
-    cooperations: { label: 'Kooperationen', icon: 'tag', board: true, section: 'Board of Partners' },
-    vip: { label: 'VIP & Lifetime', short: 'VIP', icon: 'crown', board: true, section: 'Board of Partners' },
     'name-requests': { label: 'Namensänderungen', short: 'Namen', icon: 'edit', board: true, section: 'Board of Partners' },
+    team: { label: 'Team', icon: 'users', admin: true, section: 'Board of Partners' },
     users: { label: 'Benutzer', icon: 'key', admin: true, section: 'Board of Partners' },
+    work: { label: 'Aktenbearbeitung', icon: 'briefcase', board: true, section: 'Board of Partners' },
+    vip: { label: 'VIP & Lifetime', short: 'VIP', icon: 'crown', board: true, section: 'Board of Partners' },
+    cooperations: { label: 'Kooperationen', icon: 'tag', board: true, section: 'Board of Partners' },
     fees: { label: 'Honorarordnung', icon: 'scale', admin: true, section: 'Board of Partners' },
     audit: { label: 'Protokoll', icon: 'list', admin: true, section: 'Board of Partners' },
     settings: { label: 'Einstellungen', icon: 'cog', admin: true, section: 'Board of Partners' },
@@ -885,6 +885,7 @@
           <div class="page-actions"><button class="btn-outline btn-md" data-action="concern-new">${icon('chat', 'ico-sm')}<span>Anliegen ans Board</span></button>${staff ? `<button class="btn-outline btn-md" data-action="new-event">${icon('calendar', 'ico-sm')}<span>Frist / Termin</span></button><button class="btn-gold btn-md" data-action="new-case">${icon('plus')}<span>Neue Akte</span></button>` : ''}</div>
         </div>
         ${dutyStrip()}
+        ${absenceStrip()}
         <div class="kpi-grid">${kpis.join('')}</div>`;
 
       if (!staff) return `${head}<div class="grid-2">${eventsPanel}${recentPanel}</div>`;
@@ -904,8 +905,7 @@
 
       return `${head}
         ${attentionPanel()}
-        ${absenceStrip()}
-        <div class="grid-2">${eventsPanel}${requestsPanel}</div>
+        <div class="grid-2">${requestsPanel}${eventsPanel}</div>
         <div class="grid-2 mt-4 lg:mt-5">${recentPanel}${boardPanel}</div>`;
     },
   };
@@ -2314,9 +2314,9 @@
     if (staff) {
       quick.push(`<button class="btn-outline btn-sm" data-action="new-event" data-case-id="${c.id}" data-return-case="${c.id}">${icon('calendar', 'ico-sm')}<span>Frist / Termin</span></button>`);
       quick.push(`<button class="btn-outline btn-sm" data-action="new-invoice" data-case-id="${c.id}">${icon('receipt', 'ico-sm')}<span>Rechnung</span></button>`);
-      if (!c.processTicket && c.canEdit) quick.push(`<button class="btn-outline btn-sm" data-action="pt-toggle">${icon('plus', 'ico-sm')}<span>Prozessticket (DOJ)</span></button>`);
-      if (!c.hasClientAccount && canLinkClient(c)) quick.push(`<button class="btn-outline btn-sm" data-action="case-client-search" data-id="${c.id}">${icon('user', 'ico-sm')}<span>Mandanten-Konto verknüpfen</span></button>`);
       if (c.clientId) quick.push(`<button class="btn-outline btn-sm" data-action="compose" data-recipient="${c.clientId}" data-case-id="${c.id}" data-return-case="${c.id}">${icon('mail', 'ico-sm')}<span>Mandant anschreiben</span></button>`);
+      if (!c.hasClientAccount && canLinkClient(c)) quick.push(`<button class="btn-outline btn-sm" data-action="case-client-search" data-id="${c.id}">${icon('user', 'ico-sm')}<span>Mandanten-Konto verknüpfen</span></button>`);
+      if (!c.processTicket && c.canEdit) quick.push(`<button class="btn-outline btn-sm" data-action="pt-toggle">${icon('plus', 'ico-sm')}<span>Prozessticket (DOJ)</span></button>`);
       if (c.lawyerId === me) quick.push(`<button class="btn-ghost btn-sm" data-action="release-case" data-id="${c.id}">Akte abgeben</button>`);
       if (c.isCoLawyer) quick.push(`<button class="btn-ghost btn-sm" data-action="leave-case" data-id="${c.id}">Mitarbeit beenden</button>`);
       if (admin) quick.push(`<button class="btn-danger btn-sm" data-action="delete-case" data-id="${c.id}" data-number="${esc(c.caseNumber)}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>`);
@@ -2377,9 +2377,9 @@
           <h2 id="modalTitle" class="font-serif text-2xl md:text-3xl font-semibold leading-tight">${esc(c.title)}</h2></div>
         <div class="flex flex-wrap gap-2">${memberBadge(c.membership)}${statusBadge(CASE_STATUS, c.status)}${caseLevelBadge(c)}</div>
       </div>
+      ${claim}
       ${statusSeg}
       ${track}
-      ${claim}
       ${staff ? caseStats(c, { appointments, attachments, externalDocs, tasks }) : ''}
       <div class="info-grid mb-5">${info}</div>
       ${clientLinkBanner(c, clientSuggestions)}
@@ -2389,13 +2389,13 @@
       ${editForm}
       <div class="section"><h3 class="section-title">Sachverhalt</h3><p class="text-sm whitespace-pre-wrap text-muted">${esc(c.description || '—')}</p></div>
       ${c.publicNote ? `<div class="section"><h3 class="section-title">Statushinweis</h3><div class="banner banner-gold mb-0"><p class="text-sm whitespace-pre-wrap">${esc(c.publicNote)}</p></div></div>` : ''}
-      ${contractsSection(c, contracts)}
-      ${externalSection(c, externalDocs)}
-      ${caseWorkSection(c, work)}
-      ${attachmentsSection(c, attachments)}
       <div class="section" id="secEvents"><h3 class="section-title">Termine & Fristen</h3>${apptList}</div>
       ${staff ? caseTasksSection(c, tasks) : ''}
+      ${contractsSection(c, contracts)}
       ${invoiceList ? `<div class="section"><h3 class="section-title">Rechnungen & Honorare</h3>${invoiceList}</div>` : ''}
+      ${externalSection(c, externalDocs)}
+      ${attachmentsSection(c, attachments)}
+      ${caseWorkSection(c, work)}
       <div class="section" id="secNotes"><h3 class="section-title">Verlauf & Notizen</h3>
         ${noteList}
         <form data-form="add-note" data-id="${c.id}" class="mt-4 space-y-3">
