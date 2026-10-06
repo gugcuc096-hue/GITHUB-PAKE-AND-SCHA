@@ -874,13 +874,26 @@ const actions = {
     if (!p || !t) return;
     const withLogin = $('#dmLogin').checked;
     st.dmLogin = withLogin;
-    const extra = withLogin
-      ? ` Dazu bekommt jeder seinen Website-Zugang: ${p.accounts.existing} vorhandene Konten (Passwort bleibt), ${p.accounts.missing} neue Mandantenkonten mit Einmal-Passwort.`
-      : '';
-    if (!(await ask(`„${t.name}“ geht als Direktnachricht an ${p.count} Mitglied${p.count === 1 ? '' : 'er'} mit der Rolle @${p.role.name} – nacheinander, etwa ${Math.max(1, Math.ceil((p.count * 1.5) / 60))} Minute(n).${extra}`, { title: 'Direktnachrichten senden?', confirmText: 'Senden' }))) return;
+    const byId = new Map(p.members.map((m) => [m.id, m]));
+    const picked = $$('#dmPreview .dm-pick').filter((x) => x.checked).map((x) => byId.get(x.value)).filter(Boolean);
+    if (!picked.length) throw new Error('Bitte mindestens ein Mitglied auswählen.');
+    // Neue Website-Konten: geprüfter Name aus dem Feld
+    const recipients = picked.map((m) => {
+      const input = withLogin && m.account === 'keins' ? $(`#dmPreview .dm-newname[data-id="${m.id}"]`) : null;
+      const name = input ? input.value.trim() : '';
+      if (input && name.length < 2) {
+        input.focus();
+        throw new Error(`Bitte für ${m.name} einen Namen für das Website-Konto eintragen (mindestens 2 Zeichen).`);
+      }
+      return name ? { id: m.id, name } : { id: m.id };
+    });
+    const created = withLogin ? picked.filter((m) => m.account === 'keins').length : 0;
+    const existing = withLogin ? picked.filter((m) => m.account === 'vorhanden').length : 0;
+    const extra = withLogin ? ` Dazu bekommt jeder seinen Website-Zugang: ${existing} vorhandene Konten (Passwort bleibt), ${created} neue Mandantenkonten mit Einmal-Passwort.` : '';
+    if (!(await ask(`„${t.name}“ geht als Direktnachricht an ${picked.length} Mitglied${picked.length === 1 ? '' : 'er'} mit der Rolle @${p.role.name} – nacheinander, etwa ${Math.max(1, Math.ceil((picked.length * 1.5) / 60))} Minute(n).${extra}`, { title: 'Direktnachrichten senden?', confirmText: 'Senden' }))) return;
     el.disabled = true;
     try {
-      const r = await api.post(`/api/bot/messages/${t.id}/dm`, { roleId: p.role.id, withLogin });
+      const r = await api.post(`/api/bot/messages/${t.id}/dm`, { roleId: p.role.id, withLogin, recipients });
       st.dmPreview = null;
       st.dmRuns = r.runs;
       st.dmRunsFor = t.id;

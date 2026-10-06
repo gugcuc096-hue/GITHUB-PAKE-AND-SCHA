@@ -181,7 +181,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
   for (const [label, device] of [['PC', DESKTOP], ['Handy', PHONE]]) {
     it(`Discord-Vorlage am ${label}: gepingte Rolle sichtbar, Versand per DM an eine Rolle`, async () => {
       // Eigener Server mit nachgebauter Discord-Schnittstelle (test/discordStub.js) – es geht nichts nach außen
-      const { GUILD, ROLES } = require('./discordStub');
+      const { GUILD, ROLES, MEMBERS } = require('./discordStub');
       const dsrv = await startServer({ env: { DISCORD_BOT_TOKEN: 'test-token', BOT_DM_GAP_MS: '0', PUBLIC_URL: 'https://kanzlei.example' }, preload: [require.resolve('./discordStub')] });
       try {
         const adm = client(dsrv.base);
@@ -224,14 +224,21 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         assert.match(await page.textContent('#msgUse'), /in Direktnachrichten pingt das niemanden/);
         await page.selectOption('#dmRole', ROLES.burgershot);
         await page.click('[data-action="dm-preview"]');
-        await page.waitForSelector('#dmPreview .dm-name');
+        await page.waitForSelector('#dmPreview .dm-row');
         assert.match(await page.textContent('#dmPreview'), /3 Mitglieder mit @Burgershot/);
-        if (device === PHONE) assert.ok((await page.$eval('#modalBody', (b) => b.scrollWidth - b.clientWidth)) <= 1, 'DM-Reiter passt aufs Handy');
+        // Namensfelder erst mit „Website-Zugang mitschicken“; Name korrigieren, ein Mitglied abwählen
+        assert.equal(await page.isVisible(`.dm-newname[data-id="${MEMBERS.jaywa}"]`), false);
         await page.check('#dmLogin');
+        assert.equal(await page.inputValue(`.dm-newname[data-id="${MEMBERS.jaywa}"]`), 'John Jaywa');
+        await page.fill(`.dm-newname[data-id="${MEMBERS.jaywa}"]`, 'John Doe');
+        await page.uncheck(`.dm-pick[value="${MEMBERS.closed}"]`);
+        assert.equal(await page.textContent('[data-dm-count]'), 'An 2 ausgewählte Mitglieder senden');
+        if (device === PHONE) assert.ok((await page.$eval('#modalBody', (b) => b.scrollWidth - b.clientWidth)) <= 1, 'DM-Reiter passt aufs Handy');
         await page.click('[data-action="dm-send"]');
         await page.click('[data-ps-dialog="ok"]');
         await page.waitForFunction(() => /fertig/.test(document.querySelector('#dmRuns')?.textContent || ''), null, { timeout: 10000 });
-        assert.match(await page.textContent('#dmRuns'), /2 zugestellt · 1 nicht zugestellt/);
+        assert.match(await page.textContent('#dmRuns'), /2\/2 · 2 zugestellt · 2 Konto\/Konten angelegt/);
+        assert.ok((await adm.get('/api/admin/users')).json.users.some((u) => u.displayName === 'John Doe' && u.email === 'john.doe@pake-scha.ls'));
         assert.deepEqual(problems, []);
         await ctx.close();
       } finally {
