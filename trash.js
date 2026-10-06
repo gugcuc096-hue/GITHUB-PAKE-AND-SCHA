@@ -167,9 +167,11 @@ function restore(trashId) {
 
 /** Endgültig löschen (inkl. Bilddateien der Anhänge). */
 function purge(trashId) {
-  const t = db.prepare('SELECT id, files FROM case_trash WHERE id = ?').get(trashId);
+  const t = db.prepare('SELECT id, case_id, files FROM case_trash WHERE id = ?').get(trashId);
   if (!t) return false;
   db.prepare('DELETE FROM case_trash WHERE id = ?').run(t.id);
+  // Google Docs der Verträge und des Aktenauszugs dieser Akte ebenfalls löschen (Drive-Papierkorb)
+  require('./googleDocs').removeForCase(t.case_id);
   for (const f of JSON.parse(t.files || '[]')) {
     // Datei nur löschen, wenn kein (wiederhergestellter) Anhang sie noch nutzt
     if (!db.prepare('SELECT 1 FROM case_attachments WHERE file = ?').get(f)) removeFile('evidence', f);

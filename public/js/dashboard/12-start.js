@@ -322,9 +322,11 @@ setInterval(() => {
 
   const params = new URLSearchParams(location.search);
   const discordState = params.get('discord');
+  const googleState = params.get('google');
   const caseParam = Number(params.get('case'));
-  if (discordState || params.has('case')) history.replaceState(null, '', location.pathname + location.hash);
+  if (discordState || googleState || params.has('case')) history.replaceState(null, '', location.pathname + location.hash);
   if (discordState && DISCORD_MSG[discordState]) toast(...DISCORD_MSG[discordState]);
+  if (googleState && GOOGLE_MSG[googleState]) toast(...GOOGLE_MSG[googleState]);
 
   try {
     await Promise.all([load.unread(), load.appCount(), load.duty(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {})]);

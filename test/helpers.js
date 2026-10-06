@@ -31,7 +31,11 @@ function freePort() {
   });
 }
 
-async function startServer() {
+/**
+ * opts.env: zusätzliche Umgebungsvariablen · opts.preload: Module, die vor dem Server geladen werden
+ * (z. B. test/googleStub.js – nachgebaute Google-Schnittstelle).
+ */
+async function startServer(opts = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pake-scha-test-'));
   const port = await freePort();
   const env = { ...process.env };
@@ -43,8 +47,10 @@ async function startServer() {
     ADMIN_PASSWORD: PASSWORD,
     SEED_SCHA_PASSWORD: PASSWORD,
     SEED_LEX_PASSWORD: PASSWORD,
+    ...(opts.env || {}),
   });
-  const child = spawn(process.execPath, ['server.js'], { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
+  const args = [...(opts.preload || []).flatMap((m) => ['--require', m]), 'server.js'];
+  const child = spawn(process.execPath, args, { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
   let log = '';
   child.stdout.on('data', (d) => (log += d));
   child.stderr.on('data', (d) => (log += d));
@@ -73,25 +79,27 @@ async function startServer() {
   };
 }
 
-/** Kleiner API-Client mit eigener Sitzung (Cookie „sid“). */
+/** Kleiner API-Client mit eigener Sitzung (alle Cookies, z. B. „sid“). */
 function client(base) {
-  let cookie = '';
+  const jar = {};
   async function call(method, url, body, headers = {}) {
+    const raw = Buffer.isBuffer(body);
     const res = await fetch(base + url, {
       method,
       redirect: 'manual',
       headers: {
         Accept: 'application/json',
-        ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-        ...(cookie ? { Cookie: cookie } : {}),
+        ...(body !== undefined && !raw ? { 'Content-Type': 'application/json' } : {}),
+        ...(Object.keys(jar).length ? { Cookie: Object.entries(jar).map(([k, v]) => `${k}=${v}`).join('; ') } : {}),
         ...headers,
       },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body === undefined ? undefined : raw ? body : JSON.stringify(body),
     });
     for (const c of res.headers.getSetCookie()) {
       const [pair] = c.split(';');
       const i = pair.indexOf('=');
-      if (pair.slice(0, i) === 'sid') cookie = pair.slice(i + 1) ? pair : '';
+      if (pair.slice(i + 1)) jar[pair.slice(0, i)] = pair.slice(i + 1);
+      else delete jar[pair.slice(0, i)];
     }
     const text = await res.text();
     let json = null;
@@ -100,7 +108,7 @@ function client(base) {
     } catch {
       /* keine JSON-Antwort */
     }
-    return { status: res.status, headers: res.headers, json, text };
+    return { status: res.status, headers: res.headers, location: res.headers.get('location'), json, text };
   }
   return {
     get: (url, headers) => call('GET', url, undefined, headers),
@@ -108,6 +116,8 @@ function client(base) {
     patch: (url, body = {}) => call('PATCH', url, body),
     put: (url, body = {}) => call('PUT', url, body),
     del: (url) => call('DELETE', url),
+    /** Rohdaten senden, z. B. ein Bild: upload('/api/cases/1/attachments', buffer, 'image/png') */
+    upload: (url, buffer, type) => call('POST', url, buffer, { 'Content-Type': type }),
     async login(email, password = PASSWORD) {
       const r = await call('POST', '/api/auth/login', { email, password });
       assert.equal(r.status, 200, `Anmeldung von ${email}: ${r.text}`);
@@ -116,4 +126,41 @@ function client(base) {
   };
 }
 
-module.exports = { ROOT, PASSWORD, TEAM, startServer, client };
+/** Eine Datei aus einem ZIP (z. B. word/document.xml aus einer DOCX) – ohne Zusatzpaket. */
+function readZipEntry(buf, name) {
+  const zlib = require('node:zlib');
+  let eocd = buf.length - 22;
+  while (eocd >= 0 && buf.readUInt32LE(eocd) !== 0x06054b50) eocd--;
+  let p = buf.readUInt32LE(eocd + 16);
+  const count = buf.readUInt16LE(eocd + 10);
+  for (let i = 0; i < count; i++) {
+    const method = buf.readUInt16LE(p + 10);
+    const size = buf.readUInt32LE(p + 20);
+    const nameLen = buf.readUInt16LE(p + 28);
+    const extra = buf.readUInt16LE(p + 30);
+    const comment = buf.readUInt16LE(p + 32);
+    const local = buf.readUInt32LE(p + 42);
+    if (buf.toString('utf8', p + 46, p + 46 + nameLen) === name) {
+      const start = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28);
+      const data = buf.subarray(start, start + size);
+      return method === 8 ? zlib.inflateRawSync(data) : data;
+    }
+    p += 46 + nameLen + extra + comment;
+  }
+  return null;
+}
+
+/** Text einer DOCX (Absätze als Zeilen). */
+function docxText(buf) {
+  return String(readZipEntry(buf, 'word/document.xml') || '')
+    .replace(/<w:tab\/>/g, '\t')
+    .replace(/<w:br\/>/g, '\n')
+    .replace(/<\/w:p>/g, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"');
+}
+
+module.exports = { ROOT, PASSWORD, TEAM, startServer, client, readZipEntry, docxText };

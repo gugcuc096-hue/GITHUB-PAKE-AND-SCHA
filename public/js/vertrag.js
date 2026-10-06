@@ -140,6 +140,7 @@ document.getElementById('printBtn').addEventListener('click', () => window.print
             .then((r) => {
                 state = r;
                 draw();
+                window.PS.googleDoc.mount({ kind: 'contract', id });
             })
             .catch((e) => fail(e));
     }

@@ -37,6 +37,7 @@ Premium-Webanwendung für die GTA-RP-Kanzlei **Pake & Scha Legal Consulting**: �
 | **Mandanten-Konto nachträglich verknüpfen** | Akte für einen Mandanten ohne Website-Konto (nur Name) angelegt und der Mandant registriert sich später? In der Akte **„Mandanten-Konto verknüpfen“** → Konto per Name oder E-Mail suchen → „Verknüpfen“ · passende Konten (gleicher Name wie in der Akte) werden automatisch als Vorschlag oben in der Akte angezeigt · danach sieht der Mandant die Akte unter „Meine Akten“ – mit Terminen, Verträgen, Rechnungen, Nachrichten und dem Discord-Ticket (verknüpftes Discord wird automatisch hinzugefügt) · unter „Akte bearbeiten“ ein anderes Konto wählen oder die Verknüpfung lösen (der Name bleibt in der Akte) · nur zuständige Anwälte und das Board of Partners · interner Vermerk im Aktenverlauf |
 | **Mandatsverträge** | In der Akte „Mandatsvertrag erstellen“ → Vorlage der Kanzlei wird mit Anwalt (Name, Rang), Mandant, Honorar, Datum und Ort gefüllt (Vorbelegung aus Akte und früheren Verträgen, Honorar-Vorschläge aus der Honorarordnung) · Druckansicht im Layout der Kanzleivorlage (Kopfzeile auf jeder Seite, PDF über den Druckdialog) · **Unterschriften:** der genannte Anwalt unterschreibt digital – auf Wunsch **mehrere Anwälte** (bis zu 4 weitere, jeder unterschreibt selbst; vollständig erst, wenn alle Anwälte und der Mandant unterschrieben haben) –, der Mandant im Portal (Name eintippen) – oder die Kanzlei erfasst die Unterschrift im Spiel · nach der ersten Unterschrift gesperrt · Verlauf und Discord-Ereignis „Mandatsvertrag unterschrieben“ · **mehrere Leistungen aus der Honorarordnung** (mit Menge) wählbar – die Summe wird automatisch zur Grundgebühr, die Leistungen stehen einzeln im Vertrag · Vorlagen unter Einstellungen → Vertragsvorlagen bearbeiten (siehe [Mandatsverträge](#mandatsverträge)) |
 | **Schriftsätze** | In der Akte **„Schriftsatz erstellen“**: Vorlage wählen (mitgeliefert: **Vollmacht**, **Antrag auf Akteneinsicht**, **Haftbeschwerde**; weitere unter Einstellungen → Vertragsvorlagen mit Art „Schriftsatz“) → das Formular zeigt nur die Felder der Vorlage (Empfänger, Betreff, Festnahme, Begründung, Mandant, Anwalt, Datum, Ort) → Druckansicht im Briefkopf der Kanzlei, PDF über den Druckdialog · **Unterschrift:** bei Schriftsätzen nur der Anwalt, bei der Vollmacht nur der Mandant (im Portal oder im Spiel erfasst) · **Sichtbarkeit:** Schriftsätze sind zunächst nur für die Kanzlei sichtbar („nur intern“) und lassen sich jederzeit für den Mandanten freigeben (Hinweis im Ticket) bzw. wieder auf intern stellen; Dokumente, die der Mandant unterschreiben muss, sind immer sichtbar · interne Schriftsätze erscheinen weder im Mandantenportal noch im Ticket, Verlaufseinträge dazu sind intern · nach der ersten Unterschrift gesperrt (wie Verträge) |
+| **Google Docs** | In den Druckansichten von Rechnungen, Verträgen, Schriftsätzen und dem Aktenauszug **„Als Google Doc“** (die Druckansicht bleibt) → Doc im Layout der Druckansicht im Google Drive der Kanzlei, **automatisch „Jeder mit dem Link – Betrachter“** (nur noch den Link teilen) · **automatisch aktuell:** Unterschriften (z. B. Mandant unterschreibt den Mandatsvertrag), bezahlt/storniert, Änderungen am Vertrag oder an der Akte erscheinen im Doc, der Link bleibt gleich · Mandanten sehen „Google Doc öffnen“ bei ihren Dokumenten · Einrichtung einmalig durch das Board (siehe [Google Docs ausgeben](#google-docs-ausgeben-rechnungen-verträge-schriftsätze-aktenauszüge)) |
 | **Abmeldungen** | Unter „Dienstzeiten“ (oder im Dienst-Menü oben) „Abmelden“: Zeitraum, Grund (Urlaub, Krankheit, Privat, OOC, Sonstiges), Notiz · das Team sieht aktuelle und geplante Abmeldungen, die Übersicht zeigt „Heute abgemeldet“ · „Zurückmelden“ beendet eine Abmeldung vorzeitig, „Zurückziehen“ entfernt sie · Board of Partners kann andere abmelden · Discord-Ereignis „Abmeldung / Rückmeldung“ (eigener Kanal und Rollen-Ping einstellbar) |
 | **Aktenbearbeitung** (nur Board of Partners) | Automatische Erfassung, wer welche Akte bearbeitet (federführend oder weiterer Anwalt) und wie lange – bei Zuweisung, Abgabe, Mitarbeit beenden, Schließen und Wiedereröffnen · Ansicht „Aktenbearbeitung“: laufende und abgeschlossene Bearbeitungen je Mitarbeiter, Ø Dauer, Akten nach Bearbeitungsdauer, Zeitraum 7 Tage bis alles · in jeder Akte „Bearbeitungszeiten“ · ältere Akten werden aus dem Aktenverlauf geschätzt (≈) |
 | **Discord-Tickets** | Je Akte ein privater Discord-Kanal (Kategorie z. B. „Mandatsanfragen“), je Bewerbung und Anliegen ein Board-Kanal (Kategorie „Board of Partners“, nur Board): Status, Zuständigkeit, Nachrichten, Termine, Verträge und Rechnungen erscheinen automatisch; Mandanten werden automatisch hinzugefügt (verknüpftes Discord oder „Discord-Ticket beitreten“ auf der Website); geschlossene Akten wandern ins Archiv – siehe *Discord einrichten* |
@@ -230,6 +231,8 @@ Jeder Testlauf startet den Server mit einer **frischen Test-Datenbank** in einem
 | --- | --- |
 | `test/api.test.js` | Anmeldung, CSRF-Schutz, Sicherheits-Header, Mandatsanfrage über die Website (inkl. Spam-Schutz), Rechte (Mandant sieht nur Eigenes, interne Notizen bleiben intern), Rechnungen, Papierkorb, Mandantenstimmen mit Freigabe, Datensicherung nur fürs Board |
 | `test/static.test.js` | strenge Content-Security-Policy (keine Inline-Skripte, keine `onclick`-Attribute), alle eingebundenen Dateien vorhanden, die 12 Dashboard-Teile (Reihenfolge, keine doppelten Namen), **keine Tokens/Schlüssel/Webhook-Adressen im Code** |
+| `test/google.test.js` | Google Docs gegen eine nachgebaute Google-Schnittstelle (`test/googleStub.js`): Verbinden (nur `drive.file`, Token nie im Frontend), Doc öffentlich lesbar anlegen, automatisch neu bei Bezahlung und Unterschrift, Rechte der Mandanten, gelöschtes Doc in Drive, Trennen |
+| `test/docx.test.js` | Word-Dateien für die Google Docs: Jede Vertrags-/Schriftsatzvorlage ergibt Wort für Wort denselben Text wie die Druckansicht (`contract-render.js`); Rechnung mit allen Angaben |
 | `test/browser.test.js` | Startseite (Tarifrechner, Mandatsdialog, FAQ, Handy-Menü), Registrierung, alle Dashboard-Ansichten am PC und am Handy (ohne seitliches Überlaufen), Druckansichten – jeweils ohne JavaScript-Fehler und ohne CSP-Verstöße |
 
 **GitHub-Prüfung:** `.github/workflows/test.yml` führt alle Tests (inkl. Browser-Tests in Chromium) bei jedem Pull Request und jedem Push auf `main` aus – das Ergebnis steht als grüner Haken bzw. rotes Kreuz am Pull Request. Optional in Render: *Settings → Build & Deploy → Auto-Deploy* auf „After CI Checks Pass“ stellen, dann geht eine Änderung nur live, wenn die Tests bestanden sind.
@@ -347,6 +350,36 @@ Weil FiveNet keine delegierte Freigabe für Drittanwendungen anbietet, speichert
 
 Adresse der Instanz: Dashboard → *Einstellungen* → *FiveNet* (oder Umgebungsvariable `FIVENET_URL`, Standard `https://fivenet.modernv.net`). Dort lässt sich auch die Erreichbarkeit prüfen. Bietet FiveNet später eine offizielle, delegierte Anmeldung an, wird sie in `fivenet.js` ergänzt (dort steht auch die vollständige Prüfung).
 
+## Google Docs ausgeben (Rechnungen, Verträge, Schriftsätze, Aktenauszüge)
+
+In den Druckansichten von Rechnungen/Honorarvereinbarungen, Verträgen/Schriftsätzen und dem Aktenauszug gibt es neben „Drucken / PDF“ den Knopf **„Als Google Doc“**. Die Druckansicht bleibt wie bisher.
+
+- **Aussehen wie die Druckansicht:** gleicher Aufbau, gleiche Schriften (auch die Schreibschrift der Unterschriften), Farben, Logo und Tabellen. Was Google Docs nicht kann, ist so nah wie möglich nachgebaut: Goldbalken einfarbig statt Farbverlauf, Stempel „BEZAHLT“/„STORNIERT“ gerade statt schräg, kein Zeichenabstand (Sperrung); Seitenumbrüche können minimal abweichen.
+- **Öffentlich per Link:** Jedes Doc steht automatisch auf „Jeder mit dem Link – Betrachter“ (lesen, nicht bearbeiten, nicht auffindbar). Es genügt, den Link zu teilen („Link kopieren“).
+- **Automatisch aktuell, gleicher Link:** Unterschreibt jemand (Anwalt, Mandant im Portal oder „im Spiel unterschrieben – erfasst“), werden Unterschriften zurückgesetzt, ändert sich der Vertrag, wird eine Rechnung bezahlt/storniert/wieder offen oder ändern sich Angaben der Akte (Aktenzeichen, Titel, Gericht …), die Kopfzeile der Verträge oder die Anschrift der Kanzlei, schreibt der Server das Google Doc kurz danach neu.
+- **Aktenauszug:** Momentaufnahme mit den in „Inhalt wählen“ gesetzten Abschnitten; „Aktualisieren“ schreibt ihn mit der aktuellen Auswahl neu. Da jeder mit dem Link lesen kann, „Interne Angaben“ nur bewusst einbeziehen.
+- **Löschen:** „Löschen“ in der Druckansicht, das Löschen der Rechnung/des Vertrags oder das endgültige Löschen der Akte legt das Doc in den Papierkorb des Kanzlei-Drive – der Link funktioniert dann nicht mehr.
+- **Wer:** Anlegen, Aktualisieren und Löschen die Kanzlei (Anwälte, Board). Mandanten sehen in ihrer Druckansicht „Google Doc öffnen“ / „Link kopieren“, sobald es ein Doc gibt (Aktenauszüge nur für die Kanzlei).
+- **Wo:** im Google Drive des Kanzlei-Kontos, Ordner „Pake & Scha – Dokumente“ (Unterordner „Rechnungen & Honorare“, „Verträge & Schriftsätze“, „Aktenauszüge“).
+- **Störung:** Ist Google nicht erreichbar oder die Verbindung abgelaufen, merkt sich der Server die Änderungen und holt sie nach (alle 10 Minuten bzw. sofort nach erneutem Verbinden); das Board erhält eine Systemwarnung in Discord.
+
+### Einrichtung (einmalig, ca. 10 Minuten)
+
+1. [console.cloud.google.com](https://console.cloud.google.com) → oben „Projekt auswählen“ → **„Neues Projekt“** (z. B. „Pake & Scha“).
+2. **APIs & Dienste → Bibliothek → „Google Drive API“ → „Aktivieren“.**
+3. **Google Auth Platform** (früher „OAuth-Zustimmungsbildschirm“) → „Erste Schritte“: App-Name „Pake & Scha“, Support-E-Mail, Zielgruppe **„Extern“**, Kontakt-E-Mail.
+4. **Datenzugriff → „Bereiche hinzufügen“** → `…/auth/drive.file` („Nur die Google-Drive-Dateien, die mit dieser App verwendet werden“) → Speichern.
+5. **Zielgruppe → „App veröffentlichen“** (Status „In Produktion“). Wichtig: Im Status „Test“ läuft die Verbindung nach 7 Tagen ab. Da nur `drive.file` genutzt wird, braucht es keine Prüfung durch Google. Zeigt Google beim Verbinden „Google hat diese App nicht überprüft“: „Erweitert“ → „Weiter zu Pake & Scha“.
+6. **Clients → „Client erstellen“** → Typ **„Webanwendung“** → „Autorisierte Weiterleitungs-URIs“: `https://<deine-seite>.onrender.com/api/google/callback` (die genaue Adresse steht im Dashboard unter Einstellungen → Google Docs) → „Erstellen“ → **Client-ID** und **Clientschlüssel** kopieren.
+7. **Render → Service → Environment:** `GOOGLE_CLIENT_ID` und `GOOGLE_CLIENT_SECRET` eintragen und speichern (Render deployt neu). Optional `GOOGLE_REDIRECT_URI`, falls die Adresse von `PUBLIC_URL` abweicht.
+8. **Dashboard → Einstellungen → „Google Docs“ → „Kanzlei-Google-Konto verbinden“** und mit dem **gemeinsamen Google-Konto der Kanzlei** anmelden (nicht dem privaten Konto eines Mitarbeiters) – den Haken für Google Drive setzen.
+
+Danach erscheint in allen Druckansichten der Knopf „Als Google Doc“. Ohne diese Einrichtung bleibt alles wie bisher.
+
+**Sicherheit:** Die Website erhält nur den Bereich `drive.file` – sie sieht und ändert ausschließlich Dateien, die sie selbst angelegt hat, nicht den übrigen Inhalt des Google Drive. Der Zugangsschlüssel (Refresh-Token) liegt nur auf dem Server, verschlüsselt mit einem aus `GOOGLE_CLIENT_SECRET` abgeleiteten Schlüssel, und gelangt nie in den Browser. „Trennen“ widerruft den Zugang bei Google; vorhandene Docs bleiben dann unter ihrem Link erreichbar, werden aber nicht mehr aktualisiert. Wird `GOOGLE_CLIENT_SECRET` geändert, einfach neu verbinden.
+
+Technik: `docxRender.js` baut aus denselben Daten wie die Druckansicht eine Word-Datei, Google wandelt sie beim Hochladen in ein Google Doc um (`googleDrive.js`); `googleDocs.js` merkt sich je Dokument das Doc und schreibt es bei Änderungen neu. Die unten beschriebene Google-Docs-*Integration* (Dokumente in eine Akte übernehmen) ist davon unabhängig und braucht weiterhin keine Einrichtung.
+
 ## Google-Docs-Integration
 
 Google-Docs-Dokumente werden genauso wie FiveNet-Dokumente im Abschnitt **„Externe Dokumente“** einer Akte verknüpft – mit dem Unterschied, dass die Kanzlei den Inhalt selbst laden kann:
@@ -445,6 +478,7 @@ Es gibt genau sechs Ränge (Benutzer, Team-Profile und Einstellung von Bewerbern
 - FiveNet: keine Passwörter, keine Sitzungs-Tokens, kein Scraping · „In FiveNet öffnen“ verlinkt immer auf die aus Instanz und Dokument-ID gebaute Adresse, nie auf die eingefügte
 - Discord-Bot: jede Interaktion ist von Discord signiert (`DISCORD_PUBLIC_KEY`), Bot-Token nur in Render · `/passwort` schickt das Einmal-Passwort ausschließlich per Direktnachricht an das verknüpfte Discord (nie in einen Kanal), beendet alle Sitzungen und erzwingt ein eigenes Passwort beim Login
 - **Content-Security-Policy (streng):** Skripte nur als Dateien von der eigenen Domain (kein CDN, keine Inline-Skripte, keine `onclick`-Attribute – eingeschleuster Skriptcode würde vom Browser nicht ausgeführt), keine Plugins, keine fremden Frames, Formulare nur an die eigene Seite bzw. die Discord-Anmeldung; Google Fonts und Bilder (z. B. Discord-Avatare) weiterhin erlaubt · Antworten werden komprimiert (gzip) ausgeliefert
+- Google Docs (optional): nur Zugriff auf selbst angelegte Dateien (`drive.file`), Refresh-Token verschlüsselt nur auf dem Server, Docs nur „Jeder mit dem Link – Betrachter“
 - Datensicherungen enthalten keine Login-Sitzungen; Herunterladen nur für die Rolle „Board of Partners“ (Admin)
 - Bitte nur **In-Character-Daten** speichern und keine echten Passwörter wiederverwenden
 
@@ -458,8 +492,11 @@ mediaBackup.js   Bilder als .tar.gz sichern, Sicherungen hochladen und einspiele
 systemAlerts.js  Systemwarnungen ans Board (Bot offline, Sicherung, Speicher, Absturz), einmal je Störung mit Entwarnung
 paymentReminders.js  Zahlungserinnerungen: überfällige Rechnungen einmal automatisch, „Erinnern“ von Hand (Discord-DM + Ticket)
 trash.js         Papierkorb für Akten: Momentaufnahme beim Löschen, Wiederherstellen, endgültig löschen nach 30 Tagen
+docxRender.js    Word-Dateien im Layout der Druckansichten (Rechnung, Vertrag/Schriftsatz, Aktenauszug) – Grundlage der Google Docs
+googleDrive.js   Google Drive über das Kanzlei-Konto: Anmeldung (nur drive.file), verschlüsselter Token, Docs anlegen/teilen/neu schreiben
+googleDocs.js    Google Docs je Dokument: anlegen, bei Änderungen automatisch neu schreiben, Papierkorb, Nachholen nach Störungen
 scripts/         build-css.js (Tailwind fest bauen: npm run build:css), seed-admin.js
-test/            npm test: api.test.js, static.test.js, browser.test.js, helpers.js (Server mit frischer Test-Datenbank)
+test/            npm test: api, static, browser, google (mit googleStub.js), docx – helpers.js startet den Server mit frischer Test-Datenbank
 .github/workflows/test.yml  GitHub-Prüfung: alle Tests bei jedem Pull Request
 auth.js          Sessions, Passwörter, Rollen-Middleware
 bootstrap.js     Team-Seed, Notfall-Admin, Passwort-Reset, Datenmigration
@@ -478,8 +515,8 @@ remote.js        Abrufe externer Quellen mit Zeit-, Größen- und Weiterleitungs
 uploads.js       Bild-Uploads (Formatprüfung anhand der Dateisignatur)
 helpers.js       Konstanten, Validierung
 models.js        Datenabfragen, Zeilen-Mapping, Zugriffsregeln, Protokoll
-routes/          auth, cases, search, reviews, calendar, messages, board, invoices, fees, team, admin, discord, public, duty, applications, fivenet, external, tasks, concerns, personnel, tickets, interactions, cooperations, memberships, nameRequests
+routes/          auth, cases, search, reviews, google, calendar, messages, board, invoices, fees, team, admin, discord, public, duty, applications, fivenet, external, tasks, concerns, personnel, tickets, interactions, cooperations, memberships, nameRequests
 public/          index.html, karriere.html, login.html, register.html, dashboard.html, invoice.html, vertrag.html, aktenauszug.html, css/ (app.css, tailwind.css), js/
-public/js/       je Seite ein Skript (home.js, login.js, register.js, karriere.js, invoice.js, vertrag.js, aktenauszug.js …) – Bedienelemente per data-act/addEventListener statt onclick
+public/js/       je Seite ein Skript (home.js, login.js, register.js, karriere.js, invoice.js, vertrag.js, aktenauszug.js, gdoc.js …) – Bedienelemente per data-act/addEventListener statt onclick
 public/js/dashboard/  das Dashboard in 12 Teilen (01-basis … 12-start), von dashboard.html in dieser Reihenfolge geladen
 ```

@@ -66,7 +66,10 @@ document.getElementById('printBtn').addEventListener('click', () => window.print
         return;
     }
     api.get('/api/invoices/' + id)
-        .then(({ invoice, firm }) => render(invoice, firm))
+        .then(({ invoice, firm }) => {
+            render(invoice, firm);
+            window.PS.googleDoc.mount({ kind: 'invoice', id });
+        })
         .catch((err) => {
             if (err.status === 401) {
                 location.href = '/login.html?next=' + encodeURIComponent(location.pathname + location.search);

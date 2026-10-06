@@ -342,6 +342,7 @@ templatesRouter.put(
     const d = parseBody(z.object({ header: z.string().trim().max(300) }), req, res);
     if (!d) return;
     setSetting('contract_header', d.header);
+    require('../googleDocs').touchKind('contract');
     res.json({ header: header() });
   })
 );
@@ -491,6 +492,25 @@ function loadContract(req, res) {
   return { k, c, can: permissions(k, c, req.user) };
 }
 
+/** Für das Google Doc (googleDocs.js): dieselben Daten wie die Druckansicht – ohne Anfrage/Rechteprüfung. */
+function contractDocData(cid) {
+  const k = db.prepare(`${CONTRACT_SELECT} WHERE k.id = ?`).get(cid);
+  const c = k && getCase(k.case_id);
+  if (!k || !c) return null;
+  return {
+    contract: contractRow(k, { withBody: true }),
+    case: { id: c.id, caseNumber: c.case_number, title: c.title, area: AREA_LABEL[c.area] || c.area, courtRef: c.court_ref || '', opponent: c.opponent || '' },
+    header: header(),
+  };
+}
+
+/** Darf die Person das Dokument sehen? (wie loadContract) */
+function contractVisible(cid, u) {
+  const k = db.prepare('SELECT id, case_id, internal FROM case_contracts WHERE id = ?').get(cid);
+  const c = k && getCase(k.case_id);
+  return !!(k && c && caseAccess(c, u).canView && !(k.internal && !isStaff(u)));
+}
+
 router.get('/:cid', (req, res) => {
   const { k, c, can } = loadContract(req, res);
   if (!k) return;
@@ -560,6 +580,7 @@ router.patch(
       db.prepare("UPDATE case_contracts SET data = ?, lawyer_id = ?, updated_at = datetime('now') WHERE id = ?").run(JSON.stringify(data), lawyerId, k.id);
       if (co) saveCoLawyers(k.id, co.list);
     });
+    require('../googleDocs').touch('contract', k.id);
     res.json({ contract: contractRow(db.prepare(`${CONTRACT_SELECT} WHERE k.id = ?`).get(k.id)) });
   })
 );
@@ -576,6 +597,7 @@ router.delete(
       addSystemNote(c.id, req.user, `${k.template_name} gelöscht${statusOf(k) !== 'entwurf' ? ' (war bereits unterschrieben)' : ''}.`, !!k.internal);
     });
     logActivity(req.user, k.kind === 'schriftsatz' ? 'Schriftsatz gelöscht' : 'Vertrag gelöscht', 'case', c.id, `${c.case_number}: ${k.template_name}`);
+    require('../googleDocs').remove('contract', k.id); // Google Doc in den Drive-Papierkorb
     res.json({ success: true });
   })
 );
@@ -666,6 +688,7 @@ router.post(
       by: u.display_name,
       byDiscordId: u.discord_id,
     });
+    require('../googleDocs').touch('contract', k.id); // Google Doc zeigt die Unterschrift automatisch
     res.json({ contract: contractRow(updated, { withBody: true }), can: permissions(updated, c, u) });
   })
 );
@@ -686,8 +709,9 @@ router.post(
     });
     addSystemNote(c.id, req.user, `${k.template_name}: Unterschriften zurückgesetzt.`);
     const updated = db.prepare(`${CONTRACT_SELECT} WHERE k.id = ?`).get(k.id);
+    require('../googleDocs').touch('contract', k.id);
     res.json({ contract: contractRow(updated, { withBody: true }), can: permissions(updated, c, req.user) });
   })
 );
 
-module.exports = { router, caseRouter, templatesRouter, contractsForCase };
+module.exports = { router, caseRouter, templatesRouter, contractsForCase, contractDocData, contractVisible };

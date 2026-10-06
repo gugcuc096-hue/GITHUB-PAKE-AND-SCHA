@@ -355,6 +355,47 @@ router.put(
 );
 
 /* ---------------------------------------------------------------- Detail */
+/** Akte mit allem, was die Person sehen darf (Dashboard, Aktenauszug, Google Doc des Aktenauszugs). */
+function caseDetail(c, u) {
+  const access = caseAccess(c, u);
+  const staff = isStaff(u);
+  const notes = db
+    .prepare('SELECT * FROM notes WHERE case_id = ? ORDER BY created_at ASC, id ASC')
+    .all(c.id)
+    .filter((n) => staff || !n.internal);
+  const appointments = db
+    .prepare(`${APPT_SELECT} WHERE a.case_id = ? ORDER BY a.starts_at ASC`)
+    .all(c.id)
+    .filter((a) => apptVisible(a, u));
+  const invoices = db.prepare(`${INVOICE_SELECT} WHERE i.case_id = ? ORDER BY i.created_at DESC`).all(c.id);
+  const attachments = db
+    .prepare('SELECT * FROM case_attachments WHERE case_id = ? ORDER BY created_at ASC, id ASC')
+    .all(c.id)
+    .filter((a) => staff || !a.internal);
+
+  const tasks = staff
+    ? db.prepare(`${TASK_SELECT} WHERE t.case_id = ? ORDER BY t.done ASC, t.due_date IS NULL, t.due_date ASC, t.id ASC`).all(c.id)
+    : [];
+
+  return {
+    case: { ...caseRow(c, u), ...access },
+    notes: notes.map(noteRow),
+    appointments: appointments.map((a) => apptRow(a, u)),
+    invoices: invoices.map(invoiceRow),
+    attachments: attachments.map((a) => attachmentRow(a, c.id)),
+    externalDocs: externalDocsForCase(c.id, u),
+    contracts: contractsForCase(c.id, u),
+    // Bearbeitungszeiten nur für das Board of Partners
+    work: isBoard(u) ? { rows: workForCase(c.id), closedAt: c.closed_at || null } : undefined,
+    tasks: staff ? tasks.map(taskRow) : undefined,
+    ticket: tickets.ticketInfo(c, u),
+    // Mandant: eigene Bewertung der (abgeschlossenen) Akte
+    review: require('./reviews').reviewForCase(c, u),
+    // Team: passende Mandantenkonten, solange die Akte noch keins hat (z. B. Mandant hat sich später registriert)
+    clientSuggestions: staff && !c.client_id ? clientSuggestions(c) : undefined,
+  };
+}
+
 router.get(
   '/:id',
   wrap(async (req, res) => {
@@ -365,42 +406,7 @@ router.get(
     // Fremde Akten liefern 404 statt 403, damit ihre Existenz nicht verraten wird.
     if (!access.canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
 
-    const staff = isStaff(req.user);
-    const notes = db
-      .prepare('SELECT * FROM notes WHERE case_id = ? ORDER BY created_at ASC, id ASC')
-      .all(c.id)
-      .filter((n) => staff || !n.internal);
-    const appointments = db
-      .prepare(`${APPT_SELECT} WHERE a.case_id = ? ORDER BY a.starts_at ASC`)
-      .all(c.id)
-      .filter((a) => apptVisible(a, req.user));
-    const invoices = db.prepare(`${INVOICE_SELECT} WHERE i.case_id = ? ORDER BY i.created_at DESC`).all(c.id);
-    const attachments = db
-      .prepare('SELECT * FROM case_attachments WHERE case_id = ? ORDER BY created_at ASC, id ASC')
-      .all(c.id)
-      .filter((a) => staff || !a.internal);
-
-    const tasks = staff
-      ? db.prepare(`${TASK_SELECT} WHERE t.case_id = ? ORDER BY t.done ASC, t.due_date IS NULL, t.due_date ASC, t.id ASC`).all(c.id)
-      : [];
-
-    res.json({
-      case: { ...caseRow(c, req.user), ...access },
-      notes: notes.map(noteRow),
-      appointments: appointments.map((a) => apptRow(a, req.user)),
-      invoices: invoices.map(invoiceRow),
-      attachments: attachments.map((a) => attachmentRow(a, c.id)),
-      externalDocs: externalDocsForCase(c.id, req.user),
-      contracts: contractsForCase(c.id, req.user),
-      // Bearbeitungszeiten nur für das Board of Partners
-      work: isBoard(req.user) ? { rows: workForCase(c.id), closedAt: c.closed_at || null } : undefined,
-      tasks: staff ? tasks.map(taskRow) : undefined,
-      ticket: tickets.ticketInfo(c, req.user),
-      // Mandant: eigene Bewertung der (abgeschlossenen) Akte
-      review: require('./reviews').reviewForCase(c, req.user),
-      // Team: passende Mandantenkonten, solange die Akte noch keins hat (z. B. Mandant hat sich später registriert)
-      clientSuggestions: staff && !c.client_id ? clientSuggestions(c) : undefined,
-    });
+    res.json(caseDetail(c, req.user));
   })
 );
 
@@ -599,6 +605,8 @@ router.patch(
       });
     }
     ticketUpdate(c, updated, u, { history, editFields, d, newStatus, newlyAssigned });
+    // Aktenzeichen, Titel, Gericht und Gegenpartei stehen in den Verträgen → deren Google Docs neu schreiben
+    require('../googleDocs').touchCase(c.id);
     res.json({ case: { ...caseRow(updated, u), ...caseAccess(updated, u) } });
   })
 );
@@ -911,3 +919,4 @@ function claimCase(c, u, via = '') {
 module.exports = router;
 module.exports.setCaseStatus = setCaseStatus;
 module.exports.claimCase = claimCase;
+module.exports.caseDetail = caseDetail;

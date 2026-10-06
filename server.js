@@ -99,6 +99,7 @@ app.use('/api/gdocs', externalRoutes.gdocsRouter);
 app.use('/api/gsheets', externalRoutes.gsheetsRouter);
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/search', require('./routes/search'));
+app.use('/api/google', require('./routes/google'));
 app.use('/api/reviews', require('./routes/reviews').router);
 app.use('/api/contracts', contractRoutes.router);
 app.use('/api/absences', require('./routes/absences').router);
@@ -181,6 +182,7 @@ app.listen(PORT, () => {
   require('./backup').start();
   // Papierkorb: Akten nach 30 Tagen endgültig löschen
   require('./trash').start();
+  require('./googleDocs').start();
   // Systemwarnungen ans Board (Bot offline, Sicherung fehlgeschlagen, Speicher, Absturz)
   require('./systemAlerts').start();
   // Discord-Befehle (/add, /remove, /delete, /passwort, /akte …) anmelden (nur wenn Bot-Token, Server und Public Key eingerichtet sind)
