@@ -1,0 +1,37 @@
+# Automatische Prüfung bei jedem Pull Request und jedem Push auf main:
+# API-Tests, Datei-Prüfungen (strenge CSP, Dashboard-Teile, keine Zugangsdaten) und Browser-Tests (Chromium).
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: npm test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Abhängigkeiten installieren
+        run: npm ci
+
+      # Playwright nur für die Prüfung – keine feste Abhängigkeit, Render installiert es nicht
+      - name: Browser für die Tests installieren
+        run: |
+          npm install --no-save playwright@1.63.0
+          npx playwright install --with-deps chromium
+
+      - name: Tests
+        run: npm test

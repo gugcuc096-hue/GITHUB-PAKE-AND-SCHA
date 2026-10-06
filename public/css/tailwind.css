@@ -532,6 +532,8 @@ video {
   visibility: visible;
 }.collapse {
   visibility: collapse;
+}.static {
+  position: static;
 }.fixed {
   position: fixed;
 }.absolute {
@@ -1535,6 +1537,10 @@ video {
 
   .md\:inline {
     display: inline;
+  }
+
+  .md\:flex {
+    display: flex;
   }
 
   .md\:inline-flex {

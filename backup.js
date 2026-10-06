@@ -120,11 +120,14 @@ function ensureToday() {
 
 /** Beim Start: nach einer Minute prüfen, danach stündlich. */
 function start() {
+  const alerts = () => require('./systemAlerts');
   const run = () => {
     try {
       ensureToday();
+      alerts().backupOk(); // Entwarnung, falls vorher gewarnt wurde
     } catch (err) {
       console.warn('Datensicherung fehlgeschlagen:', err.message);
+      alerts().backupFailed(err); // Board einmal per Discord warnen
     }
   };
   setTimeout(run, 60 * 1000).unref();

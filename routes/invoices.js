@@ -36,6 +36,9 @@ router.get('/', (req, res) => {
   res.json({ invoices: rows.map(invoiceRow) });
 });
 
+/** Briefkopf der Kanzlei (Anschrift, Kontakt) – z. B. für den Aktenauszug. */
+router.get('/firm', (req, res) => res.json({ firm: firmInfo() }));
+
 router.get(
   '/:id',
   wrap(async (req, res) => {
@@ -242,6 +245,18 @@ router.patch(
       memberships.cancelRequestByInvoice(inv.id, req.user);
     }
     res.json({ invoice: invoiceRow(db.prepare(`${INVOICE_SELECT} WHERE i.id = ?`).get(inv.id)), warnings });
+  })
+);
+
+/** Zahlungserinnerung von Hand senden (Discord-DM an den Mandanten und ins Ticket der Akte). */
+router.post(
+  '/:id/remind',
+  requireStaff,
+  wrap(async (req, res) => {
+    const id = idParam(req);
+    if (!id) return res.status(404).json({ error: 'Dokument nicht gefunden.' });
+    const { sent } = await require('../paymentReminders').sendReminder(id, req.user);
+    res.json({ sent, invoice: invoiceRow(db.prepare(`${INVOICE_SELECT} WHERE i.id = ?`).get(id)) });
   })
 );
 

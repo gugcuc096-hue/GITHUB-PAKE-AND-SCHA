@@ -8,6 +8,13 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=4">
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=4">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=4">
+    <!-- Installierbare App (PWA) am PC und am Handy -->
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Pake &amp; Scha">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <script src="/js/pwa.js" defer></script>
     <title>Dashboard | Pake & Scha Legal Consulting</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -39,6 +46,11 @@
                 <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
             </button>
             <div id="pageTitle" class="topbar-title">Dashboard</div>
+            <!-- Globale Suche (Strg + K) -->
+            <button type="button" class="topbar-search" data-action="global-search" title="Suchen (Strg + K)" aria-label="Suchen">
+                <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <span class="lbl">Suchen …</span><kbd>Strg K</kbd>
+            </button>
             <!-- Dienststatus / Stempeluhr (nur für das Team sichtbar) -->
             <div id="dutyWrap" class="pop-wrap hidden">
                 <button id="dutyBtn" type="button" class="duty-btn" data-action="duty-menu" aria-haspopup="true" aria-expanded="false" title="Dienststatus">
@@ -46,6 +58,10 @@
                 </button>
                 <div id="dutyPop" class="pop" role="menu"></div>
             </div>
+            <button type="button" class="btn-ghost btn-sm pwa-only" data-action="install-app" title="Dashboard als App installieren">
+                <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                <span class="hidden sm:inline">App installieren</span>
+            </button>
             <a href="/" class="btn-ghost btn-sm hidden sm:inline-flex" title="Zur öffentlichen Website">
                 <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg>
                 Website
@@ -76,6 +92,18 @@
     </div>
 
     <script src="/js/api.js"></script>
-    <script src="/js/dashboard.js"></script>
+    <!-- Dashboard: Teile in fester Reihenfolge (sie bauen aufeinander auf, 12-start.js startet die Anwendung) -->
+    <script src="/js/dashboard/01-basis.js"></script>
+    <script src="/js/dashboard/02-geruest.js"></script>
+    <script src="/js/dashboard/03-uebersicht-akten.js"></script>
+    <script src="/js/dashboard/04-vertraege-dokumente.js"></script>
+    <script src="/js/dashboard/05-akte-kalender-post.js"></script>
+    <script src="/js/dashboard/06-rechnungen.js"></script>
+    <script src="/js/dashboard/07-team-einstellungen.js"></script>
+    <script src="/js/dashboard/08-discord.js"></script>
+    <script src="/js/dashboard/09-profil-board.js"></script>
+    <script src="/js/dashboard/10-aktionen.js"></script>
+    <script src="/js/dashboard/11-formulare.js"></script>
+    <script src="/js/dashboard/12-start.js"></script>
 </body>
 </html>

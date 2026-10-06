@@ -42,7 +42,13 @@ const EVENTS = {
   'task.assigned': 'Aufgabe einem anderen Teammitglied zugewiesen',
   'membership.changed': 'VIP / Lifetime vergeben, verlängert, beendet oder abgelaufen',
   'name.requested': 'Namensänderung beantragt bzw. vom Board entschieden',
+  'system.alert': 'Systemwarnung: Kanzlei-Bot offline, Datensicherung fehlgeschlagen, Speicher fast voll, Absturz',
+  'review.created': 'Neue Mandantenstimme (Bewertung) zur Freigabe',
 };
+
+// Ereignisse, die nach dem Speichern der Auswahl dazugekommen sind, sind eingeschaltet (bis jemand sie abwählt).
+// discord_events_known = Ereignisse, die es beim letzten Speichern gab; ältere Speicherstände kennen alle außer diesen:
+const ADDED_LATER = ['system.alert', 'review.created'];
 
 function isValidWebhookUrl(url) {
   return WEBHOOK_RE.test(String(url || '').trim());
@@ -81,12 +87,22 @@ function webhookFor(event) {
 function enabledEvents() {
   const raw = getSetting('discord_events', null);
   if (!raw) return Object.keys(EVENTS);
+  let list;
   try {
-    const list = JSON.parse(raw);
-    return Array.isArray(list) ? list.filter((e) => EVENTS[e]) : Object.keys(EVENTS);
+    list = JSON.parse(raw);
   } catch {
     return Object.keys(EVENTS);
   }
+  if (!Array.isArray(list)) return Object.keys(EVENTS);
+  let known = null;
+  try {
+    known = JSON.parse(getSetting('discord_events_known', 'null'));
+  } catch {
+    known = null;
+  }
+  if (!Array.isArray(known)) known = Object.keys(EVENTS).filter((e) => !ADDED_LATER.includes(e));
+  const fresh = Object.keys(EVENTS).filter((e) => !known.includes(e));
+  return [...new Set([...list, ...fresh])].filter((e) => EVENTS[e]);
 }
 
 /* ---------------------------------------------------------------- Rollen-Ping */

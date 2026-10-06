@@ -11,6 +11,7 @@ const fivenet = require('../fivenet');
 const personnel = require('./personnel');
 const tickets = require('../tickets');
 const backup = require('../backup');
+const media = require('../mediaBackup');
 
 const ROLE_LABEL = { mandant: 'Mandant', anwalt: 'Anwalt', admin: 'Board of Partners' };
 
@@ -267,6 +268,7 @@ function settingsPayload() {
     firmAddress: getSetting('firm_address', 'Pake & Scha Legal Consulting\nWürfelpark\nLos Santos, San Andreas'),
     firmPaymentInfo: getSetting('firm_payment_info', 'Zahlbar per Überweisung an Pake & Scha Legal Consulting (Maze Bank).'),
     firmContact: getSetting('firm_contact', 'kontakt@pake-scha.ls'),
+    invoiceReminderDays: require('../paymentReminders').reminderDays(),
     showDutyPublic: getSetting('show_duty_public', '1') === '1',
     fivenetUrl: getSetting('fivenet_url', ''),
     fivenetInstance: fivenet.instance(),
@@ -290,6 +292,7 @@ router.patch(
       firmAddress: z.string().trim().max(300).optional(),
       firmPaymentInfo: z.string().trim().max(300).optional(),
       firmContact: z.string().trim().max(120).optional(),
+      invoiceReminderDays: z.number().int().min(0).max(60).optional(),
       showDutyPublic: z.boolean().optional(),
       fivenetUrl: z.string().trim().max(200).optional(),
     });
@@ -333,7 +336,10 @@ router.patch(
     tx(() => {
       if (d.showDutyPublic !== undefined) setSetting('show_duty_public', d.showDutyPublic ? '1' : '0');
       if (d.discordWebhookUrl !== undefined) setSetting('discord_webhook_url', d.discordWebhookUrl);
-      if (d.discordEvents !== undefined) setSetting('discord_events', JSON.stringify(d.discordEvents.filter((e) => discord.EVENTS[e])));
+      if (d.discordEvents !== undefined) {
+        setSetting('discord_events', JSON.stringify(d.discordEvents.filter((e) => discord.EVENTS[e])));
+        setSetting('discord_events_known', JSON.stringify(Object.keys(discord.EVENTS)));
+      }
       if (d.discordPingRole !== undefined) setSetting('discord_ping_role', d.discordPingRole);
       if (d.discordEventWebhooks !== undefined) setSetting('discord_event_webhooks', JSON.stringify(d.discordEventWebhooks));
       if (d.discordEventRoles !== undefined) setSetting('discord_event_roles', JSON.stringify(d.discordEventRoles));
@@ -341,6 +347,7 @@ router.patch(
       if (d.firmAddress !== undefined) setSetting('firm_address', d.firmAddress);
       if (d.firmPaymentInfo !== undefined) setSetting('firm_payment_info', d.firmPaymentInfo);
       if (d.firmContact !== undefined) setSetting('firm_contact', d.firmContact);
+      if (d.invoiceReminderDays !== undefined) require('../paymentReminders').setReminderDays(d.invoiceReminderDays);
       if (d.fivenetUrl !== undefined) setSetting('fivenet_url', d.fivenetUrl);
     });
     res.json({ settings: settingsPayload() });
@@ -372,6 +379,8 @@ const backupInfo = () => ({
   dbSize: backup.dbBytes(),
   keepDays: backup.KEEP_DAILY_DAYS,
   keepWeeklyDays: backup.KEEP_WEEKLY_DAYS,
+  media: media.stats(),
+  pendingRestore: media.pendingRestore(),
 });
 
 router.get('/backups', (req, res) => res.json(backupInfo()));
@@ -389,6 +398,60 @@ router.post(
     res.status(201).json({ backup: b, ...backupInfo() });
   })
 );
+
+/* ---------------------------------------------------------------- Systemwarnungen (für die Übersicht) */
+router.get('/alerts', (req, res) => res.json({ alerts: require('../systemAlerts').active() }));
+
+/** Alle hochgeladenen Bilder (Profilbilder, Team-Fotos, Beweismittel) als .tar.gz. */
+router.get('/backups/media', (req, res) => {
+  const name = `pake-scha-bilder-${new Date().toISOString().slice(0, 10)}.tar.gz`;
+  res.set({ 'Content-Type': 'application/gzip', 'Content-Disposition': `attachment; filename="${name}"` });
+  logActivity(req.user, 'Bilder-Sicherung heruntergeladen', 'settings', null, name);
+  media.writeArchive(res).catch((err) => {
+    console.warn('Bilder-Sicherung abgebrochen:', err.message);
+    res.destroy();
+  });
+});
+
+/** Sicherung hochladen: Datenbank (.db) → beim nächsten Start einspielen, Bilder (.tar.gz) → sofort ergänzen. */
+router.post(
+  '/backups/upload',
+  wrap(async (req, res) => {
+    let result;
+    try {
+      result = await media.receiveUpload(req);
+    } catch (err) {
+      if (err.status) return res.status(err.status).json({ error: err.message }); // auch 507 (Speicher voll) mit Klartext
+      throw err;
+    }
+    if (result.kind === 'datenbank') {
+      logActivity(req.user, 'Datensicherung zum Einspielen hochgeladen', 'settings', null, `${Math.round(result.size / 1024)} KB – wird beim nächsten Neustart eingespielt`);
+    } else {
+      logActivity(req.user, 'Bilder eingespielt', 'settings', null, `${result.added} neu, ${result.existing} schon vorhanden, ${result.skipped} übersprungen`);
+    }
+    res.json({ result, ...backupInfo() });
+  })
+);
+
+/** Gespeicherte Sicherung für den nächsten Start vormerken. */
+router.post(
+  '/backups/:name/restore',
+  wrap(async (req, res) => {
+    const file = backup.fileOf(req.params.name);
+    if (!file) return res.status(404).json({ error: 'Sicherung nicht gefunden.' });
+    media.stageBackup(file);
+    logActivity(req.user, 'Datensicherung zum Einspielen vorgemerkt', 'settings', null, req.params.name);
+    res.json(backupInfo());
+  })
+);
+
+router.delete('/backups/pending', (req, res) => {
+  if (media.pendingRestore()) {
+    media.cancelRestore();
+    logActivity(req.user, 'Einspielen der Datensicherung abgebrochen', 'settings', null, null);
+  }
+  res.json(backupInfo());
+});
 
 router.get('/backups/:name', (req, res) => {
   const file = backup.fileOf(req.params.name);

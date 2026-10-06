@@ -5,8 +5,10 @@
  *   # Titel            großer Dokumenttitel          ## Abschnitt   goldene Abschnittsüberschrift
  *   ### § 1 …          fette Paragraphenüberschrift  1. Text       nummerierter Absatz
  *   | Text             zentrierte Zeile (Parteien)   (4 Leerzeichen) eingerückte Zeile
- *   ===                neue Seite                    [Unterschriften] Unterschriftsfeld
+ *   ===                neue Seite                    [Unterschriften] Unterschriftsfeld (Anwälte und Mandant)
+ *   [Unterschrift Anwalt] / [Unterschrift Mandant]   Unterschriftsfeld nur für eine Seite (Schriftsätze, Vollmacht)
  *   [Weitere Anwälte]  weitere unterzeichnende Anwälte (Parteien; leer, wenn es keine gibt)
+ *   Eine Zeile nur mit {{begruendung}} entfällt, wenn das Feld leer ist.
  *   **fett**, *kursiv*, {{platzhalter}}
  * Alles wird escaped; Werte der Platzhalter ebenfalls.
  */
@@ -44,7 +46,10 @@
       .join('');
   }
 
-  function signatures(values, sig) {
+  // Platzhalter, deren Absatz ganz entfällt, wenn sie leer sind (freier Text in Schriftsätzen)
+  const OPTIONAL_LINES = new Set(['begruendung']);
+
+  function signatures(values, sig, who = 'both') {
     const clientSigned = sig && sig.clientSignature;
     const when = (v) => {
       const d = window.PS.parseDate(v);
@@ -68,17 +73,29 @@
           <div class="k-srole">${l.rank ? esc(l.rank) + ', ' : ''}Pake &amp; Scha Legal Consulting</div>
           <div class="k-snote">${l.signature ? `digital unterschrieben am ${esc(when(l.signedAt))}` : 'Unterschrift Anwalt'}</div>
         </div>`;
-    return `<div class="k-signs-wrap">
-      <p class="k-signplace">Unterzeichnet in ${v('ort') ? esc(v('ort')) : '<span class="k-blank"></span>'} am <strong>${v('datum') ? esc(v('datum')) : '<span class="k-blank"></span>'}</strong></p>
-      <div class="k-signs">
-        <div class="k-col">${lawyers.map(lawyerBlock).join('')}</div>
-        <div class="k-col"><div class="k-sign">
+    const clientBlock = `<div class="k-sign">
           <div class="k-script client">${clientSigned ? esc(sig.clientSignature) : ''}</div>
           <div class="k-line"></div>
           <div class="k-sname">${v('mandant') ? esc(v('mandant')) : 'Mandant'}</div>
-          <div class="k-srole">Mandant</div>
+          <div class="k-srole">${who === 'client' ? 'Vollmachtgeber / Mandant' : 'Mandant'}</div>
           <div class="k-snote">${clientNote || 'Unterschrift Mandant'}</div>
-        </div></div>
+        </div>`;
+    const place = `${v('ort') ? esc(v('ort')) : '<span class="k-blank"></span>'}`;
+    const date = `${v('datum') ? esc(v('datum')) : '<span class="k-blank"></span>'}`;
+    if (who === 'lawyer') {
+      // Schriftsatz: Ort, Datum und darunter die Anwälte (links)
+      return `<div class="k-signs-wrap"><p class="k-signplace">${place}, den <strong>${date}</strong></p>
+        <div class="k-signs"><div class="k-col">${lawyers.map(lawyerBlock).join('')}</div><div class="k-col"></div></div></div>`;
+    }
+    if (who === 'client') {
+      return `<div class="k-signs-wrap"><p class="k-signplace">${place}, den <strong>${date}</strong></p>
+        <div class="k-signs"><div class="k-col">${clientBlock}</div><div class="k-col"></div></div></div>`;
+    }
+    return `<div class="k-signs-wrap">
+      <p class="k-signplace">Unterzeichnet in ${place} am <strong>${date}</strong></p>
+      <div class="k-signs">
+        <div class="k-col">${lawyers.map(lawyerBlock).join('')}</div>
+        <div class="k-col">${clientBlock}</div>
       </div></div>`;
   }
 
@@ -97,11 +114,21 @@
       const line = raw.replace(/\s+$/, '');
       const t = line.trim();
       let m;
+      let opt;
       if (t === '===') pages.push([]);
       else if (/^\[unterschriften\]$/i.test(t)) {
         push(signatures(values, sig));
         signed = true;
+      } else if (/^\[unterschrift anwalt\]$/i.test(t)) {
+        push(signatures(values, sig, 'lawyer'));
+        signed = true;
+      } else if (/^\[unterschrift mandant\]$/i.test(t)) {
+        push(signatures(values, sig, 'client'));
+        signed = true;
       } else if (CO_DIRECTIVE.test(t)) push(coParties(sig));
+      else if ((opt = t.match(/^\{\{\s*([a-z_]+)\s*\}\}$/i)) && OPTIONAL_LINES.has(opt[1].toLowerCase()) && !String(values[opt[1].toLowerCase()] ?? '').trim()) {
+        /* freier Text leer → Absatz entfällt */
+      }
       else if (!t) push('<div class="k-space"></div>');
       else if ((m = line.match(/^#\s+(.*)$/))) push(`<h1 class="k-title">${inline(m[1], values)}</h1>`);
       else if ((m = line.match(/^##\s+(.*)$/))) push(`<h2 class="k-section">${inline(m[1], values)}</h2>`);
@@ -116,7 +143,7 @@
       else push(`<p class="k-p">${inline(line, values)}</p>`);
       if (i === coAfter) push(coParties(sig));
     });
-    if (!signed) push(signatures(values, sig));
+    if (!signed) push(signatures(values, sig, sig && sig.kind === 'schriftsatz' ? 'lawyer' : 'both'));
     return pages.filter((p) => p.some((h) => !h.startsWith('<div class="k-space"'))).map((p) => p.join(''));
   }
 

@@ -718,6 +718,33 @@ addColumn('invoices', 'coop_name', "TEXT NOT NULL DEFAULT ''");
 addColumn('invoices', 'coop_pct', 'REAL NOT NULL DEFAULT 0');
 addColumn('invoices', 'coop_amount', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('invoices', 'coop_via', "TEXT NOT NULL DEFAULT ''"); // discord | konto | manuell
+// Mandantenstimmen: Bewertungen abgeschlossener Akten durch den Mandanten; auf der Website erst nach Freigabe durch das Board
+db.exec(`
+  CREATE TABLE IF NOT EXISTS reviews (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id         INTEGER REFERENCES cases(id) ON DELETE SET NULL,
+    user_id         INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    rating          INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    body            TEXT NOT NULL,
+    name_mode       TEXT NOT NULL DEFAULT 'initialen' CHECK (name_mode IN ('voll','initialen','anonym')),
+    author_name     TEXT NOT NULL DEFAULT '',        -- Name zum Zeitpunkt der Bewertung
+    area            TEXT NOT NULL DEFAULT '',        -- Rechtsgebiet der Akte (für die Anzeige)
+    status          TEXT NOT NULL DEFAULT 'neu' CHECK (status IN ('neu','freigegeben','abgelehnt')),
+    decided_by_name TEXT NOT NULL DEFAULT '',
+    decided_at      TEXT,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at      TEXT
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_reviews_case ON reviews(case_id) WHERE case_id IS NOT NULL;
+  CREATE INDEX IF NOT EXISTS idx_reviews_status ON reviews(status);
+`);
+// Schriftsätze: Vorlagen und Dokumente der Art „schriftsatz“ (sonst „vertrag“); interne Schriftsätze sieht der Mandant nicht
+addColumn('contract_templates', 'kind', "TEXT NOT NULL DEFAULT 'vertrag'");
+addColumn('case_contracts', 'kind', "TEXT NOT NULL DEFAULT 'vertrag'");
+addColumn('case_contracts', 'internal', 'INTEGER NOT NULL DEFAULT 0');
+// Zahlungserinnerungen (paymentReminders.js): zuletzt erinnert, Anzahl der Erinnerungen
+addColumn('invoices', 'reminded_at', 'TEXT');
+addColumn('invoices', 'reminder_count', 'INTEGER NOT NULL DEFAULT 0');
 
 // NOT NULL entfernen oder ON-DELETE-Regeln ändern geht in SQLite nur über
 // einen Neuaufbau der Tabelle (offizielles 12-Schritte-Verfahren). Vorher
@@ -856,16 +883,36 @@ function tx(fn) {
   }
 }
 
-/** Fortlaufende Nummer pro Jahr, z. B. PS-2026-0007. Lücken durch Löschen führen nicht zu Dubletten. */
-function nextNumber(prefix, table, column) {
+// Papierkorb für Akten (siehe trash.js): gelöschte Akten liegen hier 30 Tage als Momentaufnahme.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS case_trash (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id         INTEGER NOT NULL,
+    case_number     TEXT NOT NULL,
+    title           TEXT NOT NULL DEFAULT '',
+    client_name     TEXT NOT NULL DEFAULT '',
+    deleted_by      INTEGER,
+    deleted_by_name TEXT NOT NULL DEFAULT '',
+    deleted_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    payload         TEXT NOT NULL,                     -- JSON: Zeilen der Akte und aller abhängigen Tabellen
+    files           TEXT NOT NULL DEFAULT '[]'         -- JSON: Bilddateien der Anhänge (bleiben bis zum endgültigen Löschen)
+  );
+  CREATE INDEX IF NOT EXISTS idx_case_trash_number ON case_trash(case_number);
+`);
+
+/**
+ * Fortlaufende Nummer pro Jahr, z. B. PS-2026-0007. Lücken durch Löschen führen nicht zu Dubletten.
+ * also: weitere [Tabelle, Spalte], deren Nummern ebenfalls belegt sind (Akten im Papierkorb).
+ */
+function nextNumber(prefix, table, column, also = []) {
   const head = `${prefix}-${new Date().getFullYear()}-`;
-  const row = db
-    .prepare(`SELECT MAX(CAST(substr(${column}, ?) AS INTEGER)) AS m FROM ${table} WHERE ${column} LIKE ?`)
-    .get(head.length + 1, `${head}%`);
-  return head + String((row?.m ?? 0) + 1).padStart(4, '0');
+  const max = (t, col) =>
+    db.prepare(`SELECT MAX(CAST(substr(${col}, ?) AS INTEGER)) AS m FROM ${t} WHERE ${col} LIKE ?`).get(head.length + 1, `${head}%`)?.m ?? 0;
+  const m = Math.max(max(table, column), ...also.map(([t, col]) => max(t, col)));
+  return head + String(m + 1).padStart(4, '0');
 }
 
-const nextCaseNumber = () => nextNumber('PS', 'cases', 'case_number');
+const nextCaseNumber = () => nextNumber('PS', 'cases', 'case_number', [['case_trash', 'case_number']]);
 const nextInvoiceNumber = (kind) => nextNumber(kind === 'honorarvereinbarung' ? 'HV' : 'RE', 'invoices', 'number');
 const nextApplicationNumber = () => nextNumber('BW', 'applications', 'number');
 const nextConcernNumber = () => nextNumber('AN', 'concerns', 'reference');

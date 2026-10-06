@@ -31,14 +31,16 @@ app.use(
   helmet({
     // Content-Security-Policy: Skripte nur von der eigenen Domain (Tailwind ist fest eingebaut, kein CDN mehr),
     // keine Plugins, keine fremden Frames, Formulare nur an die eigene Seite bzw. die Discord-Anmeldung.
-    // Inline-Skripte und onclick-Handler der Seiten bleiben erlaubt; Google Fonts und Bilder (z. B. Discord-Avatare,
-    // Embed-Vorschauen) kommen weiterhin von außen.
+    // Alle Skripte liegen als Dateien unter /js (keine Inline-Skripte, keine onclick-Attribute) – eingeschleuster
+    // Skriptcode würde nicht ausgeführt. Google Fonts und Bilder (z. B. Discord-Avatare, Embed-Vorschauen) kommen
+    // weiterhin von außen.
     contentSecurityPolicy: {
       useDefaults: false,
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
-        scriptSrcAttr: ["'unsafe-inline'"],
+        // Strenge Richtlinie: nur Skriptdateien der eigenen Domain – keine Inline-Skripte, keine onclick-Attribute
+        scriptSrc: ["'self'"],
+        scriptSrcAttr: ["'none'"],
         styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
         imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
@@ -96,6 +98,8 @@ app.use('/api/fivenet', fivenetRoutes.router);
 app.use('/api/gdocs', externalRoutes.gdocsRouter);
 app.use('/api/gsheets', externalRoutes.gsheetsRouter);
 app.use('/api/tasks', require('./routes/tasks'));
+app.use('/api/search', require('./routes/search'));
+app.use('/api/reviews', require('./routes/reviews').router);
 app.use('/api/contracts', contractRoutes.router);
 app.use('/api/absences', require('./routes/absences').router);
 app.use('/api/work', require('./routes/work').router);
@@ -124,6 +128,7 @@ app.use('/api/bot', require('./routes/bot').router);
 app.use('/api/public', require('./routes/public'));
 app.use('/api/public', applications.publicRouter);
 app.use('/api/public', concernRoutes.publicRouter);
+app.use('/api/public', require('./routes/reviews').publicRouter);
 app.use('/api/public', require('./routes/memberships').publicRouter);
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Schnittstelle nicht gefunden.' }));
@@ -161,6 +166,8 @@ const reminderTimer = setInterval(() => {
     dutyRoutes.closeStaleSessions();
     // VIP: abgelaufene Mitgliedschaften beenden, Erinnerung vor Ablauf
     require('./memberships').sweep().catch((err) => console.warn('VIP-Ablauf fehlgeschlagen:', err.message));
+    // Zahlungserinnerung für überfällige Rechnungen (einmal je Rechnung)
+    require('./paymentReminders').sweep().catch((err) => console.warn('Zahlungserinnerungen fehlgeschlagen:', err.message));
   } catch (err) {
     console.warn('Hintergrundaufgabe fehlgeschlagen:', err.message);
   }
@@ -172,6 +179,10 @@ app.listen(PORT, () => {
   require('./scripts/build-css').refreshOnStart();
   // Tägliche Datensicherung (backups/ neben der Datenbank)
   require('./backup').start();
+  // Papierkorb: Akten nach 30 Tagen endgültig löschen
+  require('./trash').start();
+  // Systemwarnungen ans Board (Bot offline, Sicherung fehlgeschlagen, Speicher, Absturz)
+  require('./systemAlerts').start();
   // Discord-Befehle (/add, /remove, /delete, /passwort, /akte …) anmelden (nur wenn Bot-Token, Server und Public Key eingerichtet sind)
   setTimeout(() => require('./tickets').registerCommands().catch((err) => console.warn('Discord-Befehle nicht angemeldet:', err.message)), 3000).unref();
   // Kanzlei-Bot: dauerhafte Verbindung für Rang-Sync, Role Connections und Willkommensnachrichten (nur wenn eingeschaltet)
