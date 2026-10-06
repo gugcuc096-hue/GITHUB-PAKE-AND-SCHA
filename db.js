@@ -522,6 +522,26 @@ db.exec(`
     updated_at         TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_bot_sent_template ON bot_message_sent(template_id);
+  -- Vorlage per Direktnachricht an alle Mitglieder einer Rolle: Fortschritt und Ergebnis je Durchgang
+  CREATE TABLE IF NOT EXISTS bot_dm_runs (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    template_id       INTEGER REFERENCES bot_messages(id) ON DELETE SET NULL,
+    template_name     TEXT NOT NULL DEFAULT '',
+    role_id           TEXT NOT NULL,
+    role_name         TEXT NOT NULL DEFAULT '',
+    with_login        INTEGER NOT NULL DEFAULT 0,
+    status            TEXT NOT NULL DEFAULT 'läuft',
+    total             INTEGER NOT NULL DEFAULT 0,
+    sent              INTEGER NOT NULL DEFAULT 0,
+    failed            INTEGER NOT NULL DEFAULT 0,
+    accounts_created  INTEGER NOT NULL DEFAULT 0,
+    accounts_existing INTEGER NOT NULL DEFAULT 0,
+    problems          TEXT NOT NULL DEFAULT '[]',
+    error             TEXT,
+    started_by_name   TEXT NOT NULL DEFAULT '',
+    started_at        TEXT NOT NULL DEFAULT (datetime('now')),
+    finished_at       TEXT
+  );
 
   -- Weitere unterzeichnende Anwälte eines Vertrags (der erste steht in case_contracts.lawyer_id).
   -- Name und Rang werden beim Eintragen festgehalten, damit der Vertrag später gleich bleibt.
@@ -673,6 +693,8 @@ addColumn('invoices', 'member_amount', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('invoices', 'client_user_id', 'INTEGER REFERENCES users(id) ON DELETE SET NULL');
 // Login-E-Mail: alle Konten auf @pake-scha.ls; die vorherige Adresse bleibt als Login-Alias gültig
 addColumn('users', 'old_email', 'TEXT');
+// Woher kommt das Konto? '' = Registrierung/Board, 'discord-dm' = vom Bot beim Versand an eine Rolle angelegt
+addColumn('users', 'created_via', "TEXT NOT NULL DEFAULT ''");
 addColumn('users', 'email_notice', 'INTEGER NOT NULL DEFAULT 0'); // 1 = Hinweis „Ihre E-Mail wurde umgestellt“ zeigen
 db.exec('CREATE INDEX IF NOT EXISTS idx_users_old_email ON users(old_email)');
 // Ticket per /delete gelöscht → nicht automatisch neu anlegen (nur über „Ticket anlegen“ im Dashboard)

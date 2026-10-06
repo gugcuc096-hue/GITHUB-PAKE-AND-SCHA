@@ -150,6 +150,20 @@ document.addEventListener('change', (e) => {
     syncBriefForm(t.form);
     return;
   }
+  // Per DM an Rolle: andere Rolle gewählt → alte Empfänger-Vorschau ausblenden
+  if (t.id === 'dmRole') {
+    st.dmRole = t.value;
+    st.dmPreview = null;
+    const box = $('#dmPreview');
+    if (box) box.innerHTML = '';
+  }
+  if (t.id === 'dmLogin') st.dmLogin = t.checked;
+  // Vorlage: Rolle erwähnen → <@&ID> an der Schreibmarke einfügen
+  if (t.id === 'msgRoleInsert') {
+    if (t.value) insertTemplateText(t.closest('form'), `<@&${t.value}>`);
+    t.value = '';
+    return;
+  }
   if (t.id === 'bf_visible') t.dataset.touched = '1';
   if (t.dataset.upload) {
     guard(() => handleUpload(t));

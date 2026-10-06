@@ -178,6 +178,68 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
     });
   }
 
+  for (const [label, device] of [['PC', DESKTOP], ['Handy', PHONE]]) {
+    it(`Discord-Vorlage am ${label}: gepingte Rolle sichtbar, Versand per DM an eine Rolle`, async () => {
+      // Eigener Server mit nachgebauter Discord-Schnittstelle (test/discordStub.js) – es geht nichts nach außen
+      const { GUILD, ROLES } = require('./discordStub');
+      const dsrv = await startServer({ env: { DISCORD_BOT_TOKEN: 'test-token', BOT_DM_GAP_MS: '0', PUBLIC_URL: 'https://kanzlei.example' }, preload: [require.resolve('./discordStub')] });
+      try {
+        const adm = client(dsrv.base);
+        await adm.login(TEAM.admin);
+        assert.equal((await adm.patch('/api/tickets/settings', { guildId: GUILD })).status, 200);
+        const { ctx, page, problems, settle } = await open(device);
+        await page.goto(dsrv.base + '/login.html');
+        await page.fill('#email', TEAM.admin);
+        await page.fill('#password', PASSWORD);
+        await page.click('button[type=submit]');
+        await page.waitForURL(/dashboard/);
+        await page.goto(dsrv.base + '/dashboard.html?tab=bot&modul=messages#settings');
+        await page.waitForSelector('[data-action="msg-new"]');
+        await settle();
+        await page.click('[data-action="msg-new"]');
+        await page.fill('#msgName', 'Kooperation Burgershot');
+        await page.fill('#msgForm textarea[data-k="data.embed.description"]', 'Hallo zusammen!');
+        // Rolle über die Auswahl einfügen → Vorschau zeigt den Rollennamen, Hinweis: pingt (noch) nicht
+        await page.click('#msgForm textarea[data-k="data.content"]');
+        await page.selectOption('#msgRoleInsert', ROLES.mitarbeiter);
+        assert.equal(await page.inputValue('#msgForm textarea[data-k="data.content"]'), `<@&${ROLES.mitarbeiter}>`);
+        await page.waitForTimeout(250);
+        assert.equal(await page.textContent('#msgPreview .dc-content .dc-mention.role'), '@Mitarbeiter');
+        assert.match(await page.textContent('#msgPings'), /Pingt niemanden: @Mitarbeiter/);
+        await page.check('#msgForm input[data-k="data.allowMentions"]');
+        await page.waitForTimeout(250);
+        assert.match(await page.textContent('#msgPings'), /Pingt beim Senden: @Mitarbeiter/);
+        // Nicht erwähnbare Rolle: Warnung, dass niemand benachrichtigt wird
+        await page.selectOption('#msgRoleInsert', ROLES.burgershot);
+        await page.waitForTimeout(250);
+        assert.match(await page.textContent('#msgPings'), /@Burgershot erscheint, wird aber nicht benachrichtigt/);
+        if (device === PHONE) assert.ok((await page.$eval('#modalBody', (b) => b.scrollWidth - b.clientWidth)) <= 1, 'Editor passt aufs Handy');
+        await page.click('#msgForm button[type=submit]');
+        await settle();
+
+        // Verwenden → Per DM an Rolle: Empfänger anzeigen, senden, Fortschritt
+        await page.click('[data-action="msg-tab"][data-tab="use"]');
+        await page.click('[data-action="msg-use-tab"][data-tab="dm"]');
+        await settle();
+        assert.match(await page.textContent('#msgUse'), /in Direktnachrichten pingt das niemanden/);
+        await page.selectOption('#dmRole', ROLES.burgershot);
+        await page.click('[data-action="dm-preview"]');
+        await page.waitForSelector('#dmPreview .dm-name');
+        assert.match(await page.textContent('#dmPreview'), /3 Mitglieder mit @Burgershot/);
+        if (device === PHONE) assert.ok((await page.$eval('#modalBody', (b) => b.scrollWidth - b.clientWidth)) <= 1, 'DM-Reiter passt aufs Handy');
+        await page.check('#dmLogin');
+        await page.click('[data-action="dm-send"]');
+        await page.click('[data-ps-dialog="ok"]');
+        await page.waitForFunction(() => /fertig/.test(document.querySelector('#dmRuns')?.textContent || ''), null, { timeout: 10000 });
+        assert.match(await page.textContent('#dmRuns'), /2 zugestellt · 1 nicht zugestellt/);
+        assert.deepEqual(problems, []);
+        await ctx.close();
+      } finally {
+        await dsrv.stop();
+      }
+    });
+  }
+
   it('Druckansichten: Rechnung und Aktenauszug', async () => {
     const { ctx, page, problems } = await open(DESKTOP);
     await login(page, TEAM.admin);
