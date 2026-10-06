@@ -606,6 +606,23 @@ const actions = {
     toast('Vormerkung aufgehoben – die aktuelle Datenbank bleibt.');
     renderView();
   },
+  'google-resync': async (el) => {
+    el.disabled = true;
+    try {
+      const r = await api.post('/api/google/resync', {});
+      toast(`${r.queued} Google Docs werden neu geschrieben – das dauert einen Moment.`);
+      st.google = await api.get('/api/google/status').catch(() => st.google);
+      renderView();
+    } finally {
+      el.disabled = false;
+    }
+  },
+  'google-disconnect': async () => {
+    if (!(await ask('Vorhandene Google Docs bleiben im Drive und unter ihrem Link erreichbar, werden aber nicht mehr aktualisiert. Neue Docs lassen sich erst nach erneutem Verbinden anlegen.', { title: 'Google-Konto trennen?', confirmText: 'Trennen', danger: true }))) return;
+    st.google = await api.post('/api/google/disconnect', {});
+    toast('Google-Konto getrennt.');
+    renderView();
+  },
   'backup-now': async (el) => {
     el.disabled = true;
     try {

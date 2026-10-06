@@ -254,6 +254,39 @@ function fivenetProfilePanel() {
       <details class="edit-box mt-4"><summary>Ergebnis der Schnittstellenprüfung</summary>${fivenetInterfaces()}</details>
     </section>`;
 }
+/** Google Docs: Kanzlei-Konto verbinden – Rechnungen, Verträge, Schriftsätze und Aktenauszüge als Google Doc. */
+function googleDocsPanel(g) {
+  if (!g) return '';
+  const status = g.connected ? (g.error ? badge('Verbindung getrennt', 'amber') : badge('Verbunden', 'emerald')) : g.configured ? badge('Nicht verbunden', 'slate') : badge('Nicht eingerichtet', 'slate');
+  const counts = g.counts || {};
+  const total = (counts.invoice || 0) + (counts.contract || 0) + (counts.extract || 0);
+  let body;
+  if (!g.configured) {
+    body = `<ol class="text-sm text-muted list-decimal pl-5 mt-3 space-y-1">
+        <li>console.cloud.google.com → Projekt anlegen → „Google Drive API“ aktivieren</li>
+        <li>Google Auth Platform: Zielgruppe „Extern“, App <strong>veröffentlichen</strong> („In Produktion“), Datenzugriff <code class="font-mono text-xs">…/auth/drive.file</code></li>
+        <li>Client erstellen (Webanwendung), Weiterleitungs-URI: <code class="font-mono text-gold text-xs break-all">${esc(g.redirectUri || location.origin + '/api/google/callback')}</code></li>
+        <li>In Render unter „Environment“: <code class="font-mono text-xs">GOOGLE_CLIENT_ID</code>, <code class="font-mono text-xs">GOOGLE_CLIENT_SECRET</code> – danach neu deployen. Ausführlich im README unter „Google Docs“.</li></ol>`;
+  } else if (!g.connected) {
+    body = `<p class="text-sm text-muted mt-3">Mit dem <strong>gemeinsamen Google-Konto der Kanzlei</strong> anmelden. Die Website erhält nur Zugriff auf Dateien, die sie selbst anlegt – nicht auf den übrigen Inhalt des Google Drive.</p>
+        <div class="form-actions mt-3"><a href="/api/google/connect" class="btn-gold btn-md">${icon('link', 'ico-sm')}<span>Kanzlei-Google-Konto verbinden</span></a></div>
+        <p class="form-hint mt-2">Weiterleitungs-URI in Google: <code class="font-mono text-xs break-all">${esc(g.redirectUri || '')}</code></p>`;
+  } else {
+    body = `${g.error ? `<div class="banner banner-amber mt-3 mb-0">${icon('alert')}<div>${esc(g.error)}<div class="mt-2"><a href="/api/google/connect" class="btn-gold btn-sm">Neu verbinden</a></div></div></div>` : ''}
+        <p class="text-sm mt-3">Verbunden mit <strong>${esc(g.account || 'Google-Konto')}</strong>${g.connectedAt ? ` · seit ${esc(fmtDate(g.connectedAt))}` : ''}${g.connectedBy ? ` · von ${esc(g.connectedBy)}` : ''}</p>
+        <p class="text-sm text-muted mt-1">${total ? `${counts.invoice || 0} Rechnungen · ${counts.contract || 0} Verträge/Schriftsätze · ${counts.extract || 0} Aktenauszüge im Ordner „Pake &amp; Scha – Dokumente“` : 'Noch keine Google Docs angelegt.'}${g.pending ? ` · <span class="text-amber-300">${g.pending} warten auf Aktualisierung</span>` : ''}</p>
+        <div class="form-actions mt-3">
+          <button type="button" class="btn-outline btn-md" data-action="google-resync" ${total ? '' : 'disabled'}>${icon('restore', 'ico-sm')}<span>Alle Google Docs neu schreiben</span></button>
+          <button type="button" class="btn-ghost btn-md" data-action="google-disconnect">${icon('x', 'ico-sm')}<span>Trennen</span></button>
+        </div>`;
+  }
+  return `<section class="panel panel-pad mt-4 lg:mt-5">
+      <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('doc')} Google Docs</h2>${status}</div>
+      <p class="text-sm text-muted">Rechnungen, Verträge, Schriftsätze und Aktenauszüge lassen sich in der Druckansicht mit „Als Google Doc“ ausgeben – im Layout der Druckansicht, im Google Drive der Kanzlei und für <strong>jeden mit dem Link lesbar</strong>. Unterschriften, Zahlungen und Änderungen übernimmt der Server automatisch; der Link bleibt gleich. Die Druckansicht bleibt wie bisher.</p>
+      ${body}
+    </section>`;
+}
+
 function fivenetSettingsPanel(s) {
   const fn = st.fivenet;
   const inst = s.fivenetInstance;
@@ -396,6 +429,7 @@ views.settings = {
       api.get('/api/admin/backups').catch(() => null),
       load.fivenet(true),
     ]);
+    st.google = await api.get('/api/google/status').catch(() => null);
     st.backups = backups;
     st.settings = r.settings;
     st.contractTemplates = tpl;
@@ -475,6 +509,7 @@ views.settings = {
           </div>
         </div>
         ${fivenetSettingsPanel(s)}
+        ${googleDocsPanel(st.google)}
         <section class="panel panel-pad mt-4 lg:mt-5">
           <div class="panel-head"><h2 class="panel-title">Rechnungsdaten der Kanzlei</h2></div>
           <form data-form="settings-firm" class="form-grid cols-2">

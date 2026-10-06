@@ -900,6 +900,28 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_case_trash_number ON case_trash(case_number);
 `);
 
+// Google Docs der Kanzlei (siehe googleDocs.js): je Rechnung, Vertrag/Schriftsatz bzw. Aktenauszug ein Doc mit
+// festem Link. Bewusst ohne Fremdschlüssel – Einträge überstehen Papierkorb und Wiederherstellen der Akte.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS google_docs (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind            TEXT NOT NULL CHECK (kind IN ('invoice', 'contract', 'extract')),
+    ref_id          INTEGER NOT NULL,                  -- Rechnung, Vertrag bzw. Akte (Aktenauszug)
+    case_id         INTEGER,
+    file_id         TEXT NOT NULL,
+    url             TEXT NOT NULL,
+    options         TEXT NOT NULL DEFAULT '{}',        -- Aktenauszug: gewählte Abschnitte
+    created_by      INTEGER,
+    created_by_name TEXT NOT NULL DEFAULT '',
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    synced_at       TEXT,
+    dirty           INTEGER NOT NULL DEFAULT 0,        -- 1 = muss neu geschrieben werden
+    sync_error      TEXT NOT NULL DEFAULT ''
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_google_docs_ref ON google_docs(kind, ref_id);
+  CREATE INDEX IF NOT EXISTS idx_google_docs_case ON google_docs(case_id);
+`);
+
 /**
  * Fortlaufende Nummer pro Jahr, z. B. PS-2026-0007. Lücken durch Löschen führen nicht zu Dubletten.
  * also: weitere [Tabelle, Spalte], deren Nummern ebenfalls belegt sind (Akten im Papierkorb).

@@ -350,6 +350,8 @@ router.patch(
       if (d.invoiceReminderDays !== undefined) require('../paymentReminders').setReminderDays(d.invoiceReminderDays);
       if (d.fivenetUrl !== undefined) setSetting('fivenet_url', d.fivenetUrl);
     });
+    // Anschrift/Zahlungshinweis stehen auf den Rechnungen → deren Google Docs neu schreiben
+    if (d.firmAddress !== undefined || d.firmPaymentInfo !== undefined || d.firmContact !== undefined) require('../googleDocs').touchKind('invoice');
     res.json({ settings: settingsPayload() });
   })
 );

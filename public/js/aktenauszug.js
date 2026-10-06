@@ -82,7 +82,7 @@
     }
     html += `<p class="note">${
       staff
-        ? 'Ohne „Interne Angaben“ enthält der Auszug nur, was auch der Mandant im Portal sieht – geeignet zur Weitergabe.'
+        ? 'Ohne „Interne Angaben“ enthält der Auszug nur, was auch der Mandant im Portal sieht – geeignet zur Weitergabe. Ein Google Doc übernimmt diese Auswahl; jeder mit dem Link kann es lesen.'
         : 'Der Auszug enthält alles, was Sie im Mandantenportal zu dieser Akte sehen.'
     } Die Auswahl merkt sich dieser Browser.</p>`;
     panel.innerHTML = html;
@@ -296,6 +296,8 @@
       document.getElementById('backLink').href = '/dashboard.html#cases';
       renderPanel();
       render();
+      // Google Doc mit den hier gewählten Abschnitten (nur Kanzlei)
+      if (staff) window.PS.googleDoc.mount({ kind: 'extract', id, getOptions: () => ({ ...opts }) });
       if (new URLSearchParams(location.search).get('print') === '1') setTimeout(() => window.print(), 600);
     })
     .catch((err) => {

@@ -54,6 +54,17 @@ const DISCORD_MSG = {
   session: ['Bitte zuerst anmelden.', 'error'],
 };
 
+const GOOGLE_MSG = {
+  verbunden: ['Google-Konto der Kanzlei verbunden – Google Docs sind jetzt in den Druckansichten verfügbar.', 'ok'],
+  abgebrochen: ['Die Verbindung mit Google wurde abgebrochen.', 'error'],
+  drive: ['Google hat keinen Zugriff auf Google Drive erteilt – bitte erneut verbinden und den Haken bei Google Drive setzen.', 'error'],
+  dauerhaft: ['Google hat keinen dauerhaften Zugang geliefert. Bitte unter myaccount.google.com → Sicherheit den Zugriff der App entfernen und erneut verbinden.', 'error'],
+  sitzung: ['Sicherheitsprüfung fehlgeschlagen – bitte die Verbindung erneut starten.', 'error'],
+  config: ['Google Docs ist noch nicht eingerichtet (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET in Render).', 'error'],
+  rechte: ['Nur das Board of Partners verbindet das Google-Konto der Kanzlei.', 'error'],
+  fehler: ['Die Verbindung mit Google ist fehlgeschlagen. Bitte erneut versuchen.', 'error'],
+};
+
 const DUTY = { dienst: 'Im Dienst', gericht: 'Im Gericht', pause: 'Pause', off: 'Außer Dienst' };
 const APP_STATUS = {
   eingegangen: ['Eingegangen', 'amber'],

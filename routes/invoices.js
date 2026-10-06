@@ -235,7 +235,10 @@ router.patch(
       d.status === 'bezahlt' ? new Date().toISOString() : null,
       inv.id
     );
-    if (d.status !== inv.status) logActivity(req.user, 'Rechnungsstatus geändert', 'invoice', inv.id, `${inv.number}: ${inv.status} → ${d.status}`);
+    if (d.status !== inv.status) {
+      logActivity(req.user, 'Rechnungsstatus geändert', 'invoice', inv.id, `${inv.number}: ${inv.status} → ${d.status}`);
+      require('../googleDocs').touch('invoice', inv.id); // Stempel „BEZAHLT“/„STORNIERT“ im Google Doc
+    }
     // VIP/Lifetime-Anfrage: bezahlt → Mitgliedschaft freischalten, storniert → Anfrage abgelehnt
     let warnings = [];
     if (d.status !== inv.status && d.status === 'bezahlt') {
@@ -269,8 +272,11 @@ router.delete(
     if (!inv) return res.status(404).json({ error: 'Dokument nicht gefunden.' });
     db.prepare('DELETE FROM invoices WHERE id = ?').run(inv.id);
     logActivity(req.user, 'Rechnung gelöscht', 'invoice', inv.id, inv.number);
+    require('../googleDocs').remove('invoice', inv.id);
     res.json({ success: true });
   })
 );
 
 module.exports = router;
+module.exports.firmInfo = firmInfo;
+module.exports.visibleTo = visibleTo;
