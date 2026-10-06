@@ -1086,6 +1086,13 @@ const actions = {
     openModal(briefForm(c, { templates: st.briefTemplates, defaults }));
     syncBriefForm($('form[data-form="brief-new"]'));
   },
+  // FiveNet-Dokument der Akte als Aktenzeichen übernehmen („DOC - 74412“)
+  'brief-fivenet': (el) => {
+    const input = $('#bf_fivenet_az');
+    if (!input) return;
+    input.value = el.dataset.ref;
+    input.focus();
+  },
   'brief-edit': async (el) => {
     const k = (st.caseContracts || []).find((x) => x.id === Number(el.dataset.id));
     if (!k || !st.caseInfo) return;

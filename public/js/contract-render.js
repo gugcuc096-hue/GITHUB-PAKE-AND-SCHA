@@ -10,13 +10,22 @@
  *   [Weitere Anwälte]  weitere unterzeichnende Anwälte (Parteien; leer, wenn es keine gibt)
  *   Eine Zeile nur mit {{begruendung}} entfällt, wenn das Feld leer ist.
  *   **fett**, *kursiv*, {{platzhalter}}
+ *   {{fivenet_az}} mit „DOC - 74412“ wird zum Link auf das FiveNet-Dokument (opts.fivenetUrl + /documents/74412).
  * Alles wird escaped; Werte der Platzhalter ebenfalls.
  */
 (() => {
   'use strict';
   const { esc } = window.PS;
 
-  function inline(raw, values) {
+  // FiveNet-Aktenzeichen „DOC - 74412“: Der Link wird immer aus der Instanz der Kanzlei und der Nummer gebaut.
+  const FIVENET_REF = /^DOC - (\d{1,19})$/;
+  function fivenetLink(value, opts) {
+    const m = String(value).match(FIVENET_REF);
+    const base = opts && String(opts.fivenetUrl || '').replace(/\/+$/, '');
+    return m && /^https?:\/\/[^\s"'<>]+$/i.test(base) ? `${base}/documents/${m[1]}` : '';
+  }
+
+  function inline(raw, values, opts) {
     let s = esc(raw)
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/(^|[^*])\*([^*\s][^*]*?)\*(?!\*)/g, '$1<em>$2</em>');
@@ -25,6 +34,8 @@
       const k = key.toLowerCase();
       if (!(k in values)) return `<span class="k-unknown">${esc(m)}</span>`;
       const v = String(values[k] ?? '').trim();
+      const href = k === 'fivenet_az' && fivenetLink(v, opts);
+      if (href) return `<a class="k-val k-link" href="${esc(href)}" target="_blank" rel="noopener noreferrer" title="In FiveNet öffnen">${esc(v)}</a>`;
       // Mehrzeilige Werte (z. B. mehrere Leistungen) zeilenweise darstellen
       return v ? `<span class="k-val">${esc(v).replace(/\n/g, '<br>')}</span>` : '<span class="k-blank"></span>';
     });
@@ -99,8 +110,8 @@
       </div></div>`;
   }
 
-  /** Liefert die Seiten als HTML-Strings. */
-  function render(body, values, sig) {
+  /** Liefert die Seiten als HTML-Strings. opts.fivenetUrl: Adresse der FiveNet-Instanz (für „DOC - Nummer“-Links). */
+  function render(body, values, sig, opts = {}) {
     const pages = [[]];
     let signed = false;
     const push = (html) => pages[pages.length - 1].push(html);
@@ -130,17 +141,17 @@
         /* freier Text leer → Absatz entfällt */
       }
       else if (!t) push('<div class="k-space"></div>');
-      else if ((m = line.match(/^#\s+(.*)$/))) push(`<h1 class="k-title">${inline(m[1], values)}</h1>`);
-      else if ((m = line.match(/^##\s+(.*)$/))) push(`<h2 class="k-section">${inline(m[1], values)}</h2>`);
-      else if ((m = line.match(/^###\s+(.*)$/))) push(`<h3 class="k-para">${inline(m[1], values)}</h3>`);
+      else if ((m = line.match(/^#\s+(.*)$/))) push(`<h1 class="k-title">${inline(m[1], values, opts)}</h1>`);
+      else if ((m = line.match(/^##\s+(.*)$/))) push(`<h2 class="k-section">${inline(m[1], values, opts)}</h2>`);
+      else if ((m = line.match(/^###\s+(.*)$/))) push(`<h3 class="k-para">${inline(m[1], values, opts)}</h3>`);
       else if ((m = line.match(/^\|\s?(.*)$/))) {
         const c = m[1].trim();
         // „-zwischen-“ / „- und -“ wie im Original größer und grau
-        push(!c ? '<div class="k-gap"></div>' : `<p class="k-center${/^-\s*[a-zäöü]+\s*-$/i.test(c) ? ' k-between' : ''}">${inline(c, values)}</p>`);
+        push(!c ? '<div class="k-gap"></div>' : `<p class="k-center${/^-\s*[a-zäöü]+\s*-$/i.test(c) ? ' k-between' : ''}">${inline(c, values, opts)}</p>`);
       }
-      else if ((m = line.match(/^(\d{1,3})\.\s+(.*)$/))) push(`<div class="k-item"><span class="k-num">${m[1]}.</span><div>${inline(m[2], values)}</div></div>`);
-      else if ((m = line.match(/^(?: {2,}|\t)\s*(.*)$/))) push(`<div class="k-indent">${inline(m[1], values)}</div>`);
-      else push(`<p class="k-p">${inline(line, values)}</p>`);
+      else if ((m = line.match(/^(\d{1,3})\.\s+(.*)$/))) push(`<div class="k-item"><span class="k-num">${m[1]}.</span><div>${inline(m[2], values, opts)}</div></div>`);
+      else if ((m = line.match(/^(?: {2,}|\t)\s*(.*)$/))) push(`<div class="k-indent">${inline(m[1], values, opts)}</div>`);
+      else push(`<p class="k-p">${inline(line, values, opts)}</p>`);
       if (i === coAfter) push(coParties(sig));
     });
     if (!signed) push(signatures(values, sig, sig && sig.kind === 'schriftsatz' ? 'lawyer' : 'both'));

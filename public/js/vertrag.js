@@ -98,7 +98,7 @@ document.getElementById('printBtn').addEventListener('click', () => window.print
         document.title = `${k.templateName} ${c.caseNumber} | Pake & Scha`;
         document.getElementById('backLink').href = `/dashboard.html?case=${c.id}#cases`;
         root.className = '';
-        root.innerHTML = sheets(render(k.body, values(k, c), k), header(state.header));
+        root.innerHTML = sheets(render(k.body, values(k, c), k, { fivenetUrl: state.fivenetUrl }), header(state.header));
         refit();
         renderPanel();
         if (params.get('print') === '1') setTimeout(() => window.print(), 500);
@@ -116,12 +116,12 @@ document.getElementById('printBtn').addEventListener('click', () => window.print
     if (Number.isInteger(templateId) && templateId > 0) {
         // Vorschau einer Vorlage (Einstellungen): Felder bleiben leer bzw. zeigen Beispielwerte.
         api.get('/api/contract-templates?all=1')
-            .then(({ templates, header: head }) => {
+            .then(({ templates, header: head, fivenetUrl }) => {
                 const t = templates.find((x) => x.id === templateId);
                 if (!t) throw Object.assign(new Error('Vorlage nicht gefunden.'), { status: 404 });
                 const sample = params.get('beispiel') === '1'
-                    ? { anwalt: 'Dr. Alois Pake', anwalt_rang: 'Founding Partner', anwalt_geburtsdatum: '12.03.1988', mandant: 'John Doe', mandant_geburtsdatum: '04.07.1995', leistungen: '• Vertretung Hauptverhandlung (alle Gerichte) – 100.000 $\n• U-Haft-Vertretung vor Ort – 50.000 $', grundgebuehr: '150.000 $', zusatzgebuehr: '25.000 $ je weiterem Verhandlungstag', datum: new Date().toLocaleDateString('de-DE'), ort: 'Los Santos, San Andreas', aktenzeichen: 'PS-2026-0001', akte: 'Beispielakte', rechtsgebiet: 'Strafrecht', gerichtsaktenzeichen: 'DC-2026-0142', gegenpartei: 'State of San Andreas', empfaenger: 'District Court San Andreas\nStaatsanwaltschaft Los Santos\nMission Row, Los Santos', betreff: 'Ermittlungsverfahren gegen John Doe', festnahme: 'Festnahme am 01.10.2026, Mission Row Police Department', begruendung: 'Der Beschuldigte ist nicht vorbestraft und hat sich zu jeder Zeit kooperativ gezeigt.', kanzlei: 'Pake & Scha Legal Consulting' }
-                    : { aktenzeichen: '', akte: '', rechtsgebiet: '', gerichtsaktenzeichen: '', gegenpartei: '', kanzlei: 'Pake & Scha Legal Consulting', anwalt: '', anwalt_rang: '', anwalt_geburtsdatum: '', mandant: '', mandant_geburtsdatum: '', leistungen: '', grundgebuehr: '', zusatzgebuehr: '', datum: '', ort: '', empfaenger: '', betreff: '', festnahme: '', begruendung: '' };
+                    ? { anwalt: 'Dr. Alois Pake', anwalt_rang: 'Founding Partner', anwalt_geburtsdatum: '12.03.1988', mandant: 'John Doe', mandant_geburtsdatum: '04.07.1995', leistungen: '• Vertretung Hauptverhandlung (alle Gerichte) – 100.000 $\n• U-Haft-Vertretung vor Ort – 50.000 $', grundgebuehr: '150.000 $', zusatzgebuehr: '25.000 $ je weiterem Verhandlungstag', datum: new Date().toLocaleDateString('de-DE'), ort: 'Los Santos, San Andreas', aktenzeichen: 'PS-2026-0001', akte: 'Beispielakte', rechtsgebiet: 'Strafrecht', gerichtsaktenzeichen: 'DC-2026-0142', gegenpartei: 'State of San Andreas', empfaenger: 'District Court San Andreas\nStaatsanwaltschaft Los Santos\nMission Row, Los Santos', betreff: 'Ermittlungsverfahren gegen John Doe', fivenet_az: 'DOC - 74412', festnahme: 'Festnahme am 01.10.2026, Mission Row Police Department', begruendung: 'Der Beschuldigte ist nicht vorbestraft und hat sich zu jeder Zeit kooperativ gezeigt.', kanzlei: 'Pake & Scha Legal Consulting' }
+                    : { aktenzeichen: '', akte: '', rechtsgebiet: '', gerichtsaktenzeichen: '', gegenpartei: '', kanzlei: 'Pake & Scha Legal Consulting', anwalt: '', anwalt_rang: '', anwalt_geburtsdatum: '', mandant: '', mandant_geburtsdatum: '', leistungen: '', grundgebuehr: '', zusatzgebuehr: '', datum: '', ort: '', empfaenger: '', betreff: '', fivenet_az: '', festnahme: '', begruendung: '' };
                 document.title = `Vorschau: ${t.name} | Pake & Scha`;
                 document.getElementById('backLink').href = '/dashboard.html?tab=contracts#settings';
                 document.getElementById('backLink').textContent = '← Einstellungen';
@@ -129,7 +129,7 @@ document.getElementById('printBtn').addEventListener('click', () => window.print
                 root.className = '';
                 // Beispiel: ein weiterer unterzeichnender Anwalt – zeigt, wo [Weitere Anwälte] erscheint
                 const exampleSig = { kind: t.kind, ...(params.get('beispiel') === '1' && t.kind !== 'schriftsatz' ? { coLawyers: [{ name: 'Maxine Scha', rank: 'Equity Partner', birth: '21.09.1990' }] } : {}) };
-                root.innerHTML = sheets(render(t.body, sample, exampleSig), header(head));
+                root.innerHTML = sheets(render(t.body, sample, exampleSig, { fivenetUrl }), header(head));
                 refit();
             })
             .catch((e) => fail(e, '/dashboard.html?tab=contracts#settings'));

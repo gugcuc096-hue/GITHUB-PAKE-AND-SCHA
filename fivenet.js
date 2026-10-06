@@ -202,6 +202,19 @@ function parseDocumentRef(input, inst = instance()) {
 }
 
 /**
+ * Aktenzeichen aus FiveNet für Schriftsätze, einheitlich als „DOC - 74412“. Erkannt werden „74412“, „DOC-74412“,
+ * „DOC 74412“ und Links auf ein Dokument der Instanz. Alles andere bleibt unverändert – ein manuell eingetragenes
+ * Aktenzeichen ohne FiveNet-Dokument (wird dann auch nicht verlinkt).
+ */
+function docReference(input, inst = instance()) {
+  const text = String(input ?? '').trim().replace(/\s+/g, ' ');
+  if (!text) return '';
+  const m = text.match(/^DOC\s*[-–—:#]?\s*(\d{1,19})$/i);
+  const ref = parseDocumentRef(m ? m[1] : text, inst);
+  return ref.ok ? `DOC - ${ref.documentId}` : text;
+}
+
+/**
  * Erreichbarkeit der Instanz über den öffentlichen Endpunkt /api/version prüfen.
  * Keine Weiterleitungen, kurze Zeitgrenze, nur die Versionsnummer wird ausgewertet.
  */
@@ -271,6 +284,7 @@ module.exports = {
   normalizeBaseUrl,
   instance,
   parseDocumentRef,
+  docReference,
   checkInstance,
   imageUrlFor,
   fetchImage,

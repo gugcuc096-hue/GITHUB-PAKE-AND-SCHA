@@ -20,11 +20,12 @@ const { getCase, caseAccess, caseLawyers, addSystemNote, logActivity } = require
 const discord = require('../discord');
 const tickets = require('../tickets');
 const contracts = require('../contracts');
+const fivenet = require('../fivenet');
 
 const header = () => getSetting('contract_header', contracts.DEFAULT_HEADER);
 const AREA_LABEL = { strafrecht: 'Strafrecht', zivilrecht: 'Zivilrecht', verfassungsrecht: 'Verfassungsrecht', vertragsrecht: 'Vertragsrecht', sonstiges: 'Sonstiges' };
 const text = (max) => z.string().trim().max(max);
-const FIELD_MAX = { grundgebuehr: 200, zusatzgebuehr: 200, leistungen: 3000, empfaenger: 400, betreff: 200, festnahme: 200, begruendung: 6000 };
+const FIELD_MAX = { grundgebuehr: 200, zusatzgebuehr: 200, leistungen: 3000, empfaenger: 400, betreff: 200, festnahme: 200, begruendung: 6000, fivenet_az: 300 };
 const fieldSchema = z.object(Object.fromEntries(Object.keys(contracts.FIELDS).map((k) => [k, text(FIELD_MAX[k] || 120).optional()])));
 // Aus der Honorarordnung gewählte Leistungen (Mehrfachauswahl mit Menge)
 const servicesSchema = z
@@ -46,6 +47,26 @@ function applyServices(data, services) {
     .join('\n');
   if (services.length && !String(out.grundgebuehr || '').trim()) out.grundgebuehr = usd(services.reduce((sum, s) => sum + s.qty * s.price, 0));
   return out;
+}
+
+/** Eingaben vereinheitlichen: FiveNet-Aktenzeichen als „DOC - 74412“ (aus Nummer, „DOC-74412“ oder FiveNet-Link). */
+function cleanData(data) {
+  if (!data || data.fivenet_az === undefined) return data;
+  return { ...data, fivenet_az: fivenet.docReference(data.fivenet_az) };
+}
+
+/** Basisadresse der FiveNet-Instanz – Links auf „DOC - Nummer“ werden immer daraus gebaut (Druckansicht, Google Doc). */
+const fivenetUrl = () => fivenet.instance().url;
+
+/** In der Akte hinterlegte FiveNet-Dokumente (Reihenfolge wie in der Akte) – für das Aktenzeichen in Anträgen. */
+function fivenetDocsOf(caseId) {
+  return db
+    .prepare(
+      `SELECT external_id, title FROM case_external_docs WHERE case_id = ? AND provider = 'fivenet'
+       ORDER BY sort_order IS NOT NULL, sort_order, COALESCE(doc_date, substr(linked_at, 1, 10)) DESC, id DESC`
+    )
+    .all(caseId)
+    .map((d) => ({ documentId: d.external_id, title: d.title || '', ref: `DOC - ${d.external_id}` }));
 }
 
 function parseData(raw) {
@@ -238,6 +259,7 @@ templatesRouter.get('/', (req, res) => {
   res.json({
     templates: rows.map(templateRow),
     header: header(),
+    fivenetUrl: fivenetUrl(),
     fields: contracts.FIELDS,
     autoFields: contracts.AUTO_FIELDS,
     kinds: contracts.KINDS,
@@ -384,8 +406,12 @@ caseRouter.get('/defaults', (req, res) => {
     const b = parseData(r.data).anwalt_geburtsdatum;
     if (b) births[r.lawyer_id] = b;
   }
+  // Aktenzeichen für Anträge: das erste in der Akte hinterlegte FiveNet-Dokument, sonst das Gerichtsaktenzeichen der Akte
+  const fivenetDocs = fivenetDocsOf(c.id);
   res.json({
     births,
+    fivenetDocs,
+    fivenetUrl: fivenetUrl(),
     maxCoLawyers: contracts.MAX_CO_LAWYERS,
     lawyerId: lawyer ? lawyer.id : null,
     team: team.map((l) => ({ id: l.id, name: l.name, lead: l.lead })),
@@ -400,6 +426,7 @@ caseRouter.get('/defaults', (req, res) => {
       datum: new Date().toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', year: 'numeric' }),
       ort: contracts.DEFAULT_PLACE,
       betreff: c.title || '',
+      fivenet_az: fivenetDocs.length ? fivenetDocs[0].ref : fivenet.docReference(c.court_ref || ''),
     },
   });
 });
@@ -440,7 +467,7 @@ caseRouter.post(
     const id = tx(() => {
       const info = db
         .prepare('INSERT INTO case_contracts (case_id, template_name, body, data, lawyer_id, created_by, created_by_name, kind, internal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        .run(c.id, t.name, t.body, JSON.stringify(applyServices(d.data, d.services)), lawyer.id, req.user.id, req.user.display_name, kind, internal ? 1 : 0);
+        .run(c.id, t.name, t.body, JSON.stringify(applyServices(cleanData(d.data), d.services)), lawyer.id, req.user.id, req.user.display_name, kind, internal ? 1 : 0);
       saveCoLawyers(Number(info.lastInsertRowid), co.list);
       const who = kind === 'schriftsatz' ? (needs.lawyer ? `Anwalt: ${names.join(', ')}` : `für ${d.data.mandant || 'den Mandanten'}`) : names.length > 1 ? `unterzeichnende Anwälte: ${names.join(', ')}` : `unterzeichnender Anwalt: ${lawyer.display_name}`;
       addSystemNote(c.id, req.user, `${t.name} erstellt (${who}${internal ? ', nur intern' : ''}).`, internal);
@@ -501,6 +528,7 @@ function contractDocData(cid) {
     contract: contractRow(k, { withBody: true }),
     case: { id: c.id, caseNumber: c.case_number, title: c.title, area: AREA_LABEL[c.area] || c.area, courtRef: c.court_ref || '', opponent: c.opponent || '' },
     header: header(),
+    fivenetUrl: fivenetUrl(),
   };
 }
 
@@ -518,6 +546,7 @@ router.get('/:cid', (req, res) => {
     contract: contractRow(k, { withBody: true }),
     case: { id: c.id, caseNumber: c.case_number, title: c.title, area: AREA_LABEL[c.area] || c.area, courtRef: c.court_ref || '', opponent: c.opponent || '' },
     header: header(),
+    fivenetUrl: fivenetUrl(),
     can,
   });
 });
@@ -559,7 +588,7 @@ router.patch(
     );
     if (!d) return;
     let lawyerId = k.lawyer_id;
-    const data = applyServices(d.data ? { ...parseData(k.data), ...d.data } : parseData(k.data), d.services);
+    const data = applyServices(d.data ? { ...parseData(k.data), ...cleanData(d.data) } : parseData(k.data), d.services);
     if (d.lawyerId !== undefined && d.lawyerId !== k.lawyer_id) {
       const { lawyer, error } = checkLawyer(d.lawyerId, c, req.user);
       if (error) return res.status(400).json({ error });
