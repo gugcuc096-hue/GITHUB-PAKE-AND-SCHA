@@ -216,6 +216,24 @@ npm run dev             # http://localhost:3000
 
 **Design (Tailwind):** Tailwind CSS v3 ist fest eingebaut (`public/css/tailwind.css`, vorher das Play-CDN `cdn.tailwindcss.com`, das nicht für den Produktivbetrieb gedacht ist). Nach neuen Tailwind-Klassen in HTML oder JavaScript `npm run build:css` ausführen und die Datei mit committen. Sind die Build-Werkzeuge installiert (devDependencies, auf Render bei `npm install` normalerweise der Fall), frischt der Server die Datei beim Start zusätzlich selbst auf. Die Datei wird wie zuvor das CDN als letztes Stylesheet im `<head>` geladen – das Aussehen ist identisch (geprüft: berechnete Styles aller Elemente auf allen Seiten, PC und Handy).
 
+## Automatische Tests
+
+```bash
+npm test                                   # API-Tests + Datei-Prüfungen (ca. 10 Sekunden)
+npm install --no-save playwright && npx playwright install chromium
+npm test                                   # zusätzlich Browser-Tests (PC + Handy)
+```
+
+Jeder Testlauf startet den Server mit einer **frischen Test-Datenbank** in einem Temp-Ordner (feste Test-Passwörter für die drei Team-Konten, keine Discord-/FiveNet-Zugangsdaten – es geht nichts nach außen). Die echte Datenbank wird nie berührt.
+
+| Datei | prüft |
+| --- | --- |
+| `test/api.test.js` | Anmeldung, CSRF-Schutz, Sicherheits-Header, Mandatsanfrage über die Website (inkl. Spam-Schutz), Rechte (Mandant sieht nur Eigenes, interne Notizen bleiben intern), Rechnungen, Papierkorb, Mandantenstimmen mit Freigabe, Datensicherung nur fürs Board |
+| `test/static.test.js` | strenge Content-Security-Policy (keine Inline-Skripte, keine `onclick`-Attribute), alle eingebundenen Dateien vorhanden, die 12 Dashboard-Teile (Reihenfolge, keine doppelten Namen), **keine Tokens/Schlüssel/Webhook-Adressen im Code** |
+| `test/browser.test.js` | Startseite (Tarifrechner, Mandatsdialog, FAQ, Handy-Menü), Registrierung, alle Dashboard-Ansichten am PC und am Handy (ohne seitliches Überlaufen), Druckansichten – jeweils ohne JavaScript-Fehler und ohne CSP-Verstöße |
+
+**GitHub-Prüfung:** `.github/workflows/test.yml` führt alle Tests (inkl. Browser-Tests in Chromium) bei jedem Pull Request und jedem Push auf `main` aus – das Ergebnis steht als grüner Haken bzw. rotes Kreuz am Pull Request. Optional in Render: *Settings → Build & Deploy → Auto-Deploy* auf „After CI Checks Pass“ stellen, dann geht eine Änderung nur live, wenn die Tests bestanden sind.
+
 ## App für PC und Handy (PWA)
 
 Website und Dashboard lassen sich als **App installieren** – ohne App-Store, direkt aus dem Browser:
@@ -441,6 +459,8 @@ systemAlerts.js  Systemwarnungen ans Board (Bot offline, Sicherung, Speicher, Ab
 paymentReminders.js  Zahlungserinnerungen: überfällige Rechnungen einmal automatisch, „Erinnern“ von Hand (Discord-DM + Ticket)
 trash.js         Papierkorb für Akten: Momentaufnahme beim Löschen, Wiederherstellen, endgültig löschen nach 30 Tagen
 scripts/         build-css.js (Tailwind fest bauen: npm run build:css), seed-admin.js
+test/            npm test: api.test.js, static.test.js, browser.test.js, helpers.js (Server mit frischer Test-Datenbank)
+.github/workflows/test.yml  GitHub-Prüfung: alle Tests bei jedem Pull Request
 auth.js          Sessions, Passwörter, Rollen-Middleware
 bootstrap.js     Team-Seed, Notfall-Admin, Passwort-Reset, Datenmigration
 discord.js       Webhooks & OAuth2

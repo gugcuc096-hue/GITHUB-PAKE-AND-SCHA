@@ -6,7 +6,7 @@
  * Wird VOR api.js und site.js geladen. Wie früher das Inline-Skript ohne „use strict“.
  */
 
-/* ---------- Bedienelemente: statt onclick="…" in der Seite steht data-act="…" ---------- */
+/* ---------- Bedienelemente: statt onclick-Attributen in der Seite steht data-act="…" ---------- */
 // Vor allen anderen Listenern angemeldet – dieselbe Reihenfolge wie früher die Inline-Handler.
 const PAGE_ACTIONS = {
     menu: () => toggleMobileMenu(),
