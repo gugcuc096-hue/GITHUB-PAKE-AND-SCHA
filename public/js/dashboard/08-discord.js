@@ -841,12 +841,45 @@ function dmPreviewHtml(p, t) {
   if (!p) return '';
   const tag = { vorhanden: ['Konto', 'emerald'], keins: ['kein Konto', 'slate'], gesperrt: ['gesperrt', 'red'] };
   const tooMany = p.count > p.max;
-  return `<div class="dm-preview mt-3">
+  const rows = p.members
+    .map(
+      (m) => `<div class="dm-row">
+        <label class="dm-who"><input type="checkbox" class="dm-pick" value="${m.id}" ${tooMany ? 'disabled' : 'checked'}>
+          <span class="min-w-0"><span class="dm-nick">${esc(m.name)}</span> <span class="dm-user">@${esc(m.username)}</span></span></label>
+        ${badge(tag[m.account][0], tag[m.account][1])}
+        ${
+          m.account === 'keins'
+            ? `<input class="field dm-newname" data-id="${m.id}" maxlength="80" value="${esc(m.name)}" placeholder="Vor- und Nachname (IC)" aria-label="Name für das Website-Konto von ${esc(m.name)}">`
+            : `<span class="dm-acc">${m.accountName ? `Konto: ${esc(m.accountName)}` : ''}</span>`
+        }</div>`
+    )
+    .join('');
+  return `<div class="dm-preview mt-3${st.dmLogin ? ' with-login' : ''}">
       <div class="text-sm"><strong>${p.count}</strong> Mitglied${p.count === 1 ? '' : 'er'} mit ${dcMention('role', p.role.id)} · ${p.accounts.existing} mit Website-Konto · ${p.accounts.missing} ohne${p.accounts.locked ? ` · ${p.accounts.locked} gesperrt` : ''}</div>
-      ${p.count ? `<div class="dm-names mt-2">${p.members.map((m) => `<span class="dm-name">${esc(m.name)} ${badge(tag[m.account][0], tag[m.account][1])}</span>`).join('')}${p.count > p.members.length ? `<span class="text-xs text-dim">… und ${p.count - p.members.length} weitere</span>` : ''}</div>` : ''}
+      ${
+        p.count
+          ? `<div class="dm-head mt-2"><label class="dm-who"><input type="checkbox" id="dmAll" ${tooMany ? 'disabled' : 'checked'}> <span>alle</span></label><span class="dm-login-only">Name für das neue Website-Konto – vorbelegt mit dem Spitznamen auf dem Server; bitte den IC-Namen prüfen</span></div>
+             <div class="dm-list">${rows}</div>`
+          : ''
+      }
+      ${p.count > p.members.length ? `<p class="text-xs text-dim mt-1">… und ${p.count - p.members.length} weitere</p>` : ''}
       ${tooMany ? `<p class="form-hint text-red-300">Zu viele für Direktnachrichten (höchstens ${p.max}) – bitte eine kleinere Rolle wählen oder in einen Kanal senden.</p>` : ''}
-      ${p.count && !tooMany ? `<div class="form-actions mt-3"><button type="button" class="btn-gold btn-md" data-action="dm-send" data-id="${t.id}">${icon('send', 'ico-sm')}<span>An ${p.count} Mitglied${p.count === 1 ? '' : 'er'} senden</span></button></div>` : ''}
+      ${p.count && !tooMany ? `<div class="form-actions mt-3"><button type="button" class="btn-gold btn-md" data-action="dm-send" data-id="${t.id}">${icon('send', 'ico-sm')}<span data-dm-count>${dmSendLabel(p.count)}</span></button></div>` : ''}
     </div>`;
+}
+const dmSendLabel = (n) => `An ${n} ausgewählte${n === 1 ? 's Mitglied' : ' Mitglieder'} senden`;
+/** Auswahl geändert: Zähler auf dem Knopf und „alle“ nachziehen. */
+function dmSyncPicks() {
+  const picks = $$('#dmPreview .dm-pick');
+  const n = picks.filter((x) => x.checked).length;
+  const label = $('#dmPreview [data-dm-count]');
+  if (label) label.textContent = dmSendLabel(n);
+  const all = $('#dmAll');
+  if (all) {
+    all.checked = n === picks.length;
+    all.indeterminate = n > 0 && n < picks.length;
+  }
+  $$('#dmPreview .dm-row').forEach((row) => row.classList.toggle('off', !row.querySelector('.dm-pick').checked));
 }
 function dmRunsHtml(runs) {
   if (!runs) return '<p class="text-sm text-dim">Frühere Versände werden geladen …</p>';

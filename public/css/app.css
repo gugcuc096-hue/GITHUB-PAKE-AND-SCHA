@@ -990,8 +990,21 @@ body.ps-dialog-open { overflow: hidden; }
 .msg-ping .dc-mention { white-space: nowrap; }
 /* Per DM an Rolle: Empfänger und Fortschritt */
 .dm-preview { padding: 0.8rem 0.9rem; border: 1px solid var(--glass-border); border-radius: 12px; background: rgba(255, 255, 255, 0.02); }
-.dm-names { display: flex; flex-wrap: wrap; gap: 0.35rem 0.6rem; max-height: 12rem; overflow-y: auto; }
-.dm-name { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; color: var(--text-muted); min-width: 0; overflow-wrap: anywhere; }
+.dm-head { display: flex; flex-wrap: wrap; gap: 0.35rem 1rem; align-items: center; font-size: 0.72rem; color: var(--text-dim); padding: 0 0.15rem 0.35rem; border-bottom: 1px solid var(--glass-border); }
+.dm-list { display: grid; max-height: 22rem; overflow-y: auto; }
+.dm-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 15rem); gap: 0.35rem 0.75rem; align-items: center; padding: 0.4rem 0.15rem; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.dm-row.off { opacity: 0.45; }
+.dm-who { display: flex; align-items: center; gap: 0.5rem; min-width: 0; cursor: pointer; font-size: 0.85rem; }
+.dm-who input { width: 16px; height: 16px; accent-color: var(--gold-500); flex-shrink: 0; }
+.dm-nick { color: var(--text); overflow-wrap: anywhere; }
+.dm-user { color: var(--text-dim); font-size: 0.75rem; overflow-wrap: anywhere; }
+.dm-acc { font-size: 0.75rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.dm-newname { min-height: 0; padding: 0.35rem 0.6rem; font-size: 0.82rem; }
+.dm-preview:not(.with-login) .dm-newname, .dm-preview:not(.with-login) .dm-login-only { display: none; }
+@media (max-width: 639px) {
+  .dm-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .dm-row .dm-newname, .dm-row .dm-acc { grid-column: 1 / -1; }
+}
 .dm-bar { height: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
 .dm-bar span { display: block; height: 100%; background: linear-gradient(90deg, #b8962e, #d4af37); transition: width 0.4s ease; }
 .dm-problems { margin: 0.35rem 0 0; padding-left: 1.1rem; font-size: 0.75rem; color: var(--text-muted); list-style: disc; }

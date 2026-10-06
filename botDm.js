@@ -64,7 +64,13 @@ async function preview(roleId) {
   const list = await membersWithRole(roleId);
   const members = list.map((m) => {
     const acc = accountOf(m.user.id);
-    return { id: m.user.id, name: memberName(m), account: acc ? (acc.active ? 'vorhanden' : 'gesperrt') : 'keins' };
+    return {
+      id: m.user.id,
+      name: memberName(m),
+      username: m.user.username || '',
+      account: acc ? (acc.active ? 'vorhanden' : 'gesperrt') : 'keins',
+      accountName: acc ? acc.display_name : null,
+    };
   });
   return {
     role,
@@ -75,7 +81,7 @@ async function preview(roleId) {
       missing: members.filter((m) => m.account === 'keins').length,
       locked: members.filter((m) => m.account === 'gesperrt').length,
     },
-    members: members.slice(0, 100),
+    members: members.slice(0, MAX_RECIPIENTS),
   };
 }
 
@@ -91,8 +97,9 @@ function freeEmail(name, discordId) {
   return `mandant.${discordId}@${EMAIL_DOMAIN}`;
 }
 
-function createAccount(m) {
-  const name = truncate(memberName(m), 80);
+/** name: vom Board vor dem Senden geprüfter Name (sonst der Anzeigename auf dem Server). */
+function createAccount(m, chosenName) {
+  const name = truncate(String(chosenName || memberName(m)).trim(), 80);
   const displayName = name.length >= 2 ? name : `Mandant ${m.user.id.slice(-4)}`;
   const email = freeEmail(displayName, m.user.id);
   const password = generateTempPassword();
@@ -166,7 +173,7 @@ function runs(templateId = null) {
 }
 
 /** Einem Mitglied schicken: Vorlage (+ ggf. Zugang). Liefert 'neu' | 'vorhanden' | 'gesperrt' | null. */
-async function sendTo(m, t, guild, withLogin, starter) {
+async function sendTo(m, t, guild, withLogin, starter, chosenName) {
   const payload = msgs.build(JSON.parse(t.data || '{}'), guild);
   payload.allowed_mentions = { parse: [] }; // in Direktnachrichten pingt niemand
   let created = null;
@@ -174,7 +181,7 @@ async function sendTo(m, t, guild, withLogin, starter) {
   if (withLogin) {
     const acc = accountOf(m.user.id);
     if (!acc) {
-      created = createAccount(m);
+      created = createAccount(m, chosenName);
       kind = 'neu';
       payload.embeds = [...payload.embeds, accessEmbed('neu', created)].slice(0, 10);
     } else if (acc.active) {
@@ -204,7 +211,7 @@ async function sendTo(m, t, guild, withLogin, starter) {
 const reason = (err) =>
   err && err.code === 50007 ? 'nimmt keine Direktnachrichten an' : err && err.status === 404 ? 'nicht mehr auf dem Server' : truncate(String((err && err.message) || err), 160);
 
-async function work(runId, list, t, withLogin, starter) {
+async function work(runId, list, t, withLogin, starter, names = new Map()) {
   const guild = await tickets.rest('GET', `/guilds/${tickets.config().guildId}?with_counts=true`).catch(() => null);
   const problems = [];
   const n = { sent: 0, failed: 0, created: 0, existing: 0 };
@@ -222,7 +229,7 @@ async function work(runId, list, t, withLogin, starter) {
       }
       const m = list[i];
       try {
-        const kind = await sendTo(m, t, guild, withLogin, starter);
+        const kind = await sendTo(m, t, guild, withLogin, starter, names.get(m.user.id));
         n.sent++;
         if (kind === 'neu') n.created++;
         if (kind === 'vorhanden') n.existing++;
@@ -244,14 +251,24 @@ async function work(runId, list, t, withLogin, starter) {
   logActivity(starter, 'Discord-Bot: Direktnachrichten an Rolle', 'settings', null, `${t.name}: ${n.sent} gesendet, ${n.failed} nicht zugestellt${withLogin ? `, ${n.created} Konto/Konten angelegt` : ''} (${status})`);
 }
 
-/** Durchgang starten (läuft im Hintergrund weiter). */
-async function start(t, roleId, withLogin, starter) {
+/**
+ * Durchgang starten (läuft im Hintergrund weiter). recipients (optional): die vom Board ausgewählten Mitglieder,
+ * je mit geprüftem Namen für ein neues Website-Konto – [{ id, name? }]. Ohne Angabe: alle mit der Rolle.
+ */
+async function start(t, roleId, withLogin, starter, recipients = null) {
   ensureReady();
   if (active) throw Object.assign(new Error('Es läuft bereits ein Versand per Direktnachricht – bitte warten oder abbrechen.'), { status: 409 });
   const role = await roleInfo(roleId);
   if (!msgs.build(JSON.parse(t.data || '{}'), null)) throw Object.assign(new Error('Die Vorlage ist leer.'), { status: 400 });
-  const list = await membersWithRole(roleId);
+  let list = await membersWithRole(roleId);
   if (!list.length) throw Object.assign(new Error(`Niemand auf dem Server hat die Rolle „${role.name}“.`), { status: 400 });
+  const names = new Map();
+  if (recipients) {
+    const chosen = new Map(recipients.map((r) => [r.id, r.name]));
+    list = list.filter((m) => chosen.has(m.user.id)); // nur Ausgewählte, die die Rolle (noch) haben
+    if (!list.length) throw Object.assign(new Error('Bitte mindestens ein Mitglied auswählen.'), { status: 400 });
+    for (const [id, name] of chosen) if (name) names.set(id, name);
+  }
   if (list.length > MAX_RECIPIENTS) {
     throw Object.assign(new Error(`Die Rolle „${role.name}“ haben ${list.length} Mitglieder – per Direktnachricht gehen höchstens ${MAX_RECIPIENTS} auf einmal. Bitte eine kleinere Rolle wählen oder die Nachricht in einen Kanal senden.`), { status: 400 });
   }
@@ -261,7 +278,7 @@ async function start(t, roleId, withLogin, starter) {
   const runId = Number(info.lastInsertRowid);
   active = { id: runId, cancel: false };
   const who = { id: starter.id, display_name: starter.display_name };
-  work(runId, list, t, withLogin, who)
+  work(runId, list, t, withLogin, who, names)
     .catch((err) => console.warn('Direktnachrichten an Rolle:', err.message))
     .finally(() => {
       active = null;

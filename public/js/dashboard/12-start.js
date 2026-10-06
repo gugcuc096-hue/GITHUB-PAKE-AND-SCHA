@@ -157,7 +157,12 @@ document.addEventListener('change', (e) => {
     const box = $('#dmPreview');
     if (box) box.innerHTML = '';
   }
-  if (t.id === 'dmLogin') st.dmLogin = t.checked;
+  if (t.id === 'dmLogin') {
+    st.dmLogin = t.checked;
+    $('#dmPreview .dm-preview')?.classList.toggle('with-login', t.checked); // Namensfelder nur mit Website-Zugang
+  }
+  if (t.id === 'dmAll') $$('#dmPreview .dm-pick').forEach((x) => (x.checked = t.checked));
+  if (t.id === 'dmAll' || (t.classList && t.classList.contains('dm-pick'))) dmSyncPicks();
   // Vorlage: Rolle erwähnen → <@&ID> an der Schreibmarke einfügen
   if (t.id === 'msgRoleInsert') {
     if (t.value) insertTemplateText(t.closest('form'), `<@&${t.value}>`);

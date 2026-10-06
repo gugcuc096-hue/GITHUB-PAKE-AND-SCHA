@@ -103,7 +103,7 @@ describe('Nachrichten-Vorlagen: Rollen und Direktnachrichten', () => {
     const p = await admin.get(`/api/bot/messages/${tid}/dm?roleId=${ROLES.burgershot}`);
     assert.equal(p.status, 200, p.text);
     assert.equal(p.json.count, 3, 'zwei Bots ausgenommen');
-    assert.deepEqual(p.json.members.map((m) => m.name), ['Closed Dms', 'John Jaywa', 'MO']);
+    assert.deepEqual(p.json.members.map((m) => [m.name, m.username]), [['Closed Dms', 'closed'], ['John Jaywa', 'jaywa'], ['MO', 'mo']]);
     assert.deepEqual(p.json.accounts, { existing: 0, missing: 3, locked: 0 });
   });
 
@@ -113,8 +113,23 @@ describe('Nachrichten-Vorlagen: Rollen und Direktnachrichten', () => {
     assert.equal((await lawyer.post(`/api/bot/messages/${tid}/dm`, { roleId: ROLES.burgershot, withLogin: true })).status, 403);
   });
 
-  it('Versand mit Website-Zugang: neue Konten mit verknüpftem Discord und Einmal-Passwort', async () => {
-    const r = await admin.post(`/api/bot/messages/${tid}/dm`, { roleId: ROLES.burgershot, withLogin: true });
+  it('Auswahl und Namen werden geprüft', async () => {
+    const tooShort = await admin.post(`/api/bot/messages/${tid}/dm`, { roleId: ROLES.burgershot, withLogin: true, recipients: [{ id: MEMBERS.jaywa, name: 'J' }] });
+    assert.equal(tooShort.status, 400);
+    assert.match(tooShort.json.error, /mindestens 2 Zeichen/);
+    // Nur Mitglieder mit der Rolle zählen – wer sie nicht hat, wird nicht angeschrieben
+    const none = await admin.post(`/api/bot/messages/${tid}/dm`, { roleId: ROLES.burgershot, withLogin: true, recipients: [{ id: '900000000000000999' }] });
+    assert.equal(none.status, 400);
+    assert.equal((await admin.get('/api/bot/dm-runs')).json.runs.length, 0);
+  });
+
+  it('Versand mit Website-Zugang: neue Konten mit geprüftem Namen, verknüpftem Discord und Einmal-Passwort', async () => {
+    const r = await admin.post(`/api/bot/messages/${tid}/dm`, {
+      roleId: ROLES.burgershot,
+      withLogin: true,
+      // Name fürs Konto vom Board korrigiert; MO ohne Angabe → Spitzname
+      recipients: [{ id: MEMBERS.jaywa, name: 'John Doe' }, { id: MEMBERS.mo }, { id: MEMBERS.closed, name: 'Carl Closed' }],
+    });
     assert.equal(r.status, 201, r.text);
     assert.equal(r.json.run.total, 3);
     const run = await waitForRun(tid);
@@ -134,20 +149,21 @@ describe('Nachrichten-Vorlagen: Rollen und Direktnachrichten', () => {
     assert.match(access.description, /Discord ist bereits verknüpft/);
     const email = access.fields.find((f) => f.name === 'E-Mail-Adresse').value.replace(/`/g, '');
     const password = access.fields.find((f) => f.name === 'Einmal-Passwort').value.match(/\|\|`([^`]+)`\|\|/)[1];
-    assert.equal(email, 'john.jaywa@pake-scha.ls');
+    assert.equal(email, 'john.doe@pake-scha.ls');
+    assert.match(access.description, /Hallo \*\*John Doe\*\*/);
     assert.deepEqual(jaywa.components.at(-1).components[0], { type: 2, style: 5, label: 'Zur Anmeldung', url: 'https://kanzlei.example/login.html' });
 
     // Mit den Zugangsdaten aus der Direktnachricht anmelden – neues Passwort ist Pflicht
     const john = client(server.base);
     const u = await john.login(email, password);
     assert.equal(u.role, 'mandant');
-    assert.equal(u.displayName, 'John Jaywa');
+    assert.equal(u.displayName, 'John Doe');
     assert.equal(u.mustChangePassword, true);
 
     // Wer keine Direktnachrichten annimmt, bekommt auch kein Konto (das Passwort kennt niemand)
     const { users } = (await admin.get('/api/admin/users')).json;
     assert.ok(users.some((x) => x.email === 'mo@pake-scha.ls'));
-    assert.ok(!users.some((x) => x.displayName === 'Closed Dms'), 'Konto wieder entfernt');
+    assert.ok(!users.some((x) => x.displayName === 'Carl Closed' || x.displayName === 'Closed Dms'), 'Konto wieder entfernt');
     assert.ok(!JSON.stringify((await admin.get('/api/bot/dm-runs')).json).includes(password), 'Passwort nirgends gespeichert');
   });
 
@@ -164,8 +180,12 @@ describe('Nachrichten-Vorlagen: Rollen und Direktnachrichten', () => {
     assert.equal((await admin.get('/api/bot/dm-runs')).json.runs.length, 2);
   });
 
-  it('ohne Website-Zugang nur die Vorlage; unbekannte Rolle wird abgelehnt', async () => {
-    const before = stubState().dms.length;
+  it('ohne Website-Zugang nur die Vorlage, nur an Ausgewählte; unbekannte Rolle wird abgelehnt', async () => {
+    let before = stubState().dms.length;
+    assert.equal((await admin.post(`/api/bot/messages/${tid}/dm`, { roleId: ROLES.burgershot, withLogin: false, recipients: [{ id: MEMBERS.mo }] })).status, 201);
+    assert.equal((await waitForRun(tid)).total, 1);
+    assert.deepEqual(stubState().dms.slice(before).map((d) => d.to), [MEMBERS.mo]);
+    before = stubState().dms.length;
     assert.equal((await admin.post(`/api/bot/messages/${tid}/dm`, { roleId: ROLES.burgershot, withLogin: false })).status, 201);
     await waitForRun(tid);
     const sent = stubState().dms.slice(before);

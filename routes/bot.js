@@ -408,10 +408,25 @@ router.post(
   wrap(async (req, res) => {
     const t = loadTemplate(req, res);
     if (!t) return;
-    const d = parseBody(z.object({ roleId: id, withLogin: z.boolean() }), req, res);
+    const d = parseBody(
+      z.object({
+        roleId: id,
+        withLogin: z.boolean(),
+        // Ausgewählte Empfänger, je optional mit geprüftem Namen für ein neues Website-Konto
+        recipients: z
+          .array(z.object({ id, name: z.string().trim().max(80).optional() }))
+          .max(dm.MAX_RECIPIENTS)
+          .optional(),
+      }),
+      req,
+      res
+    );
     if (!d) return;
+    if ((d.recipients || []).some((r) => r.name !== undefined && r.name.length < 2)) {
+      return res.status(400).json({ error: 'Bitte für jedes neue Website-Konto einen Namen mit mindestens 2 Zeichen angeben.' });
+    }
     try {
-      const run = await dm.start(t, d.roleId, d.withLogin, req.user);
+      const run = await dm.start(t, d.roleId, d.withLogin, req.user, d.recipients || null);
       logActivity(req.user, 'Discord-Bot: Direktnachrichten an Rolle gestartet', 'settings', null, `${t.name} → @${run.roleName} (${run.total} Mitglieder${d.withLogin ? ', mit Website-Zugang' : ''})`);
       res.status(201).json({ run, runs: dm.runs(t.id) });
     } catch (err) {
