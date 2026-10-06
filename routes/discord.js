@@ -120,7 +120,8 @@ router.get(
 
     if (!req.user) return res.redirect('/login.html?discord=session');
     const other = db.prepare('SELECT id FROM users WHERE discord_id = ? AND id != ?').get(profile.id, req.user.id);
-    if (other) return fail('taken');
+    // Hängt das Discord an einem vom Bot angelegten, nie benutzten Konto, gibt dieses es frei (die Person hat schon ein eigenes)
+    if (other && !require('../botDm').releaseUnusedBotAccount(profile.id, req.user.id)) return fail('taken');
     const previousDiscordId = req.user.discord_id;
     db.prepare('UPDATE users SET discord_id = ?, discord_username = ?, discord_avatar = ? WHERE id = ?').run(
       profile.id,

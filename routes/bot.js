@@ -13,6 +13,7 @@ const { logActivity } = require('../models');
 const { db } = require('../db');
 const bot = require('../discordBot');
 const msgs = require('../botMessages');
+const dm = require('../botDm');
 const { idParam } = require('../helpers');
 
 const router = express.Router();
@@ -384,6 +385,51 @@ router.post(
     res.json({ template: msgs.templateRow(msgs.getTemplate(t.id)), ...messagesOverview() });
   })
 );
+
+/** Per Direktnachricht an alle Mitglieder einer Rolle: Vorschau der Empfänger (wer hat schon ein Website-Konto?). */
+router.get(
+  '/messages/:tid/dm',
+  wrap(async (req, res) => {
+    const t = loadTemplate(req, res);
+    if (!t) return;
+    const roleId = String(req.query.roleId || '');
+    if (!ID.test(roleId)) return res.status(400).json({ error: 'Bitte eine Rolle wählen.' });
+    try {
+      res.json(await dm.preview(roleId));
+    } catch (err) {
+      res.status(err.status === 400 ? 400 : 502).json({ error: err.message });
+    }
+  })
+);
+
+/** Versand starten – läuft im Hintergrund (langsam, abbrechbar); Fortschritt über /dm-runs. */
+router.post(
+  '/messages/:tid/dm',
+  wrap(async (req, res) => {
+    const t = loadTemplate(req, res);
+    if (!t) return;
+    const d = parseBody(z.object({ roleId: id, withLogin: z.boolean() }), req, res);
+    if (!d) return;
+    try {
+      const run = await dm.start(t, d.roleId, d.withLogin, req.user);
+      logActivity(req.user, 'Discord-Bot: Direktnachrichten an Rolle gestartet', 'settings', null, `${t.name} → @${run.roleName} (${run.total} Mitglieder${d.withLogin ? ', mit Website-Zugang' : ''})`);
+      res.status(201).json({ run, runs: dm.runs(t.id) });
+    } catch (err) {
+      res.status([400, 409].includes(err.status) ? err.status : 502).json({ error: err.message });
+    }
+  })
+);
+
+router.get('/dm-runs', (req, res) => res.json({ runs: dm.runs(Number(req.query.templateId) || null) }));
+
+router.post('/dm-runs/:rid/cancel', (req, res) => {
+  const rid = idParam(req, 'rid');
+  const run = rid && db.prepare('SELECT template_id FROM bot_dm_runs WHERE id = ?').get(rid);
+  if (!run) return res.status(404).json({ error: 'Versand nicht gefunden.' });
+  const cancelled = dm.cancel(rid);
+  if (cancelled) logActivity(req.user, 'Discord-Bot: Direktnachrichten abgebrochen', 'settings', rid);
+  res.json({ cancelled, runs: dm.runs(run.template_id) });
+});
 
 /** Gesendete Nachricht auf den aktuellen Stand der Vorlage bringen bzw. in Discord löschen. */
 function loadSent(req, res, t) {

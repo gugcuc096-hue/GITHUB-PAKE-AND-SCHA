@@ -246,12 +246,31 @@ function sampleVars() {
 }
 const fillVars = (text, vars) => String(text || '').replace(/\{(?:user(?:\.(?:name|username|id|avatar))?|server|membercount|date|website)\}/g, (m) => vars[m] ?? m);
 /** Discord-Markdown für die Vorschau (Text ist escaped). */
-/** Discord-Formatierung innerhalb einer Zeile (fett, kursiv, Code, Links, Spoiler …). Alles wird escaped. */
+/** Erwähnung wie in Discord: Rolle in ihrer Farbe mit Namen, Kanal mit Namen, Mitglied/@everyone als Markierung. */
+function dcMention(kind, id) {
+  if (kind === 'role') {
+    const r = (botRoleList() || []).find((x) => x.id === id);
+    const style = r && r.color ? ` style="--role:${esc(r.color)}"` : '';
+    return `<span class="dc-mention role${r ? '' : ' unknown'}"${style} title="Rolle · ID ${esc(id)}">@${esc(r ? r.name : 'unbekannte Rolle')}</span>`;
+  }
+  if (kind === 'channel') {
+    const c = ((st.botDiscord && st.botDiscord.channels) || []).find((x) => x.id === id);
+    return `<span class="dc-mention" title="Kanal · ID ${esc(id)}">#${esc(c ? c.name : 'unbekannter Kanal')}</span>`;
+  }
+  if (kind === 'user') return `<span class="dc-mention" title="Mitglied · ID ${esc(id)}">@Mitglied</span>`;
+  return `<span class="dc-mention">@${esc(kind)}</span>`;
+}
+
+/** Discord-Formatierung innerhalb einer Zeile (fett, kursiv, Code, Links, Spoiler, Erwähnungen …). Alles wird escaped. */
 function dcInline(text, mentionName = '') {
   const keep = [];
   const stash = (html) => `\u0002${keep.push(html) - 1}\u0003`;
   return esc(text)
     .replace(/`([^`\n]+)`/g, (m, c) => stash(`<code>${c}</code>`))
+    .replace(/&lt;@&amp;(\d{15,25})&gt;/g, (m, id) => stash(dcMention('role', id)))
+    .replace(/&lt;@!?(\d{15,25})&gt;/g, (m, id) => stash(dcMention('user', id)))
+    .replace(/&lt;#(\d{15,25})&gt;/g, (m, id) => stash(dcMention('channel', id)))
+    .replace(/@(everyone|here)\b/g, (m, k) => stash(dcMention(k)))
     .replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, (m, t, u) => stash(`<span class="dc-link" title="${u}">${t}</span>`))
     .replace(/https?:\/\/[^\s<]+/g, (m) => stash(`<span class="dc-link">${m}</span>`))
     .replace(/\u0001/g, `<span class="dc-mention">@${esc(mentionName)}</span>`)
@@ -549,7 +568,9 @@ function botMessagesModule() {
         ? list
             .map((t) => {
               const e = t.data.embed || {};
-              const summary = [t.data.content ? 'Text' : '', e.enabled ? `Embed${e.title ? ` „${e.title}“` : ''}` : '', (t.data.buttons || []).length ? `${t.data.buttons.length} Button(s)` : ''].filter(Boolean).join(' · ');
+              const pings = t.data.allowMentions ? mentionsIn(t.data.content) : [];
+              const pingText = pings.length ? `pingt ${pings.map((x) => (x.kind === 'role' ? `@${((botRoleList() || []).find((r) => r.id === x.id) || {}).name || 'Rolle'}` : x.kind === 'user' ? '@Mitglied' : `@${x.kind}`)).join(', ')}` : '';
+              const summary = [t.data.content ? 'Text' : '', e.enabled ? `Embed${e.title ? ` „${e.title}“` : ''}` : '', (t.data.buttons || []).length ? `${t.data.buttons.length} Button(s)` : '', pingText].filter(Boolean).join(' · ');
               return `<div class="msg-card">
                   <div class="msg-main"><div class="flex flex-wrap items-center gap-2"><span class="font-medium">${esc(t.name)}</span>${t.jobs
                   .map((j) => badge(`${jobLabel(j)} → ${channelName(j.channelId)}${j.enabled ? '' : ' (pausiert)'}`, j.enabled ? (j.lastError ? 'red' : 'emerald') : 'slate'))
@@ -565,6 +586,72 @@ function botMessagesModule() {
         : '<p class="text-sm text-dim">Noch keine Vorlage – „Neue Vorlage“ anlegen, z. B. eine Ankündigung, Regeln oder ein Hinweis auf die Website.</p>'
     }</div>
     </section>`;
+}
+
+/* Wer wird gepingt? Erwähnungen in Nachricht und Embed – mit Hinweis, wenn ein Ping nicht ankommt */
+const MENTION_RE = /<@(&|!?)(\d{15,25})>|@(everyone|here)\b/g;
+function mentionsIn(text) {
+  const seen = new Map();
+  for (const m of String(text || '').matchAll(MENTION_RE)) {
+    const x = m[3] ? { kind: m[3], key: m[3] } : { kind: m[1] === '&' ? 'role' : 'user', id: m[2], key: `${m[1] === '&' ? 'r' : 'u'}${m[2]}` };
+    seen.set(x.key, x);
+  }
+  return [...seen.values()];
+}
+function msgPingsHtml(d) {
+  const e = d.embed || {};
+  const inText = mentionsIn(d.content);
+  const inEmbed = e.enabled ? mentionsIn([e.author, e.title, e.description, e.footer, ...(e.fields || []).flatMap((f) => [f.name, f.value])].join('\n')) : [];
+  const onlyEmbed = inEmbed.filter((x) => !inText.some((y) => y.key === x.key));
+  if (!inText.length && !onlyEmbed.length) return '';
+  const roles = botRoleList();
+  const role = (x) => (roles || []).find((r) => r.id === x.id);
+  const chip = (x) => dcMention(x.kind, x.id);
+  const lines = [];
+  if (inText.length) {
+    lines.push(
+      d.allowMentions
+        ? `<div class="msg-ping on">${icon('bell', 'ico-sm')}<span><strong>Pingt beim Senden:</strong> ${inText.map(chip).join(' ')}</span></div>`
+        : `<div class="msg-ping off">${icon('bell', 'ico-sm')}<span><strong>Pingt niemanden:</strong> ${inText.map(chip).join(' ')} steht im Text, aber „Erwähnungen pingen“ ist aus.</span></div>`
+    );
+    if (d.allowMentions && roles) {
+      const canAll = !!(st.botDiscord && st.botDiscord.botMentionAll);
+      inText
+        .filter((x) => x.kind === 'role' && !role(x))
+        .forEach((x) => lines.push(`<div class="msg-ping warn">${icon('alert', 'ico-sm')}<span>Die Rolle mit der ID <span class="font-mono">${esc(x.id)}</span> gibt es auf dem Server nicht – bitte die Rollen-ID prüfen.</span></div>`));
+      inText
+        .filter((x) => x.kind === 'role' && role(x) && !role(x).mentionable && !canAll)
+        .forEach((x) =>
+          lines.push(`<div class="msg-ping warn">${icon('alert', 'ico-sm')}<span>${chip(x)} erscheint, wird aber <strong>nicht benachrichtigt</strong>: In Discord bei der Rolle „Allen erlauben, @Erwähnungen für diese Rolle zu verwenden“ einschalten – oder dem Bot das Recht „@everyone, @here und alle Rollen erwähnen“ geben.</span></div>`)
+        );
+      if (inText.some((x) => x.kind === 'everyone' || x.kind === 'here') && !canAll) {
+        lines.push(`<div class="msg-ping warn">${icon('alert', 'ico-sm')}<span>Für @everyone/@here braucht der Bot das Recht „@everyone, @here und alle Rollen erwähnen“.</span></div>`);
+      }
+    }
+  }
+  if (onlyEmbed.length) {
+    lines.push(`<div class="msg-ping info">${icon('eye', 'ico-sm')}<span>${onlyEmbed.map(chip).join(' ')} im Embed ${onlyEmbed.length === 1 ? 'wird' : 'werden'} nur angezeigt, nicht gepingt – für einen Ping in „Nachricht“ schreiben.</span></div>`);
+  }
+  return lines.join('');
+}
+/** Text (Platzhalter, Erwähnung) an der Schreibmarke einfügen – im zuletzt benutzten Feld, sonst in „Nachricht“. */
+function insertTemplateText(inForm, text) {
+  if (!inForm) return;
+  const remembered = st.wlField && st.wlField.isConnected && st.wlField.closest('form') === inForm ? st.wlField : null;
+  const field = remembered || inForm.querySelector('textarea[data-k="content"], textarea[data-k="data.content"]');
+  if (!field) return;
+  field.focus();
+  field.setRangeText(text, field.selectionStart, field.selectionEnd, 'end');
+  if (inForm.id === 'msgForm') updateMsgPreview(inForm);
+  else updateWelcomePreview(inForm);
+}
+/** Auswahl „Rolle erwähnen“: fügt <@&ID> an der Schreibmarke ein (zuletzt benutztes Feld, sonst „Nachricht“). */
+function msgRoleInsert() {
+  const roles = (botRoleList() || []).filter((r) => !r.managed);
+  if (!roles.length) return '';
+  return `<select id="msgRoleInsert" class="field msg-role-insert" aria-label="Rolle erwähnen">
+      <option value="">@ Rolle erwähnen …</option>
+      ${roles.map((r) => `<option value="${r.id}">@${esc(r.name)}</option>`).join('')}</select>`;
 }
 
 /* Editor */
@@ -593,9 +680,10 @@ function msgEditor(t) {
       <div class="wl-grid">
         <div class="wl-editor">
           <div><label class="label" for="msgName">Name der Vorlage</label><input id="msgName" data-k="name" class="field" required minlength="2" maxlength="80" value="${esc(t ? t.name : '')}" placeholder="z. B. Ankündigung Öffnungszeiten"></div>
-          <div class="tpl-chips">${chips}</div>
+          <div class="tpl-chips">${chips}${msgRoleInsert()}</div>
           <div><label class="label">Nachricht</label><textarea data-k="data.content" class="field" rows="3" maxlength="2000" placeholder="Text über dem Embed (optional) – **fett**, *kursiv*, Links …">${esc(d.content || '')}</textarea></div>
           <label class="check"><input type="checkbox" data-k="data.allowMentions" ${d.allowMentions ? 'checked' : ''}> Erwähnungen pingen (@everyone, @Rolle, @Person im Text)</label>
+          <div id="msgPings" class="msg-pings" aria-live="polite">${msgPingsHtml(d)}</div>
           <div class="emb-edit">
             <label class="check"><input type="checkbox" data-k="data.embed.enabled" data-emb-toggle ${e.enabled ? 'checked' : ''}> Embed anhängen</label>
             <div class="emb-fields" ${e.enabled ? '' : 'hidden'}>
@@ -684,6 +772,7 @@ function msgUse(t) {
     ['sent', `Gesendet (${t.sent.length})`],
     ['zeitplan', `Zeitplan (${jobs('zeitplan').length})`],
     ['nachrichten', `Alle X Nachrichten (${jobs('nachrichten').length})`],
+    ['dm', 'Per DM an Rolle'],
   ];
   const jobList = (kind) =>
     jobs(kind).length
@@ -726,6 +815,8 @@ function msgUse(t) {
           </div>
           <div class="form-actions mt-3"><button type="button" class="btn-gold btn-md" data-action="msg-job-add" data-kind="zeitplan" data-id="${t.id}">${icon('plus', 'ico-sm')}<span>Zeitplan anlegen</span></button></div>
           <p class="form-hint">Mindestens alle ${st.botMessages.limits.minInterval} Minuten. Beispiel: täglich um 18:00 → erster Versand heute 18:00, alle 1 Tage. War der Server zum Termin aus, wird einmal nachgeholt.</p></div>`;
+  } else if (tab === 'dm') {
+    pane = dmPane(t);
   } else {
     // „verbindet“/„getrennt“ = meldet sich gerade (neu) an – nur bei Fehler oder aus warnen
     const connected = !st.bot || !['fehler', 'aus'].includes(st.bot.status.state);
@@ -744,6 +835,61 @@ function msgUse(t) {
     .join('')}</div><div class="mt-3">${pane}</div>`;
 }
 
+/* Per Direktnachricht an alle Mitglieder einer Rolle (z. B. Anleitung für die Mitarbeiter eines Kooperationspartners) */
+const DM_STATUS = { läuft: ['läuft', 'amber'], fertig: ['fertig', 'emerald'], abgebrochen: ['abgebrochen', 'slate'], fehler: ['Fehler', 'red'] };
+function dmPreviewHtml(p, t) {
+  if (!p) return '';
+  const tag = { vorhanden: ['Konto', 'emerald'], keins: ['kein Konto', 'slate'], gesperrt: ['gesperrt', 'red'] };
+  const tooMany = p.count > p.max;
+  return `<div class="dm-preview mt-3">
+      <div class="text-sm"><strong>${p.count}</strong> Mitglied${p.count === 1 ? '' : 'er'} mit ${dcMention('role', p.role.id)} · ${p.accounts.existing} mit Website-Konto · ${p.accounts.missing} ohne${p.accounts.locked ? ` · ${p.accounts.locked} gesperrt` : ''}</div>
+      ${p.count ? `<div class="dm-names mt-2">${p.members.map((m) => `<span class="dm-name">${esc(m.name)} ${badge(tag[m.account][0], tag[m.account][1])}</span>`).join('')}${p.count > p.members.length ? `<span class="text-xs text-dim">… und ${p.count - p.members.length} weitere</span>` : ''}</div>` : ''}
+      ${tooMany ? `<p class="form-hint text-red-300">Zu viele für Direktnachrichten (höchstens ${p.max}) – bitte eine kleinere Rolle wählen oder in einen Kanal senden.</p>` : ''}
+      ${p.count && !tooMany ? `<div class="form-actions mt-3"><button type="button" class="btn-gold btn-md" data-action="dm-send" data-id="${t.id}">${icon('send', 'ico-sm')}<span>An ${p.count} Mitglied${p.count === 1 ? '' : 'er'} senden</span></button></div>` : ''}
+    </div>`;
+}
+function dmRunsHtml(runs) {
+  if (!runs) return '<p class="text-sm text-dim">Frühere Versände werden geladen …</p>';
+  if (!runs.length) return '';
+  return `<div class="form-sub mt-4">Versände</div><div class="msg-jobs">${runs
+    .map((r) => {
+      const [label, color] = DM_STATUS[r.status] || [r.status, 'slate'];
+      const done = r.sent + r.failed;
+      return `<div class="msg-job"><div class="min-w-0 grow">
+          <div class="flex flex-wrap items-center gap-2"><span class="font-medium">@${esc(r.roleName)}</span>${badge(label, color)}${r.withLogin ? badge('mit Website-Zugang', 'sky') : ''}</div>
+          <div class="text-xs text-dim mt-1">${done}/${r.total} · ${r.sent} zugestellt${r.failed ? ` · ${r.failed} nicht zugestellt` : ''}${r.withLogin ? ` · ${r.accountsCreated} Konto/Konten angelegt · ${r.accountsExisting} vorhanden` : ''} · ${esc(fmtDate(r.startedAt))}${r.startedByName ? ` von ${esc(r.startedByName)}` : ''}</div>
+          ${r.status === 'läuft' ? `<div class="dm-bar mt-2"><span style="width:${r.total ? Math.round((done / r.total) * 100) : 0}%"></span></div>` : ''}
+          ${r.error ? `<div class="text-xs text-red-300 mt-1">${esc(r.error)}</div>` : ''}
+          ${r.problems.length ? `<details class="mt-1"><summary class="text-xs text-muted">${r.problems.length} Hinweis${r.problems.length === 1 ? '' : 'e'}</summary><ul class="dm-problems">${r.problems.map((x) => `<li><strong>${esc(x.name)}</strong>: ${esc(x.reason)}</li>`).join('')}</ul></details>` : ''}
+        </div>${r.status === 'läuft' ? `<div class="msg-actions"><button type="button" class="btn-ghost btn-sm fn-danger" data-action="dm-cancel" data-rid="${r.id}">Abbrechen</button></div>` : ''}</div>`;
+    })
+    .join('')}</div>`;
+}
+function dmPane(t) {
+  const runs = st.dmRunsFor === t.id ? st.dmRuns : null;
+  if (!runs) setTimeout(() => guard(() => refreshDmRuns(t.id)), 0);
+  const roleMentions = mentionsIn(t.data.content).filter((x) => x.kind !== 'user');
+  return `<p class="text-sm text-muted">Die gespeicherte Vorlage als <strong>Direktnachricht</strong> an alle Mitglieder mit einer Rolle schicken – z. B. eine Anleitung an die Mitarbeiter eines Kooperationspartners. Der Bot schickt die Nachrichten langsam nacheinander (etwa 40 pro Minute, höchstens 250 auf einmal); wer keine Direktnachrichten annimmt, steht danach unter „Hinweise“.</p>
+      ${roleMentions.length ? `<div class="msg-ping warn mt-3">${icon('alert', 'ico-sm')}<span>Die Vorlage erwähnt ${roleMentions.map((x) => dcMention(x.kind, x.id)).join(' ')} – in Direktnachrichten pingt das niemanden und erscheint dort als „@unbekannte Rolle“. Für DMs besser eine eigene Vorlage ohne Erwähnung nutzen.</span></div>` : ''}
+      <div class="msg-inline mt-3"><div class="grow"><label class="label" for="dmRole">Rolle</label>${roleSelect('id="dmRole" aria-label="Rolle"', st.dmRole || '', { empty: '— Rolle wählen —' })}</div>
+        <button type="button" class="btn-outline btn-md self-end" data-action="dm-preview" data-id="${t.id}">${icon('users', 'ico-sm')}<span>Empfänger anzeigen</span></button></div>
+      <label class="check mt-3"><input type="checkbox" id="dmLogin" ${st.dmLogin ? 'checked' : ''}> Website-Zugang mitschicken</label>
+      <p class="form-hint">Wer schon ein Website-Konto mit diesem Discord hat, bekommt seine E-Mail-Adresse und den Hinweis auf „Mit Discord anmelden“ – sein Passwort bleibt unverändert. Für alle anderen legt der Bot ein Mandantenkonto an (Discord gleich verknüpft, damit z. B. der Kooperationsrabatt über die Discord-Rolle greift) und schickt ein Einmal-Passwort, das beim ersten Login geändert wird. Kommt die Nachricht nicht an, wird das neue Konto wieder entfernt.</p>
+      <div id="dmPreview">${st.dmPreview && st.dmPreview.role.id === st.dmRole ? dmPreviewHtml(st.dmPreview, t) : ''}</div>
+      <div id="dmRuns">${dmRunsHtml(runs)}</div>`;
+}
+/** Versände dieser Vorlage laden; solange einer läuft, alle 2 Sekunden nachsehen. */
+async function refreshDmRuns(tid) {
+  clearTimeout(st.dmTimer);
+  const r = await api.get(`/api/bot/dm-runs?templateId=${tid}`);
+  st.dmRuns = r.runs;
+  st.dmRunsFor = tid;
+  const box = $('#dmRuns');
+  if (!box || st.msgId !== tid) return;
+  box.innerHTML = dmRunsHtml(r.runs);
+  if (r.runs.some((x) => x.status === 'läuft')) st.dmTimer = setTimeout(() => guard(() => refreshDmRuns(tid)), 2000);
+}
+
 /** Modal: Bearbeiten | Verwenden (wie Sapphire). */
 function msgModal(t) {
   const tab = t ? st.msgTab || 'edit' : 'edit';
@@ -757,7 +903,11 @@ function msgModal(t) {
 }
 function updateMsgPreview(form) {
   const el = $('#msgPreview');
-  if (el && form) el.innerHTML = msgPreviewHtml(msgBody(form).data);
+  if (!el || !form) return;
+  const data = msgBody(form).data;
+  el.innerHTML = msgPreviewHtml(data);
+  const pings = $('#msgPings');
+  if (pings) pings.innerHTML = msgPingsHtml(data);
 }
 function msgCurrent() {
   return st.botMessages && st.botMessages.templates.find((x) => x.id === st.msgId);

@@ -818,16 +818,7 @@ const actions = {
     el.closest('.rc-cond').remove();
     rcRenumber(rule);
   },
-  'wl-insert': (el) => {
-    const inForm = el.closest('form');
-    const remembered = st.wlField && st.wlField.isConnected && st.wlField.closest('form') === inForm ? st.wlField : null;
-    const field = remembered || (inForm && inForm.querySelector('textarea[data-k="content"], textarea[data-k="data.content"]'));
-    if (!field) return;
-    field.focus();
-    field.setRangeText(el.dataset.text, field.selectionStart, field.selectionEnd, 'end');
-    if (inForm.id === 'msgForm') updateMsgPreview(inForm);
-    else updateWelcomePreview(inForm);
-  },
+  'wl-insert': (el) => insertTemplateText(el.closest('form'), el.dataset.text),
   'bot-join-apply': async (el) => {
     const bots = el.dataset.target === 'bots';
     const form = el.closest('form');
@@ -862,6 +853,51 @@ const actions = {
     st.msgUseTab = el.dataset.tab;
     const t = msgCurrent();
     if (t) $('#msgUse').innerHTML = msgUse(t);
+  },
+  // Per Direktnachricht an alle Mitglieder einer Rolle
+  'dm-preview': async (el) => {
+    const role = $('#dmRole').value.trim();
+    if (!role) throw new Error('Bitte eine Rolle wählen.');
+    st.dmRole = role;
+    el.disabled = true;
+    try {
+      st.dmPreview = await api.get(`/api/bot/messages/${el.dataset.id}/dm?roleId=${encodeURIComponent(role)}`);
+      const t = msgCurrent();
+      if (t) $('#dmPreview').innerHTML = dmPreviewHtml(st.dmPreview, t);
+    } finally {
+      el.disabled = false;
+    }
+  },
+  'dm-send': async (el) => {
+    const p = st.dmPreview;
+    const t = msgCurrent();
+    if (!p || !t) return;
+    const withLogin = $('#dmLogin').checked;
+    st.dmLogin = withLogin;
+    const extra = withLogin
+      ? ` Dazu bekommt jeder seinen Website-Zugang: ${p.accounts.existing} vorhandene Konten (Passwort bleibt), ${p.accounts.missing} neue Mandantenkonten mit Einmal-Passwort.`
+      : '';
+    if (!(await ask(`„${t.name}“ geht als Direktnachricht an ${p.count} Mitglied${p.count === 1 ? '' : 'er'} mit der Rolle @${p.role.name} – nacheinander, etwa ${Math.max(1, Math.ceil((p.count * 1.5) / 60))} Minute(n).${extra}`, { title: 'Direktnachrichten senden?', confirmText: 'Senden' }))) return;
+    el.disabled = true;
+    try {
+      const r = await api.post(`/api/bot/messages/${t.id}/dm`, { roleId: p.role.id, withLogin });
+      st.dmPreview = null;
+      st.dmRuns = r.runs;
+      st.dmRunsFor = t.id;
+      $('#dmPreview').innerHTML = '';
+      $('#dmRuns').innerHTML = dmRunsHtml(r.runs);
+      toast(`Versand an ${r.run.total} Mitglied${r.run.total === 1 ? '' : 'er'} gestartet.`);
+      st.dmTimer = setTimeout(() => guard(() => refreshDmRuns(t.id)), 2000);
+    } finally {
+      el.disabled = false;
+    }
+  },
+  'dm-cancel': async (el) => {
+    if (!(await ask('Wer schon eine Nachricht bekommen hat, behält sie. Der Rest bekommt keine mehr.', { title: 'Versand abbrechen?', confirmText: 'Abbrechen', danger: true }))) return;
+    const r = await api.post(`/api/bot/dm-runs/${el.dataset.rid}/cancel`, {});
+    toast(r.cancelled ? 'Versand wird abgebrochen.' : 'Der Versand war schon beendet.');
+    const t = msgCurrent();
+    if (t) await refreshDmRuns(t.id);
   },
   'msg-delete': async (el) => {
     const t = st.botMessages.templates.find((x) => x.id === Number(el.dataset.id));

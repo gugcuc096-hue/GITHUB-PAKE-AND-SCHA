@@ -418,13 +418,29 @@ async function sendDm(userId, payload) {
   return tickets.rest('POST', `/channels/${ch.id}/messages`, payload);
 }
 
+/**
+ * Derselbe Beitritt? Discord liefert die Beitrittszeit im Live-Ereignis und beim Abruf der Mitgliederliste nicht
+ * immer gleich genau (z. B. „…:01.393449+00:00“ bzw. „…:01.393000+00:00“). Als Text verglichen galt ein schon
+ * begrüßter Beitritt beim Abgleich alle 10 Minuten deshalb als neu – die Willkommensnachricht kam doppelt.
+ * Jetzt zählt die Zeit: weniger als eine Minute Abstand = derselbe Beitritt.
+ */
+const SAME_JOIN_MS = 60 * 1000;
+function sameJoin(a, b) {
+  const x = Date.parse(a);
+  const y = Date.parse(b);
+  return Number.isFinite(x) && Number.isFinite(y) ? Math.abs(x - y) < SAME_JOIN_MS : String(a) === String(b);
+}
+/** Gibt es für diesen Beitritt schon einen Eintrag (discord_welcomes bzw. discord_join_roles)? */
+const joinRecorded = (table, memberId, joinedAt) => db.prepare(`SELECT joined_at FROM ${table} WHERE member_id = ?`).all(memberId).some((r) => sameJoin(r.joined_at, joinedAt));
+
 /** Begrüßen – genau einmal je Beitritt. */
 async function welcomeMember(member, joinedAt, stats) {
   const w = welcomeConfig();
   if (!w.enabled) return;
   const user = member.user;
-  const fresh = db.prepare('INSERT OR IGNORE INTO discord_welcomes (member_id, joined_at) VALUES (?, ?)').run(user.id, joinedAt).changes > 0;
-  if (!fresh) return;
+  // Prüfen und Eintragen ohne await dazwischen – ein gleichzeitiger Abgleich kann sich nicht dazwischenschieben
+  if (joinRecorded('discord_welcomes', user.id, joinedAt)) return;
+  if (!db.prepare('INSERT OR IGNORE INTO discord_welcomes (member_id, joined_at) VALUES (?, ?)').run(user.id, joinedAt).changes) return;
   const guild = await guildInfo(true).catch(() => null);
   const msg = isId(w.channelId) ? buildMessage(w, user, guild) : null;
   if (msg) await tickets.rest('POST', `/channels/${w.channelId}/messages`, msg).catch((err) => noteError(err, 'Willkommensnachricht'));
@@ -445,9 +461,9 @@ function queueJoinRoles(member, joinedAt) {
   const list = jr.enabled ? (member.user.bot ? jr.bots : jr.humans) : [];
   if (!list.length) return [];
   const due = new Date((Date.parse(joinedAt) || Date.now()) + jr.delayMinutes * 60e3).toISOString();
-  const fresh = db
-    .prepare('INSERT OR IGNORE INTO discord_join_roles (member_id, joined_at, is_bot, due_at) VALUES (?, ?, ?, ?)')
-    .run(member.user.id, joinedAt, member.user.bot ? 1 : 0, due).changes > 0;
+  const fresh =
+    !joinRecorded('discord_join_roles', member.user.id, joinedAt) &&
+    db.prepare('INSERT OR IGNORE INTO discord_join_roles (member_id, joined_at, is_bot, due_at) VALUES (?, ?, ?, ?)').run(member.user.id, joinedAt, member.user.bot ? 1 : 0, due).changes > 0;
   if (!fresh || Date.parse(due) > Date.now() || (jr.waitScreening && member.pending)) return [];
   markJoinDone(member.user.id, joinedAt, 'beim Beitritt vergeben');
   return list;
@@ -494,7 +510,7 @@ async function processJoinQueue({ memberId = null, stats = null } = {}) {
       }
       throw err;
     }
-    if (m.joined_at && m.joined_at !== r.joined_at) {
+    if (m.joined_at && !sameJoin(m.joined_at, r.joined_at)) {
       markJoinDone(r.member_id, r.joined_at, 'erneut beigetreten');
       continue;
     }
@@ -523,13 +539,11 @@ async function catchUpJoins(members, stats) {
   const fromWelcome = from(w.enabled, w.since);
   const fromJoin = from(jr.enabled, jr.since);
   if (fromWelcome === Infinity && fromJoin === Infinity) return;
-  const welcomed = db.prepare('SELECT 1 FROM discord_welcomes WHERE member_id = ? AND joined_at = ?');
-  const queued = db.prepare('SELECT 1 FROM discord_join_roles WHERE member_id = ? AND joined_at = ?');
   for (const m of members) {
     if (!m.user || !m.joined_at) continue;
     const t = Date.parse(m.joined_at);
-    const welcome = !m.user.bot && t > fromWelcome && !welcomed.get(m.user.id, m.joined_at);
-    const join = t > fromJoin && !queued.get(m.user.id, m.joined_at);
+    const welcome = !m.user.bot && t > fromWelcome && !joinRecorded('discord_welcomes', m.user.id, m.joined_at);
+    const join = t > fromJoin && !joinRecorded('discord_join_roles', m.user.id, m.joined_at);
     if (welcome || join) await handleJoin(m, stats, { welcome, join });
   }
   await processJoinQueue({ stats });
@@ -902,11 +916,15 @@ async function discordData(fresh = false) {
   const botMember = await tickets.rest('GET', `/guilds/${g}/members/${me.id}`).catch(() => ({ roles: [] }));
   const pos = new Map(roles.map((r) => [r.id, r.position]));
   const botTop = Math.max(0, ...(botMember.roles || []).map((id) => pos.get(id) || 0));
+  // Darf der Bot jede Rolle pingen? Recht „@everyone, @here und alle Rollen erwähnen“ (1 << 17) oder Administrator (1 << 3)
+  const perms = roles.filter((r) => r.id === g || (botMember.roles || []).includes(r.id)).reduce((acc, r) => acc | BigInt(r.permissions || 0), 0n);
+  const botMentionAll = (perms & ((1n << 17n) | (1n << 3n))) !== 0n;
   const categories = new Map(channels.filter((c) => c.type === 4).map((c) => [c.id, c.name]));
   const data = {
     guild: guild ? { name: guild.name, icon: guild.icon ? `https://cdn.discordapp.com/icons/${g}/${guild.icon}.png?size=128` : null, memberCount: guild.approximate_member_count || null } : null,
     bot: { name: me.global_name || me.username || 'Kanzlei-Bot', avatar: avatarUrl(me) },
     botTop,
+    botMentionAll,
     roles: roles
       .filter((r) => r.id !== g)
       .sort((a, b) => b.position - a.position)
@@ -916,6 +934,7 @@ async function discordData(fresh = false) {
         color: r.color ? `#${Number(r.color).toString(16).padStart(6, '0')}` : null,
         position: r.position,
         managed: !!r.managed,
+        mentionable: !!r.mentionable,
         assignable: !r.managed && r.position < botTop,
       })),
     channels: channels
@@ -930,6 +949,8 @@ async function discordData(fresh = false) {
 module.exports = {
   start,
   refresh,
+  listMembers,
+  sendDm,
   restart,
   status,
   scan,
@@ -949,4 +970,5 @@ module.exports = {
   MAX_RULES,
   MAX_CONDITIONS,
   WELCOME_DEFAULT,
+  _test: { handleJoin, catchUpJoins, sameJoin },
 };

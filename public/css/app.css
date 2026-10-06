@@ -977,6 +977,25 @@ body.ps-dialog-open { overflow: hidden; }
 .dc-content { margin-top: 0.1rem; word-wrap: break-word; }
 .dc-content code, .dc-desc code { background: #2b2d31; padding: 0 0.25rem; border-radius: 4px; font-size: 0.85em; }
 .dc-mention { background: rgba(88, 101, 242, 0.3); color: #c9cdfb; padding: 0 0.15rem; border-radius: 3px; font-weight: 500; }
+/* Rollen-Erwähnung in der Farbe der Rolle (wie in Discord) */
+.dc-mention.role { color: var(--role, #c9cdfb); background: color-mix(in srgb, var(--role, #5865f2) 22%, transparent); }
+.dc-mention.unknown { color: #fca5a5; background: rgba(239, 68, 68, 0.18); }
+/* Vorlagen-Editor: wer wird gepingt? */
+.msg-pings { display: grid; gap: 0.35rem; }
+.msg-pings:empty { display: none; }
+.msg-ping { display: flex; gap: 0.5rem; align-items: flex-start; font-size: 0.8rem; line-height: 1.45; padding: 0.45rem 0.65rem; border-radius: 10px; border: 1px solid var(--glass-border); color: var(--text-muted); }
+.msg-ping .ico { flex: none; margin-top: 0.1rem; }
+.msg-ping.on { border-color: rgba(52, 211, 153, 0.45); background: rgba(16, 185, 129, 0.08); color: #d1fae5; }
+.msg-ping.off, .msg-ping.warn { border-color: rgba(251, 191, 36, 0.45); background: rgba(251, 191, 36, 0.08); color: #fde68a; }
+.msg-ping .dc-mention { white-space: nowrap; }
+/* Per DM an Rolle: Empfänger und Fortschritt */
+.dm-preview { padding: 0.8rem 0.9rem; border: 1px solid var(--glass-border); border-radius: 12px; background: rgba(255, 255, 255, 0.02); }
+.dm-names { display: flex; flex-wrap: wrap; gap: 0.35rem 0.6rem; max-height: 12rem; overflow-y: auto; }
+.dm-name { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; color: var(--text-muted); min-width: 0; overflow-wrap: anywhere; }
+.dm-bar { height: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.dm-bar span { display: block; height: 100%; background: linear-gradient(90deg, #b8962e, #d4af37); transition: width 0.4s ease; }
+.dm-problems { margin: 0.35rem 0 0; padding-left: 1.1rem; font-size: 0.75rem; color: var(--text-muted); list-style: disc; }
+.msg-role-insert { width: auto; min-height: 0; padding: 0.2rem 2rem 0.2rem 0.55rem; font-size: 0.72rem; border-radius: 8px; }
 .dc-link { color: #00a8fc; }
 .dc-embed { display: flex; gap: 1rem; margin-top: 0.4rem; max-width: 432px; padding: 0.6rem 0.9rem 0.8rem 0.75rem; border-left: 4px solid #d4af37; border-radius: 4px; background: #2b2d31; }
 .dc-embed-main { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 0.35rem; }
