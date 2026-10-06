@@ -333,6 +333,7 @@ router.patch(
       return res.status(400).json({ error: 'Das ist keine gültige Discord-Webhook-URL (https://discord.com/api/webhooks/…).' });
     }
     logActivity(req.user, 'Einstellungen geändert', 'settings', null, Object.keys(d).join(', '));
+    const fivenetBefore = getSetting('fivenet_url', '');
     tx(() => {
       if (d.showDutyPublic !== undefined) setSetting('show_duty_public', d.showDutyPublic ? '1' : '0');
       if (d.discordWebhookUrl !== undefined) setSetting('discord_webhook_url', d.discordWebhookUrl);
@@ -352,6 +353,8 @@ router.patch(
     });
     // Anschrift/Zahlungshinweis stehen auf den Rechnungen → deren Google Docs neu schreiben
     if (d.firmAddress !== undefined || d.firmPaymentInfo !== undefined || d.firmContact !== undefined) require('../googleDocs').touchKind('invoice');
+    // Links „DOC - Nummer“ in Schriftsätzen zeigen auf die FiveNet-Instanz → bei neuer Adresse deren Google Docs neu schreiben
+    if (d.fivenetUrl !== undefined && d.fivenetUrl !== fivenetBefore) require('../googleDocs').touchKind('contract');
     res.json({ settings: settingsPayload() });
   })
 );

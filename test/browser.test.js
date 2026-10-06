@@ -37,6 +37,11 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
     await admin.login(TEAM.admin);
     data.caseId = (await admin.get('/api/cases')).json.cases.find((c) => c.caseNumber === data.caseNumber).id;
     data.invoiceId = (await admin.post('/api/invoices', { caseId: data.caseId, items: [{ description: 'Beratung', quantity: 1, unitPrice: 15000 }] })).json.invoice.id;
+    // In der Akte hinterlegte FiveNet-Dokumente (Aktenzeichen für Anträge) – das zuletzt verknüpfte steht oben
+    const older = await admin.post(`/api/cases/${data.caseId}/external`, { provider: 'fivenet', input: '70001', attest: true, title: 'Anklageschrift der Staatsanwaltschaft Los Santos (Entwurf)' });
+    assert.equal(older.status, 201, older.text);
+    const link = await admin.post(`/api/cases/${data.caseId}/external`, { provider: 'fivenet', input: '74412', attest: true, title: 'Festnahmebericht LSPD' });
+    assert.equal(link.status, 201, link.text);
   });
   after(async () => {
     if (browser) await browser.close();
@@ -131,6 +136,43 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       await page.click(`[data-action="open-case"][data-id="${data.caseId}"] >> nth=0`);
       await settle();
       assert.ok((await page.evaluate(() => document.body.innerText)).includes(data.caseNumber), 'Akte geöffnet');
+      assert.deepEqual(problems, []);
+      await ctx.close();
+    });
+  }
+
+  for (const [label, device] of [['PC', DESKTOP], ['Handy', PHONE]]) {
+    it(`Antrag am ${label}: FiveNet-Aktenzeichen vorbelegt und in der Druckansicht ein Link`, async () => {
+      const { ctx, page, problems, settle } = await open(device);
+      await login(page, TEAM.admin);
+      await page.evaluate(() => (location.hash = '#cases'));
+      await settle();
+      await page.click(`[data-action="open-case"][data-id="${data.caseId}"] >> nth=0`);
+      await settle();
+      await page.click('[data-action="brief-new"]');
+      await settle();
+      await page.selectOption('#bf_tpl', { label: 'Antrag auf Akteneinsicht' });
+      assert.ok(await page.isVisible('#bf_fivenet_az'), 'Feld sichtbar');
+      assert.equal(await page.inputValue('#bf_fivenet_az'), 'DOC - 74412', 'aus der Akte vorbelegt');
+      await page.fill('#bf_fivenet_az', '');
+      await page.click('[data-action="brief-fivenet"]');
+      assert.equal(await page.inputValue('#bf_fivenet_az'), 'DOC - 74412', 'per Klick übernommen');
+      if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Formular passt aufs Handy');
+      // Auswahl-Knöpfe umbrechen, statt das Formular zu verbreitern (Spalten bleiben gleich breit)
+      const widths = await page.$eval('#modalBody', (b) => ({ over: b.scrollWidth - b.clientWidth, cols: [...b.querySelectorAll('[data-bf="betreff"], [data-bf="fivenet_az"]')].map((x) => x.getBoundingClientRect().width) }));
+      assert.ok(widths.over <= 1, `Dialog ragt nicht über den Rand (${widths.over}px)`);
+      assert.ok(Math.abs(widths.cols[0] - widths.cols[1]) <= 1, `Betreff und Aktenzeichen gleich breit (${widths.cols})`);
+      await page.selectOption('#bf_tpl', { label: 'Vollmacht' });
+      assert.ok(!(await page.isVisible('#bf_fivenet_az')), 'Vollmacht braucht kein FiveNet-Aktenzeichen');
+      await page.selectOption('#bf_tpl', { label: 'Antrag auf Akteneinsicht' });
+      await page.click('form[data-form="brief-new"] button[type=submit]');
+      await settle();
+      const href = await page.getAttribute('#secBriefs a[href^="/vertrag.html"] >> nth=0', 'href');
+      await page.goto(server.base + href);
+      await page.waitForSelector('.sheet');
+      const link = await page.$eval('.sheet a.k-link', (a) => ({ href: a.href, text: a.textContent, target: a.target }));
+      assert.deepEqual(link, { href: 'https://fivenet.modernv.net/documents/74412', text: 'DOC - 74412', target: '_blank' });
+      assert.ok((await page.textContent('.sheet')).includes('Aktenzeichen: DOC - 74412'));
       assert.deepEqual(problems, []);
       await ctx.close();
     });

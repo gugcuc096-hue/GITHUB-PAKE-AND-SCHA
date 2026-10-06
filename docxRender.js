@@ -383,6 +383,18 @@ function contractValues(k, c) {
   return { ...k.data, aktenzeichen: c.caseNumber, akte: c.title, rechtsgebiet: c.area, gerichtsaktenzeichen: c.courtRef || '', gegenpartei: c.opponent || '', kanzlei: 'Pake & Scha Legal Consulting' };
 }
 
+// FiveNet-Aktenzeichen „DOC - 74412“ → Link auf das Dokument; Adresse immer aus der Instanz der Kanzlei (wie contract-render.js)
+const FIVENET_REF = /^DOC - (\d{1,19})$/;
+const K_LINK = '1A4FA0';
+function fivenetLink(value, opts) {
+  const m = String(value).match(FIVENET_REF);
+  const base = opts && String(opts.fivenetUrl || '').replace(/\/+$/, '');
+  return m && /^https?:\/\/[^\s"'<>]+$/i.test(base) ? `${base}/documents/${m[1]}` : '';
+}
+
+// Zeilenende in mehrzeiligen Werten, wenn der Absatz zeilenweise aufgeteilt wird (opts.split in inlineRuns)
+const LINE_END = Symbol('Zeilenende');
+
 /** Leeres Feld zum Ausfüllen (im Browser eine Linie von 38 mm). */
 function blankRun(o) {
   const size = o.size || 11;
@@ -394,7 +406,7 @@ function blankRun(o) {
  * HTML-Tags entstehen Textstücke mit Formatierung. Werte werden (wie dort) erst danach eingesetzt, Sternchen
  * in Werten lösen also keine Formatierung aus.
  */
-function inlineRuns(raw, values, base) {
+function inlineRuns(raw, values, base, opts = {}) {
   const [B1, B0, I1, I0, P1, P0] = ['\u0001', '\u0002', '\u0003', '\u0004', '\u0005', '\u0006'];
   let s = String(raw)
     .replace(/[\u0001-\u0006]/g, '')
@@ -427,7 +439,11 @@ function inlineRuns(raw, values, base) {
       if (!(key in values)) out.push(...runs(m, { ...style(), color: '991B1B', highlight: 'FEE2E2' }));
       else {
         const v = String(values[key] ?? '').trim();
-        out.push(...(v ? runs(v, style()) : [blankRun(style())]));
+        const href = key === 'fivenet_az' && fivenetLink(v, opts);
+        if (href) out.push(new D.ExternalHyperlink({ link: href, children: runs(v, { ...style(), color: K_LINK, underline: true }) }));
+        else if (!v) out.push(blankRun(style()));
+        else if (opts.split) v.split('\n').forEach((line, j) => out.push(...(j ? [LINE_END] : []), ...runs(line, style())));
+        else out.push(...runs(v, style()));
       }
     } else buf += ch;
   }
@@ -586,11 +602,13 @@ function contractHeader(headerText, W) {
   });
 }
 
-async function contractDocx(k, c, headerText) {
+/** opts.fivenetUrl: Adresse der FiveNet-Instanz – „DOC - Nummer“ wird zum Link auf das Dokument. */
+async function contractDocx(k, c, headerText, opts = {}) {
   const pageW = 12240; // US Letter wie die Druckansicht
   const side = mm(25);
   const W = pageW - 2 * side;
   const values = contractValues(k, c);
+  const inl = (text, base, extra) => inlineRuns(text, values, base, extra ? { ...opts, ...extra } : opts);
   const pt = (vmm) => vmm / 0.3528; // mm → pt
   const centerBase = { font: 'Roboto Serif', size: 9.5, color: K_INK, boldSize: 11 };
 
@@ -599,28 +617,34 @@ async function contractDocx(k, c, headerText) {
     const P = (runsFn, o, top, bottom) => ({ top, bottom, make: (before, pageBreak) => [para(runsFn(), { ...o, before, after: 0, pageBreakBefore: pageBreak })] });
     switch (b.type) {
       case 'title':
-        return [P(() => inlineRuns(b.text, values, { font: 'Tinos', size: 30, bold: true, color: K_GOLD }), { align: D.AlignmentType.CENTER, line: 1.2, font: 'Tinos', mark: 30, keepNext: true }, 24, 10)];
+        return [P(() => inl(b.text, { font: 'Tinos', size: 30, bold: true, color: K_GOLD }), { align: D.AlignmentType.CENTER, line: 1.2, font: 'Tinos', mark: 30, keepNext: true }, 24, 10)];
       case 'section':
-        return [P(() => inlineRuns(b.text, values, { font: 'Tinos', size: 17, bold: true, color: K_GOLD }), { align: D.AlignmentType.CENTER, line: 1.3, font: 'Tinos', mark: 17, keepNext: true }, 8, 7)];
+        return [P(() => inl(b.text, { font: 'Tinos', size: 17, bold: true, color: K_GOLD }), { align: D.AlignmentType.CENTER, line: 1.3, font: 'Tinos', mark: 17, keepNext: true }, 8, 7)];
       case 'para':
-        return [P(() => inlineRuns(b.text, values, { font: 'Tinos', size: 11, bold: true, color: K_SOFT }), { line: 1.4, font: 'Tinos', mark: 11, keepNext: true }, 7, 3)];
-      case 'p':
-        return [P(() => inlineRuns(b.text, values, { font: 'Tinos', size: 11, color: K_SOFT }), { align: D.AlignmentType.JUSTIFIED, line: 2, font: 'Tinos', mark: 11, keepLines: true }, 0, 2)];
+        return [P(() => inl(b.text, { font: 'Tinos', size: 11, bold: true, color: K_SOFT }), { line: 1.4, font: 'Tinos', mark: 11, keepNext: true }, 7, 3)];
+      case 'p': {
+        // Mehrzeilige Werte (z. B. Empfänger): je Zeile ein eigener Absatz ohne Zwischenabstand. Word und Google Docs
+        // ziehen im Blocksatz sonst jede Zeile vor einem Zeilenumbruch über die ganze Breite – der Browser nicht.
+        const lines = [[]];
+        for (const r of inl(b.text, { font: 'Tinos', size: 11, color: K_SOFT }, { split: true })) r === LINE_END ? lines.push([]) : lines[lines.length - 1].push(r);
+        const o = { align: D.AlignmentType.JUSTIFIED, line: 2, font: 'Tinos', mark: 11, keepLines: true };
+        return lines.map((rs, j) => P(() => rs, { ...o, keepNext: j < lines.length - 1 }, 0, j === lines.length - 1 ? 2 : 0));
+      }
       case 'center':
         return b.between
-          ? [P(() => inlineRuns(b.text, values, { ...centerBase, size: 15, color: K_MUTED, boldSize: 15 }), { align: D.AlignmentType.CENTER, line: 1.55, font: 'Roboto Serif', mark: 15 }, 2, 2)]
-          : [P(() => inlineRuns(b.text, values, centerBase), { align: D.AlignmentType.CENTER, line: 1.55, font: 'Roboto Serif', mark: 9.5 }, 0, 0)];
+          ? [P(() => inl(b.text, { ...centerBase, size: 15, color: K_MUTED, boldSize: 15 }), { align: D.AlignmentType.CENTER, line: 1.55, font: 'Roboto Serif', mark: 15 }, 2, 2)]
+          : [P(() => inl(b.text, centerBase), { align: D.AlignmentType.CENTER, line: 1.55, font: 'Roboto Serif', mark: 9.5 }, 0, 0)];
       case 'item':
         return [
           P(
-            () => [...runs(`${b.num}.`, { font: 'Tinos', size: 11, bold: true, color: K_SOFT }), new D.TextRun({ text: '\t' }), ...inlineRuns(b.text, values, { font: 'Tinos', size: 11, color: K_SOFT })],
+            () => [...runs(`${b.num}.`, { font: 'Tinos', size: 11, bold: true, color: K_SOFT }), new D.TextRun({ text: '\t' }), ...inl(b.text, { font: 'Tinos', size: 11, color: K_SOFT })],
             { line: 2, font: 'Tinos', mark: 11, keepLines: true, indent: { left: mm(7), hanging: mm(7) }, tabStops: [{ type: D.TabStopType.LEFT, position: mm(7) }] },
             0,
             1
           ),
         ];
       case 'indent':
-        return [P(() => inlineRuns(b.text, values, { font: 'Tinos', size: 11, color: K_MUTED }), { line: 2, font: 'Tinos', mark: 11, keepLines: true, indent: { left: mm(14) } }, 0, 1)];
+        return [P(() => inl(b.text, { font: 'Tinos', size: 11, color: K_MUTED }), { line: 2, font: 'Tinos', mark: 11, keepLines: true, indent: { left: mm(14) } }, 0, 1)];
       case 'space':
         return [{ height: 3 }];
       case 'gap':

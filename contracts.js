@@ -23,6 +23,7 @@ const FIELDS = {
   // vor allem für Schriftsätze
   empfaenger: 'Empfänger (Gericht, Staatsanwaltschaft, Behörde – mehrzeilig)',
   betreff: 'Betreff / Bezug',
+  fivenet_az: 'Aktenzeichen aus FiveNet („DOC - Nummer“, wird zum Link auf das FiveNet-Dokument)',
   festnahme: 'Festnahme bzw. Haft (Datum, Ort, Behörde)',
   begruendung: 'Begründung bzw. eigener Text (mehrzeilig; leer = Absatz entfällt)',
 };
@@ -128,7 +129,7 @@ const AKTENEINSICHT = `{{empfaenger}}
 # Antrag auf Akteneinsicht
 
 **Betreff:** {{betreff}}
-**Aktenzeichen:** {{gerichtsaktenzeichen}}
+**Aktenzeichen:** {{fivenet_az}}
 **Unser Zeichen:** {{aktenzeichen}}
 
 Sehr geehrte Damen und Herren,
@@ -150,7 +151,7 @@ const HAFTBESCHWERDE = `{{empfaenger}}
 
 # Haftbeschwerde
 
-**Aktenzeichen:** {{gerichtsaktenzeichen}}
+**Aktenzeichen:** {{fivenet_az}}
 **Unser Zeichen:** {{aktenzeichen}}
 
 In der Sache gegen **{{mandant}}** (geb. am {{mandant_geburtsdatum}}) legen wir namens und in Vollmacht des Beschuldigten
@@ -193,8 +194,12 @@ function signatureNeeds(body, kind = 'vertrag') {
 
 /** Frühere Fassungen der mitgelieferten Vorlagen – unverändert übernommene werden automatisch aktualisiert. */
 const WITHOUT_CO_LAWYERS = MANDATSVERTRAG.replace('[Weitere Anwälte]\n', '');
+// Anträge vor dem FiveNet-Aktenzeichen: „Aktenzeichen“ war das Gerichtsaktenzeichen der Akte
+const withCourtRef = (body) => body.replace('**Aktenzeichen:** {{fivenet_az}}', '**Aktenzeichen:** {{gerichtsaktenzeichen}}');
 const PREVIOUS_VERSIONS = {
   mandatsvertrag: [WITHOUT_CO_LAWYERS, WITHOUT_CO_LAWYERS.replace('    *Vereinbarte Leistungen:*\n    {{leistungen}}\n', '')],
+  akteneinsicht: [withCourtRef(AKTENEINSICHT)],
+  haftbeschwerde: [withCourtRef(HAFTBESCHWERDE)],
 };
 
 /** Höchstzahl weiterer unterzeichnender Anwälte (zusätzlich zum ersten). */

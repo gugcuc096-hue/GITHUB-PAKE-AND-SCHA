@@ -164,6 +164,7 @@ function updateServiceSum(form) {
 const BRIEF_FIELDS = [
   ['empfaenger', 'Empfänger', 'textarea', 'z. B. District Court San Andreas\nStaatsanwaltschaft Los Santos'],
   ['betreff', 'Betreff / Bezug', 'input', ''],
+  ['fivenet_az', 'Aktenzeichen (FiveNet)', 'input', 'DOC - 74412 – oder Link auf das FiveNet-Dokument'],
   ['anwalt', 'Anwalt im Dokument', 'input', ''],
   ['anwalt_rang', 'Rang', 'input', 'z. B. Senior Associate'],
   ['anwalt_geburtsdatum', 'Geburtsdatum Anwalt (IC)', 'input', 'TT.MM.JJJJ'],
@@ -184,6 +185,14 @@ function signatureNeeds(body, kind) {
   return { lawyer, client };
 }
 const usedFields = (body) => new Set([...String(body || '').matchAll(/\{\{\s*([a-z_]+)\s*\}\}/gi)].map((m) => m[1].toLowerCase()));
+/** Unter dem FiveNet-Aktenzeichen: die in der Akte hinterlegten FiveNet-Dokumente zum Übernehmen – sonst Hinweis zum manuellen Eintrag. */
+function fivenetRefHint(defaults) {
+  const docs = defaults.fivenetDocs || [];
+  if (!docs.length) return '<p class="form-hint">In dieser Akte ist noch kein FiveNet-Dokument hinterlegt – bitte manuell eintragen (z. B. DOC - 74412). Steht dort „DOC - Nummer“, wird das Aktenzeichen im Dokument zum Link auf die Akte in FiveNet.</p>';
+  return `<div class="chip-row fn-refs mt-2">${docs
+    .map((d) => `<button type="button" class="chip" data-action="brief-fivenet" data-ref="${esc(d.ref)}" title="${esc(d.title || d.ref)}">${esc(d.ref)}${d.title ? ` · ${esc(d.title.length > 40 ? d.title.slice(0, 39) + '…' : d.title)}` : ''}</button>`)
+    .join('')}</div><p class="form-hint">Aus FiveNet-Dokumenten der Akte übernehmen. Im Schriftsatz wird „DOC - Nummer“ zum Link, über den Sachbearbeiter die Akte direkt in FiveNet öffnen.</p>`;
+}
 
 function briefCard(k, c) {
   const staff = isStaff();
@@ -231,7 +240,7 @@ function briefForm(c, { templates, defaults, k = null }) {
       type === 'textarea'
         ? `<textarea id="bf_${name}" name="${name}" rows="${name === 'begruendung' ? 6 : 3}" maxlength="${name === 'begruendung' ? 6000 : 400}" class="field" placeholder="${esc(ph)}">${esc(v[name] || '')}</textarea>`
         : `<input id="bf_${name}" name="${name}" class="field" maxlength="200" value="${esc(v[name] || '')}" placeholder="${esc(ph)}">`
-    }</div>`;
+    }${name === 'fivenet_az' ? fivenetRefHint(defaults) : ''}</div>`;
   return `
       <h2 id="modalTitle" class="modal-title">${k ? `${esc(k.templateName)} bearbeiten` : 'Schriftsatz erstellen'}</h2>
       <p class="modal-sub"><span class="font-mono text-gold">${esc(c.caseNumber)}</span> · ${esc(c.title)}</p>

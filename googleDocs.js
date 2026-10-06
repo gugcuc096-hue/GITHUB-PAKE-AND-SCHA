@@ -87,7 +87,7 @@ async function build(kind, refId, { options, viewer } = {}) {
     return {
       caseId: d.case.id,
       name: `${d.contract.templateName} ${d.case.caseNumber}${client ? ` – ${client}` : ''}`,
-      docx: await render.contractDocx(d.contract, d.case, d.header),
+      docx: await render.contractDocx(d.contract, d.case, d.header, { fivenetUrl: d.fivenetUrl }),
     };
   }
   if (kind === 'extract') {
