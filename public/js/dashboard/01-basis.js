@@ -210,6 +210,12 @@ const st = {
   modalCurrent: null,
   modalRestoring: false,
   modalReplace: 0,
+  modalAsking: false, // Rückfrage „Eingaben verwerfen?“ ist offen
+  // Zurück-Taste (siehe syncHistory in 02-geruest.js)
+  histTimer: null,
+  histSkip: 0, // Zeitpunkt des eigenen history.back() – das folgende popstate ist kein Klick auf „Zurück“
+  histPaused: false, // beim Start: Akte aus der Adresse wird gerade geöffnet
+  leaving: false, // Abmelden: Seite wird bewusst verlassen (keine Rückfrage des Browsers)
   invoiceFrom: null, // Rechnung aus einer Akte heraus: { view, caseId, caseNumber } – Abbrechen/Erstellen führen dorthin zurück
   caseAttachments: [],
   duty: null,
@@ -233,6 +239,10 @@ const st = {
   taskState: 'open',
   taskQuery: '',
   dueTasks: 0,
+  chatUnread: 0, // neue Nachrichten in Akten (Chat)
+  chatPolling: false,
+  chatCaseId: null, // Akte, deren Chat gerade angezeigt wird
+  appChatPolling: false,
   // Anliegen ans Board, Personalprotokoll
   concerns: null, // eigene Anliegen
   concernsAll: null, // alle Anliegen (Board of Partners)
@@ -513,10 +523,15 @@ const load = {
       st.duty = { me: null, onDuty: r.members || [] };
     }
   },
+  /** Neue Nachrichten in Akten (Badge „Akten“ in der Navigation). */
+  async chatUnread() {
+    st.chatUnread = (await api.get('/api/cases/chat-unread')).total;
+  },
   async appCount() {
     if (!isBoard()) return;
     const list = (await api.get('/api/admin/applications')).applications;
-    st.newApplications = list.filter((a) => a.status === 'eingegangen').length;
+    // Badge „Bewerbungen“: neue Bewerbungen und ungelesene Nachrichten von Bewerbern
+    st.newApplications = list.filter((a) => a.status === 'eingegangen').length + list.reduce((n, a) => n + (a.unreadMessages || 0), 0);
   },
   async tasks() {
     st.tasks = (await api.get(`/api/tasks?scope=${st.taskScope}&state=${st.taskState}`)).tasks;

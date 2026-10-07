@@ -21,6 +21,8 @@ const discord = require('../discord');
 const tickets = require('../tickets');
 const contracts = require('../contracts');
 const fivenet = require('../fivenet');
+const coop = require('../cooperations');
+const memberships = require('../memberships');
 
 const header = () => getSetting('contract_header', contracts.DEFAULT_HEADER);
 const AREA_LABEL = { strafrecht: 'Strafrecht', zivilrecht: 'Zivilrecht', verfassungsrecht: 'Verfassungsrecht', vertragsrecht: 'Vertragsrecht', sonstiges: 'Sonstiges' };
@@ -28,8 +30,17 @@ const text = (max) => z.string().trim().max(max);
 const FIELD_MAX = { grundgebuehr: 200, zusatzgebuehr: 200, leistungen: 3000, empfaenger: 400, betreff: 200, festnahme: 200, begruendung: 6000, fivenet_az: 300 };
 const fieldSchema = z.object(Object.fromEntries(Object.keys(contracts.FIELDS).map((k) => [k, text(FIELD_MAX[k] || 120).optional()])));
 // Aus der Honorarordnung gewählte Leistungen (Mehrfachauswahl mit Menge)
+// listPrice/discount: VIP-, Lifetime- oder Kooperationspreis – price ist dann der ermäßigte Preis
 const servicesSchema = z
-  .array(z.object({ name: z.string().trim().min(1).max(160), price: z.number().int().min(0).max(1e10), qty: z.number().int().min(1).max(99) }))
+  .array(
+    z.object({
+      name: z.string().trim().min(1).max(160),
+      price: z.number().int().min(0).max(1e10),
+      qty: z.number().int().min(1).max(99),
+      listPrice: z.number().int().min(0).max(1e10).optional(),
+      discount: z.string().trim().max(80).optional(),
+    })
+  )
   .max(30);
 // Weitere unterzeichnende Anwälte (Name und Rang kommen aus dem Benutzerkonto, das Geburtsdatum aus dem Formular)
 const coLawyersSchema = z.array(z.object({ id: z.number().int().positive(), birth: text(40).optional() })).max(contracts.MAX_CO_LAWYERS);
@@ -42,8 +53,10 @@ const usd = (n) => `${Math.round(n).toLocaleString('de-DE')} $`;
 function applyServices(data, services) {
   if (services === undefined) return data;
   const out = { ...data, services };
+  // Ermäßigt (VIP, Lifetime, Kooperation): Rabatt und regulärer Preis stehen dahinter
+  const reduced = (s) => (s.listPrice > s.price ? ` (${s.discount ? `${s.discount}, ` : ''}regulär ${usd(s.listPrice)})` : '');
   out.leistungen = services
-    .map((s) => (s.qty > 1 ? `• ${s.qty} × ${s.name} à ${usd(s.price)} = ${usd(s.qty * s.price)}` : `• ${s.name} – ${usd(s.price)}`))
+    .map((s) => (s.qty > 1 ? `• ${s.qty} × ${s.name} à ${usd(s.price)}${reduced(s)} = ${usd(s.qty * s.price)}` : `• ${s.name} – ${usd(s.price)}${reduced(s)}`))
     .join('\n');
   if (services.length && !String(out.grundgebuehr || '').trim()) out.grundgebuehr = usd(services.reduce((sum, s) => sum + s.qty * s.price, 0));
   return out;
@@ -387,7 +400,21 @@ function loadCase(req, res) {
  * Vorbelegung: Anwalt (Name, Rang, Geburtsdatum aus seinem letzten Vertrag), Mandant (Name aus der Akte,
  * Geburtsdatum aus einem früheren Vertrag desselben Mandanten), heutiges Datum, Ort.
  */
-caseRouter.get('/defaults', (req, res) => {
+/**
+ * Rabatt des Mandanten auf die Honorarordnung – wie bei Rechnungen: VIP/Lifetime (aktive Mitgliedschaft) oder
+ * Kooperation (Discord-Rolle bzw. zugeordnetes Konto); beides wird nicht addiert, es gilt der höhere Satz.
+ */
+async function clientDiscount(c) {
+  const ms = c.client_id ? memberships.activeFor(c.client_id) : null;
+  const kind = ms ? memberships.KIND_LABEL[ms.kind] || '' : '';
+  let best = ms && ms.discount_pct > 0 ? { kind: ms.kind, label: ms.tier_name.toLowerCase().includes(kind.toLowerCase()) ? ms.tier_name : `${kind} ${ms.tier_name}`, pct: ms.discount_pct } : null;
+  const found = await coop.detectForCase(c).catch(() => null);
+  const k = found && found.best;
+  if (k && k.discountPct > (best ? best.pct : 0)) best = { kind: 'coop', label: `Kooperation ${k.name}`, pct: k.discountPct };
+  return best;
+}
+
+caseRouter.get('/defaults', wrap(async (req, res) => {
   const c = loadCase(req, res);
   if (!c) return;
   const team = caseLawyers(c);
@@ -408,8 +435,10 @@ caseRouter.get('/defaults', (req, res) => {
   }
   // Aktenzeichen für Anträge: das erste in der Akte hinterlegte FiveNet-Dokument, sonst das Gerichtsaktenzeichen der Akte
   const fivenetDocs = fivenetDocsOf(c.id);
+  const discount = await clientDiscount(c);
   res.json({
     births,
+    discount,
     fivenetDocs,
     fivenetUrl: fivenetUrl(),
     maxCoLawyers: contracts.MAX_CO_LAWYERS,
@@ -429,7 +458,7 @@ caseRouter.get('/defaults', (req, res) => {
       fivenet_az: fivenetDocs.length ? fivenetDocs[0].ref : fivenet.docReference(c.court_ref || ''),
     },
   });
-});
+}));
 
 caseRouter.post(
   '/',

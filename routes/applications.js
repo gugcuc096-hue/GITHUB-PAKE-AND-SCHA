@@ -1,4 +1,5 @@
 'use strict';
+const crypto = require('crypto');
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { z } = require('zod');
@@ -11,6 +12,7 @@ const personnel = require('./personnel');
 const tickets = require('../tickets');
 
 const stars = (n) => '★'.repeat(n) + '☆'.repeat(5 - n);
+const WELCOME = 'Herzlichen Glückwunsch – willkommen im Team von Pake & Scha! Ihre Zugangsdaten erhalten Sie direkt vom Board of Partners.';
 
 // skipFailedRequests: Tippfehler im Formular (400) verbrauchen kein Kontingent.
 const limit = (windowMs, max, message, skipFailedRequests = false) =>
@@ -23,6 +25,54 @@ const limit = (windowMs, max, message, skipFailedRequests = false) =>
     handler: (req, res) => res.status(429).json({ error: message }),
   });
 
+
+/* ================================================================
+   Nachrichten zwischen Board und Bewerber
+   ================================================================
+ * Der Bewerber hat kein Konto: Er erreicht seine Bewerbung über einen persönlichen Link (/bewerbung.html#<token>,
+ * nach dem Absenden angezeigt und auf dem Gerät gemerkt; Bewerbungsnummer + Zugangscode führen ebenfalls dorthin).
+ * Dort sieht er den Stand (Fortschritt), den Gesprächstermin und schreibt mit dem Board. Verbindet er sein Discord,
+ * kommen Antworten und neue Stände zusätzlich als Discord-Direktnachricht. Ins Board-Ticket kommen die Nachrichten
+ * nur als Protokoll fürs Board – der Bewerber ist nicht im Ticket (dort stehen auch interne Notizen).
+ */
+const newToken = () => crypto.randomBytes(24).toString('base64url');
+const portalPath = (a) => `/bewerbung.html#${a.access_token}`;
+
+function messageRow(m) {
+  return { id: m.id, fromBoard: !!m.from_board, author: m.author_name, body: m.body, createdAt: m.created_at };
+}
+function messagesOf(appId, after = 0) {
+  return db.prepare('SELECT * FROM application_messages WHERE application_id = ? AND id > ? ORDER BY id').all(appId, after).map(messageRow);
+}
+const lastMessageId = (appId) => db.prepare('SELECT COALESCE(MAX(id), 0) AS m FROM application_messages WHERE application_id = ?').get(appId).m;
+
+/** Nachricht speichern (Board oder Bewerber) – liefert die neue Nachricht. */
+function addMessage(a, { fromBoard, user = null, body }) {
+  const info = db
+    .prepare('INSERT INTO application_messages (application_id, from_board, author_id, author_name, body) VALUES (?, ?, ?, ?, ?)')
+    .run(a.id, fromBoard ? 1 : 0, user ? user.id : null, fromBoard ? (user ? user.display_name : 'Board of Partners') : a.name, body);
+  const id = Number(info.lastInsertRowid);
+  // Wer schreibt, hat alles davor gelesen
+  db.prepare(`UPDATE applications SET ${fromBoard ? 'board_read_id' : 'applicant_read_id'} = ?, updated_at = datetime('now') WHERE id = ?`).run(id, a.id);
+  return messageRow(db.prepare('SELECT * FROM application_messages WHERE id = ?').get(id));
+}
+
+/** Discord-Direktnachricht an den Bewerber (nur wenn er sein Discord verbunden hat). */
+async function dmApplicant(a, { title, description, fields }) {
+  if (!tickets.isId(a.discord_user_id) || !tickets.hasToken()) return false;
+  try {
+    const ch = await tickets.rest('POST', '/users/@me/channels', { recipient_id: a.discord_user_id });
+    const base = tickets.siteBase();
+    await tickets.rest('POST', `/channels/${ch.id}/messages`, {
+      embeds: [tickets.embed({ title, description, fields, footer: `Bewerbung ${a.number} · Pake & Scha Legal Consulting` })],
+      components: base ? [{ type: 1, components: [{ type: 2, style: 5, label: 'Zur Bewerbung', url: base + portalPath(a) }] }] : undefined,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+const statusText = (a) => `Neuer Stand: **${APPLICATION_STATUS[a.status] || a.status}**`;
 
 /* ================================================================
    Öffentlich: Karriereseite
@@ -61,14 +111,15 @@ publicRouter.post(
       positionTitle = p.title;
     }
     const code = randomPin();
+    const token = newToken();
     const { number, id } = tx(() => {
       const nr = nextApplicationNumber();
       const info = db
         .prepare(
-          `INSERT INTO applications (number, access_code, position_id, position_title, name, age, phone, email, discord, experience, motivation, availability)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO applications (number, access_code, access_token, position_id, position_title, name, age, phone, email, discord, experience, motivation, availability)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
-        .run(nr, code, d.positionId, positionTitle, d.name, d.age ?? null, d.phone || '', d.email || '', d.discord, d.experience || '', d.motivation, d.availability || '');
+        .run(nr, code, token, d.positionId, positionTitle, d.name, d.age ?? null, d.phone || '', d.email || '', d.discord, d.experience || '', d.motivation, d.availability || '');
       return { number: nr, id: Number(info.lastInsertRowid) };
     });
     tickets.boardCreated('application', id);
@@ -82,7 +133,7 @@ publicRouter.post(
         { name: 'Alter', value: d.age ? String(d.age) : '—' },
       ],
     });
-    res.status(201).json({ number, code, positionTitle });
+    res.status(201).json({ number, code, positionTitle, token, portal: `/bewerbung.html#${token}` });
   })
 );
 
@@ -99,11 +150,76 @@ publicRouter.post(
       positionTitle: a.position_title,
       status: a.status,
       statusLabel: APPLICATION_STATUS[a.status],
-      publicNote: a.public_note || null,
+      publicNote: (db.prepare('SELECT body FROM application_messages WHERE application_id = ? AND from_board = 1 ORDER BY id DESC LIMIT 1').get(a.id) || {}).body || a.public_note || null,
       interviewAt: a.status === 'gespraech' ? a.interview_at : null,
       createdAt: a.created_at,
       updatedAt: a.updated_at,
+      portal: portalPath(a),
     });
+  })
+);
+
+/* ---------------------------------------------------------------- Bewerberseite (persönlicher Link) */
+const portalLimiter = limit(15 * 60 * 1000, 400, 'Zu viele Anfragen. Bitte in ein paar Minuten erneut versuchen.');
+const writeLimiter = limit(15 * 60 * 1000, 30, 'Sie haben viele Nachrichten in kurzer Zeit gesendet. Bitte kurz warten.', true);
+const tokenSchema = z.string().trim().min(20).max(64);
+function byToken(token) {
+  return db.prepare('SELECT * FROM applications WHERE access_token = ?').get(token) || null;
+}
+
+/** Bewerbungsnummer + Zugangscode → persönlicher Link (für alle, die nur die Nummer notiert haben). */
+publicRouter.post(
+  '/application-access',
+  limit(15 * 60 * 1000, 15, 'Zu viele Versuche. Bitte in ein paar Minuten erneut versuchen.'),
+  wrap(async (req, res) => {
+    const d = parseBody(z.object({ number: z.string().trim().min(1).max(30), code: z.string().trim().min(1).max(10) }), req, res);
+    if (!d) return;
+    const a = db.prepare('SELECT * FROM applications WHERE number = ? AND access_code = ?').get(d.number.toUpperCase(), d.code);
+    if (!a) return res.status(404).json({ error: 'Keine Bewerbung mit diesen Angaben gefunden.' });
+    res.json({ token: a.access_token, portal: portalPath(a) });
+  })
+);
+
+/** Bewerberseite: Stand, Gesprächstermin, Nachrichten (after: nur neuere – zum Nachladen). */
+publicRouter.post(
+  '/application-portal',
+  portalLimiter,
+  wrap(async (req, res) => {
+    const d = parseBody(z.object({ token: tokenSchema, after: z.number().int().min(0).optional() }), req, res);
+    if (!d) return;
+    const a = byToken(d.token);
+    if (!a) return res.status(404).json({ error: 'Diese Bewerbung wurde nicht gefunden – der Link ist ungültig oder die Bewerbung wurde gelöscht.' });
+    const last = lastMessageId(a.id);
+    if (last > a.applicant_read_id) db.prepare('UPDATE applications SET applicant_read_id = ? WHERE id = ?').run(last, a.id);
+    res.json({
+      number: a.number,
+      name: a.name,
+      positionTitle: a.position_title,
+      status: a.status,
+      statusLabel: APPLICATION_STATUS[a.status] || a.status,
+      interviewAt: a.status === 'gespraech' ? a.interview_at : null,
+      hired: !!a.hired_user_id,
+      createdAt: a.created_at,
+      updatedAt: a.updated_at,
+      messages: messagesOf(a.id, d.after || 0),
+      boardRead: a.board_read_id,
+      discord: { connected: tickets.isId(a.discord_user_id), available: discord.oauthConfigured() && tickets.hasToken() },
+    });
+  })
+);
+
+/** Nachricht des Bewerbers ans Board. */
+publicRouter.post(
+  '/application-portal/messages',
+  writeLimiter,
+  wrap(async (req, res) => {
+    const d = parseBody(z.object({ token: tokenSchema, body: z.string().trim().min(1).max(3000) }), req, res);
+    if (!d) return;
+    const a = byToken(d.token);
+    if (!a) return res.status(404).json({ error: 'Diese Bewerbung wurde nicht gefunden.' });
+    const message = addMessage(a, { fromBoard: false, body: d.body });
+    tickets.boardPost('application', a.id, { title: `💬 Nachricht von ${truncate(a.name, 150)} (Bewerber)`, description: d.body, color: tickets.COLORS.blue, by: 'Über die Bewerberseite' });
+    res.status(201).json({ message });
   })
 );
 
@@ -134,20 +250,61 @@ function detail(a) {
     notes,
     hiredUser: hired ? { id: hired.id, email: hired.email, displayName: hired.display_name } : null,
     ticket: tickets.boardTicketInfo('application', a),
+    // Nachrichten mit dem Bewerber und sein persönlicher Link (nur fürs Board)
+    messages: messagesOf(a.id),
+    applicantRead: a.applicant_read_id,
+    portal: portalPath(a),
+    discordConnected: tickets.isId(a.discord_user_id),
   };
 }
 
 adminRouter.get('/', (req, res) => {
-  const rows = db.prepare('SELECT * FROM applications ORDER BY created_at DESC, id DESC').all();
-  res.json({ applications: rows.map(applicationRow) });
+  const rows = db
+    .prepare(
+      `SELECT a.*, (SELECT COUNT(*) FROM application_messages m WHERE m.application_id = a.id AND m.from_board = 0 AND m.id > a.board_read_id) AS unread_messages
+       FROM applications a ORDER BY a.created_at DESC, a.id DESC`
+    )
+    .all();
+  res.json({ applications: rows.map((a) => ({ ...applicationRow(a), unreadMessages: a.unread_messages })) });
 });
+
+/** Board hat die Nachrichten gesehen (beim Öffnen der Bewerbung bzw. Nachladen im offenen Chat). */
+function markBoardRead(a) {
+  const last = lastMessageId(a.id);
+  if (last > a.board_read_id) db.prepare('UPDATE applications SET board_read_id = ? WHERE id = ?').run(last, a.id);
+}
 
 adminRouter.get('/:id', (req, res) => {
   const id = idParam(req);
   const a = id && load(id);
   if (!a) return res.status(404).json({ error: 'Bewerbung nicht gefunden.' });
-  res.json(detail(a));
+  markBoardRead(a);
+  res.json(detail(load(a.id)));
 });
+
+adminRouter.get('/:id/messages', (req, res) => {
+  const id = idParam(req);
+  const a = id && load(id);
+  if (!a) return res.status(404).json({ error: 'Bewerbung nicht gefunden.' });
+  markBoardRead(a);
+  res.json({ messages: messagesOf(a.id, Math.max(0, Number(req.query.after) || 0)), applicantRead: a.applicant_read_id });
+});
+
+/** Nachricht des Boards an den Bewerber (Bewerberseite + Discord-Direktnachricht, falls verbunden). */
+adminRouter.post(
+  '/:id/messages',
+  wrap(async (req, res) => {
+    const id = idParam(req);
+    const a = id && load(id);
+    if (!a) return res.status(404).json({ error: 'Bewerbung nicht gefunden.' });
+    const d = parseBody(z.object({ body: z.string().trim().min(1).max(3000) }), req, res);
+    if (!d) return;
+    const message = addMessage(a, { fromBoard: true, user: req.user, body: d.body });
+    const dm = await dmApplicant(a, { title: '✉️ Neue Nachricht zu Ihrer Bewerbung', description: d.body, fields: [{ name: 'Von', value: `${req.user.display_name} · Board of Partners` }] });
+    tickets.boardPost('application', a.id, { title: '✉️ Nachricht an den Bewerber', description: d.body, color: tickets.COLORS.gold, by: req.user.display_name });
+    res.status(201).json({ message, applicantRead: a.applicant_read_id, discordSent: dm });
+  })
+);
 
 adminRouter.patch(
   '/:id',
@@ -179,6 +336,7 @@ adminRouter.patch(
     if (d.status && d.status !== a.status) lines.push(`Status: ${APPLICATION_STATUS[a.status]} → ${APPLICATION_STATUS[d.status]}`);
     if (d.rating !== undefined && d.rating !== a.rating) lines.push(`Bewertung: ${stars(d.rating)}`);
     if (d.publicNote !== undefined && d.publicNote !== a.public_note && d.publicNote) lines.push(`Nachricht an den Bewerber: ${d.publicNote}`);
+    if (d.status && d.status !== a.status) dmApplicant({ ...a, status: d.status }, { title: '📌 Ihre Bewerbung bei Pake & Scha', description: statusText({ status: d.status }) });
     if (lines.length) {
       const closing = d.status === 'abgelehnt';
       tickets.boardPost('application', a.id, {
@@ -217,10 +375,11 @@ adminRouter.post(
     if (!d) return;
     const startsAt = new Date(d.startsAt).toISOString();
     const location = d.location || 'Kanzlei Würfelpark';
+    const when = new Date(startsAt).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', dateStyle: 'full', timeStyle: 'short' });
+    const invite = d.publicNote || `Wir laden Sie zum Bewerbungsgespräch ein: ${when} Uhr · Ort: ${location}. Bitte geben Sie uns hier kurz Bescheid, ob der Termin passt.`;
     tx(() => {
-      db.prepare(
-        "UPDATE applications SET status = 'gespraech', interview_at = ?, public_note = ?, updated_at = datetime('now') WHERE id = ?"
-      ).run(startsAt, d.publicNote ?? (a.public_note || `Wir laden Sie zum Gespräch ein. Ort: ${location}.`), a.id);
+      db.prepare("UPDATE applications SET status = 'gespraech', interview_at = ?, updated_at = datetime('now') WHERE id = ?").run(startsAt, a.id);
+      addMessage(a, { fromBoard: true, user: req.user, body: invite });
       db.prepare(
         `INSERT INTO appointments (type, title, starts_at, location, note, status, assigned_to, created_by, client_visible)
          VALUES ('intern', ?, ?, ?, ?, 'bestaetigt', ?, ?, 0)`
@@ -234,6 +393,7 @@ adminRouter.post(
       );
     });
     logActivity(req.user, 'Bewerbungsgespräch geplant', 'application', a.id, `${a.number} (${a.name})`);
+    dmApplicant({ ...a, status: 'gespraech' }, { title: '📅 Einladung zum Bewerbungsgespräch', description: invite });
     const ts = Math.floor(new Date(startsAt).getTime() / 1000);
     tickets.boardPost('application', a.id, {
       title: '📅 Bewerbungsgespräch geplant',
@@ -294,10 +454,10 @@ adminRouter.post(
           'INSERT INTO team_members (name, role_title, description, initials, tier, sort_order, user_id, visible) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
         ).run(a.name, d.rank || 'Mitarbeiter', d.description || '', deriveInitials(a.name), BOARD_RANKS.includes(d.rank) ? 'leitung' : 'anwalt', maxOrder + 1, userId, d.visible === false ? 0 : 1);
       }
-      db.prepare(
-        "UPDATE applications SET status = 'angenommen', hired_user_id = ?, public_note = CASE WHEN public_note = '' THEN ? ELSE public_note END, updated_at = datetime('now') WHERE id = ?"
-      ).run(userId, 'Herzlichen Glückwunsch – willkommen im Team von Pake & Scha! Ihre Zugangsdaten erhalten Sie direkt vom Board of Partners.', a.id);
+      db.prepare("UPDATE applications SET status = 'angenommen', hired_user_id = ?, updated_at = datetime('now') WHERE id = ?").run(userId, a.id);
+      addMessage(a, { fromBoard: true, user: req.user, body: WELCOME });
     });
+    dmApplicant({ ...a, status: 'angenommen' }, { title: '🎉 Willkommen bei Pake & Scha', description: WELCOME });
     logActivity(req.user, 'Bewerber eingestellt', 'application', a.id, `${a.name} als ${d.rank || 'Mitarbeiter (ohne Rang)'}`);
     personnel.recordHire({ userId: hiredId, name: a.name, rank: d.rank || null, note: `Über Bewerbung ${a.number}`, by: req.user });
     tickets.boardPost('application', a.id, {
@@ -389,4 +549,4 @@ positionsRouter.delete(
   })
 );
 
-module.exports = { publicRouter, adminRouter, positionsRouter };
+module.exports = { publicRouter, adminRouter, positionsRouter, dmApplicant };

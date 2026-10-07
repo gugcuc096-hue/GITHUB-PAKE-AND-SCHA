@@ -252,7 +252,7 @@
         /* Copy button */
         .copy-btn { transition: all 0.2s ease; }
         .copy-btn.copied { color: var(--emerald-500) !important; border-color: rgba(16,185,129,0.5) !important; }
-        /* Anliegen ans Board: Reiter „Einreichen“ / „Status abfragen“ */
+        /* Anliegen ans Board: Reiter „Einreichen“ / „Meine Anliegen“ */
         .concern-tab { border-color: var(--glass-border); color: var(--text-muted); background: transparent; }
         .concern-tab:hover { color: #fff; }
         .concern-tab.is-active { border-color: var(--gold-500); color: var(--gold-light); background: rgba(212,175,55,0.1); }
@@ -1006,7 +1006,7 @@
                     </div>
                     <div class="flex flex-col gap-3 md:w-60 shrink-0">
                         <button type="button" data-act="concern" class="btn-gold px-6 py-3.5 text-xs uppercase tracking-wider">Anliegen einreichen</button>
-                        <button type="button" data-act="concern" data-mode="status" class="btn-outline px-6 py-3.5 text-xs uppercase tracking-wider">Status abfragen</button>
+                        <button type="button" data-act="concern" data-mode="status" class="btn-outline px-6 py-3.5 text-xs uppercase tracking-wider">Meine Anliegen</button>
                     </div>
                 </div>
             </div>
@@ -1119,7 +1119,7 @@
             <p class="text-xs text-[var(--text-muted)] mb-5">Ihr Anliegen sieht ausschließlich das Board of Partners – die Leitung der Kanzlei. Sie erhalten sofort eine Vorgangsnummer und einen Pin, mit denen Sie die Antwort hier abrufen.</p>
             <div class="grid grid-cols-2 gap-2 mb-5" role="tablist" aria-label="Anliegen">
                 <button type="button" role="tab" data-concern-tab="new" class="concern-tab py-2.5 rounded-lg border text-xs uppercase tracking-wider transition-colors">Einreichen</button>
-                <button type="button" role="tab" data-concern-tab="status" class="concern-tab py-2.5 rounded-lg border text-xs uppercase tracking-wider transition-colors">Status abfragen</button>
+                <button type="button" role="tab" data-concern-tab="status" class="concern-tab py-2.5 rounded-lg border text-xs uppercase tracking-wider transition-colors">Meine Anliegen</button>
             </div>
 
             <div id="concernNewPane">
@@ -1179,10 +1179,11 @@
             </div>
 
             <div id="concernStatusPane" class="hidden">
+                <div id="concernSaved" class="hidden mb-4"></div>
                 <form id="concernLookup" class="grid grid-cols-1 sm:grid-cols-[1fr_9rem] gap-3 mb-3" novalidate>
                     <input id="clRef" type="text" autocomplete="off" autocapitalize="characters" placeholder="Vorgangsnummer, z. B. AN-2026-0001" aria-label="Vorgangsnummer" class="w-full bg-slate-900/80 border border-[var(--glass-border)] rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--gold-500)] font-mono">
                     <input id="clPin" type="text" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Pin" aria-label="Pin (6 Ziffern)" class="w-full bg-slate-900/80 border border-[var(--glass-border)] rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--gold-500)] font-mono tracking-widest">
-                    <button type="submit" class="btn-gold sm:col-span-2 py-3 text-xs uppercase tracking-wider disabled:opacity-60">Status abfragen</button>
+                    <button type="submit" class="btn-gold sm:col-span-2 py-3 text-xs uppercase tracking-wider disabled:opacity-60">Anliegen öffnen</button>
                 </form>
                 <div id="concernResult" aria-live="polite"><p class="text-center py-6 text-[var(--text-dim)] text-sm italic">Vorgangsnummer und Pin finden Sie in der Bestätigung Ihres Anliegens.</p></div>
             </div>

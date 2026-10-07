@@ -44,7 +44,7 @@
             <nav class="flex items-center gap-1 sm:gap-2" aria-label="Karriere-Navigation">
                 <a href="/" class="btn-ghost btn-sm hidden md:inline-flex">Startseite</a>
                 <a href="#stellen" class="btn-ghost btn-sm hidden sm:inline-flex">Stellen</a>
-                <a href="#status" class="btn-ghost btn-sm hidden sm:inline-flex">Bewerbungsstatus</a>
+                <a href="#status" class="btn-ghost btn-sm hidden sm:inline-flex">Meine Bewerbung</a>
                 <a href="/login.html" data-auth-link class="btn-outline btn-sm" aria-label="Login">
                     <svg class="ico-sm text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                     <span data-auth-label>Login</span>
@@ -157,19 +157,21 @@
             </div>
         </section>
 
-        <!-- Statusabfrage -->
+        <!-- Bereits beworben: zur persönlichen Bewerberseite (Stand, Gesprächstermin, Nachrichten) -->
         <section id="status" class="max-w-3xl mx-auto px-5 sm:px-6 py-16 border-t border-[var(--glass-border)]">
             <div class="text-center mb-8">
                 <p class="text-xs uppercase tracking-widest text-gold mb-2">Bereits beworben?</p>
-                <h2 class="font-serif text-4xl md:text-5xl font-semibold">Bewerbungsstatus</h2>
+                <h2 class="font-serif text-4xl md:text-5xl font-semibold">Ihre Bewerbung</h2>
+                <p class="text-sm text-muted mt-3 max-w-xl mx-auto">Auf Ihrer Bewerberseite sehen Sie den Stand, Ihren Gesprächstermin und schreiben direkt mit dem Board of Partners.</p>
             </div>
+            <div id="myApplications" class="hidden glass-card p-5 sm:p-8 mb-5"></div>
             <div class="glass-card p-5 sm:p-8">
                 <form id="statusForm" class="flex flex-col sm:flex-row gap-3" novalidate>
                     <input id="stNumber" class="field font-mono" placeholder="Bewerbungsnummer, z. B. BW-2026-0001" autocapitalize="characters" aria-label="Bewerbungsnummer">
                     <input id="stCode" class="field font-mono sm:w-48" inputmode="numeric" maxlength="6" placeholder="Zugangscode" aria-label="Zugangscode">
-                    <button type="submit" class="btn-gold btn-md">Prüfen</button>
+                    <button type="submit" class="btn-gold btn-md">Öffnen</button>
                 </form>
-                <div id="statusResult" class="mt-6"></div>
+                <div id="statusResult" class="mt-4"></div>
             </div>
         </section>
     </main>

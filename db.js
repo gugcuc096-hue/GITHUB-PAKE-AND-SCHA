@@ -944,6 +944,45 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_google_docs_case ON google_docs(case_id);
 `);
 
+/*
+ * Nachrichten in der Akte (Chat Kanzlei ↔ Mandant): das sind die für den Mandanten sichtbaren Einträge in notes
+ * (internal = 0, system = 0). Hier steht nur, bis wohin jemand gelesen hat (für „neu“-Hinweise und „gelesen“).
+ */
+const hadChatReads = tableExists('case_chat_reads');
+db.exec(`
+  CREATE TABLE IF NOT EXISTS case_chat_reads (
+    case_id  INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    last_id  INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (case_id, user_id)
+  );
+`);
+
+/*
+ * Bewerbungen: Nachrichten zwischen Board und Bewerber (Bewerberseite mit persönlichem Link statt Statusabfrage).
+ * access_token: geheimer Link /bewerbung.html#<token> · discord_user_id: per Discord-Anmeldung verbunden (Antworten
+ * kommen dann als Discord-Direktnachricht) · *_read_id: bis wohin Bewerber bzw. Board gelesen haben.
+ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS application_messages (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    application_id INTEGER NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+    from_board     INTEGER NOT NULL DEFAULT 0,
+    author_id      INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    author_name    TEXT NOT NULL DEFAULT '',
+    body           TEXT NOT NULL,
+    created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_application_messages ON application_messages(application_id, id);
+`);
+addColumn('applications', 'access_token', "TEXT NOT NULL DEFAULT ''");
+addColumn('applications', 'discord_user_id', "TEXT NOT NULL DEFAULT ''");
+addColumn('applications', 'applicant_read_id', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('applications', 'board_read_id', 'INTEGER NOT NULL DEFAULT 0');
+for (const row of db.prepare("SELECT id FROM applications WHERE access_token = ''").all()) {
+  db.prepare('UPDATE applications SET access_token = ? WHERE id = ?').run(crypto.randomBytes(24).toString('base64url'), row.id);
+}
+
 /**
  * Fortlaufende Nummer pro Jahr, z. B. PS-2026-0007. Lücken durch Löschen führen nicht zu Dubletten.
  * also: weitere [Tabelle, Spalte], deren Nummern ebenfalls belegt sind (Akten im Papierkorb).
@@ -985,6 +1024,18 @@ if (!getSetting('migrated_priority_from_urgency')) {
     .run().changes;
   setSetting('migrated_priority_from_urgency', new Date().toISOString());
   if (n) console.log(`Priorität aus der Dringlichkeit übernommen: ${n} Akte(n).`);
+}
+
+// Akten-Chat neu: Bisherige Nachrichten gelten als gelesen (sonst wären beim ersten Start alle „neu“).
+if (!hadChatReads) setSetting('chat_read_floor', db.prepare('SELECT COALESCE(MAX(id), 0) AS m FROM notes').get().m);
+
+// „Nachricht an den Bewerber“ (früher ein einzelnes Feld) wird zur ersten Nachricht im Bewerbungs-Chat.
+if (!getSetting('migrated_application_public_note')) {
+  for (const a of db.prepare("SELECT id, public_note, updated_at FROM applications WHERE public_note != ''").all()) {
+    db.prepare("INSERT INTO application_messages (application_id, from_board, author_name, body, created_at) VALUES (?, 1, 'Board of Partners', ?, ?)").run(a.id, a.public_note, a.updated_at);
+  }
+  db.prepare('UPDATE applications SET applicant_read_id = (SELECT COALESCE(MAX(m.id), 0) FROM application_messages m WHERE m.application_id = applications.id)').run();
+  setSetting('migrated_application_public_note', new Date().toISOString());
 }
 
 // Ältere Anliegen (vor Einführung der Vorgangsnummer) nachträglich nummerieren.

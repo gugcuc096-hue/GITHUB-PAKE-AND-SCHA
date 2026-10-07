@@ -12,21 +12,32 @@ document.addEventListener('click', (e) => {
   if (e.target.closest('a[href^="/vertrag.html"]')) st.contractTabAt = Date.now();
   // Klick neben das Fenster: zurück zum vorherigen Fenster (z. B. zur Akte) bzw. schließen
   if (e.target === $('#modal')) {
-    guard(() => modalBack());
+    guard(() => modalDismiss());
     return;
   }
   const link = e.target.closest('a[href^="#"]');
-  if (link && !link.dataset.action && link.getAttribute('href') === location.hash) {
-    e.preventDefault();
-    go(hashView());
-    return;
+  if (link && !link.dataset.action) {
+    // Seitenwechsel aus einem offenen Fenster/Menü oder mit ungespeicherten Eingaben: über leaveTo (Verlauf + Rückfrage)
+    if (onOverlayEntry() || unsavedInputs()) {
+      e.preventDefault();
+      guard(() => leaveTo(decodeURIComponent(link.getAttribute('href').slice(1))));
+      return;
+    }
+    if (link.getAttribute('href') === location.hash) {
+      e.preventDefault();
+      go(hashView());
+      return;
+    }
   }
   const el = e.target.closest('[data-action]');
   if (!el || el.disabled) return;
   const fn = actions[el.dataset.action];
   if (!fn) return;
   e.preventDefault();
-  guard(() => fn(el, e));
+  // Doppelklick: dieselbe Aktion läuft noch (z. B. Senden, Erinnern, Übernehmen) – nicht ein zweites Mal auslösen
+  if (el.dataset.busy) return;
+  el.dataset.busy = '1';
+  guard(() => fn(el, e)).finally(() => delete el.dataset.busy);
 });
 
 document.addEventListener('keydown', (e) => {
@@ -53,12 +64,18 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (e.key === 'Escape') {
-    if ($('#modal').classList.contains('open')) guard(() => modalBack());
+    if ($('#modal').classList.contains('open')) guard(() => modalDismiss());
     else closeSidebar();
   }
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[role="button"][data-action]')) {
     e.preventDefault();
     e.target.click();
+  }
+  // Chat: Enter sendet, Umschalt + Enter macht eine neue Zeile (am Handy bleibt Enter ein Zeilenumbruch)
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.target.classList && e.target.classList.contains('chat-input') && window.matchMedia('(hover: hover)').matches) {
+    e.preventDefault();
+    if (e.target.value.trim()) e.target.form.requestSubmit();
+    return;
   }
   // Enter in einem Eingabefeld des Generators soll nicht versehentlich die Rechnung erstellen.
   if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.closest('#invoiceForm')) e.preventDefault();
@@ -90,6 +107,10 @@ document.addEventListener('input', (e) => {
   if (t.id === 'caseSearch') {
     st.caseQuery = t.value;
     $('#caseList').innerHTML = caseTable();
+  } else if (t.classList && t.classList.contains('chat-input')) {
+    // Eingabefeld wächst mit (bis zu einigen Zeilen)
+    t.style.height = 'auto';
+    t.style.height = Math.min(t.scrollHeight + 2, 180) + 'px';
   } else if (t.id === 'gsInput') {
     st.gsQuery = t.value;
     clearTimeout(st.gsTimer);
@@ -294,7 +315,24 @@ document.addEventListener('change', (e) => {
   }
 });
 
-window.addEventListener('hashchange', () => go(hashView()));
+// Seitenwechsel per Zurück/Vorwärts oder Adresszeile – mit Rückfrage, wenn auf der Seite noch etwas Ungespeichertes steht
+window.addEventListener('hashchange', () =>
+  guard(async () => {
+    const view = hashView();
+    if (view !== st.view && formDirty($('#content')) && !(await askDiscard(true))) {
+      history.pushState(null, '', '#' + st.view); // auf der Seite bleiben
+      return;
+    }
+    await go(view);
+  })
+);
+window.addEventListener('popstate', onPopState);
+// Neu laden / Tab schließen mit ungespeicherten Eingaben: Rückfrage des Browsers
+window.addEventListener('beforeunload', (e) => {
+  if (st.leaving || !st.user || !unsavedInputs({ invoice: true })) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
 
 // Vertrag im anderen Tab unterschrieben: beim Zurückkehren die offene Akte auffrischen –
 // aber nur, wenn dort nichts halb Eingetipptes verloren ginge.
@@ -314,10 +352,17 @@ window.addEventListener('focus', () => {
   if (!dirty) reloadCase(id).catch(() => {});
 });
 
+// Offener Chat (Akte oder Bewerbung): neue Nachrichten alle paar Sekunden nachladen
+setInterval(() => {
+  if (!st.user) return;
+  pollChat();
+  if (typeof pollAppChat === 'function') pollAppChat();
+}, 6000);
+
 // Ungelesene Post, neue Bewerbungen und Dienststatus regelmäßig aktualisieren (Badges in der Navigation)
 setInterval(() => {
   if (document.hidden || !st.user) return;
-  Promise.all([load.unread(), load.appCount(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {})])
+  Promise.all([load.chatUnread().catch(() => {}), load.unread(), load.appCount(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {})])
     .then(renderNav)
     .catch(() => {});
 }, 30000);
@@ -345,16 +390,24 @@ setInterval(() => {
   const discordState = params.get('discord');
   const googleState = params.get('google');
   const caseParam = Number(params.get('case'));
-  if (discordState || googleState || params.has('case')) history.replaceState(null, '', location.pathname + location.hash);
+  // Neu geladen, während eine Akte offen war: der Verlaufseintrag gehört schon zur Akte – nur wieder öffnen
+  const restoring = params.has('case') && onOverlayEntry();
+  if (!restoring && (discordState || googleState || params.has('case'))) history.replaceState(null, '', location.pathname + location.hash);
   if (discordState && DISCORD_MSG[discordState]) toast(...DISCORD_MSG[discordState]);
   if (googleState && GOOGLE_MSG[googleState]) toast(...GOOGLE_MSG[googleState]);
 
   try {
-    await Promise.all([load.unread(), load.appCount(), load.duty(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {})]);
+    await Promise.all([load.chatUnread().catch(() => {}), load.unread(), load.appCount(), load.duty(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {})]);
     renderUser();
   } catch {
     /* Badges und Dienststatus sind nicht kritisch */
   }
-  await go(hashView());
-  if (Number.isInteger(caseParam) && caseParam > 0) guard(() => openCase(caseParam));
+  st.histPaused = true;
+  try {
+    await go(hashView());
+    if (Number.isInteger(caseParam) && caseParam > 0) await guard(() => openCase(caseParam));
+  } finally {
+    st.histPaused = false;
+    syncHistory();
+  }
 })();

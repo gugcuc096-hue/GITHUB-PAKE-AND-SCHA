@@ -62,6 +62,27 @@ describe('Server und Sicherheit', () => {
     const me = await as.admin.get('/api/auth/me');
     assert.equal(me.status, 200);
   });
+
+  it('verlängert die Sitzung bei Nutzung (7 Tage ab der letzten Nutzung)', async () => {
+    const { DatabaseSync } = require('node:sqlite');
+    const db = new DatabaseSync(require('node:path').join(server.dir, 'test.db'));
+    try {
+      const u = client(server.base);
+      const user = await u.login(TEAM.partner);
+      const soon = new Date(Date.now() + 2 * 864e5).toISOString(); // vor fünf Tagen angemeldet
+      db.prepare('UPDATE sessions SET expires_at = ? WHERE user_id = ?').run(soon, user.id);
+      const r = await u.get('/api/auth/me');
+      assert.equal(r.status, 200);
+      assert.match(r.headers.get('set-cookie') || '', /sid=.*Max-Age=604800/i);
+      const { expires_at: exp } = db.prepare('SELECT expires_at FROM sessions WHERE user_id = ?').get(user.id);
+      assert.ok(new Date(exp) - Date.now() > 6.9 * 864e5, exp);
+      // frisch verlängert: nicht bei jeder Anfrage erneut schreiben
+      const again = await u.get('/api/auth/me');
+      assert.equal(again.headers.get('set-cookie'), null);
+    } finally {
+      db.close();
+    }
+  });
 });
 
 describe('Mandatsanfrage über die Website', () => {

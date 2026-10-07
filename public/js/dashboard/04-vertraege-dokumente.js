@@ -75,8 +75,12 @@ function contractForm(c, { templates, defaults, k = null }) {
     `<div class="${span ? 'span-2' : ''}"><label class="label" for="kf_${name}">${esc(label)}</label><input id="kf_${name}" name="${name}" class="field" maxlength="${name.includes('gebuehr') ? 200 : 120}" value="${esc(v[name] || '')}" ${attrs}></div>`;
   // Leistungen aus der Honorarordnung (Mehrfachauswahl, Menge je Leistung); gespeicherte Auswahl beim Bearbeiten wiederherstellen
   const saved = (k && Array.isArray(k.data.services) ? k.data.services : []).map((x) => ({ ...x }));
-  const fees = (st.fees || []).map((f) => ({ name: f.name, price: f.price, category: f.category }));
-  saved.filter((x) => !fees.some((f) => f.name === x.name)).forEach((x) => fees.push({ name: x.name, price: x.price, category: '_alt' }));
+  // VIP/Lifetime oder Kooperation des Mandanten: Leistungen zum ermäßigten Preis (wie bei Rechnungen)
+  const disc = defaults.discount && defaults.discount.pct > 0 ? defaults.discount : null;
+  const reduce = (price) => (disc ? Math.round((price * (100 - disc.pct)) / 100) : price);
+  const discLabel = disc ? `${disc.label} −${disc.pct} %` : '';
+  const fees = (st.fees || []).map((f) => ({ name: f.name, price: reduce(f.price), listPrice: disc ? f.price : undefined, discount: disc ? discLabel : undefined, category: f.category }));
+  saved.filter((x) => !fees.some((f) => f.name === x.name)).forEach((x) => fees.push({ ...x, category: '_alt' }));
   const cats = { ...FEE_CATEGORIES, _alt: 'Aus diesem Vertrag (nicht mehr in der Honorarordnung)' };
   const svcList = Object.entries(cats)
     .map(([cat, label]) => {
@@ -85,11 +89,12 @@ function contractForm(c, { templates, defaults, k = null }) {
       return `<div class="svc-cat">${esc(label)}</div>${list
         .map((f) => {
           const sel = saved.find((x) => x.name === f.name);
-          const price = sel ? sel.price : f.price;
-          return `<label class="svc"><input type="checkbox" class="svc-check" data-name="${esc(f.name)}" data-price="${price}" ${sel ? 'checked' : ''}>
+          const x = sel || f; // gespeicherte Leistung behält ihren Preis
+          const list = x.listPrice > x.price ? x.listPrice : null;
+          return `<label class="svc"><input type="checkbox" class="svc-check" data-name="${esc(f.name)}" data-price="${x.price}" ${list ? `data-list-price="${list}" data-discount="${esc(x.discount || '')}"` : ''} ${sel ? 'checked' : ''}>
               <span class="svc-name">${esc(f.name)}</span>
               <input type="number" class="field svc-qty" min="1" max="99" value="${sel ? sel.qty : 1}" aria-label="Menge ${esc(f.name)}" ${sel ? '' : 'disabled'}>
-              <span class="svc-price">${esc(money(price))}</span></label>`;
+              <span class="svc-price">${list ? `<s class="svc-list-price">${esc(money(list))}</s> ` : ''}${esc(money(x.price))}</span></label>`;
         })
         .join('')}`;
     })
@@ -116,6 +121,7 @@ function contractForm(c, { templates, defaults, k = null }) {
         ${field('mandant_geburtsdatum', 'Geburtsdatum (IC)', 'placeholder="TT.MM.JJJJ"')}
         <div class="span-2 form-sub">Honorar</div>
         ${svcList ? `<div class="span-2"><div class="label">Leistungen aus der Honorarordnung <span class="text-dim font-normal normal-case tracking-normal">– mehrere wählbar, die Summe wird zur Grundgebühr</span></div>
+          ${disc ? `<div class="svc-discount">${icon(disc.kind === 'coop' ? 'tag' : 'crown', 'ico-sm')}<span><strong>${esc(disc.label)}</strong>: −${disc.pct} % auf die Honorarordnung – die Preise unten sind bereits ermäßigt (wie in Rechnungen).</span></div>` : ''}
           <div class="svc-list" id="svcList">${svcList}</div>
           <div class="svc-sum"><span>Summe der Leistungen</span><strong id="svcSum">${esc(money(saved.reduce((sum, x) => sum + x.price * x.qty, 0)))}</strong></div></div>` : ''}
         <div><label class="label" for="kf_grundgebuehr">Grundgebühr</label><input id="kf_grundgebuehr" name="grundgebuehr" class="field" maxlength="200" value="${esc(v.grundgebuehr || '')}" placeholder="z. B. 100.000 $">
@@ -147,6 +153,7 @@ function contractServices(form) {
     name: box.dataset.name,
     price: Number(box.dataset.price) || 0,
     qty: Math.min(99, Math.max(1, Number(box.closest('.svc').querySelector('.svc-qty').value) || 1)),
+    ...(box.dataset.listPrice ? { listPrice: Number(box.dataset.listPrice), discount: box.dataset.discount || undefined } : {}),
   }));
 }
 

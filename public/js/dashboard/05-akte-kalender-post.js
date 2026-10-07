@@ -68,36 +68,62 @@ async function afterTaskChange() {
 }
 
 /** Board-Ticket einer Bewerbung bzw. eines Anliegens (nur Board of Partners). */
+/*
+ * Discord-Tickets und Prozessticket als schmale Leiste oben in der Akte bzw. Bewerbung: Status auf einen Blick,
+ * Erklärungen nur, wenn etwas zu tun ist (sonst im Tooltip).
+ */
+const ticketState = (t) => (t.exists ? (t.archived ? badge('archiviert', 'slate') : badge('aktiv', 'emerald')) : t.deleted ? badge('per /delete gelöscht', 'slate') : badge('noch nicht angelegt', 'amber'));
+const ticketOpen = (url, label = 'Öffnen') => (url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="btn-discord btn-sm">${DISCORD_ICON}<span>${esc(label)}</span></a>` : '');
+function ticketStrip({ title, tip = '', badges = '', hint = '', error = '', actions = '', extra = '' }) {
+  return `<div class="ticket-strip">
+      <div class="ts-main"><span class="ts-title" ${tip ? `title="${esc(tip)}"` : ''}>${DISCORD_ICON}<strong>${esc(title)}</strong></span>${badges}</div>
+      ${actions ? `<div class="ts-actions">${actions}</div>` : ''}
+      ${hint ? `<div class="ts-hint">${hint}</div>` : ''}
+      ${error ? `<div class="ts-hint text-red-300">${icon('alert', 'ico-sm')} ${esc(error)}</div>` : ''}
+      ${extra}
+    </div>`;
+}
+
 function boardTicketLine(kind, id, t) {
   if (!t) return '';
-  const open = t.url ? `<a href="${esc(t.url)}" target="_blank" rel="noopener" class="btn-discord btn-sm">${DISCORD_ICON}<span>In Discord öffnen</span></a>` : '';
-  return `<div class="banner banner-discord items-center justify-between flex-wrap mt-4">
-      <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><strong>Discord-Ticket (Board)</strong>${t.exists ? (t.archived ? badge('archiviert', 'slate') : badge('aktiv', 'emerald')) : t.deleted ? badge('per /delete gelöscht', 'slate') : badge('noch nicht angelegt', 'amber')}</div>
-        ${t.error ? `<div class="text-xs text-red-300 mt-1">${icon('alert', 'ico-sm')} ${esc(t.error)}</div>` : ''}</div>
-      <div class="flex flex-wrap gap-2">${open}<button class="btn-outline btn-sm" data-action="board-ticket-sync" data-kind="${kind}" data-id="${id}">${t.exists ? 'Abgleichen' : t.deleted ? 'Neu anlegen' : 'Ticket anlegen'}</button></div></div>`;
+  return ticketStrip({
+    title: 'Discord-Ticket (Board)',
+    badges: ticketState(t),
+    error: t.error,
+    actions: `${ticketOpen(t.url)}<button class="btn-ghost btn-sm" data-action="board-ticket-sync" data-kind="${kind}" data-id="${id}">${t.exists ? 'Abgleichen' : t.deleted ? 'Neu anlegen' : 'Ticket anlegen'}</button>`,
+  });
 }
 
 /** Discord-Ticket der Akte (nur wenn Discord-Tickets eingerichtet sind). */
 function ticketBanner(c, t) {
   if (!t) return '';
-  const open = t.url ? `<a href="${esc(t.url)}" target="_blank" rel="noopener" class="btn-discord btn-sm">${DISCORD_ICON}<span>In Discord öffnen</span></a>` : '';
   if (!isStaff()) {
     if (t.deleted) return ''; // Ticket wurde von der Kanzlei gelöscht
-    if (t.clientInTicket) return `<div class="banner banner-discord items-center justify-between flex-wrap"><div><strong>Ihr Discord-Ticket</strong><div class="text-sm text-muted">Alle Neuigkeiten zu dieser Akte erscheinen automatisch in Ihrem privaten Discord-Kanal.</div></div>${open}</div>`;
+    if (t.clientInTicket) return ticketStrip({ title: 'Ihr Discord-Ticket', tip: 'Alle Neuigkeiten zu dieser Akte erscheinen automatisch in Ihrem privaten Discord-Kanal.', badges: badge('verbunden', 'emerald'), actions: ticketOpen(t.url) });
     if (t.clientLinked)
-      return `<div class="banner banner-discord items-center justify-between flex-wrap"><div><strong>Discord-Ticket</strong><div class="text-sm text-muted">Sie werden automatisch hinzugefügt, sobald Sie auf dem Discord-Server der Kanzlei sind.</div></div><button class="btn-outline btn-sm" data-action="ticket-sync" data-id="${c.id}">Erneut prüfen</button></div>`;
-    return `<div class="banner banner-discord items-center justify-between flex-wrap"><div><strong>Discord-Ticket</strong><div class="text-sm text-muted">Verbinden Sie Ihr Discord-Konto – dann kommen Sie automatisch in das private Ticket zu Ihrer Akte.</div></div><a href="/api/discord/connect" class="btn-discord btn-sm">${DISCORD_ICON}<span>Discord verbinden</span></a></div>`;
+      return ticketStrip({ title: 'Discord-Ticket', hint: 'Sie werden automatisch hinzugefügt, sobald Sie auf dem Discord-Server der Kanzlei sind.', actions: `<button class="btn-ghost btn-sm" data-action="ticket-sync" data-id="${c.id}">Erneut prüfen</button>` });
+    return ticketStrip({ title: 'Discord-Ticket', hint: 'Verbinden Sie Ihr Discord-Konto – dann kommen Sie automatisch in das private Ticket zu Ihrer Akte.', actions: `<a href="/api/discord/connect" class="btn-discord btn-sm">${DISCORD_ICON}<span>Discord verbinden</span></a>` });
   }
   const client = t.clientInTicket
     ? badge('Mandant im Ticket', 'emerald')
     : t.clientLinked
       ? badge('Mandant nicht auf dem Server', 'amber')
       : badge(c.hasClientAccount ? 'Mandant: Discord nicht verknüpft' : 'Mandant noch nicht beigetreten', 'slate');
-  return `<div class="banner banner-discord items-center justify-between flex-wrap">
-      <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><strong>Discord-Ticket</strong>${t.exists ? (t.archived ? badge('archiviert', 'slate') : badge('aktiv', 'emerald')) : t.deleted ? badge('per /delete gelöscht', 'slate') : badge('noch nicht angelegt', 'amber')}${t.exists ? client : ''}</div>
-        <div class="text-xs text-dim mt-1">${t.exists ? 'Status, Zuständigkeit, Nachrichten, Termine, Verträge und Rechnungen erscheinen automatisch im Kanal – interne Notizen nie.' : t.deleted ? 'Das Ticket wurde im Discord gelöscht und wird nicht automatisch neu angelegt. „Neu anlegen“ erstellt einen frischen Kanal.' : 'Wird automatisch angelegt; hier von Hand anlegen, falls es fehlt.'}${!t.clientInTicket && !c.hasClientAccount ? ' Mandanten ohne Konto treten direkt nach dem Einreichen auf der Website bei – sonst im Ticket mit /add hinzufügen.' : ''}</div>
-        ${t.error ? `<div class="text-xs text-red-300 mt-1">${icon('alert', 'ico-sm')} ${esc(t.error)}</div>` : ''}</div>
-      <div class="flex flex-wrap gap-2">${open}<button class="btn-outline btn-sm" data-action="ticket-sync" data-id="${c.id}">${t.exists ? 'Abgleichen' : t.deleted ? 'Neu anlegen' : 'Ticket anlegen'}</button></div></div>`;
+  // Erklärungen im Tooltip; als Zeile nur, wenn etwas zu tun ist (Ticket fehlt bzw. wurde gelöscht)
+  const info = `Status, Zuständigkeit, Nachrichten, Termine, Verträge und Rechnungen erscheinen automatisch im Kanal – interne Notizen nie.${!t.clientInTicket && !c.hasClientAccount ? ' Mandanten ohne Konto treten direkt nach dem Einreichen auf der Website bei – sonst im Ticket mit /add hinzufügen.' : ''}`;
+  const hint = t.exists
+    ? ''
+    : t.deleted
+      ? 'Das Ticket wurde im Discord gelöscht und wird nicht automatisch neu angelegt. „Neu anlegen“ erstellt einen frischen Kanal.'
+      : 'Wird automatisch angelegt; hier von Hand anlegen, falls es fehlt.';
+  return ticketStrip({
+    title: 'Discord-Ticket',
+    tip: info,
+    badges: ticketState(t) + (t.exists ? client : ''),
+    hint: esc(hint),
+    error: t.error,
+    actions: `${ticketOpen(t.url)}<button class="btn-ghost btn-sm" data-action="ticket-sync" data-id="${c.id}">${t.exists ? 'Abgleichen' : t.deleted ? 'Neu anlegen' : 'Ticket anlegen'}</button>`,
+  });
 }
 
 /** Prozessticket: Link zum Kanal auf einem anderen Discord (z. B. DOJ) – nur für die Kanzlei. */
@@ -114,14 +140,13 @@ function processTicketBanner(c) {
           </form></div>`
     : '';
   if (!pt) return form;
-  return `<div class="banner banner-discord items-center justify-between flex-wrap">
-      <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><strong>Prozessticket</strong>${badge('DOJ-Discord', 'sky')}</div>
-        ${pt.label ? `<div class="text-sm mt-1 break-words">${esc(pt.label)}</div>` : ''}
-        <div class="text-xs text-dim mt-1">Kanal auf einem anderen Discord-Server · nur für die Kanzlei sichtbar</div></div>
-      <div class="flex flex-wrap gap-2"><a href="${esc(pt.url)}" target="_blank" rel="noopener noreferrer" class="btn-discord btn-sm">${DISCORD_ICON}<span>Prozessticket öffnen</span></a>${
-      c.canEdit ? `<button class="btn-outline btn-sm" data-action="pt-toggle">Ändern</button><button class="btn-ghost btn-sm" data-action="pt-remove" data-id="${c.id}">Entfernen</button>` : ''
-    }</div>
-      ${form}</div>`;
+  return ticketStrip({
+    title: 'Prozessticket',
+    tip: 'Kanal auf einem anderen Discord-Server · nur für die Kanzlei sichtbar',
+    badges: `${badge('DOJ-Discord', 'sky')}${pt.label ? `<span class="ts-label">${esc(pt.label)}</span>` : ''}`,
+    actions: `${ticketOpen(pt.url)}${c.canEdit ? `<button class="btn-ghost btn-sm" data-action="pt-toggle">Ändern</button><button class="btn-ghost btn-sm" data-action="pt-remove" data-id="${c.id}">Entfernen</button>` : ''}`,
+    extra: form,
+  });
 }
 
 /** Darf das Mandanten-Konto der Akte verknüpfen/lösen: zuständige Anwälte und Board of Partners. */
@@ -184,7 +209,146 @@ async function setCasePriority(sel) {
   await reloadCase(id);
 }
 
-function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, clientSuggestions, review }) {
+/* ---------------------------------------------------------------- Nachrichten (Chat in Akte und Bewerbung) */
+function chatDayLabel(iso) {
+  const d = parseDate(iso);
+  if (!d) return '';
+  const key = (x) => x.toLocaleDateString('de-DE');
+  if (key(d) === key(new Date())) return 'Heute';
+  if (key(d) === key(new Date(Date.now() - 864e5))) return 'Gestern';
+  return d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+const chatTime = (iso) => (parseDate(iso) || new Date()).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+/**
+ * Eine Sprechblase. x: { id, side ('out' = eigene Seite, 'in' = Gegenseite), author, sub, body, createdAt, del }.
+ * prevDay: Tag der vorherigen Nachricht – davor kommt bei einem neuen Tag die Trennlinie („Heute“, „Gestern“ …).
+ */
+function chatBubble(x, prevDay) {
+  const day = chatDayLabel(x.createdAt);
+  return `${day !== prevDay ? `<div class="chat-day"><span>${esc(day)}</span></div>` : ''}
+    <div class="chat-msg ${x.side}" data-id="${x.id}">
+      <div class="chat-bubble">
+        ${x.author ? `<div class="chat-author">${esc(x.author)}${x.sub ? ` <span>· ${esc(x.sub)}</span>` : ''}</div>` : ''}
+        <div class="chat-text">${esc(x.body)}</div>
+        <div class="chat-foot"><span>${esc(chatTime(x.createdAt))}</span><span class="chat-receipt"></span>${x.del || ''}</div>
+      </div>
+    </div>`;
+}
+/** Mehrere Nachrichten (toBubble: Nachricht → Angaben für chatBubble). prevDay: Tag vor der ersten. */
+function chatBubbles(list, toBubble, prevDay = null) {
+  return list
+    .map((m) => {
+      const html = chatBubble(toBubble(m), prevDay);
+      prevDay = chatDayLabel(m.createdAt);
+      return html;
+    })
+    .join('');
+}
+/** „Gesendet“ / „Gelesen“ unter der letzten eigenen Nachricht (otherRead: bis wohin die Gegenseite gelesen hat). */
+function chatReceipts(list, otherRead) {
+  if (!list) return;
+  if (otherRead !== undefined) list.dataset.otherRead = String(otherRead);
+  const read = Number(list.dataset.otherRead) || 0;
+  const outs = $$('.chat-msg.out', list);
+  outs.forEach((el) => (el.querySelector('.chat-receipt').textContent = ''));
+  const last = outs[outs.length - 1];
+  if (last) last.querySelector('.chat-receipt').textContent = Number(last.dataset.id) <= read ? '· gelesen' : '· gesendet';
+}
+/** Neue Nachrichten unten anhängen (doppelte werden übersprungen); scrollt mit, wenn man unten war. */
+function chatAppend(list, messages, toBubble) {
+  if (!list || !messages.length) return;
+  const fresh = messages.filter((m) => !list.querySelector(`.chat-msg[data-id="${m.id}"]`));
+  if (!fresh.length) return;
+  const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 60;
+  list.querySelector('.chat-empty')?.remove();
+  const days = $$('.chat-day span', list);
+  list.insertAdjacentHTML('beforeend', chatBubbles(fresh, toBubble, days.length ? days[days.length - 1].textContent : null));
+  list.dataset.lastId = String(Math.max(Number(list.dataset.lastId) || 0, ...fresh.map((m) => m.id)));
+  if (atBottom || fresh.some((m) => toBubble(m).side === 'out')) list.scrollTop = list.scrollHeight;
+  chatReceipts(list);
+}
+function chatForm({ form, attrs, placeholder }) {
+  return `<form data-form="${form}" ${attrs} class="chat-form">
+          <textarea name="body" rows="1" maxlength="${form === 'chat-send' ? 4000 : 3000}" required class="field chat-input" placeholder="${esc(placeholder)}" aria-label="Nachricht schreiben"></textarea>
+          <button type="submit" class="btn-gold chat-send" aria-label="Senden" title="Senden">${icon('send')}</button>
+        </form>`;
+}
+
+/* Akte: Kanzlei ↔ Mandant */
+function caseBubble(m) {
+  const side = m.fromFirm === isStaff() ? 'out' : 'in';
+  const mine = m.authorId === st.user.id;
+  return {
+    id: m.id,
+    side,
+    // Namen zeigen: bei der Gegenseite immer, in der Kanzlei auch bei Kollegen
+    author: side === 'in' || (isStaff() && !mine) ? m.author : '',
+    sub: m.authorRank || (m.fromFirm ? '' : 'Mandant'),
+    body: m.body,
+    createdAt: m.createdAt,
+    del:
+      mine || isAdmin()
+        ? `<button type="button" class="chat-del" data-action="delete-note" data-case-id="${st.chatCaseId}" data-id="${m.id}" aria-label="Nachricht löschen" title="Nachricht löschen">${icon('trash', 'ico-sm')}</button>`
+        : '',
+  };
+}
+function chatSection(c, chat, ticket) {
+  const staff = isStaff();
+  st.chatCaseId = c.id;
+  const list = chat ? chat.messages : [];
+  const reach = !staff
+    ? ''
+    : c.hasClientAccount
+      ? `${esc(c.clientName)} sieht die Nachrichten im Mandantenportal${ticket && ticket.clientInTicket ? ' und im Discord-Ticket' : ''}.`
+      : ticket && ticket.clientInTicket
+        ? 'Der Mandant hat kein Portal-Konto – Nachrichten erreichen ihn über das Discord-Ticket.'
+        : 'Der Mandant hat noch kein Portal-Konto und ist nicht im Discord-Ticket – Nachrichten liest er erst, wenn er eines davon hat.';
+  const empty = staff ? 'Noch keine Nachrichten. Schreiben Sie dem Mandanten direkt hier.' : 'Noch keine Nachrichten. Schreiben Sie Ihrer Kanzlei – Ihr Anwalt wird benachrichtigt.';
+  return `<div class="section" id="secChat">
+      <h3 class="section-title">Nachrichten <span class="text-xs text-dim font-normal" style="font-family:Inter,sans-serif">${staff ? 'mit dem Mandanten' : 'mit Ihrer Kanzlei'}</span></h3>
+      <div class="chat">
+        <div class="chat-list" id="chatList" data-case-id="${c.id}" data-last-id="${list.length ? list[list.length - 1].id : 0}" data-other-read="${chat ? chat.read.other : 0}" aria-live="polite">
+          ${list.length ? chatBubbles(list, caseBubble) : `<p class="chat-empty">${esc(empty)}</p>`}
+        </div>
+        ${chatForm({ form: 'chat-send', attrs: `data-case-id="${c.id}"`, placeholder: staff ? `Nachricht an ${c.clientName === '—' ? 'den Mandanten' : c.clientName} …` : 'Nachricht an Ihre Kanzlei …' })}
+        <p class="chat-hint"><span class="hidden md:inline">Enter sendet · Umschalt + Enter für eine neue Zeile. </span>${reach}</p>
+      </div>
+    </div>`;
+}
+/** Nach dem Öffnen/Neuzeichnen: ans Ende scrollen, Lesebestätigung, als gelesen merken. */
+function initChat(data) {
+  const list = $('#chatList');
+  if (!list) return;
+  list.scrollTop = list.scrollHeight;
+  chatReceipts(list);
+  markChatRead(Number(list.dataset.caseId), Number(list.dataset.lastId), data && data.chat ? data.chat.read.mine : 0);
+}
+async function markChatRead(caseId, lastId, mine = 0) {
+  if (!lastId || lastId <= mine) return;
+  await api.post(`/api/cases/${caseId}/chat/read`, { lastId }).catch(() => {});
+  await load.chatUnread().catch(() => {});
+  renderNav();
+}
+/** Neue Nachrichten nachladen (alle paar Sekunden, solange der Chat der Akte offen ist). */
+async function pollChat() {
+  const list = $('#chatList');
+  if (!list || document.hidden || st.chatPolling) return;
+  st.chatPolling = true;
+  try {
+    const caseId = Number(list.dataset.caseId);
+    const r = await api.get(`/api/cases/${caseId}/chat?after=${Number(list.dataset.lastId) || 0}`);
+    if (!list.isConnected) return;
+    chatAppend(list, r.messages, caseBubble);
+    chatReceipts(list, r.read.other);
+    if (r.messages.length) await markChatRead(caseId, Number(list.dataset.lastId), r.read.mine);
+  } catch {
+    /* nächster Versuch beim nächsten Takt */
+  } finally {
+    st.chatPolling = false;
+  }
+}
+
+function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, clientSuggestions, review, chat }) {
   const staff = isStaff();
   const admin = isAdmin();
   const me = st.user.id;
@@ -241,7 +405,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     quick.push(`<button class="btn-outline btn-sm" data-action="new-event" data-case-id="${c.id}" data-return-case="${c.id}">${icon('calendar', 'ico-sm')}<span>Frist / Termin</span></button>`);
     quick.push(`<button class="btn-outline btn-sm" data-action="new-invoice" data-case-id="${c.id}">${icon('receipt', 'ico-sm')}<span>Rechnung</span></button>`);
     quick.push(`<a class="btn-outline btn-sm" href="/aktenauszug.html?id=${c.id}" target="_blank" rel="noopener">${icon('printer', 'ico-sm')}<span>Aktenauszug (PDF)</span></a>`);
-    if (c.clientId) quick.push(`<button class="btn-outline btn-sm" data-action="compose" data-recipient="${c.clientId}" data-case-id="${c.id}" data-return-case="${c.id}">${icon('mail', 'ico-sm')}<span>Mandant anschreiben</span></button>`);
+    quick.push(`<button class="btn-outline btn-sm" data-action="chat-focus">${icon('chat', 'ico-sm')}<span>Mandant anschreiben</span></button>`);
     if (!c.hasClientAccount && canLinkClient(c)) quick.push(`<button class="btn-outline btn-sm" data-action="case-client-search" data-id="${c.id}">${icon('user', 'ico-sm')}<span>Mandanten-Konto verknüpfen</span></button>`);
     if (!c.processTicket && c.canEdit) quick.push(`<button class="btn-outline btn-sm" data-action="pt-toggle">${icon('plus', 'ico-sm')}<span>Prozessticket (DOJ)</span></button>`);
     if (c.lawyerId === me) quick.push(`<button class="btn-ghost btn-sm" data-action="release-case" data-id="${c.id}">Akte abgeben</button>`);
@@ -249,7 +413,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     if (admin) quick.push(`<button class="btn-danger btn-sm" data-action="delete-case" data-id="${c.id}" data-number="${esc(c.caseNumber)}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>`);
   } else {
     if (!c.closed) quick.push(`<button class="btn-outline btn-sm" data-action="new-event" data-case-id="${c.id}" data-return-case="${c.id}">${icon('calendar', 'ico-sm')}<span>Termin anfragen</span></button>`);
-    quick.push(`<button class="btn-outline btn-sm" data-action="compose" ${c.lawyerId ? `data-recipient="${c.lawyerId}"` : ''} data-case-id="${c.id}" data-return-case="${c.id}">${icon('mail', 'ico-sm')}<span>Nachricht zur Akte</span></button>`);
+    quick.push(`<button class="btn-outline btn-sm" data-action="chat-focus">${icon('chat', 'ico-sm')}<span>Nachricht zur Akte</span></button>`);
     quick.push(`<a class="btn-outline btn-sm" href="/aktenauszug.html?id=${c.id}" target="_blank" rel="noopener">${icon('printer', 'ico-sm')}<span>Aktenauszug (PDF)</span></a>`);
   }
 
@@ -287,8 +451,10 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
         .join('')
     : '';
 
-  const noteList = notes.length
-    ? `<div class="timeline">${notes
+  // Verlauf: automatische Einträge und (nur Kanzlei) interne Notizen – Nachrichten stehen im Chat
+  const log = notes.filter((n) => n.system || n.internal);
+  const noteList = log.length
+    ? `<div class="timeline">${log
         .map((n) => {
           const canDelete = !n.system && (n.authorId === me || admin);
           return `<div class="tl-item ${n.internal ? 'tl-internal' : ''} ${n.system ? 'tl-system' : ''}">
@@ -311,30 +477,33 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       ${staff ? caseStats(c, { appointments, attachments, externalDocs, tasks }) : ''}
       <div class="info-grid mb-5">${info}</div>
       ${clientLinkBanner(c, clientSuggestions)}
-      ${ticketBanner(c, ticket)}
-      ${processTicketBanner(c)}
+      ${ticket || c.processTicket || c.canEdit ? `<div class="ticket-strips">${ticketBanner(c, ticket)}${processTicketBanner(c)}</div>` : ''}
       ${quick.length ? `<div class="form-actions mb-2">${quick.join('')}</div>` : ''}
       ${editForm}
       ${staff ? '' : reviewSection(c, review)}
       <div class="section"><h3 class="section-title">Sachverhalt</h3><p class="text-sm whitespace-pre-wrap text-muted">${esc(c.description || '—')}</p></div>
       ${c.publicNote ? `<div class="section"><h3 class="section-title">Statushinweis</h3><div class="banner banner-gold mb-0"><p class="text-sm whitespace-pre-wrap">${esc(c.publicNote)}</p></div></div>` : ''}
+      ${chatSection(c, chat, ticket)}
       <div class="section" id="secEvents"><h3 class="section-title">Termine & Fristen</h3>${apptList}</div>
-      ${staff ? caseTasksSection(c, tasks) : ''}
       ${contractsSection(c, contracts.filter((k) => k.kind !== 'schriftsatz'))}
       ${briefsSection(c, contracts.filter((k) => k.kind === 'schriftsatz'))}
-      ${invoiceList ? `<div class="section"><h3 class="section-title">Rechnungen & Honorare</h3>${invoiceList}</div>` : ''}
       ${externalSection(c, externalDocs)}
       ${attachmentsSection(c, attachments)}
+      ${staff ? caseTasksSection(c, tasks) : ''}
+      ${invoiceList ? `<div class="section"><h3 class="section-title">Rechnungen & Honorare</h3>${invoiceList}</div>` : ''}
       ${caseWorkSection(c, work)}
-      <div class="section" id="secNotes"><h3 class="section-title">Verlauf & Notizen</h3>
+      <div class="section" id="secNotes"><h3 class="section-title">${staff ? 'Verlauf & interne Notizen' : 'Verlauf'}</h3>
         ${noteList}
-        <form data-form="add-note" data-id="${c.id}" class="mt-4 space-y-3">
-          <textarea name="body" rows="3" maxlength="4000" required class="field" placeholder="${staff ? 'Notiz, Telefonat, Beweismittel, nächster Schritt …' : 'Nachricht oder Ergänzung zu Ihrer Akte …'}" aria-label="Neue Notiz"></textarea>
+        ${staff
+        ? `<form data-form="add-note" data-id="${c.id}" class="mt-4 space-y-3">
+          <input type="hidden" name="internal" value="on">
+          <textarea name="body" rows="3" maxlength="4000" required class="field" placeholder="Notiz, Telefonat, Beweismittel, nächster Schritt …" aria-label="Neue interne Notiz"></textarea>
           <div class="flex flex-wrap items-center justify-between gap-3">
-            ${staff ? '<label class="check"><input type="checkbox" name="internal" checked> Nur intern (für den Mandanten unsichtbar)</label>' : '<span></span>'}
-            <button type="submit" class="btn-outline btn-md">${icon('send', 'ico-sm')}<span>Speichern</span></button>
+            <span class="text-xs text-dim">Interne Notizen sieht nur die Kanzlei – Nachrichten an den Mandanten oben unter „Nachrichten“.</span>
+            <button type="submit" class="btn-outline btn-md">${icon('send', 'ico-sm')}<span>Notiz speichern</span></button>
           </div>
-        </form>
+        </form>`
+        : ''}
       </div>`;
 }
 

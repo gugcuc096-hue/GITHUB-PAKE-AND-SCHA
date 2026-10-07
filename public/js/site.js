@@ -367,6 +367,45 @@
   const concernModal = document.getElementById('concernModal');
   let concernAccess = null; // { reference, pin } der zuletzt abgefragten Vorgangs
 
+  // Anliegen auf diesem Gerät merken: dann genügt ein Klick statt Vorgangsnummer und Pin einzutippen
+  const CONCERN_STORE = 'ps.anliegen';
+  function savedConcerns() {
+    try {
+      const list = JSON.parse(localStorage.getItem(CONCERN_STORE) || '[]');
+      return Array.isArray(list) ? list.filter((x) => x && typeof x.reference === 'string' && typeof x.pin === 'string') : [];
+    } catch {
+      return [];
+    }
+  }
+  function saveConcern(entry) {
+    try {
+      localStorage.setItem(CONCERN_STORE, JSON.stringify([entry, ...savedConcerns().filter((x) => x.reference !== entry.reference)].slice(0, 5)));
+    } catch {
+      /* ohne Speicher bleibt es bei Vorgangsnummer + Pin */
+    }
+  }
+  function renderSavedConcerns() {
+    const box = document.getElementById('concernSaved');
+    const list = savedConcerns();
+    box.classList.toggle('hidden', !list.length);
+    box.innerHTML = list.length
+      ? `<div class="text-[0.7rem] uppercase tracking-widest text-[var(--text-dim)] mb-2">Auf diesem Gerät</div><div class="flex flex-col gap-2">${list
+          .map((x) => `<button type="button" class="btn-outline w-full py-2.5 px-4 text-left flex items-center justify-between gap-3" data-saved-concern="${esc(x.reference)}"><span class="font-mono text-sm">${esc(x.reference)}</span><span class="text-xs text-[var(--text-dim)] truncate">${esc(x.subject || '')}</span></button>`)
+          .join('')}</div>`
+      : '';
+  }
+  function openSavedConcern(reference) {
+    const x = savedConcerns().find((c) => c.reference === reference);
+    if (!x) return;
+    document.getElementById('clRef').value = x.reference;
+    document.getElementById('clPin').value = x.pin;
+    lookupConcern();
+  }
+  document.getElementById('concernSaved').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-saved-concern]');
+    if (b) openSavedConcern(b.dataset.savedConcern);
+  });
+
   function fmtWhen(v) {
     const d = window.PS.parseDate ? window.PS.parseDate(v) : new Date(v);
     return d ? d.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
@@ -380,6 +419,12 @@
     });
     document.getElementById('concernNewPane').classList.toggle('hidden', tab !== 'new');
     document.getElementById('concernStatusPane').classList.toggle('hidden', tab !== 'status');
+    if (tab === 'status') {
+      renderSavedConcerns();
+      // Nur ein Anliegen auf diesem Gerät: gleich öffnen
+      const list = savedConcerns();
+      if (list.length === 1 && !concernAccess) openSavedConcern(list[0].reference);
+    }
   }
 
   /** Formular an den Besucher anpassen: angemeldet = Name aus dem Konto, Kategorien je Rolle. */
@@ -434,6 +479,7 @@
   document.getElementById('cfAnon').addEventListener('change', syncConcernPersonal);
 
   function showConcernSuccess(res) {
+    if (!res.linkedToAccount) saveConcern({ reference: res.reference, pin: res.pin, subject: document.getElementById('cfSubject')?.value.trim() || '' });
     const box = document.getElementById('concernSuccess');
     const text = `Vorgangsnummer: ${res.reference}\nPin: ${res.pin}`;
     box.innerHTML = `
@@ -445,12 +491,12 @@
         <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3 text-center"><div class="text-[0.6rem] uppercase tracking-widest text-[var(--text-muted)]">Vorgangsnummer</div><div class="font-mono text-lg text-[var(--gold-light)]">${esc(res.reference)}</div></div>
         <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3 text-center"><div class="text-[0.6rem] uppercase tracking-widest text-[var(--text-muted)]">Pin</div><div class="font-mono text-lg tracking-[0.2em] text-[var(--gold-light)]">${esc(res.pin)}</div></div>
       </div>
-      <p class="text-xs text-amber-300/90 text-center mb-5">Bitte notieren Sie beide Angaben – damit lesen Sie jederzeit die Antwort des Boards.</p>
+      <p class="text-xs text-amber-300/90 text-center mb-5">${res.linkedToAccount ? 'Bitte notieren Sie beide Angaben – damit lesen Sie jederzeit die Antwort des Boards.' : 'Auf diesem Gerät ist Ihr Anliegen gespeichert – unter „Meine Anliegen“ genügt ein Klick. Für andere Geräte bitte beide Angaben notieren.'}</p>
       <div class="flex flex-col sm:flex-row gap-2">
         <button type="button" id="concernCopy" class="btn-outline flex-1 py-3 text-xs uppercase tracking-wider">Daten kopieren</button>
         ${res.linkedToAccount
           ? '<a href="/dashboard.html#concerns" class="btn-gold flex-1 py-3 text-xs uppercase tracking-wider text-center">Im Dashboard ansehen</a>'
-          : '<button type="button" id="concernCheck" class="btn-gold flex-1 py-3 text-xs uppercase tracking-wider">Status ansehen</button>'}
+          : '<button type="button" id="concernCheck" class="btn-gold flex-1 py-3 text-xs uppercase tracking-wider">Anliegen ansehen</button>'}
       </div>`;
     document.getElementById('concernForm').classList.add('hidden');
     box.classList.remove('hidden');
@@ -558,6 +604,8 @@
     try {
       const d = await api.post('/api/public/concern-status', { reference, pin });
       concernAccess = { reference, pin };
+      saveConcern({ reference, pin, subject: d.subject || '' });
+      renderSavedConcerns();
       renderConcern(d);
     } catch (err) {
       out.innerHTML = `<p class="text-center py-6 text-red-300 text-sm">${esc(err.status === 429 ? err.message : 'Kein Anliegen mit diesen Angaben gefunden. Bitte Vorgangsnummer und Pin prüfen.')}</p>`;

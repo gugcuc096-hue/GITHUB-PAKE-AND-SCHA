@@ -336,7 +336,7 @@ views['vip-angebot'] = {
     const want = Number(new URLSearchParams(location.search).get('vip'));
     if (want) {
       st.vipAutoTier = want;
-      history.replaceState(null, '', '/dashboard.html' + location.hash);
+      history.replaceState(history.state, '', '/dashboard.html' + location.hash);
     }
   },
   render() {
@@ -1195,7 +1195,7 @@ function appTable() {
       <tbody>${rows
       .map(
         (a) => `<tr class="row" data-action="app-open" data-id="${a.id}">
-          <td class="td-main"><div class="font-mono text-gold text-xs">${esc(a.number)}</div><div class="font-medium">${esc(a.name)}${a.age ? ` <span class="text-dim text-xs">(${esc(a.age)})</span>` : ''}</div><div class="text-xs text-dim">Discord: ${esc(a.discord || '—')}</div></td>
+          <td class="td-main"><div class="font-mono text-gold text-xs">${esc(a.number)}</div><div class="font-medium">${esc(a.name)}${a.age ? ` <span class="text-dim text-xs">(${esc(a.age)})</span>` : ''}${a.unreadMessages ? ` <span class="chat-new" title="Neue Nachrichten des Bewerbers">${icon('chat', 'ico-sm')}${a.unreadMessages}</span>` : ''}</div><div class="text-xs text-dim">Discord: ${esc(a.discord || '—')}</div></td>
           <td data-label="Stelle">${esc(a.positionTitle)}</td>
           <td data-label="Eingang" class="text-xs text-dim nowrap">${esc(fmtDate(a.createdAt))}</td>
           <td data-label="Bewertung">${stars(a.rating)}</td>
@@ -1223,7 +1223,7 @@ views.applications = {
     const [a, p] = await Promise.all([api.get('/api/admin/applications'), api.get('/api/admin/positions')]);
     st.applications = a.applications;
     st.positions = p.positions;
-    st.newApplications = st.applications.filter((x) => x.status === 'eingegangen').length;
+    st.newApplications = st.applications.filter((x) => x.status === 'eingegangen').length + st.applications.reduce((n, x) => n + (x.unreadMessages || 0), 0);
   },
   render() {
     const count = (f) => st.applications.filter((a) => f === 'alle' || (f === 'offen' ? OPEN_APP.includes(a.status) : a.status === f)).length;
@@ -1252,13 +1252,91 @@ async function openApplication(id) {
   const data = await api.get('/api/admin/applications/' + id);
   openModal(appDetail(data), { wide: true, key: `app:${id}`, reopen: () => openApplication(id) });
   st.modalAppId = id;
+  initAppChat();
 }
 async function reloadApplication(data) {
-  if (st.modalAppId === data.application.id) replaceModal(appDetail(data));
+  if (st.modalAppId === data.application.id) {
+    const draft = $('#modalBody .chat-input')?.value || '';
+    replaceModal(appDetail(data));
+    if (draft && $('#modalBody .chat-input')) $('#modalBody .chat-input').value = draft;
+    initAppChat();
+  }
   refreshBehind();
 }
 
-function appDetail({ application: a, notes, hiredUser, ticket }) {
+/* ---------------------------------------------------------------- Bewerbung: Fortschritt und Nachrichten */
+// Stand der Bewerbung als Kreise (wie der Bearbeitungsstand einer Akte): Eingegangen → In Prüfung → Gespräch → Entscheidung
+const APP_STEPS = [
+  ['eingegangen', 'Eingegangen'],
+  ['in_pruefung', 'In Prüfung'],
+  ['gespraech', 'Gespräch'],
+  ['angenommen', 'Angenommen'],
+];
+function appTrack(a) {
+  const idx = { eingegangen: 0, in_pruefung: 1, gespraech: 2, angenommen: 3, abgelehnt: 3 }[a.status] ?? 0;
+  const rejected = a.status === 'abgelehnt';
+  const accepted = a.status === 'angenommen';
+  return `<div class="track is-editable mb-5">
+      <div class="track-head"><span>Bewerbungsstand${rejected ? ' · <span class="text-red-300">abgelehnt</span>' : ''}</span><span class="track-hint">Schritt anklicken, um ihn zu ändern</span></div>
+      <div class="track-line"><div class="track-fill" style="width:${(idx / 3) * 75}%"></div>
+      <div class="grid grid-cols-4">${APP_STEPS.map(([key, label], i) => {
+        const last = i === 3;
+        const done = i < idx || (last && accepted);
+        const cur = !rejected && !accepted && i === idx;
+        const node = last && rejected ? '<div class="track-node rejected">✕</div>' : `<div class="track-node ${done ? 'done' : cur ? 'current' : ''}">${done ? '✓' : i + 1}</div>`;
+        const inner = `${node}<span class="track-label text-[0.7rem] sm:text-xs text-muted text-center">${esc(last && rejected ? 'Abgelehnt' : label)}</span>`;
+        return a.status === key
+          ? `<div class="track-step" aria-current="step">${inner}</div>`
+          : `<button type="button" class="track-step" data-action="app-status" data-id="${a.id}" data-status="${key}" title="Bewerbungsstand: ${esc(label)}" aria-label="Bewerbungsstand auf „${esc(label)}“ setzen">${inner}</button>`;
+      }).join('')}</div></div></div>`;
+}
+function appBubble(m) {
+  return { id: m.id, side: m.fromBoard ? 'out' : 'in', author: m.fromBoard ? (m.author === st.user.displayName ? '' : m.author) : m.author, sub: m.fromBoard ? 'Board of Partners' : 'Bewerber', body: m.body, createdAt: m.createdAt };
+}
+function appChatSection(a, { messages = [], applicantRead = 0, portal, discordConnected }) {
+  const link = `${location.origin}${portal}`;
+  return `<div class="section" id="secAppChat">
+      <h3 class="section-title">Nachrichten <span class="text-xs text-dim font-normal" style="font-family:Inter,sans-serif">mit dem Bewerber</span></h3>
+      <div class="app-reach">
+        ${discordConnected ? badge('Discord verbunden', 'emerald') : badge('Discord nicht verbunden', 'slate')}
+        <span class="text-xs text-dim">${discordConnected ? 'Nachrichten und neue Stände bekommt der Bewerber zusätzlich als Discord-Direktnachricht.' : 'Der Bewerber liest Nachrichten auf seiner Bewerberseite – dort kann er auch sein Discord verbinden.'}</span>
+        <button type="button" class="btn-ghost btn-sm ml-auto" data-action="copy" data-text="${esc(link)}" title="${esc(link)}">${icon('link', 'ico-sm')}<span>Link zur Bewerberseite</span></button>
+      </div>
+      <div class="chat">
+        <div class="chat-list" id="appChatList" data-app-id="${a.id}" data-last-id="${messages.length ? messages[messages.length - 1].id : 0}" data-other-read="${applicantRead}" aria-live="polite">
+          ${messages.length ? chatBubbles(messages, appBubble) : '<p class="chat-empty">Noch keine Nachrichten. Fragen, Terminabsprachen und Rückmeldungen laufen hier – der Bewerber antwortet über seine Bewerberseite.</p>'}
+        </div>
+        ${chatForm({ form: 'app-message', attrs: `data-id="${a.id}"`, placeholder: `Nachricht an ${a.name} …` })}
+        <p class="chat-hint"><span class="hidden md:inline">Enter sendet · Umschalt + Enter für eine neue Zeile. </span>Interne Notizen gehören unten unter „Interne Notizen“ – die sieht der Bewerber nie.</p>
+      </div>
+    </div>`;
+}
+function initAppChat() {
+  const list = $('#appChatList');
+  if (!list) return;
+  list.scrollTop = list.scrollHeight;
+  chatReceipts(list);
+  load.appCount().then(renderNav).catch(() => {}); // beim Öffnen gelesen
+}
+async function pollAppChat() {
+  const list = $('#appChatList');
+  if (!list || document.hidden || st.appChatPolling) return;
+  st.appChatPolling = true;
+  try {
+    const id = Number(list.dataset.appId);
+    const r = await api.get(`/api/admin/applications/${id}/messages?after=${Number(list.dataset.lastId) || 0}`);
+    if (!list.isConnected) return;
+    chatAppend(list, r.messages, appBubble);
+    chatReceipts(list, r.applicantRead);
+    if (r.messages.length) load.appCount().then(renderNav).catch(() => {});
+  } catch {
+    /* nächster Versuch beim nächsten Takt */
+  } finally {
+    st.appChatPolling = false;
+  }
+}
+
+function appDetail({ application: a, notes, hiredUser, ticket, ...chat }) {
   const cell = (k, v) => `<div><div class="k">${esc(k)}</div><div class="v">${esc(v || '—')}</div></div>`;
   const qa = (q, text) => (text ? `<div class="qa"><div class="q">${esc(q)}</div><div class="a">${esc(text)}</div></div>` : '');
   return `
@@ -1274,27 +1352,21 @@ function appDetail({ application: a, notes, hiredUser, ticket }) {
         .map((n) => `<button type="button" class="${n <= a.rating ? 'on' : ''}" data-action="app-rate" data-id="${a.id}" data-value="${n === a.rating ? 0 : n}" aria-label="${n} Sterne">★</button>`)
         .join('')}</span>
       </div>
-      <div class="chip-row mb-5" role="group" aria-label="Status">${Object.entries(APP_STATUS)
-      .map(([k, [l]]) => `<button type="button" class="chip ${a.status === k ? 'active' : ''}" data-action="app-status" data-id="${a.id}" data-status="${k}">${esc(l)}</button>`)
-      .join('')}</div>
+      ${appTrack(a)}
       ${hiredUser ? `<div class="banner banner-gold">${icon('check')}<div>Eingestellt – Login-Konto <strong>${esc(hiredUser.email)}</strong> wurde angelegt.</div></div>` : ''}
       <div class="info-grid mb-5">${cell('Alter', a.age ? String(a.age) : '')}${cell('Telefon', a.phone)}${cell('Discord', a.discord)}${cell('E-Mail', a.email)}${cell('Eingegangen', fmtDate(a.createdAt))}${cell('Gespräch', a.interviewAt ? fmtDate(a.interviewAt) : '')}</div>
       ${boardTicketLine('application', a.id, ticket)}
       <div class="stack">${qa('Motivation', a.motivation)}${qa('Erfahrung', a.experience)}${qa('Verfügbarkeit', a.availability)}</div>
 
-      <div class="grid-2 section">
-        <form data-form="app-interview" data-id="${a.id}" class="qa form-grid">
-          <div class="q">Zum Gespräch einladen</div>
+      ${appChatSection(a, chat)}
+
+      <div class="section">
+        <form data-form="app-interview" data-id="${a.id}" class="qa form-grid cols-2">
+          <div class="q span-2">Zum Gespräch einladen</div>
           <div><label class="label">Termin</label><input name="startsAt" type="datetime-local" class="field" required value="${a.interviewAt ? toLocalInput(a.interviewAt) : ''}"></div>
           <div><label class="label">Ort</label><input name="location" class="field" maxlength="120" value="Kanzlei Würfelpark"></div>
-          <button type="submit" class="btn-outline btn-md">${icon('calendar', 'ico-sm')}<span>Gespräch planen</span></button>
-          <p class="form-hint">Setzt den Status auf „Einladung zum Gespräch“ und trägt den Termin in den Team-Kalender ein.</p>
-        </form>
-        <form data-form="app-public-note" data-id="${a.id}" class="qa form-grid">
-          <div class="q">Nachricht an den Bewerber</div>
-          <textarea name="publicNote" rows="4" maxlength="1000" class="field" placeholder="z. B. Vielen Dank! Wir melden uns bis Freitag.">${esc(a.publicNote)}</textarea>
-          <button type="submit" class="btn-outline btn-md">Speichern</button>
-          <p class="form-hint">Sichtbar in der Statusabfrage auf der Karriereseite.</p>
+          <div class="span-2 flex flex-wrap items-center gap-3"><button type="submit" class="btn-outline btn-md">${icon('calendar', 'ico-sm')}<span>Gespräch planen</span></button>
+          <p class="form-hint">Setzt den Stand auf „Gespräch“, trägt den Termin in den Team-Kalender ein und schickt dem Bewerber die Einladung als Nachricht.</p></div>
         </form>
       </div>
 

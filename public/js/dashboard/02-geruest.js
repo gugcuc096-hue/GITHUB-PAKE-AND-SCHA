@@ -16,7 +16,7 @@ function renderNav() {
       section = v.section;
       html += `<div class="nav-section">${esc(section)}</div>`;
     }
-    const count = { mail: st.unread, applications: st.newApplications, tasks: st.dueTasks, concerns: st.concernUnseen, 'concerns-board': st.concernOpen, personnel: st.personnelNew, 'name-requests': st.nameOpen, vip: st.vipReqOpen, reviews: st.reviewOpen }[key] || 0;
+    const count = { cases: st.chatUnread, mail: st.unread, applications: st.newApplications, tasks: st.dueTasks, concerns: st.concernUnseen, 'concerns-board': st.concernOpen, personnel: st.personnelNew, 'name-requests': st.nameOpen, vip: st.vipReqOpen, reviews: st.reviewOpen }[key] || 0;
     const active = st.view === key || (key === 'invoices' && st.view === 'invoice-new');
     html += `<a href="#${key}" class="nav-item ${active ? 'active' : ''}" ${active ? 'aria-current="page"' : ''}>${icon(v.icon)}<span>${esc(viewLabel(key))}</span>${count ? `<span class="nav-count">${count > 99 ? '99+' : count}</span>` : ''}</a>`;
   }
@@ -27,7 +27,7 @@ function renderNav() {
     bottom
       .map(
         (k) =>
-          `<a href="#${k}" class="bn-item ${st.view === k ? 'active' : ''}">${icon(VIEWS[k].icon)}<span>${esc(viewLabel(k, true))}</span>${k === 'mail' && st.unread ? `<span class="dot-badge">${st.unread > 99 ? '99+' : st.unread}</span>` : ''}</a>`
+          `<a href="#${k}" class="bn-item ${st.view === k ? 'active' : ''}">${icon(VIEWS[k].icon)}<span>${esc(viewLabel(k, true))}</span>${k === 'mail' && st.unread ? `<span class="dot-badge">${st.unread > 99 ? '99+' : st.unread}</span>` : ''}${k === 'cases' && st.chatUnread ? `<span class="dot-badge">${st.chatUnread > 99 ? '99+' : st.chatUnread}</span>` : ''}</a>`
       )
       .join('') + `<button type="button" class="bn-item" data-action="open-sidebar">${icon('more')}<span>Mehr</span></button>`;
 
@@ -96,10 +96,123 @@ async function setDutyStatus(status, note) {
 function openSidebar() {
   $('#sidebar').classList.add('open');
   $('#sidebarBackdrop').classList.add('show');
+  scheduleHistory();
 }
 function closeSidebar() {
   $('#sidebar').classList.remove('open');
   $('#sidebarBackdrop').classList.remove('show');
+  scheduleHistory();
+}
+
+/*
+ * Zurück-Taste (Browser, Handy-Geste, Maustaste): Ist ein Fenster oder das Handy-Menü offen, bekommt es einen
+ * eigenen Eintrag im Verlauf. „Zurück“ schließt dann genau dieses Fenster (wie X) statt die Seite zu verlassen.
+ * Ist eine Akte offen, steht sie in der Adresse (?case=12) – nach dem Neuladen ist sie wieder offen.
+ */
+const overlayOpen = () => $('#modal').classList.contains('open') || $('#sidebar').classList.contains('open');
+const onOverlayEntry = () => !!(history.state && history.state.psOverlay);
+/** Akte, die gerade offen ist – auch wenn ein Unterfenster (z. B. Vertrag) darüber liegt. */
+function openCaseId() {
+  for (const m of [st.modalCurrent, ...[...st.modalStack].reverse()]) {
+    if (m && m.key && m.key.startsWith('case:')) return Number(m.key.slice(5));
+  }
+  return null;
+}
+/** Aktuelle Adresse mit (oder ohne) ?case=… */
+function urlWithCase(id) {
+  const p = new URLSearchParams(location.search);
+  p.delete('case');
+  if (id) p.set('case', id);
+  const q = p.toString();
+  return location.pathname + (q ? '?' + q : '') + location.hash;
+}
+/** Verlauf an das anpassen, was offen ist (nach dem aktuellen Klick, damit Seitenwechsel zuerst greifen). */
+function scheduleHistory() {
+  clearTimeout(st.histTimer);
+  st.histTimer = setTimeout(syncHistory, 0);
+}
+function syncHistory() {
+  if (st.histPaused || (st.histSkip && Date.now() - st.histSkip < 2000)) return; // eigenes „Zurück“ läuft noch
+  st.histSkip = 0;
+  if (overlayOpen()) {
+    const url = urlWithCase(openCaseId());
+    if (!onOverlayEntry()) history.pushState({ psOverlay: 1 }, '', url);
+    else if (url !== location.pathname + location.search + location.hash) history.replaceState({ psOverlay: 1 }, '', url);
+  } else if (onOverlayEntry()) {
+    // per X/Esc/Speichern geschlossen: den Eintrag des Fensters wieder entfernen
+    st.histSkip = Date.now();
+    history.back();
+  }
+}
+function onPopState(e) {
+  if (st.histSkip && Date.now() - st.histSkip < 2000) {
+    st.histSkip = 0;
+    scheduleHistory();
+    return;
+  }
+  st.histSkip = 0;
+  if (e.state && e.state.psOverlay) {
+    // „Vorwärts“ auf ein bereits geschlossenes Fenster: die Akte wieder öffnen, sonst als normalen Eintrag behandeln
+    if (overlayOpen()) return;
+    const id = Number(new URLSearchParams(location.search).get('case'));
+    if (id) guard(() => openCase(id));
+    else history.replaceState(null, '', urlWithCase(null));
+    return;
+  }
+  if (!overlayOpen()) return; // normaler Seitenwechsel – erledigt hashchange
+  // Zurück bei offener Rückfrage: nur die Rückfrage schließen
+  const cancel = document.querySelector('.ps-dialog-root.open [data-ps-dialog="cancel"]');
+  if (cancel) {
+    cancel.click();
+    scheduleHistory();
+    return;
+  }
+  if ($('#sidebar').classList.contains('open')) {
+    closeSidebar();
+    return;
+  }
+  // Mit ungespeicherten Eingaben kommt erst die Rückfrage – bis dahin bleibt das Fenster im Verlauf
+  if (formDirty($('#modalBody'))) syncHistory();
+  guard(() => modalDismiss()).finally(scheduleHistory);
+}
+
+/*
+ * Ungespeicherte Eingaben: Wer in einem Formular etwas eingetragen hat und das Fenster schließt, die Seite wechselt
+ * oder neu lädt, wird vorher gefragt. Felder, die sofort speichern (Priorität, Rolle, Sortierung …), zählen nicht.
+ */
+const AUTO_SAVE_FIELDS = '[data-case-priority], [data-user-field], [data-ext-sort], [data-upload], [data-no-dirty], #msgRoleInsert, input[type="search"]';
+function formDirty(root, { invoice = false } = {}) {
+  if (!root) return false;
+  return $$('form[data-form] input, form[data-form] textarea, form[data-form] select', root).some((el) => {
+    if (el.disabled || el.type === 'hidden' || el.type === 'file' || el.matches(AUTO_SAVE_FIELDS)) return false;
+    if (!invoice && el.closest('#invoiceForm')) return false; // Rechnungs-Entwurf bleibt beim Seitenwechsel erhalten
+    if (el.type === 'checkbox' || el.type === 'radio') return el.checked !== el.defaultChecked;
+    if (el.tagName === 'SELECT') {
+      const def = [...el.options].findIndex((o) => o.defaultSelected);
+      return el.selectedIndex !== (def < 0 ? 0 : def);
+    }
+    return el.value !== el.defaultValue;
+  });
+}
+/** Irgendwo etwas Ungespeichertes – im offenen Fenster, in einem Fenster darunter oder auf der Seite? */
+function unsavedInputs({ invoice = false } = {}) {
+  if (formDirty($('#modalBody')) || st.modalStack.some((m) => m.nodes && formDirty(m.nodes))) return true;
+  if (formDirty($('#content'), { invoice })) return true;
+  // Rechnungs-Entwurf (geht nur beim Neuladen verloren)
+  return invoice && st.view === 'invoice-new' && !!st.draft && (st.draft.items.length > 0 || !!st.draft.subject || !!st.draft.notes);
+}
+const askDiscard = (page = false) =>
+  ask(page ? 'Ihre Eingaben auf dieser Seite sind noch nicht gespeichert und gehen sonst verloren.' : 'Ihre Eingaben in diesem Fenster sind noch nicht gespeichert und gehen sonst verloren.', {
+    title: 'Eingaben verwerfen?',
+    confirmText: 'Verwerfen',
+    cancelText: 'Weiter bearbeiten',
+    danger: true,
+  });
+/** Zu einer anderen Seite – bei ungespeicherten Eingaben erst nachfragen. */
+async function leaveTo(view) {
+  if (unsavedInputs() && !(await askDiscard(true))) return;
+  closeSidebar();
+  return navigate(view || 'overview');
 }
 
 /*
@@ -148,6 +261,7 @@ function openModal(html, { wide = false, key = null, reopen = null, child = fals
   tickCountdowns();
   const focusTarget = $('#modalBody [autofocus]');
   if (focusTarget && window.matchMedia('(min-width: 768px)').matches) focusTarget.focus();
+  scheduleHistory();
 }
 function replaceModal(html) {
   const body = $('#modalBody');
@@ -165,6 +279,7 @@ function closeModal() {
   st.modalCurrent = null;
   const modal = $('#modal');
   if (!modal.classList.contains('open')) return;
+  scheduleHistory();
   modal.classList.remove('open');
   $('#modalBody').innerHTML = '';
   document.body.classList.remove('modal-open');
@@ -209,8 +324,22 @@ async function modalBack() {
     modal.classList.add('open');
     document.body.classList.add('modal-open');
     tickCountdowns();
+    scheduleHistory();
   }
   restoreModalScroll(prev.scroll);
+}
+/** Vom Nutzer geschlossen (X, Esc, daneben, Abbrechen, Zurück-Taste): bei ungespeicherten Eingaben erst nachfragen. */
+async function modalDismiss(back = modalBack) {
+  if (st.modalRestoring || st.modalAsking) return;
+  if (formDirty($('#modalBody'))) {
+    st.modalAsking = true;
+    try {
+      if (!(await askDiscard())) return;
+    } finally {
+      st.modalAsking = false;
+    }
+  }
+  await back();
 }
 /**
  * An die vorherige Stelle scrollen. Frisch geladene Inhalte (Bilder, nachgeladene Angaben) wachsen oft noch ein
@@ -284,7 +413,9 @@ function renderView() {
   tickCountdowns();
 }
 function navigate(view) {
-  if (location.hash !== '#' + view) history.pushState(null, '', '#' + view);
+  // Aus einem offenen Fenster heraus: dessen Verlaufseintrag durch die neue Seite ersetzen (Zurück führt nicht ins Leere)
+  if (onOverlayEntry()) history.replaceState(null, '', urlWithCase(null).split('#')[0] + '#' + view);
+  else if (location.hash !== '#' + view) history.pushState(null, '', '#' + view);
   return go(view);
 }
 /** Lädt die Daten der aktuellen Ansicht neu, ohne einen offenen Dialog zu schließen. */
