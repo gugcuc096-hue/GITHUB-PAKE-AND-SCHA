@@ -201,6 +201,55 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       await ctx.close();
     });
 
+    it(`Zurück-Taste am ${label}: schließt Fenster, fragt bei ungespeicherten Eingaben, Akte bleibt beim Neuladen offen`, async () => {
+      const { ctx, page, problems, settle } = await open(device);
+      await login(page, TEAM.admin);
+      await page.evaluate(() => (location.hash = '#cases'));
+      await settle();
+      const modalOpen = () => page.evaluate(() => document.querySelector('#modal').classList.contains('open'));
+      const back = async () => {
+        await page.evaluate(() => history.back());
+        await page.waitForTimeout(500);
+      };
+      await page.click(`[data-action="open-case"][data-id="${data.caseId}"] >> nth=0`);
+      await page.waitForSelector('#modalBody #secContracts');
+      await page.waitForFunction((id) => new URLSearchParams(location.search).get('case') === String(id), data.caseId);
+
+      // Unterfenster → Zurück → Akte → Zurück → Liste (die Seite bleibt dieselbe)
+      await page.click('#modalBody [data-action="task-new"]');
+      await page.waitForSelector('#modalBody form[data-form="task"]');
+      await back();
+      await page.waitForSelector('#modalBody #secContracts');
+      await back();
+      assert.equal(await modalOpen(), false, 'Zurück schließt die Akte');
+      assert.equal(await page.evaluate(() => location.hash + location.search), '#cases', 'weiter in der Aktenliste');
+
+      // Ungespeicherte Eingaben: Esc und Zurück fragen nach, „Weiter bearbeiten“ behält alles
+      await page.click(`[data-action="open-case"][data-id="${data.caseId}"] >> nth=0`);
+      await page.waitForSelector('#modalBody #secContracts');
+      await page.click('#modalBody [data-action="task-new"]');
+      await page.fill('#modalBody form[data-form="task"] input[name="title"]', 'Nicht verlieren');
+      await page.keyboard.press('Escape');
+      await page.click('.ps-dialog-root.open [data-ps-dialog="cancel"]');
+      await back();
+      await page.click('.ps-dialog-root.open [data-ps-dialog="cancel"]');
+      await page.waitForTimeout(300);
+      assert.equal(await page.inputValue('#modalBody form[data-form="task"] input[name="title"]'), 'Nicht verlieren');
+      await page.click('.modal-close');
+      await page.click('.ps-dialog-root.open [data-ps-dialog="ok"]'); // Verwerfen
+      await page.waitForSelector('#modalBody #secContracts');
+
+      // Neu laden: dieselbe Akte ist wieder offen, Zurück führt in die Liste
+      await page.reload();
+      await page.waitForSelector('#modalBody #secContracts');
+      assert.ok((await page.textContent('#modalBody')).includes(data.caseNumber), 'Akte nach dem Neuladen offen');
+      await back();
+      assert.equal(await modalOpen(), false);
+      assert.equal(await page.evaluate(() => st.view), 'cases');
+      assert.deepEqual(problems, []);
+      await ctx.close();
+    });
+
     it(`Antrag am ${label}: FiveNet-Aktenzeichen vorbelegt und in der Druckansicht ein Link`, async () => {
       const { ctx, page, problems, settle } = await open(device);
       await login(page, TEAM.admin);

@@ -420,7 +420,7 @@ views.settings = {
     if (['general', 'bot', 'contracts'].includes(q)) st.settingsTab = q;
     const modul = new URLSearchParams(location.search).get('modul');
     if (BOT_MODULES.some(([k]) => k === modul)) st.botModule = modul;
-    if (modul) history.replaceState(null, '', `${location.pathname}?tab=${st.settingsTab || 'general'}#settings`);
+    if (modul) history.replaceState(history.state, '', `${location.pathname}?tab=${st.settingsTab || 'general'}#settings`);
     const [r, tpl, tk, bot, backups] = await Promise.all([
       api.get('/api/admin/settings'),
       api.get('/api/contract-templates?all=1'),

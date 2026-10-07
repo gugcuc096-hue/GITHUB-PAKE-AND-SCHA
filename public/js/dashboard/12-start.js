@@ -12,21 +12,32 @@ document.addEventListener('click', (e) => {
   if (e.target.closest('a[href^="/vertrag.html"]')) st.contractTabAt = Date.now();
   // Klick neben das Fenster: zurück zum vorherigen Fenster (z. B. zur Akte) bzw. schließen
   if (e.target === $('#modal')) {
-    guard(() => modalBack());
+    guard(() => modalDismiss());
     return;
   }
   const link = e.target.closest('a[href^="#"]');
-  if (link && !link.dataset.action && link.getAttribute('href') === location.hash) {
-    e.preventDefault();
-    go(hashView());
-    return;
+  if (link && !link.dataset.action) {
+    // Seitenwechsel aus einem offenen Fenster/Menü oder mit ungespeicherten Eingaben: über leaveTo (Verlauf + Rückfrage)
+    if (onOverlayEntry() || unsavedInputs()) {
+      e.preventDefault();
+      guard(() => leaveTo(decodeURIComponent(link.getAttribute('href').slice(1))));
+      return;
+    }
+    if (link.getAttribute('href') === location.hash) {
+      e.preventDefault();
+      go(hashView());
+      return;
+    }
   }
   const el = e.target.closest('[data-action]');
   if (!el || el.disabled) return;
   const fn = actions[el.dataset.action];
   if (!fn) return;
   e.preventDefault();
-  guard(() => fn(el, e));
+  // Doppelklick: dieselbe Aktion läuft noch (z. B. Senden, Erinnern, Übernehmen) – nicht ein zweites Mal auslösen
+  if (el.dataset.busy) return;
+  el.dataset.busy = '1';
+  guard(() => fn(el, e)).finally(() => delete el.dataset.busy);
 });
 
 document.addEventListener('keydown', (e) => {
@@ -53,7 +64,7 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (e.key === 'Escape') {
-    if ($('#modal').classList.contains('open')) guard(() => modalBack());
+    if ($('#modal').classList.contains('open')) guard(() => modalDismiss());
     else closeSidebar();
   }
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[role="button"][data-action]')) {
@@ -294,7 +305,24 @@ document.addEventListener('change', (e) => {
   }
 });
 
-window.addEventListener('hashchange', () => go(hashView()));
+// Seitenwechsel per Zurück/Vorwärts oder Adresszeile – mit Rückfrage, wenn auf der Seite noch etwas Ungespeichertes steht
+window.addEventListener('hashchange', () =>
+  guard(async () => {
+    const view = hashView();
+    if (view !== st.view && formDirty($('#content')) && !(await askDiscard(true))) {
+      history.pushState(null, '', '#' + st.view); // auf der Seite bleiben
+      return;
+    }
+    await go(view);
+  })
+);
+window.addEventListener('popstate', onPopState);
+// Neu laden / Tab schließen mit ungespeicherten Eingaben: Rückfrage des Browsers
+window.addEventListener('beforeunload', (e) => {
+  if (st.leaving || !st.user || !unsavedInputs({ invoice: true })) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
 
 // Vertrag im anderen Tab unterschrieben: beim Zurückkehren die offene Akte auffrischen –
 // aber nur, wenn dort nichts halb Eingetipptes verloren ginge.
@@ -345,7 +373,9 @@ setInterval(() => {
   const discordState = params.get('discord');
   const googleState = params.get('google');
   const caseParam = Number(params.get('case'));
-  if (discordState || googleState || params.has('case')) history.replaceState(null, '', location.pathname + location.hash);
+  // Neu geladen, während eine Akte offen war: der Verlaufseintrag gehört schon zur Akte – nur wieder öffnen
+  const restoring = params.has('case') && onOverlayEntry();
+  if (!restoring && (discordState || googleState || params.has('case'))) history.replaceState(null, '', location.pathname + location.hash);
   if (discordState && DISCORD_MSG[discordState]) toast(...DISCORD_MSG[discordState]);
   if (googleState && GOOGLE_MSG[googleState]) toast(...GOOGLE_MSG[googleState]);
 
@@ -355,6 +385,12 @@ setInterval(() => {
   } catch {
     /* Badges und Dienststatus sind nicht kritisch */
   }
-  await go(hashView());
-  if (Number.isInteger(caseParam) && caseParam > 0) guard(() => openCase(caseParam));
+  st.histPaused = true;
+  try {
+    await go(hashView());
+    if (Number.isInteger(caseParam) && caseParam > 0) await guard(() => openCase(caseParam));
+  } finally {
+    st.histPaused = false;
+    syncHistory();
+  }
 })();

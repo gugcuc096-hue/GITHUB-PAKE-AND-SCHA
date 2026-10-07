@@ -8,6 +8,7 @@ const { avatarUrl } = require('./uploads');
 const SESSION_COOKIE = 'sid';
 const SESSION_DAYS = 7;
 const SESSION_MS = SESSION_DAYS * 24 * 60 * 60 * 1000;
+const RENEW_AFTER_MS = 24 * 60 * 60 * 1000;
 
 function hashPassword(plain) {
   return bcrypt.hashSync(plain, 10);
@@ -129,6 +130,11 @@ function loadUser(req, res, next) {
   const row = db.prepare('SELECT * FROM users WHERE id = ?').get(session.user_id);
   if (!row || !row.active) return next();
   req.user = row;
+  // Wer die Seite nutzt, bleibt angemeldet: Ablauf (7 Tage) zählt ab der letzten Nutzung – höchstens einmal am Tag verlängert
+  if (new Date(session.expires_at).getTime() - Date.now() < SESSION_MS - RENEW_AFTER_MS) {
+    db.prepare('UPDATE sessions SET expires_at = ? WHERE token = ?').run(new Date(Date.now() + SESSION_MS).toISOString(), token);
+    res.cookie(SESSION_COOKIE, token, { ...cookieOptions(), maxAge: SESSION_MS });
+  }
   next();
 }
 

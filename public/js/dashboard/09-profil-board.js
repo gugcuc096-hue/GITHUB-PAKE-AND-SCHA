@@ -336,7 +336,7 @@ views['vip-angebot'] = {
     const want = Number(new URLSearchParams(location.search).get('vip'));
     if (want) {
       st.vipAutoTier = want;
-      history.replaceState(null, '', '/dashboard.html' + location.hash);
+      history.replaceState(history.state, '', '/dashboard.html' + location.hash);
     }
   },
   render() {

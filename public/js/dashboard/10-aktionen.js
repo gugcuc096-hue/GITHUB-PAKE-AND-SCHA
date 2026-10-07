@@ -11,9 +11,11 @@ const actions = {
   'open-sidebar': openSidebar,
   'close-sidebar': closeSidebar,
   // X, „Abbrechen“, „Schließen“, „Fertig“: zurück zum vorherigen Fenster (z. B. zur Akte) – sonst schließen
-  'close-modal': () => modalBack(),
+  'close-modal': () => modalDismiss(),
   'reload-view': () => go(st.view),
   logout: async () => {
+    if (unsavedInputs({ invoice: true }) && !(await askDiscard(true))) return;
+    st.leaving = true; // keine zweite Rückfrage des Browsers
     await api.post('/api/auth/logout');
     location.href = '/login.html';
   },
@@ -478,7 +480,7 @@ const actions = {
     toast('Anhang gelöscht.');
     await returnOrClose();
   },
-  'back-to-case': () => returnOrClose(),
+  'back-to-case': () => modalDismiss(returnOrClose),
 
   // VIP & Lifetime – Anfragen
   'vipreq-filter': async (el) => {
@@ -768,7 +770,7 @@ const actions = {
   },
   'settings-tab': async (el) => {
     st.settingsTab = el.dataset.tab;
-    history.replaceState(null, '', `${location.pathname}?tab=${st.settingsTab}#settings`);
+    history.replaceState(history.state, '', `${location.pathname}?tab=${st.settingsTab}#settings`);
     if (st.settingsTab === 'bot' && st.bot && !st.botDiscord) await loadBotDiscord();
     renderView();
   },
@@ -1314,7 +1316,7 @@ const actions = {
     renderView();
   },
   'app-open': (el) => openApplication(Number(el.dataset.id)),
-  'app-back': (el) => (st.modalStack.length ? modalBack() : openApplication(Number(el.dataset.id))),
+  'app-back': (el) => modalDismiss(() => (st.modalStack.length ? modalBack() : openApplication(Number(el.dataset.id)))),
   'app-rate': async (el) => {
     const data = await api.patch('/api/admin/applications/' + el.dataset.id, { rating: Number(el.dataset.value) });
     await reloadApplication(data);

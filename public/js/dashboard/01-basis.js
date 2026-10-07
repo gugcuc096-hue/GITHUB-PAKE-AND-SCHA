@@ -210,6 +210,12 @@ const st = {
   modalCurrent: null,
   modalRestoring: false,
   modalReplace: 0,
+  modalAsking: false, // Rückfrage „Eingaben verwerfen?“ ist offen
+  // Zurück-Taste (siehe syncHistory in 02-geruest.js)
+  histTimer: null,
+  histSkip: 0, // Zeitpunkt des eigenen history.back() – das folgende popstate ist kein Klick auf „Zurück“
+  histPaused: false, // beim Start: Akte aus der Adresse wird gerade geöffnet
+  leaving: false, // Abmelden: Seite wird bewusst verlassen (keine Rückfrage des Browsers)
   invoiceFrom: null, // Rechnung aus einer Akte heraus: { view, caseId, caseNumber } – Abbrechen/Erstellen führen dorthin zurück
   caseAttachments: [],
   duty: null,
