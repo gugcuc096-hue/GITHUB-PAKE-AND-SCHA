@@ -505,7 +505,8 @@ function eventForm(e, preset = {}) {
         <div class="span-2"><label class="label">Ort</label><input name="location" class="field" maxlength="120" value="${esc(v.location ?? (type === 'frist' ? '' : 'Kanzlei Würfelpark'))}" placeholder="z. B. District Court, Saal 2"></div>
         <div class="span-2"><label class="label">Notiz</label><textarea name="note" rows="3" class="field" maxlength="1000" placeholder="Vorbereitung, Unterlagen, Hinweise …">${esc(v.note || '')}</textarea></div>
         <label class="check span-2"><input type="checkbox" name="clientVisible" ${visible ? 'checked' : ''}> Für den Mandanten im Portal sichtbar</label>
-        <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>${isNew ? 'Eintrag anlegen' : 'Speichern'}</span></button></div>
+        <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>${isNew ? 'Eintrag anlegen' : 'Speichern'}</span></button>
+          <button type="button" class="btn-ghost btn-md" data-action="close-modal">Abbrechen</button></div>
       </form>
       ${statusBtns ? `<div class="form-actions mt-5 pt-5" style="border-top:1px solid var(--line)">${statusBtns}</div>` : ''}`;
 }
@@ -522,7 +523,8 @@ function eventRequestForm(caseId) {
         <div><label class="label">Akte</label><select name="caseId" class="field"><option value="">Allgemeine Beratung</option>${own.map((c) => opt(c.id, `${c.caseNumber} – ${c.title}`, c.id === caseId)).join('')}</select></div>
         <div class="span-2"><label class="label">Ort</label><input name="location" class="field" maxlength="120" value="Kanzlei Würfelpark"></div>
         <div class="span-2"><label class="label">Notiz (optional)</label><textarea name="note" rows="3" class="field" maxlength="1000"></textarea></div>
-        <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('send', 'ico-sm')}<span>Anfrage senden</span></button></div>
+        <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('send', 'ico-sm')}<span>Anfrage senden</span></button>
+          <button type="button" class="btn-ghost btn-md" data-action="close-modal">Abbrechen</button></div>
       </form>`;
 }
 
@@ -545,13 +547,14 @@ async function openEvent(id, returnCase = null) {
     e = st.eventCache.get(id);
   }
   if (!e) throw new Error('Termin nicht gefunden.');
-  st.returnCase = returnCase;
+  const opts = { key: `event:${id}`, reopen: () => openEvent(id) };
   if (isStaff()) {
     await Promise.all([load.cases(), load.lawyers()]);
-    openModal(eventForm(e));
+    openModal(eventForm(e), opts);
   } else {
-    openModal(eventDetailClient(e));
+    openModal(eventDetailClient(e), opts);
   }
+  st.returnCase = returnCase;
 }
 
 /* ---------------------------------------------------------------- Kanzlei-Post */

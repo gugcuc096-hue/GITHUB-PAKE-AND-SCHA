@@ -388,7 +388,7 @@ async function openSearchResult(type, id) {
   const list = (st.gsResults && st.gsResults[type]) || [];
   const x = list.find((r) => r.id === id);
   if (!x) return;
-  if (type === 'cases') return openCase(id);
+  if (type === 'cases') return modalInstead(() => openCase(id));
   if (type === 'clients') {
     // Akten des Mandanten in der Aktenverwaltung
     st.caseQuery = x.name;
@@ -398,7 +398,7 @@ async function openSearchResult(type, id) {
     return navigate('cases');
   }
   if (type === 'invoices') {
-    if (x.caseId) return openCase(x.caseId);
+    if (x.caseId) return modalInstead(() => openCase(x.caseId));
     closeModal();
     window.open(`/invoice.html?id=${x.id}`, '_blank', 'noopener');
     return;
@@ -407,11 +407,11 @@ async function openSearchResult(type, id) {
     if (!st.myTasks.some((t) => t.id === x.id) && !st.tasks.some((t) => t.id === x.id)) st.tasks = [x, ...st.tasks];
     st.returnCase = null;
     await Promise.all([load.lawyers(), load.cases()]);
-    return taskModal(x);
+    return modalInstead(() => taskModal(x));
   }
   if (type === 'events') {
     st.eventCache.set(x.id, x);
-    return openEvent(x.id);
+    return modalInstead(() => openEvent(x.id));
   }
   if (type === 'messages') {
     st.mailBox = x.box;
@@ -549,9 +549,10 @@ function rememberCase(data) {
 async function openCase(id) {
   await load.lawyers();
   const data = await api.get('/api/cases/' + id);
+  // Erst öffnen (ein vorheriges Fenster wird samt seinem Zustand beiseitegelegt), dann die Akte merken
+  openModal(caseDetail(data), { wide: true, key: `case:${id}`, reopen: () => openCase(id) });
   rememberCase(data);
   st.modalCaseId = id;
-  openModal(caseDetail(data), { wide: true });
 }
 async function reloadCase(id) {
   const data = await api.get('/api/cases/' + id);

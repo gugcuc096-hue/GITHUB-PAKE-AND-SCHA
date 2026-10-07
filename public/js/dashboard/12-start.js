@@ -10,8 +10,9 @@
 document.addEventListener('click', (e) => {
   if (!e.target.closest('#dutyWrap')) closeDutyPop();
   if (e.target.closest('a[href^="/vertrag.html"]')) st.contractTabAt = Date.now();
+  // Klick neben das Fenster: zurück zum vorherigen Fenster (z. B. zur Akte) bzw. schließen
   if (e.target === $('#modal')) {
-    closeModal();
+    guard(() => modalBack());
     return;
   }
   const link = e.target.closest('a[href^="#"]');
@@ -52,7 +53,7 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (e.key === 'Escape') {
-    if ($('#modal').classList.contains('open')) closeModal();
+    if ($('#modal').classList.contains('open')) guard(() => modalBack());
     else closeSidebar();
   }
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[role="button"][data-action]')) {
@@ -75,7 +76,8 @@ document.addEventListener('submit', (e) => {
   e.preventDefault();
   const buttons = $$('button[type="submit"]', f);
   buttons.forEach((b) => (b.disabled = true));
-  guard(() => forms[f.dataset.form](f)).finally(() => buttons.forEach((b) => b.isConnected && (b.disabled = false)));
+  // Ein Fenster, das nach dem Absenden aufgeht (z. B. Zugangsdaten), ersetzt das Formular – zurück geht es nie zum abgeschickten Formular
+  guard(() => modalInstead(() => forms[f.dataset.form](f))).finally(() => buttons.forEach((b) => b.isConnected && (b.disabled = false)));
 });
 
 document.addEventListener('paste', (e) => {

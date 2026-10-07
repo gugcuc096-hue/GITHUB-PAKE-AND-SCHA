@@ -641,7 +641,7 @@ async function openConcern(id) {
   const d = await api.get('/api/concerns/' + id);
   const html = concernDetailHtml(d);
   if ($('#modal').classList.contains('open') && st.modalConcernId === d.concern.id) replaceModal(html);
-  else openModal(html, { wide: true });
+  else openModal(html, { wide: true, key: `concern:${d.concern.id}`, reopen: () => openConcern(d.concern.id) });
   st.modalConcernId = d.concern.id;
   // Geöffnet = gelesen: Hinweis „Neue Antwort“ und Zähler in der Navigation aktualisieren.
   for (const [list, view] of [
@@ -1250,8 +1250,8 @@ views.applications = {
 
 async function openApplication(id) {
   const data = await api.get('/api/admin/applications/' + id);
+  openModal(appDetail(data), { wide: true, key: `app:${id}`, reopen: () => openApplication(id) });
   st.modalAppId = id;
-  openModal(appDetail(data), { wide: true });
 }
 async function reloadApplication(data) {
   if (st.modalAppId === data.application.id) replaceModal(appDetail(data));

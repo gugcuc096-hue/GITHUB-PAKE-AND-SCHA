@@ -205,6 +205,12 @@ const st = {
   draft: null,
   modalCaseId: null,
   returnCase: null,
+  // Dialog-Verlauf (siehe openModal/modalBack in 02-geruest.js)
+  modalStack: [],
+  modalCurrent: null,
+  modalRestoring: false,
+  modalReplace: 0,
+  invoiceFrom: null, // Rechnung aus einer Akte heraus: { view, caseId, caseNumber } – Abbrechen/Erstellen führen dorthin zurück
   caseAttachments: [],
   duty: null,
   dutyWeek: null,

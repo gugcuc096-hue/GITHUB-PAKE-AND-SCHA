@@ -102,13 +102,48 @@ function closeSidebar() {
   $('#sidebarBackdrop').classList.remove('show');
 }
 
-function openModal(html, { wide = false } = {}) {
-  $('#modalBody').innerHTML = html;
-  $('#modalCard').classList.toggle('wide', wide);
+/*
+ * Dialog-Verlauf: Wird aus einem Fenster heraus ein weiteres geöffnet (z. B. Mandatsvertrag, Termin oder Aufgabe
+ * aus der Akte), merkt sich das Dashboard das vorherige. Schließen – X, Esc, Klick daneben, „Abbrechen“ – und
+ * Speichern führen genau dorthin zurück; erst das erste Fenster schließt ganz.
+ *  - Akten, Anliegen, Bewerbungen und Termine (opts.reopen) werden beim Zurückkehren frisch geladen und an
+ *    dieselbe Stelle gescrollt – Änderungen aus dem Unterfenster sind sofort zu sehen.
+ *  - Andere Fenster (z. B. ein halb ausgefülltes Formular) kommen genau so zurück, wie sie waren.
+ *  - Ein abgeschicktes Formular wird ersetzt (nie dorthin zurück); Seitenwechsel schließen alles (closeModal).
+ */
+const MODAL_STATE = ['modalCaseId', 'modalAppId', 'modalConcernId', 'caseInfo', 'caseAttachments', 'caseDocs', 'caseContracts', 'caseTasks', 'returnCase', 'msgId', 'msgTab', 'msgUseTab'];
+
+/** Das gerade offene Fenster beiseitelegen (Inhalt samt Eingaben, Scrollposition und zugehörigem Zustand). */
+function stashModal() {
+  const body = $('#modalBody');
+  const scroll = [$('#modal').scrollTop, body.scrollTop]; // vor dem Ausräumen lesen – danach ist das Fenster leer und oben
+  const nodes = document.createDocumentFragment();
+  while (body.firstChild) nodes.appendChild(body.firstChild);
+  const state = {};
+  MODAL_STATE.forEach((k) => (state[k] = st[k]));
+  st.modalStack.push({ ...(st.modalCurrent || {}), nodes, state, scroll });
+  // Das neue Fenster zeigt keine Akte/Bewerbung/kein Anliegen mehr – Aktualisierungen im Hintergrund dürfen es nicht ersetzen
+  st.modalCaseId = null;
+  st.modalAppId = null;
+  st.modalConcernId = null;
+}
+
+/**
+ * opts.key: was das Fenster zeigt (z. B. 'case:12') – dasselbe noch einmal öffnen ersetzt es nur.
+ * opts.reopen: lädt das Fenster neu (für die Rückkehr aus einem Unterfenster).
+ */
+function openModal(html, { wide = false, key = null, reopen = null, child = false } = {}) {
   const modal = $('#modal');
+  const body = $('#modalBody');
+  const same = key && st.modalCurrent && st.modalCurrent.key === key;
+  // child: auch nach dem Absenden eines Formulars als Unterfenster öffnen (z. B. „Rechnung erstellt“ über der Akte)
+  if (modal.classList.contains('open') && !st.modalRestoring && (child || !st.modalReplace) && !same) stashModal();
+  st.modalCurrent = { key, reopen, wide };
+  body.innerHTML = html;
+  $('#modalCard').classList.toggle('wide', wide);
   modal.classList.add('open');
   modal.scrollTop = 0;
-  $('#modalBody').scrollTop = 0;
+  body.scrollTop = 0;
   document.body.classList.add('modal-open');
   tickCountdowns();
   const focusTarget = $('#modalBody [autofocus]');
@@ -124,7 +159,10 @@ function replaceModal(html) {
   modal.scrollTop = y2;
   tickCountdowns();
 }
+/** Alles schließen – auch die vorherigen Fenster (Seitenwechsel, Abmelden). */
 function closeModal() {
+  st.modalStack = [];
+  st.modalCurrent = null;
   const modal = $('#modal');
   if (!modal.classList.contains('open')) return;
   modal.classList.remove('open');
@@ -133,6 +171,66 @@ function closeModal() {
   st.modalCaseId = null;
   st.modalAppId = null;
   st.modalConcernId = null;
+  st.returnCase = null;
+}
+/** Neues Fenster an die Stelle des aktuellen setzen (z. B. Suchergebnis statt Suche) – ohne Rückweg dorthin. */
+async function modalInstead(fn) {
+  st.modalReplace++;
+  try {
+    return await fn();
+  } finally {
+    st.modalReplace--;
+  }
+}
+/** Zurück zum vorherigen Fenster – oder schließen, wenn es keins gibt. */
+async function modalBack() {
+  if (st.modalRestoring) return; // vorheriges Fenster lädt gerade (z. B. Doppelklick auf X)
+  const prev = st.modalStack.pop();
+  if (!prev) return closeModal();
+  const modal = $('#modal');
+  const body = $('#modalBody');
+  if (prev.reopen) {
+    st.modalRestoring = true;
+    try {
+      await prev.reopen();
+      st.returnCase = null; // die Akte selbst ist wieder offen
+    } catch (e) {
+      handleError(e);
+      return closeModal(); // z. B. Akte inzwischen gelöscht – nicht mit veralteten Daten weiterarbeiten
+    } finally {
+      st.modalRestoring = false;
+    }
+  } else {
+    body.innerHTML = '';
+    body.appendChild(prev.nodes);
+    Object.assign(st, prev.state);
+    st.modalCurrent = { key: prev.key || null, reopen: null, wide: !!prev.wide };
+    $('#modalCard').classList.toggle('wide', !!prev.wide);
+    modal.classList.add('open');
+    document.body.classList.add('modal-open');
+    tickCountdowns();
+  }
+  restoreModalScroll(prev.scroll);
+}
+/**
+ * An die vorherige Stelle scrollen. Frisch geladene Inhalte (Bilder, nachgeladene Angaben) wachsen oft noch ein
+ * paar Pixel – deshalb kurz danach noch einmal, solange niemand selbst gescrollt hat.
+ */
+function restoreModalScroll([top, bodyTop]) {
+  const modal = $('#modal');
+  const body = $('#modalBody');
+  const apply = () => {
+    modal.scrollTop = top;
+    body.scrollTop = bodyTop;
+    return [modal.scrollTop, body.scrollTop];
+  };
+  let last = apply();
+  for (const ms of [50, 200, 600]) {
+    setTimeout(() => {
+      if (!modal.classList.contains('open') || modal.scrollTop !== last[0] || body.scrollTop !== last[1]) return; // inzwischen selbst gescrollt
+      last = apply();
+    }, ms);
+  }
 }
 
 const loadingHtml = () =>
@@ -159,6 +257,7 @@ const hashView = () => decodeURIComponent(location.hash.slice(1)) || 'overview';
 
 async function go(view) {
   if (!allowed(view)) view = 'overview';
+  if (view !== 'invoice-new') st.invoiceFrom = null; // Rechnung aus einer Akte: Rückweg gilt nur bis zum Verlassen der Seite
   st.view = view;
   closeModal();
   closeSidebar();
@@ -197,11 +296,12 @@ async function refreshBehind() {
     handleError(e);
   }
 }
-/** Nach Unterdialogen aus einer Akte heraus zurück zur Akte springen. */
+/** Nach dem Speichern in einem Unterfenster (z. B. aus der Akte heraus) dorthin zurück, sonst schließen. */
 async function returnOrClose() {
   const caseId = st.returnCase;
   st.returnCase = null;
-  if (caseId) await openCase(caseId);
+  if (st.modalStack.length) await modalBack();
+  else if (caseId) await openCase(caseId);
   else closeModal();
   refreshBehind();
 }

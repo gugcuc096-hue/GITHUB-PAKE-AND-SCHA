@@ -10,7 +10,8 @@
 const actions = {
   'open-sidebar': openSidebar,
   'close-sidebar': closeSidebar,
-  'close-modal': closeModal,
+  // X, „Abbrechen“, „Schließen“, „Fertig“: zurück zum vorherigen Fenster (z. B. zur Akte) – sonst schließen
+  'close-modal': () => modalBack(),
   'reload-view': () => go(st.view),
   logout: async () => {
     await api.post('/api/auth/logout');
@@ -99,7 +100,7 @@ const actions = {
     if (!(await askDelete(`Akte ${el.dataset.number} löschen?`, 'Die Akte kommt mit Notizen, Aufgaben, Anhängen und Verträgen 30 Tage in den Papierkorb (Aktenverwaltung → Papierkorb) und lässt sich bis dahin wiederherstellen. Danach wird sie endgültig gelöscht.', 'Löschen'))) return;
     await api.del('/api/cases/' + el.dataset.id);
     toast('Akte gelöscht – 30 Tage im Papierkorb.');
-    closeModal();
+    await modalBack();
     await refreshBehind();
   },
   'case-trash': () => openTrash(),
@@ -281,8 +282,17 @@ const actions = {
   },
   'new-invoice': async (el) => {
     await load.cases();
+    // Aus der Akte heraus: Abbrechen und Erstellen führen zurück in diese Akte
+    const from = el.dataset.caseId && st.modalCaseId === Number(el.dataset.caseId) ? { view: st.view, caseId: st.modalCaseId, caseNumber: st.caseInfo ? st.caseInfo.caseNumber : '' } : null;
     st.draft = newDraft(el.dataset.caseId ? Number(el.dataset.caseId) : null);
+    st.invoiceFrom = from;
     await navigate('invoice-new');
+  },
+  'inv-back': async () => {
+    const from = st.invoiceFrom;
+    if (!from) return navigate('invoices');
+    await navigate(from.view);
+    await openCase(from.caseId);
   },
   'inv-add-item': () => {
     st.draft.items.push({ description: '', quantity: 1, unitPrice: 0 });
@@ -695,7 +705,7 @@ const actions = {
   'coop-member-add': async (el) => {
     await api.post(`/api/cooperations/${el.dataset.id}/members`, { userId: Number(el.dataset.user) });
     toast(`${el.dataset.name} zugeordnet.`);
-    closeModal();
+    await modalBack();
     await refreshBehind();
   },
   'coop-member-remove': async (el) => {
@@ -1081,14 +1091,14 @@ const actions = {
     if (!(await ask('Das Anliegen wird gelöscht – das Board hat noch nicht darauf reagiert.', { title: 'Anliegen zurückziehen?', confirmText: 'Zurückziehen', danger: true }))) return;
     await api.del('/api/concerns/' + el.dataset.id);
     toast('Anliegen zurückgezogen.');
-    closeModal();
+    await modalBack();
     await Promise.all([refreshBehind(), load.concernCount().then(renderNav)]);
   },
   'concern-delete': async (el) => {
     if (!(await ask('Das Anliegen samt Verlauf wird endgültig gelöscht.', { title: 'Anliegen löschen?', confirmText: 'Löschen', danger: true }))) return;
     await api.del('/api/concerns/' + el.dataset.id);
     toast('Anliegen gelöscht.');
-    closeModal();
+    await modalBack();
     await Promise.all([refreshBehind(), load.concernCount().then(renderNav)]);
   },
   // Beförderungen & Einstellungen
@@ -1304,7 +1314,7 @@ const actions = {
     renderView();
   },
   'app-open': (el) => openApplication(Number(el.dataset.id)),
-  'app-back': (el) => openApplication(Number(el.dataset.id)),
+  'app-back': (el) => (st.modalStack.length ? modalBack() : openApplication(Number(el.dataset.id))),
   'app-rate': async (el) => {
     const data = await api.patch('/api/admin/applications/' + el.dataset.id, { rating: Number(el.dataset.value) });
     await reloadApplication(data);
@@ -1322,7 +1332,7 @@ const actions = {
     if (!(await askDelete(`Bewerbung ${el.dataset.number} löschen?`, 'Die Bewerbung und alle Notizen dazu werden endgültig gelöscht.', 'Endgültig löschen'))) return;
     await api.del('/api/admin/applications/' + el.dataset.id);
     toast('Bewerbung gelöscht.');
-    closeModal();
+    await modalBack();
     await refreshBehind();
   },
   'position-new': () => positionModal(null),

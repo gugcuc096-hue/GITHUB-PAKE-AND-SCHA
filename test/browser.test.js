@@ -142,6 +142,65 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
   }
 
   for (const [label, device] of [['PC', DESKTOP], ['Handy', PHONE]]) {
+    it(`Fenster am ${label}: Schließen führt zurück in die Akte, aus der man kam`, async () => {
+      const { ctx, page, problems, settle } = await open(device);
+      await login(page, TEAM.admin);
+      await page.evaluate(() => (location.hash = '#cases'));
+      await settle();
+      await page.click(`[data-action="open-case"][data-id="${data.caseId}"] >> nth=0`);
+      await page.waitForSelector('#modalBody #secContracts');
+      const backInCase = async (what) => {
+        await page.waitForSelector('#modalBody #secContracts', { timeout: 5000 });
+        assert.ok(await page.evaluate((n) => document.querySelector('#modal').classList.contains('open') && document.querySelector('#modalBody').textContent.includes(n), data.caseNumber), `${what}: zurück in der Akte`);
+      };
+      // Am Handy scrollt das Fenster selbst, am PC die Fläche dahinter
+      const scroller = device === PHONE ? '#modalBody' : '#modal';
+      const scrollTop = () => page.$eval(scroller, (el) => el.scrollTop);
+
+      // X, Esc und Klick daneben in einem Unterfenster → zurück in die Akte (an dieselbe Stelle)
+      await page.$eval('#modalBody [data-action="contract-new"]', (el) => el.scrollIntoView({ block: 'center' }));
+      await page.waitForTimeout(300);
+      const before = await scrollTop();
+      assert.ok(before > 50, `Akte gescrollt (${before})`);
+      await page.$eval('#modalBody [data-action="contract-new"]', (el) => el.click()); // ohne erneutes Scrollen durch Playwright
+      await page.waitForSelector('#modalBody form[data-form="contract-new"]');
+      await page.click('.modal-close');
+      await backInCase('Mandatsvertrag → X');
+      assert.ok(Math.abs((await scrollTop()) - before) <= 5, `wieder an derselben Stelle (${before} → ${await scrollTop()})`);
+      await page.click('#modalBody [data-action="brief-new"]');
+      await page.waitForSelector('#modalBody form[data-form="brief-new"]');
+      await page.keyboard.press('Escape');
+      await backInCase('Schriftsatz → Esc');
+      await page.click('#modalBody [data-action="task-new"]');
+      await page.waitForSelector('#modalBody form[data-form="task"]');
+      await page.mouse.click(5, 5);
+      await backInCase('Aufgabe → Klick daneben');
+      await page.click('#modalBody [data-action="new-event"]');
+      await page.waitForSelector('#modalBody form[data-form="event"]');
+      await page.click('#modalBody form[data-form="event"] [data-action="close-modal"]');
+      await backInCase('Termin → Abbrechen');
+
+      // Speichern im Unterfenster → zurück in die Akte, Neues ist sofort zu sehen
+      await page.click('#modalBody [data-action="task-new"]');
+      await page.fill('#modalBody form[data-form="task"] input[name="title"]', `Zeugen anrufen ${label}`);
+      await page.click('#modalBody form[data-form="task"] button[type=submit]');
+      await backInCase('Aufgabe speichern');
+      assert.ok((await page.textContent('#modalBody')).includes(`Zeugen anrufen ${label}`), 'neue Aufgabe in der Akte');
+
+      // Rechnung aus der Akte: Abbrechen → zurück in die Akte
+      await page.click('#modalBody [data-action="new-invoice"]');
+      await page.waitForSelector('#invoiceForm');
+      assert.ok((await page.textContent('.page-head')).includes(`Akte ${data.caseNumber}`), 'Rückweg zur Akte angezeigt');
+      await page.click('#invoiceForm [data-action="inv-back"]');
+      await backInCase('Rechnung → Abbrechen');
+
+      // Erst in der Akte selbst schließt X das Fenster
+      await page.click('.modal-close');
+      await page.waitForFunction(() => !document.querySelector('#modal').classList.contains('open'));
+      assert.deepEqual(problems, []);
+      await ctx.close();
+    });
+
     it(`Antrag am ${label}: FiveNet-Aktenzeichen vorbelegt und in der Druckansicht ein Link`, async () => {
       const { ctx, page, problems, settle } = await open(device);
       await login(page, TEAM.admin);
