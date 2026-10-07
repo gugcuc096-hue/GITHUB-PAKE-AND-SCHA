@@ -151,6 +151,12 @@ const actions = {
     toast('Endgültig gelöscht.');
     await openTrash(true);
   },
+  'chat-focus': () => {
+    const sec = $('#secChat');
+    if (!sec) return;
+    sec.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    $('#secChat .chat-input')?.focus({ preventScroll: true });
+  },
   'delete-note': async (el) => {
     if (!(await askDelete('Notiz löschen?', 'Die Notiz wird aus dem Verlauf der Akte entfernt.'))) return;
     const caseId = Number(el.dataset.caseId);

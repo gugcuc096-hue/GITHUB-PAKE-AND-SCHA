@@ -71,6 +71,12 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     e.target.click();
   }
+  // Chat: Enter sendet, Umschalt + Enter macht eine neue Zeile (am Handy bleibt Enter ein Zeilenumbruch)
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.target.classList && e.target.classList.contains('chat-input') && window.matchMedia('(hover: hover)').matches) {
+    e.preventDefault();
+    if (e.target.value.trim()) e.target.form.requestSubmit();
+    return;
+  }
   // Enter in einem Eingabefeld des Generators soll nicht versehentlich die Rechnung erstellen.
   if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.closest('#invoiceForm')) e.preventDefault();
 });
@@ -101,6 +107,10 @@ document.addEventListener('input', (e) => {
   if (t.id === 'caseSearch') {
     st.caseQuery = t.value;
     $('#caseList').innerHTML = caseTable();
+  } else if (t.classList && t.classList.contains('chat-input')) {
+    // Eingabefeld wächst mit (bis zu einigen Zeilen)
+    t.style.height = 'auto';
+    t.style.height = Math.min(t.scrollHeight + 2, 180) + 'px';
   } else if (t.id === 'gsInput') {
     st.gsQuery = t.value;
     clearTimeout(st.gsTimer);
@@ -342,10 +352,17 @@ window.addEventListener('focus', () => {
   if (!dirty) reloadCase(id).catch(() => {});
 });
 
+// Offener Chat (Akte oder Bewerbung): neue Nachrichten alle paar Sekunden nachladen
+setInterval(() => {
+  if (!st.user) return;
+  pollChat();
+  if (typeof pollAppChat === 'function') pollAppChat();
+}, 6000);
+
 // Ungelesene Post, neue Bewerbungen und Dienststatus regelmäßig aktualisieren (Badges in der Navigation)
 setInterval(() => {
   if (document.hidden || !st.user) return;
-  Promise.all([load.unread(), load.appCount(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {})])
+  Promise.all([load.chatUnread().catch(() => {}), load.unread(), load.appCount(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {})])
     .then(renderNav)
     .catch(() => {});
 }, 30000);
@@ -380,7 +397,7 @@ setInterval(() => {
   if (googleState && GOOGLE_MSG[googleState]) toast(...GOOGLE_MSG[googleState]);
 
   try {
-    await Promise.all([load.unread(), load.appCount(), load.duty(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {})]);
+    await Promise.all([load.chatUnread().catch(() => {}), load.unread(), load.appCount(), load.duty(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {})]);
     renderUser();
   } catch {
     /* Badges und Dienststatus sind nicht kritisch */

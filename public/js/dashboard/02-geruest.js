@@ -16,7 +16,7 @@ function renderNav() {
       section = v.section;
       html += `<div class="nav-section">${esc(section)}</div>`;
     }
-    const count = { mail: st.unread, applications: st.newApplications, tasks: st.dueTasks, concerns: st.concernUnseen, 'concerns-board': st.concernOpen, personnel: st.personnelNew, 'name-requests': st.nameOpen, vip: st.vipReqOpen, reviews: st.reviewOpen }[key] || 0;
+    const count = { cases: st.chatUnread, mail: st.unread, applications: st.newApplications, tasks: st.dueTasks, concerns: st.concernUnseen, 'concerns-board': st.concernOpen, personnel: st.personnelNew, 'name-requests': st.nameOpen, vip: st.vipReqOpen, reviews: st.reviewOpen }[key] || 0;
     const active = st.view === key || (key === 'invoices' && st.view === 'invoice-new');
     html += `<a href="#${key}" class="nav-item ${active ? 'active' : ''}" ${active ? 'aria-current="page"' : ''}>${icon(v.icon)}<span>${esc(viewLabel(key))}</span>${count ? `<span class="nav-count">${count > 99 ? '99+' : count}</span>` : ''}</a>`;
   }
@@ -27,7 +27,7 @@ function renderNav() {
     bottom
       .map(
         (k) =>
-          `<a href="#${k}" class="bn-item ${st.view === k ? 'active' : ''}">${icon(VIEWS[k].icon)}<span>${esc(viewLabel(k, true))}</span>${k === 'mail' && st.unread ? `<span class="dot-badge">${st.unread > 99 ? '99+' : st.unread}</span>` : ''}</a>`
+          `<a href="#${k}" class="bn-item ${st.view === k ? 'active' : ''}">${icon(VIEWS[k].icon)}<span>${esc(viewLabel(k, true))}</span>${k === 'mail' && st.unread ? `<span class="dot-badge">${st.unread > 99 ? '99+' : st.unread}</span>` : ''}${k === 'cases' && st.chatUnread ? `<span class="dot-badge">${st.chatUnread > 99 ? '99+' : st.chatUnread}</span>` : ''}</a>`
       )
       .join('') + `<button type="button" class="bn-item" data-action="open-sidebar">${icon('more')}<span>Mehr</span></button>`;
 

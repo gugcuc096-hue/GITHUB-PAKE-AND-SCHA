@@ -44,6 +44,7 @@ const {
 const discord = require('../discord');
 const tickets = require('../tickets');
 const trash = require('../trash');
+const caseChat = require('../caseChat');
 const { contractsForCase } = require('./contracts');
 const { workForCase } = require('./work');
 const { imageBody, saveImage, removeFile, evidencePath } = require('../uploads');
@@ -118,7 +119,36 @@ router.get('/', (req, res) => {
   const rows = isStaff(u)
     ? db.prepare(`${CASE_SELECT} ORDER BY c.updated_at DESC`).all()
     : db.prepare(`${CASE_SELECT} WHERE c.client_id = ? ORDER BY c.updated_at DESC`).all(u.id);
-  res.json({ cases: rows.map((c) => caseRow(c, u)) });
+  const unread = caseChat.unreadFor(u).cases;
+  res.json({ cases: rows.map((c) => ({ ...caseRow(c, u), chatUnread: unread[c.id] || 0 })) });
+});
+
+/* ---------------------------------------------------------------- Nachrichten (Chat Kanzlei ↔ Mandant) */
+/** Neue Nachrichten der Gegenseite (Badges in Navigation und Aktenliste). */
+router.get('/chat-unread', (req, res) => {
+  res.json(caseChat.unreadFor(req.user));
+});
+
+/** Nachrichten nach ?after= (regelmäßiges Nachladen im offenen Chat) und der Lesestand der Gegenseite. */
+router.get('/:id/chat', (req, res) => {
+  const id = idParam(req);
+  const c = id && getCase(id);
+  if (!c || !caseAccess(c, req.user).canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
+  const after = Math.max(0, Number(req.query.after) || 0);
+  res.json({ messages: caseChat.messages(c.id, after), read: caseChat.readState(c, req.user) });
+});
+
+/** Gelesen bis lastId. */
+router.post('/:id/chat/read', (req, res) => {
+  const id = idParam(req);
+  const c = id && getCase(id);
+  if (!c || !caseAccess(c, req.user).canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
+  const d = parseBody(z.object({ lastId: z.number().int().min(0) }), req, res);
+  if (!d) return;
+  // nie über die letzte vorhandene Nachricht hinaus
+  const max = db.prepare('SELECT COALESCE(MAX(id), 0) AS m FROM notes WHERE case_id = ? AND internal = 0 AND system = 0').get(c.id).m;
+  caseChat.markRead(c.id, req.user.id, Math.min(d.lastId, max));
+  res.json({ success: true });
 });
 
 /* ---------------------------------------------------------------- Anlegen */
@@ -388,6 +418,8 @@ function caseDetail(c, u) {
     // Bearbeitungszeiten nur für das Board of Partners
     work: isBoard(u) ? { rows: workForCase(c.id), closedAt: c.closed_at || null } : undefined,
     tasks: staff ? tasks.map(taskRow) : undefined,
+    // Nachrichten mit dem Mandanten und Lesestand
+    chat: { messages: caseChat.messages(c.id), read: caseChat.readState(c, u) },
     ticket: tickets.ticketInfo(c, u),
     // Mandant: eigene Bewertung der (abgeschlossenen) Akte
     review: require('./reviews').reviewForCase(c, u),
@@ -829,12 +861,14 @@ router.post(
     const d = parseBody(z.object({ body: z.string().trim().min(1).max(4000), internal: z.boolean().optional() }), req, res);
     if (!d) return;
     const internal = !!d.internal && isStaff(req.user);
-    tx(() => {
-      db.prepare(
-        `INSERT INTO notes (case_id, author_id, author_name, author_role, body, internal) VALUES (?, ?, ?, ?, ?, ?)`
-      ).run(c.id, req.user.id, req.user.display_name, req.user.role, d.body, internal ? 1 : 0);
+    const noteId = tx(() => {
+      const info = db
+        .prepare(`INSERT INTO notes (case_id, author_id, author_name, author_role, body, internal) VALUES (?, ?, ?, ?, ?, ?)`)
+        .run(c.id, req.user.id, req.user.display_name, req.user.role, d.body, internal ? 1 : 0);
       db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(c.id);
+      return Number(info.lastInsertRowid);
     });
+    if (!internal) caseChat.markRead(c.id, req.user.id, noteId); // eigene Nachricht gilt als gelesen
     // Interne Notizen bleiben intern – ins Ticket kommt nur, was auch der Mandant sieht.
     if (!internal) {
       tickets.post(c.id, {
@@ -846,7 +880,7 @@ router.post(
         byDiscordId: req.user.discord_id,
       });
     }
-    res.status(201).json({ success: true });
+    res.status(201).json({ success: true, id: noteId, message: internal ? undefined : caseChat.messages(c.id, noteId - 1)[0] });
   })
 );
 

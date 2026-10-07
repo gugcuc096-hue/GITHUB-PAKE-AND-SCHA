@@ -201,6 +201,80 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       await ctx.close();
     });
 
+    it(`Nachrichten am ${label}: Akte (Kanzlei ↔ Mandant), Bewerbung und Bewerberseite`, async () => {
+      const adm = client(server.base);
+      const me = await adm.login(TEAM.admin);
+      // Mandant mit Konto und eigener Akte (zuständig: Board-Mitglied, das sich gleich anmeldet)
+      const email = `chat.${label.toLowerCase()}`;
+      const mandant = client(server.base);
+      assert.equal((await mandant.post('/api/auth/register', { displayName: `Chat ${label}`, email, password: 'Mandanten-Passwort-1' })).status, 201);
+      await mandant.login(email, 'Mandanten-Passwort-1');
+      const kase = (await adm.post('/api/cases', { title: `Chat-Akte ${label}`, area: 'zivilrecht', clientEmail: email, lawyerId: me.id })).json.case;
+      await mandant.post(`/api/cases/${kase.id}/notes`, { body: `Frage vom Mandanten (${label})` });
+
+      const { ctx, page, problems, settle } = await open(device);
+      const watch = (p) => p.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
+      await login(page, TEAM.admin);
+      const badge = device === PHONE ? '#bottomNav a[href="#cases"] .dot-badge' : '#nav a[href="#cases"] .nav-count';
+      assert.equal(await page.textContent(badge), '1', 'neue Nachricht in der Navigation');
+      await page.evaluate(() => (location.hash = '#cases'));
+      await settle();
+      assert.ok(await page.$(`[data-action="open-case"][data-id="${kase.id}"] .chat-new`), 'neue Nachricht in der Aktenliste');
+      await page.click(`[data-action="open-case"][data-id="${kase.id}"] >> nth=0`);
+      await page.waitForSelector('#chatList .chat-msg.in');
+      await page.waitForFunction((sel) => !document.querySelector(sel), badge); // beim Öffnen gelesen
+      await page.fill('#secChat .chat-input', `Antwort der Kanzlei (${label})`);
+      if (device === DESKTOP) await page.press('#secChat .chat-input', 'Enter');
+      else await page.click('#secChat .chat-send');
+      await page.waitForSelector('#chatList .chat-msg.out');
+      assert.equal(await page.inputValue('#secChat .chat-input'), '', 'Eingabe nach dem Senden leer');
+      assert.ok((await mandant.get(`/api/cases/${kase.id}/chat`)).json.messages.some((m) => m.body === `Antwort der Kanzlei (${label})`), 'Mandant sieht die Antwort');
+      // Antwort des Mandanten erscheint im offenen Chat von selbst
+      await mandant.post(`/api/cases/${kase.id}/notes`, { body: `Danke! (${label})` });
+      await page.waitForFunction((t) => [...document.querySelectorAll('#chatList .chat-text')].some((e) => e.textContent === t), `Danke! (${label})`, { timeout: 12000 });
+      if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Akte mit Chat: nichts ragt über den Rand');
+      await page.click('.modal-close');
+
+      // Bewerbung: Stand per Kreis, Nachricht ans Board, Bewerberseite
+      const app = (
+        await client(server.base).post('/api/public/applications', {
+          positionId: null,
+          name: `Bewerber ${label}`,
+          discord: 'bewerber',
+          motivation: 'Ich möchte bei Pake & Scha anfangen und bringe Erfahrung aus der Rechtsberatung mit – gern auch abends.',
+          accept: true,
+        })
+      ).json;
+      const appId = (await adm.get('/api/admin/applications')).json.applications.find((a) => a.number === app.number).id;
+      await page.evaluate(() => (location.hash = '#applications'));
+      await settle();
+      await page.click(`[data-action="app-open"][data-id="${appId}"]`);
+      await page.waitForSelector('#appChatList');
+      await page.click('#modalBody .track-step[data-status="in_pruefung"]');
+      await page.waitForSelector('#modalBody .track-step[aria-current="step"] >> text=In Prüfung');
+      await page.fill('#secAppChat .chat-input', `Hallo vom Board (${label})`);
+      await page.click('#secAppChat .chat-send');
+      await page.waitForSelector('#appChatList .chat-msg.out');
+
+      const portal = await ctx.newPage();
+      watch(portal);
+      await portal.goto(server.base + app.portal);
+      await portal.waitForSelector('#bwChat .chat-msg.in');
+      assert.equal((await portal.textContent('#bwStatus')).trim(), 'In Prüfung');
+      assert.ok((await portal.textContent('#bwChat')).includes(`Hallo vom Board (${label})`));
+      await portal.fill('#bwForm textarea', `Antwort des Bewerbers (${label})`);
+      await portal.click('#bwForm button[type=submit]');
+      await portal.waitForSelector('#bwChat .chat-msg.out');
+      if (device === PHONE) assert.ok((await overflow(portal)) <= 1, 'Bewerberseite: nichts ragt über den Rand');
+      // Board sieht die Antwort im offenen Fenster (Nachladen)
+      await page.waitForFunction((t) => [...document.querySelectorAll('#appChatList .chat-text')].some((e) => e.textContent === t), `Antwort des Bewerbers (${label})`, { timeout: 12000 });
+      // Karriereseite: Bewerbung ist auf dem Gerät gemerkt
+      await portal.goto(server.base + '/karriere.html');
+      await portal.waitForSelector(`#myApplications a[href="${app.portal}"]`);
+      assert.deepEqual(problems, []);
+      await ctx.close();
+    });
+
     it(`Zurück-Taste am ${label}: schließt Fenster, fragt bei ungespeicherten Eingaben, Akte bleibt beim Neuladen offen`, async () => {
       const { ctx, page, problems, settle } = await open(device);
       await login(page, TEAM.admin);

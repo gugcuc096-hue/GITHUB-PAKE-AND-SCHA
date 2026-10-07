@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#02050e">
+    <meta name="robots" content="noindex">
+    <meta name="referrer" content="no-referrer">
+    <link rel="icon" href="/favicon.ico?v=4" sizes="48x48">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=4">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=4">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=4">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Pake &amp; Scha">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <script src="/js/pwa.js" defer></script>
+    <title>Ihre Bewerbung | Pake & Scha Legal Consulting</title>
+    <meta name="description" content="Ihre Bewerbung bei Pake & Scha Legal Consulting: Stand, Gesprächstermin und Nachrichten an das Board of Partners.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/app.css">
+    <style>
+        .bw-card { padding: 1.25rem; }
+        @media (min-width: 640px) { .bw-card { padding: 1.75rem; } }
+        .bw-chat .chat { border: 0; border-radius: 0; background: none; }
+        .bw-chat .chat-list { max-height: 460px; }
+        .bw-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--glass-border); }
+        .bw-link { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.72rem; word-break: break-all; color: var(--text-dim); background: rgba(255, 255, 255, 0.03); border: 1px solid var(--glass-border); border-radius: 10px; padding: 0.5rem 0.65rem; }
+    </style>
+    <link rel="stylesheet" href="/css/tailwind.css">
+</head>
+<body class="min-h-screen flex flex-col">
+    <div class="ambient-bg"><div class="glow-orb orb-1"></div><div class="glow-orb orb-2"></div></div>
+
+    <header class="sticky top-0 z-40 glass-nav">
+        <div class="max-w-6xl mx-auto px-4 sm:px-8 h-[68px] flex items-center justify-between gap-3">
+            <a href="/" class="flex items-center gap-3 min-w-0">
+                <img class="brand-logo" src="/img/logo.svg" width="24" height="44" alt="Pake &amp; Scha" decoding="async">
+                <span class="min-w-0"><span class="brand-name block whitespace-nowrap">Pake &amp; Scha</span><span class="brand-sub hidden sm:block">Legal Consulting &amp; Advocacy</span></span>
+            </a>
+            <nav class="flex items-center gap-1 sm:gap-2" aria-label="Navigation">
+                <a href="/" class="btn-ghost btn-sm hidden sm:inline-flex">Startseite</a>
+                <a href="/karriere.html" class="btn-outline btn-sm">Karriere</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="flex-grow">
+        <section class="max-w-3xl mx-auto w-full px-4 sm:px-6 py-10 sm:py-14">
+            <div id="portal" aria-live="polite">
+                <div class="glass-card bw-card text-center text-muted">Ihre Bewerbung wird geladen …</div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Discord verbinden: POST, damit der persönliche Link nicht in Adresszeile oder Verlauf von Discord landet -->
+    <form id="discordJoinForm" method="post" action="/api/discord/application-join" class="hidden">
+        <input type="hidden" name="token">
+    </form>
+
+    <footer class="border-t border-[var(--glass-border)] py-8 bg-[rgba(2,5,14,0.95)]">
+        <div class="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-muted">
+            <span class="flex flex-col items-center md:items-start gap-0.5"><span class="font-serif italic text-sm text-[var(--gold-light)]">Recht haben. <span class="text-gold">Recht bekommen.</span></span><span>© <span id="year">2026</span> Pake &amp; Scha Legal Consulting</span></span>
+            <div class="flex flex-wrap justify-center gap-x-6 gap-y-2 uppercase tracking-wider text-[0.7rem]">
+                <a href="/" class="hover:text-[var(--gold-500)]">Startseite</a>
+                <a href="/karriere.html" class="hover:text-[var(--gold-500)]">Karriere</a>
+                <a href="/login.html" class="text-gold">Mandantenportal</a>
+            </div>
+        </div>
+    </footer>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/bewerbung.js"></script>
+</body>
+</html>

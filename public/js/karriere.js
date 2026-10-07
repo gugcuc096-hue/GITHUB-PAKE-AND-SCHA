@@ -1,8 +1,33 @@
-/* Karriereseite (karriere.html): Stellen, Bewerbung, Statusabfrage – früher Inline-Skript in der Seite, jetzt eigene Datei (strenge Content-Security-Policy). */
+/* Karriereseite (karriere.html): Stellen, Bewerbung, Zugang zur persönlichen Bewerberseite – früher Inline-Skript in der Seite, jetzt eigene Datei (strenge Content-Security-Policy). */
 (() => {
     'use strict';
-    const { api, esc, fmtDate, copy, toast } = window.PS;
-    const STATUS_COLOR = { eingegangen: 'amber', in_pruefung: 'sky', gespraech: 'gold', angenommen: 'emerald', abgelehnt: 'red' };
+    const { api, esc, copy, toast } = window.PS;
+    const STORE = 'ps.bewerbungen'; // persönliche Links der Bewerbungen auf diesem Gerät (siehe bewerbung.js)
+    function remembered() {
+        try {
+            const list = JSON.parse(localStorage.getItem(STORE) || '[]');
+            return Array.isArray(list) ? list.filter((x) => x && typeof x.token === 'string') : [];
+        } catch {
+            return [];
+        }
+    }
+    function remember(entry) {
+        try {
+            localStorage.setItem(STORE, JSON.stringify([entry, ...remembered().filter((x) => x.token !== entry.token)].slice(0, 5)));
+        } catch {
+            /* ohne Speicher funktioniert der Link trotzdem */
+        }
+    }
+    // Bereits beworben (auf diesem Gerät): direkt zur Bewerberseite
+    (() => {
+        const list = remembered();
+        const box = document.getElementById('myApplications');
+        if (!list.length || !box) return;
+        box.innerHTML = `<div class="text-xs uppercase tracking-widest text-dim mb-3">Auf diesem Gerät</div><div class="flex flex-col gap-2">${list
+            .map((x) => `<a class="btn-outline btn-md justify-between" href="/bewerbung.html#${esc(x.token)}"><span class="font-mono">${esc(x.number || 'Bewerbung')}</span><span class="text-xs text-dim">${esc(x.position || '')}</span></a>`)
+            .join('')}</div>`;
+        box.classList.remove('hidden');
+    })();
     const form = document.getElementById('applyForm');
     const select = document.getElementById('apPosition');
     document.getElementById('year').textContent = new Date().getFullYear();
@@ -89,30 +114,27 @@
             const res = await api.post('/api/public/applications', body);
             form.classList.add('hidden');
             const box = document.getElementById('applySuccess');
-            const text = `Bewerbungsnummer: ${res.number}\nZugangscode: ${res.code}`;
+            const portal = `${location.origin}${res.portal}`;
+            remember({ token: res.token, number: res.number, position: res.positionTitle });
+            const text = `Bewerbungsnummer: ${res.number}\nZugangscode: ${res.code}\nBewerberseite: ${portal}`;
             box.innerHTML = `
                 <div class="w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center justify-center mx-auto mb-4">
                     <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg></div>
                 <h3 class="font-serif text-3xl font-semibold mb-2">Vielen Dank für Ihre Bewerbung!</h3>
-                <p class="text-sm text-muted mb-6">Ihre Bewerbung als <strong>${esc(res.positionTitle)}</strong> ist eingegangen. Das Board of Partners meldet sich über Discord bei Ihnen.</p>
+                <p class="text-sm text-muted mb-6">Ihre Bewerbung als <strong>${esc(res.positionTitle)}</strong> ist eingegangen. Auf Ihrer persönlichen Bewerberseite sehen Sie den Stand und schreiben direkt mit dem Board of Partners.</p>
                 <div class="grid grid-cols-2 gap-3 mb-3 max-w-md mx-auto">
                     <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3"><div class="text-[0.6rem] uppercase tracking-widest text-muted">Bewerbungsnummer</div><div class="font-mono text-lg text-[var(--gold-light)]">${esc(res.number)}</div></div>
                     <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3"><div class="text-[0.6rem] uppercase tracking-widest text-muted">Zugangscode</div><div class="font-mono text-lg tracking-[0.2em] text-[var(--gold-light)]">${esc(res.code)}</div></div>
                 </div>
-                <p class="text-xs text-amber-300/90 mb-6">Bitte notieren Sie beide Angaben – damit sehen Sie jederzeit den Stand Ihrer Bewerbung.</p>
+                <p class="text-xs text-amber-300/90 mb-6">Die Bewerberseite ist auf diesem Gerät gespeichert. Bitte notieren Sie trotzdem beide Angaben – damit öffnen Sie sie auch auf jedem anderen Gerät.</p>
                 <div class="flex flex-col sm:flex-row justify-center gap-2">
                     <button type="button" id="copyApply" class="btn-outline btn-md">Daten kopieren</button>
-                    <a href="#status" id="checkApply" class="btn-gold btn-md">Status ansehen</a>
+                    <a href="${esc(res.portal)}" id="checkApply" class="btn-gold btn-md">Zur Bewerberseite</a>
                 </div>`;
             box.classList.remove('hidden');
             box.scrollIntoView({ behavior: 'smooth', block: 'center' });
             document.getElementById('copyApply').addEventListener('click', async () => {
                 toast((await copy(text)) ? 'Bewerbungsdaten kopiert.' : 'Bitte die Angaben notieren.');
-            });
-            document.getElementById('checkApply').addEventListener('click', () => {
-                document.getElementById('stNumber').value = res.number;
-                document.getElementById('stCode').value = res.code;
-                checkStatus();
             });
         } catch (ex) {
             err.textContent = ex.message;
@@ -122,7 +144,7 @@
         }
     });
 
-    // Statusabfrage
+    // Bewerbungsnummer + Zugangscode → persönliche Bewerberseite
     async function checkStatus() {
         const out = document.getElementById('statusResult');
         const number = document.getElementById('stNumber').value.trim().toUpperCase();
@@ -132,15 +154,9 @@
             return;
         }
         try {
-            const d = await api.post('/api/public/application-status', { number, code });
-            out.innerHTML = `
-                <div class="flex flex-wrap items-center justify-between gap-3 pb-4 mb-4 border-b border-[var(--glass-border)]">
-                    <div><div class="text-xs uppercase tracking-widest text-dim">Bewerbung</div><div class="font-mono text-lg">${esc(d.number)}</div><div class="text-sm text-muted">${esc(d.positionTitle)}</div></div>
-                    <span class="badge badge-${STATUS_COLOR[d.status] || 'slate'} text-sm px-4 py-1">${esc(d.statusLabel)}</span>
-                </div>
-                ${d.interviewAt ? `<div class="banner banner-gold"><div><strong>Gesprächstermin:</strong> ${esc(fmtDate(d.interviewAt))} Uhr</div></div>` : ''}
-                <div class="qa"><div class="q">Nachricht der Kanzlei</div><div class="a">${esc(d.publicNote || 'Ihre Bewerbung ist eingegangen und wird geprüft. Wir melden uns bei Ihnen.')}</div></div>
-                <p class="text-xs text-dim mt-3">Zuletzt aktualisiert: ${esc(fmtDate(d.updatedAt))}</p>`;
+            const r = await api.post('/api/public/application-access', { number, code });
+            out.innerHTML = '<p class="text-sm text-muted">Ihre Bewerberseite wird geöffnet …</p>';
+            location.href = r.portal;
         } catch (ex) {
             out.innerHTML = `<p class="form-error">${esc(ex.status === 429 ? ex.message : 'Keine Bewerbung mit diesen Angaben gefunden.')}</p>`;
         }

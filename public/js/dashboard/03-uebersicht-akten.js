@@ -275,7 +275,7 @@ function caseTable() {
       <tbody>${rows
       .map(
         (c) => `<tr class="row" data-action="open-case" data-id="${c.id}">
-          <td class="td-main"><div class="font-mono text-gold text-xs">${esc(c.caseNumber)}</div><div class="font-medium">${esc(c.title)}</div>
+          <td class="td-main"><div class="font-mono text-gold text-xs">${esc(c.caseNumber)}</div><div class="font-medium">${esc(c.title)}${c.chatUnread ? ` <span class="chat-new" title="Neue Nachrichten">${icon('chat', 'ico-sm')}${c.chatUnread}</span>` : ''}</div>
             <div class="text-xs text-dim mt-1 flex flex-wrap items-center gap-2">${esc(AREAS[c.area] || c.area)}${staff ? '' : caseLevelBadge(c)}</div></td>
           ${staff ? `<td data-label="Mandant">${esc(c.clientName)}${c.membership ? `<div class="mt-1">${memberBadge(c.membership)}</div>` : ''}</td>` : ''}
           <td data-label="Zuständig">${c.lawyerName ? `${esc(c.lawyerName)}${(c.coLawyers || []).length ? `<div class="text-xs text-dim">+ ${esc(c.coLawyers.map((l) => l.name).join(', '))}</div>` : ''}` : badge('Unbesetzt', 'amber')}</td>
@@ -553,11 +553,18 @@ async function openCase(id) {
   openModal(caseDetail(data), { wide: true, key: `case:${id}`, reopen: () => openCase(id) });
   rememberCase(data);
   st.modalCaseId = id;
+  initChat(data);
 }
 async function reloadCase(id) {
   const data = await api.get('/api/cases/' + id);
   rememberCase(data);
-  if (st.modalCaseId === id) replaceModal(caseDetail(data));
+  if (st.modalCaseId === id) {
+    // Angefangene Nachricht und Chat-Position bleiben beim Neuzeichnen erhalten
+    const draft = $('#modalBody .chat-input')?.value || '';
+    replaceModal(caseDetail(data));
+    if (draft && $('#modalBody .chat-input')) $('#modalBody .chat-input').value = draft;
+    initChat(data);
+  }
   refreshBehind();
 }
 

@@ -23,14 +23,14 @@ function stateCookieOptions() {
 function startFlow(req, res, mode, extra = '') {
   const cfg = discord.oauthConfig(req);
   if (!cfg) {
-    const target = mode === 'login' ? '/login.html?discord=disabled' : mode === 'case' ? '/?discord=disabled' : '/dashboard.html?discord=disabled#profile';
+    const target = mode === 'login' ? '/login.html?discord=disabled' : mode === 'case' ? '/?discord=disabled' : mode === 'application' ? '/bewerbung.html?discord=disabled' : '/dashboard.html?discord=disabled#profile';
     return res.redirect(target);
   }
   const state = crypto.randomBytes(24).toString('hex');
   res.cookie(STATE_COOKIE, [mode, state, extra].filter(Boolean).join('.'), { ...stateCookieOptions(), maxAge: STATE_MAX_AGE });
   const scopes = mode !== 'login' && tickets.active() ? ['identify', 'guilds.join'] : ['identify'];
   // Ticket-Beitritt immer mit Discord-Bestätigung (kein stilles Durchwinken)
-  res.redirect(discord.authorizeUrl(cfg, state, scopes, mode === 'case' ? 'consent' : 'none'));
+  res.redirect(discord.authorizeUrl(cfg, state, scopes, mode === 'case' || mode === 'application' ? 'consent' : 'none'));
 }
 
 router.get('/status', (req, res) => {
@@ -51,24 +51,37 @@ router.get('/login', (req, res) => startFlow(req, res, 'login'));
  * und dem Ticket seiner Akte hinzugefügt.
  */
 const joinLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 15, standardHeaders: true, legacyHeaders: false, handler: (req, res) => res.redirect('/?ticket=limit') });
-router.post('/case-join', express.urlencoded({ extended: false, limit: '2kb' }), joinLimiter, (req, res) => {
-  // Nur Formulare der eigenen Website (Schutz vor fremden Seiten, die den Ablauf anstoßen)
+/** Nur Formulare der eigenen Website (Schutz vor fremden Seiten, die den Ablauf anstoßen). */
+function fromOwnSite(req) {
   const origin = req.get('origin');
-  if (origin && !(origin === 'null' && req.get('sec-fetch-site') === 'same-origin')) {
-    let host = '';
-    try {
-      host = new URL(origin).host;
-    } catch {
-      host = '';
-    }
-    if (host !== req.get('host')) return res.redirect('/?ticket=error');
+  if (!origin || (origin === 'null' && req.get('sec-fetch-site') === 'same-origin')) return true;
+  try {
+    return new URL(origin).host === req.get('host');
+  } catch {
+    return false;
   }
+}
+
+router.post('/case-join', express.urlencoded({ extended: false, limit: '2kb' }), joinLimiter, (req, res) => {
+  if (!fromOwnSite(req)) return res.redirect('/?ticket=error');
   const number = String(req.body?.caseNumber || '').trim().toUpperCase().slice(0, 30);
   const pin = String(req.body?.pin || '').trim().slice(0, 10);
   if (!tickets.active()) return res.redirect('/?ticket=disabled');
   const c = number && pin ? db.prepare('SELECT id FROM cases WHERE case_number = ? AND access_pin = ?').get(number, pin) : null;
   if (!c) return res.redirect('/?ticket=notfound');
   startFlow(req, res, 'case', String(c.id));
+});
+
+/*
+ * Bewerber verbindet sein Discord (Bewerberseite, persönlicher Link): Antworten des Boards und neue Stände kommen
+ * dann als Direktnachricht. Der Link-Schlüssel kommt per POST (nicht in der Adresszeile).
+ */
+router.post('/application-join', express.urlencoded({ extended: false, limit: '2kb' }), joinLimiter, (req, res) => {
+  if (!fromOwnSite(req)) return res.redirect('/bewerbung.html?discord=error');
+  const token = String(req.body?.token || '').trim().slice(0, 64);
+  const a = token.length >= 20 ? db.prepare('SELECT id FROM applications WHERE access_token = ?').get(token) : null;
+  if (!a) return res.redirect('/bewerbung.html?discord=notfound');
+  startFlow(req, res, 'application', String(a.id));
 });
 
 /** Wartet höchstens ms auf den Abgleich (die Weiterleitung soll nicht hängen). */
@@ -80,8 +93,8 @@ router.get(
     const raw = req.cookies?.[STATE_COOKIE] || '';
     res.clearCookie(STATE_COOKIE, stateCookieOptions());
     const [mode, expected, extra] = raw.split('.');
-    const failTarget = mode === 'login' ? '/login.html' : mode === 'case' ? '/' : '/dashboard.html';
-    const fail = (code) => res.redirect(`${failTarget}?${mode === 'case' ? 'ticket' : 'discord'}=${code}${mode === 'login' || mode === 'case' ? '' : '#profile'}`);
+    const failTarget = mode === 'login' ? '/login.html' : mode === 'case' ? '/' : mode === 'application' ? '/bewerbung.html' : '/dashboard.html';
+    const fail = (code) => res.redirect(`${failTarget}?${mode === 'case' ? 'ticket' : 'discord'}=${code}${mode === 'login' || mode === 'case' || mode === 'application' ? '' : '#profile'}`);
 
     if (!expected || req.query.state !== expected) return fail('state');
     if (req.query.error) return fail('denied');
@@ -116,6 +129,23 @@ router.get(
       const info = tickets.ticketInfo(db.prepare('SELECT * FROM cases WHERE id = ?').get(c.id), null);
       if (info && info.url && info.clientInTicket) return res.redirect(info.url);
       return res.redirect('/?ticket=pending');
+    }
+
+    // Bewerber: Discord an der Bewerbung merken (für Direktnachrichten), dem Server beitreten, Bestätigung schicken
+    if (mode === 'application') {
+      const appId = Number(extra);
+      const a = Number.isInteger(appId) && appId > 0 ? db.prepare('SELECT * FROM applications WHERE id = ?').get(appId) : null;
+      if (!a) return fail('error');
+      db.prepare('UPDATE applications SET discord_user_id = ? WHERE id = ?').run(profile.id, a.id);
+      if (profile.scope.includes('guilds.join') && tickets.active()) await within(tickets.joinGuild(profile.id, profile.accessToken), 8000);
+      await within(
+        require('./applications').dmApplicant(
+          { ...a, discord_user_id: profile.id },
+          { title: '🔔 Benachrichtigungen aktiv', description: 'Ihr Discord ist mit Ihrer Bewerbung verbunden. Antworten des Board of Partners und neue Stände Ihrer Bewerbung erhalten Sie ab jetzt hier als Direktnachricht.' }
+        ),
+        6000
+      );
+      return res.redirect(`/bewerbung.html?discord=verbunden#${a.access_token}`);
     }
 
     if (!req.user) return res.redirect('/login.html?discord=session');

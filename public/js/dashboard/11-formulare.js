@@ -158,6 +158,28 @@ const forms = {
     toast('Prozessticket gespeichert.');
     await reloadCase(id);
   },
+  'chat-send': async (f) => {
+    const input = f.elements.body;
+    const body = input.value.trim();
+    if (!body) return;
+    const caseId = Number(f.dataset.caseId);
+    const r = await api.post(`/api/cases/${caseId}/notes`, { body, internal: false });
+    input.value = '';
+    input.style.height = '';
+    if (r.message) chatAppend($('#chatList'), [r.message], caseBubble);
+    input.focus();
+  },
+  'app-message': async (f) => {
+    const input = f.elements.body;
+    const body = input.value.trim();
+    if (!body) return;
+    const r = await api.post(`/api/admin/applications/${f.dataset.id}/messages`, { body });
+    input.value = '';
+    input.style.height = '';
+    chatAppend($('#appChatList'), [r.message], appBubble);
+    if (!r.discordSent) toast('Gesendet – der Bewerber sieht die Nachricht auf seiner Bewerberseite.');
+    input.focus();
+  },
   'add-note': async (f) => {
     const fd = new FormData(f);
     const id = Number(f.dataset.id);
@@ -500,11 +522,6 @@ const forms = {
       location: val(fd, 'location'),
     });
     toast('Gespräch geplant – der Termin steht im Kalender.');
-    await reloadApplication(data);
-  },
-  'app-public-note': async (f) => {
-    const data = await api.patch('/api/admin/applications/' + f.dataset.id, { publicNote: val(new FormData(f), 'publicNote') });
-    toast('Nachricht an den Bewerber gespeichert.');
     await reloadApplication(data);
   },
   'app-note': async (f) => {
