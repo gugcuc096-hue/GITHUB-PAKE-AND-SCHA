@@ -114,7 +114,7 @@ const forms = {
     // Ränge stecken auch in Auswahllisten (Anwälte, Empfänger) – beim nächsten Öffnen neu laden.
     st.lawyers = [];
     st.contacts = null;
-    closeModal();
+    await modalBack();
     await refreshBehind();
   },
   'new-case': async (f) => {
@@ -217,7 +217,7 @@ const forms = {
     if (id) await api.patch('/api/board/' + id, body);
     else await api.post('/api/board', body);
     toast('Notiz gespeichert.');
-    closeModal();
+    await modalBack();
     await refreshBehind();
   },
   invoice: async () => {
@@ -243,14 +243,19 @@ const forms = {
     });
     st.draft = null;
     const inv = res.invoice;
-    await navigate('invoices');
+    // Aus einer Akte heraus erstellt: zurück in die Akte, die Bestätigung liegt darüber (Schließen → Akte)
+    const from = st.invoiceFrom;
+    if (from) {
+      await navigate(from.view);
+      await openCase(from.caseId);
+    } else await navigate('invoices');
     openModal(`
         <h2 class="modal-title">${esc(INVOICE_KIND[inv.kind])} erstellt</h2>
         <p class="modal-sub">Nummer <span class="font-mono text-gold">${esc(inv.number)}</span> über <strong>${money(inv.total)}</strong> an ${esc(inv.clientName)}.</p>
         <div class="form-actions">
           <a class="btn-gold btn-md" href="/invoice.html?id=${inv.id}" target="_blank" rel="noopener">${icon('printer', 'ico-sm')}<span>Drucken / Als PDF speichern</span></a>
           <button class="btn-ghost btn-md" data-action="close-modal">Schließen</button>
-        </div>`);
+        </div>`, { child: !!from });
   },
   coop: async (f) => {
     const fd = new FormData(f);
@@ -267,7 +272,7 @@ const forms = {
     if (f.dataset.id) await api.patch(`/api/cooperations/${f.dataset.id}`, body);
     else await api.post('/api/cooperations', body);
     toast(f.dataset.id ? 'Kooperation gespeichert.' : `Kooperation „${body.name}“ angelegt.`);
-    closeModal();
+    await modalBack();
     await refreshBehind();
   },
   'name-direct': async (f) => {
@@ -297,7 +302,7 @@ const forms = {
     const fd = new FormData(f);
     await api.post(`/api/name-requests/${f.dataset.id}/decide`, { approve: false, note: val(fd, 'note') });
     toast('Abgelehnt.');
-    closeModal();
+    await modalBack();
     await refreshBehind();
   },
   'vipreq-accept': async (f) => {
@@ -305,21 +310,21 @@ const forms = {
     const res = await api.post(`/api/memberships/requests/${f.dataset.id}/accept`, { paid: fd.get('paid') === 'on', note: val(fd, 'note') || undefined });
     toast(res.request.status === 'aktiv' ? `Angenommen und freigeschaltet · Rechnung ${res.invoice.number}.` : `Angenommen · Rechnung ${res.invoice.number} – freigeschaltet wird nach Zahlung.`);
     (res.warnings || []).forEach((w) => toast(w, 'error'));
-    closeModal();
+    await modalBack();
     await refreshBehind();
   },
   'vipreq-decline': async (f) => {
     const fd = new FormData(f);
     await api.post(`/api/memberships/requests/${f.dataset.id}/decline`, { reason: val(fd, 'reason') });
     toast('Anfrage abgelehnt.');
-    closeModal();
+    await modalBack();
     await refreshBehind();
   },
   'vip-request': async (f) => {
     const fd = new FormData(f);
     await api.post('/api/memberships/requests', { tierId: Number(f.dataset.id), message: val(fd, 'message') || undefined });
     toast('Anfrage gesendet – das Board of Partners meldet sich.');
-    closeModal();
+    await modalBack();
     await refreshBehind();
   },
   tier: async (f) => {
@@ -338,7 +343,7 @@ const forms = {
     if (f.dataset.id) await api.patch(`/api/memberships/tiers/${f.dataset.id}`, body);
     else await api.post('/api/memberships/tiers', body);
     toast(f.dataset.id ? 'Stufe gespeichert.' : `Stufe „${body.name}“ angelegt.`);
-    closeModal();
+    await modalBack();
     await refreshBehind();
   },
   'vip-grant': async (f) => {
@@ -355,7 +360,7 @@ const forms = {
     }
     toast(`${res.membership.tierName} für ${res.membership.name} vergeben${res.invoice ? ` · Rechnung ${res.invoice.number}` : ''}.`);
     (res.warnings || []).forEach((w) => toast(w, 'error'));
-    closeModal();
+    await modalBack();
     await refreshBehind();
   },
   'vip-renew': async (f) => {
@@ -363,7 +368,7 @@ const forms = {
     const res = await api.post(`/api/memberships/${f.dataset.id}/renew`, { invoice: fd.get('invoice') === 'on' });
     toast(`Verlängert bis ${fmtDateOnly(String(res.membership.expiresAt).slice(0, 10))}${res.invoice ? ` · Rechnung ${res.invoice.number}` : ''}.`);
     (res.warnings || []).forEach((w) => toast(w, 'error'));
-    closeModal();
+    await modalBack();
     await refreshBehind();
   },
   'vip-end': async (f) => {
@@ -371,7 +376,7 @@ const forms = {
     const res = await api.post(`/api/memberships/${f.dataset.id}/end`, { reason: val(fd, 'reason') || undefined });
     toast('Mitgliedschaft beendet.');
     (res.warnings || []).forEach((w) => toast(w, 'error'));
-    closeModal();
+    await modalBack();
     await refreshBehind();
   },
   team: async (f) => {
@@ -401,14 +406,14 @@ const forms = {
     st.lawyers = [];
     st.contacts = null;
     if (res.credentials) showCredentials(res.credentials, body.name);
-    else closeModal();
+    else await modalBack();
     await refreshBehind();
   },
   'team-delete': async (f) => {
     const fd = new FormData(f);
     const res = await api.del(`/api/admin/team/${f.dataset.id}${fd.get('lock') === 'on' ? '?lockAccount=1' : ''}`);
     toast(res.accountLocked ? 'Profil entfernt und Login-Konto gesperrt.' : 'Profil entfernt.');
-    closeModal();
+    await modalBack();
     await refreshBehind();
   },
   'user-new': async (f) => {
@@ -437,7 +442,7 @@ const forms = {
     if (id) await api.patch('/api/admin/fees/' + id, body);
     else await api.post('/api/admin/fees', body);
     toast('Honorarordnung aktualisiert – live auf der Website.');
-    closeModal();
+    await modalBack();
     await refreshBehind();
   },
   'settings-discord': async (f) => {
@@ -484,7 +489,7 @@ const forms = {
       await api.post('/api/duty/sessions', { userId: Number(fd.get('userId')), startedAt: iso('startedAt'), endedAt: iso('endedAt'), note: val(fd, 'note') });
     }
     toast('Dienstzeit gespeichert.');
-    closeModal();
+    await modalBack();
     await refreshBehind();
   },
   'app-interview': async (f) => {
@@ -530,7 +535,7 @@ const forms = {
     if (id) await api.patch('/api/admin/positions/' + id, body);
     else await api.post('/api/admin/positions', body);
     toast('Stelle gespeichert – live auf der Karriereseite.');
-    closeModal();
+    await modalBack();
     await refreshBehind();
   },
   'ext-link': async (f) => {
@@ -549,7 +554,7 @@ const forms = {
     if (f.elements.userId) body.userId = Number(fd.get('userId'));
     await api.post('/api/absences', body);
     toast('Abmeldung eingetragen.');
-    closeModal();
+    await modalBack();
     await afterAbsenceChange();
   },
   'tpl-save': async (f) => {
@@ -558,7 +563,7 @@ const forms = {
     if (f.dataset.id) await api.patch(`/api/contract-templates/${f.dataset.id}`, body);
     else await api.post('/api/contract-templates', body);
     toast('Vorlage gespeichert.');
-    closeModal();
+    await modalBack();
     await refreshSettingsTemplates();
   },
   'contract-header': async (f) => {

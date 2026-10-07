@@ -200,7 +200,7 @@ function summaryHtml() {
       <div id="invSumFigures">${summaryFiguresHtml()}</div>
       <p class="form-hint mb-4">Nach dem Erstellen öffnet sich die Druckansicht – dort „Als PDF speichern“ wählen.</p>
       <button type="submit" class="btn-gold btn-lg btn-block">${icon('check')}<span>Dokument erstellen</span></button>
-      <a href="#invoices" class="btn-ghost btn-md btn-block mt-2">Abbrechen</a>`;
+      ${st.invoiceFrom ? `<button type="button" class="btn-ghost btn-md btn-block mt-2" data-action="inv-back">Abbrechen</button>` : '<a href="#invoices" class="btn-ghost btn-md btn-block mt-2">Abbrechen</a>'}`;
 }
 function updateInvoiceSummary() {
   // Nicht die ganze Box ersetzen: Verlässt man ein Feld per Klick auf „Dokument erstellen“, würde der
@@ -314,7 +314,11 @@ views['invoice-new'] = {
     const hv = d.kind === 'honorarvereinbarung';
     return `
         <div class="page-head">
-          <div><a href="#invoices" class="text-sm text-dim hover:text-white inline-flex items-center gap-1">${icon('chevronLeft', 'ico-sm')}Rechnungen</a>
+          <div>${
+            st.invoiceFrom
+              ? `<button type="button" class="text-sm text-dim hover:text-white inline-flex items-center gap-1" data-action="inv-back">${icon('chevronLeft', 'ico-sm')}Akte ${esc(st.invoiceFrom.caseNumber)}</button>`
+              : `<a href="#invoices" class="text-sm text-dim hover:text-white inline-flex items-center gap-1">${icon('chevronLeft', 'ico-sm')}Rechnungen</a>`
+          }
             <h1 class="page-title mt-1">Rechnung / Honorar erstellen</h1>
             <p class="page-sub">Positionen aus der Honorarordnung übernehmen oder frei erfassen – Summen werden live berechnet.</p></div>
         </div>
