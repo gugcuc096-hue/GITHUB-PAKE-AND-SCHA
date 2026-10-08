@@ -97,6 +97,8 @@ router.post(
       linkedToAccount: !!account,
       // Discord-Ticket: ohne verknüpftes Konto kann der Mandant mit Aktenzeichen + Pin beitreten
       discordTicket: tickets.active() && discord.oauthConfigured(),
+      // … oder gleich ein Konto mit Discord anlegen (die Akte hängt dann daran)
+      discordSignup: !account && discord.oauthConfigured(),
     });
   })
 );

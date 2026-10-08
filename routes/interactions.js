@@ -24,6 +24,7 @@ const tickets = require('../tickets');
 const bot = require('../botCommands');
 const cases = require('./cases');
 const concerns = require('./concerns');
+const contractRoutes = require('./contracts');
 
 const router = express.Router();
 
@@ -89,6 +90,61 @@ function handleConcern(action, id, u, channelId) {
   if (r.error) return fail(r.error);
   if (!r.changed) return info('Keine Änderung – das Anliegen hat diesen Status bereits.');
   return status === 'erledigt' ? done(`Anliegen **${k.reference}** ist als erledigt markiert.`, 'Anliegen erledigt') : done(`Anliegen **${k.reference}** ist wieder offen.`, '🔓 Wieder geöffnet');
+}
+
+/*
+ * Vertrag in Discord lesen und unterschreiben (Knopf unter „Vertrag erstellt“ im Akten-Ticket):
+ *  ksign:read:<id>  → Vertragstext nur für die Person sichtbar (Mandant oder Kanzlei), beim Mandanten mit „Jetzt unterschreiben“
+ *  ksign:sign:<id>  → Fenster (Modal): vollständigen Namen eintippen – wie die Unterschrift im Mandantenportal
+ *  ksign:modal:<id> → Unterschrift speichern
+ * Der Mandant braucht dafür kein Website-Konto: Es zählt das Discord, mit dem er im Ticket ist.
+ */
+function handleContract(action, id, body, discordId, channelId) {
+  if (action === 'modal') {
+    const typed = body.data?.components?.[0]?.components?.[0]?.value || '';
+    const who = body.member?.user?.global_name || body.member?.user?.username || body.user?.username || '';
+    const r = contractRoutes.signViaDiscord(id, discordId, channelId, typed, who);
+    if (r.error) return fail(r.error);
+    return done(`**${r.k.template_name}** ist mit Ihrer Unterschrift (**${r.signature}**) versehen. Die Kanzlei wird benachrichtigt.`, 'Unterschrieben');
+  }
+  const r = contractRoutes.discordContract(id, discordId, channelId);
+  if (r.error) return fail(r.error);
+  if (action === 'sign') {
+    if (!r.canSign) return info(r.viewer !== 'mandant' ? 'Unterschreiben kann nur der Mandant dieser Akte.' : 'Sie haben bereits unterschrieben.');
+    return {
+      type: 9,
+      data: {
+        custom_id: `ksign:modal:${r.k.id}`,
+        title: 'Vertrag unterschreiben',
+        components: [
+          {
+            type: 1,
+            components: [{ type: 4, custom_id: 'name', style: 1, label: 'Ihr vollständiger Name (wie im Vertrag)', min_length: 3, max_length: 120, required: true, placeholder: (r.data.mandant || 'Vor- und Nachname').slice(0, 100) }],
+          },
+        ],
+      },
+    };
+  }
+  if (action !== 'read') return fail('Unbekannter Button.');
+  const view = contractRoutes.discordReadView(r.k, r.c, r.data);
+  const portal = tickets.siteBase() && (r.viewer === 'kanzlei' || r.c.client_id) ? `${tickets.siteBase()}/vertrag.html?id=${r.k.id}` : null;
+  const buttons = [
+    ...(r.canSign ? [{ type: 2, style: 3, label: 'Jetzt unterschreiben', emoji: { name: '✍️' }, custom_id: `ksign:sign:${r.k.id}` }] : []),
+    ...(portal ? [{ type: 2, style: 5, label: 'Druckansicht im Portal', url: portal }] : []),
+  ];
+  const card = (o) => bot.respond(o).data.embeds[0];
+  const embeds = view.parts.map((text, i) =>
+    card({ title: i === 0 ? `📝 ${r.k.template_name} · ${r.c.case_number}` : undefined, description: text, color: COLORS.gold, ...(i === view.parts.length - 1 ? { fields: [{ name: 'Unterschriften', value: view.status || '—' }] } : {}) })
+  );
+  return {
+    type: 4,
+    data: {
+      embeds,
+      ...(buttons.length ? { components: [{ type: 1, components: buttons }] } : {}),
+      flags: 64,
+      allowed_mentions: { parse: [] },
+    },
+  };
 }
 
 const TICKET_LABEL = { case: 'Akte', application: 'Bewerbung', concern: 'Anliegen' };
@@ -196,7 +252,7 @@ router.post('/', express.raw({ type: '*/*', limit: '100kb' }), (req, res) => {
     return res.status(400).end();
   }
   if (body.type === 1) return res.json({ type: 1 }); // PING (Prüfung durch Discord)
-  if (body.type !== 2 && body.type !== 3) return res.json(fail('Diese Aktion wird nicht unterstützt.'));
+  if (![2, 3, 5].includes(body.type)) return res.json(fail('Diese Aktion wird nicht unterstützt.'));
 
   try {
     if (String(body.guild_id || '') !== tickets.config().guildId) return res.json(fail('Dieser Server ist nicht für den Kanzlei-Bot eingerichtet.'));
@@ -213,11 +269,14 @@ router.post('/', express.raw({ type: '*/*', limit: '100kb' }), (req, res) => {
       return res.json(fail('Unbekannter Befehl.'));
     }
 
-    if (!u) return res.json(fail(`${NOT_LINKED} Danach erneut klicken.`, 'Kein verknüpftes Konto'));
     const [kind, action, idText] = String(body.data?.custom_id || '').split(':');
     const id = Number(idText);
     if (!Number.isInteger(id) || id <= 0) return res.json(fail('Unbekannter Button.'));
     const channelId = String(body.channel_id || body.channel?.id || '');
+    // Vertrag lesen/unterschreiben: auch ohne Website-Konto (der Mandant zählt über sein Discord im Ticket)
+    if (kind === 'ksign') return res.json(handleContract(action, id, body, discordId, channelId));
+    if (body.type === 5) return res.json(fail('Unbekanntes Formular.'));
+    if (!u) return res.json(fail(`${NOT_LINKED} Danach erneut klicken.`, 'Kein verknüpftes Konto'));
     if (kind === 'case') return res.json(handleCase(action, id, u, channelId));
     if (kind === 'concern') return res.json(handleConcern(action, id, u, channelId));
     if (kind === 'tdel' && ['case', 'application', 'concern'].includes(action)) return res.json(confirmDelete(action, id, u, discordId, channelId));

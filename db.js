@@ -958,6 +958,19 @@ db.exec(`
   );
 `);
 
+// Nachrichten aus dem Discord-Ticket (Übernahme in den Chat der Akte): Discord-Nachrichten-ID gegen Doppelte
+addColumn('notes', 'discord_message_id', 'TEXT');
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_discord_msg ON notes(discord_message_id) WHERE discord_message_id IS NOT NULL');
+
+// Konto per Discord angelegt: Name im Spiel (IC) wird beim ersten Login einmal abgefragt
+addColumn('users', 'needs_name', 'INTEGER NOT NULL DEFAULT 0');
+
+// Rechnung: Mandant meldet die Zahlung (mit Notiz und optional Screenshot), die Kanzlei bestätigt
+addColumn('invoices', 'payment_reported_at', 'TEXT');
+addColumn('invoices', 'payment_note', "TEXT NOT NULL DEFAULT ''");
+addColumn('invoices', 'payment_proof', "TEXT NOT NULL DEFAULT ''");
+addColumn('invoices', 'payment_reported_by', 'INTEGER');
+
 /*
  * Bewerbungen: Nachrichten zwischen Board und Bewerber (Bewerberseite mit persönlichem Link statt Statusabfrage).
  * access_token: geheimer Link /bewerbung.html#<token> · discord_user_id: per Discord-Anmeldung verbunden (Antworten

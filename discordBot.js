@@ -20,8 +20,11 @@ const tickets = require('./tickets');
 
 const { isId } = tickets;
 const botMessages = require('./botMessages');
-// GUILDS + GUILD_MEMBERS (privilegiert); GUILD_MESSAGES nur, wenn eine „alle X Nachrichten“-Automatik aktiv ist
-const intents = () => (1 << 0) | (1 << 1) | (botMessages.hasMessageJobs() ? 1 << 9 : 0);
+// GUILDS + GUILD_MEMBERS (privilegiert); GUILD_MESSAGES nur, wenn eine „alle X Nachrichten“-Automatik aktiv ist;
+// dazu MESSAGE_CONTENT (privilegiert), wenn Nachrichten aus Akten-Tickets in den Chat der Akte übernommen werden
+const MESSAGE_CONTENT = 1 << 15;
+const chatImport = () => tickets.active() && tickets.config().chatImport;
+const intents = () => (1 << 0) | (1 << 1) | (botMessages.hasMessageJobs() || chatImport() ? 1 << 9 : 0) | (chatImport() ? MESSAGE_CONTENT : 0);
 const SCAN_EVERY = 10 * 60 * 1000;
 const MAX_RULES = 25;
 const MAX_CONDITIONS = 10;
@@ -126,7 +129,7 @@ function migrateJoinRoles() {
 
 const anyRoleModule = () => rankSyncConfig().enabled || connectionsConfig().enabled || alwaysRoles().length > 0;
 const wanted = () =>
-  tickets.hasToken() && isId(guildId()) && (anyRoleModule() || welcomeConfig().enabled || joinRolesConfig().enabled || botMessages.hasMessageJobs());
+  tickets.hasToken() && isId(guildId()) && (anyRoleModule() || welcomeConfig().enabled || joinRolesConfig().enabled || botMessages.hasMessageJobs() || chatImport());
 
 /* ================================================================ Warteschlange & Fehler */
 let chain = Promise.resolve();
@@ -785,6 +788,20 @@ function onMessage(ws, raw, resuming) {
 function onClose(code) {
   gw.ws = null;
   clearTimers();
+  // Verweigerte privilegierte Intents: lag es am MESSAGE CONTENT INTENT (Übernahme aus Tickets), nur diese
+  // Funktion abschalten und ohne sie neu verbinden – Rang-Sync, Willkommen & Co. laufen weiter.
+  if (code === 4014 && gw.intents & MESSAGE_CONTENT) {
+    setSetting('discord_ticket_chat_import', '0');
+    setSetting(
+      'discord_ticket_chat_import_error',
+      'Discord verweigert den „MESSAGE CONTENT INTENT“ – die Übernahme aus den Tickets wurde ausgeschaltet. Im Discord Developer Portal → Bot → „Privileged Gateway Intents“ den „MESSAGE CONTENT INTENT“ einschalten, speichern und hier wieder einschalten.'
+    );
+    noteError(new Error('MESSAGE CONTENT INTENT verweigert – Übernahme aus den Tickets ausgeschaltet.'), 'Gateway');
+    gw.sessionId = null;
+    gw.seq = null;
+    schedule(false);
+    return;
+  }
   if (FATAL[code]) {
     gw.state = 'fehler';
     gw.error = FATAL[code];
@@ -828,7 +845,16 @@ function dispatch(t, d) {
     if (!d.user.bot) queueMember(d.user.id, d.roles || []);
   }
   else if (t === 'GUILD_MEMBER_REMOVE') enqueue(() => handleLeave(d.user), 'Abschiedsnachricht');
-  else if (t === 'MESSAGE_CREATE') botMessages.onMessage(d);
+  else if (t === 'MESSAGE_CREATE') {
+    botMessages.onMessage(d);
+    if (chatImport()) {
+      try {
+        require('./caseChat').importFromDiscord(d);
+      } catch (err) {
+        noteError(err, 'Übernahme aus dem Ticket');
+      }
+    }
+  }
 }
 
 /** Nach Einstellungsänderungen: verbinden, wenn ein Modul an ist – sonst trennen. */
@@ -890,6 +916,7 @@ function status() {
     errors: lastErrors.slice(0, 10),
     joinQueue: db.prepare("SELECT COUNT(*) AS n FROM discord_join_roles WHERE done_at IS NULL").get().n,
     messageIntent: !!(gw.intents & (1 << 9)),
+    contentIntent: !!(gw.intents & MESSAGE_CONTENT),
   };
 }
 
@@ -970,5 +997,5 @@ module.exports = {
   MAX_RULES,
   MAX_CONDITIONS,
   WELCOME_DEFAULT,
-  _test: { handleJoin, catchUpJoins, sameJoin },
+  _test: { handleJoin, catchUpJoins, sameJoin, onClose, dispatch, gw, intents },
 };

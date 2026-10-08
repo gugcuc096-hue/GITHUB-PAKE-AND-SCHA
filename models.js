@@ -423,6 +423,8 @@ function invoiceRow(i) {
     overdueDays: i.status === 'offen' ? overdueDays(i.due_date) : 0,
     remindedAt: i.reminded_at || null,
     reminderCount: i.reminder_count || 0,
+    // Mandant hat die Zahlung gemeldet (die Kanzlei bestätigt oder lehnt ab)
+    paymentReport: i.payment_reported_at ? { at: i.payment_reported_at, note: i.payment_note || '', proof: !!i.payment_proof } : null,
   };
 }
 

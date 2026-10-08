@@ -132,6 +132,25 @@ router.patch(
   })
 );
 
+/*
+ * Konto per Discord angelegt: Der Name im Spiel (IC) wird beim ersten Besuch einmal abgefragt – danach gelten die
+ * üblichen Regeln (Namensänderung per Antrag ans Board).
+ */
+router.post(
+  '/initial-name',
+  requireAuth,
+  wrap(async (req, res) => {
+    if (!req.user.needs_name) return res.status(400).json({ error: 'Ihr Name ist bereits hinterlegt – Änderungen bitte im Profil beim Board of Partners beantragen.' });
+    const data = parseBody(z.object({ displayName: z.string().trim().min(3).max(80) }), req, res);
+    if (!data) return;
+    const name = data.displayName.replace(/\s+/g, ' ');
+    if (!/\S+\s+\S+/.test(name)) return res.status(400).json({ error: 'Bitte Vor- und Nachnamen Ihres Charakters angeben (z. B. „John Doe“).' });
+    db.prepare('UPDATE users SET display_name = ?, needs_name = 0 WHERE id = ?').run(name, req.user.id);
+    logActivity(req.user, 'Name beim ersten Login festgelegt', 'user', req.user.id, `${req.user.display_name} → ${name}`);
+    res.json({ user: publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id)) });
+  })
+);
+
 // Profilbild: der Browser schneidet quadratisch zu und verkleinert, der Server prüft das Format.
 router.post(
   '/avatar',

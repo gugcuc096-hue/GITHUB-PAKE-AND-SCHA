@@ -33,6 +33,7 @@ router.patch(
         roleIds: z.string().trim().max(300).optional(),
         pingRoles: z.boolean().optional(),
         pingCooldownMin: z.number().int().min(-1).max(10080).optional(),
+        chatImport: z.boolean().optional(),
         boardCategoryId: idField.optional(),
         boardArchiveId: idField.optional(),
         boardRoleIds: z.string().trim().max(300).optional(),
@@ -57,6 +58,7 @@ router.patch(
       roleIds: 'discord_ticket_roles',
       pingRoles: 'discord_ticket_ping',
       pingCooldownMin: 'discord_ticket_ping_cooldown',
+      chatImport: 'discord_ticket_chat_import',
       boardCategoryId: 'discord_ticket_board_category',
       boardArchiveId: 'discord_ticket_board_archive',
       boardRoleIds: 'discord_ticket_board_roles',
@@ -67,6 +69,7 @@ router.patch(
       if (d[k] === undefined) continue;
       setSetting(key, typeof d[k] === 'boolean' ? (d[k] ? '1' : '0') : String(d[k]));
     }
+    if (d.chatImport) setSetting('discord_ticket_chat_import_error', ''); // neuer Versuch – alte Fehlermeldung weg
     logActivity(req.user, 'Einstellungen geändert', 'settings', null, `Discord-Tickets: ${Object.keys(d).join(', ')}`);
     require('../discordBot').refresh(); // Server-ID gilt auch für Rang-Sync & Co.
     tickets.registerCommands().catch((err) => console.warn('Discord-Befehle nicht angemeldet:', err.message)); // Slash-Befehle

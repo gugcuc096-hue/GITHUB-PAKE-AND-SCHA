@@ -52,6 +52,8 @@ const DISCORD_MSG = {
   state: ['Sicherheitsprüfung fehlgeschlagen – bitte die Verbindung erneut starten.', 'error'],
   disabled: ['Die Discord-Anbindung ist noch nicht eingerichtet.', 'error'],
   session: ['Bitte zuerst anmelden.', 'error'],
+  willkommen: ['Willkommen! Ihr Konto ist mit Discord verbunden – anmelden können Sie sich künftig mit „Mit Discord anmelden“.', 'ok'],
+  fremdeakte: ['Angemeldet. Die Akte aus Ihrer Anfrage gehört bereits zu einem anderen Konto – bitte wenden Sie sich an die Kanzlei.', 'error'],
 };
 
 const GOOGLE_MSG = {
@@ -175,6 +177,8 @@ const st = {
   events: [],
   eventCache: new Map(),
   invoices: [],
+  paymentReports: 0, // Kanzlei: offene Rechnungen, die der Mandant als bezahlt gemeldet hat (Badge „Rechnungen“)
+  toSign: [], // Mandant: Verträge/Schriftsätze, die auf seine Unterschrift warten („Was ist zu tun?“)
   board: [],
   fees: [],
   adminFees: [],
@@ -272,12 +276,18 @@ const statusBadge = (map, key) => badge(...(map[key] || [key, 'slate']));
 // Offene Rechnung nach dem Fälligkeitsdatum
 const overdueText = (i) => `${i.overdueDays} ${i.overdueDays === 1 ? 'Tag' : 'Tage'} überfällig`;
 // kurz: Tabelle („Überfällig“, Tage als Tooltip und rotes Fälligkeitsdatum), sonst mit Anzahl der Tage
+// Vom Mandanten als bezahlt gemeldet – die Kanzlei prüft den Eingang (Rechnung bleibt bis dahin offen)
+const paymentReported = (i) => i.status === 'offen' && !!i.paymentReport;
+const paymentReportTip = (i) =>
+  `Gemeldet am ${fmtDate(i.paymentReport.at)}${i.paymentReport.note ? ` – „${i.paymentReport.note}“` : ''}${i.paymentReport.proof ? ' · mit Screenshot' : ''}${i.overdueDays > 0 ? ` · ${overdueText(i)}` : ''}`;
 const invoiceBadge = (i, short = false) =>
-  i.overdueDays > 0
-    ? short
-      ? `<span class="badge badge-red" title="${esc(overdueText(i))}">Überfällig</span>`
-      : badge(overdueText(i), 'red')
-    : statusBadge(INVOICE_STATUS, i.status);
+  paymentReported(i)
+    ? `<span class="badge badge-sky" title="${esc(paymentReportTip(i))}">${isStaff() ? 'Zahlung gemeldet' : 'Gemeldet – wird geprüft'}</span>`
+    : i.overdueDays > 0
+      ? short
+        ? `<span class="badge badge-red" title="${esc(overdueText(i))}">Überfällig</span>`
+        : badge(overdueText(i), 'red')
+      : statusBadge(INVOICE_STATUS, i.status);
 const opt = (value, label, selected = false) => `<option value="${esc(value)}" ${selected ? 'selected' : ''}>${esc(label)}</option>`;
 
 /** Auswahlliste der Ränge; ein veralteter Rang bleibt sichtbar, bis ein neuer gewählt wird. */
@@ -555,6 +565,10 @@ const load = {
   /** Board: neue Mandantenstimmen (warten auf Freigabe) */
   async reviewCount() {
     if (isBoard()) st.reviewOpen = (await api.get('/api/reviews?status=neu')).open;
+  },
+  /** Kanzlei: vom Mandanten als bezahlt gemeldete Rechnungen */
+  async paymentReports() {
+    if (isStaff()) st.paymentReports = (await api.get('/api/invoices/payment-reports')).count;
   },
   /** Board: offene VIP-/Lifetime-Anfragen */
   async vipCount() {

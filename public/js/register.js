@@ -10,6 +10,17 @@
     }
     document.getElementById('loginLink').href = '/login.html' + (params.get('next') ? '?next=' + encodeURIComponent(params.get('next')) : '');
 
+    // Mit Discord registrieren (nur wenn die Discord-Anmeldung eingerichtet ist)
+    api.get('/api/discord/status').then((s) => { if (s.oauth) document.getElementById('discordBlock').classList.remove('hidden'); }).catch(() => {});
+    const DISCORD = {
+        denied: 'Die Registrierung über Discord wurde abgebrochen.',
+        error: 'Die Registrierung über Discord ist fehlgeschlagen. Bitte erneut versuchen.',
+        state: 'Sicherheitsprüfung fehlgeschlagen – bitte erneut versuchen.',
+        disabled: 'Die Discord-Anmeldung ist noch nicht eingerichtet.',
+        locked: 'Dieser Zugang wurde gesperrt. Bitte wenden Sie sich an das Board of Partners.',
+    };
+    if (DISCORD[params.get('discord')]) document.getElementById('formError').textContent = DISCORD[params.get('discord')];
+
     // E-Mail-Vorschlag aus dem Namen („Max Müller“ → „max.mueller“), bis selbst etwas eingetragen wird
     const emailInput = form.elements.email;
     emailInput.addEventListener('input', () => { emailInput.dataset.own = '1'; });

@@ -62,6 +62,7 @@ const forms = {
       roleIds: val(fd, 'roleIds'),
       pingRoles: fd.has('pingRoles'),
       pingCooldownMin: Number(fd.get('pingCooldownMin')),
+      chatImport: fd.has('chatImport'),
       boardCategoryId: val(fd, 'boardCategoryId'),
       boardArchiveId: val(fd, 'boardArchiveId'),
       boardRoleIds: val(fd, 'boardRoleIds'),
@@ -157,6 +158,36 @@ const forms = {
     await api.put(`/api/cases/${id}/process-ticket`, { url: val(fd, 'url'), label: val(fd, 'label') });
     toast('Prozessticket gespeichert.');
     await reloadCase(id);
+  },
+  'inv-pay-report': async (f) => {
+    const id = Number(f.dataset.id);
+    const file = f.elements.proof.files[0];
+    await api.post(`/api/invoices/${id}/payment-report`, { note: val(new FormData(f), 'note') });
+    let proofFailed = false;
+    if (file) {
+      try {
+        await api.upload(`/api/invoices/${id}/payment-proof`, await resizeImage(file, { max: 1600 }));
+      } catch {
+        proofFailed = true; // Meldung ist trotzdem angekommen – Screenshot lässt sich nachreichen
+      }
+    }
+    await returnOrClose();
+    if (proofFailed) toast('Zahlung gemeldet – der Screenshot konnte nicht hochgeladen werden. Bitte über „Screenshot nachreichen“ erneut versuchen.', 'error');
+    else toast('Danke! Die Zahlung ist gemeldet – die Kanzlei prüft den Eingang und bestätigt ihn.');
+  },
+  'inv-pay-reject': async (f) => {
+    await api.post(`/api/invoices/${f.dataset.id}/payment-reject`, { reason: val(new FormData(f), 'reason') });
+    await returnOrClose();
+    load.paymentReports().then(renderNav).catch(() => {});
+    toast('Meldung zurückgewiesen – der Mandant wird informiert.');
+  },
+  'initial-name': async (f) => {
+    const r = await api.post('/api/auth/initial-name', { displayName: val(new FormData(f), 'displayName') });
+    st.user = r.user;
+    renderUser();
+    closeModal();
+    toast(`Danke, ${r.user.displayName}! Ihr Konto ist eingerichtet.`);
+    if (st.view === 'overview' || st.view === 'cases') refreshBehind();
   },
   'chat-send': async (f) => {
     const input = f.elements.body;

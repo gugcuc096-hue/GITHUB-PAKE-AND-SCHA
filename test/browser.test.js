@@ -68,8 +68,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
     return { ctx, page, problems, settle };
   }
   const overflow = (page) => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-  async function login(page, email) {
-    await page.goto(server.base + '/login.html');
+  async function login(page, email, base = server.base) {
+    await page.goto(base + '/login.html');
     await page.fill('#email', email);
     await page.fill('#password', PASSWORD);
     await page.click('button[type=submit]');
@@ -421,6 +421,167 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.waitForFunction(() => /fertig/.test(document.querySelector('#dmRuns')?.textContent || ''), null, { timeout: 10000 });
         assert.match(await page.textContent('#dmRuns'), /2\/2 · 2 zugestellt · 2 Konto\/Konten angelegt/);
         assert.ok((await adm.get('/api/admin/users')).json.users.some((u) => u.displayName === 'John Doe' && u.email === 'john.doe@pake-scha.ls'));
+        assert.deepEqual(problems, []);
+        await ctx.close();
+      } finally {
+        await dsrv.stop();
+      }
+    });
+  }
+
+  for (const [label, device] of [['PC', DESKTOP], ['Handy', PHONE]]) {
+    it(`Mandantenportal am ${label}: „Was ist zu tun?“, Zahlung melden und bestätigen`, async () => {
+      // Eigener Server – die Login-Sperre (20 Anmeldungen je 15 Minuten) zählt je Server
+      const psrv = await startServer();
+      try {
+        const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+        const adm = client(psrv.base);
+        const me = await adm.login(TEAM.admin);
+        // Mandant mit Akte, offener Rechnung, Vertrag zur Unterschrift und neuer Nachricht der Kanzlei
+        const email = `todo.${label.toLowerCase()}`;
+        const mandant = client(psrv.base);
+        assert.equal((await mandant.post('/api/auth/register', { displayName: `Toni ${label}`, email, password: PASSWORD })).status, 201);
+        const kase = (await adm.post('/api/cases', { title: `To-do-Akte ${label}`, area: 'zivilrecht', clientEmail: email, lawyerId: me.id })).json.case;
+        const inv = (await adm.post('/api/invoices', { caseId: kase.id, items: [{ description: 'Beratung', quantity: 1, unitPrice: 9000 }] })).json.invoice;
+        const { templates } = (await adm.get('/api/contract-templates')).json;
+        const defaults = (await adm.get(`/api/cases/${kase.id}/contracts/defaults`)).json;
+        const k = (await adm.post(`/api/cases/${kase.id}/contracts`, { templateId: templates.find((t) => t.key === 'mandatsvertrag').id, lawyerId: me.id, data: { ...defaults.data, mandant: `Toni ${label}` } })).json.contract;
+        await adm.post(`/api/cases/${kase.id}/notes`, { body: `Bitte den Vertrag unterschreiben (${label}).` });
+
+        const { ctx, page, problems, settle } = await open(device);
+        await login(page, `${email}@pake-scha.ls`, psrv.base);
+        await settle();
+        const titles = () => page.$$eval('#content section.todo .todo-title', (els) => els.map((e) => e.textContent));
+        assert.deepEqual(await titles(), [`${k.templateName} unterschreiben`, `Rechnung ${inv.number} über 9.000 $ begleichen`, 'Neue Nachricht von Ihrer Kanzlei']);
+        assert.equal(await page.getAttribute(`#content section.todo a[href="/vertrag.html?id=${k.id}"]`, 'target'), '_blank', 'Vertrag öffnet sich zum Unterschreiben');
+        const top = await page.$eval('#content section.todo', (el) => el.getBoundingClientRect().top);
+        const kpis = await page.$eval('#content .kpi-grid', (el) => el.getBoundingClientRect().top);
+        assert.ok(top < kpis, 'Karte steht ganz oben (vor den Kennzahlen)');
+        if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Übersicht passt aufs Handy');
+
+        // Zahlung melden – mit Hinweis und Screenshot
+        await page.click(`#content section.todo [data-action="inv-pay-report"][data-id="${inv.id}"]`);
+        await page.waitForSelector('#modalBody form[data-form="inv-pay-report"]');
+        assert.match(await page.textContent('#modalBody .pay-info'), /Maze Bank/);
+        await page.fill('#payNote', `Überwiesen heute (${label})`);
+        await page.setInputFiles('#modalBody input[name="proof"]', { name: 'ueberweisung.png', mimeType: 'image/png', buffer: PNG });
+        assert.equal(await page.textContent('#payProofName'), 'ueberweisung.png');
+        if (device === PHONE) assert.ok((await page.$eval('#modalBody', (b) => b.scrollWidth - b.clientWidth)) <= 1, 'Fenster passt aufs Handy');
+        await page.click('#modalBody form[data-form="inv-pay-report"] button[type=submit]');
+        await page.waitForFunction(() => !document.querySelector('#modal.open'));
+        await settle();
+        assert.deepEqual(await titles(), [`${k.templateName} unterschreiben`, 'Neue Nachricht von Ihrer Kanzlei'], 'gemeldete Rechnung ist erledigt');
+        const report = (await adm.get(`/api/invoices/${inv.id}`)).json.invoice.paymentReport;
+        assert.equal(report.note, `Überwiesen heute (${label})`);
+        assert.equal(report.proof, true, 'Screenshot hochgeladen');
+
+        // Neue Nachricht: öffnet die Akte direkt beim Chat; danach ist auch dieser Punkt erledigt
+        await page.click(`#content section.todo [data-action="open-case-chat"][data-id="${kase.id}"]`);
+        await page.waitForSelector('#chatList .chat-msg.in');
+        const chatTop = await page.$eval('#secChat', (el) => el.getBoundingClientRect().top);
+        assert.ok(chatTop < 300, `Nachrichten sind im Blick (${Math.round(chatTop)}px)`);
+        await page.click('.modal-close');
+        await settle();
+        assert.deepEqual(await titles(), [`${k.templateName} unterschreiben`]);
+        assert.deepEqual(problems, []);
+        await ctx.close();
+
+        // Kanzlei: Badge an „Rechnungen“, Filter „Zahlung gemeldet“, Nachweis ansehen, Eingang bestätigen
+        const staff = await open(device);
+        await login(staff.page, TEAM.admin, psrv.base);
+        if (device === DESKTOP) assert.equal(await staff.page.textContent('#nav a[href="#invoices"] .nav-count'), '1');
+        await staff.page.evaluate(() => (location.hash = '#invoices'));
+        await staff.settle();
+        await staff.page.click('[data-action="inv-filter"][data-value="gemeldet"]');
+        await staff.settle();
+        const row = staff.page.locator('tbody tr', { has: staff.page.locator(`text=${inv.number}`) });
+        assert.match(await row.textContent(), /Zahlung gemeldet/);
+        assert.match(await row.textContent(), new RegExp(`Überwiesen heute \\(${label}\\)`));
+        assert.equal(await row.locator('a[href$="/payment-proof"]').getAttribute('target'), '_blank');
+        if (device === PHONE) assert.ok((await overflow(staff.page)) <= 1, 'Rechnungen passen aufs Handy');
+        await row.locator('[data-action="inv-status"][data-status="bezahlt"]').click();
+        await staff.page.waitForFunction(() => /Zahlungseingang bestätigt/.test(document.body.textContent));
+        await staff.settle();
+        assert.equal((await adm.get(`/api/invoices/${inv.id}`)).json.invoice.status, 'bezahlt');
+        if (device === DESKTOP) assert.equal(await staff.page.$('#nav a[href="#invoices"] .nav-count'), null, 'Badge weg');
+        assert.deepEqual(staff.problems, []);
+        await staff.ctx.close();
+      } finally {
+        await psrv.stop();
+      }
+    });
+  }
+
+  for (const [label, device] of [['PC', DESKTOP], ['Handy', PHONE]]) {
+    it(`Discord-Konto am ${label}: mit einem Klick registrieren, Name im Spiel, Konto direkt nach der Mandatsanfrage`, async () => {
+      // Eigener Server mit Discord-Anmeldung gegen die nachgebaute Schnittstelle; die Discord-Seite selbst überspringt der Browser
+      const dsrv = await startServer({
+        env: { DISCORD_BOT_TOKEN: 'test-token', DISCORD_CLIENT_ID: '900000000000000003', DISCORD_CLIENT_SECRET: 'test-secret' },
+        preload: [require.resolve('./discordStub')],
+      });
+      try {
+        const { ctx, page, problems, settle } = await open(device);
+        let discordId = '';
+        await ctx.route(/^https:\/\/discord\.com\/oauth2\/authorize/, (route) => {
+          const state = new URL(route.request().url()).searchParams.get('state');
+          route.fulfill({ status: 302, headers: { location: `${dsrv.base}/api/discord/callback?code=user-${discordId}&state=${state}` } });
+        });
+        const suffix = device === PHONE ? '2' : '1';
+
+        // 1) Registrieren mit Discord → Dashboard fragt einmal nach dem Namen im Spiel
+        discordId = `90000000000000016${suffix}`;
+        await page.goto(dsrv.base + '/register.html');
+        await page.waitForSelector('#discordBlock:not(.hidden) a[href="/api/discord/register"]');
+        if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Registrierung passt aufs Handy');
+        await page.click('#discordBlock a[href="/api/discord/register"]');
+        await page.waitForURL(/dashboard\.html/);
+        await page.waitForSelector('#modalBody form[data-form="initial-name"]');
+        await page.fill('#inName', 'Tony');
+        await page.click('#modalBody form[data-form="initial-name"] button[type=submit]');
+        await page.waitForFunction(() => /Vor- und Nachnamen/.test(document.body.textContent));
+        await page.fill('#inName', 'Tony Montana');
+        await page.click('#modalBody form[data-form="initial-name"] button[type=submit]');
+        await page.waitForFunction(() => !document.querySelector('#modal.open'));
+        await settle();
+        assert.match(await page.textContent('.page-title'), /Tony Montana/);
+        await page.reload();
+        await page.waitForSelector('#nav a.nav-item', { state: 'attached' });
+        await settle();
+        assert.equal(await page.$('#modalBody form[data-form="initial-name"]'), null, 'nur einmal gefragt');
+
+        // 2) Abmelden, „Mit Discord anmelden“ mit einem neuen Discord → Login-Seite fragt nach, bevor ein Konto entsteht
+        await ctx.clearCookies();
+        discordId = `90000000000000017${suffix}`;
+        await page.goto(dsrv.base + '/login.html');
+        await page.waitForSelector('#discordBlock:not(.hidden)');
+        await page.click('#discordBlock a[href="/api/discord/login"]');
+        await page.waitForURL(/login\.html\?discord=neu/);
+        await page.waitForSelector('#discordSignup:not(.hidden)');
+        assert.match(await page.textContent('#discordSignupName'), /Neuer Nutzer/);
+        if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Login-Seite passt aufs Handy');
+        await page.click('#discordSignupBtn');
+        await page.waitForURL(/dashboard\.html/);
+        await page.waitForSelector('#modalBody form[data-form="initial-name"]');
+
+        // 3) Mandatsanfrage auf der Startseite → „Konto mit Discord anlegen“ → Akte öffnet sich im Portal
+        await ctx.clearCookies();
+        discordId = `90000000000000018${suffix}`;
+        await page.goto(dsrv.base + '/');
+        await page.locator('[data-act="ticket"]').nth(1).click();
+        await page.waitForFunction(() => !document.getElementById('ticketModal').classList.contains('opacity-0'));
+        await page.fill('#tkName', `Lena Berg ${label}`);
+        await page.selectOption('#tkArea', 'zivilrecht');
+        await page.fill('#tkDesc', 'Mein Fahrzeug wurde am Pier beschädigt.');
+        await page.click('#ticketForm button[type=submit]');
+        await page.waitForSelector('#ticketAccount');
+        const caseNumber = (await page.textContent('#ticketSuccess .font-mono')).trim();
+        if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Erfolgsanzeige passt aufs Handy');
+        await page.click('#ticketAccount');
+        await page.waitForURL(/dashboard\.html/);
+        await page.waitForSelector('#modalBody #chatList', { timeout: 10000 });
+        assert.match(await page.textContent('#modalBody'), new RegExp(caseNumber));
+        assert.equal(await page.$('#modalBody form[data-form="initial-name"]'), null, 'Name kommt aus der Mandatsanfrage');
+        if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Akte passt aufs Handy');
         assert.deepEqual(problems, []);
         await ctx.close();
       } finally {

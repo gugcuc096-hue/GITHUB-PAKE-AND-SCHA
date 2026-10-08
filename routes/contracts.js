@@ -23,6 +23,7 @@ const contracts = require('../contracts');
 const fivenet = require('../fivenet');
 const coop = require('../cooperations');
 const memberships = require('../memberships');
+const contractDiscord = require('../contractDiscord');
 
 const header = () => getSetting('contract_header', contracts.DEFAULT_HEADER);
 const AREA_LABEL = { strafrecht: 'Strafrecht', zivilrecht: 'Zivilrecht', verfassungsrecht: 'Verfassungsrecht', vertragsrecht: 'Vertragsrecht', sonstiges: 'Sonstiges' };
@@ -513,6 +514,7 @@ caseRouter.post(
             ? `Das Dokument liegt im Mandantenportal unter der Akte ${c.case_number} bereit – bitte prüfen und unterschreiben.`
             : `Das Dokument ist im Mandantenportal unter der Akte ${c.case_number} abrufbar.`,
           mention: needs.client ? 'client' : undefined,
+          components: needs.client ? signButtons(id) : undefined,
           by: req.user.display_name,
           byDiscordId: req.user.discord_id,
         });
@@ -521,11 +523,12 @@ caseRouter.post(
     }
     tickets.post(c.id, {
       title: `📝 ${t.name} erstellt`,
-      description: `Der Vertrag liegt im Mandantenportal unter der Akte ${c.case_number} bereit – bitte prüfen und unterschreiben.`,
+      description: `Der Vertrag liegt im Mandantenportal unter der Akte ${c.case_number} bereit – bitte prüfen und unterschreiben.${signButtons(id) ? ' Oder gleich hier: **„Lesen & unterschreiben“**.' : ''}`,
       fields: [{ name: names.length > 1 ? 'Unterzeichnende Anwälte' : 'Unterzeichnender Anwalt', value: names.join('\n') }],
       // Einmal pingen: der Mandant (soll unterschreiben) und die übrigen unterzeichnenden Anwälte
       mention: 'client',
       mentionIds: discordIdsOf([{ userId: lawyer.id }, ...co.list.map((x) => ({ userId: x.lawyer.id }))]),
+      components: signButtons(id),
       by: req.user.display_name,
       byDiscordId: req.user.discord_id,
     });
@@ -567,6 +570,23 @@ function contractVisible(cid, u) {
   const c = k && getCase(k.case_id);
   return !!(k && c && caseAccess(c, u).canView && !(k.internal && !isStaff(u)));
 }
+
+/** Mandant: Verträge und Schriftsätze, die auf seine Unterschrift warten (Karte „Was ist zu tun?“ im Portal). */
+router.get('/to-sign', (req, res) => {
+  const u = req.user;
+  if (u.role !== 'mandant') return res.json({ contracts: [] });
+  const rows = db
+    .prepare(
+      `SELECT k.id, k.case_id, k.template_name, k.kind, k.body, k.created_at, c.case_number, c.title AS case_title
+       FROM case_contracts k JOIN cases c ON c.id = k.case_id
+       WHERE c.client_id = ? AND k.internal = 0 AND k.client_signed_at IS NULL ORDER BY k.created_at, k.id`
+    )
+    .all(u.id)
+    .filter((k) => needsOf(k).client);
+  res.json({
+    contracts: rows.map((k) => ({ id: k.id, caseId: k.case_id, caseNumber: k.case_number, caseTitle: k.case_title, templateName: k.template_name, kind: k.kind || 'vertrag', createdAt: k.created_at })),
+  });
+});
 
 router.get('/:cid', (req, res) => {
   const { k, c, can } = loadContract(req, res);
@@ -663,6 +683,108 @@ router.delete(
 const normName = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
 
 /**
+ * Nach einer Unterschrift (Website oder Discord): Verlauf, Benachrichtigung, Ticket, Google Doc.
+ * who: 'anwalt' | 'mandant' · u: wer unterschrieben hat (beim Mandanten über Discord ggf. ohne Website-Konto:
+ * { id: null, display_name, role: 'mandant', discord_id }). Liefert den aktualisierten Vertrag.
+ */
+function afterSign(k, c, who, u, note) {
+  const updated = db.prepare(`${CONTRACT_SELECT} WHERE k.id = ?`).get(k.id);
+  const full = fullySigned(updated);
+  tx(() => {
+    addSystemNote(c.id, u && u.id ? u : null, note + (full ? ` ${k.kind === 'schriftsatz' ? 'Das Dokument' : 'Der Vertrag'} ist vollständig unterschrieben.` : ''), !!updated.internal);
+    db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(c.id);
+  });
+  const needs = needsOf(updated);
+  const lawyers = needs.lawyer ? allLawyers(updated) : [];
+  const openLawyers = lawyers.filter((l) => !l.signedAt).map((l) => l.name);
+  // Wenige Pings: Unterschreibt ein Anwalt, wird niemand erwähnt (der Mandant wurde beim Erstellen gepingt).
+  // Unterschreibt der Mandant, werden nur die Anwälte erwähnt, deren Unterschrift noch fehlt.
+  const pingIds = who === 'anwalt' ? [] : discordIdsOf(lawyers.filter((l) => !l.signedAt));
+  notifySigned(c, updated, who === 'anwalt' ? 'Anwalt' : 'Mandanten', u, pingIds);
+  if (!updated.internal) tickets.post(c.id, {
+    title: full ? `✅ ${k.template_name} vollständig unterschrieben` : `✍️ ${k.template_name} vom ${who === 'anwalt' ? 'Anwalt' : 'Mandanten'} unterschrieben`,
+    description: full
+      ? k.kind === 'schriftsatz'
+        ? 'Alle nötigen Unterschriften liegen vor.'
+        : `${lawyers.length > 1 ? 'Alle' : 'Beide'} Unterschriften liegen vor – der Vertrag ist wirksam.`
+      : `Jetzt fehlt noch die Unterschrift ${[
+          ...(openLawyers.length ? [`${openLawyers.length > 1 ? 'der Anwälte' : 'von'} ${openLawyers.join(', ')}`] : []),
+          ...(updated.client_signed_at || !needs.client ? [] : [`des Mandanten (im Mandantenportal${signButtons(k.id) ? ' oder hier im Ticket über „Lesen & unterschreiben“' : ''})`]),
+        ].join(' und ')}.`,
+    color: full ? tickets.COLORS.green : tickets.COLORS.gold,
+    fields: [
+      ...(lawyers.length ? [{ name: lawyers.length > 1 ? 'Anwälte' : 'Anwalt', value: lawyers.map((l) => (l.signedAt ? `✅ ${l.signature}` : `⏳ ${l.name} – offen`)).join('\n') }] : []),
+      ...(needs.client
+        ? [{ name: 'Mandant', value: updated.client_signed_at ? `✅ ${updated.client_signature}${updated.client_signed_via === 'kanzlei' ? ' (im Spiel)' : updated.client_signed_via === 'discord' ? ' (über Discord)' : ''}` : '⏳ offen' }]
+        : []),
+    ],
+    mentionIds: pingIds,
+    by: u.display_name,
+    byDiscordId: u.discord_id,
+  });
+  require('../googleDocs').touch('contract', k.id); // Google Doc zeigt die Unterschrift automatisch
+  return updated;
+}
+
+/* ---------------------------------------------------------------- Unterschrift des Mandanten in Discord */
+/** Knöpfe unter der Ticket-Nachricht „Vertrag erstellt“ (nur mit Interactions-Endpunkt, sonst kämen Klicks nie an). */
+function signButtons(kid) {
+  if (!tickets.panelInteractive()) return undefined;
+  return [{ type: 1, components: [{ type: 2, style: 1, label: 'Lesen & unterschreiben', emoji: { name: '✍️' }, custom_id: `ksign:read:${kid}` }] }];
+}
+
+/**
+ * Wer klickt: der Mandant der Akte (verknüpftes Discord des Mandantenkontos oder Discord aus „Ticket beitreten“),
+ * ein Anwalt/Board-Mitglied mit Zugriff (darf nur lesen) – sonst niemand.
+ */
+function discordViewer(c, discordId) {
+  if (tickets.clientDiscordIds(c).includes(discordId)) return 'mandant';
+  const u = db.prepare("SELECT * FROM users WHERE discord_id = ? AND active = 1 AND role IN ('anwalt','admin')").get(discordId);
+  return u && caseAccess(c, u).canView ? 'kanzlei' : null;
+}
+
+/** Vertrag zum Lesen bzw. Unterschreiben aus einem Discord-Klick laden (gleiche Regeln wie im Portal). */
+function discordContract(kid, discordId, channelId) {
+  const k = db.prepare(`${CONTRACT_SELECT} WHERE k.id = ?`).get(kid);
+  const c = k && getCase(k.case_id);
+  if (!k || !c || k.internal) return { error: 'Dieses Dokument gibt es nicht (mehr).' };
+  if (c.discord_channel_id !== channelId) return { error: 'Dieser Knopf gehört nicht zu diesem Ticket.' };
+  const viewer = discordViewer(c, discordId);
+  if (!viewer) return { error: 'Das Dokument sehen nur der Mandant dieser Akte und die Kanzlei.' };
+  const needs = needsOf(k);
+  return { k, c, viewer, data: parseData(k.data), canSign: viewer === 'mandant' && needs.client && !k.client_signed_at };
+}
+
+/** Text und Unterschriften für die (nur für die Person sichtbare) Antwort in Discord. */
+function discordReadView(k, c, data) {
+  const { parts, clipped } = contractDiscord.chunks(contractDiscord.toMarkdown(k.body, data, c));
+  const needs = needsOf(k);
+  const lawyers = needs.lawyer ? allLawyers(k) : [];
+  const status = [
+    ...lawyers.map((l) => `${l.signedAt ? '✅' : '⏳'} ${l.signedAt ? l.signature : l.name} (Anwalt)`),
+    ...(needs.client ? [`${k.client_signed_at ? '✅' : '⏳'} ${k.client_signed_at ? k.client_signature : data.mandant || 'Mandant'} (Mandant)`] : []),
+  ].join('\n');
+  return { parts: clipped ? [...parts.slice(0, -1), `${parts[parts.length - 1]}\n\n… *(gekürzt – die vollständige Fassung zeigt die Druckansicht im Mandantenportal)*`] : parts, status };
+}
+
+/** Unterschrift des Mandanten über Discord (Name eingetippt wie im Portal). */
+function signViaDiscord(kid, discordId, channelId, typedName, discordName) {
+  const r = discordContract(kid, discordId, channelId);
+  if (r.error) return { error: r.error };
+  if (r.viewer !== 'mandant') return { error: 'Unterschreiben kann nur der Mandant dieser Akte.' };
+  if (!r.canSign) return { error: r.k.client_signed_at ? 'Sie haben bereits unterschrieben.' : 'Für dieses Dokument ist keine Unterschrift des Mandanten vorgesehen.' };
+  const typed = String(typedName || '').replace(/\s+/g, ' ').trim();
+  if (typed.length < 3) return { error: 'Bitte zum Unterschreiben Ihren vollständigen Namen eintippen.' };
+  if (r.data.mandant && normName(typed) !== normName(r.data.mandant)) return { error: `Der eingetippte Name stimmt nicht mit dem Namen im Vertrag überein („${r.data.mandant}“).` };
+  const signature = r.data.mandant || typed;
+  db.prepare("UPDATE case_contracts SET client_signature = ?, client_signed_at = datetime('now'), client_signed_via = 'discord', updated_at = datetime('now') WHERE id = ?").run(signature, r.k.id);
+  const account = r.c.client_id ? db.prepare('SELECT * FROM users WHERE id = ?').get(r.c.client_id) : null;
+  const actor = account && account.discord_id === discordId ? account : { id: null, display_name: signature, role: 'mandant', discord_id: discordId };
+  afterSign(r.k, r.c, 'mandant', actor, `${r.k.template_name} vom Mandanten über Discord unterschrieben (${signature}${discordName ? `, Discord: ${discordName}` : ''}).`);
+  return { ok: true, k: r.k, signature };
+}
+
+/**
  * as = 'anwalt'   → ein im Vertrag genannter Anwalt unterschreibt (der erste oder ein weiterer)
  * as = 'mandant'  → der Mandant unterschreibt im Portal (Name eintippen)
  * as = 'erfassen' → die Kanzlei hält fest, dass der Mandant im Spiel unterschrieben hat
@@ -714,39 +836,7 @@ router.post(
       ).run(name, u.display_name, k.id);
       note = `${k.template_name}: Unterschrift des Mandanten (im Spiel) erfasst von ${u.display_name}.`;
     }
-    const updated = db.prepare(`${CONTRACT_SELECT} WHERE k.id = ?`).get(k.id);
-    const full = fullySigned(updated);
-    tx(() => {
-      addSystemNote(c.id, u, note + (full ? ` ${k.kind === 'schriftsatz' ? 'Das Dokument' : 'Der Vertrag'} ist vollständig unterschrieben.` : ''), !!updated.internal);
-      db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(c.id);
-    });
-    const needs = needsOf(updated);
-    const lawyers = needs.lawyer ? allLawyers(updated) : [];
-    const openLawyers = lawyers.filter((l) => !l.signedAt).map((l) => l.name);
-    // Wenige Pings: Unterschreibt ein Anwalt, wird niemand erwähnt (der Mandant wurde beim Erstellen gepingt).
-    // Unterschreibt der Mandant, werden nur die Anwälte erwähnt, deren Unterschrift noch fehlt.
-    const pingIds = d.as === 'anwalt' ? [] : discordIdsOf(lawyers.filter((l) => !l.signedAt));
-    notifySigned(c, updated, d.as === 'anwalt' ? 'Anwalt' : 'Mandanten', u, pingIds);
-    if (!updated.internal) tickets.post(c.id, {
-      title: full ? `✅ ${k.template_name} vollständig unterschrieben` : `✍️ ${k.template_name} vom ${d.as === 'anwalt' ? 'Anwalt' : 'Mandanten'} unterschrieben`,
-      description: full
-        ? k.kind === 'schriftsatz'
-          ? 'Alle nötigen Unterschriften liegen vor.'
-          : `${lawyers.length > 1 ? 'Alle' : 'Beide'} Unterschriften liegen vor – der Vertrag ist wirksam.`
-        : `Jetzt fehlt noch die Unterschrift ${[
-            ...(openLawyers.length ? [`${openLawyers.length > 1 ? 'der Anwälte' : 'von'} ${openLawyers.join(', ')}`] : []),
-            ...(updated.client_signed_at || !needs.client ? [] : ['des Mandanten (im Mandantenportal)']),
-          ].join(' und ')}.`,
-      color: full ? tickets.COLORS.green : tickets.COLORS.gold,
-      fields: [
-        ...(lawyers.length ? [{ name: lawyers.length > 1 ? 'Anwälte' : 'Anwalt', value: lawyers.map((l) => (l.signedAt ? `✅ ${l.signature}` : `⏳ ${l.name} – offen`)).join('\n') }] : []),
-        ...(needs.client ? [{ name: 'Mandant', value: updated.client_signed_at ? `✅ ${updated.client_signature}${updated.client_signed_via === 'kanzlei' ? ' (im Spiel)' : ''}` : '⏳ offen' }] : []),
-      ],
-      mentionIds: pingIds,
-      by: u.display_name,
-      byDiscordId: u.discord_id,
-    });
-    require('../googleDocs').touch('contract', k.id); // Google Doc zeigt die Unterschrift automatisch
+    const updated = afterSign(k, c, d.as === 'anwalt' ? 'anwalt' : 'mandant', u, note);
     res.json({ contract: contractRow(updated, { withBody: true }), can: permissions(updated, c, u) });
   })
 );
@@ -772,4 +862,4 @@ router.post(
   })
 );
 
-module.exports = { router, caseRouter, templatesRouter, contractsForCase, contractDocData, contractVisible };
+module.exports = { router, caseRouter, templatesRouter, contractsForCase, contractDocData, contractVisible, discordContract, discordReadView, signViaDiscord };

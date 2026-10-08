@@ -54,6 +54,7 @@ views.profile = {
           </section>
           <form data-form="password" class="panel panel-pad form-grid" ${u.mustChangePassword ? 'style="border-color:rgba(245,158,11,.5)"' : ''}>
             <h2 class="panel-title">Passwort ändern</h2>
+            ${u.viaDiscord ? '<p class="form-hint">Ihr Konto wurde mit Discord angelegt – Sie melden sich mit „Mit Discord anmelden“ an und brauchen kein Passwort. Möchten Sie sich auch mit E-Mail und Passwort anmelden, schreiben Sie auf dem Kanzlei-Discord <strong>/passwort</strong>: Der Bot schickt Ihnen ein Passwort per Direktnachricht, das Sie hier ändern können.</p>' : ''}
             <div><label class="label" for="pwOld">Aktuelles Passwort</label><input id="pwOld" name="currentPassword" type="password" autocomplete="current-password" required class="field"></div>
             <div><label class="label" for="pwNew">Neues Passwort (mind. 10 Zeichen)</label><input id="pwNew" name="newPassword" type="password" autocomplete="new-password" minlength="10" required class="field"></div>
             <div><label class="label" for="pwNew2">Neues Passwort wiederholen</label><input id="pwNew2" name="newPassword2" type="password" autocomplete="new-password" required class="field"></div>
@@ -1503,6 +1504,12 @@ async function handleUpload(input) {
     st.fnPending = { urls: [], blobs: files.slice(0, FN_MAX_IMAGES) };
     reportImport(await importPendingImages(caseId, d));
     await reloadCase(caseId);
+  } else if (kind === 'pay-proof') {
+    // Screenshot zur gemeldeten Zahlung nachreichen
+    toast('Screenshot wird hochgeladen …');
+    await api.upload(`/api/invoices/${input.dataset.id}/payment-proof`, await resizeImage(files[0], { max: 1600 }));
+    toast('Screenshot gespeichert – die Kanzlei sieht ihn bei der Zahlungsmeldung.');
+    await afterInvoiceChange(input);
   } else if (kind === 'evidence') {
     const caseId = Number(input.dataset.caseId);
     const caption = ($('#attCaption')?.value || '').trim();

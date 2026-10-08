@@ -104,6 +104,9 @@ function publicUser(u) {
     board: u.role === 'admin' || (u.role === 'anwalt' && ['Founding Partner', 'Equity Partner', 'Partner'].includes(u.rank)),
     active: !!u.active,
     mustChangePassword: !!u.must_change_password,
+    // Konto per Discord angelegt: Name im Spiel noch einmal abfragen
+    needsName: !!u.needs_name,
+    viaDiscord: u.created_via === 'discord',
     // Login-E-Mail wurde auf @pake-scha.ls umgestellt → einmal Hinweis mit der alten Adresse
     emailNotice: u.email_notice ? { oldEmail: u.old_email || null } : null,
     avatarUrl: userAvatarUrl(u),

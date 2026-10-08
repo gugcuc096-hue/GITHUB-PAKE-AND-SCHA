@@ -74,6 +74,9 @@ function config() {
       .filter(isId),
     pingRoles: getSetting('discord_ticket_ping', '1') === '1',
     pingCooldownMin: pingCooldown(),
+    // Nachrichten aus dem Akten-Ticket in den Chat der Akte übernehmen (braucht den „MESSAGE CONTENT INTENT“)
+    chatImport: getSetting('discord_ticket_chat_import', '0') === '1',
+    chatImportError: getSetting('discord_ticket_chat_import_error', '') || null,
   };
 }
 
@@ -684,6 +687,7 @@ function post(caseId, msg) {
     const payload = {
       content: unique.length ? unique.map((id) => `<@${id}>`).join(' ') : undefined,
       embeds: [embed({ ...msg, footer: msg.by ? `${msg.by} · Pake & Scha Legal Consulting` : undefined })],
+      ...(msg.components ? { components: msg.components } : {}), // z. B. „Lesen & unterschreiben“ beim Vertrag
       allowed_mentions: { parse: [], users: unique },
     };
     try {
@@ -1400,6 +1404,8 @@ module.exports = {
   joinGuild,
   ticketInfo,
   clientDiscordId,
+  clientDiscordIds,
+  panelInteractive,
   COLORS,
   INVITE_PERMISSIONS,
   isId,

@@ -309,4 +309,4 @@ function releaseUnusedBotAccount(discordId, exceptUserId) {
   return true;
 }
 
-module.exports = { preview, start, cancel, runs, releaseUnusedBotAccount, MAX_RECIPIENTS, _test: { freeEmail, memberName } };
+module.exports = { preview, start, cancel, runs, releaseUnusedBotAccount, freeEmail, MAX_RECIPIENTS, _test: { freeEmail, memberName } };

@@ -13,6 +13,11 @@
  */
 const { db, getSetting } = require('./db');
 
+/* ---------------------------------------------------------------- Aus dem Discord-Ticket übernehmen */
+// Wird erst beim Aufruf geladen (tickets.js lädt viele Module – so entsteht kein Kreis beim Start)
+const ticketsMod = () => require('./tickets');
+const MAX_BODY = 4000;
+
 const CHAT = 'n.internal = 0 AND n.system = 0';
 const floor = () => Number(getSetting('chat_read_floor', 0)) || 0;
 const fromFirm = (n) => n.author_role !== 'mandant';
@@ -24,6 +29,7 @@ function row(n) {
     author: n.author_name,
     authorRank: fromFirm(n) ? n.author_rank || '' : '',
     fromFirm: fromFirm(n),
+    viaDiscord: !!n.discord_message_id, // aus dem Discord-Ticket übernommen
     body: n.body,
     createdAt: n.created_at,
   };
@@ -89,4 +95,44 @@ function unreadFor(u) {
   return { total, cases };
 }
 
-module.exports = { messages, markRead, readState, unreadFor };
+/**
+ * Nachricht aus dem Discord-Ticket einer Akte in den Chat übernehmen (Gateway-Ereignis MESSAGE_CREATE).
+ * Übernommen wird nur, was der Mandant (sein Discord im Ticket) oder ein Anwalt/Board-Mitglied mit Zugriff schreibt –
+ * keine Bots, keine per /add hinzugefügten Dritten. Ohne „MESSAGE CONTENT INTENT“ liefert Discord keinen Text,
+ * dann wird nichts übernommen. Nachrichten der Website kommen vom Bot und werden daher nie doppelt übernommen.
+ * Liefert die neue Nachricht (für Tests) oder null.
+ */
+function importFromDiscord(d) {
+  const tickets = ticketsMod();
+  if (!d || !d.author || d.author.bot || d.webhook_id || ![0, 19].includes(d.type ?? 0)) return null;
+  const t = tickets.ticketByChannel(String(d.channel_id || ''));
+  if (!t || t.kind !== 'case' || !t.row) return null;
+  const c = t.row;
+  const authorId = String(d.author.id);
+  // Erwähnungen lesbar machen (<@123> → @Name), Anhänge als Links anhängen
+  let text = String(d.content || '');
+  for (const m of d.mentions || []) text = text.replace(new RegExp(`<@!?${m.id}>`, 'g'), `@${m.global_name || m.username || 'Person'}`);
+  const files = (d.attachments || []).map((a) => a && a.url).filter((u) => /^https:\/\//.test(String(u || '')));
+  const body = [text.trim(), ...files.map((u) => `📎 ${u}`)].filter(Boolean).join('\n').slice(0, MAX_BODY);
+  if (!body) return null;
+  if (db.prepare('SELECT 1 FROM notes WHERE discord_message_id = ?').get(String(d.id))) return null;
+
+  let author = null;
+  if (tickets.clientDiscordIds(c).includes(authorId)) {
+    const account = c.client_id ? db.prepare('SELECT id, display_name FROM users WHERE id = ?').get(c.client_id) : null;
+    author = { id: account ? account.id : null, name: account ? account.display_name : c.client_name || d.author.global_name || d.author.username || 'Mandant', role: 'mandant' };
+  } else {
+    const u = db.prepare("SELECT * FROM users WHERE discord_id = ? AND active = 1 AND role IN ('anwalt','admin')").get(authorId);
+    if (u && require('./models').caseAccess(c, u).canView) author = { id: u.id, name: u.display_name, role: u.role };
+  }
+  if (!author) return null;
+  const info = db
+    .prepare('INSERT INTO notes (case_id, author_id, author_name, author_role, body, internal, discord_message_id) VALUES (?, ?, ?, ?, ?, 0, ?)')
+    .run(c.id, author.id, author.name, author.role, body, String(d.id));
+  db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(c.id);
+  const id = Number(info.lastInsertRowid);
+  if (author.id) markRead(c.id, author.id, id); // eigene Nachricht gilt als gelesen
+  return messages(c.id, id - 1)[0] || null;
+}
+
+module.exports = { messages, markRead, readState, unreadFor, importFromDiscord };
