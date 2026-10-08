@@ -521,11 +521,21 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       });
       try {
         const { ctx, page, problems, settle } = await open(device);
+        // Discord selbst gibt es im Test nicht: Der Start der Anmeldung (eigene Website) wird abgefangen – statt zu
+        // Discord geht es mit dem Code „user-<ID>“ direkt zurück zur Website, wie nach „Autorisieren“ in Discord.
+        // (Weiterleitungsziele wie discord.com fängt Playwright nicht zuverlässig ab – daher schon den ersten Aufruf.)
         let discordId = '';
-        await ctx.route(/^https:\/\/discord\.com\/oauth2\/authorize/, (route) => {
-          const state = new URL(route.request().url()).searchParams.get('state');
-          route.fulfill({ status: 302, headers: { location: `${dsrv.base}/api/discord/callback?code=user-${discordId}&state=${state}` } });
+        let toDiscord = 0;
+        await ctx.route(/\/api\/discord\/(register|login|case-account)$/, async (route) => {
+          const res = await route.fetch({ maxRedirects: 0 });
+          const to = res.headers().location || '';
+          if (!to.startsWith('https://discord.com/oauth2/authorize')) return route.fulfill({ response: res });
+          toDiscord++;
+          const state = new URL(to).searchParams.get('state');
+          const cookie = res.headers()['set-cookie'];
+          await route.fulfill({ status: 302, headers: { location: `${dsrv.base}/api/discord/callback?code=user-${discordId}&state=${state}`, ...(cookie ? { 'set-cookie': cookie } : {}) } });
         });
+        await ctx.route(/^https:\/\/discord\.com\//, (route) => route.abort()); // niemals die echte Seite laden
         const suffix = device === PHONE ? '2' : '1';
 
         // 1) Registrieren mit Discord → Dashboard fragt einmal nach dem Namen im Spiel
@@ -582,6 +592,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         assert.match(await page.textContent('#modalBody'), new RegExp(caseNumber));
         assert.equal(await page.$('#modalBody form[data-form="initial-name"]'), null, 'Name kommt aus der Mandatsanfrage');
         if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Akte passt aufs Handy');
+        assert.equal(toDiscord, 3, 'dreimal zur Discord-Anmeldung weitergeleitet');
         assert.deepEqual(problems, []);
         await ctx.close();
       } finally {
