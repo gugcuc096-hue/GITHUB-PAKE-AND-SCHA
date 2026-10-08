@@ -25,6 +25,30 @@
         notice.classList.remove('hidden');
     }
 
+    // „Mit Discord anmelden“, aber noch kein Konto: nachfragen, ob ein neues Mandantenkonto angelegt werden soll
+    if (params.get('discord') === 'neu') {
+        api.get('/api/discord/pending').then((r) => {
+            if (!r.pending) {
+                notice.textContent = 'Die Discord-Anmeldung ist abgelaufen. Bitte erneut „Mit Discord anmelden“.';
+                notice.classList.remove('hidden');
+                return;
+            }
+            document.getElementById('discordSignupName').textContent = `„${r.pending.name}“`;
+            document.getElementById('discordSignup').classList.remove('hidden');
+        }).catch(() => {});
+        document.getElementById('discordSignupBtn').addEventListener('click', async (e) => {
+            e.target.disabled = true;
+            try {
+                const r = await api.post('/api/discord/signup');
+                location.replace(r.redirect || '/dashboard.html');
+            } catch (ex) {
+                notice.textContent = ex.message;
+                notice.classList.remove('hidden');
+                e.target.disabled = false;
+            }
+        });
+    }
+
     // Bereits angemeldet? Direkt weiter.
     api.get('/api/auth/session').then((r) => { if (r && r.user) location.replace(nextUrl()); }).catch(() => {});
     api.get('/api/discord/status').then((s) => { if (s.oauth) document.getElementById('discordBlock').classList.remove('hidden'); }).catch(() => {});

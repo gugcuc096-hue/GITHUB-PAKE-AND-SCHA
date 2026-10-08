@@ -35,6 +35,11 @@ const actions = {
   },
   'new-case': newCaseModal,
   'open-case': (el) => openCase(Number(el.dataset.id)),
+  // „Was ist zu tun?“: Akte öffnen und direkt zu den Nachrichten springen
+  'open-case-chat': async (el) => {
+    await openCase(Number(el.dataset.id));
+    $('#secChat')?.scrollIntoView({ block: 'start' });
+  },
   'case-status': async (el) => {
     const id = Number(el.dataset.id);
     await api.patch('/api/cases/' + id, { status: el.dataset.status });
@@ -320,9 +325,16 @@ const actions = {
   },
   'inv-status': async (el) => {
     await api.patch('/api/invoices/' + el.dataset.id, { status: el.dataset.status });
-    toast({ bezahlt: 'Als bezahlt markiert.', storniert: 'Dokument storniert.', offen: 'Wieder als offen markiert.' }[el.dataset.status]);
-    await refreshBehind();
+    toast(
+      el.dataset.reported && el.dataset.status === 'bezahlt'
+        ? 'Zahlungseingang bestätigt – der Mandant wird informiert.'
+        : { bezahlt: 'Als bezahlt markiert.', storniert: 'Dokument storniert.', offen: 'Wieder als offen markiert.' }[el.dataset.status]
+    );
+    await afterInvoiceChange(el);
   },
+  // Mandant: „Ich habe bezahlt“ melden · Kanzlei: Meldung zurückweisen (Zahlung nicht eingegangen)
+  'inv-pay-report': (el) => paymentReportModal(Number(el.dataset.id)),
+  'inv-pay-reject': (el) => paymentRejectModal(Number(el.dataset.id), el.dataset.number),
   'inv-remind': async (el) => {
     const r = await api.post(`/api/invoices/${el.dataset.id}/remind`);
     if (r.sent.length) toast(`Zahlungserinnerung zu ${el.dataset.number} gesendet (${r.sent.join(' und ')}).`);

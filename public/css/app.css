@@ -1156,3 +1156,30 @@ textarea.field.chat-input { resize: none; min-height: 42px; height: 42px; max-he
 .ticket-strips:has(> .pt-box[hidden]:only-child) { display: none; }
 .track-node.rejected { border-color: var(--red); background: rgba(248, 113, 113, 0.18); color: #fecaca; font-weight: 700; }
 .app-reach { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; margin-bottom: 0.6rem; }
+/* Zahlung melden (Rechnungen) – Knöpfe umbrechen statt Tabelle bzw. Zeile zu verbreitern */
+@media (min-width: 768px) {
+  .td-actions.inv-actions { white-space: normal; }
+  .td-actions.inv-actions > * { margin-top: 0.15rem; margin-bottom: 0.15rem; }
+}
+.list-row.inv-row { flex-wrap: wrap; }
+.inv-pay-row { flex-basis: 100%; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.4rem; }
+.pay-info { display: flex; gap: 0.6rem; align-items: flex-start; padding: 0.7rem 0.85rem; margin-bottom: 1rem; border: 1px solid var(--gold-hairline); border-radius: 12px; background: rgba(212, 175, 55, 0.06); }
+.pay-info > .ico-sm { flex: none; margin-top: 0.15rem; color: var(--gold-light); }
+.pay-info .pre-line { white-space: pre-line; overflow-wrap: anywhere; }
+.pay-note { max-width: 220px; margin-top: 0.2rem; overflow-wrap: anywhere; }
+/* Mandantenportal: „Was ist zu tun?“ */
+.todo-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.todo-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.65rem 0.75rem; border: 1px solid var(--glass-border); border-radius: 12px; background: rgba(255, 255, 255, 0.025); }
+.todo-item.urgent { border-color: rgba(248, 113, 113, 0.35); }
+.todo-ico { flex: none; width: 34px; height: 34px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; background: rgba(212, 175, 55, 0.12); color: var(--gold-light); }
+.todo-item.urgent .todo-ico { background: rgba(248, 113, 113, 0.12); color: #fca5a5; }
+.todo-main { flex: 1; min-width: 0; }
+.todo-title { font-weight: 500; font-size: 0.92rem; overflow-wrap: anywhere; }
+.todo-meta { font-size: 0.78rem; color: var(--text-dim); margin-top: 0.1rem; overflow-wrap: anywhere; }
+.todo-actions { flex: none; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.4rem; }
+.todo-done { display: flex; align-items: center; gap: 0.6rem; padding: 0.75rem 1rem; color: var(--text-muted); font-size: 0.9rem; }
+.todo-done > .ico { flex: none; color: #6ee7b7; }
+@media (max-width: 640px) {
+  .todo-item { flex-wrap: wrap; }
+  .todo-actions { width: 100%; justify-content: flex-start; }
+}

@@ -5,6 +5,58 @@
 'use strict';
 
 /* ---------------------------------------------------------------- Rechnungen */
+/**
+ * Zahlung melden: Der Mandant meldet „bezahlt“ (optional mit Screenshot), die Kanzlei bestätigt den Eingang
+ * oder weist die Meldung zurück. Knöpfe für Rechnungsliste und Akte.
+ */
+function paymentButtons(i) {
+  if (i.status !== 'offen') return '';
+  if (!isStaff()) {
+    if (!i.paymentReport) return `<button class="btn-gold btn-sm" data-action="inv-pay-report" data-id="${i.id}">${icon('check', 'ico-sm')}<span>Als bezahlt melden</span></button>`;
+    return i.paymentReport.proof
+      ? ''
+      : `<label class="btn-ghost btn-sm file-btn" title="Screenshot der Überweisung nachreichen">${icon('camera', 'ico-sm')}<span>Screenshot nachreichen</span><input type="file" accept="image/*" data-upload="pay-proof" data-id="${i.id}" aria-label="Screenshot der Überweisung hochladen"></label>`;
+  }
+  if (!i.paymentReport) return '';
+  return `${i.paymentReport.proof ? `<a class="btn-outline btn-sm" href="/api/invoices/${i.id}/payment-proof" target="_blank" rel="noopener">${icon('eye', 'ico-sm')}<span>Nachweis</span></a>` : ''}<button class="btn-gold btn-sm" data-action="inv-status" data-id="${i.id}" data-status="bezahlt" data-reported="1">${icon('check', 'ico-sm')}<span>Eingang bestätigen</span></button><button class="btn-ghost btn-sm" data-action="inv-pay-reject" data-id="${i.id}" data-number="${esc(i.number)}">Nicht eingegangen</button>`;
+}
+
+/** Nach einer Änderung an einer Rechnung: Akte (falls die Rechnung dort angeklickt wurde) bzw. Ansicht und Badge neu laden. */
+async function afterInvoiceChange(el) {
+  load.paymentReports().then(renderNav).catch(() => {});
+  if (el && el.closest('#modalBody') && st.modalCaseId) await reloadCase(st.modalCaseId);
+  else await refreshBehind();
+}
+
+/** Mandant: Zahlung melden – mit den Zahlungsangaben der Kanzlei, Hinweis und optional Screenshot. */
+async function paymentReportModal(id) {
+  const { invoice: i, firm } = await api.get('/api/invoices/' + id);
+  openModal(`
+      <h2 class="modal-title">Zahlung melden</h2>
+      <p class="modal-sub">${esc(INVOICE_KIND[i.kind])} <span class="font-mono text-gold">${esc(i.number)}</span> über <strong>${money(i.total)}</strong>${i.dueDate ? ` · fällig ${esc(fmtDateOnly(i.dueDate))}` : ''}. Sobald die Kanzlei den Eingang geprüft hat, steht die Rechnung auf „Bezahlt“.</p>
+      <div class="pay-info">${icon('receipt', 'ico-sm')}<div><div class="label">Zahlungsangaben der Kanzlei</div><div class="text-sm pre-line">${esc(firm.paymentInfo)}</div></div></div>
+      <form data-form="inv-pay-report" data-id="${i.id}" class="form-grid">
+        <div><label class="label" for="payNote">Hinweis an die Kanzlei <span class="text-dim">(optional)</span></label>
+          <textarea id="payNote" name="note" class="field" rows="3" maxlength="500" placeholder="z. B. wann und von welchem Konto Sie überwiesen haben"></textarea></div>
+        <div><span class="label">Screenshot der Überweisung <span class="text-dim">(optional)</span></span>
+          <label class="btn-outline btn-sm file-btn">${icon('camera', 'ico-sm')}<span id="payProofName">Bild auswählen</span><input type="file" name="proof" accept="image/*" aria-label="Screenshot der Überweisung auswählen"></label>
+          <p class="form-hint">Den Screenshot sieht nur die Kanzlei.</p></div>
+        <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Zahlung melden</span></button><button type="button" class="btn-ghost btn-md" data-action="close-modal">Abbrechen</button></div>
+      </form>`);
+}
+
+/** Kanzlei: gemeldete Zahlung ist nicht eingegangen – optional mit Hinweis an den Mandanten (Ticket). */
+function paymentRejectModal(id, number) {
+  openModal(`
+      <h2 class="modal-title">Zahlung nicht eingegangen?</h2>
+      <p class="modal-sub">Die Meldung zu <span class="font-mono text-gold">${esc(number)}</span> wird zurückgesetzt – die Rechnung bleibt offen. Der Mandant erfährt es in der Akte und über Discord (Ticket bzw. Direktnachricht) und kann die Zahlung erneut melden.</p>
+      <form data-form="inv-pay-reject" data-id="${id}" class="form-grid">
+        <div><label class="label" for="payReason">Hinweis an den Mandanten <span class="text-dim">(optional)</span></label>
+          <textarea id="payReason" name="reason" class="field" rows="3" maxlength="300" placeholder="z. B. Betrag unvollständig oder kein Eingang auf dem Kanzleikonto"></textarea></div>
+        <div class="form-actions"><button type="submit" class="btn-danger btn-md">Meldung zurückweisen</button><button type="button" class="btn-ghost btn-md" data-action="close-modal">Abbrechen</button></div>
+      </form>`);
+}
+
 function invoiceTable(rows) {
   const staff = isStaff();
   if (!rows.length) return empty(st.invoices.length ? 'Keine Dokumente für diese Auswahl.' : staff ? 'Noch keine Rechnungen erstellt.' : 'Es liegen keine Rechnungen vor.', 'receipt');
@@ -17,7 +69,7 @@ function invoiceTable(rows) {
           <td data-label="Empfänger">${esc(i.clientName)}</td>
           <td data-label="Akte">${i.caseNumber ? `<button class="text-gold font-mono text-xs hover:underline" data-action="open-case" data-id="${i.caseId}">${esc(i.caseNumber)}</button>` : '—'}</td>
           <td data-label="Betrag" class="font-mono nowrap" style="text-align:right">${money(i.total)}</td>
-          <td data-label="Status">${invoiceBadge(i, true)}</td>
+          <td data-label="Status">${invoiceBadge(i, true)}${staff && paymentReported(i) && i.paymentReport.note ? `<div class="text-xs text-dim pay-note">„${esc(i.paymentReport.note)}“</div>` : ''}</td>
           <td data-label="Datum" class="text-xs text-dim nowrap"><div>${esc(fmtDate(i.createdAt))}${i.dueDate && i.status === 'offen' ? `<div${i.overdueDays > 0 ? ` class="text-red-300" title="${esc(overdueText(i))}"` : ''}>fällig ${esc(fmtDateOnly(i.dueDate))}</div>` : ''}${
           staff && i.status === 'offen'
             ? `<div><button type="button" class="remind-link" data-action="inv-remind" data-id="${i.id}" data-number="${esc(i.number)}" title="${esc(
@@ -27,9 +79,10 @@ function invoiceTable(rows) {
               )}">${icon('bell', 'ico-sm')}<span>${i.remindedAt ? `erinnert ${esc(new Date(i.remindedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }))}` : 'Erinnern'}</span></button></div>`
             : ''
         }</div></td>
-          <td class="td-actions">
+          <td class="td-actions inv-actions">
             <a class="btn-outline btn-sm" href="/invoice.html?id=${i.id}" target="_blank" rel="noopener">${icon('printer', 'ico-sm')}<span>PDF / Druck</span></a>
-            ${staff && i.status === 'offen' ? `<button class="btn-gold btn-sm" data-action="inv-status" data-id="${i.id}" data-status="bezahlt">Bezahlt</button><button class="btn-ghost btn-sm" data-action="inv-status" data-id="${i.id}" data-status="storniert">Storno</button>` : ''}
+            ${paymentButtons(i)}
+            ${staff && i.status === 'offen' && !paymentReported(i) ? `<button class="btn-gold btn-sm" data-action="inv-status" data-id="${i.id}" data-status="bezahlt">Bezahlt</button><button class="btn-ghost btn-sm" data-action="inv-status" data-id="${i.id}" data-status="storniert">Storno</button>` : ''}
             ${staff && i.status !== 'offen' ? `<button class="btn-ghost btn-sm" data-action="inv-status" data-id="${i.id}" data-status="offen">Wieder offen</button>` : ''}
             ${isAdmin() ? `<button class="icon-btn sm" data-action="inv-delete" data-id="${i.id}" data-number="${esc(i.number)}" aria-label="Löschen">${icon('trash', 'ico-sm')}</button>` : ''}
           </td></tr>`
@@ -43,8 +96,10 @@ views.invoices = {
   },
   render() {
     const staff = isStaff();
-    const f = st.invFilter;
-    const match = (i, s) => s === 'alle' || (s === 'ueberfaellig' ? i.overdueDays > 0 : i.status === s);
+    // Filter ohne Treffer mehr (z. B. letzte gemeldete Zahlung bestätigt): wieder alle zeigen
+    const gone = (st.invFilter === 'gemeldet' && !st.invoices.some(paymentReported)) || (st.invFilter === 'ueberfaellig' && !st.invoices.some((i) => i.overdueDays > 0));
+    const f = gone ? 'alle' : st.invFilter;
+    const match = (i, s) => s === 'alle' || (s === 'ueberfaellig' ? i.overdueDays > 0 : s === 'gemeldet' ? paymentReported(i) : i.status === s);
     const rows = st.invoices.filter((i) => match(i, f));
     const sum = (s) => st.invoices.filter((i) => match(i, s)).reduce((a, i) => a + i.total, 0);
     const count = (s) => st.invoices.filter((i) => match(i, s)).length;
@@ -59,7 +114,7 @@ views.invoices = {
           <div class="panel kpi"><div class="kpi-label">${icon('alert', 'ico-sm')}Überfällig</div><div class="kpi-value">${money(sum('ueberfaellig'))}</div><div class="kpi-sub">${count('ueberfaellig')} überfällig</div></div>
           <div class="panel kpi"><div class="kpi-label">${icon('check', 'ico-sm')}Bezahlt</div><div class="kpi-value">${money(sum('bezahlt'))}</div><div class="kpi-sub">${count('bezahlt')} Dokument(e)</div></div>
         </div>` : ''}
-        <div class="chip-row mb-4">${[['alle', 'Alle'], ['offen', 'Offen'], ...(count('ueberfaellig') ? [['ueberfaellig', 'Überfällig']] : []), ['bezahlt', 'Bezahlt'], ['storniert', 'Storniert']]
+        <div class="chip-row mb-4">${[['alle', 'Alle'], ['offen', 'Offen'], ...(count('gemeldet') ? [['gemeldet', staff ? 'Zahlung gemeldet' : 'Gemeldet']] : []), ...(count('ueberfaellig') ? [['ueberfaellig', 'Überfällig']] : []), ['bezahlt', 'Bezahlt'], ['storniert', 'Storniert']]
         .map(([k, l]) => `<button class="chip ${f === k ? 'active' : ''}" data-action="inv-filter" data-value="${k}">${l} <span class="chip-count">${count(k)}</span></button>`)
         .join('')}</div>
         <div class="panel p-2 md:p-3">${invoiceTable(rows)}</div>`;

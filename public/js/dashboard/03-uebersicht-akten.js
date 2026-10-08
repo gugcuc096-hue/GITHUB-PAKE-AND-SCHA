@@ -80,6 +80,58 @@ function dutyStrip() {
     </section>`;
 }
 
+/**
+ * Mandantenportal: „Was ist zu tun?“ – ganz oben nur das, was der Mandant gerade selbst erledigen muss, jeweils mit
+ * einem Knopf, der direkt dorthin führt: unterschreiben, Rechnung begleichen/als bezahlt melden, neue Nachrichten
+ * lesen, Termin heute/morgen, ungelesene Kanzlei-Post.
+ */
+function todoPanel() {
+  const item = (ico, title, meta, actions, tone = '') =>
+    `<div class="todo-item ${tone}"><span class="todo-ico">${icon(ico, 'ico-sm')}</span><div class="todo-main"><div class="todo-title">${title}</div>${meta ? `<div class="todo-meta">${meta}</div>` : ''}</div><div class="todo-actions">${actions}</div></div>`;
+  const caseRef = (number, title) => `Akte <span class="font-mono text-gold">${esc(number)}</span>${title ? ` · ${esc(title)}` : ''}`;
+  const items = [];
+  for (const k of st.toSign) {
+    items.push(item('edit', `${esc(k.templateName)} unterschreiben`, caseRef(k.caseNumber, k.caseTitle), `<a class="btn-gold btn-sm" href="/vertrag.html?id=${k.id}" target="_blank" rel="noopener">${icon('edit', 'ico-sm')}<span>Lesen &amp; unterschreiben</span></a>`));
+  }
+  // Überfällige zuerst, dann nach Fälligkeit (ohne Fälligkeit zuletzt)
+  const open = st.invoices.filter((x) => x.status === 'offen' && !x.paymentReport).sort((a, b) => b.overdueDays - a.overdueDays || (a.dueDate || '9999').localeCompare(b.dueDate || '9999'));
+  for (const i of open) {
+    const due = i.overdueDays > 0 ? `<span class="text-red-300">${esc(overdueText(i))}</span>` : i.dueDate ? `fällig ${esc(fmtDateOnly(i.dueDate))}` : '';
+    items.push(
+      item(
+        'receipt',
+        `${esc(INVOICE_KIND[i.kind])} <span class="font-mono text-gold">${esc(i.number)}</span> über ${esc(money(i.total))} begleichen`,
+        [due, i.caseNumber ? caseRef(i.caseNumber) : ''].filter(Boolean).join(' · '),
+        `<button class="btn-gold btn-sm" data-action="inv-pay-report" data-id="${i.id}">${icon('check', 'ico-sm')}<span>Als bezahlt melden</span></button><a class="btn-ghost btn-sm" href="/invoice.html?id=${i.id}" target="_blank" rel="noopener">Ansehen</a>`,
+        i.overdueDays > 0 ? 'urgent' : ''
+      )
+    );
+  }
+  for (const c of st.cases.filter((x) => x.chatUnread > 0)) {
+    items.push(item('chat', `${c.chatUnread === 1 ? 'Neue Nachricht' : `${c.chatUnread} neue Nachrichten`} von Ihrer Kanzlei`, caseRef(c.caseNumber, c.title), `<button class="btn-gold btn-sm" data-action="open-case-chat" data-id="${c.id}">${icon('chat', 'ico-sm')}<span>Lesen &amp; antworten</span></button>`));
+  }
+  // Bestätigte Termine heute und morgen (Fristen betreffen die Kanzlei)
+  const soon = upcomingEvents(20).filter((e) => {
+    const d = parseDate(e.startsAt);
+    return e.status === 'bestaetigt' && e.type !== 'frist' && d && daysUntil(dayKey(d)) <= 1;
+  });
+  for (const e of soon) {
+    const when = `${daysUntil(dayKey(parseDate(e.startsAt))) <= 0 ? 'Heute' : 'Morgen'}, ${fmtTime(e.startsAt)} Uhr`;
+    items.push(item('calendar', `${esc(when)}: ${esc(e.title)}`, [EVENT_TYPES[e.type], e.location, e.caseNumber ? `Akte ${e.caseNumber}` : ''].filter(Boolean).map(esc).join(' · '), `<button class="btn-outline btn-sm" data-action="open-event" data-id="${e.id}">Details</button>`));
+  }
+  if (st.unread) {
+    items.push(item('mail', `${st.unread === 1 ? 'Eine ungelesene Nachricht' : `${st.unread} ungelesene Nachrichten`} in der Kanzlei-Post`, '', `<a class="btn-outline btn-sm" href="#mail">Öffnen</a>`));
+  }
+  if (!items.length) {
+    if (!st.cases.length) return ''; // Noch kein Mandat: darunter steht „Mandat einreichen“
+    return `<section class="panel todo-done mb-4 lg:mb-5">${icon('check')}<div><strong>Alles erledigt.</strong> Im Moment müssen Sie nichts tun – wir melden uns, sobald es Neuigkeiten gibt.</div></section>`;
+  }
+  return `<section class="panel panel-pad todo mb-4 lg:mb-5" aria-labelledby="todoTitle">
+      <div class="panel-head"><h2 class="panel-title" id="todoTitle">Was ist zu tun?</h2>${badge(items.length === 1 ? '1 Punkt' : `${items.length} Punkte`, 'gold')}</div>
+      <div class="todo-list">${items.join('')}</div>
+    </section>`;
+}
+
 /** Überfällige/heute fällige eigene Aufgaben und eigene Akten ohne Bewegung – nur wenn es etwas zu tun gibt. */
 const STALE_DAYS = 7;
 function attentionPanel() {
@@ -114,6 +166,7 @@ views.overview = {
       load.myTasks(),
       isStaff() ? api.get('/api/absences').then((r) => (st.absences = r)) : null,
       isAdmin() ? api.get('/api/admin/alerts').then((r) => (st.alerts = r.alerts), () => (st.alerts = [])) : null,
+      !isStaff() ? api.get('/api/contracts/to-sign').then((r) => (st.toSign = r.contracts), () => (st.toSign = [])) : null,
     ]);
   },
   render() {
@@ -182,6 +235,7 @@ views.overview = {
             <p class="page-sub">${esc(u.rank || ROLES[u.role])} · Pake &amp; Scha Legal Consulting</p></div>
           <div class="page-actions"><button class="btn-outline btn-md" data-action="concern-new">${icon('chat', 'ico-sm')}<span>Anliegen ans Board</span></button>${staff ? `<button class="btn-outline btn-md" data-action="new-event">${icon('calendar', 'ico-sm')}<span>Frist / Termin</span></button><button class="btn-gold btn-md" data-action="new-case">${icon('plus')}<span>Neue Akte</span></button>` : ''}</div>
         </div>
+        ${staff ? '' : todoPanel()}
         ${dutyStrip()}
         ${absenceStrip()}
         <div class="kpi-grid">${kpis.join('')}</div>`;

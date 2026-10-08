@@ -230,7 +230,7 @@ function chatBubble(x, prevDay) {
       <div class="chat-bubble">
         ${x.author ? `<div class="chat-author">${esc(x.author)}${x.sub ? ` <span>· ${esc(x.sub)}</span>` : ''}</div>` : ''}
         <div class="chat-text">${esc(x.body)}</div>
-        <div class="chat-foot"><span>${esc(chatTime(x.createdAt))}</span><span class="chat-receipt"></span>${x.del || ''}</div>
+        <div class="chat-foot"><span>${esc(chatTime(x.createdAt))}${x.via ? ` · ${esc(x.via)}` : ''}</span><span class="chat-receipt"></span>${x.del || ''}</div>
       </div>
     </div>`;
 }
@@ -284,6 +284,7 @@ function caseBubble(m) {
     // Namen zeigen: bei der Gegenseite immer, in der Kanzlei auch bei Kollegen
     author: side === 'in' || (isStaff() && !mine) ? m.author : '',
     sub: m.authorRank || (m.fromFirm ? '' : 'Mandant'),
+    via: m.viaDiscord ? 'über Discord' : '',
     body: m.body,
     createdAt: m.createdAt,
     del:
@@ -328,6 +329,12 @@ async function markChatRead(caseId, lastId, mine = 0) {
   await api.post(`/api/cases/${caseId}/chat/read`, { lastId }).catch(() => {});
   await load.chatUnread().catch(() => {});
   renderNav();
+  // Aktenliste bzw. „Was ist zu tun?“ dahinter: Die Nachrichten dieser Akte sind jetzt gelesen
+  const c = st.cases.find((x) => x.id === caseId);
+  if (c && c.chatUnread) {
+    c.chatUnread = 0;
+    if (st.view === 'overview' || st.view === 'cases') renderView();
+  }
 }
 /** Neue Nachrichten nachladen (alle paar Sekunden, solange der Chat der Akte offen ist). */
 async function pollChat() {
@@ -445,8 +452,10 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
   const invoiceList = invoices.length
     ? invoices
         .map(
-          (i) => `<div class="list-row wrap"><div class="main"><div class="title"><span class="font-mono text-gold">${esc(i.number)}</span> · ${esc(INVOICE_KIND[i.kind])}</div><div class="meta">${esc(fmtDate(i.createdAt))} · ${esc(i.issuerName)}</div></div>
-            <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end"><span class="font-mono nowrap">${money(i.total)}</span>${invoiceBadge(i)}<a class="icon-btn sm" href="/invoice.html?id=${i.id}" target="_blank" rel="noopener" aria-label="Drucken / PDF">${icon('printer', 'ico-sm')}</a></div></div>`
+          (i) => `<div class="list-row wrap inv-row"><div class="main"><div class="title"><span class="font-mono text-gold">${esc(i.number)}</span> · ${esc(INVOICE_KIND[i.kind])}</div><div class="meta">${esc(fmtDate(i.createdAt))} · ${esc(i.issuerName)}</div></div>
+            <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end"><span class="font-mono nowrap">${money(i.total)}</span>${invoiceBadge(i)}<a class="icon-btn sm" href="/invoice.html?id=${i.id}" target="_blank" rel="noopener" aria-label="Drucken / PDF">${icon('printer', 'ico-sm')}</a></div>${
+              paymentButtons(i) ? `<div class="inv-pay-row">${paymentButtons(i)}</div>` : ''
+            }</div>`
         )
         .join('')
     : '';

@@ -4,7 +4,8 @@ const { z } = require('zod');
 const { db, nextInvoiceNumber, getSetting } = require('../db');
 const { requireAuth, requireStaff, requireAdmin, isStaff } = require('../auth');
 const { wrap, parseBody, idParam, dateOnly, truncate } = require('../helpers');
-const { INVOICE_SELECT, invoiceRow, getCase, addSystemNote, logActivity } = require('../models');
+const { imageBody, saveImage, removeFile, evidencePath } = require('../uploads');
+const { INVOICE_SELECT, invoiceRow, getCase, caseLawyers, addSystemNote, logActivity } = require('../models');
 const discord = require('../discord');
 const tickets = require('../tickets');
 const coop = require('../cooperations');
@@ -38,6 +39,12 @@ router.get('/', (req, res) => {
 
 /** Briefkopf der Kanzlei (Anschrift, Kontakt) – z. B. für den Aktenauszug. */
 router.get('/firm', (req, res) => res.json({ firm: firmInfo() }));
+
+/** Kanzlei: offene Rechnungen, die der Mandant als bezahlt gemeldet hat (Badge „Rechnungen“). */
+router.get('/payment-reports', requireStaff, (req, res) => {
+  const { n } = db.prepare("SELECT COUNT(*) AS n FROM invoices WHERE status = 'offen' AND payment_reported_at IS NOT NULL").get();
+  res.json({ count: n });
+});
 
 router.get(
   '/:id',
@@ -239,6 +246,22 @@ router.patch(
       logActivity(req.user, 'Rechnungsstatus geändert', 'invoice', inv.id, `${inv.number}: ${inv.status} → ${d.status}`);
       require('../googleDocs').touch('invoice', inv.id); // Stempel „BEZAHLT“/„STORNIERT“ im Google Doc
     }
+    // Zahlungsmeldung des Mandanten: Bestätigung ins Ticket; wieder „offen“ → alte Meldung gilt nicht mehr
+    if (inv.payment_reported_at && inv.status === 'offen' && d.status === 'bezahlt') {
+      const full = db.prepare(`${INVOICE_SELECT} WHERE i.id = ?`).get(inv.id);
+      tellClient(
+        full,
+        {
+          title: `✅ Zahlung eingegangen: ${docLabel(inv)} ${inv.number}`,
+          description: `Vielen Dank – Ihre Zahlung über **${money(inv.total)}** ist eingegangen. Die ${docLabel(inv)} ist damit beglichen.`,
+          color: tickets.COLORS.green,
+        },
+        req.user
+      );
+    } else if (inv.payment_reported_at && inv.status !== 'offen' && d.status === 'offen') {
+      db.prepare("UPDATE invoices SET payment_reported_at = NULL, payment_note = '', payment_proof = '', payment_reported_by = NULL WHERE id = ?").run(inv.id);
+      if (inv.payment_proof) removeFile('evidence', inv.payment_proof);
+    }
     // VIP/Lifetime-Anfrage: bezahlt → Mitgliedschaft freischalten, storniert → Anfrage abgelehnt
     let warnings = [];
     if (d.status !== inv.status && d.status === 'bezahlt') {
@@ -248,6 +271,144 @@ router.patch(
       memberships.cancelRequestByInvoice(inv.id, req.user);
     }
     res.json({ invoice: invoiceRow(db.prepare(`${INVOICE_SELECT} WHERE i.id = ?`).get(inv.id)), warnings });
+  })
+);
+
+/* ---------------------------------------------------------------- Zahlung melden (Mandant) */
+/** Empfänger der Rechnung: der Mandant der Akte bzw. das Konto, auf das die Rechnung läuft. */
+const isRecipient = (inv, u) => u.role === 'mandant' && ((inv.case_client_id && inv.case_client_id === u.id) || (inv.client_user_id && inv.client_user_id === u.id));
+const docLabel = (inv) => (inv.kind === 'honorarvereinbarung' ? 'Honorarvereinbarung' : 'Rechnung');
+const loadInvoice = (id) => (id ? db.prepare(`${INVOICE_SELECT} WHERE i.id = ?`).get(id) : null);
+
+/** Mandant informieren: im Ticket der Akte – ohne Ticket (z. B. VIP-Rechnung ohne Akte) per Discord-Direktnachricht. */
+function tellClient(inv, msg, by) {
+  const c = inv.case_id ? getCase(inv.case_id) : null;
+  if (c && tickets.active() && !c.discord_deleted) {
+    tickets.post(c.id, { ...msg, mention: 'client', by: by.display_name, byDiscordId: by.discord_id });
+    return;
+  }
+  const clientId = inv.client_user_id || inv.case_client_id;
+  if (clientId) memberships.dm(clientId, { title: msg.title, description: msg.description, color: msg.color }).catch(() => {});
+}
+
+/** Wer bekommt die Meldung im Team-Kanal gepingt: die Anwälte der Akte, sonst wer die Rechnung erstellt hat. */
+function paymentPingIds(inv, c) {
+  const ids = c ? caseLawyers(c).map((l) => l.discordId) : [];
+  if (!ids.length && inv.issued_by) {
+    const issuer = db.prepare('SELECT discord_id FROM users WHERE id = ?').get(inv.issued_by);
+    if (issuer && issuer.discord_id) ids.push(issuer.discord_id);
+  }
+  return ids.filter(Boolean);
+}
+
+/**
+ * Mandant meldet: „Ich habe bezahlt“ (optional mit Hinweis, z. B. Verwendungszweck, und Screenshot als Nachweis).
+ * Die Rechnung bleibt offen, bis die Kanzlei den Zahlungseingang bestätigt („Bezahlt“) oder die Meldung zurückweist.
+ */
+router.post(
+  '/:id/payment-report',
+  wrap(async (req, res) => {
+    const u = req.user;
+    const inv = loadInvoice(idParam(req));
+    if (!inv || !visibleTo(inv, u)) return res.status(404).json({ error: 'Dokument nicht gefunden.' });
+    if (!isRecipient(inv, u)) return res.status(403).json({ error: 'Nur der Empfänger der Rechnung kann eine Zahlung melden.' });
+    if (inv.status !== 'offen') return res.status(400).json({ error: 'Diese Rechnung ist nicht (mehr) offen.' });
+    if (inv.payment_reported_at) return res.status(409).json({ error: 'Die Zahlung ist bereits gemeldet – die Kanzlei prüft den Eingang.' });
+    const d = parseBody(z.object({ note: z.string().trim().max(500).optional() }), req, res);
+    if (!d) return;
+    db.prepare("UPDATE invoices SET payment_reported_at = datetime('now'), payment_note = ?, payment_reported_by = ? WHERE id = ?").run(d.note || '', u.id, inv.id);
+
+    const label = docLabel(inv);
+    const c = inv.case_id ? getCase(inv.case_id) : null;
+    const fields = [
+      { name: 'Betrag', value: money(inv.total) },
+      { name: 'Gemeldet von', value: u.display_name },
+      ...(d.note ? [{ name: 'Hinweis des Mandanten', value: truncate(d.note, 500) }] : []),
+      ...(inv.case_number ? [{ name: 'Akte', value: inv.case_number }] : []),
+    ];
+    const viaTicket = !!c && tickets.active() && !!c.discord_channel_id && !c.discord_deleted;
+    if (c) addSystemNote(c.id, u, `${label} ${inv.number} als bezahlt gemeldet – bitte den Zahlungseingang prüfen.${d.note ? ` Hinweis: ${truncate(d.note, 300)}` : ''}`, true);
+    logActivity(u, 'Zahlung gemeldet', 'invoice', inv.id, `${inv.number} · ${money(inv.total)}`);
+    discord.notify('invoice.payment', {
+      title: `💸 Zahlung gemeldet: ${label} ${inv.number}`,
+      description: 'Der Mandant meldet die Zahlung. Bitte den Eingang prüfen und die Rechnung im Dashboard als „Bezahlt“ bestätigen.',
+      fields: [{ name: 'Empfänger', value: inv.client_name || '—' }, ...fields],
+      // Mit Ticket pingt die Nachricht im Ticket – im Team-Kanal dann nicht noch einmal
+      mentionIds: viaTicket ? [] : paymentPingIds(inv, c),
+    });
+    if (c) {
+      tickets.post(c.id, {
+        title: `💸 Zahlung gemeldet: ${label} ${inv.number}`,
+        description: 'Der Mandant hat die Zahlung über das Mandantenportal gemeldet. Die Kanzlei prüft den Eingang und bestätigt ihn.',
+        fields,
+        color: tickets.COLORS.blue,
+        mention: 'lawyers',
+        by: u.display_name,
+        byDiscordId: u.discord_id,
+      });
+    }
+    res.json({ invoice: invoiceRow(loadInvoice(inv.id)) });
+  })
+);
+
+/** Screenshot der Überweisung zur Meldung hochladen (ersetzt einen früheren). Liegt geschützt, nicht öffentlich. */
+router.post(
+  '/:id/payment-proof',
+  imageBody,
+  wrap(async (req, res) => {
+    const u = req.user;
+    const inv = loadInvoice(idParam(req));
+    if (!inv || !visibleTo(inv, u)) return res.status(404).json({ error: 'Dokument nicht gefunden.' });
+    if (!isRecipient(inv, u)) return res.status(403).json({ error: 'Nur der Empfänger der Rechnung kann einen Nachweis hochladen.' });
+    if (inv.status !== 'offen' || !inv.payment_reported_at) return res.status(400).json({ error: 'Bitte zuerst die Zahlung melden.' });
+    const saved = saveImage(req, 'evidence');
+    db.prepare('UPDATE invoices SET payment_proof = ? WHERE id = ?').run(saved.file, inv.id);
+    if (inv.payment_proof) removeFile('evidence', inv.payment_proof);
+    if (inv.case_id) addSystemNote(inv.case_id, u, `Zahlungsnachweis (Screenshot) zu ${docLabel(inv)} ${inv.number} hochgeladen.`, true);
+    res.json({ invoice: invoiceRow(loadInvoice(inv.id)) });
+  })
+);
+
+/** Nachweis ansehen: Kanzlei und der Empfänger selbst. */
+router.get(
+  '/:id/payment-proof',
+  wrap(async (req, res) => {
+    const inv = loadInvoice(idParam(req));
+    if (!inv || !visibleTo(inv, req.user) || !inv.payment_proof) return res.status(404).json({ error: 'Kein Nachweis vorhanden.' });
+    res.set('Cache-Control', 'private, no-store');
+    res.sendFile(evidencePath(inv.payment_proof), (err) => {
+      if (err && !res.headersSent) res.status(404).json({ error: 'Datei nicht gefunden.' });
+    });
+  })
+);
+
+/** Kanzlei: Zahlung ist (noch) nicht eingegangen – Meldung zurückweisen; der Mandant wird im Ticket informiert. */
+router.post(
+  '/:id/payment-reject',
+  requireStaff,
+  wrap(async (req, res) => {
+    const u = req.user;
+    const inv = loadInvoice(idParam(req));
+    if (!inv) return res.status(404).json({ error: 'Dokument nicht gefunden.' });
+    if (inv.status !== 'offen' || !inv.payment_reported_at) return res.status(400).json({ error: 'Zu dieser Rechnung liegt keine offene Zahlungsmeldung vor.' });
+    const d = parseBody(z.object({ reason: z.string().trim().max(300).optional() }), req, res);
+    if (!d) return;
+    db.prepare("UPDATE invoices SET payment_reported_at = NULL, payment_note = '', payment_proof = '', payment_reported_by = NULL WHERE id = ?").run(inv.id);
+    if (inv.payment_proof) removeFile('evidence', inv.payment_proof);
+    const label = docLabel(inv);
+    // Für den Mandanten sichtbar in der Akte – der Hinweis richtet sich an ihn
+    if (inv.case_id) addSystemNote(inv.case_id, u, `Zahlung zu ${label} ${inv.number} ist noch nicht eingegangen – bitte die Überweisung prüfen und erneut melden.${d.reason ? ` Hinweis der Kanzlei: ${truncate(d.reason, 300)}` : ''}`, false);
+    tellClient(
+      inv,
+      {
+        title: `⚠️ Zahlung noch nicht eingegangen: ${label} ${inv.number}`,
+        description: `Ihre Zahlung über **${money(inv.total)}** ist bei uns noch nicht eingegangen.${d.reason ? `\n\n${truncate(d.reason, 300)}` : ''}\n\nBitte prüfen Sie die Überweisung und melden Sie die Zahlung im Mandantenportal unter „Rechnungen“ erneut.`,
+        color: tickets.COLORS.gold,
+      },
+      u
+    );
+    logActivity(u, 'Zahlungsmeldung zurückgewiesen', 'invoice', inv.id, `${inv.number}${d.reason ? ` · ${truncate(d.reason, 120)}` : ''}`);
+    res.json({ invoice: invoiceRow(loadInvoice(inv.id)) });
   })
 );
 
@@ -268,9 +429,10 @@ router.delete(
   requireAdmin,
   wrap(async (req, res) => {
     const id = idParam(req);
-    const inv = id && db.prepare('SELECT id, number FROM invoices WHERE id = ?').get(id);
+    const inv = id && db.prepare('SELECT id, number, payment_proof FROM invoices WHERE id = ?').get(id);
     if (!inv) return res.status(404).json({ error: 'Dokument nicht gefunden.' });
     db.prepare('DELETE FROM invoices WHERE id = ?').run(inv.id);
+    if (inv.payment_proof) removeFile('evidence', inv.payment_proof);
     logActivity(req.user, 'Rechnung gelöscht', 'invoice', inv.id, inv.number);
     require('../googleDocs').remove('invoice', inv.id);
     res.json({ success: true });

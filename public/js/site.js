@@ -56,6 +56,10 @@
         <button type="button" id="ticketCopy" class="btn-outline flex-1 py-3 text-xs uppercase tracking-wider">Aktenzeichen kopieren</button>
         ${res.linkedToAccount && res.caseId ? `<a href="/dashboard.html?case=${Number(res.caseId)}" class="btn-gold flex-1 py-3 text-xs uppercase tracking-wider">Zur Akte</a>` : ''}
       </div>
+      ${!res.linkedToAccount && res.discordSignup
+        ? `<button type="button" id="ticketAccount" class="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-full bg-[#5865F2] hover:bg-[#4752c4] text-white text-xs uppercase tracking-wider font-semibold py-3 transition-colors">Konto mit Discord anlegen</button>
+           <p class="text-[0.7rem] text-center text-[var(--text-dim)] mt-2">Ein Klick, kein Passwort: Ihre Akte erscheint sofort im Mandantenportal – mit Nachrichten an Ihren Anwalt, Verträgen und Rechnungen${res.discordTicket ? ', und Sie kommen automatisch in Ihr Discord-Ticket' : ''}.</p>`
+        : ''}
       ${res.discordTicket
         ? `<button type="button" id="ticketDiscord" class="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-full bg-[#5865F2] hover:bg-[#4752c4] text-white text-xs uppercase tracking-wider font-semibold py-3 transition-colors">Discord-Ticket beitreten</button>
            <p class="text-[0.7rem] text-center text-[var(--text-dim)] mt-2">Ihr privates Ticket auf dem Discord der Kanzlei – alle Neuigkeiten zu Ihrer Akte automatisch. Am besten gleich beitreten.</p>`
@@ -69,6 +73,7 @@
     });
     // Beitritt nur direkt nach dem Einreichen: Aktenzeichen + Pin bleiben im Hintergrund (der Pin wird nicht angezeigt)
     document.getElementById('ticketDiscord')?.addEventListener('click', () => joinTicket(res.caseNumber, res.pin));
+    document.getElementById('ticketAccount')?.addEventListener('click', () => joinTicket(res.caseNumber, res.pin, '/api/discord/case-account'));
   }
 
   window.handleFormSubmit = async function (e) {
@@ -106,8 +111,9 @@
 
   /* ---------------------------------------------------------------- Discord-Ticket der Akte */
   /** Schickt Aktenzeichen + Pin per POST an den Server, der zur Discord-Anmeldung weiterleitet. */
-  function joinTicket(caseNumber, pin) {
+  function joinTicket(caseNumber, pin, action = '/api/discord/case-join') {
     const f = document.getElementById('ticketJoinForm');
+    f.action = action; // auch „Konto mit Discord anlegen“ (gleiche Angaben, anderes Ziel)
     f.elements.caseNumber.value = caseNumber;
     f.elements.pin.value = pin;
     f.submit();

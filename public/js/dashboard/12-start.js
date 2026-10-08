@@ -193,6 +193,12 @@ document.addEventListener('change', (e) => {
     return;
   }
   if (t.id === 'bf_visible') t.dataset.touched = '1';
+  // Zahlung melden: gewählten Screenshot anzeigen (hochgeladen wird erst beim Absenden)
+  if (t.name === 'proof' && t.closest('form[data-form="inv-pay-report"]')) {
+    const label = $('#payProofName');
+    if (label) label.textContent = t.files[0] ? t.files[0].name : 'Bild auswählen';
+    return;
+  }
   if (t.dataset.upload) {
     guard(() => handleUpload(t));
     return;
@@ -340,6 +346,11 @@ window.addEventListener('focus', () => {
   const id = st.modalCaseId;
   // Nur nach dem Öffnen eines Vertrags (nicht bei jedem Fensterwechsel).
   if (!st.contractTabAt || Date.now() - st.contractTabAt > 30 * 60 * 1000) return;
+  // Aus „Was ist zu tun?“ unterschrieben (ohne offenes Fenster): Übersicht auffrischen
+  if (!id && st.view === 'overview' && !$('#modal').classList.contains('open')) {
+    refreshBehind();
+    return;
+  }
   if (!id || !$('#secContracts') || document.body.classList.contains('ps-dialog-open')) return;
   const dirty = [...document.querySelectorAll('#modal input, #modal textarea, #modal select')].some((el) => {
     if (el.type === 'checkbox' || el.type === 'radio') return el.checked !== el.defaultChecked;
@@ -362,7 +373,7 @@ setInterval(() => {
 // Ungelesene Post, neue Bewerbungen und Dienststatus regelmäßig aktualisieren (Badges in der Navigation)
 setInterval(() => {
   if (document.hidden || !st.user) return;
-  Promise.all([load.chatUnread().catch(() => {}), load.unread(), load.appCount(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {})])
+  Promise.all([load.chatUnread().catch(() => {}), load.unread(), load.appCount(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {}), load.paymentReports().catch(() => {})])
     .then(renderNav)
     .catch(() => {});
 }, 30000);
@@ -397,7 +408,7 @@ setInterval(() => {
   if (googleState && GOOGLE_MSG[googleState]) toast(...GOOGLE_MSG[googleState]);
 
   try {
-    await Promise.all([load.chatUnread().catch(() => {}), load.unread(), load.appCount(), load.duty(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {})]);
+    await Promise.all([load.chatUnread().catch(() => {}), load.unread(), load.appCount(), load.duty(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {}), load.paymentReports().catch(() => {})]);
     renderUser();
   } catch {
     /* Badges und Dienststatus sind nicht kritisch */
@@ -410,4 +421,17 @@ setInterval(() => {
     st.histPaused = false;
     syncHistory();
   }
+  if (st.user.needsName) askInitialName();
 })();
+
+/** Konto per Discord angelegt: einmal nach dem Namen im Spiel fragen (erscheint in Akten, Verträgen, Nachrichten). */
+function askInitialName() {
+  openModal(`
+      <h2 id="modalTitle" class="modal-title">Willkommen bei Pake &amp; Scha!</h2>
+      <p class="modal-sub">Ihr Konto ist mit Discord verbunden. Wie heißt Ihr Charakter im Spiel? So erscheinen Sie in Ihren Akten, Verträgen und Nachrichten.</p>
+      <form data-form="initial-name" class="form-grid">
+        <div><label class="label" for="inName">Vor- und Nachname (im Spiel)</label><input id="inName" name="displayName" class="field" required minlength="3" maxlength="80" autocomplete="name" placeholder="z. B. John Doe" autofocus></div>
+        <p class="form-hint">Später ändern Sie den Namen nur noch per Antrag ans Board of Partners – bitte genau so, wie er im Spiel lautet.</p>
+        <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('check', 'ico-sm')}<span>Speichern</span></button></div>
+      </form>`);
+}

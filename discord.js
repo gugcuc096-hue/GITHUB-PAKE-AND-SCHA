@@ -44,11 +44,12 @@ const EVENTS = {
   'name.requested': 'Namensänderung beantragt bzw. vom Board entschieden',
   'system.alert': 'Systemwarnung: Kanzlei-Bot offline, Datensicherung fehlgeschlagen, Speicher fast voll, Absturz',
   'review.created': 'Neue Mandantenstimme (Bewertung) zur Freigabe',
+  'invoice.payment': 'Mandant meldet eine Rechnung als bezahlt',
 };
 
 // Ereignisse, die nach dem Speichern der Auswahl dazugekommen sind, sind eingeschaltet (bis jemand sie abwählt).
 // discord_events_known = Ereignisse, die es beim letzten Speichern gab; ältere Speicherstände kennen alle außer diesen:
-const ADDED_LATER = ['system.alert', 'review.created'];
+const ADDED_LATER = ['system.alert', 'review.created', 'invoice.payment'];
 
 function isValidWebhookUrl(url) {
   return WEBHOOK_RE.test(String(url || '').trim());
@@ -351,7 +352,7 @@ async function fetchDiscordUser(cfg, code) {
   if (!userRes.ok) throw new Error(`Discord-Profil konnte nicht geladen werden (${userRes.status})`);
   const u = await userRes.json();
   // accessToken nur für den einmaligen Server-Beitritt (guilds.join) – wird nirgends gespeichert.
-  return { id: String(u.id), username: u.global_name || u.username, avatar: u.avatar || null, accessToken: token.access_token, scope: String(token.scope || '') };
+  return { id: String(u.id), username: u.global_name || u.username, handle: u.username || '', avatar: u.avatar || null, accessToken: token.access_token, scope: String(token.scope || '') };
 }
 
 module.exports = {

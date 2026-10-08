@@ -8,6 +8,8 @@
  * dazu ein Bot mit Burgershot-Rolle, der nie angeschrieben werden darf.
  *
  * DISCORD_STUB_STATE=<Datei>: Nach jedem Aufruf steht dort der Stand als JSON (gesendete Nachrichten und DMs).
+ * Discord-Login (OAuth2): Der Code „user-<Discord-ID>“ meldet genau diese Person an (bekannte Mitglieder mit ihrem
+ * Profil, sonst „Neuer Nutzer“).
  */
 const fs = require('fs');
 
@@ -42,7 +44,7 @@ const roles = [
   { id: ROLES.bot, name: 'Kanzlei-Bot', position: 4, permissions: '0', color: 0, managed: true },
 ];
 
-const state = { calls: [], channelMessages: [], dms: [], seq: 0 };
+const state = { calls: [], channelMessages: [], dms: [], channels: [], seq: 0, channelSeq: 0 };
 const save = () => STATE && fs.writeFileSync(STATE, JSON.stringify(state, null, 1));
 const json = (status, body) => new Response(body === null ? null : JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
@@ -50,6 +52,19 @@ globalThis.fetch = async (input, init = {}) => {
   const url = new URL(typeof input === 'string' ? input : input.url);
   if (url.hostname !== 'discord.com') return realFetch(input, init);
   const method = String(init.method || 'GET').toUpperCase();
+  // Discord-Login (OAuth2): Code „user-<ID>“ → Zugangstoken „tok-<ID>“ → Profil dieser Person
+  const auth = String((init.headers && (init.headers.Authorization || init.headers.authorization)) || '');
+  if (method === 'POST' && url.pathname === '/api/oauth2/token') {
+    state.calls.push('POST /oauth2/token');
+    save();
+    const id = (String(new URLSearchParams(String(init.body || '')).get('code') || '').match(/^user-(\d{15,25})$/) || [])[1];
+    return id ? json(200, { access_token: `tok-${id}`, token_type: 'Bearer', scope: 'identify guilds.join' }) : json(400, { error: 'invalid_grant' });
+  }
+  const bearer = auth.match(/^Bearer tok-(\d{15,25})$/);
+  if (method === 'GET' && url.pathname === '/api/users/@me' && bearer) {
+    const mem = members.find((x) => x.user.id === bearer[1]);
+    return json(200, mem ? { avatar: null, ...mem.user } : { id: bearer[1], username: `neu${bearer[1].slice(-3)}`, global_name: 'Neuer Nutzer', avatar: null });
+  }
   const path = url.pathname.replace(/^\/api\/v10/, '');
   const body = init.body ? JSON.parse(init.body) : undefined;
   state.calls.push(`${method} ${path}`);
@@ -59,6 +74,12 @@ globalThis.fetch = async (input, init = {}) => {
     if (method === 'GET' && path === `/guilds/${GUILD}`) return json(200, { id: GUILD, name: 'Testserver', icon: null, approximate_member_count: members.length });
     if (method === 'GET' && path === `/guilds/${GUILD}/roles`) return json(200, roles);
     if (method === 'GET' && path === `/guilds/${GUILD}/channels`) return json(200, [{ id: '900000000000000500', name: 'willkommen', type: 0, position: 1 }]);
+    // Ticket-Kanäle anlegen (Akten-Tickets): fortlaufende IDs ab …701
+    if (method === 'POST' && path === `/guilds/${GUILD}/channels`) {
+      const id = String(900000000000000700n + BigInt(++state.channelSeq));
+      state.channels.push({ id, name: body.name, parent_id: body.parent_id });
+      return json(201, { id, guild_id: GUILD, type: body.type, name: body.name, parent_id: body.parent_id });
+    }
     if (method === 'GET' && path === `/guilds/${GUILD}/members`) {
       const after = url.searchParams.get('after') || '0';
       return json(200, members.filter((m) => BigInt(m.user.id) > BigInt(after)));
