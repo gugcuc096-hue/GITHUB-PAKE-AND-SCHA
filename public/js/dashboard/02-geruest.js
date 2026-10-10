@@ -192,13 +192,40 @@ function syncHistory() {
   st.histSkip = 0;
   if (overlayOpen()) {
     const url = urlWithCase(openCaseId());
-    if (!onOverlayEntry()) history.pushState({ psOverlay: 1 }, '', url);
-    else if (url !== location.pathname + location.search + location.hash) history.replaceState({ psOverlay: 1 }, '', url);
+    // base: die Seite unter dem Fenster – nur dorthin führt das Schließen später zurück
+    if (!onOverlayEntry()) history.pushState({ psOverlay: 1, base: location.pathname + location.search + location.hash }, '', url);
+    else if (url !== location.pathname + location.search + location.hash) history.replaceState({ ...history.state, psOverlay: 1 }, '', url);
   } else if (onOverlayEntry()) {
     // per X/Esc/Speichern geschlossen: den Eintrag des Fensters wieder entfernen
+    dropOverlayEntry();
+  }
+}
+/**
+ * Verlaufseintrag eines geschlossenen Fensters entfernen – ohne je das Dashboard zu verlassen. Ein einfaches
+ * „Zurück“ landete sonst auf dem Eintrag davor, und der ist nicht immer die Seite unter dem Fenster: Akte per Link
+ * geöffnet, Seite neu geladen, von der Website gekommen, oder der Browser überspringt Einträge (z. B. Brave). Dann
+ * führte X auf die Website. Zurück geht es deshalb nur auf genau den Eintrag der Seite darunter; gibt es den nicht
+ * direkt davor, wird der Eintrag des Fensters einfach zur Seite umgeschrieben.
+ */
+function dropOverlayEntry() {
+  const page = urlWithCase(null);
+  const nav = window.navigation;
+  if (nav && nav.currentEntry && typeof nav.traverseTo === 'function') {
+    const prev = nav.currentEntry.index > 0 ? nav.entries()[nav.currentEntry.index - 1] : null;
+    if (prev && prev.url === new URL(page, location.href).href) {
+      st.histSkip = Date.now();
+      const t = nav.traverseTo(prev.key); // genau dieser Eintrag – der Browser überspringt hier nichts
+      t.committed.catch(() => {});
+      t.finished.catch(() => {});
+      return;
+    }
+  } else if (history.state && history.state.base === page) {
+    // Browser ohne Navigation API: der Eintrag davor ist die Seite, von der aus das Fenster geöffnet wurde
     st.histSkip = Date.now();
     history.back();
+    return;
   }
+  history.replaceState(null, '', page);
 }
 function onPopState(e) {
   if (st.histSkip && Date.now() - st.histSkip < 2000) {
