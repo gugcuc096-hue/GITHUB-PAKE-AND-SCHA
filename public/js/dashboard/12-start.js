@@ -438,7 +438,10 @@ setInterval(() => {
   const caseParam = Number(params.get('case'));
   // Neu geladen, während eine Akte offen war: der Verlaufseintrag gehört schon zur Akte – nur wieder öffnen
   const restoring = params.has('case') && onOverlayEntry();
-  if (!restoring && (discordState || googleState || params.has('case'))) history.replaceState(null, '', location.pathname + location.hash);
+  // Akte per Link ohne Seite (Discord „Im Dashboard öffnen“, /akte, Startseite): dahinter liegt die Aktenliste –
+  // X führt dorthin statt zur Übersicht
+  const hash = location.hash || (params.has('case') && !restoring ? '#cases' : '');
+  if (!restoring && (discordState || googleState || params.has('case'))) history.replaceState(null, '', location.pathname + hash);
   if (discordState && DISCORD_MSG[discordState]) toast(...DISCORD_MSG[discordState]);
   if (googleState && GOOGLE_MSG[googleState]) toast(...GOOGLE_MSG[googleState]);
   if (googleState) st.settingsTab = 'integrations'; // Google Docs stehen unter Einstellungen → Integrationen

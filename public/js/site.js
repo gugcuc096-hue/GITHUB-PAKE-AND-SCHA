@@ -54,7 +54,7 @@
       <p class="text-xs text-[var(--text-muted)] text-center mb-5">Bitte geben Sie das Aktenzeichen bei Rückfragen an.${res.linkedToAccount ? '' : ' Mit einem Mandantenkonto sehen Sie den Stand Ihrer Akte jederzeit im Mandantenportal.'}</p>
       <div class="flex flex-col sm:flex-row gap-2">
         <button type="button" id="ticketCopy" class="btn-outline flex-1 py-3 text-xs uppercase tracking-wider">Aktenzeichen kopieren</button>
-        ${res.linkedToAccount && res.caseId ? `<a href="/dashboard.html?case=${Number(res.caseId)}" class="btn-gold flex-1 py-3 text-xs uppercase tracking-wider">Zur Akte</a>` : ''}
+        ${res.linkedToAccount && res.caseId ? `<a href="/dashboard.html?case=${Number(res.caseId)}#cases" class="btn-gold flex-1 py-3 text-xs uppercase tracking-wider">Zur Akte</a>` : ''}
       </div>
       ${!res.linkedToAccount && res.discordSignup
         ? `<button type="button" id="ticketAccount" class="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-full bg-[#5865F2] hover:bg-[#4752c4] text-white text-xs uppercase tracking-wider font-semibold py-3 transition-colors">Konto mit Discord anlegen</button>

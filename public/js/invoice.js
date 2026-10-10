@@ -5,6 +5,8 @@ document.getElementById('printBtn').addEventListener('click', () => window.print
 (() => {
     'use strict';
     const { api, esc, money, parseDate } = window.PS;
+    const backLink = document.getElementById('backLink');
+    window.PS.closeToDashboard(backLink);
     const KIND = { rechnung: 'Rechnung', honorarvereinbarung: 'Honorarvereinbarung' };
     const dateDe = (v) => { const d = parseDate(v); return d ? d.toLocaleDateString('de-DE') : '—'; };
     const dayDe = (s) => (s ? new Date(s + 'T12:00:00').toLocaleDateString('de-DE') : '—');
@@ -67,6 +69,11 @@ document.getElementById('printBtn').addEventListener('click', () => window.print
     }
     api.get('/api/invoices/' + id)
         .then(({ invoice, firm }) => {
+            // Rechnung zu einer Akte: zurück in die Akte, sonst zu den Rechnungen
+            if (invoice.caseId) {
+                backLink.href = `/dashboard.html?case=${Number(invoice.caseId)}#cases`;
+                backLink.textContent = '← Zur Akte';
+            }
             render(invoice, firm);
             window.PS.googleDoc.mount({ kind: 'invoice', id });
         })

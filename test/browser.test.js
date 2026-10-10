@@ -807,6 +807,63 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       }
     });
 
+    it(`Schließen am ${label}: Akte aus einem Discord-Link führt zur Aktenliste, Druckansichten zurück in die Akte`, async () => {
+      // Eigener Server – die Anmeldungen hier zählen nicht gegen die Sperre des gemeinsamen Servers
+      const rsrv = await startServer();
+      try {
+        const adm = client(rsrv.base);
+        const me = await adm.login(TEAM.admin);
+        const kase = (await adm.post('/api/cases', { title: `Rückweg ${label}`, area: 'zivilrecht', clientName: 'Rita Rückweg', lawyerId: me.id })).json.case;
+        const inv = (await adm.post('/api/invoices', { caseId: kase.id, items: [{ description: 'Beratung', quantity: 1, unitPrice: 9000 }] })).json.invoice;
+        const { templates } = (await adm.get('/api/contract-templates')).json;
+        const defaults = (await adm.get(`/api/cases/${kase.id}/contracts/defaults`)).json;
+        const k = (await adm.post(`/api/cases/${kase.id}/contracts`, { templateId: templates.find((t) => t.key === 'mandatsvertrag').id, lawyerId: me.id, data: defaults.data })).json.contract;
+
+        const { ctx, page, problems, settle } = await open(device);
+        await login(page, TEAM.admin, rsrv.base);
+        const closedTo = async (p, what) => {
+          await p.click('.modal-close');
+          await p.waitForFunction(() => !document.querySelector('#modal').classList.contains('open'));
+          await p.waitForTimeout(300);
+          assert.equal(await p.evaluate(() => location.hash), '#cases', `${what}: X führt zur Aktenliste`);
+          assert.match(await p.textContent('#pageTitle'), /Akten/, `${what}: Aktenliste sichtbar`);
+        };
+
+        // 1) „Im Dashboard öffnen“ aus dem Discord-Ticket bzw. /akte (Link ohne Seite): dahinter liegt die Aktenliste
+        await page.goto(`${rsrv.base}/dashboard.html?case=${kase.id}`);
+        await page.waitForSelector('#modalBody .case-jump');
+        await settle();
+        await closedTo(page, 'Discord-Link');
+
+        // 2) Vertrag, Rechnung und Aktenauszug aus der Akte (neuer Tab): „← Zur Akte“ schließt den Tab – die Akte ist noch offen
+        await page.click(`[data-action="open-case"][data-id="${kase.id}"] >> nth=0`);
+        await page.waitForSelector('#modalBody .case-jump');
+        for (const href of [`/vertrag.html?id=${k.id}`, `/invoice.html?id=${inv.id}`, `/aktenauszug.html?id=${kase.id}`]) {
+          const [tab] = await Promise.all([ctx.waitForEvent('page'), page.$eval(`#modalBody a[href="${href}"]`, (a) => a.click())]);
+          await tab.waitForFunction(() => document.getElementById('backLink').href.includes('?case='));
+          assert.match(await tab.textContent('#backLink'), /Zur Akte/, `${href}: Knopf „Zur Akte“`);
+          // Der Tab schließt sich mitten im Klick – Playwright meldet das als Fehler des Klicks, entscheidend ist „close“
+          await Promise.all([tab.waitForEvent('close'), tab.click('#backLink').catch(() => {})]);
+          assert.ok(await page.isVisible('#modalBody .case-jump'), `${href}: Akte im Dashboard noch offen`);
+        }
+        await closedTo(page, 'Akte aus der Liste');
+
+        // 3) Druckansicht direkt aufgerufen (z. B. „Lesen & unterschreiben“ aus Discord): „← Zur Akte“ öffnet die Akte, X führt zur Liste
+        const direct = await ctx.newPage();
+        await direct.goto(`${rsrv.base}/vertrag.html?id=${k.id}`);
+        await direct.waitForFunction(() => document.getElementById('backLink').href.includes('?case='));
+        await direct.click('#backLink');
+        await direct.waitForURL(/dashboard\.html/);
+        await direct.waitForSelector('#modalBody .case-jump');
+        await direct.waitForTimeout(300);
+        await closedTo(direct, 'Vertrag direkt');
+        assert.deepEqual(problems, []);
+        await ctx.close();
+      } finally {
+        await rsrv.stop();
+      }
+    });
+
     it(`Startseite am ${label}: Honorarordnung nach Kategorien aufklappbar${device === PHONE ? ', fester Knopf „Mandat anfragen“' : ''}`, async () => {
       const { ctx, page, problems } = await open(device);
       await page.goto(server.base + '/');
