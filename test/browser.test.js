@@ -625,8 +625,16 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.fill('#tkName', `Lena Berg ${label}`);
         await page.selectOption('#tkArea', 'zivilrecht');
         await page.fill('#tkDesc', 'Mein Fahrzeug wurde am Pier beschädigt.');
-        await page.click('#ticketForm button[type=submit]');
-        await page.waitForSelector('#ticketAccount');
+        // Antwort des Servers festhalten – schlägt der Schritt fehl, steht im Fehler, was zurückkam (samt Server-Log)
+        const [sent] = await Promise.all([
+          page.waitForResponse((r) => r.url().endsWith('/api/public/cases') && r.request().method() === 'POST'),
+          page.click('#ticketForm button[type=submit]'),
+        ]);
+        const sentBody = await sent.text();
+        const why = `Mandatsanfrage: ${sent.status()} ${sentBody}\nCookies: ${JSON.stringify((await ctx.cookies()).map((c) => c.name))}\nServer: ${dsrv.log().slice(-1500)}`;
+        assert.equal(sent.status(), 201, why);
+        assert.match(sentBody, /"discordSignup":true/, why);
+        await page.waitForSelector('#ticketAccount', { timeout: 10000 });
         // Nach dem Absenden schließt ein Klick daneben die Bestätigung nicht (Discord-Beitritt gibt es nur hier)
         await page.mouse.click(5, 5);
         await page.waitForTimeout(300);
