@@ -431,7 +431,9 @@ function openSearch() {
       <h2 class="modal-title">Suchen</h2>
       <label class="search mt-2">${icon('search')}<input id="gsInput" class="field" type="search" placeholder="${isStaff() ? 'Akten, Mandanten, Rechnungen, Termine …' : 'Akten, Rechnungen, Termine …'}" value="${esc(st.gsQuery)}" autocomplete="off" aria-label="Suchbegriff" autofocus></label>
       <div id="gsResults" class="gs-results" role="listbox" aria-label="Suchergebnisse"></div>
-      <div class="gs-foot hidden md:flex"><span><kbd>↑</kbd> <kbd>↓</kbd> auswählen</span><span><kbd>Enter</kbd> öffnen</span><span><kbd>Esc</kbd> schließen</span><span><kbd>${KEY_MOD}</kbd> <kbd>K</kbd> Suche öffnen</span></div>`);
+      <div class="gs-foot hidden md:flex"><span><kbd>↑</kbd> <kbd>↓</kbd> auswählen</span><span><kbd>Enter</kbd> öffnen</span><span><kbd>Esc</kbd> schließen</span><span><kbd>${KEY_MOD}</kbd> <kbd>K</kbd> Suche öffnen</span></div>`,
+    { light: true }
+  );
   const input = $('#gsInput');
   input.focus();
   input.select();

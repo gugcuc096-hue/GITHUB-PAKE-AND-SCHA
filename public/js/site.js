@@ -479,8 +479,15 @@
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !concernModal.classList.contains('pointer-events-none')) window.closeConcernModal();
   });
+  // Klick daneben schließt nur, wenn nichts verloren geht (kein angefangener Text, keine Bestätigung mit Vorgangsnummer)
+  let concernPressOutside = false;
+  concernModal.addEventListener('pointerdown', (e) => (concernPressOutside = e.target === concernModal));
   concernModal.addEventListener('click', (e) => {
-    if (e.target === concernModal) window.closeConcernModal();
+    if (e.target !== concernModal || !concernPressOutside) return;
+    const typed = [...concernModal.querySelectorAll('textarea, #cfSubject')].some((f) => f.value.trim());
+    const success = document.getElementById('concernSuccess').getClientRects().length > 0;
+    if (typed || success) window.nudgeDialog?.(concernModal.firstElementChild);
+    else window.closeConcernModal();
   });
   document.querySelectorAll('[data-concern-tab]').forEach((b) => b.addEventListener('click', () => concernTab(b.dataset.concernTab)));
   document.getElementById('cfAnon').addEventListener('change', syncConcernPersonal);

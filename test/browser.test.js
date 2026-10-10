@@ -87,7 +87,16 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
     await page.click('[data-act="ticket"][data-source="calc"]');
     await page.waitForFunction(() => !document.getElementById('ticketModal').classList.contains('opacity-0'));
     assert.match(await page.inputValue('#tkDesc'), /Gewünschte Leistungen/, 'Auswahl aus dem Rechner übernommen');
+    // Klick daneben: mit angefangenem Sachverhalt bleibt das Fenster offen, leer geht es zu; Esc schließt immer
+    await page.mouse.click(5, 5);
+    await page.waitForTimeout(300);
+    assert.equal(await page.$eval('#ticketModal', (m) => m.classList.contains('opacity-0')), false, 'mit Text bleibt das Fenster offen');
     await page.keyboard.press('Escape');
+    await page.waitForFunction(() => document.getElementById('ticketModal').classList.contains('opacity-0'));
+    await page.locator('[data-act="ticket"]').nth(1).click();
+    await page.waitForFunction(() => !document.getElementById('ticketModal').classList.contains('opacity-0'));
+    await page.fill('#tkDesc', '');
+    await page.mouse.click(5, 5);
     await page.waitForFunction(() => document.getElementById('ticketModal').classList.contains('opacity-0'));
     await page.locator('[data-act="faq"]').first().click();
     assert.ok(await page.$('.faq-item.open'), 'FAQ klappt auf');
@@ -157,7 +166,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       const scroller = device === PHONE ? '#modalBody' : '#modal';
       const scrollTop = () => page.$eval(scroller, (el) => el.scrollTop);
 
-      // X, Esc und Klick daneben in einem Unterfenster → zurück in die Akte (an dieselbe Stelle)
+      // X, Esc und Abbrechen in einem Unterfenster → zurück in die Akte (an dieselbe Stelle)
       await page.$eval('#modalBody [data-action="contract-new"]', (el) => el.scrollIntoView({ block: 'center' }));
       await page.waitForTimeout(300);
       const before = await scrollTop();
@@ -171,10 +180,14 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       await page.waitForSelector('#modalBody form[data-form="brief-new"]');
       await page.keyboard.press('Escape');
       await backInCase('Schriftsatz → Esc');
+      // Klick neben das Fenster schließt nichts – weder das Unterfenster noch die Akte
       await page.click('#modalBody [data-action="task-new"]');
       await page.waitForSelector('#modalBody form[data-form="task"]');
       await page.mouse.click(5, 5);
-      await backInCase('Aufgabe → Klick daneben');
+      await page.waitForTimeout(300);
+      assert.ok(await page.$('#modalBody form[data-form="task"]'), 'Aufgabe: Klick daneben lässt das Fenster offen');
+      await page.click('.modal-close');
+      await backInCase('Aufgabe → X');
       await page.click('#modalBody [data-action="new-event"]');
       await page.waitForSelector('#modalBody form[data-form="event"]');
       await page.click('#modalBody form[data-form="event"] [data-action="close-modal"]');
@@ -194,8 +207,38 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       await page.click('#invoiceForm [data-action="inv-back"]');
       await backInCase('Rechnung → Abbrechen');
 
+      // Die Akte selbst: Klick daneben (rechts daneben, am Handy über dem Fenster) lässt sie offen
+      const [besideX, besideY] = device === PHONE ? [195, 10] : [1340, 450];
+      await page.mouse.click(besideX, besideY);
+      await page.waitForTimeout(300);
+      await backInCase('Akte → Klick daneben');
+      await page.$eval(scroller, (el) => (el.scrollTop = 0));
+      if (device === DESKTOP) {
+        // Text markieren und erst neben dem Fenster loslassen – auch das schließt nichts
+        const t = await page.$eval('#modalTitle', (h) => {
+          const r = h.getBoundingClientRect();
+          return { x: r.left + 5, y: r.top + r.height / 2 };
+        });
+        await page.mouse.move(t.x, t.y);
+        await page.mouse.down();
+        await page.mouse.move(besideX, t.y, { steps: 5 });
+        await page.mouse.up();
+        await page.waitForTimeout(300);
+        await backInCase('Akte → markiert bis neben das Fenster');
+      }
+      // Esc bei offenem „⋯ Mehr“ schließt nur das Menü
+      await page.click('#modalBody details.more-menu > summary');
+      await page.keyboard.press('Escape');
+      assert.equal(await page.$eval('#modalBody details.more-menu', (d) => d.open), false, 'Esc schließt das Menü');
+      await backInCase('Esc im Menü');
+
       // Erst in der Akte selbst schließt X das Fenster
       await page.click('.modal-close');
+      await page.waitForFunction(() => !document.querySelector('#modal').classList.contains('open'));
+      // Die Suche (Strg + K) ist ein leichtes Fenster: Klick daneben schließt sie
+      await page.keyboard.press('Control+k');
+      await page.waitForSelector('#gsInput');
+      await page.mouse.click(besideX, besideY);
       await page.waitForFunction(() => !document.querySelector('#modal').classList.contains('open'));
       assert.deepEqual(problems, []);
       await ctx.close();
@@ -584,6 +627,10 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.fill('#tkDesc', 'Mein Fahrzeug wurde am Pier beschädigt.');
         await page.click('#ticketForm button[type=submit]');
         await page.waitForSelector('#ticketAccount');
+        // Nach dem Absenden schließt ein Klick daneben die Bestätigung nicht (Discord-Beitritt gibt es nur hier)
+        await page.mouse.click(5, 5);
+        await page.waitForTimeout(300);
+        assert.ok(await page.isVisible('#ticketAccount'), 'Bestätigung bleibt offen');
         const caseNumber = (await page.textContent('#ticketSuccess .font-mono')).trim();
         if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Erfolgsanzeige passt aufs Handy');
         await page.click('#ticketAccount');
