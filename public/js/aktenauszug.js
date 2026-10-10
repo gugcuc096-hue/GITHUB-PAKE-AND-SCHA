@@ -7,6 +7,7 @@
 (() => {
   'use strict';
   const { api, esc, fmtDate, parseDate, money } = window.PS;
+  window.PS.closeToDashboard(document.getElementById('backLink'));
 
   const AREAS = { strafrecht: 'Strafrecht', zivilrecht: 'Zivilrecht', verfassungsrecht: 'Verfassungsrecht', vertragsrecht: 'Vertragsrecht', sonstiges: 'Sonstiges' };
   const URGENCY = { normal: 'Normal', eilig: 'Eilig', notfall: 'Notfall' };
@@ -293,7 +294,9 @@
       data = caseData;
       firm = f.firm || firm;
       opts = loadOpts();
-      document.getElementById('backLink').href = '/dashboard.html#cases';
+      // Zurück in genau diese Akte (aus dem Dashboard geöffnet: Tab schließen, siehe closeToDashboard)
+      document.getElementById('backLink').href = `/dashboard.html?case=${id}#cases`;
+      document.getElementById('backLink').textContent = '← Zur Akte';
       renderPanel();
       render();
       // Google Doc mit den hier gewählten Abschnitten (nur Kanzlei)

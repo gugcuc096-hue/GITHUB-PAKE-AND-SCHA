@@ -524,7 +524,7 @@ function panelFor(kind, r) {
       if (!closed && !r.lawyer_id) buttons.push(button('Akte übernehmen', `case:claim:${r.id}`, 3, { emoji: { name: '🙋' } }));
       buttons.push(closed ? button('Wieder öffnen', `case:reopen:${r.id}`, 1, { emoji: { name: '🔓' } }) : button('Akte schließen', `case:close:${r.id}`, 4, { emoji: { name: '🔒' } }));
     }
-    if (base) buttons.push(linkButton('Im Dashboard öffnen', `${base}/dashboard.html?case=${r.id}`));
+    if (base) buttons.push(linkButton('Im Dashboard öffnen', `${base}/dashboard.html?case=${r.id}#cases`));
     state = `${closed ? 'closed' : 'open'}|${r.lawyer_id ? 'taken' : 'free'}`;
   } else if (kind === 'concern') {
     const closed = BOARD_KINDS.concern.closed.includes(r.status);

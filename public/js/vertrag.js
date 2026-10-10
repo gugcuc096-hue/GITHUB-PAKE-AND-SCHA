@@ -6,6 +6,7 @@ document.getElementById('printBtn').addEventListener('click', () => window.print
     'use strict';
     const { api, esc, parseDate } = window.PS;
     const { render, header } = window.PS.contract;
+    window.PS.closeToDashboard(document.getElementById('backLink'));
     const params = new URLSearchParams(location.search);
     const id = Number(params.get('id'));
     const templateId = Number(params.get('vorlage'));

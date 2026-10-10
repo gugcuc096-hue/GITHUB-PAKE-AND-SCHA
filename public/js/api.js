@@ -202,5 +202,27 @@
     });
   }
 
-  window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog };
+  /**
+   * „← Zur Akte“ / „← Dashboard“ in Druckansichten (Vertrag, Schriftsatz, Rechnung, Aktenauszug): Aus dem Dashboard
+   * öffnen sie sich in einem neuen Tab – dann schließt der Knopf diesen Tab, und man ist wieder im Dashboard genau dort,
+   * wo man war (z. B. in der offenen Akte). Sonst (Link aus Discord, Lesezeichen) führt er zum Ziel des Links.
+   */
+  function closeToDashboard(link) {
+    if (!link) return;
+    link.addEventListener('click', (e) => {
+      let fromDashboard = false;
+      try {
+        const ref = new URL(document.referrer);
+        fromDashboard = ref.origin === location.origin && ref.pathname === '/dashboard.html';
+      } catch {
+        /* kein Verweis – direkt aufgerufen */
+      }
+      if (!fromDashboard || history.length > 1) return;
+      e.preventDefault();
+      window.close();
+      setTimeout(() => (location.href = link.href), 300); // Browser erlaubt das Schließen nicht: wie ein normaler Link
+    });
+  }
+
+  window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog, closeToDashboard };
 })();

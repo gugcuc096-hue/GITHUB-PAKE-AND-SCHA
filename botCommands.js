@@ -184,7 +184,7 @@ function akteCommand(body, u) {
         c.public_note ? { name: 'Hinweis der Kanzlei', value: c.public_note, inline: false } : null,
       ],
     },
-    { components: linkRow('Im Dashboard öffnen', dashboardLink(`/dashboard.html?case=${c.id}`)) }
+    { components: linkRow('Im Dashboard öffnen', dashboardLink(`/dashboard.html?case=${c.id}#cases`)) }
   );
 }
 
