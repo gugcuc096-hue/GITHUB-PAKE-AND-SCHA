@@ -193,8 +193,11 @@
       document.addEventListener('keydown', onKey, true);
       ok.addEventListener('click', () => close(true));
       cancel.addEventListener('click', () => close(false));
+      // Daneben klicken = Abbrechen – aber nicht, wenn der Klick im Dialog begann (z. B. Text markiert)
+      let pressOutside = false;
+      root.addEventListener('pointerdown', (e) => (pressOutside = e.target === root));
       root.addEventListener('click', (e) => {
-        if (e.target === root) close(false);
+        if (e.target === root && pressOutside) close(false);
       });
     });
   }

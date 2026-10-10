@@ -58,7 +58,23 @@ function closeTicketModal() {
     document.body.style.overflow = '';
 }
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeTicketModal(); });
-document.getElementById('ticketModal').addEventListener('click', (e) => { if (e.target.id === 'ticketModal') closeTicketModal(); });
+/** Fenster bleibt offen und „wippt“ kurz – der Klick daneben ist angekommen, schließen geht mit X oder Esc. */
+function nudgeDialog(panel) {
+    if (!panel || typeof panel.animate !== 'function' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    panel.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.012)' }, { transform: 'scale(1)' }], { duration: 220, easing: 'ease-out' });
+}
+window.nudgeDialog = nudgeDialog;
+// Klick neben das Fenster schließt es nur, wenn dabei nichts verloren geht: nicht nach dem Absenden (Aktenzeichen,
+// „Discord-Ticket beitreten“ gibt es nur dort) und nicht mit angefangenem Sachverhalt. Wer im Fenster Text markiert
+// und daneben loslässt, hat nicht daneben geklickt.
+let ticketPressOutside = false;
+document.getElementById('ticketModal').addEventListener('pointerdown', (e) => { ticketPressOutside = e.target.id === 'ticketModal'; });
+document.getElementById('ticketModal').addEventListener('click', (e) => {
+    if (e.target.id !== 'ticketModal' || !ticketPressOutside) return;
+    const keep = !document.getElementById('ticketSuccess').classList.contains('hidden') || document.getElementById('tkDesc').value.trim();
+    if (keep) nudgeDialog(e.target.firstElementChild);
+    else closeTicketModal();
+});
 
 /* ---------- Toast System ---------- */
 function showToast(title, message) {

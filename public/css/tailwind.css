@@ -1350,6 +1350,8 @@ video {
   transition-duration: 300ms;
 }.ease-in-out {
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}.ease-out {
+  transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
 }.hover\:border-\[var\(--gold-500\)\]:hover {
   border-color: var(--gold-500);
 }.hover\:border-red-400:hover {

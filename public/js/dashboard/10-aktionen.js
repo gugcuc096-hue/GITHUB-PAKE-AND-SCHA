@@ -490,7 +490,7 @@ const actions = {
           <a class="btn-ghost btn-md" href="${esc(a.url)}" download>${icon('download', 'ico-sm')}<span>Herunterladen</span></a>
           ${canDelete ? `<button class="btn-danger btn-md" data-action="att-delete" data-id="${a.id}" data-case-id="${caseId}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>` : ''}
         </div>`,
-      { wide: true }
+      { wide: true, light: true }
     );
   },
   'att-delete': async (el) => {

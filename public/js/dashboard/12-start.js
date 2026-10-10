@@ -7,6 +7,10 @@
 /* ================================================================
    Ereignisse
    ================================================================ */
+// Wo der Klick begonnen hat: Wer im Fenster Text markiert und neben dem Fenster loslässt, hat nicht „daneben“ geklickt.
+let modalPressOutside = false;
+document.addEventListener('pointerdown', (e) => (modalPressOutside = e.target === $('#modal')), true);
+
 document.addEventListener('click', (e) => {
   if (!e.target.closest('#dutyWrap')) closeDutyPop();
   // Menü „⋯ Mehr“: Klick daneben oder auf einen Eintrag schließt es
@@ -14,9 +18,12 @@ document.addEventListener('click', (e) => {
     if (!d.contains(e.target) || e.target.closest('.more-item')) d.open = false;
   });
   if (e.target.closest('a[href^="/vertrag.html"]')) st.contractTabAt = Date.now();
-  // Klick neben das Fenster: zurück zum vorherigen Fenster (z. B. zur Akte) bzw. schließen
+  // Klick neben das Fenster: Akte, Formulare und Detailfenster bleiben offen (versehentlich daneben geklickt) –
+  // nur Suche und Bildansicht gehen zu (zurück zum vorherigen Fenster, z. B. zur Akte)
   if (e.target === $('#modal')) {
-    guard(() => modalDismiss());
+    if (!modalPressOutside) return;
+    if (st.modalCurrent && st.modalCurrent.light) guard(() => modalDismiss());
+    else nudgeModal();
     return;
   }
   const link = e.target.closest('a[href^="#"]');
@@ -68,6 +75,17 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (e.key === 'Escape') {
+    // Erst das kleine Menü bzw. die Dienst-Auswahl schließen – nicht gleich die ganze Akte
+    const menu = $('details.more-menu[open]');
+    if (menu) {
+      menu.open = false;
+      menu.querySelector('summary').focus();
+      return;
+    }
+    if ($('#dutyPop').classList.contains('open')) {
+      closeDutyPop();
+      return;
+    }
     if ($('#modal').classList.contains('open')) guard(() => modalDismiss());
     else closeSidebar();
   }

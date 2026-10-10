@@ -301,13 +301,14 @@ function stashModal() {
  * opts.key: was das Fenster zeigt (z. B. 'case:12') – dasselbe noch einmal öffnen ersetzt es nur.
  * opts.reopen: lädt das Fenster neu (für die Rückkehr aus einem Unterfenster).
  */
-function openModal(html, { wide = false, key = null, reopen = null, child = false } = {}) {
+// light: Fenster ohne eigene Arbeit darin (Suche, Bildansicht) – nur diese schließt ein Klick daneben
+function openModal(html, { wide = false, key = null, reopen = null, child = false, light = false } = {}) {
   const modal = $('#modal');
   const body = $('#modalBody');
   const same = key && st.modalCurrent && st.modalCurrent.key === key;
   // child: auch nach dem Absenden eines Formulars als Unterfenster öffnen (z. B. „Rechnung erstellt“ über der Akte)
   if (modal.classList.contains('open') && !st.modalRestoring && (child || !st.modalReplace) && !same) stashModal();
-  st.modalCurrent = { key, reopen, wide };
+  st.modalCurrent = { key, reopen, wide, light };
   body.innerHTML = html;
   $('#modalCard').classList.toggle('wide', wide);
   modal.classList.add('open');
@@ -375,7 +376,7 @@ async function modalBack() {
     body.innerHTML = '';
     body.appendChild(prev.nodes);
     Object.assign(st, prev.state);
-    st.modalCurrent = { key: prev.key || null, reopen: null, wide: !!prev.wide };
+    st.modalCurrent = { key: prev.key || null, reopen: null, wide: !!prev.wide, light: !!prev.light };
     $('#modalCard').classList.toggle('wide', !!prev.wide);
     modal.classList.add('open');
     document.body.classList.add('modal-open');
@@ -384,7 +385,16 @@ async function modalBack() {
   }
   restoreModalScroll(prev.scroll);
 }
-/** Vom Nutzer geschlossen (X, Esc, daneben, Abbrechen, Zurück-Taste): bei ungespeicherten Eingaben erst nachfragen. */
+/**
+ * Klick neben ein Fenster (Akte, Formular, Detailansicht): Es bleibt offen und „wippt“ kurz, damit klar ist,
+ * dass der Klick angekommen ist. Schließen geht mit X, Esc, „Abbrechen“ oder der Zurück-Taste.
+ */
+function nudgeModal() {
+  const card = $('#modalCard');
+  if (!card || typeof card.animate !== 'function' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  card.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.012)' }, { transform: 'scale(1)' }], { duration: 220, easing: 'ease-out' });
+}
+/** Vom Nutzer geschlossen (X, Esc, Abbrechen, Zurück-Taste; bei Suche und Bildansicht auch daneben): bei ungespeicherten Eingaben erst nachfragen. */
 async function modalDismiss(back = modalBack) {
   if (st.modalRestoring || st.modalAsking) return;
   if (formDirty($('#modalBody'))) {
