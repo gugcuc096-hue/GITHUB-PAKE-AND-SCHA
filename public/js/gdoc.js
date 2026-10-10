@@ -90,7 +90,7 @@
       if (!available) {
         create.disabled = true;
         create.title = configured
-          ? 'Das Google-Konto der Kanzlei ist nicht verbunden – Board of Partners: Dashboard → Einstellungen → Google Docs.'
+          ? 'Das Google-Konto der Kanzlei ist nicht verbunden – Board of Partners: Dashboard → Einstellungen → Integrationen → Google Docs.'
           : 'Google Docs ist noch nicht eingerichtet – siehe README („Google Docs“).';
       } else {
         create.title = 'Als Google Doc im Drive der Kanzlei anlegen – jeder mit dem Link kann es ansehen, Änderungen erscheinen automatisch.';

@@ -140,22 +140,24 @@ const VIEWS = {
   invoices: { label: 'Rechnungen', icon: 'receipt' },
   'vip-angebot': { label: 'VIP & Lifetime', short: 'VIP', icon: 'crown', client: true },
   mail: { label: 'Kanzlei-Post', short: 'Post', icon: 'mail' },
-  board: { label: 'Pinnwand', icon: 'pin', staff: true },
-  concerns: { label: 'Anliegen ans Board', short: 'Anliegen', icon: 'chat' },
-  duty: { label: 'Dienstzeiten', icon: 'clock', staff: true },
-  personnel: { label: 'Beförderungen & Einstellungen', short: 'Personal', icon: 'star', staff: true },
-  'concerns-board': { label: 'Eingegangene Anliegen', short: 'Anliegen', icon: 'chat', board: true, section: 'Board of Partners' },
-  applications: { label: 'Bewerbungen', icon: 'userAdd', board: true, section: 'Board of Partners' },
-  'name-requests': { label: 'Namensänderungen', short: 'Namen', icon: 'edit', board: true, section: 'Board of Partners' },
-  reviews: { label: 'Mandantenstimmen', short: 'Stimmen', icon: 'star', board: true, section: 'Board of Partners' },
-  team: { label: 'Team', icon: 'users', admin: true, section: 'Board of Partners' },
-  users: { label: 'Benutzer', icon: 'key', admin: true, section: 'Board of Partners' },
-  work: { label: 'Aktenbearbeitung', icon: 'briefcase', board: true, section: 'Board of Partners' },
-  vip: { label: 'VIP & Lifetime', short: 'VIP', icon: 'crown', board: true, section: 'Board of Partners' },
-  cooperations: { label: 'Kooperationen', icon: 'tag', board: true, section: 'Board of Partners' },
-  fees: { label: 'Honorarordnung', icon: 'scale', admin: true, section: 'Board of Partners' },
-  audit: { label: 'Protokoll', icon: 'list', admin: true, section: 'Board of Partners' },
-  settings: { label: 'Einstellungen', icon: 'cog', admin: true, section: 'Board of Partners' },
+  // Menügruppen (Überschrift „section“): Kanzlei, Board-Eingang und Verwaltung lassen sich auf- und zuklappen
+  board: { label: 'Pinnwand', icon: 'pin', staff: true, section: 'Kanzlei' },
+  concerns: { label: 'Anliegen ans Board', short: 'Anliegen', icon: 'chat', section: 'Kanzlei', staffSection: true },
+  duty: { label: 'Dienstzeiten', icon: 'clock', staff: true, section: 'Kanzlei' },
+  personnel: { label: 'Beförderungen & Einstellungen', short: 'Personal', icon: 'star', staff: true, section: 'Kanzlei' },
+  // Board: eigene und eingegangene Anliegen sind ein Menüpunkt „Anliegen“ (Reiter „Eingang“ / „Meine Anliegen“)
+  'concerns-board': { label: 'Eingegangene Anliegen', navLabel: 'Anliegen', short: 'Anliegen', icon: 'chat', board: true, section: 'Board-Eingang' },
+  applications: { label: 'Bewerbungen', icon: 'userAdd', board: true, section: 'Board-Eingang' },
+  'name-requests': { label: 'Namensänderungen', short: 'Namen', icon: 'edit', board: true, section: 'Board-Eingang' },
+  reviews: { label: 'Mandantenstimmen', short: 'Stimmen', icon: 'star', board: true, section: 'Board-Eingang' },
+  team: { label: 'Team', icon: 'users', admin: true, section: 'Verwaltung' },
+  users: { label: 'Benutzer', icon: 'key', admin: true, section: 'Verwaltung' },
+  work: { label: 'Aktenbearbeitung', icon: 'briefcase', board: true, section: 'Verwaltung' },
+  vip: { label: 'VIP & Lifetime', short: 'VIP', icon: 'crown', board: true, section: 'Verwaltung' },
+  cooperations: { label: 'Kooperationen', icon: 'tag', board: true, section: 'Verwaltung' },
+  fees: { label: 'Honorarordnung', icon: 'scale', admin: true, section: 'Verwaltung' },
+  audit: { label: 'Protokoll', icon: 'list', admin: true, section: 'Verwaltung' },
+  settings: { label: 'Einstellungen', icon: 'cog', admin: true, section: 'Verwaltung' },
   profile: { label: 'Mein Profil', short: 'Profil', icon: 'user', section: 'Konto' },
   'invoice-new': { label: 'Neues Dokument', icon: 'receipt', staff: true, hidden: true },
 };
@@ -331,6 +333,8 @@ function lawyerPicker({ leadId = null, coIds = [], withLead = false, extra = [],
       ${options ? `<div class="lawyer-grid">${options}</div>` : '<p class="text-sm text-dim">Keine weiteren Anwälte im Team.</p>'}</div>`;
 }
 const empty = (text, ico = 'folder') => `<div class="empty">${icon(ico, 'ico-lg')}<p>${esc(text)}</p></div>`;
+/** Leerer Kasten in der Übersicht: nur eine schmale Zeile, damit das Wichtige nach oben rückt. */
+const emptyLine = (text, ico = 'check') => `<p class="empty-line">${icon(ico, 'ico-sm')}<span>${esc(text)}</span></p>`;
 const pad = (n) => String(n).padStart(2, '0');
 const dayKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const byStart = (a, b) => parseDate(a.startsAt) - parseDate(b.startsAt);

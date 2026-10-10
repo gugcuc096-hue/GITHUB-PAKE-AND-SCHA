@@ -216,14 +216,14 @@ views.overview = {
     const eventsPanel = `
         <section class="panel panel-pad">
           <div class="panel-head"><h2 class="panel-title">${staff ? 'Fristen & Termine' : 'Ihre Termine'}</h2><a href="#calendar" class="btn-ghost btn-sm">Alle anzeigen</a></div>
-          ${upcoming.length ? upcoming.map((e) => eventRow(e)).join('') : empty('Keine anstehenden Termine.', 'calendar')}
+          ${upcoming.length ? upcoming.map((e) => eventRow(e)).join('') : emptyLine('Keine anstehenden Termine.', 'calendar')}
         </section>`;
 
     const recent = st.cases.slice(0, 5);
     const recentPanel = `
         <section class="panel panel-pad">
           <div class="panel-head"><h2 class="panel-title">${staff ? 'Zuletzt bearbeitet' : 'Meine Akten'}</h2><a href="#cases" class="btn-ghost btn-sm">Alle Akten</a></div>
-          ${recent.length ? recent.map((c) => caseListRow(c)).join('') : empty(staff ? 'Noch keine Akten.' : 'Sie haben noch kein Mandat eingereicht.', 'folder')}
+          ${recent.length ? recent.map((c) => caseListRow(c)).join('') : emptyLine(staff ? 'Noch keine Akten.' : 'Sie haben noch kein Mandat eingereicht.', 'folder')}
           ${!staff ? `<div class="form-actions mt-4"><button class="btn-gold btn-md" data-action="new-case">${icon('plus')}<span>Mandat einreichen</span></button><button class="btn-outline btn-md" data-action="new-event">${icon('calendar', 'ico-sm')}<span>Termin anfragen</span></button><button class="btn-outline btn-md" data-action="compose">${icon('mail', 'ico-sm')}<span>Nachricht an die Kanzlei</span></button></div>` : ''}
         </section>`;
 
@@ -247,12 +247,12 @@ views.overview = {
     const requestsPanel = `
         <section class="panel panel-pad">
           <div class="panel-head"><h2 class="panel-title">Neue Mandatsanfragen</h2>${unassigned.length ? badge(`${unassigned.length} offen`, 'amber') : ''}</div>
-          ${unassigned.length ? unassigned.map((c) => caseListRow(c, `<button class="btn-gold btn-sm" data-action="claim-case" data-id="${c.id}">Übernehmen</button>`)).join('') : empty('Alle Anfragen sind vergeben.', 'check')}
+          ${unassigned.length ? unassigned.map((c) => caseListRow(c, `<button class="btn-gold btn-sm" data-action="claim-case" data-id="${c.id}">Übernehmen</button>`)).join('') : emptyLine('Alle Anfragen sind vergeben.', 'check')}
         </section>`;
     const boardPanel = `
         <section class="panel panel-pad">
           <div class="panel-head"><h2 class="panel-title">Pinnwand</h2><a href="#board" class="btn-ghost btn-sm">Zur Pinnwand</a></div>
-          ${pinned.length ? pinned.map((n) => `<div class="tl-item mb-2" style="border-left:3px solid ${NOTE_COLORS[n.color] || NOTE_COLORS.gold}"><div class="tl-meta"><strong class="text-muted">${esc(n.title || 'Notiz')}</strong> · ${esc(n.authorName)}</div><div class="tl-body">${esc(n.body.length > 220 ? n.body.slice(0, 220) + '…' : n.body)}</div></div>`).join('') : empty('Keine angehefteten Notizen.', 'pin')}
+          ${pinned.length ? pinned.map((n) => `<div class="tl-item mb-2" style="border-left:3px solid ${NOTE_COLORS[n.color] || NOTE_COLORS.gold}"><div class="tl-meta"><strong class="text-muted">${esc(n.title || 'Notiz')}</strong> · ${esc(n.authorName)}</div><div class="tl-body">${esc(n.body.length > 220 ? n.body.slice(0, 220) + '…' : n.body)}</div></div>`).join('') : emptyLine('Keine angehefteten Notizen.', 'pin')}
         </section>`;
 
     return `${head}

@@ -260,6 +260,32 @@
         /* Back to top */
         #backToTop { opacity: 0; pointer-events: none; transition: all 0.3s ease; transform: translateY(8px); }
         #backToTop.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
+
+        /* Honorarordnung: Kategorien auf- und zuklappen (unter „Alle Leistungen“ ist die erste offen) */
+        .price-head { cursor: pointer; user-select: none; border-radius: 6px; }
+        .price-head:focus-visible { outline: 2px solid var(--gold-500); outline-offset: 4px; }
+        .price-head .price-count { margin-left: auto; font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; }
+        .price-head .price-chev { width: 18px; height: 18px; flex: none; color: var(--gold-500); transition: transform 0.2s ease; }
+        .price-head > span:first-child { flex: none; }
+        .price-head h3 { min-width: 0; hyphens: auto; }
+        @media (max-width: 639px) {
+            .price-head { flex-wrap: wrap; row-gap: 0.15rem; }
+            .price-head h3 { flex: 1 1 0; font-size: 1.4rem; line-height: 1.25; }
+            .price-head .price-chev { order: 2; }
+            .price-head .price-count { order: 3; flex-basis: 100%; margin-left: 1.25rem; }
+        }
+        .price-category.collapsed .price-chev { transform: rotate(-90deg); }
+        .price-category.collapsed > .grid { display: none; }
+        #priceListContainer > .price-category + .price-category { margin-top: 1.5rem; }
+
+        /* Am Handy: fester Knopf „Mandat anfragen“ (der Knopf oben in der Kopfzeile ist dort ausgeblendet) */
+        #mobileCta { display: none; }
+        @media (max-width: 639px) {
+            #mobileCta { display: flex; position: fixed; left: 4.75rem; right: 1rem; bottom: 1.5rem; z-index: 40; height: 2.75rem; opacity: 0; pointer-events: none; transform: translateY(8px); transition: all 0.3s ease; }
+            #mobileCta.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
+            /* Platz unter dem Footer, damit der feste Knopf nichts verdeckt */
+            body > footer.py-10 { padding-bottom: 5.5rem; }
+        }
     </style>
     <!-- Tailwind fest gebaut (npm run build:css) – zuletzt eingebunden wie zuvor beim Play-CDN -->
     <link rel="stylesheet" href="/css/tailwind.css">
@@ -821,7 +847,7 @@
 
         <!-- KANZLEIRÄNGE SECTION -->
         <section id="raenge" class="max-w-6xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
-            <div class="text-center max-w-3xl mx-auto mb-16">
+            <div class="text-center max-w-3xl mx-auto mb-10">
                 <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Struktur & Verfassungsgefüge</div>
                 <h2 class="font-serif text-4xl md:text-5xl font-semibold mb-4">Hierarchie & Kanzleiränge</h2>
                 <p class="text-[var(--text-muted)] text-base leading-relaxed">
@@ -829,10 +855,10 @@
                 </p>
             </div>
 
-            <div class="space-y-16">
+            <div class="space-y-10">
                 <!-- BOARD OF PARTNERS -->
                 <div>
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8 pb-3 border-b border-[var(--gold-hairline)]">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-3 border-b border-[var(--gold-hairline)]">
                         <div>
                             <span class="text-[0.65rem] uppercase tracking-[0.25em] text-[var(--gold-500)] font-semibold block mb-1">Ebene I — Leitende Gesellschafter</span>
                             <h3 class="font-serif text-3xl text-[var(--gold-light)] font-semibold tracking-wide">Board of Partners</h3>
@@ -840,15 +866,15 @@
                         <span class="self-start sm:self-auto text-xs font-mono text-[var(--gold-500)] px-3 py-1 rounded-full border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.05)]">Höchste Entscheidungsgewalt</span>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div class="glass-card p-8 border-t-2 border-t-[var(--gold-500)] flex flex-col justify-between">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="glass-card p-6 border-t-2 border-t-[var(--gold-500)] flex flex-col justify-between">
                             <div>
-                                <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center justify-between mb-3">
                                     <span class="text-[0.65rem] font-mono px-3 py-1 rounded-full bg-[rgba(212,175,55,0.15)] text-[var(--gold-light)] border border-[var(--gold-hairline)] uppercase font-semibold">Grundsatzebene</span>
                                     <span class="text-xs text-[var(--text-muted)] font-mono">Rang 01</span>
                                 </div>
                                 <h4 class="font-serif text-2xl font-semibold text-white mb-3">Founding Partner</h4>
-                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-6">
+                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-4">
                                     Gründer, Inhaber und Leitung der Kanzlei. Trägt die Gesamtverantwortung für Strategie, Personal und Qualität, führt Grundsatz- und Großmandate und vertritt staatliche Institutionen, Unternehmen und Privatpersonen vor jedem Gericht.
                                 </p>
                             </div>
@@ -857,14 +883,14 @@
                             </div>
                         </div>
 
-                        <div class="glass-card p-8 border-t-2 border-t-[var(--gold-500)] flex flex-col justify-between">
+                        <div class="glass-card p-6 border-t-2 border-t-[var(--gold-500)] flex flex-col justify-between">
                             <div>
-                                <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center justify-between mb-3">
                                     <span class="text-[0.65rem] font-mono px-3 py-1 rounded-full bg-[rgba(212,175,55,0.15)] text-[var(--gold-light)] border border-[var(--gold-hairline)] uppercase font-semibold">Gesellschafter</span>
                                     <span class="text-xs text-[var(--text-muted)] font-mono">Rang 02</span>
                                 </div>
                                 <h4 class="font-serif text-2xl font-semibold text-white mb-3">Equity Partner</h4>
-                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-6">
+                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-4">
                                     Kapitalführender Partner mit Leitungsverantwortung für spezifische Rechtsbereiche (z. B. Wirtschaftsstrafrecht oder Verwaltungsrecht). Führt Großmandate, verantwortet die interne Qualitätssicherung und leitet strategische Vergleichsverhandlungen.
                                 </p>
                             </div>
@@ -873,14 +899,14 @@
                             </div>
                         </div>
 
-                        <div class="glass-card p-8 border-t-2 border-t-[var(--gold-500)] flex flex-col justify-between">
+                        <div class="glass-card p-6 border-t-2 border-t-[var(--gold-500)] flex flex-col justify-between">
                             <div>
-                                <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center justify-between mb-3">
                                     <span class="text-[0.65rem] font-mono px-3 py-1 rounded-full bg-[rgba(212,175,55,0.15)] text-[var(--gold-light)] border border-[var(--gold-hairline)] uppercase font-semibold">Partner</span>
                                     <span class="text-xs text-[var(--text-muted)] font-mono">Rang 03</span>
                                 </div>
                                 <h4 class="font-serif text-2xl font-semibold text-white mb-3">Partner</h4>
-                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-6">
+                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-4">
                                     Vollwertiges Mitglied des Führungsgremiums. Eigenständige Mandatsübernahme, Fachführung von Associate-Teams und Vertretung in hochkomplexen Hauptverhandlungen sowie Notfalleinsätzen.
                                 </p>
                             </div>
@@ -893,7 +919,7 @@
 
                 <!-- ASSOCIATE ATTORNEYS -->
                 <div>
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8 pb-3 border-b border-slate-700">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-3 border-b border-slate-700">
                         <div>
                             <span class="text-[0.65rem] uppercase tracking-[0.25em] text-slate-400 font-semibold block mb-1">Ebene II — Angestellte Anwaltschaft</span>
                             <h3 class="font-serif text-3xl text-slate-200 font-semibold tracking-wide">Associate Attorneys</h3>
@@ -901,15 +927,15 @@
                         <span class="self-start sm:self-auto text-xs font-mono text-slate-400 px-3 py-1 rounded-full border border-slate-700 bg-slate-800/40">Operative Anwaltschaft</span>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div class="glass-card p-8 border-t-2 border-t-amber-500/60 flex flex-col justify-between">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="glass-card p-6 border-t-2 border-t-amber-500/60 flex flex-col justify-between">
                             <div>
-                                <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center justify-between mb-3">
                                     <span class="text-[0.65rem] font-mono px-3 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 uppercase font-semibold">Senior Level</span>
                                     <span class="text-xs text-[var(--text-muted)] font-mono">Rang 04</span>
                                 </div>
                                 <h4 class="font-serif text-2xl font-semibold text-white mb-3">Senior Associate</h4>
-                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-6">
+                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-4">
                                     Erfahrene Anwälte mit umfassender Praxiserfahrung. Eigenverantwortliche Betreuung von Haftprüfungsterminen, U-Haft-Vertretungen vor Ort, Akteneinsichten und Prozessführung vor jedem Gericht.
                                 </p>
                             </div>
@@ -918,14 +944,14 @@
                             </div>
                         </div>
 
-                        <div class="glass-card p-8 border-t-2 border-t-slate-500 flex flex-col justify-between">
+                        <div class="glass-card p-6 border-t-2 border-t-slate-500 flex flex-col justify-between">
                             <div>
-                                <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center justify-between mb-3">
                                     <span class="text-[0.65rem] font-mono px-3 py-1 rounded-full bg-slate-500/10 text-slate-300 border border-slate-500/20 uppercase font-semibold">Mid Level</span>
                                     <span class="text-xs text-[var(--text-muted)] font-mono">Rang 05</span>
                                 </div>
                                 <h4 class="font-serif text-2xl font-semibold text-white mb-3">Associate</h4>
-                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-6">
+                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-4">
                                     Approbierte Juristen für das Tagesgeschäft. Bearbeitung eingehender Mandatstickets, Prüfung von Verträgen, Verfassung von Klageschriften und eigenständige Vertretung von Mandanten vor Gericht.
                                 </p>
                             </div>
@@ -934,14 +960,14 @@
                             </div>
                         </div>
 
-                        <div class="glass-card p-8 border-t-2 border-t-slate-600 flex flex-col justify-between">
+                        <div class="glass-card p-6 border-t-2 border-t-slate-600 flex flex-col justify-between">
                             <div>
-                                <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center justify-between mb-3">
                                     <span class="text-[0.65rem] font-mono px-3 py-1 rounded-full bg-slate-600/10 text-slate-400 border border-slate-600/20 uppercase font-semibold">Junior Level</span>
                                     <span class="text-xs text-[var(--text-muted)] font-mono">Rang 06</span>
                                 </div>
                                 <h4 class="font-serif text-2xl font-semibold text-white mb-3">Junior Associate</h4>
-                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-6">
+                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-4">
                                     Junge Rechtsanwälte im Mentoring. Vertreten Mandanten vor jedem Gericht – auf Wunsch mit Rückendeckung erfahrener Kollegen – und übernehmen Recherchen, Ermittlungsakten und Beweisanträge.
                                 </p>
                             </div>
@@ -1034,6 +1060,12 @@
             </div>
         </div>
     </footer>
+
+    <!-- Am Handy: Mandat anfragen (erscheint beim Scrollen) -->
+    <button id="mobileCta" data-act="ticket" class="btn-gold items-center justify-center gap-2 rounded-full text-xs uppercase tracking-wider font-semibold">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        Mandat anfragen
+    </button>
 
     <!-- Back to top -->
     <button id="backToTop" data-act="top" aria-label="Nach oben scrollen" class="fixed bottom-6 left-6 z-40 w-11 h-11 rounded-full btn-outline flex items-center justify-center">

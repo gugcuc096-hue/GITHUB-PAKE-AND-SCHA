@@ -26,7 +26,10 @@ document.querySelectorAll('[data-act]').forEach((el) => {
 document.addEventListener('change', (e) => {
     if (e.target.classList && e.target.classList.contains('calc-check')) calculateTotal();
 });
-document.getElementById('priceSearch').addEventListener('input', () => filterPrices());
+document.getElementById('priceSearch').addEventListener('input', () => {
+    priceManual.clear(); // neue Suche: aufklappen, was passt
+    filterPrices();
+});
 document.getElementById('priceSort').addEventListener('change', () => sortPrices());
 document.getElementById('ticketForm').addEventListener('submit', (e) => window.handleFormSubmit(e));
 
@@ -84,6 +87,7 @@ function toggleMobileMenu() {
     document.getElementById('menuIconOpen').classList.toggle('hidden', open);
     document.getElementById('menuIconClose').classList.toggle('hidden', !open);
     document.getElementById('menuToggle').setAttribute('aria-expanded', open);
+    syncMobileCta();
 }
 
 // Mobil-Menü: erst zuklappen lassen, dann zum Abschnitt springen. Sonst wird der Sprung berechnet,
@@ -107,8 +111,53 @@ document.querySelectorAll('#mobileMenu a[href^="#"]').forEach(link => {
     });
 });
 
+/* ---------- Honorarordnung: Kategorien auf- und zuklappen ---------- */
+// Unter „Alle Leistungen“ ist die erste Kategorie offen, die übrigen zeigen nur ihre Überschrift mit der Anzahl.
+// Ein Reiter öffnet seine Kategorie, eine Suche alle Kategorien mit Treffern; von Hand geöffnete bleiben offen.
+const priceManual = new Map(); // Kategorie → offen (von Hand umgeschaltet)
+function priceOpen(cat, index) {
+    const key = cat.getAttribute('data-category');
+    if (priceManual.has(key)) return priceManual.get(key);
+    const query = document.getElementById('priceSearch').value.trim();
+    const activeCat = document.querySelector('.tab-btn.active').getAttribute('data-cat');
+    if (query) return [...cat.querySelectorAll('.price-item')].some((item) => item.style.display !== 'none');
+    return activeCat !== 'all' || index === 0;
+}
+function applyPriceCollapse() {
+    document.querySelectorAll('.price-category').forEach((cat, i) => {
+        const open = priceOpen(cat, i);
+        cat.classList.toggle('collapsed', !open);
+        const head = cat.querySelector('.price-head');
+        if (head) head.setAttribute('aria-expanded', String(open));
+    });
+}
+function enhancePriceCategories() {
+    document.querySelectorAll('.price-category').forEach((cat) => {
+        const head = cat.firstElementChild;
+        if (!head || head.classList.contains('price-head')) return;
+        head.classList.add('price-head');
+        head.setAttribute('role', 'button');
+        head.setAttribute('tabindex', '0');
+        const n = cat.querySelectorAll('.price-item').length;
+        head.insertAdjacentHTML('beforeend', `<span class="price-count">${n} ${n === 1 ? 'Leistung' : 'Leistungen'}</span><svg class="price-chev" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>`);
+        const toggle = () => {
+            priceManual.set(cat.getAttribute('data-category'), cat.classList.contains('collapsed'));
+            applyPriceCollapse();
+        };
+        head.addEventListener('click', toggle);
+        head.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggle();
+            }
+        });
+    });
+    applyPriceCollapse();
+}
+
 /* ---------- Category Filter ---------- */
 function setCategory(cat) {
+    priceManual.clear();
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-cat') === cat);
     });
@@ -133,6 +182,7 @@ function filterPrices() {
         if (show) visibleCount++;
     });
     document.getElementById('noResults').classList.toggle('hidden', visibleCount !== 0);
+    applyPriceCollapse();
 }
 
 /* ---------- Price Sort ---------- */
@@ -153,6 +203,7 @@ function sortPrices() {
     });
 }
 document.querySelectorAll('.price-item').forEach((item, i) => item.dataset.originalIndex = i);
+enhancePriceCategories();
 
 /* ---------- Interactive Calculator ---------- */
 function calculateTotal() {
@@ -278,7 +329,13 @@ document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
 window.addEventListener('scroll', () => {
     updateScrollspy();
     document.getElementById('backToTop').classList.toggle('show', window.scrollY > 600);
+    syncMobileCta();
 });
+// Fester Knopf „Mandat anfragen“ am Handy: nach dem Startbereich, nicht bei offenem Menü
+function syncMobileCta() {
+    const menuOpen = document.getElementById('mobileMenu').classList.contains('open');
+    document.getElementById('mobileCta').classList.toggle('show', window.scrollY > 600 && !menuOpen);
+}
 // Team, Honorarordnung & Co. werden nachgeladen und verschieben die Abschnitte
 window.addEventListener('load', updateScrollspy);
 window.addEventListener('resize', updateScrollspy);

@@ -3,7 +3,7 @@
  * Datensicherung: Einmal am Tag eine Kopie der Datenbank in den Ordner backups/ neben der Datenbank
  * (auf Render also auf der Persistent Disk). Aufbewahrt werden die Sicherungen der letzten 7 Tage und
  * danach eine je Woche bis 5 Wochen zurück. Login-Sitzungen werden aus den Kopien entfernt.
- * Das Board of Partners (Admin) kann unter Einstellungen → Allgemein jederzeit sichern und herunterladen.
+ * Das Board of Partners (Admin) kann unter Einstellungen → System jederzeit sichern und herunterladen.
  * Wiederherstellen: Sicherung als „restore.db“ neben die Datenbank legen und neu starten (siehe db.js / README).
  */
 const fs = require('fs');

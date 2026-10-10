@@ -9,6 +9,10 @@
    ================================================================ */
 document.addEventListener('click', (e) => {
   if (!e.target.closest('#dutyWrap')) closeDutyPop();
+  // Menü „⋯ Mehr“: Klick daneben oder auf einen Eintrag schließt es
+  $$('details.more-menu[open]').forEach((d) => {
+    if (!d.contains(e.target) || e.target.closest('.more-item')) d.open = false;
+  });
   if (e.target.closest('a[href^="/vertrag.html"]')) st.contractTabAt = Date.now();
   // Klick neben das Fenster: zurück zum vorherigen Fenster (z. B. zur Akte) bzw. schließen
   if (e.target === $('#modal')) {
@@ -86,6 +90,19 @@ document.addEventListener('focusin', (e) => {
   const t = e.target;
   if (t.closest && t.closest('#welcomeForm, #msgForm') && (t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && t.type === 'text'))) st.wlField = t;
 });
+
+// Menü „⋯ Mehr“ am rechten Rand: nach links aufklappen, damit es nicht aus dem Bild ragt
+document.addEventListener(
+  'toggle',
+  (e) => {
+    const d = e.target;
+    if (!d.matches || !d.matches('details.more-menu') || !d.open) return;
+    const pop = d.querySelector('.more-pop');
+    pop.classList.remove('align-right');
+    if (pop.getBoundingClientRect().right > window.innerWidth - 8) pop.classList.add('align-right');
+  },
+  true
+);
 
 document.addEventListener('submit', (e) => {
   const f = e.target.closest('form[data-form]');
@@ -406,6 +423,7 @@ setInterval(() => {
   if (!restoring && (discordState || googleState || params.has('case'))) history.replaceState(null, '', location.pathname + location.hash);
   if (discordState && DISCORD_MSG[discordState]) toast(...DISCORD_MSG[discordState]);
   if (googleState && GOOGLE_MSG[googleState]) toast(...GOOGLE_MSG[googleState]);
+  if (googleState) st.settingsTab = 'integrations'; // Google Docs stehen unter Einstellungen → Integrationen
 
   try {
     await Promise.all([load.chatUnread().catch(() => {}), load.unread(), load.appCount(), load.duty(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {}), load.paymentReports().catch(() => {})]);

@@ -194,6 +194,7 @@
       const active = document.querySelector('.tab-btn.active');
       if (typeof window.setCategory === 'function') window.setCategory(active ? active.dataset.cat : 'all');
       if (typeof window.sortPrices === 'function') window.sortPrices();
+      if (typeof window.enhancePriceCategories === 'function') window.enhancePriceCategories(); // Kategorien auf-/zuklappbar
     }
 
     const calc = document.getElementById('calcOptions');

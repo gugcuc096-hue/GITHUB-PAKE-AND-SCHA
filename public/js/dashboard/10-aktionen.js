@@ -9,6 +9,7 @@
    ================================================================ */
 const actions = {
   'open-sidebar': openSidebar,
+  'nav-group': (el) => toggleNavGroup(el.dataset.group),
   'close-sidebar': closeSidebar,
   // X, „Abbrechen“, „Schließen“, „Fertig“: zurück zum vorherigen Fenster (z. B. zur Akte) – sonst schließen
   'close-modal': () => modalDismiss(),
