@@ -417,7 +417,7 @@ function discordOAuthCheck(d) {
 views.settings = {
   async load() {
     const q = new URLSearchParams(location.search).get('tab');
-    if (['general', 'bot', 'contracts'].includes(q)) st.settingsTab = q;
+    if (SETTINGS_TABS.some(([k]) => k === q)) st.settingsTab = q;
     const modul = new URLSearchParams(location.search).get('modul');
     if (BOT_MODULES.some(([k]) => k === modul)) st.botModule = modul;
     if (modul) history.replaceState(history.state, '', `${location.pathname}?tab=${st.settingsTab || 'general'}#settings`);
@@ -440,77 +440,17 @@ views.settings = {
   },
   render() {
     const s = st.settings;
-    const tab = st.settingsTab || 'general';
-    const tabs = [
-      ['general', 'Allgemein', icon('cog', 'ico-sm')],
-      ['bot', 'Discord-Bot', DISCORD_ICON],
-      ['contracts', 'Vertragsvorlagen', icon('doc', 'ico-sm')],
-    ];
-    const head = `<div class="page-head"><div><h1 class="page-title">Einstellungen</h1><p class="page-sub">Discord-Bot, Rechnungsdaten, Vertragsvorlagen und Notfall-Zugang.</p></div></div>
-        <div class="chip-row settings-tabs" role="tablist" aria-label="Bereiche der Einstellungen">${tabs
-        .map(([k, label, ic]) => `<button type="button" class="chip ${tab === k ? 'active' : ''}" role="tab" aria-selected="${tab === k}" data-action="settings-tab" data-tab="${k}">${ic}<span>${label}</span></button>`)
-        .join('')}</div>`;
+    const tab = SETTINGS_TABS.some(([k]) => k === st.settingsTab) ? st.settingsTab : 'general';
+    const head = `<div class="page-head"><div><h1 class="page-title">Einstellungen</h1><p class="page-sub">Kanzlei &amp; Rechnungen, Discord, Integrationen, System und Vertragsvorlagen.</p></div></div>
+        <div class="chip-row settings-tabs" role="tablist" aria-label="Bereiche der Einstellungen">${SETTINGS_TABS.map(
+          ([k, label, ic]) => `<button type="button" class="chip ${tab === k ? 'active' : ''}" role="tab" aria-selected="${tab === k}" data-action="settings-tab" data-tab="${k}">${ic === 'discord' ? DISCORD_ICON : icon(ic, 'ico-sm')}<span>${esc(label)}</span></button>`
+        ).join('')}</div>`;
     if (tab === 'bot') return head + botSettings();
     if (tab === 'contracts') return head + contractTemplatesPanel();
+    if (tab === 'integrations') return `${head}${fivenetSettingsPanel(s)}${googleDocsPanel(st.google)}`;
+    if (tab === 'system') return `${head}${backupPanel()}<div class="mt-4 lg:mt-5">${emergencyPanel()}</div>`;
     return `${head}
-        <div class="grid-2">
-          <section class="panel panel-pad">
-            <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${DISCORD_ICON} Discord-Webhook</h2>${s.discordWebhookActive ? badge('Aktiv', 'emerald') : badge('Nicht verbunden', 'slate')}</div>
-            <p class="text-sm text-muted mb-4">Wichtige Kanzlei-Updates (neue Mandate, Fristen, Terminanfragen …) automatisch nach Discord senden – auf Wunsch je Ereignis in einen eigenen Kanal. In Discord: Kanal → Einstellungen → Integrationen → Webhooks → „Neuer Webhook“ → URL kopieren.</p>
-            <form data-form="settings-discord" class="form-grid">
-              <div><label class="label">Webhook-URL (Standard-Kanal)</label><input name="webhook" class="field font-mono text-xs" value="${esc(s.discordWebhookUrl)}" placeholder="https://discord.com/api/webhooks/…" autocomplete="off">
-                ${s.discordWebhookFromEnv ? '<p class="form-hint">Aktuell wird die URL aus der Umgebungsvariable DISCORD_WEBHOOK_URL verwendet.</p>' : ''}</div>
-              <div><label class="label" for="pingRole">Standard-Rolle zum Pingen (Rollen-ID)</label><input id="pingRole" name="pingRole" class="field font-mono text-xs" value="${esc(s.discordPingRole)}" placeholder="z. B. 1546979799820537986" inputmode="numeric" autocomplete="off">
-                <p class="form-hint">Wird bei allen Ereignissen mit Haken bei „Rolle pingen“ erwähnt, sofern dort keine eigene Rolle steht. Rollen-ID: Discord → Einstellungen → Erweitert → Entwicklermodus an, dann Servereinstellungen → Rollen → Rechtsklick auf die Rolle → „Rollen-ID kopieren“.</p></div>
-              <div class="banner banner-amber mb-0">${icon('alert')}<div><strong>Wichtig, damit der Ping ankommt:</strong> In Discord unter Servereinstellungen → Rollen → Rolle wählen → „<em>Erlaube jedem, @mention für diese Rolle zu verwenden</em>“ einschalten. Sonst kommt die Nachricht an, aber niemand wird gepingt. @everyone/@here werden nie gepingt.</div></div>
-              <div>
-                <div class="label">Ereignisse – Kanal und Rolle</div>
-                <p class="form-hint mb-2">Leer = Standard-Kanal bzw. Standard-Rolle. Für einen weiteren Kanal in Discord dort einen eigenen Webhook anlegen und die URL beim Ereignis eintragen.</p>
-                <div class="ev-list">${Object.entries(s.availableEvents)
-                .map(
-                  ([k, l]) => `<div class="ev-item">
-                      <div class="ev-top"><span class="ev-name">${esc(l)}</span>
-                        <label class="check"><input type="checkbox" name="events" value="${esc(k)}" ${s.discordEvents.includes(k) ? 'checked' : ''}> Nachricht</label>
-                        <label class="check"><input type="checkbox" name="pingEvents" value="${esc(k)}" ${s.discordPingEvents.includes(k) ? 'checked' : ''}> Rolle pingen</label></div>
-                      <div class="ev-fields">
-                        <input name="eventWebhook" data-event="${esc(k)}" class="field font-mono text-xs" value="${esc((s.discordEventWebhooks || {})[k] || '')}" placeholder="Kanal: Standard" autocomplete="off" aria-label="Webhook-URL (Kanal) für: ${esc(l)}">
-                        <input name="eventRole" data-event="${esc(k)}" class="field font-mono text-xs" value="${esc((s.discordEventRoles || {})[k] || '')}" placeholder="Rolle: Standard" inputmode="numeric" autocomplete="off" aria-label="Rollen-ID für: ${esc(l)}">
-                      </div>
-                    </div>`
-                )
-                .join('')}</div>
-              </div>
-              <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button>
-                <button type="button" class="btn-outline btn-md" data-action="discord-test" ${s.discordWebhookActive ? '' : 'disabled'}>${icon('send', 'ico-sm')}<span>Testnachricht</span></button></div>
-            </form>
-          </section>
-          <div class="stack">
-            <section class="panel panel-pad">
-              <div class="panel-head"><h2 class="panel-title">Website</h2></div>
-              <form data-form="settings-website" class="form-grid">
-                <label class="check"><input type="checkbox" name="showDutyPublic" ${s.showDutyPublic ? 'checked' : ''}> Dienststatus öffentlich anzeigen – „Eilnotdienst: 2 Anwälte im Dienst“ in der Kopfzeile und grüne Punkte bei den Teamkarten</label>
-                <div class="form-actions"><button type="submit" class="btn-outline btn-md">Speichern</button><a href="/karriere.html" target="_blank" rel="noopener" class="btn-ghost btn-md">${icon('globe', 'ico-sm')}<span>Karriereseite</span></a></div>
-              </form>
-            </section>
-            <section class="panel panel-pad">
-              <div class="panel-head"><h2 class="panel-title">Discord-Login</h2>${s.discordOAuthConfigured ? badge('Eingerichtet', 'emerald') : badge('Nicht eingerichtet', 'slate')}</div>
-              <p class="text-sm text-muted">Teammitglieder und Mandanten können ihr Discord-Konto im Profil verknüpfen und sich danach per Discord anmelden. Verknüpfte Anwälte werden bei Fristen und Zuweisungen im Kanal erwähnt.</p>
-              ${s.discordOAuthConfigured ? '' : `<ol class="text-sm text-muted list-decimal pl-5 mt-3 space-y-1">
-                <li>discord.com/developers/applications → „New Application“</li>
-                <li>OAuth2 → Redirect hinzufügen: <code class="font-mono text-gold text-xs break-all">${esc((s.discordOAuth && s.discordOAuth.redirectUri) || location.origin + '/api/discord/callback')}</code></li>
-                <li>In Render unter „Environment“ setzen: <code class="font-mono text-xs">DISCORD_CLIENT_ID</code>, <code class="font-mono text-xs">DISCORD_CLIENT_SECRET</code>, <code class="font-mono text-xs">PUBLIC_URL</code> – danach „Manual Deploy“ → „Deploy latest commit“.</li></ol>`}
-              ${discordOAuthCheck(s.discordOAuth)}
-            </section>
-            <section class="panel panel-pad">
-              <div class="panel-head"><h2 class="panel-title">Notfall-Zugang</h2></div>
-              <p class="text-sm text-muted">Passwort vergessen und kein Admin mehr erreichbar? In Render unter „Environment“ die Variable <code class="font-mono text-gold text-xs">ADMIN_RESET_PASSWORD</code> (mind. 10 Zeichen) setzen und neu deployen. Das Konto des Board of Partners erhält dieses Passwort. Danach die Variable wieder entfernen.</p>
-              <p class="text-sm text-muted mt-2">Gibt es gar keinen aktiven Admin mehr, stellt der Server das Konto von Dr. Alois Pake beim Start automatisch wieder her (Passwort im Render-Log bzw. aus <code class="font-mono text-xs">ADMIN_PASSWORD</code>).</p>
-            </section>
-          </div>
-        </div>
-        ${fivenetSettingsPanel(s)}
-        ${googleDocsPanel(st.google)}
-        <section class="panel panel-pad mt-4 lg:mt-5">
+        <section class="panel panel-pad">
           <div class="panel-head"><h2 class="panel-title">Rechnungsdaten der Kanzlei</h2></div>
           <form data-form="settings-firm" class="form-grid cols-2">
             <div><label class="label">Anschrift (Briefkopf)</label><textarea name="firmAddress" rows="3" maxlength="300" class="field">${esc(s.firmAddress)}</textarea></div>
@@ -521,11 +461,91 @@ views.settings = {
             <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button></div>
           </form>
         </section>
-        ${backupPanel()}`;
+        <div class="mt-4 lg:mt-5">${websitePanel(s)}</div>`;
   },
 };
 
-/** Einstellungen → Allgemein: tägliche Datensicherung, „Jetzt sichern“, Herunterladen. */
+/* Einstellungen in Reitern – „bot“ ist der Discord-Reiter (Webhook, Login, Tickets und Bot-Module; alte Links ?tab=bot gelten weiter) */
+const SETTINGS_TABS = [
+  ['general', 'Kanzlei & Rechnungen', 'receipt'],
+  ['bot', 'Discord', 'discord'],
+  ['integrations', 'Integrationen', 'link'],
+  ['system', 'System', 'shield'],
+  ['contracts', 'Vertragsvorlagen', 'doc'],
+];
+
+/** Discord → Webhook: Kanzlei-Updates in Kanäle, je Ereignis Kanal und Rolle. */
+function discordWebhookPanel(s) {
+  return `
+      <section class="panel panel-pad">
+        <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${DISCORD_ICON} Discord-Webhook</h2>${s.discordWebhookActive ? badge('Aktiv', 'emerald') : badge('Nicht verbunden', 'slate')}</div>
+        <p class="text-sm text-muted mb-4">Wichtige Kanzlei-Updates (neue Mandate, Fristen, Terminanfragen …) automatisch nach Discord senden – auf Wunsch je Ereignis in einen eigenen Kanal. In Discord: Kanal → Einstellungen → Integrationen → Webhooks → „Neuer Webhook“ → URL kopieren.</p>
+        <form data-form="settings-discord" class="form-grid">
+          <div><label class="label">Webhook-URL (Standard-Kanal)</label><input name="webhook" class="field font-mono text-xs" value="${esc(s.discordWebhookUrl)}" placeholder="https://discord.com/api/webhooks/…" autocomplete="off">
+            ${s.discordWebhookFromEnv ? '<p class="form-hint">Aktuell wird die URL aus der Umgebungsvariable DISCORD_WEBHOOK_URL verwendet.</p>' : ''}</div>
+          <div><label class="label" for="pingRole">Standard-Rolle zum Pingen (Rollen-ID)</label><input id="pingRole" name="pingRole" class="field font-mono text-xs" value="${esc(s.discordPingRole)}" placeholder="z. B. 1546979799820537986" inputmode="numeric" autocomplete="off">
+            <p class="form-hint">Wird bei allen Ereignissen mit Haken bei „Rolle pingen“ erwähnt, sofern dort keine eigene Rolle steht. Rollen-ID: Discord → Einstellungen → Erweitert → Entwicklermodus an, dann Servereinstellungen → Rollen → Rechtsklick auf die Rolle → „Rollen-ID kopieren“.</p></div>
+          <div class="banner banner-amber mb-0">${icon('alert')}<div><strong>Wichtig, damit der Ping ankommt:</strong> In Discord unter Servereinstellungen → Rollen → Rolle wählen → „<em>Erlaube jedem, @mention für diese Rolle zu verwenden</em>“ einschalten. Sonst kommt die Nachricht an, aber niemand wird gepingt. @everyone/@here werden nie gepingt.</div></div>
+          <div>
+            <div class="label">Ereignisse – Kanal und Rolle</div>
+            <p class="form-hint mb-2">Leer = Standard-Kanal bzw. Standard-Rolle. Für einen weiteren Kanal in Discord dort einen eigenen Webhook anlegen und die URL beim Ereignis eintragen.</p>
+            <div class="ev-list">${Object.entries(s.availableEvents)
+            .map(
+              ([k, l]) => `<div class="ev-item">
+                  <div class="ev-top"><span class="ev-name">${esc(l)}</span>
+                    <label class="check"><input type="checkbox" name="events" value="${esc(k)}" ${s.discordEvents.includes(k) ? 'checked' : ''}> Nachricht</label>
+                    <label class="check"><input type="checkbox" name="pingEvents" value="${esc(k)}" ${s.discordPingEvents.includes(k) ? 'checked' : ''}> Rolle pingen</label></div>
+                  <div class="ev-fields">
+                    <input name="eventWebhook" data-event="${esc(k)}" class="field font-mono text-xs" value="${esc((s.discordEventWebhooks || {})[k] || '')}" placeholder="Kanal: Standard" autocomplete="off" aria-label="Webhook-URL (Kanal) für: ${esc(l)}">
+                    <input name="eventRole" data-event="${esc(k)}" class="field font-mono text-xs" value="${esc((s.discordEventRoles || {})[k] || '')}" placeholder="Rolle: Standard" inputmode="numeric" autocomplete="off" aria-label="Rollen-ID für: ${esc(l)}">
+                  </div>
+                </div>`
+            )
+            .join('')}</div>
+          </div>
+          <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button>
+            <button type="button" class="btn-outline btn-md" data-action="discord-test" ${s.discordWebhookActive ? '' : 'disabled'}>${icon('send', 'ico-sm')}<span>Testnachricht</span></button></div>
+        </form>
+      </section>`;
+}
+
+/** Discord → Discord-Login: Einrichtung und Prüfung der Umgebungsvariablen. */
+function discordLoginPanel(s) {
+  return `
+      <section class="panel panel-pad">
+        <div class="panel-head"><h2 class="panel-title">Discord-Login</h2>${s.discordOAuthConfigured ? badge('Eingerichtet', 'emerald') : badge('Nicht eingerichtet', 'slate')}</div>
+        <p class="text-sm text-muted">Teammitglieder und Mandanten können ihr Discord-Konto im Profil verknüpfen und sich danach per Discord anmelden. Verknüpfte Anwälte werden bei Fristen und Zuweisungen im Kanal erwähnt.</p>
+        ${s.discordOAuthConfigured ? '' : `<ol class="text-sm text-muted list-decimal pl-5 mt-3 space-y-1">
+          <li>discord.com/developers/applications → „New Application“</li>
+          <li>OAuth2 → Redirect hinzufügen: <code class="font-mono text-gold text-xs break-all">${esc((s.discordOAuth && s.discordOAuth.redirectUri) || location.origin + '/api/discord/callback')}</code></li>
+          <li>In Render unter „Environment“ setzen: <code class="font-mono text-xs">DISCORD_CLIENT_ID</code>, <code class="font-mono text-xs">DISCORD_CLIENT_SECRET</code>, <code class="font-mono text-xs">PUBLIC_URL</code> – danach „Manual Deploy“ → „Deploy latest commit“.</li></ol>`}
+        ${discordOAuthCheck(s.discordOAuth)}
+      </section>`;
+}
+
+/** Kanzlei & Rechnungen → Website (Dienststatus öffentlich). */
+function websitePanel(s) {
+  return `
+      <section class="panel panel-pad">
+        <div class="panel-head"><h2 class="panel-title">Website</h2></div>
+        <form data-form="settings-website" class="form-grid">
+          <label class="check"><input type="checkbox" name="showDutyPublic" ${s.showDutyPublic ? 'checked' : ''}> Dienststatus öffentlich anzeigen – „Eilnotdienst: 2 Anwälte im Dienst“ in der Kopfzeile und grüne Punkte bei den Teamkarten</label>
+          <div class="form-actions"><button type="submit" class="btn-outline btn-md">Speichern</button><a href="/karriere.html" target="_blank" rel="noopener" class="btn-ghost btn-md">${icon('globe', 'ico-sm')}<span>Karriereseite</span></a></div>
+        </form>
+      </section>`;
+}
+
+/** System → Notfall-Zugang. */
+function emergencyPanel() {
+  return `
+      <section class="panel panel-pad">
+        <div class="panel-head"><h2 class="panel-title">Notfall-Zugang</h2></div>
+        <p class="text-sm text-muted">Passwort vergessen und kein Admin mehr erreichbar? In Render unter „Environment“ die Variable <code class="font-mono text-gold text-xs">ADMIN_RESET_PASSWORD</code> (mind. 10 Zeichen) setzen und neu deployen. Das Konto des Board of Partners erhält dieses Passwort. Danach die Variable wieder entfernen.</p>
+        <p class="text-sm text-muted mt-2">Gibt es gar keinen aktiven Admin mehr, stellt der Server das Konto von Dr. Alois Pake beim Start automatisch wieder her (Passwort im Render-Log bzw. aus <code class="font-mono text-xs">ADMIN_PASSWORD</code>).</p>
+      </section>`;
+}
+
+/** Einstellungen → System: tägliche Datensicherung, „Jetzt sichern“, Herunterladen. */
 const fmtBytes = (n) =>
   n == null
     ? '–'

@@ -140,7 +140,7 @@ const connected = () => configured() && !!refreshToken();
 async function accessToken(force = false) {
   if (!force && access.token && Date.now() < access.expires - 60000) return access.token;
   const rt = refreshToken();
-  if (!configured() || !rt) throw fail('Das Google-Konto der Kanzlei ist nicht verbunden (Einstellungen → Google Docs).', 409, 'not_connected');
+  if (!configured() || !rt) throw fail('Das Google-Konto der Kanzlei ist nicht verbunden (Einstellungen → Integrationen → Google Docs).', 409, 'not_connected');
   try {
     const t = await tokenRequest({ refresh_token: rt, grant_type: 'refresh_token' });
     access = { token: t.access_token, expires: Date.now() + (Number(t.expires_in) || 3000) * 1000 };
@@ -150,12 +150,12 @@ async function accessToken(force = false) {
   } catch (err) {
     if (err.code === 'invalid_grant') {
       // Zugriff widerrufen oder abgelaufen (z. B. App in Google noch im „Testmodus“: 7 Tage)
-      setSetting('google_error', 'Die Verbindung zu Google ist abgelaufen oder wurde widerrufen – bitte unter Einstellungen → Google Docs neu verbinden.');
+      setSetting('google_error', 'Die Verbindung zu Google ist abgelaufen oder wurde widerrufen – bitte unter Einstellungen → Integrationen → Google Docs neu verbinden.');
       require('./systemAlerts').raise('google', {
         title: 'Google Docs: Verbindung getrennt',
-        description: 'Google hat den Zugang der Website abgelehnt. Bis zum erneuten Verbinden (Dashboard → Einstellungen → Google Docs) werden keine Google Docs aktualisiert.',
+        description: 'Google hat den Zugang der Website abgelehnt. Bis zum erneuten Verbinden (Dashboard → Einstellungen → Integrationen → Google Docs) werden keine Google Docs aktualisiert.',
       });
-      throw fail('Die Verbindung zu Google ist abgelaufen oder wurde widerrufen – bitte unter Einstellungen → Google Docs neu verbinden.', 409, 'expired');
+      throw fail('Die Verbindung zu Google ist abgelaufen oder wurde widerrufen – bitte unter Einstellungen → Integrationen → Google Docs neu verbinden.', 409, 'expired');
     }
     throw err;
   }

@@ -32,7 +32,7 @@ views.profile = {
       : st.discordOAuth
         ? `<p class="text-sm text-muted mb-4">Verbinden Sie Ihr Discord-Konto, um sich künftig mit einem Klick anzumelden${isStaff() ? ' und bei Fristen oder neuen Akten im Kanzlei-Discord erwähnt zu werden' : ''}.</p>
              <a class="btn-discord btn-md" href="/api/discord/connect">${DISCORD_ICON}<span>Mit Discord verbinden</span></a>`
-        : `<p class="text-sm text-muted">Das Board of Partners hat die Discord-Anmeldung noch nicht eingerichtet.${isAdmin() ? ' <a href="/dashboard.html?tab=general#settings" class="text-gold underline">Einstellungen → Discord-Login</a> zeigt, was fehlt.' : ''}</p>`;
+        : `<p class="text-sm text-muted">Das Board of Partners hat die Discord-Anmeldung noch nicht eingerichtet.${isAdmin() ? ' <a href="/dashboard.html?tab=bot&amp;modul=login#settings" class="text-gold underline">Einstellungen → Discord → Discord-Login</a> zeigt, was fehlt.' : ''}</p>`;
     return `
         ${u.mustChangePassword ? `<div class="banner banner-amber">${icon('alert')}<div><strong>Bitte jetzt ein eigenes Passwort festlegen.</strong> Ihr aktuelles Passwort wurde automatisch erzeugt oder vom Board of Partners zurückgesetzt.</div></div>` : ''}
         <div class="page-head"><div><h1 class="page-title">Mein Profil</h1><p class="page-sub">Kontaktdaten, Passwort, Discord${isStaff() ? ' und FiveNet' : ''}.</p></div></div>
@@ -536,11 +536,21 @@ function concernsPage(d) {
     : isStaff()
       ? 'Ein Anliegen an die Führungsebene – Personal, Konflikte, Vorschläge, Abläufe oder Vergütung. Auf Wunsch anonym. Einsehen kann es nur das Board of Partners; hier sehen Sie Ihre eigenen Anliegen und die Antworten.'
       : 'Sie möchten die Kanzleileitung direkt erreichen – etwa zur Betreuung Ihres Mandats, mit einer Beschwerde oder einem Lob? Das Board of Partners kümmert sich persönlich darum. Hier sehen Sie Ihre Anliegen und die Antworten.';
+  // Board: eingegangene und eigene Anliegen unter einem Menüpunkt – umschalten per Reiter
+  const tabs = concernsMerged()
+    ? `<div class="chip-row settings-tabs mb-4" role="tablist" aria-label="Anliegen">${[
+        ['concerns-board', 'Eingang', st.concernOpen],
+        ['concerns', 'Meine Anliegen', st.concernUnseen],
+      ]
+        .map(([k, l, n]) => `<a href="#${k}" class="chip ${st.view === k ? 'active' : ''}" role="tab" aria-selected="${st.view === k}">${icon(k === 'concerns' ? 'user' : 'chat', 'ico-sm')}<span>${l}</span>${n ? ` <span class="chip-count">${n}</span>` : ''}</a>`)
+        .join('')}</div>`
+    : '';
   return `
       <div class="page-head">
-        <div><h1 class="page-title">${all ? 'Eingegangene Anliegen' : 'Anliegen an das Board of Partners'}</h1><p class="page-sub">${esc(sub)}</p></div>
+        <div><h1 class="page-title">${all ? 'Eingegangene Anliegen' : concernsMerged() ? 'Meine Anliegen' : 'Anliegen an das Board of Partners'}</h1><p class="page-sub">${esc(sub)}</p></div>
         <div class="page-actions"><button class="${all ? 'btn-outline' : 'btn-gold'} btn-md" data-action="concern-new">${icon('plus')}<span>Neues Anliegen</span></button></div>
       </div>
+      ${tabs}
       <div class="toolbar">
         <div class="chip-row">
           ${CONCERN_FILTERS.map(([k, l]) => `<button class="chip ${st.concernFilter === k ? 'active' : ''}" data-action="concern-filter" data-value="${k}">${l} <span class="chip-count">${count(k)}</span></button>`).join('')}
@@ -570,7 +580,7 @@ async function concernNewModal() {
   const staff = isStaff();
   openModal(`
       <h2 class="modal-title">Anliegen an das Board of Partners</h2>
-      <p class="modal-sub">${staff ? 'Für Führungsthemen: Personal, Konflikte, Vorschläge, Abläufe, Vergütung …' : 'Zur Betreuung Ihres Mandats, einer Rechnung, als Beschwerde oder Lob – direkt an die Kanzleileitung.'} Einsehen kann es nur das Board of Partners; die Antwort finden Sie unter „Anliegen ans Board“.</p>
+      <p class="modal-sub">${staff ? 'Für Führungsthemen: Personal, Konflikte, Vorschläge, Abläufe, Vergütung …' : 'Zur Betreuung Ihres Mandats, einer Rechnung, als Beschwerde oder Lob – direkt an die Kanzleileitung.'} Einsehen kann es nur das Board of Partners; die Antwort finden Sie unter ${concernsMerged() ? '„Anliegen“ → „Meine Anliegen“' : '„Anliegen ans Board“'}.</p>
       <form data-form="concern-new" class="form-grid cols-2">
         <div><label class="label" for="cnCat">Kategorie</label><select id="cnCat" name="category" class="field" required>${Object.entries(cats).map(([k, l]) => opt(k, l)).join('')}</select></div>
         <div><label class="label" for="cnUrg">Dringlichkeit</label><select id="cnUrg" name="urgency" class="field">${opt('normal', 'Normal', true)}${opt('dringend', 'Dringend')}</select></div>
@@ -786,7 +796,7 @@ views.cooperations = {
     const warn = !d.discord.bot
       ? `<div class="banner banner-amber">${icon('alert')}<div>Es ist kein Discord-Bot eingerichtet (<code>DISCORD_BOT_TOKEN</code>). Discord-Rollen werden dann nicht erkannt – es gelten nur von Hand zugeordnete Konten.</div></div>`
       : !d.discord.defaultGuild
-        ? `<div class="banner banner-amber">${icon('alert')}<div>Kein Discord-Server hinterlegt: unter <a href="/dashboard.html?tab=bot&amp;modul=tickets#settings" class="text-gold underline">Einstellungen → Discord-Bot → Tickets</a> die Server-ID eintragen oder bei jeder Kooperation den Server angeben.</div></div>`
+        ? `<div class="banner banner-amber">${icon('alert')}<div>Kein Discord-Server hinterlegt: unter <a href="/dashboard.html?tab=bot&amp;modul=tickets#settings" class="text-gold underline">Einstellungen → Discord → Tickets</a> die Server-ID eintragen oder bei jeder Kooperation den Server angeben.</div></div>`
         : '';
     return `
         <div class="page-head">
@@ -1023,7 +1033,7 @@ function absencePanel() {
         <button class="btn-outline btn-sm" data-action="absence-new">${icon('plus', 'ico-sm')}<span>Abmelden</span></button></div>
       ${mine ? `<div class="banner banner-amber mb-3">${icon('alert')}<div>Sie sind bis ${esc(dayDe(mine.endDate))} abgemeldet. Wieder da? <button class="link-btn" data-action="absence-return" data-id="${mine.id}">Jetzt zurückmelden</button></div></div>` : ''}
       ${rows}
-      <p class="form-hint mt-3">Abmeldungen, Rückmeldungen und Zurückziehen erscheinen auf Wunsch in Discord (Einstellungen → Discord → „Abmeldung / Rückmeldung“).</p>
+      <p class="form-hint mt-3">Abmeldungen, Rückmeldungen und Zurückziehen erscheinen auf Wunsch in Discord (Einstellungen → Discord → Webhook → „Abmeldung / Rückmeldung“).</p>
     </section>`;
 }
 

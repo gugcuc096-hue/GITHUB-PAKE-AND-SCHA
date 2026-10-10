@@ -122,7 +122,7 @@ router.post(
     if (!isStaff(req.user)) return res.status(403).json({ error: 'Google Docs legt die Kanzlei an.' });
     const t = target(req, res);
     if (!t) return;
-    if (!drive.connected()) return res.status(409).json({ error: 'Das Google-Konto der Kanzlei ist nicht verbunden (Einstellungen → Google Docs).' });
+    if (!drive.connected()) return res.status(409).json({ error: 'Das Google-Konto der Kanzlei ist nicht verbunden (Einstellungen → Integrationen → Google Docs).' });
     const existed = !!gdocs.rowFor(t.kind, t.id);
     const options = t.kind === 'extract' && req.body && typeof req.body.options === 'object' ? req.body.options : undefined;
     const doc = await gdocs.publish(t.kind, t.id, req.user, options);

@@ -599,6 +599,214 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await dsrv.stop();
       }
     });
+
+    it(`Bedienung am ${label}: Menügruppen, Anliegen-Reiter, Sprungleiste und „Mehr“ in der Akte, Einstellungs-Reiter`, async () => {
+      // Eigener Server – die Anmeldungen hier zählen nicht gegen die Sperre des gemeinsamen Servers
+      const usrv = await startServer();
+      try {
+        const adm = client(usrv.base);
+        const me = await adm.login(TEAM.admin);
+        const mandant = client(usrv.base);
+        await mandant.post('/api/auth/register', { displayName: 'Toni Montana', email: 'toni.montana', password: PASSWORD });
+        const kase = (await adm.post('/api/cases', { title: 'Körperverletzung Würfelpark', area: 'strafrecht', clientEmail: 'toni.montana', lawyerId: me.id, description: 'Mandant wurde am Würfelpark festgenommen.' })).json.case;
+        await adm.post('/api/invoices', { caseId: kase.id, items: [{ description: 'Beratung', quantity: 1, unitPrice: 9000 }] });
+        const concern = await mandant.post('/api/concerns', { category: 'beschwerde', subject: 'Rückruf zu meiner Akte', body: 'Bitte melden Sie sich zu meiner Akte, danke.' });
+        assert.equal(concern.status, 201, concern.text);
+
+        const { ctx, page, problems, settle } = await open(device);
+        await login(page, TEAM.admin, usrv.base);
+        await settle();
+        const openMenu = async () => {
+          if (device === PHONE && !(await page.$('#sidebar.open'))) {
+            await page.click('#bottomNav [data-action="open-sidebar"]');
+            await page.waitForSelector('#nav a[href="#overview"]', { state: 'visible' });
+          }
+        };
+        const group = (name) => page.$eval(`#nav .nav-toggle[data-group="${name}"]`, (b) => ({ open: b.getAttribute('aria-expanded') === 'true', count: (b.querySelector('.nav-count') || {}).textContent || '' }));
+        const usersVisible = () => page.isVisible('#nav a[href="#users"]');
+
+        // Übersicht: leere Bereiche als kurze Zeile, Handy-Leiste mit Aufgaben statt Post
+        assert.ok(await page.isVisible('#content .empty-line'), 'leere Bereiche kompakt');
+        if (device === PHONE) {
+          assert.ok(await page.$('#bottomNav a[href="#tasks"]'), 'Aufgaben unten in der Leiste');
+          assert.equal(await page.$('#bottomNav a[href="#mail"]'), null, 'Post steht oben als Briefsymbol');
+        }
+
+        // Menü: Verwaltung zugeklappt, Kanzlei und Board-Eingang offen – Auswahl bleibt nach dem Neuladen
+        await openMenu();
+        assert.deepEqual(await group('Verwaltung'), { open: false, count: '' });
+        assert.equal((await group('Kanzlei')).open, true);
+        assert.equal((await group('Board-Eingang')).open, true);
+        assert.equal(await usersVisible(), false, 'Benutzer stecken in der zugeklappten Verwaltung');
+        await page.click('#nav .nav-toggle[data-group="Verwaltung"]');
+        assert.equal((await group('Verwaltung')).open, true);
+        assert.equal(await usersVisible(), true);
+        await page.click('#nav .nav-toggle[data-group="Board-Eingang"]');
+        assert.deepEqual(await group('Board-Eingang'), { open: false, count: '1' }, 'zugeklappt: Zähler des neuen Anliegens am Gruppennamen');
+        await page.reload();
+        await page.waitForSelector('#nav a.nav-item', { state: 'attached' });
+        await settle();
+        await openMenu();
+        assert.equal((await group('Verwaltung')).open, true, 'aufgeklappt gemerkt');
+        assert.equal((await group('Board-Eingang')).open, false, 'zugeklappt gemerkt');
+        await page.click('#nav .nav-toggle[data-group="Verwaltung"]');
+        assert.equal(await usersVisible(), false);
+        // Liegt die aktuelle Seite in einer zugeklappten Gruppe, ist sie trotzdem offen
+        await page.evaluate(() => (location.hash = '#users'));
+        await settle();
+        await openMenu();
+        assert.equal((await group('Verwaltung')).open, true, 'aktuelle Seite bleibt im Menü sichtbar');
+        await page.evaluate(() => (location.hash = '#overview'));
+        await settle();
+        await openMenu();
+        assert.equal((await group('Verwaltung')).open, false, 'danach wieder wie gewählt zugeklappt');
+
+        // Anliegen: ein Menüpunkt für das Board, eigene Anliegen als Reiter
+        assert.equal(await page.$('#nav a[href="#concerns"]'), null, 'kein zweiter Menüpunkt');
+        assert.equal((await page.textContent('#nav a[href="#concerns-board"]')).trim().startsWith('Anliegen'), true);
+        await page.evaluate(() => (location.hash = '#concerns-board'));
+        await settle();
+        assert.ok((await page.textContent('#content')).includes('Rückruf zu meiner Akte'), 'Eingang zeigt das Anliegen');
+        await page.click('#content .settings-tabs a[href="#concerns"]');
+        await settle();
+        assert.equal(await page.evaluate(() => location.hash), '#concerns');
+        assert.match(await page.textContent('#content .page-title'), /Meine Anliegen/);
+        assert.ok(await page.$('#nav a[href="#concerns-board"].active'), 'Menüpunkt bleibt markiert');
+        await page.click('#content .settings-tabs a[href="#concerns-board"]');
+        await settle();
+        assert.equal(await page.evaluate(() => location.hash), '#concerns-board');
+
+        // Akte: Sprungleiste mit Zahlen, bleibt beim Springen oben stehen
+        await page.evaluate((id) => openCase(id), kase.id);
+        await page.waitForSelector('#modalBody .case-jump');
+        assert.match(await page.textContent('#modalBody .case-jump [data-target="secInvoices"]'), /Rechnungen\s*1/);
+        await page.click('#modalBody .case-jump [data-target="secInvoices"]');
+        await page.waitForTimeout(900);
+        const pos = await page.evaluate((phone) => {
+          const scroller = document.querySelector(phone ? '#modalBody' : '#modal');
+          const top = phone ? scroller.getBoundingClientRect().top : 0;
+          const bar = document.querySelector('#modalBody .case-jump').getBoundingClientRect();
+          return { scrolled: scroller.scrollTop, barTop: Math.round(bar.top - top), barBottom: bar.bottom, sec: document.getElementById('secInvoices').getBoundingClientRect().top };
+        }, device === PHONE);
+        assert.ok(pos.scrolled > 200, `zu den Rechnungen gesprungen (${pos.scrolled})`);
+        assert.ok(Math.abs(pos.barTop) <= 2, `Leiste klebt oben (${pos.barTop})`);
+        assert.ok(pos.sec >= pos.barBottom - 2 && pos.sec < 844 / 2, `Abschnitt direkt unter der Leiste (${pos.sec} / ${pos.barBottom})`);
+        const closeFree = await page.$eval('.modal-close', (x) => {
+          const r = x.getBoundingClientRect();
+          return r.bottom < 0 || x.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+        });
+        assert.ok(closeFree, 'die Leiste verdeckt das X zum Schließen nicht');
+
+        // „⋯ Mehr“: seltene Aktionen nur im Menü, Klick daneben schließt es
+        assert.equal(await page.$$eval('#modalBody [data-action="delete-case"]', (els) => els.every((e) => e.closest('.more-menu'))), true, 'Löschen steckt im Menü');
+        assert.equal(await page.isVisible('#modalBody .more-item[data-action="delete-case"]'), false);
+        await page.$eval('#modal', (m) => (m.scrollTop = 0));
+        await page.$eval('#modalBody', (m) => (m.scrollTop = 0));
+        await page.click('#modalBody details.more-menu > summary');
+        assert.equal(await page.isVisible('#modalBody .more-item[data-action="release-case"]'), true);
+        await page.click('#modalTitle');
+        assert.equal(await page.$eval('#modalBody details.more-menu', (d) => d.open), false, 'Klick daneben schließt das Menü');
+        await page.click('#modalBody details.more-menu > summary');
+        await page.click('#modalBody .more-item[data-action="release-case"]');
+        await page.waitForSelector('#psDialogTitle');
+        assert.equal(await page.textContent('#psDialogTitle'), 'Akte abgeben?');
+        await page.click('[data-ps-dialog="cancel"]');
+        assert.equal((await adm.get(`/api/cases/${kase.id}`)).json.case.lawyerId, me.id, 'abgebrochen – Akte bleibt');
+        await page.click('#modalBody details.more-menu > summary');
+        await page.click('#modalBody .more-item[data-action="delete-case"]');
+        await page.waitForSelector('[data-ps-dialog="ok"]');
+        await page.click('[data-ps-dialog="ok"]');
+        await page.waitForFunction(() => !document.querySelector('#modal').classList.contains('open'));
+        assert.equal((await adm.get(`/api/cases/${kase.id}`)).status, 404, 'Akte gelöscht (Papierkorb)');
+
+        // Einstellungen: fünf Reiter, Discord mit Webhook und Login als Module, System mit Datensicherung
+        await page.evaluate(() => (location.hash = '#settings'));
+        await settle();
+        assert.deepEqual(await page.$$eval('#content .settings-tabs .chip', (els) => els.map((e) => e.textContent.trim())), ['Kanzlei & Rechnungen', 'Discord', 'Integrationen', 'System', 'Vertragsvorlagen']);
+        assert.ok(await page.$('#content form[data-form="settings-firm"]'));
+        await page.click('#content .settings-tabs [data-tab="integrations"]');
+        await settle();
+        assert.match(await page.textContent('#content'), /FiveNet[\s\S]*Google Docs/);
+        await page.click('#content .settings-tabs [data-tab="system"]');
+        await settle();
+        assert.match(await page.textContent('#content'), /Datensicherung[\s\S]*Notfall/);
+        await page.click('#content .settings-tabs [data-tab="bot"]');
+        await settle();
+        await page.click('#content .bot-nav-item[data-module="webhook"]');
+        await settle();
+        await page.fill('#content form[data-form="settings-discord"] input[name="pingRole"]', '1546979799820537986');
+        await page.click('#content form[data-form="settings-discord"] button[type=submit]');
+        await settle();
+        assert.equal((await adm.get('/api/admin/settings')).json.settings.discordPingRole, '1546979799820537986', 'Webhook-Einstellungen speichern wie zuvor');
+        // Alter Link aus Hinweisen (?tab=bot&modul=login) führt weiter zum richtigen Modul
+        await page.goto(`${usrv.base}/dashboard.html?tab=bot&modul=login#settings`);
+        await page.waitForSelector('#content .bot-nav-item[data-module="login"].active');
+        assert.match(await page.textContent('#content'), /Discord-Login/);
+        if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Einstellungen passen aufs Handy');
+
+        // Mitarbeiter ohne Board: „Anliegen ans Board“ unter Kanzlei, kein Board-Eingang
+        if (device === DESKTOP) {
+          const staff = await open(device);
+          await login(staff.page, TEAM.anwalt, usrv.base);
+          assert.ok(await staff.page.$('#nav .nav-group a[href="#concerns"]'), 'eigener Punkt „Anliegen ans Board“');
+          assert.equal(await staff.page.$('#nav .nav-toggle[data-group="Board-Eingang"]'), null);
+          assert.deepEqual(staff.problems, []);
+          await staff.ctx.close();
+        }
+        assert.deepEqual(problems, []);
+        await ctx.close();
+      } finally {
+        await usrv.stop();
+      }
+    });
+
+    it(`Startseite am ${label}: Honorarordnung nach Kategorien aufklappbar${device === PHONE ? ', fester Knopf „Mandat anfragen“' : ''}`, async () => {
+      const { ctx, page, problems } = await open(device);
+      await page.goto(server.base + '/');
+      await page.waitForSelector('#priceListContainer .price-head');
+      const state = () => page.$$eval('#priceListContainer .price-category', (els) => els.filter((e) => e.style.display !== 'none').map((e) => !e.classList.contains('collapsed')));
+      const first = await state();
+      assert.ok(first.length >= 3, 'Kategorien vorhanden');
+      assert.deepEqual(first, first.map((_, i) => i === 0), 'nur die erste Kategorie ist offen');
+      const second = page.locator('#priceListContainer .price-head').nth(1);
+      await second.click();
+      assert.equal((await state())[1], true, 'Klick öffnet die Kategorie');
+      assert.equal(await second.getAttribute('aria-expanded'), 'true');
+      await second.press('Enter');
+      assert.equal((await state())[1], false, 'Enter klappt wieder zu');
+      // Suche: genau die Kategorien mit Treffern gehen auf
+      await page.fill('#priceSearch', 'Haft');
+      await page.waitForTimeout(300);
+      const hits = await page.$$eval('#priceListContainer .price-category', (els) =>
+        els.map((e) => [[...e.querySelectorAll('.price-item')].some((i) => i.style.display !== 'none'), !e.classList.contains('collapsed')])
+      );
+      assert.ok(hits.some(([hit]) => hit), 'Treffer gefunden');
+      assert.ok(hits.every(([hit, open]) => hit === open), 'Kategorien mit Treffern offen, ohne Treffer zu');
+      await page.fill('#priceSearch', '');
+      await page.waitForTimeout(300);
+      assert.deepEqual(await state(), first, 'ohne Suche wieder wie am Anfang');
+      // Kategorie-Reiter zeigt die Kategorie offen
+      await page.locator('.tab-btn[data-cat]:not([data-cat="all"])').nth(2).click();
+      await page.waitForTimeout(300);
+      assert.deepEqual(await state(), [true]);
+
+      if (device === PHONE) {
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await page.waitForFunction(() => !document.getElementById('mobileCta').classList.contains('show'));
+        assert.equal(await page.isVisible('#mobileCta'), true);
+        assert.equal(await page.$eval('#mobileCta', (b) => getComputedStyle(b).pointerEvents), 'none', 'oben ausgeblendet');
+        await page.evaluate(() => window.scrollTo(0, 2500));
+        await page.waitForFunction(() => document.getElementById('mobileCta').classList.contains('show'));
+        await page.waitForTimeout(400);
+        await page.click('#mobileCta');
+        await page.waitForFunction(() => !document.getElementById('ticketModal').classList.contains('opacity-0'));
+        assert.ok((await overflow(page)) <= 1, 'nichts ragt über den Rand');
+      } else {
+        assert.equal(await page.isVisible('#mobileCta'), false, 'am PC kein fester Knopf');
+      }
+      assert.deepEqual(problems, []);
+      await ctx.close();
+    });
   }
 
   it('Druckansichten: Rechnung und Aktenauszug', async () => {

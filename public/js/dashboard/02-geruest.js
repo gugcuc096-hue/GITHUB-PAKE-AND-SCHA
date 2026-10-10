@@ -7,27 +7,83 @@
 /* ================================================================
    Grundgerüst: Navigation, Dialog, Routing
    ================================================================ */
+/* Menügruppen: Kanzlei, Board-Eingang und Verwaltung lassen sich auf- und zuklappen (im Browser gemerkt);
+ * Verwaltung ist anfangs zu. Liegt die geöffnete Seite in einer zugeklappten Gruppe, ist sie trotzdem sichtbar. */
+const NAV_FOLDABLE = { Kanzlei: false, 'Board-Eingang': false, Verwaltung: true }; // Gruppe → anfangs zugeklappt?
+function navClosedPrefs() {
+  try {
+    return JSON.parse(localStorage.getItem('ps.navClosed') || '{}') || {};
+  } catch {
+    return {};
+  }
+}
+function toggleNavGroup(group) {
+  const prefs = navClosedPrefs();
+  const closed = group in prefs ? prefs[group] : NAV_FOLDABLE[group];
+  prefs[group] = !closed;
+  try {
+    localStorage.setItem('ps.navClosed', JSON.stringify(prefs));
+  } catch {
+    /* nur Komfort – ohne Speicher gilt die Auswahl bis zum Neuladen */
+  }
+  st.navClosed = prefs;
+  renderNav();
+}
+/** Board: „Anliegen“ führt in den Eingang; eigene Anliegen sind dort ein Reiter. */
+const concernsMerged = () => isBoard();
+function navCount(key) {
+  if (key === 'concerns-board') return (st.concernOpen || 0) + (st.concernUnseen || 0);
+  return { cases: st.chatUnread, mail: st.unread, applications: st.newApplications, tasks: st.dueTasks, concerns: st.concernUnseen, personnel: st.personnelNew, 'name-requests': st.nameOpen, vip: st.vipReqOpen, reviews: st.reviewOpen, invoices: st.paymentReports }[key] || 0;
+}
+function navActive(key) {
+  if (key === 'invoices') return st.view === 'invoices' || st.view === 'invoice-new';
+  if (key === 'concerns-board' && concernsMerged()) return st.view === 'concerns-board' || st.view === 'concerns';
+  return st.view === key;
+}
 function renderNav() {
-  let html = '';
-  let section = null;
+  const prefs = st.navClosed || (st.navClosed = navClosedPrefs());
+  const groups = []; // [{ name, items: [key] }]
   for (const [key, v] of Object.entries(VIEWS)) {
     if (v.hidden || !allowed(key)) continue;
-    if (v.section && v.section !== section) {
-      section = v.section;
-      html += `<div class="nav-section">${esc(section)}</div>`;
-    }
-    const count = { cases: st.chatUnread, mail: st.unread, applications: st.newApplications, tasks: st.dueTasks, concerns: st.concernUnseen, 'concerns-board': st.concernOpen, personnel: st.personnelNew, 'name-requests': st.nameOpen, vip: st.vipReqOpen, reviews: st.reviewOpen, invoices: st.paymentReports }[key] || 0;
-    const active = st.view === key || (key === 'invoices' && st.view === 'invoice-new');
-    html += `<a href="#${key}" class="nav-item ${active ? 'active' : ''}" ${active ? 'aria-current="page"' : ''}>${icon(v.icon)}<span>${esc(viewLabel(key))}</span>${count ? `<span class="nav-count">${count > 99 ? '99+' : count}</span>` : ''}</a>`;
+    if (key === 'concerns' && concernsMerged()) continue; // steckt im Board-Punkt „Anliegen“
+    const name = v.section && (!v.staffSection || isStaff()) ? v.section : groups.length ? groups[groups.length - 1].name : null;
+    if (!groups.length || groups[groups.length - 1].name !== name) groups.push({ name, items: [] });
+    groups[groups.length - 1].items.push(key);
   }
+  const item = (key) => {
+    const v = VIEWS[key];
+    const count = navCount(key);
+    const active = navActive(key);
+    const label = isBoard() && v.navLabel ? v.navLabel : viewLabel(key);
+    return `<a href="#${key}" class="nav-item ${active ? 'active' : ''}" ${active ? 'aria-current="page"' : ''}>${icon(v.icon)}<span>${esc(label)}</span>${count ? `<span class="nav-count">${count > 99 ? '99+' : count}</span>` : ''}</a>`;
+  };
+  let html = '';
+  groups.forEach((g, i) => {
+    const items = g.items.map(item).join('');
+    if (!g.name) {
+      html += items;
+      return;
+    }
+    if (!(g.name in NAV_FOLDABLE)) {
+      html += `<div class="nav-section">${esc(g.name)}</div>${items}`;
+      return;
+    }
+    const closed = (g.name in prefs ? prefs[g.name] : NAV_FOLDABLE[g.name]) && !g.items.some(navActive);
+    const total = g.items.reduce((n, k) => n + navCount(k), 0);
+    html += `<button type="button" class="nav-section nav-toggle" data-action="nav-group" data-group="${esc(g.name)}" aria-expanded="${!closed}" aria-controls="navGroup${i}">
+        <span>${esc(g.name)}</span>${closed && total ? `<span class="nav-count">${total > 99 ? '99+' : total}</span>` : ''}${icon('chevronDown', 'ico-sm nav-chev')}</button>
+      <div class="nav-group" id="navGroup${i}" ${closed ? 'hidden' : ''}>${items}</div>`;
+  });
   $('#nav').innerHTML = html;
 
-  const bottom = ['overview', 'cases', 'calendar', 'mail'];
+  // Handy-Leiste: Mitarbeiter haben Aufgaben statt Post (Post steht ohnehin oben als Briefsymbol)
+  const bottom = isStaff() ? ['overview', 'cases', 'tasks', 'calendar'] : ['overview', 'cases', 'calendar', 'mail'];
+  const dot = (n) => (n ? `<span class="dot-badge">${n > 99 ? '99+' : n}</span>` : '');
   $('#bottomNav').innerHTML =
     bottom
       .map(
         (k) =>
-          `<a href="#${k}" class="bn-item ${st.view === k ? 'active' : ''}">${icon(VIEWS[k].icon)}<span>${esc(viewLabel(k, true))}</span>${k === 'mail' && st.unread ? `<span class="dot-badge">${st.unread > 99 ? '99+' : st.unread}</span>` : ''}${k === 'cases' && st.chatUnread ? `<span class="dot-badge">${st.chatUnread > 99 ? '99+' : st.chatUnread}</span>` : ''}</a>`
+          `<a href="#${k}" class="bn-item ${st.view === k ? 'active' : ''}">${icon(VIEWS[k].icon)}<span>${esc(viewLabel(k, true))}</span>${dot({ mail: st.unread, cases: st.chatUnread, tasks: st.dueTasks }[k])}</a>`
       )
       .join('') + `<button type="button" class="bn-item" data-action="open-sidebar">${icon('more')}<span>Mehr</span></button>`;
 

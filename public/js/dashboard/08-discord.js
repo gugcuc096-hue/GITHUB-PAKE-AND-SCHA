@@ -7,6 +7,8 @@
 /* ---------------------------------------------------------------- Einstellungen: Discord-Bot (wie Sapphire, im eigenen Bot) */
 const BOT_MODULES = [
   ['overview', 'Übersicht', 'home'],
+  ['webhook', 'Webhook (Meldungen)', 'send'],
+  ['login', 'Discord-Login', 'key'],
   ['tickets', 'Tickets', 'folder'],
   ['ranks', 'Rang-Sync', 'users'],
   ['connections', 'Role Connections', 'link'],
@@ -71,12 +73,15 @@ function collectForm(form) {
 
 function botNav() {
   const b = st.bot;
+  const s = st.settings || {};
   const on = {
+    webhook: !!s.discordWebhookActive,
+    login: !!s.discordOAuthConfigured,
     tickets: st.ticketSettings && st.ticketSettings.active,
-    ranks: b.rankSync.enabled,
-    connections: b.connections.enabled,
-    joinroles: b.joinRoles && (b.joinRoles.enabled || b.joinRoles.alwaysEnabled),
-    welcome: b.welcome.enabled,
+    ranks: !!(b && b.rankSync.enabled),
+    connections: !!(b && b.connections.enabled),
+    joinroles: !!(b && b.joinRoles && (b.joinRoles.enabled || b.joinRoles.alwaysEnabled)),
+    welcome: !!(b && b.welcome.enabled),
     messages: !!(st.botMessages && st.botMessages.templates.some((t) => t.jobs.some((j) => j.enabled))),
   };
   const cur = st.botModule || 'overview';
@@ -959,8 +964,11 @@ function msgRefresh(r) {
 }
 
 function botSettings() {
-  if (!st.bot) return '<div class="panel panel-pad text-sm text-muted">Bot-Einstellungen werden geladen …</div>';
   const cur = st.botModule || 'overview';
+  // Webhook und Discord-Login brauchen den Bot nicht
+  if (cur === 'webhook') return `<div class="bot-layout">${botNav()}<div class="bot-main">${discordWebhookPanel(st.settings)}</div></div>`;
+  if (cur === 'login') return `<div class="bot-layout">${botNav()}<div class="bot-main">${discordLoginPanel(st.settings)}</div></div>`;
+  if (!st.bot) return '<div class="panel panel-pad text-sm text-muted">Bot-Einstellungen werden geladen …</div>';
   const discordErr = st.botDiscord && st.botDiscord.error && cur !== 'overview' && cur !== 'tickets'
     ? `<div class="banner banner-amber">${icon('alert')}<div>Rollen und Kanäle konnten nicht aus Discord geladen werden: ${esc(st.botDiscord.error)} – Auswahl daher als ID-Feld.</div></div>`
     : '';

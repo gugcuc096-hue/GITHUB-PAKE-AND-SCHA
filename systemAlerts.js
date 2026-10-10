@@ -93,7 +93,7 @@ function checkBot() {
   const label = { verbindet: 'verbindet …', getrennt: 'getrennt – verbindet neu', fehler: 'Fehler', aus: 'aus' }[st.state] || st.state;
   raise('bot', {
     title: `Kanzlei-Bot seit ${BOT_OFFLINE_MINUTES} Minuten offline`,
-    description: `Rang-Sync, Join Roles, Willkommensnachrichten und Automatiken laufen gerade nicht. Status: ${label}.${st.error ? ` ${clean(st.error)}` : ''} Im Dashboard unter Einstellungen → Discord-Bot → „Neu verbinden“. Tickets und Kanzlei-Meldungen sind nicht betroffen.`,
+    description: `Rang-Sync, Join Roles, Willkommensnachrichten und Automatiken laufen gerade nicht. Status: ${label}.${st.error ? ` ${clean(st.error)}` : ''} Im Dashboard unter Einstellungen → Discord → „Neu verbinden“. Tickets und Kanzlei-Meldungen sind nicht betroffen.`,
   });
 }
 
@@ -101,7 +101,7 @@ function checkBot() {
 function backupFailed(err) {
   raise('backup', {
     title: 'Datensicherung fehlgeschlagen',
-    description: `Die tägliche Sicherung der Datenbank hat nicht geklappt: ${clean(err && err.message)}. Der Server versucht es stündlich erneut. Einstellungen → Allgemein → Datensicherung → „Jetzt sichern“.`,
+    description: `Die tägliche Sicherung der Datenbank hat nicht geklappt: ${clean(err && err.message)}. Der Server versucht es stündlich erneut. Einstellungen → System → Datensicherung → „Jetzt sichern“.`,
   });
 }
 function backupOk() {

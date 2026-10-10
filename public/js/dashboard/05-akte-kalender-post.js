@@ -415,9 +415,13 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     quick.push(`<button class="btn-outline btn-sm" data-action="chat-focus">${icon('chat', 'ico-sm')}<span>Mandant anschreiben</span></button>`);
     if (!c.hasClientAccount && canLinkClient(c)) quick.push(`<button class="btn-outline btn-sm" data-action="case-client-search" data-id="${c.id}">${icon('user', 'ico-sm')}<span>Mandanten-Konto verknüpfen</span></button>`);
     if (!c.processTicket && c.canEdit) quick.push(`<button class="btn-outline btn-sm" data-action="pt-toggle">${icon('plus', 'ico-sm')}<span>Prozessticket (DOJ)</span></button>`);
-    if (c.lawyerId === me) quick.push(`<button class="btn-ghost btn-sm" data-action="release-case" data-id="${c.id}">Akte abgeben</button>`);
-    if (c.isCoLawyer) quick.push(`<button class="btn-ghost btn-sm" data-action="leave-case" data-id="${c.id}">Mitarbeit beenden</button>`);
-    if (admin) quick.push(`<button class="btn-danger btn-sm" data-action="delete-case" data-id="${c.id}" data-number="${esc(c.caseNumber)}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>`);
+    // Seltene bzw. folgenreiche Aktionen stehen im Menü „⋯ Mehr“ statt zwischen den täglichen Knöpfen
+    const more = [
+      c.lawyerId === me ? `<button type="button" class="more-item" data-action="release-case" data-id="${c.id}">${icon('logout', 'ico-sm')}<span>Akte abgeben</span></button>` : '',
+      c.isCoLawyer ? `<button type="button" class="more-item" data-action="leave-case" data-id="${c.id}">${icon('logout', 'ico-sm')}<span>Mitarbeit beenden</span></button>` : '',
+      admin ? `<button type="button" class="more-item danger" data-action="delete-case" data-id="${c.id}" data-number="${esc(c.caseNumber)}">${icon('trash', 'ico-sm')}<span>Akte löschen</span></button>` : '',
+    ].join('');
+    if (more) quick.push(`<details class="more-menu"><summary class="btn-ghost btn-sm" aria-label="Weitere Aktionen">${icon('more', 'ico-sm')}<span>Mehr</span></summary><div class="more-pop">${more}</div></details>`);
   } else {
     if (!c.closed) quick.push(`<button class="btn-outline btn-sm" data-action="new-event" data-case-id="${c.id}" data-return-case="${c.id}">${icon('calendar', 'ico-sm')}<span>Termin anfragen</span></button>`);
     quick.push(`<button class="btn-outline btn-sm" data-action="chat-focus">${icon('chat', 'ico-sm')}<span>Nachricht zur Akte</span></button>`);
@@ -474,12 +478,43 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
         .join('')}</div>`
     : '<p class="text-sm text-dim">Noch keine Einträge.</p>';
 
+  // Abschnitte der Akte (in dieser Reihenfolge) – die Sprungleiste zeigt nur, was es in der Akte gibt
+  const contractList = contracts.filter((k) => k.kind !== 'schriftsatz');
+  const briefList = contracts.filter((k) => k.kind === 'schriftsatz');
+  const parts = {
+    chat: chatSection(c, chat, ticket),
+    contracts: contractsSection(c, contractList),
+    briefs: briefsSection(c, briefList),
+    external: externalSection(c, externalDocs),
+    evidence: attachmentsSection(c, attachments),
+    tasks: staff ? caseTasksSection(c, tasks) : '',
+    invoices: invoiceList ? `<div class="section" id="secInvoices"><h3 class="section-title">Rechnungen & Honorare</h3>${invoiceList}</div>` : '',
+    work: caseWorkSection(c, work),
+  };
+  const openTasks = tasks.filter((t) => !t.done).length;
+  const jumps = [
+    ['secChat', 'Nachrichten', chat ? chat.messages.length : 0, parts.chat],
+    ['secEvents', 'Termine', appointments.length, true],
+    ['secContracts', 'Verträge', contractList.length, parts.contracts],
+    ['secBriefs', 'Schriftsätze', briefList.length, parts.briefs],
+    ['secExternal', 'Dokumente', externalDocs.length, parts.external],
+    ['secEvidence', 'Beweise', attachments.length, parts.evidence],
+    ['secTasks', 'Aufgaben', openTasks, parts.tasks],
+    ['secInvoices', 'Rechnungen', invoices.length, parts.invoices],
+    ['secWork', 'Zeiten', 0, parts.work],
+    ['secNotes', 'Verlauf', 0, true],
+  ].filter((j) => j[3]);
+  const jumpBar = `<nav class="case-jump" aria-label="Abschnitte der Akte"><div class="chip-row">${jumps
+    .map(([id, label, n]) => `<button type="button" class="chip" data-action="scroll-to" data-target="${id}">${esc(label)}${n ? ` <span class="chip-count">${n}</span>` : ''}</button>`)
+    .join('')}</div></nav>`;
+
   return `
       <div class="flex flex-wrap items-start justify-between gap-3 mb-5 pr-12">
         <div class="min-w-0"><div class="font-mono text-gold text-sm">${esc(c.caseNumber)}</div>
           <h2 id="modalTitle" class="font-serif text-2xl md:text-3xl font-semibold leading-tight">${esc(c.title)}</h2></div>
         <div class="flex flex-wrap gap-2">${memberBadge(c.membership)}${statusBadge(CASE_STATUS, c.status)}${caseLevelBadge(c)}</div>
       </div>
+      ${jumpBar}
       ${claim}
       ${statusSeg}
       ${track}
@@ -492,15 +527,15 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       ${staff ? '' : reviewSection(c, review)}
       <div class="section"><h3 class="section-title">Sachverhalt</h3><p class="text-sm whitespace-pre-wrap text-muted">${esc(c.description || '—')}</p></div>
       ${c.publicNote ? `<div class="section"><h3 class="section-title">Statushinweis</h3><div class="banner banner-gold mb-0"><p class="text-sm whitespace-pre-wrap">${esc(c.publicNote)}</p></div></div>` : ''}
-      ${chatSection(c, chat, ticket)}
+      ${parts.chat}
       <div class="section" id="secEvents"><h3 class="section-title">Termine & Fristen</h3>${apptList}</div>
-      ${contractsSection(c, contracts.filter((k) => k.kind !== 'schriftsatz'))}
-      ${briefsSection(c, contracts.filter((k) => k.kind === 'schriftsatz'))}
-      ${externalSection(c, externalDocs)}
-      ${attachmentsSection(c, attachments)}
-      ${staff ? caseTasksSection(c, tasks) : ''}
-      ${invoiceList ? `<div class="section"><h3 class="section-title">Rechnungen & Honorare</h3>${invoiceList}</div>` : ''}
-      ${caseWorkSection(c, work)}
+      ${parts.contracts}
+      ${parts.briefs}
+      ${parts.external}
+      ${parts.evidence}
+      ${parts.tasks}
+      ${parts.invoices}
+      ${parts.work}
       <div class="section" id="secNotes"><h3 class="section-title">${staff ? 'Verlauf & interne Notizen' : 'Verlauf'}</h3>
         ${noteList}
         ${staff
