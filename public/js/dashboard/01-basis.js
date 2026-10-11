@@ -30,8 +30,6 @@ const PRIORITY = {
   3: ['Hoch', 'amber', 'Hohe Priorität'],
   4: ['Kritisch', 'red', 'Kritische Priorität'],
 };
-// Start-Priorität einer neuen Akte aus der Dringlichkeit (Angabe des Mandanten) – wie auf dem Server
-const PRIORITY_FROM_URGENCY = { normal: 2, eilig: 3, notfall: 4 };
 const CASE_SORTS = { aktualisiert: 'Zuletzt geändert', prioritaet: 'Priorität', neueste: 'Neueste zuerst', aelteste: 'Älteste zuerst' };
 const SOURCES = { portal: 'Mandantenportal', web: 'Website-Formular', kanzlei: 'Kanzlei' };
 const EVENT_TYPES = { gericht: 'Gerichtstermin', frist: 'Frist', mandant: 'Mandantengespräch', intern: 'Intern' };
@@ -276,6 +274,12 @@ const isAdmin = () => !!st.user && st.user.role === 'admin';
 const isBoard = () => !!st.user && !!st.user.board;
 const badge = (text, color = 'gold') => `<span class="badge badge-${color}">${esc(text)}</span>`;
 const statusBadge = (map, key) => badge(...(map[key] || [key, 'slate']));
+/**
+ * Leerer Abschnitt der Akte als eine Zeile: „Titel · noch keine … · Knöpfe“ statt Überschrift plus Erklärtext.
+ * hint: längere Erklärung als Tooltip; actions: fertiges HTML (Knöpfe).
+ */
+const emptySection = (id, title, note, actions = '', hint = '') =>
+  `<div class="section sec-empty"${id ? ` id="${id}"` : ''}><h3 class="section-title">${esc(title)}</h3><span class="sec-empty-note"${hint ? ` title="${esc(hint)}"` : ''}>${esc(note)}</span>${actions ? `<span class="ext-add">${actions}</span>` : ''}</div>`;
 // Offene Rechnung nach dem Fälligkeitsdatum
 const overdueText = (i) => `${i.overdueDays} ${i.overdueDays === 1 ? 'Tag' : 'Tage'} überfällig`;
 // kurz: Tabelle („Überfällig“, Tage als Tooltip und rotes Fälligkeitsdatum), sonst mit Anzahl der Tage

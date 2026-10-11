@@ -132,25 +132,22 @@ function todoPanel() {
     </section>`;
 }
 
-/** Überfällige/heute fällige eigene Aufgaben und eigene Akten ohne Bewegung – nur wenn es etwas zu tun gibt. */
-const STALE_DAYS = 7;
+/** Überfällige/heute fällige eigene Aufgaben und eigene liegengebliebene Akten – nur wenn es etwas zu tun gibt. */
 function attentionPanel() {
   const me = st.user.id;
   const overdue = st.myTasks.filter((t) => t.dueDate && daysUntil(t.dueDate) < 0);
   const today = st.myTasks.filter((t) => t.dueDate && daysUntil(t.dueDate) === 0);
-  const stale = st.cases.filter((c) => {
-    const d = parseDate(c.updatedAt);
-    return c.status === 'in_bearbeitung' && onCase(c, me) && d && -daysUntil(dayKey(d)) >= STALE_DAYS;
-  });
+  // Gleiche Schwelle wie die Markierung in der Aktenliste (Einstellungen, Standard 5 Tage)
+  const stale = st.cases.filter((c) => c.idleDays > 0 && onCase(c, me)).sort((a, b) => b.idleDays - a.idleDays);
   if (!overdue.length && !today.length && !stale.length) return '';
   const due = [...overdue, ...today];
   return `<section class="panel panel-pad attention mb-4 lg:mb-5">
       <div class="panel-head"><h2 class="panel-title">Handlungsbedarf</h2>
-        <div class="flex flex-wrap gap-2">${overdue.length ? badge(`${overdue.length} überfällig`, 'red') : ''}${today.length ? badge(`${today.length} heute fällig`, 'amber') : ''}${stale.length ? badge(`${stale.length} ruhende Akte${stale.length === 1 ? '' : 'n'}`, 'slate') : ''}</div></div>
+        <div class="flex flex-wrap gap-2">${overdue.length ? badge(`${overdue.length} überfällig`, 'red') : ''}${today.length ? badge(`${today.length} heute fällig`, 'amber') : ''}${stale.length ? badge(`${stale.length} liegengeblieben`, 'amber') : ''}</div></div>
       ${due.length ? `<div class="task-list">${due.slice(0, 5).map((t) => taskItem(t)).join('')}</div>` : ''}
       ${due.length > 5 ? `<a href="#tasks" class="btn-ghost btn-sm mt-2">Alle ${due.length} fälligen Aufgaben anzeigen</a>` : ''}
-      ${stale.length ? `<div class="${due.length ? 'mt-4' : ''}"><div class="text-xs uppercase tracking-widest text-dim mb-1">Ihre Akten seit ${STALE_DAYS}+ Tagen ohne Bewegung</div>
-        ${stale.slice(0, 4).map((c) => caseListRow(c, badge(relDays(c.updatedAt), 'slate'))).join('')}</div>` : ''}
+      ${stale.length ? `<div class="${due.length ? 'mt-4' : ''}"><div class="text-xs uppercase tracking-widest text-dim mb-1">Ihre liegengebliebenen Akten (ohne Aktivität)</div>
+        ${stale.slice(0, 4).map((c) => caseListRow(c, idleBadge(c))).join('')}</div>` : ''}
     </section>`;
 }
 
@@ -268,8 +265,7 @@ function filteredCases() {
   // Ein eingefügter FiveNet-/Google-Docs-Link oder eine Dokument-ID findet die Akten, mit denen das Dokument verknüpft ist.
   const extId = q ? externalIdFrom(st.caseQuery) : null;
   return st.cases.filter((c) => {
-    const f = st.caseFilter;
-    const stateOk = f === 'alle' || (f === 'aktiv' ? c.status !== 'geschlossen' : c.status === f);
+    const stateOk = caseMatches(c, st.caseFilter);
     const mineOk = !st.caseMine || onCase(c);
     const textOk =
       !q ||
@@ -279,9 +275,18 @@ function filteredCases() {
     return stateOk && mineOk && textOk;
   });
 }
-function caseCount(f) {
-  return st.cases.filter((c) => f === 'alle' || (f === 'aktiv' ? c.status !== 'geschlossen' : c.status === f)).length;
+/** Filter der Aktenliste: alle, aktiv, ein Status oder „liegt“ (liegengeblieben, nur Kanzlei). */
+function caseMatches(c, f) {
+  if (f === 'alle') return true;
+  if (f === 'aktiv') return c.status !== 'geschlossen';
+  if (f === 'liegt') return c.idleDays > 0;
+  return c.status === f;
 }
+function caseCount(f) {
+  return st.cases.filter((c) => caseMatches(c, f)).length;
+}
+/** Markierung „liegt seit X Tagen“ (offene Akte ohne Aktivität, Schwelle in den Einstellungen). */
+const idleBadge = (c) => (c.idleDays ? `<span class="badge badge-amber idle-badge" title="Seit ${c.idleDays} Tagen keine Aktivität in dieser Akte">liegt seit ${c.idleDays} T.</span>` : '');
 /** VIP / Lifetime des Mandanten als Badge. */
 function memberBadge(m) {
   if (!m) return '';
@@ -335,7 +340,7 @@ function caseTable() {
           <td data-label="Zuständig">${c.lawyerName ? `${esc(c.lawyerName)}${(c.coLawyers || []).length ? `<div class="text-xs text-dim">+ ${esc(c.coLawyers.map((l) => l.name).join(', '))}</div>` : ''}` : badge('Unbesetzt', 'amber')}</td>
           ${staff ? `<td data-label="Priorität">${priorityBadge(c)}</td>` : ''}
           <td data-label="Status">${statusBadge(CASE_STATUS, c.status)}</td>
-          <td data-label="Aktualisiert" class="text-dim text-xs nowrap">${esc(fmtDate(c.updatedAt))}</td></tr>`
+          <td data-label="Aktualisiert" class="text-dim text-xs nowrap">${esc(fmtDate(c.updatedAt))}${staff && c.idleDays ? `<div class="mt-1">${idleBadge(c)}</div>` : ''}</td></tr>`
       )
       .join('')}</tbody></table></div>`;
 }
@@ -514,6 +519,8 @@ views.cases = {
   render() {
     const staff = isStaff();
     const filters = [['aktiv', 'Aktiv'], ['offen', 'Offen'], ['in_bearbeitung', 'In Bearbeitung'], ['geschlossen', 'Geschlossen'], ['alle', 'Alle']];
+    // „Liegengeblieben“ erscheint nur, wenn es solche Akten gibt (oder der Filter gerade gewählt ist)
+    if (staff && (caseCount('liegt') || st.caseFilter === 'liegt')) filters.splice(3, 0, ['liegt', 'Liegengeblieben']);
     return `
         <div class="page-head">
           <div><h1 class="page-title">${staff ? 'Aktenverwaltung' : 'Meine Akten'}</h1>
@@ -625,6 +632,14 @@ async function reloadCase(id) {
 function attachmentsSection(c, attachments) {
   const staff = isStaff();
   const canUpload = staff || !c.closed;
+  if (!attachments.length)
+    return emptySection(
+      'secEvidence',
+      'Beweismittel & Anhänge',
+      'noch keine',
+      canUpload ? `<label class="btn-outline btn-sm file-btn">${icon('camera', 'ico-sm')}<span>Bilder hinzufügen</span><input type="file" accept="image/*" multiple data-upload="evidence" data-case-id="${c.id}" aria-label="Bilder hinzufügen"></label>` : '',
+      staff ? 'Fotos, Screenshots und Belege (bis 40 Bilder). Neue Bilder sind zunächst nur für die Kanzlei sichtbar.' : 'Fotos, Screenshots und Belege zu Ihrem Fall (bis 40 Bilder).'
+    );
   return `<div class="section" id="secEvidence">
       <h3 class="section-title">Beweismittel & Anhänge <span class="text-xs text-dim font-normal" style="font-family:Inter,sans-serif">${attachments.length} / 40</span></h3>
       ${canUpload ? `<div class="flex flex-wrap items-center gap-3 mb-3">
@@ -643,25 +658,23 @@ function attachmentsSection(c, attachments) {
         ? `<label class="att-add file-btn">${icon('camera')}<span>Bilder hinzufügen</span><input type="file" accept="image/*" multiple data-upload="evidence" data-case-id="${c.id}" aria-label="Bilder hinzufügen"></label>`
         : ''}
       </div>
-      ${!attachments.length && !canUpload ? '<p class="text-sm text-dim">Keine Anhänge.</p>' : ''}
     </div>`;
 }
 
 /* ---------------------------------------------------------------- Aktenübersicht (Kennzahlen im Aktenkopf) */
-function caseStats(c, { appointments, attachments, externalDocs, tasks }) {
+/** Eine Zeile: nächste Frist, offene Aufgaben, letzte Aktivität – Anzahl der Dokumente und Beweise steht in der Reiterzeile. */
+function caseStats(c, { appointments, tasks }) {
   const cutoff = Date.now() - 60 * 60 * 1000;
   const next = appointments
     .filter((e) => (e.status === 'bestaetigt' || e.status === 'angefragt') && (e.type === 'frist' || parseDate(e.startsAt) >= cutoff))
     .sort(byStart)[0];
   const open = tasks.filter((t) => !t.done);
   const overdue = open.filter((t) => t.dueDate && daysUntil(t.dueDate) < 0).length;
-  const pill = (label, value, target, extra = '') =>
-    `<button type="button" class="stat-pill" data-action="scroll-to" data-target="${target}"><span class="k">${esc(label)}</span><span class="v">${value}</span>${extra}</button>`;
-  return `<div class="case-stats mb-5">
-      ${pill('Nächste Frist / Termin', next ? esc(next.title) : '<span class="text-dim">keine</span>', 'secEvents', next ? countdownHtml(next) : '')}
-      ${pill('Aufgaben', open.length ? `${open.length} offen` : '<span class="text-dim">keine offen</span>', 'secTasks', overdue ? `<span class="countdown cd-over">${overdue} überfällig</span>` : '')}
-      ${pill('Externe Dokumente', String(externalDocs.length), 'secExternal')}
-      ${pill('Beweismittel', String(attachments.length), 'secEvidence')}
-      ${pill('Letzte Aktivität', esc(relDays(c.updatedAt)), 'secNotes')}
+  const fact = (label, value, target, extra = '') =>
+    `<button type="button" class="fact" data-action="scroll-to" data-target="${target}"><span class="k">${esc(label)}</span> <span class="v">${value}</span>${extra}</button>`;
+  return `<div class="case-facts mb-5">
+      ${fact('Nächste Frist / Termin', next ? esc(next.title) : '<span class="text-dim">keine</span>', 'secEvents', next ? countdownHtml(next) : '')}
+      ${fact('Aufgaben', open.length ? `${open.length} offen` : '<span class="text-dim">keine offen</span>', 'secTasks', overdue ? `<span class="countdown cd-over">${overdue} überfällig</span>` : '')}
+      ${fact('Letzte Aktivität', esc(relDays(c.updatedAt)), 'secNotes', c.idleDays ? '<span class="countdown cd-over">liegengeblieben</span>' : '')}
     </div>`;
 }

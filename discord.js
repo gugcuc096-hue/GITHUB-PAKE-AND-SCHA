@@ -45,11 +45,12 @@ const EVENTS = {
   'system.alert': 'Systemwarnung: Kanzlei-Bot offline, Datensicherung fehlgeschlagen, Speicher fast voll, Absturz',
   'review.created': 'Neue Mandantenstimme (Bewertung) zur Freigabe',
   'invoice.payment': 'Mandant meldet eine Rechnung als bezahlt',
+  'case.idle': 'Liegengebliebene Akte – nur wenn die Discord-DM an den zuständigen Anwalt nicht möglich ist',
 };
 
 // Ereignisse, die nach dem Speichern der Auswahl dazugekommen sind, sind eingeschaltet (bis jemand sie abwählt).
 // discord_events_known = Ereignisse, die es beim letzten Speichern gab; ältere Speicherstände kennen alle außer diesen:
-const ADDED_LATER = ['system.alert', 'review.created', 'invoice.payment'];
+const ADDED_LATER = ['system.alert', 'review.created', 'invoice.payment', 'case.idle'];
 
 function isValidWebhookUrl(url) {
   return WEBHOOK_RE.test(String(url || '').trim());

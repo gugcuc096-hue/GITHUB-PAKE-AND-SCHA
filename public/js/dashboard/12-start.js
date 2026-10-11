@@ -254,12 +254,8 @@ document.addEventListener('change', (e) => {
     guard(() => setCasePriority(t));
     return;
   }
-  // Akte bearbeiten: Dringlichkeit geändert → Priorität zieht mit, solange sie noch dem automatischen Wert entspricht
-  if (t.name === 'urgency' && t.form && t.form.dataset.form === 'case-edit' && t.form.elements.priority) {
-    const prio = t.form.elements.priority;
-    const prev = t.dataset.prev || [...t.options].find((o) => o.defaultSelected)?.value || 'normal';
-    if (Number(prio.value) === PRIORITY_FROM_URGENCY[prev]) prio.value = String(PRIORITY_FROM_URGENCY[t.value] || 2);
-    t.dataset.prev = t.value;
+  if (t.dataset.caseStatus !== undefined) {
+    guard(() => setCaseStatus(t));
     return;
   }
   if (t.id === 'tierKind') {

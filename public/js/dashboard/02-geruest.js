@@ -214,9 +214,7 @@ function dropOverlayEntry() {
     const prev = nav.currentEntry.index > 0 ? nav.entries()[nav.currentEntry.index - 1] : null;
     if (prev && prev.url === new URL(page, location.href).href) {
       st.histSkip = Date.now();
-      const t = nav.traverseTo(prev.key); // genau dieser Eintrag – der Browser überspringt hier nichts
-      t.committed.catch(() => {});
-      t.finished.catch(() => {});
+      traverseBack(nav, prev); // genau dieser Eintrag – der Browser überspringt hier nichts
       return;
     }
   } else if (history.state && history.state.base === page) {
@@ -226,6 +224,26 @@ function dropOverlayEntry() {
     return;
   }
   history.replaceState(null, '', page);
+}
+/**
+ * Im Verlauf auf genau diesen Eintrag zurückspringen. Der Sprung läuft asynchron: Tippt man währenddessen schon auf
+ * einen Menüpunkt (am Handy direkt nach dem Schließen der Akte), landete der Sprung danach wieder auf der alten
+ * Seite – Adresse und Ansicht passten nicht mehr zusammen. Dann wird das Ziel nach dem Sprung noch einmal aufgerufen.
+ */
+function traverseBack(nav, entry) {
+  let wanted = null;
+  const onNavigate = (e) => {
+    if (e.hashChange && e.navigationType !== 'traverse') wanted = new URL(e.destination.url).hash;
+  };
+  nav.addEventListener('navigate', onNavigate);
+  const t = nav.traverseTo(entry.key);
+  t.committed.catch(() => {});
+  const done = () => {
+    nav.removeEventListener('navigate', onNavigate);
+    if (wanted && location.hash !== wanted) location.hash = wanted;
+  };
+  t.finished.then(done, done);
+  return t;
 }
 function onPopState(e) {
   if (st.histSkip && Date.now() - st.histSkip < 2000) {
@@ -263,7 +281,7 @@ function onPopState(e) {
  * Ungespeicherte Eingaben: Wer in einem Formular etwas eingetragen hat und das Fenster schließt, die Seite wechselt
  * oder neu lädt, wird vorher gefragt. Felder, die sofort speichern (Priorität, Rolle, Sortierung …), zählen nicht.
  */
-const AUTO_SAVE_FIELDS = '[data-case-priority], [data-user-field], [data-ext-sort], [data-upload], [data-no-dirty], #msgRoleInsert, input[type="search"]';
+const AUTO_SAVE_FIELDS = '[data-case-priority], [data-case-status], [data-user-field], [data-ext-sort], [data-upload], [data-no-dirty], #msgRoleInsert, input[type="search"]';
 function formDirty(root, { invoice = false } = {}) {
   if (!root) return false;
   return $$('form[data-form] input, form[data-form] textarea, form[data-form] select', root).some((el) => {

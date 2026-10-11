@@ -451,13 +451,15 @@ views.settings = {
     if (tab === 'system') return `${head}${backupPanel()}<div class="mt-4 lg:mt-5">${emergencyPanel()}</div>`;
     return `${head}
         <section class="panel panel-pad">
-          <div class="panel-head"><h2 class="panel-title">Rechnungsdaten der Kanzlei</h2></div>
+          <div class="panel-head"><h2 class="panel-title">Kanzleidaten & Erinnerungen</h2></div>
           <form data-form="settings-firm" class="form-grid cols-2">
             <div><label class="label">Anschrift (Briefkopf)</label><textarea name="firmAddress" rows="3" maxlength="300" class="field">${esc(s.firmAddress)}</textarea></div>
             <div><label class="label">Zahlungshinweis</label><textarea name="firmPaymentInfo" rows="3" maxlength="300" class="field">${esc(s.firmPaymentInfo)}</textarea></div>
             <div><label class="label">Kontakt</label><input name="firmContact" maxlength="120" class="field" value="${esc(s.firmContact)}"></div>
             <div><label class="label">Zahlungserinnerung (Tage nach Fälligkeit)</label><input type="number" name="invoiceReminderDays" min="0" max="60" step="1" class="field" value="${esc(s.invoiceReminderDays)}">
               <p class="form-hint">Offene Rechnungen erinnern den Mandanten so viele Tage nach dem Fälligkeitsdatum einmal automatisch – per Discord-DM und im Ticket der Akte. 0 = aus. Von Hand geht es jederzeit mit „Erinnern“ an der Rechnung.</p></div>
+            <div><label class="label">Liegengebliebene Akten (Tage ohne Aktivität)</label><input type="number" name="caseIdleDays" min="0" max="60" step="1" class="field" value="${esc(s.caseIdleDays)}">
+              <p class="form-hint">Offene Akten, an denen sich so viele Tage nichts getan hat, werden in der Aktenliste markiert; der zuständige Anwalt bekommt einmal eine Discord-DM (nie ins Ticket des Mandanten). 0 = aus.</p></div>
             <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button></div>
           </form>
         </section>

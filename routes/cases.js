@@ -86,7 +86,8 @@ function notifyCreated(c, user) {
       { name: 'Mandant', value: c.client_account_name || c.client_name || '—' },
       // Team-Kanal (nur Kanzlei): Priorität + was der Mandant angegeben hat
       { name: 'Priorität', value: PRIORITY_DISCORD[c.priority] || PRIORITY_DISCORD[2] },
-      { name: 'Dringlichkeit (Angabe Mandant)', value: URGENCY_LABEL[c.urgency] || c.urgency },
+      // Angabe des Mandanten nur, wenn er mehr als „Normal“ gewählt hat (von der Kanzlei angelegte Akten: nie)
+      c.urgency !== 'normal' ? { name: 'Dringlichkeit (Angabe Mandant)', value: URGENCY_LABEL[c.urgency] || c.urgency } : null,
       { name: 'Zuständig', value: lawyerNames(c) },
       { name: 'Angelegt von', value: user ? user.display_name : 'Website-Formular' },
     ],

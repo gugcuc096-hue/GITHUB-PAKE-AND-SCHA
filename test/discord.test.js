@@ -195,3 +195,95 @@ describe('Nachrichten-Vorlagen: Rollen und Direktnachrichten', () => {
     assert.equal(bad.status, 400);
   });
 });
+
+describe('Liegengebliebene Akten', () => {
+  // Im Testprozess gegen die nachgebaute Discord-Schnittstelle (wie oben bei der Willkommensnachricht)
+  let db, models, idle, stub, lead, noDiscord, client;
+  const daysAgo = (n) => new Date(Date.now() - n * 864e5).toISOString().replace('T', ' ').slice(0, 19);
+  const addCase = (no, lawyerId, quietDays, status = 'offen') =>
+    Number(
+      db
+        .prepare(`INSERT INTO cases (case_number, access_pin, title, lawyer_id, status, client_name, updated_at) VALUES (?, '0000', ?, ?, ?, 'Mandant', ?)`)
+        .run(no, `Akte ${no}`, lawyerId, status, daysAgo(quietDays)).lastInsertRowid
+    );
+  const addUser = (email, name, role, discordId = null) =>
+    Number(db.prepare(`INSERT INTO users (email, password_hash, display_name, role, discord_id) VALUES (?, 'x', ?, ?, ?)`).run(email, name, role, discordId).lastInsertRowid);
+  const row = (id, u) => models.caseRow(models.getCase(id), u);
+  const dmsTo = (id) => stub.state.dms.filter((d) => d.to === id);
+
+  before(() => {
+    if (!process.env.DB_PATH) process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pake-scha-idle-')), 'i.db');
+    process.env.DISCORD_BOT_TOKEN = 'test-token';
+    stub = require('./discordStub');
+    ({ db } = require('../db'));
+    models = require('../models');
+    idle = require('../idleCases');
+    lead = addUser('idle.lead@pake-scha.ls', 'Idle Lead', 'anwalt', MEMBERS.mo);
+    noDiscord = addUser('idle.ohne@pake-scha.ls', 'Ohne Discord', 'anwalt');
+    client = addUser('idle.mandant@pake-scha.ls', 'Idle Mandant', 'mandant');
+    models.setIdleLimit(5);
+  });
+
+  it('meldet offene Akten ohne Aktivität einmal per DM an den zuständigen Anwalt – geschlossene und frische nicht', async () => {
+    const a = addCase('PS-IDLE-A', lead, 6);
+    const b = addCase('PS-IDLE-B', lead, 12, 'in_bearbeitung');
+    const closed = addCase('PS-IDLE-C', lead, 20, 'geschlossen');
+    const fresh = addCase('PS-IDLE-D', lead, 2);
+    const other = addCase('PS-IDLE-E', noDiscord, 8);
+    const staff = db.prepare('SELECT * FROM users WHERE id = ?').get(lead);
+    const mandant = db.prepare('SELECT * FROM users WHERE id = ?').get(client);
+
+    // Markierung in der Aktenliste: nur Kanzlei, nur offene Akten ab der Schwelle
+    assert.equal(row(a, staff).idleDays, 6);
+    assert.equal(row(b, staff).idleDays, 12);
+    assert.equal(row(closed, staff).idleDays, 0);
+    assert.equal(row(fresh, staff).idleDays, 0);
+    assert.equal(row(a, mandant).idleDays, undefined, 'Mandanten sehen die Markierung nicht');
+
+    const before = stub.state.dms.length;
+    await idle.sweep();
+    const sent = stub.state.dms.slice(before);
+    assert.equal(sent.length, 1, 'eine Nachricht für beide Akten');
+    assert.equal(sent[0].to, MEMBERS.mo);
+    const text = JSON.stringify(sent[0].embeds);
+    assert.match(text, /PS-IDLE-A/);
+    assert.match(text, /PS-IDLE-B/);
+    assert.doesNotMatch(text, /PS-IDLE-[CDE]/);
+    // Nie ins Ticket der Akte (dort liest der Mandant mit)
+    assert.ok(!stub.state.channelMessages.some((m) => /PS-IDLE/.test(JSON.stringify(m))));
+    // Verlauf (intern) – die Erinnerung selbst zählt nicht als Aktivität
+    const notes = db.prepare('SELECT body, internal FROM notes WHERE case_id = ? AND system = 1').all(a);
+    assert.ok(notes.some((n) => /Discord-DM erinnert/.test(n.body) && n.internal === 1), JSON.stringify(notes));
+    assert.match(db.prepare('SELECT body FROM notes WHERE case_id = ? AND system = 1').get(other).body, /nicht zugestellt/);
+    assert.equal(row(a, staff).idleDays, 6, 'liegt weiterhin');
+
+    // Zweiter Durchlauf: nichts Neues
+    await idle.sweep();
+    assert.equal(stub.state.dms.length, before + 1);
+
+    // Wieder Aktivität → keine Markierung; ruht sie danach erneut, wird wieder (einmal) erinnert
+    db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(a);
+    assert.equal(row(a, staff).idleDays, 0);
+    await idle.sweep();
+    assert.equal(stub.state.dms.length, before + 1);
+    db.prepare('UPDATE cases SET updated_at = ?, idle_notified_at = ? WHERE id = ?').run(daysAgo(7), new Date(Date.now() - 9 * 864e5).toISOString(), a);
+    await idle.sweep();
+    const again = stub.state.dms.slice(before + 1);
+    assert.equal(again.length, 1);
+    assert.match(JSON.stringify(again[0].embeds), /PS-IDLE-A/);
+    assert.doesNotMatch(JSON.stringify(again[0].embeds), /PS-IDLE-B/);
+    assert.equal(dmsTo(MEMBERS.mo).length >= 2, true);
+  });
+
+  it('0 Tage schaltet Markierung und Erinnerung ab', async () => {
+    models.setIdleLimit(0);
+    const c = addCase('PS-IDLE-F', lead, 30);
+    const staff = db.prepare('SELECT * FROM users WHERE id = ?').get(lead);
+    assert.equal(row(c, staff).idleDays, 0);
+    const before = stub.state.dms.length;
+    await idle.sweep();
+    assert.equal(stub.state.dms.length, before);
+    models.setIdleLimit(5);
+    assert.equal(row(c, staff).idleDays, 30);
+  });
+});

@@ -979,15 +979,15 @@ function caseWorkSection(c, work) {
   const opened = parseDate(c.createdAt);
   const end = work.closedAt ? parseDate(work.closedAt) : null;
   const total = opened ? (end ? end.getTime() : now) - opened.getTime() : null;
-  const rows = work.rows.length
-    ? work.rows
+  const since = `${end ? 'Bearbeitungsdauer bis zum Abschluss' : 'Offen seit'} ${fmtDur(total)}`;
+  if (!work.rows.length) return emptySection('secWork', 'Bearbeitungszeiten', `noch keine Bearbeitung erfasst · ${since}`, '', 'Nur für das Board of Partners sichtbar.');
+  const rows = work.rows
         .map(
           (w) => `<div class="list-row wrap"><div class="main"><div class="title flex flex-wrap items-center gap-2">${esc(w.name)}${statusBadge(ROLE_BADGE, w.role)}</div>
               <div class="meta">${esc(fmtDate(w.startedAt))} – ${w.running ? 'heute' : esc(fmtDate(w.endedAt))}${w.endReason ? ' · ' + esc(w.endReason) : ''}${w.estimated ? ' · ≈ geschätzt' : ''}</div></div>
               <span class="font-mono text-sm shrink-0 ${w.running ? 'text-emerald-300' : 'text-gold'}">${w.estimated ? '≈ ' : ''}${esc(fmtDur(w.durationMs))}</span></div>`
         )
-        .join('')
-    : '<p class="text-sm text-dim">Noch keine Bearbeitung erfasst.</p>';
+        .join('');
   return `<div class="section" id="secWork"><h3 class="section-title">Bearbeitungszeiten <span class="text-xs text-dim font-normal">nur Board of Partners</span></h3>
       <p class="text-sm text-muted mb-2">${end ? `Bearbeitungsdauer bis zum Abschluss: <strong>${esc(fmtDur(total))}</strong>` : `Offen seit <strong>${esc(fmtDur(total))}</strong>`}</p>
       ${rows}</div>`;
@@ -1523,7 +1523,9 @@ async function handleUpload(input) {
   } else if (kind === 'evidence') {
     const caseId = Number(input.dataset.caseId);
     const caption = ($('#attCaption')?.value || '').trim();
-    const internal = $('#attInternal')?.checked ? '1' : '0';
+    // Ohne Kästchen (erster Upload aus der leeren Zeile): bei der Kanzlei wie voreingestellt „nur intern“
+    const box = $('#attInternal');
+    const internal = (box ? box.checked : isStaff()) ? '1' : '0';
     const batch = files.slice(0, 10);
     if (files.length > 10) toast('Es werden maximal 10 Bilder auf einmal hochgeladen.', 'error');
     toast(batch.length === 1 ? 'Bild wird hochgeladen …' : `${batch.length} Bilder werden hochgeladen …`);

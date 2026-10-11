@@ -41,12 +41,6 @@ const actions = {
     await openCase(Number(el.dataset.id));
     $('#secChat')?.scrollIntoView({ block: 'start' });
   },
-  'case-status': async (el) => {
-    const id = Number(el.dataset.id);
-    await api.patch('/api/cases/' + id, { status: el.dataset.status });
-    toast(`Status: ${CASE_STATUS[el.dataset.status][0]}`);
-    await reloadCase(id);
-  },
   'case-step': async (el) => {
     const id = Number(el.dataset.id);
     const step = Number(el.dataset.step);
