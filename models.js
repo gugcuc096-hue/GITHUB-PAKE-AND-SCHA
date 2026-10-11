@@ -1,5 +1,5 @@
 'use strict';
-const { db } = require('./db');
+const { db, getSetting, setSetting } = require('./db');
 const { isStaff, userAvatarUrl } = require('./auth');
 const { STEPS, CASE_STATUS, EVENT_TYPES, APPLICATION_STATUS, DUTY_STATUS, truncate } = require('./helpers');
 const { avatarUrl, teamPhotoUrl } = require('./uploads');
@@ -50,7 +50,8 @@ const CASE_SELECT = `
             FROM memberships m WHERE m.user_id = c.client_id AND m.status = 'aktiv'
               AND (m.expires_at IS NULL OR m.expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
             ORDER BY m.discount_pct DESC LIMIT 1) AS membership_json,
-         (SELECT r.id FROM reviews r WHERE r.case_id = c.id) AS review_id
+         (SELECT r.id FROM reviews r WHERE r.case_id = c.id) AS review_id,
+         CAST(julianday('now') - julianday(c.updated_at) AS INTEGER) AS days_quiet
   FROM cases c
   LEFT JOIN users cu ON cu.id = c.client_id
   LEFT JOIN users lu ON lu.id = c.lawyer_id`;
@@ -121,6 +122,27 @@ function caseAccess(c, u) {
   };
 }
 
+/* Liegengebliebene Akten: offen und seit X Tagen ohne Aktivität (Einstellung, Standard 5 Tage, 0 = aus) */
+const IDLE_DEFAULT_DAYS = 5;
+let idleCache = { at: 0, days: IDLE_DEFAULT_DAYS };
+function idleLimit() {
+  if (Date.now() - idleCache.at > 5000) {
+    const n = Number(getSetting('case_idle_days', String(IDLE_DEFAULT_DAYS)));
+    idleCache = { at: Date.now(), days: Number.isInteger(n) && n >= 0 && n <= 60 ? n : IDLE_DEFAULT_DAYS };
+  }
+  return idleCache.days;
+}
+function setIdleLimit(n) {
+  setSetting('case_idle_days', String(n));
+  idleCache = { at: 0, days: n };
+}
+/** Tage ohne Aktivität, wenn die Akte als liegengeblieben gilt – sonst 0. */
+function caseIdleDays(c) {
+  const limit = idleLimit();
+  if (!limit || c.status === 'geschlossen' || c.days_quiet == null) return 0;
+  return c.days_quiet >= limit ? c.days_quiet : 0;
+}
+
 function caseRow(c, u) {
   const staff = isStaff(u);
   return {
@@ -156,6 +178,8 @@ function caseRow(c, u) {
     externalDocIds: staff ? String(c.external_doc_ids || '').split(' ').filter(Boolean) : undefined,
     createdAt: c.created_at,
     updatedAt: c.updated_at,
+    // Nur Kanzlei: seit so vielen Tagen ohne Aktivität (0 = nicht liegengeblieben)
+    idleDays: staff ? caseIdleDays(c) : undefined,
     reviewed: !!c.review_id, // Mandantenstimme zu dieser Akte abgegeben
   };
 }
@@ -580,6 +604,10 @@ function onDutyMembers() {
 }
 
 module.exports = {
+  idleLimit,
+  setIdleLimit,
+  caseIdleDays,
+  IDLE_DEFAULT_DAYS,
   logActivity,
   berlinToday,
   overdueDays,

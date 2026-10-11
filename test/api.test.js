@@ -174,6 +174,22 @@ describe('Akten und Rechte', () => {
   });
 });
 
+describe('Liegengebliebene Akten (Einstellung)', () => {
+  it('Board stellt die Tage ein (Standard 5, 0 = aus); nur die Kanzlei sieht die Markierung', async () => {
+    assert.equal((await as.admin.get('/api/admin/settings')).json.settings.caseIdleDays, 5);
+    const r = await as.admin.patch('/api/admin/settings', { caseIdleDays: 7 });
+    assert.equal(r.status, 200, r.text);
+    assert.equal(r.json.settings.caseIdleDays, 7);
+    assert.equal((await as.admin.patch('/api/admin/settings', { caseIdleDays: 99 })).status, 400);
+    assert.notEqual((await as.mandant.patch('/api/admin/settings', { caseIdleDays: 1 })).status, 200);
+    assert.equal((await as.admin.patch('/api/admin/settings', { caseIdleDays: 5 })).status, 200);
+    const staff = (await as.admin.get('/api/cases')).json.cases.find((c) => c.id === state.ownCase.id);
+    assert.equal(staff.idleDays, 0, 'frische Akte liegt nicht');
+    const own = (await as.mandant.get('/api/cases')).json.cases.find((c) => c.id === state.ownCase.id);
+    assert.equal(own.idleDays, undefined);
+  });
+});
+
 describe('Rechnungen', () => {
   it('Kanzlei stellt eine Rechnung zur Akte aus (Summe stimmt)', async () => {
     const r = await as.admin.post('/api/invoices', {

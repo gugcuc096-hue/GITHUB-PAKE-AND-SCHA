@@ -4,7 +4,7 @@ const { z } = require('zod');
 const { db, tx, getSetting, setSetting } = require('../db');
 const { requireAuth, requireAdmin, requireStaff, hashPassword, generateTempPassword, destroyAllSessions, userAvatarUrl } = require('../auth');
 const { wrap, parseBody, idParam, DUTY_STATUS, rankField, RANK_ORDER_SQL, BOARD_RANKS, firmEmail, EMAIL_HINT } = require('../helpers');
-const { logActivity } = require('../models');
+const { logActivity, idleLimit, setIdleLimit } = require('../models');
 const { removeFile } = require('../uploads');
 const discord = require('../discord');
 const fivenet = require('../fivenet');
@@ -269,6 +269,7 @@ function settingsPayload() {
     firmPaymentInfo: getSetting('firm_payment_info', 'Zahlbar per Überweisung an Pake & Scha Legal Consulting (Maze Bank).'),
     firmContact: getSetting('firm_contact', 'kontakt@pake-scha.ls'),
     invoiceReminderDays: require('../paymentReminders').reminderDays(),
+    caseIdleDays: idleLimit(),
     showDutyPublic: getSetting('show_duty_public', '1') === '1',
     fivenetUrl: getSetting('fivenet_url', ''),
     fivenetInstance: fivenet.instance(),
@@ -293,6 +294,7 @@ router.patch(
       firmPaymentInfo: z.string().trim().max(300).optional(),
       firmContact: z.string().trim().max(120).optional(),
       invoiceReminderDays: z.number().int().min(0).max(60).optional(),
+      caseIdleDays: z.number().int().min(0).max(60).optional(),
       showDutyPublic: z.boolean().optional(),
       fivenetUrl: z.string().trim().max(200).optional(),
     });
@@ -349,6 +351,7 @@ router.patch(
       if (d.firmPaymentInfo !== undefined) setSetting('firm_payment_info', d.firmPaymentInfo);
       if (d.firmContact !== undefined) setSetting('firm_contact', d.firmContact);
       if (d.invoiceReminderDays !== undefined) require('../paymentReminders').setReminderDays(d.invoiceReminderDays);
+      if (d.caseIdleDays !== undefined) setIdleLimit(d.caseIdleDays);
       if (d.fivenetUrl !== undefined) setSetting('fivenet_url', d.fivenetUrl);
     });
     // Anschrift/Zahlungshinweis stehen auf den Rechnungen → deren Google Docs neu schreiben

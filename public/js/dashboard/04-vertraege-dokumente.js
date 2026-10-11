@@ -39,11 +39,17 @@ function contractCard(k, c) {
 function contractsSection(c, list) {
   const staff = isStaff();
   if (!staff && !list.length) return '';
+  if (!list.length)
+    return emptySection(
+      'secContracts',
+      'Verträge',
+      'noch keiner',
+      c.canEdit ? `<button type="button" class="btn-outline btn-sm" data-action="contract-new" data-case-id="${c.id}">${icon('plus', 'ico-sm')}<span>Mandatsvertrag erstellen</span></button>` : '',
+      'Füllt die Vorlage der Kanzlei mit den Daten dieser Akte – danach unterschreiben Anwalt (auf Wunsch mehrere) und Mandant (im Portal oder im Spiel); drucken oder als PDF speichern.'
+    );
   return `<div class="section" id="secContracts">
       <h3 class="section-title">Verträge ${staff && c.canEdit ? `<span class="ext-add"><button type="button" class="btn-outline btn-sm" data-action="contract-new" data-case-id="${c.id}">${icon('doc', 'ico-sm')}<span>Mandatsvertrag erstellen</span></button></span>` : ''}</h3>
-      ${list.length
-      ? `<div class="stack">${list.map((k) => contractCard(k, c)).join('')}</div>`
-      : `<p class="text-sm text-dim">Noch kein Vertrag. „Mandatsvertrag erstellen“ füllt die Vorlage der Kanzlei mit den Daten dieser Akte – danach unterschreiben Anwalt (auf Wunsch mehrere Anwälte) und Mandant (im Portal oder im Spiel), und der Vertrag lässt sich drucken oder als PDF speichern.</p>`}
+      <div class="stack">${list.map((k) => contractCard(k, c)).join('')}</div>
       ${!staff && list.some((k) => !k.clientSignedAt) ? '<p class="form-hint">Bitte lesen Sie den Vertrag und unterschreiben Sie ihn über „Ansehen &amp; unterschreiben“.</p>' : ''}
     </div>`;
 }
@@ -228,11 +234,17 @@ function briefCard(k, c) {
 function briefsSection(c, list) {
   const staff = isStaff();
   if (!staff && !list.length) return '';
+  if (!list.length)
+    return emptySection(
+      'secBriefs',
+      'Schriftsätze',
+      'noch keine',
+      c.canEdit ? `<button type="button" class="btn-outline btn-sm" data-action="brief-new" data-case-id="${c.id}">${icon('plus', 'ico-sm')}<span>Schriftsatz erstellen</span></button>` : '',
+      'Vorlage der Kanzlei (z. B. Vollmacht, Akteneinsicht, Haftbeschwerde) mit den Daten dieser Akte füllen; drucken oder als PDF speichern. Zunächst nur für die Kanzlei sichtbar.'
+    );
   return `<div class="section" id="secBriefs">
       <h3 class="section-title">Schriftsätze ${staff && c.canEdit ? `<span class="ext-add"><button type="button" class="btn-outline btn-sm" data-action="brief-new" data-case-id="${c.id}">${icon('doc', 'ico-sm')}<span>Schriftsatz erstellen</span></button></span>` : ''}</h3>
-      ${list.length
-      ? `<div class="stack">${list.map((k) => briefCard(k, c)).join('')}</div>`
-      : '<p class="text-sm text-dim">Noch keine Schriftsätze. „Schriftsatz erstellen“ füllt eine Vorlage der Kanzlei – z. B. Vollmacht, Antrag auf Akteneinsicht oder Haftbeschwerde – mit den Daten dieser Akte; danach drucken oder als PDF speichern. Schriftsätze sind zunächst nur für die Kanzlei sichtbar (außer der Mandant muss unterschreiben, z. B. bei der Vollmacht).</p>'}
+      <div class="stack">${list.map((k) => briefCard(k, c)).join('')}</div>
       ${!staff && list.some((k) => k.needsClient && !k.clientSignedAt) ? '<p class="form-hint">Bitte lesen und unterschreiben Sie das Dokument über „Ansehen &amp; unterschreiben“.</p>' : ''}
     </div>`;
 }
@@ -395,13 +407,24 @@ function externalSection(c, docs) {
   const staff = isStaff();
   const sortable = staff && docs.length > 1;
   if (!staff && !docs.length) return '';
+  const addButtons = `<button type="button" class="btn-outline btn-sm" data-action="fn-add">${icon('link', 'ico-sm')}<span>FiveNet-Dokument</span></button>
+        <button type="button" class="btn-outline btn-sm" data-action="gd-add" data-provider="gdocs">${icon('doc', 'ico-sm')}<span>Google-Docs-Dokument</span></button>
+        <button type="button" class="btn-outline btn-sm" data-action="gd-add" data-provider="gsheets">${icon('table', 'ico-sm')}<span>Google-Sheets-Tabelle</span></button>`;
+  if (!docs.length)
+    return emptySection(
+      'secExternal',
+      'Externe Dokumente',
+      'noch keine',
+      // kurze Beschriftung, damit die Zeile auch am Handy knapp bleibt
+      `<button type="button" class="btn-outline btn-sm" data-action="fn-add" title="FiveNet-Dokument verknüpfen">${icon('link', 'ico-sm')}<span>FiveNet</span></button>
+        <button type="button" class="btn-outline btn-sm" data-action="gd-add" data-provider="gdocs" title="Google-Docs-Dokument verknüpfen">${icon('doc', 'ico-sm')}<span>Google Docs</span></button>
+        <button type="button" class="btn-outline btn-sm" data-action="gd-add" data-provider="gsheets" title="Google-Sheets-Tabelle verknüpfen">${icon('table', 'ico-sm')}<span>Google Sheets</span></button>`,
+      'Polizeiberichte und Strafakten aus FiveNet, Dokumente aus Google Docs oder Tabellen aus Google Sheets per Link verknüpfen – mit Abschrift und Bildern.'
+    );
   return `<div class="section" id="secExternal">
       <h3 class="section-title">Externe Dokumente ${staff ? `<span class="ext-add">
-        <button type="button" class="btn-outline btn-sm" data-action="fn-add">${icon('link', 'ico-sm')}<span>FiveNet-Dokument</span></button>
-        <button type="button" class="btn-outline btn-sm" data-action="gd-add" data-provider="gdocs">${icon('doc', 'ico-sm')}<span>Google-Docs-Dokument</span></button>
-        <button type="button" class="btn-outline btn-sm" data-action="gd-add" data-provider="gsheets">${icon('table', 'ico-sm')}<span>Google-Sheets-Tabelle</span></button></span>` : ''}</h3>
-      ${docs.length
-      ? `${sortable ? `<div class="ext-sortbar">
+        ${addButtons}</span>` : ''}</h3>
+      ${sortable ? `<div class="ext-sortbar">
               <span class="form-hint">${icon('grip', 'ico-sm')} Reihenfolge ändern: Dokument gedrückt halten und nach oben oder unten ziehen.</span>
               <select class="field ext-sort" data-ext-sort data-case-id="${c.id}" aria-label="Dokumente sortieren">
                 <option value="">Sortieren …</option>
@@ -410,8 +433,7 @@ function externalSection(c, docs) {
                 <option value="title">Titel A–Z</option>
                 <option value="source">Nach Quelle</option>
               </select></div>` : ''}
-            <div class="stack"${sortable ? ` id="extList" data-case-id="${c.id}"` : ''}>${docs.map((d) => externalDocCard(d, c, sortable)).join('')}</div>`
-      : '<p class="text-sm text-dim">Noch keine externen Dokumente. Polizeiberichte und Strafakten aus FiveNet, Verträge und Schriftsätze aus Google Docs oder Aufstellungen aus Google Sheets lassen sich per Link mit der Akte verknüpfen – mit Abschrift und Bildern.</p>'}
+            <div class="stack"${sortable ? ` id="extList" data-case-id="${c.id}"` : ''}>${docs.map((d) => externalDocCard(d, c, sortable)).join('')}</div>
       ${!staff ? '<p class="form-hint">Öffnen im Original ist nur mit einer Berechtigung in FiveNet bzw. bei Google möglich.</p>' : ''}
     </div>`;
 }

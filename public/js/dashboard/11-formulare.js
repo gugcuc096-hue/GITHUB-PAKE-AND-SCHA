@@ -120,7 +120,7 @@ const forms = {
   },
   'new-case': async (f) => {
     const fd = new FormData(f);
-    const body = { title: val(fd, 'title'), area: val(fd, 'area'), urgency: val(fd, 'urgency'), description: val(fd, 'description') };
+    const body = { title: val(fd, 'title'), area: val(fd, 'area'), urgency: val(fd, 'urgency') || 'normal', description: val(fd, 'description') };
     if (isStaff()) {
       if (val(fd, 'clientEmail')) body.clientEmail = val(fd, 'clientEmail');
       else if (!val(fd, 'clientName')) throw new Error('Bitte den Namen des Mandanten oder die E-Mail eines Mandantenkontos angeben.');
@@ -141,7 +141,7 @@ const forms = {
     const fd = new FormData(f);
     const id = Number(f.dataset.id);
     const body = {};
-    ['title', 'area', 'urgency', 'clientName', 'clientPhone', 'opponent', 'courtRef', 'description', 'publicNote'].forEach((k) => {
+    ['title', 'area', 'clientName', 'clientPhone', 'opponent', 'courtRef', 'description', 'publicNote'].forEach((k) => {
       if (f.elements[k]) body[k] = val(fd, k);
     });
     if (f.elements.step) body.step = Number(fd.get('step'));
@@ -704,9 +704,10 @@ const forms = {
       firmPaymentInfo: val(fd, 'firmPaymentInfo'),
       firmContact: val(fd, 'firmContact'),
       invoiceReminderDays: Number(val(fd, 'invoiceReminderDays') || 0),
+      caseIdleDays: Number(val(fd, 'caseIdleDays') || 0),
     });
     st.settings = res.settings;
-    toast('Rechnungsdaten gespeichert.');
+    toast('Einstellungen gespeichert.');
   },
   profile: async (f) => {
     const fd = new FormData(f);

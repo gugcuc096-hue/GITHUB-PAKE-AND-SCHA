@@ -85,7 +85,7 @@ router.post(
         { name: 'Telefon', value: d.phone || '—' },
         { name: 'Rechtsgebiet', value: AREA_TITLES[d.area] },
         { name: 'Priorität', value: PRIORITY_DISCORD[c.priority] || PRIORITY_DISCORD[2] },
-        { name: 'Dringlichkeit (Angabe Mandant)', value: URGENCY_LABEL[d.urgency] || d.urgency },
+        d.urgency !== 'normal' ? { name: 'Dringlichkeit (Angabe Mandant)', value: URGENCY_LABEL[d.urgency] || d.urgency } : null,
       ],
     });
 

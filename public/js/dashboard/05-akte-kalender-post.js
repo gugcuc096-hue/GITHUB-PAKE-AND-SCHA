@@ -24,9 +24,17 @@ function taskItem(t, { showCase = true } = {}) {
 function caseTasksSection(c, tasks) {
   const open = tasks.filter((t) => !t.done);
   const done = tasks.filter((t) => t.done);
+  if (!tasks.length)
+    return emptySection(
+      'secTasks',
+      'Aufgaben & Wiedervorlagen',
+      'noch keine',
+      `<button type="button" class="btn-outline btn-sm" data-action="task-new" data-case-id="${c.id}">${icon('plus', 'ico-sm')}<span>Aufgabe</span></button><button type="button" class="btn-ghost btn-sm" data-action="task-checklist" data-case-id="${c.id}">${icon('tasks', 'ico-sm')}<span>Checkliste ${esc(AREAS[c.area] || '')} übernehmen</span></button>`,
+      'Mit Datum wird eine Aufgabe zur Wiedervorlage und erscheint rechtzeitig unter „Handlungsbedarf“.'
+    );
   return `<div class="section" id="secTasks">
       <h3 class="section-title">Aufgaben & Wiedervorlagen <span class="text-xs text-dim font-normal" style="font-family:Inter,sans-serif">${open.length} offen · ${done.length} erledigt</span></h3>
-      ${tasks.length ? `<div class="task-list">${open.map((t) => taskItem(t, { showCase: false })).join('')}${done.map((t) => taskItem(t, { showCase: false })).join('')}</div>` : '<p class="text-sm text-dim mb-2">Noch keine Aufgaben. Wiedervorlage mit Datum anlegen oder die Checkliste für dieses Rechtsgebiet übernehmen.</p>'}
+      <div class="task-list">${open.map((t) => taskItem(t, { showCase: false })).join('')}${done.map((t) => taskItem(t, { showCase: false })).join('')}</div>
       <form data-form="task-quick" data-case-id="${c.id}" class="task-quick mt-3">
         <input name="title" class="field" required minlength="2" maxlength="160" placeholder="Neue Aufgabe oder Wiedervorlage …" aria-label="Neue Aufgabe">
         <input name="dueDate" type="date" class="field" aria-label="Fällig am" title="Fällig am (Wiedervorlage)">
@@ -209,6 +217,19 @@ async function setCasePriority(sel) {
   await reloadCase(id);
 }
 
+async function setCaseStatus(sel) {
+  const id = Number(sel.dataset.id);
+  const status = sel.value;
+  try {
+    await api.patch('/api/cases/' + id, { status });
+  } catch (err) {
+    sel.value = sel.dataset.value;
+    throw err;
+  }
+  toast(`Status: ${CASE_STATUS[status][0]}`);
+  await reloadCase(id);
+}
+
 /* ---------------------------------------------------------------- Nachrichten (Chat in Akte und Bewerbung) */
 function chatDayLabel(iso) {
   const d = parseDate(iso);
@@ -381,7 +402,8 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     staff ? ['Kontakt', [c.clientPhone, c.clientEmail].filter(Boolean).join(' · ') || '—'] : null,
     [caseTeam(c).length > 1 ? 'Zuständige Anwälte' : 'Zuständig', teamText(c)],
     ['Rechtsgebiet', AREAS[c.area] || c.area],
-    [staff ? 'Dringlichkeit (Angabe Mandant)' : 'Dringlichkeit', (URGENCY[c.urgency] || [c.urgency])[0]],
+    // Kanzlei arbeitet nur mit der Priorität – die Angabe des Mandanten steht als Hinweis daneben
+    staff ? null : ['Dringlichkeit', (URGENCY[c.urgency] || [c.urgency])[0]],
     c.opponent ? ['Gegenpartei', c.opponent] : null,
     c.courtRef ? ['Gerichtsaktenzeichen', c.courtRef] : null,
     ['Eröffnet', fmtDate(c.createdAt)],
@@ -391,17 +413,22 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     .map(([k, v]) => `<div><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`)
     .join('');
 
-  const statusSeg = c.canEdit
-    ? `<div class="case-controls mb-5"><div class="chip-row" role="group" aria-label="Status ändern">${Object.entries(CASE_STATUS)
-        .map(([k, [l]]) => `<button type="button" class="chip ${c.status === k ? 'active' : ''}" data-action="case-status" data-id="${c.id}" data-status="${k}">${esc(l)}</button>`)
-        .join('')}</div>${
+  // Aktenkopf: Status und Priorität als Auswahl (zuständige Anwälte), sonst als Badges
+  const urgHint =
+    staff && c.urgency !== 'normal' && URGENCY[c.urgency]
+      ? `<span class="urg-hint urg-${esc(c.urgency)}" title="Dringlichkeit, die der Mandant beim Einreichen angegeben hat">Mandant: ${esc(URGENCY[c.urgency][0])}</span>`
+      : '';
+  const headControls = c.canEdit
+    ? `${memberBadge(c.membership)}<label class="case-sel st-${esc(c.status)}"><span>Status</span><select class="field" data-case-status data-id="${c.id}" data-value="${esc(c.status)}" aria-label="Status der Akte">${Object.entries(CASE_STATUS)
+        .map(([k, [l]]) => opt(k, l, c.status === k))
+        .join('')}</select></label>${
         staff
-          ? `<label class="case-prio prio-${c.priority || 2}"><span>Priorität</span><select class="field" data-case-priority data-id="${c.id}" data-value="${c.priority || 2}" aria-label="Priorität der Akte">${Object.entries(PRIORITY)
+          ? `<label class="case-sel prio-${c.priority || 2}"><span>Priorität</span><select class="field" data-case-priority data-id="${c.id}" data-value="${c.priority || 2}" aria-label="Priorität der Akte">${Object.entries(PRIORITY)
               .map(([k, [l]]) => opt(k, l, Number(k) === (c.priority || 2)))
               .join('')}</select></label>`
           : ''
-      }</div>`
-    : '';
+      }${urgHint}`
+    : `${memberBadge(c.membership)}${statusBadge(CASE_STATUS, c.status)}${caseLevelBadge(c)}${urgHint}`;
 
   const claim = c.canClaim
     ? `<div class="banner banner-amber items-center justify-between flex-wrap"><div>${icon('alert')} Diese Akte hat noch keinen zuständigen Anwalt.</div><button class="btn-gold btn-sm" data-action="claim-case" data-id="${c.id}">Akte übernehmen</button></div>`
@@ -434,9 +461,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
           <form data-form="case-edit" data-id="${c.id}" class="form-grid cols-2">
             <div class="span-2"><label class="label">Titel</label><input name="title" class="field" required minlength="3" maxlength="120" value="${esc(c.title)}"></div>
             <div><label class="label">Rechtsgebiet</label><select name="area" class="field">${Object.entries(AREAS).map(([k, l]) => opt(k, l, c.area === k)).join('')}</select></div>
-            <div><label class="label">Dringlichkeit (Angabe Mandant)</label><select name="urgency" class="field">${Object.entries(URGENCY).map(([k, [l]]) => opt(k, l, c.urgency === k)).join('')}</select></div>
             <div><label class="label">Verfahrensstand</label><select name="step" class="field">${STEPS.map((s, i) => opt(i, s, c.step === i)).join('')}</select></div>
-            ${staff ? `<div><label class="label">Priorität (nur intern)</label><select name="priority" class="field">${Object.entries(PRIORITY).map(([k, [l]]) => opt(k, l, Number(k) === (c.priority || 2))).join('')}</select></div>` : ''}
             ${c.hasClientAccount && canLinkClient(c) ? `<div class="span-2 flex flex-wrap items-center justify-between gap-2 text-sm"><div><span class="text-xs uppercase tracking-widest text-dim mr-1">Mandanten-Konto</span> <strong>${esc(c.clientName)}</strong>${c.clientEmail ? ` <span class="text-dim">· ${esc(c.clientEmail)}</span>` : ''}</div><div class="flex flex-wrap gap-2">${isBoard() && c.clientId ? `<button type="button" class="btn-outline btn-sm" data-action="name-direct" data-user-id="${c.clientId}" data-name="${esc(c.clientName)}" data-email="${esc(c.clientEmail || '')}" data-return-case="${c.id}">Name korrigieren</button>` : ''}<button type="button" class="btn-outline btn-sm" data-action="case-client-search" data-id="${c.id}">Anderes Konto</button><button type="button" class="btn-ghost btn-sm" data-action="case-unlink-client" data-id="${c.id}">Verknüpfung lösen</button></div></div>` : ''}
             ${!c.hasClientAccount ? `<div><label class="label">Mandant</label><input name="clientName" class="field" maxlength="80" value="${esc(c.clientName === '—' ? '' : c.clientName)}"></div>` : ''}
             <div><label class="label">Telefon Mandant</label><input name="clientPhone" class="field" maxlength="40" value="${esc(c.clientPhone || '')}"></div>
@@ -449,9 +474,13 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
           </form></details>`
     : '';
 
-  const apptList = appointments.length
-    ? appointments.map((e) => eventRow(e)).join('')
-    : '<p class="text-sm text-dim">Keine Termine oder Fristen zu dieser Akte.</p>';
+  const newEventBtn =
+    staff || !c.closed
+      ? `<button type="button" class="btn-outline btn-sm" data-action="new-event" data-case-id="${c.id}" data-return-case="${c.id}">${icon('plus', 'ico-sm')}<span>${staff ? 'Frist / Termin' : 'Termin anfragen'}</span></button>`
+      : '';
+  const eventsSection = appointments.length
+    ? `<div class="section" id="secEvents"><h3 class="section-title">Termine & Fristen</h3>${appointments.map((e) => eventRow(e)).join('')}</div>`
+    : emptySection('secEvents', 'Termine & Fristen', 'keine', newEventBtn);
 
   const invoiceList = invoices.length
     ? invoices
@@ -509,26 +538,25 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     .join('')}</div></nav>`;
 
   return `
-      <div class="flex flex-wrap items-start justify-between gap-3 mb-5 pr-12">
+      <div class="case-head mb-5 pr-12">
         <div class="min-w-0"><div class="font-mono text-gold text-sm">${esc(c.caseNumber)}</div>
           <h2 id="modalTitle" class="font-serif text-2xl md:text-3xl font-semibold leading-tight">${esc(c.title)}</h2></div>
-        <div class="flex flex-wrap gap-2">${memberBadge(c.membership)}${statusBadge(CASE_STATUS, c.status)}${caseLevelBadge(c)}</div>
+        <div class="case-controls">${headControls}</div>
       </div>
       ${jumpBar}
       ${claim}
-      ${statusSeg}
       ${track}
-      ${staff ? caseStats(c, { appointments, attachments, externalDocs, tasks }) : ''}
+      ${staff ? caseStats(c, { appointments, tasks }) : ''}
       <div class="info-grid mb-5">${info}</div>
       ${clientLinkBanner(c, clientSuggestions)}
       ${ticket || c.processTicket || c.canEdit ? `<div class="ticket-strips">${ticketBanner(c, ticket)}${processTicketBanner(c)}</div>` : ''}
       ${quick.length ? `<div class="form-actions mb-2">${quick.join('')}</div>` : ''}
       ${editForm}
       ${staff ? '' : reviewSection(c, review)}
-      <div class="section"><h3 class="section-title">Sachverhalt</h3><p class="text-sm whitespace-pre-wrap text-muted">${esc(c.description || '—')}</p></div>
+      ${c.description ? `<div class="section"><h3 class="section-title">Sachverhalt</h3><p class="text-sm whitespace-pre-wrap text-muted">${esc(c.description)}</p></div>` : emptySection('', 'Sachverhalt', 'noch nicht beschrieben', '', c.canEdit ? 'Unter „Akte bearbeiten“ ergänzen.' : '')}
       ${c.publicNote ? `<div class="section"><h3 class="section-title">Statushinweis</h3><div class="banner banner-gold mb-0"><p class="text-sm whitespace-pre-wrap">${esc(c.publicNote)}</p></div></div>` : ''}
       ${parts.chat}
-      <div class="section" id="secEvents"><h3 class="section-title">Termine & Fristen</h3>${apptList}</div>
+      ${eventsSection}
       ${parts.contracts}
       ${parts.briefs}
       ${parts.external}
@@ -564,9 +592,9 @@ async function newCaseModal() {
           <div class="span-2"><label class="label" for="ncEmail">…oder Login-E-Mail eines registrierten Mandanten (optional)</label><input id="ncEmail" name="clientEmail" type="text" autocapitalize="none" spellcheck="false" class="field" placeholder="z. B. max.mustermann@pake-scha.ls – verknüpft die Akte mit dem Konto"></div>` : ''}
         <div class="span-2"><label class="label" for="ncTitle">Titel</label><input id="ncTitle" name="title" class="field" required minlength="3" maxlength="120" placeholder="z. B. Festnahme am Legion Square" ${staff ? '' : 'autofocus'}></div>
         <div><label class="label">Rechtsgebiet</label><select name="area" class="field">${Object.entries(AREAS).map(([k, l]) => opt(k, l)).join('')}</select></div>
-        <div><label class="label">${staff ? 'Dringlichkeit (Angabe Mandant)' : 'Dringlichkeit'}</label><select name="urgency" class="field">${Object.entries(URGENCY).map(([k, [l]]) => opt(k, l)).join('')}</select></div>
-        ${staff ? `<div><label class="label">Priorität (nur intern)</label><select name="priority" class="field">${opt('', 'Automatisch – nach Dringlichkeit', true)}${Object.entries(PRIORITY).map(([k, [l]]) => opt(k, l)).join('')}</select></div>
-          <div class="self-end text-xs text-dim pb-2">Normal → Normale, Eilig → Hohe, Notfall → Kritische Priorität. Später jederzeit in der Akte änderbar.</div>` : ''}
+        ${staff
+          ? `<div><label class="label">Priorität</label><select name="priority" class="field">${Object.entries(PRIORITY).map(([k, [l]]) => opt(k, l, k === '2')).join('')}</select></div>`
+          : `<div><label class="label">Dringlichkeit</label><select name="urgency" class="field">${Object.entries(URGENCY).map(([k, [l]]) => opt(k, l)).join('')}</select></div>`}
         ${staff ? `<div><label class="label">Gegenpartei</label><input name="opponent" class="field" maxlength="120" placeholder="optional"></div>
           <div><label class="label">Gerichtsaktenzeichen</label><input name="courtRef" class="field" maxlength="60" placeholder="optional"></div>` : ''}
         ${staff ? lawyerPicker({ leadId: st.user.id, withLead: isAdmin(), emptyLead: 'Noch niemand (offene Anfrage)' }) : ''}

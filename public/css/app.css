@@ -239,14 +239,20 @@ button.track-step:hover .track-node, button.track-step:focus-visible .track-node
 button.track-step:hover .track-label, button.track-step:focus-visible .track-label { color: var(--gold-light); }
 button.track-step:focus-visible { outline: 2px solid var(--gold-500); outline-offset: 3px; }
 button.track-step:disabled { cursor: progress; opacity: 0.7; }
-/* Status + Priorität über der Leiste */
-.case-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem 1rem; }
-.case-controls .chip-row { min-width: 0; }
-.case-prio { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: var(--text-dim); }
-.case-prio .field { width: auto; min-height: 34px; padding: 0.3rem 2.1rem 0.3rem 0.75rem; font-size: 0.8rem; border-radius: 999px; }
-.case-prio.prio-3 .field { border-color: rgba(245, 158, 11, 0.55); color: #fde68a; }
-.case-prio.prio-4 .field { border-color: rgba(239, 68, 68, 0.6); color: #fecaca; }
-.case-prio.prio-2 .field { border-color: rgba(56, 189, 248, 0.45); }
+/* Aktenkopf: Titel links, Status + Priorität als Auswahl rechts (am Handy darunter) */
+.case-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 0.75rem 1rem; }
+.case-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; }
+.case-sel { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.72rem; color: var(--text-dim); }
+.case-sel .field { width: auto; min-height: 34px; padding: 0.3rem 2.1rem 0.3rem 0.75rem; font-size: 0.8rem; border-radius: 999px; }
+.case-sel.st-offen .field { border-color: rgba(245, 158, 11, 0.55); color: #fde68a; }
+.case-sel.st-in_bearbeitung .field { border-color: rgba(56, 189, 248, 0.45); }
+.case-sel.prio-3 .field { border-color: rgba(245, 158, 11, 0.55); color: #fde68a; }
+.case-sel.prio-4 .field { border-color: rgba(239, 68, 68, 0.6); color: #fecaca; }
+.case-sel.prio-2 .field { border-color: rgba(56, 189, 248, 0.45); }
+/* Angabe des Mandanten beim Einreichen – nur ein Hinweis, gearbeitet wird mit der Priorität */
+.urg-hint { font-size: 0.72rem; color: var(--text-dim); white-space: nowrap; cursor: help; }
+.urg-hint.urg-eilig { color: #fcd34d; }
+.urg-hint.urg-notfall { color: #fca5a5; }
 /* Prioritäts-Badge mit kleiner Stufen-Anzeige (1–4 Balken) */
 .prio-badge { gap: 0.4rem; }
 .prio-bars { display: inline-flex; align-items: flex-end; gap: 1.5px; height: 10px; }
@@ -553,6 +559,14 @@ a:hover > .brand-logo { transform: scale(1.04); }
 .info-grid .k { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); }
 .info-grid .v { font-size: 0.9rem; word-break: break-word; }
 .section { margin-top: 1.5rem; }
+/* Leerer Abschnitt: eine Zeile „Titel · noch keine … · Knöpfe“ */
+.sec-empty { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.9rem; margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid var(--glass-border); }
+.sec-empty .section-title { font-size: 1.1rem; margin: 0; }
+.sec-empty-note { font-size: 0.82rem; color: var(--text-dim); }
+.sec-empty-note[title] { cursor: help; text-decoration: underline dotted rgba(138, 150, 179, 0.5); text-underline-offset: 3px; }
+.sec-empty .ext-add { margin-left: auto; }
+@media (max-width: 639px) { .sec-empty .ext-add { margin-left: 0; width: 100%; } }
+.sec-empty + .sec-empty { margin-top: 0; }
 .section-title { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 600; margin-bottom: 0.6rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
 details.edit-box { border: 1px solid var(--glass-border); border-radius: 14px; padding: 0 1rem; background: rgba(15, 23, 42, 0.35); }
 details.edit-box[open] { padding-bottom: 1rem; }
@@ -691,13 +705,13 @@ details.edit-box[open] > summary::after { content: '–'; }
 .btn-discord { display: inline-flex; align-items: center; justify-content: center; gap: 0.6rem; border-radius: 999px; background: #5865f2; color: #fff; font-weight: 600; border: 0; cursor: pointer; text-decoration: none; transition: filter 0.2s ease, transform 0.2s ease; }
 .btn-discord:hover { filter: brightness(1.1); transform: translateY(-1px); }
 
-/* Aktenübersicht: Kennzahlen im Aktenkopf */
-.case-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
-@media (min-width: 768px) { .case-stats { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
-.stat-pill { display: flex; flex-direction: column; align-items: flex-start; gap: 0.2rem; min-width: 0; text-align: left; padding: 0.6rem 0.75rem; border-radius: 12px; border: 1px solid var(--glass-border); background: rgba(15, 23, 42, 0.45); color: inherit; cursor: pointer; transition: border-color 0.15s ease; }
-.stat-pill:hover { border-color: var(--gold-hairline); }
-.stat-pill .k { font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); }
-.stat-pill .v { font-size: 0.9rem; font-weight: 600; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Aktenübersicht: Kennzahlen im Aktenkopf – eine Zeile */
+.case-facts { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 1.25rem; font-size: 0.85rem; }
+.fact { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 0.35rem; min-width: 0; max-width: 100%; padding: 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; }
+.fact .k { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); }
+.fact .v { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 22ch; }
+.fact:hover .v { color: var(--gold-light); }
+.fact:focus-visible { outline: 2px solid var(--gold-hairline); outline-offset: 3px; border-radius: 4px; }
 .link-btn { background: none; border: 0; padding: 0; color: var(--gold-500); cursor: pointer; font: inherit; text-decoration: none; }
 .link-btn:hover { text-decoration: underline; }
 

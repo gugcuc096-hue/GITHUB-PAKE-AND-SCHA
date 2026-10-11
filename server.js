@@ -169,6 +169,8 @@ const reminderTimer = setInterval(() => {
     require('./memberships').sweep().catch((err) => console.warn('VIP-Ablauf fehlgeschlagen:', err.message));
     // Zahlungserinnerung für überfällige Rechnungen (einmal je Rechnung)
     require('./paymentReminders').sweep().catch((err) => console.warn('Zahlungserinnerungen fehlgeschlagen:', err.message));
+    // Liegengebliebene Akten: zuständigen Anwalt einmal je Ruhephase erinnern
+    require('./idleCases').sweep().catch((err) => console.warn('Hinweis auf liegengebliebene Akten fehlgeschlagen:', err.message));
   } catch (err) {
     console.warn('Hintergrundaufgabe fehlgeschlagen:', err.message);
   }

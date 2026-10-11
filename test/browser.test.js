@@ -10,6 +10,7 @@
  */
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
+const path = require('node:path');
 const { startServer, client, TEAM, PASSWORD } = require('./helpers');
 
 let chromium = null;
@@ -638,7 +639,17 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         const why = `Mandatsanfrage: ${sent.status()} ${sentBody}\nCookies: ${JSON.stringify((await ctx.cookies()).map((c) => c.name))}\nServer: ${dsrv.log().slice(-1500)}`;
         assert.equal(sent.status(), 201, why);
         assert.match(sentBody, /"discordSignup":true/, why);
-        await page.waitForSelector('#ticketAccount', { timeout: 10000 });
+        await page.waitForSelector('#ticketAccount', { timeout: 10000 }).catch(async (err) => {
+          // Antwort war richtig, der Knopf fehlt trotzdem: Zustand der Seite festhalten
+          const dom = await page.evaluate(() => ({
+            url: location.href,
+            modal: document.getElementById('ticketModal').className,
+            formHidden: document.getElementById('ticketFormWrap').classList.contains('hidden'),
+            success: document.getElementById('ticketSuccess').innerHTML.replace(/\s+/g, ' ').slice(0, 600),
+            toasts: [...document.querySelectorAll('#toastRoot > *')].map((t) => t.textContent.trim()),
+          }));
+          throw new Error(`${err.message}\n${why}\nSeite: ${JSON.stringify(dom)}`);
+        });
         // Nach dem Absenden schließt ein Klick daneben die Bestätigung nicht (Discord-Beitritt gibt es nur hier)
         await page.mouse.click(5, 5);
         await page.waitForTimeout(300);
@@ -900,6 +911,112 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await ctx.close();
       } finally {
         await rsrv.stop();
+      }
+    });
+
+    it(`Aktenkopf am ${label}: nur Priorität (Mandanten-Angabe als Hinweis), Status als Auswahl, leere Abschnitte als eine Zeile, liegengebliebene Akten`, async () => {
+      // Eigener Server – Mandatsanfragen und Anmeldungen zählen nicht gegen die Sperren des gemeinsamen Servers
+      const ksrv = await startServer();
+      try {
+        const adm = client(ksrv.base);
+        const me = await adm.login(TEAM.admin);
+        const web = await client(ksrv.base).post('/api/public/cases', { name: 'Lena Berg', phone: '555-0101', area: 'zivilrecht', urgency: 'eilig', description: 'Mein Fahrzeug wurde am Pier beschädigt.', website: '' });
+        assert.equal(web.status, 201, web.text);
+        const webCase = (await adm.get('/api/cases')).json.cases.find((c) => c.caseNumber === web.json.caseNumber);
+        assert.equal(webCase.priority, 3, 'Eilig → Hohe Priorität');
+        const quiet = (await adm.post('/api/cases', { title: 'Körperverletzung Würfelpark', area: 'strafrecht', clientName: 'Toni', lawyerId: me.id })).json.case;
+        // Seit 8 Tagen nichts passiert (Standard-Schwelle: 5 Tage)
+        const { DatabaseSync } = require('node:sqlite');
+        const sql = new DatabaseSync(path.join(ksrv.dir, 'test.db'));
+        sql.prepare("UPDATE cases SET updated_at = datetime('now', '-8 days') WHERE id = ?").run(quiet.id);
+        sql.close();
+
+        const { ctx, page, problems, settle } = await open(device);
+        await login(page, TEAM.admin, ksrv.base);
+        await page.goto(`${ksrv.base}/dashboard.html#cases`);
+        await page.waitForSelector('#caseList tr.row');
+        await settle();
+        // Aktenliste: Markierung und eigener Filter
+        assert.match(await page.textContent(`#caseList tr.row[data-id="${quiet.id}"]`), /liegt seit 8 T\./);
+        assert.doesNotMatch(await page.textContent(`#caseList tr.row[data-id="${webCase.id}"]`), /liegt seit/);
+        await page.click('[data-action="case-filter"][data-value="liegt"]');
+        await page.waitForFunction(() => document.querySelectorAll('#caseList tr.row').length === 1);
+        assert.equal(await page.getAttribute('#caseList tr.row', 'data-id'), String(quiet.id));
+        await page.click('[data-action="case-filter"][data-value="aktiv"]');
+
+        // Website-Anfrage „Eilig“: Kanzlei sieht die Priorität, die Angabe des Mandanten nur als Hinweis daneben
+        await page.click(`#caseList tr.row[data-id="${webCase.id}"]`);
+        await page.waitForSelector('#modalBody .case-head');
+        await settle();
+        assert.equal(await page.inputValue('#modalBody [data-case-priority]'), '3');
+        assert.equal((await page.textContent('#modalBody .urg-hint')).trim(), 'Mandant: Eilig');
+        assert.doesNotMatch(await page.textContent('#modalBody .info-grid'), /Dringlichkeit/);
+        await page.click('#modalBody details.edit-box summary');
+        assert.equal(await page.$('#modalBody form[data-form="case-edit"] [name="urgency"]'), null, 'nur Priorität bearbeiten');
+        await page.click('#modalBody details.edit-box summary');
+        // Status als Auswahl neben der Priorität (keine Status-Knöpfe mehr)
+        assert.equal(await page.inputValue('#modalBody [data-case-status]'), 'offen');
+        assert.equal(await page.$('#modalBody [data-action="case-status"]'), null);
+        await page.selectOption('#modalBody [data-case-status]', 'in_bearbeitung');
+        await page.waitForFunction(() => document.querySelector('#modalBody [data-case-status]')?.dataset.value === 'in_bearbeitung');
+        assert.match(await page.textContent('#modalBody .timeline'), /Status: Offen → In Bearbeitung/);
+        // Kennzahlen: eine Zeile mit drei Angaben
+        assert.equal(await page.$$eval('#modalBody .case-facts .fact', (els) => els.length), 3);
+        if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Aktenkopf passt aufs Handy');
+
+        // Akte schließen und sofort auf einen Menüpunkt tippen, während der Sprung zurück im Verlauf noch läuft
+        // (hier künstlich verzögert): Früher landete der Sprung danach wieder auf „Akten“ – Adresse und Ansicht
+        // passten nicht mehr zusammen, ein Tipp auf „Akten“ tat dann nichts.
+        await page.evaluate(() => {
+          const real = navigation.traverseTo.bind(navigation);
+          window.__traversing = false;
+          navigation.traverseTo = (key, opts) => {
+            window.__traversing = true;
+            const later = new Promise((r) => setTimeout(r, 300)).then(() => real(key, opts));
+            return { committed: later.then((t) => t.committed), finished: later.then((t) => t.finished) };
+          };
+        });
+        await page.click('.modal-close');
+        await page.waitForFunction(() => window.__traversing);
+        await page.evaluate(() => (location.hash = '#applications'));
+        await page.waitForTimeout(800);
+        assert.equal(await page.evaluate(() => location.hash), '#applications', 'Adresse bleibt beim gewählten Menüpunkt');
+        await page.waitForFunction(() => /Bewerbungen/.test(document.querySelector('.page-title')?.textContent || ''));
+        await page.evaluate(() => delete navigation.traverseTo);
+        await page.evaluate(() => (location.hash = '#cases'));
+        await page.waitForSelector('#caseList tr.row');
+        await settle();
+
+        // Neue Akte: keine Dringlichkeit, Priorität „Normal“ vorbelegt
+        await page.click('[data-action="new-case"]');
+        await page.waitForSelector('#modalBody form[data-form="new-case"]');
+        assert.equal(await page.$('#modalBody form[data-form="new-case"] [name="urgency"]'), null);
+        assert.equal(await page.inputValue('#modalBody form[data-form="new-case"] [name="priority"]'), '2');
+        await page.click('.modal-close');
+        await page.waitForFunction(() => !document.querySelector('#modal.open'));
+
+        // Leere Akte: kurze Zeilen mit Knopf statt Überschrift + Erklärtext; liegengeblieben im Aktenkopf
+        await page.click(`#caseList tr.row[data-id="${quiet.id}"]`);
+        await page.waitForSelector('#modalBody .case-head');
+        await settle();
+        for (const [id, action] of [['secEvents', 'new-event'], ['secContracts', 'contract-new'], ['secBriefs', 'brief-new'], ['secExternal', 'fn-add'], ['secTasks', 'task-new']]) {
+          assert.ok(await page.$(`#modalBody #${id}.sec-empty [data-action="${action}"]`), `${id}: eine Zeile mit „${action}“`);
+        }
+        assert.ok(await page.$('#modalBody #secEvidence.sec-empty input[type=file][data-upload="evidence"]'), 'Bilder hinzufügen direkt in der Zeile');
+        assert.match(await page.textContent('#modalBody .case-facts'), /liegengeblieben/);
+        // Eine Zeile: Titel und Knopf stehen am PC auf gleicher Höhe
+        if (device === DESKTOP) {
+          const [t, b] = await page.$$eval('#modalBody #secBriefs > *', (els) => [els[0].getBoundingClientRect().top, els[2].getBoundingClientRect().top]);
+          assert.ok(Math.abs(t - b) < 20, `Schriftsätze in einer Zeile (${t} / ${b})`);
+        }
+        // Knopf in der leeren Zeile funktioniert wie zuvor
+        await page.click('#modalBody #secBriefs [data-action="brief-new"]');
+        await page.waitForSelector('#modalBody form[data-form="brief-new"]');
+        if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'leere Akte passt aufs Handy');
+        assert.deepEqual(problems, []);
+        await ctx.close();
+      } finally {
+        await ksrv.stop();
       }
     });
 
