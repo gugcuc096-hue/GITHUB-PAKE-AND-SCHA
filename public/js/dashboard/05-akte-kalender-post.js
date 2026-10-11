@@ -82,9 +82,9 @@ async function afterTaskChange() {
  */
 const ticketState = (t) => (t.exists ? (t.archived ? badge('archiviert', 'slate') : badge('aktiv', 'emerald')) : t.deleted ? badge('per /delete gelöscht', 'slate') : badge('noch nicht angelegt', 'amber'));
 const ticketOpen = (url, label = 'Öffnen') => (url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="btn-discord btn-sm">${DISCORD_ICON}<span>${esc(label)}</span></a>` : '');
-function ticketStrip({ title, tip = '', badges = '', hint = '', error = '', actions = '', extra = '' }) {
-  return `<div class="ticket-strip">
-      <div class="ts-main"><span class="ts-title" ${tip ? `title="${esc(tip)}"` : ''}>${DISCORD_ICON}<strong>${esc(title)}</strong></span>${badges}</div>
+function ticketStrip({ title, tip = '', badges = '', hint = '', error = '', actions = '', extra = '', ico = DISCORD_ICON, tone = '' }) {
+  return `<div class="ticket-strip${tone ? ` strip-${tone}` : ''}">
+      <div class="ts-main"><span class="ts-title" ${tip ? `title="${esc(tip)}"` : ''}>${ico}<strong>${esc(title)}</strong></span>${badges}</div>
       ${actions ? `<div class="ts-actions">${actions}</div>` : ''}
       ${hint ? `<div class="ts-hint">${hint}</div>` : ''}
       ${error ? `<div class="ts-hint text-red-300">${icon('alert', 'ico-sm')} ${esc(error)}</div>` : ''}
@@ -442,6 +442,18 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     memberBadge(c.membership),
   ].join('');
 
+  // Liegengeblieben (nur Kanzlei): ruhige Leiste ganz oben – mit dem, was dagegen hilft
+  const idleStrip = c.idleDays
+    ? `<div class="ticket-strips idle-strip">${ticketStrip({
+        title: `Liegt seit ${dayCount(c.idleDays)}`,
+        tip: 'Offene Akte ohne Aktivität. Ein Verlaufseintrag, eine Nachricht, ein Termin oder eine Wiedervorlage beendet den Hinweis.',
+        ico: icon('clock'),
+        tone: 'amber',
+        badges: `<span class="ts-label">keine Aktivität seit ${esc(fmtDay(c.updatedAt))}</span>`,
+        actions: `<button type="button" class="btn-outline btn-sm" data-action="task-new" data-case-id="${c.id}">${icon('plus', 'ico-sm')}<span>Wiedervorlage</span></button><button type="button" class="btn-ghost btn-sm" data-action="note-focus">${icon('edit', 'ico-sm')}<span>Notiz</span></button>`,
+      })}</div>`
+    : '';
+
   const claim = c.canClaim
     ? `<div class="banner banner-amber items-center justify-between flex-wrap"><div>${icon('alert')} Diese Akte hat noch keinen zuständigen Anwalt.</div><button class="btn-gold btn-sm" data-action="claim-case" data-id="${c.id}">Akte übernehmen</button></div>`
     : '';
@@ -513,7 +525,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
           const canDelete = !n.system && (n.authorId === me || admin);
           return `<div class="tl-item ${n.internal ? 'tl-internal' : ''} ${n.system ? 'tl-system' : ''}">
               <div class="tl-meta"><span class="text-muted font-medium">${esc(n.author)}</span>${n.authorRole && ROLES[n.authorRole] ? `<span>${esc(ROLES[n.authorRole])}</span>` : ''}<span>${esc(fmtDate(n.createdAt))}</span>${n.internal ? badge('intern', 'amber') : ''}
-              ${canDelete ? `<button class="ml-auto text-dim hover:text-red-300" data-action="delete-note" data-case-id="${c.id}" data-id="${n.id}" aria-label="Notiz löschen">${icon('trash', 'ico-sm')}</button>` : ''}</div>
+              ${canDelete ? `<button type="button" class="icon-btn sm tl-del" data-action="delete-note" data-case-id="${c.id}" data-id="${n.id}" aria-label="Notiz löschen" title="Notiz löschen">${icon('trash', 'ico-sm')}</button>` : ''}</div>
               <div class="tl-body">${esc(n.body)}</div></div>`;
         })
         .join('')}</div>`
@@ -556,13 +568,13 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
         <div class="case-props">${headProps}</div>
       </div>
       ${jumpBar}
+      ${idleStrip}
       ${claim}
       ${track}
-      ${staff ? caseStats(c, { appointments, tasks }) : ''}
-      <div class="info-grid mb-5">${info}</div>
+      <div class="info-grid mb-5">${staff ? caseStats(c, { appointments, tasks }) : ''}${info}</div>
       ${clientLinkBanner(c, clientSuggestions)}
       ${ticket || c.processTicket || c.canEdit ? `<div class="ticket-strips">${ticketBanner(c, ticket)}${processTicketBanner(c)}</div>` : ''}
-      ${quick.length ? `<div class="form-actions mb-2">${quick.join('')}</div>` : ''}
+      ${quick.length ? `<div class="form-actions case-quick mb-2">${quick.join('')}</div>` : ''}
       ${editForm}
       ${staff ? '' : reviewSection(c, review)}
       ${c.description ? `<div class="section"><h3 class="section-title">Sachverhalt</h3><p class="text-sm whitespace-pre-wrap text-muted">${esc(c.description)}</p></div>` : emptySection('', 'Sachverhalt', 'noch nicht beschrieben', '', c.canEdit ? 'Unter „Akte bearbeiten“ ergänzen.' : '')}
@@ -828,7 +840,7 @@ function mailReader(m) {
   const inbox = st.mailBox === 'inbox';
   return `
       <button class="btn-ghost btn-sm mb-3 lg:hidden" data-action="mail-back">${icon('chevronLeft', 'ico-sm')}<span>Zurück</span></button>
-      <div class="flex flex-wrap items-center gap-2 mb-2">${m.priority ? badge('Wichtig', 'red') : ''}${m.caseNumber ? `<button class="badge badge-gold" data-action="open-case" data-id="${m.caseId}">Akte ${esc(m.caseNumber)}</button>` : ''}</div>
+      <div class="flex flex-wrap items-center gap-2 mb-2">${m.priority ? badge('Wichtig', 'red') : ''}${m.caseNumber ? `<button type="button" class="btn-outline btn-sm" data-action="open-case" data-id="${m.caseId}">${icon('folder', 'ico-sm')}<span>Akte ${esc(m.caseNumber)}</span></button>` : ''}</div>
       <h2 class="font-serif text-2xl md:text-3xl font-semibold leading-tight">${esc(m.subject || '(kein Betreff)')}</h2>
       <div class="flex items-center gap-3 mt-3">
         <span class="avatar">${avatarImg(m.senderAvatar, m.senderName)}</span>

@@ -938,6 +938,13 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await settle();
         // Aktenliste: Markierung und eigener Filter
         assert.match(await page.textContent(`#caseList tr.row[data-id="${quiet.id}"] .td-main`), /liegt seit 8 Tagen/);
+        // Einheitlich: alle Markierungen (Status, Priorität, „liegt seit …“) im selben Stil – flaches Etikett, kein Knopf-Rand
+        const tags = await page.$$eval('#caseList .badge', (els) => {
+          const body = getComputedStyle(document.body).fontFamily;
+          return { n: els.length, styles: [...new Set(els.map((e) => { const cs = getComputedStyle(e); return `${cs.borderTopLeftRadius}|${cs.borderTopWidth}|${cs.fontFamily === body}`; }))] };
+        });
+        assert.ok(tags.n >= 4, 'Markierungen in der Liste');
+        assert.deepEqual(tags.styles, ['6px|0px|true'], 'ein Stil für alle Markierungen');
         assert.doesNotMatch(await page.textContent(`#caseList tr.row[data-id="${webCase.id}"]`), /liegt seit/);
         await page.click('[data-action="case-filter"][data-value="liegt"]');
         await page.waitForFunction(() => document.querySelectorAll('#caseList tr.row').length === 1);
@@ -964,8 +971,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.selectOption('#modalBody [data-case-status]', 'in_bearbeitung');
         await page.waitForFunction(() => document.querySelector('#modalBody [data-case-status]')?.dataset.value === 'in_bearbeitung');
         assert.match(await page.textContent('#modalBody .timeline'), /Status: Offen → In Bearbeitung/);
-        // Kennzahlen: eine Zeile mit drei Angaben
-        assert.equal(await page.$$eval('#modalBody .case-facts .fact', (els) => els.length), 3);
+        // Kennzahlen: erste Zeile im Raster der Angaben (Bezeichnung über dem Wert wie alle Angaben)
+        assert.equal(await page.$$eval('#modalBody .info-grid .fact', (els) => els.length), 3);
         if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Aktenkopf passt aufs Handy');
 
         // Akte schließen und sofort auf einen Menüpunkt tippen, während der Sprung zurück im Verlauf noch läuft
@@ -1007,7 +1014,23 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
           assert.ok(await page.$(`#modalBody #${id}.sec-empty [data-action="${action}"]`), `${id}: eine Zeile mit „${action}“`);
         }
         assert.ok(await page.$('#modalBody #secEvidence.sec-empty input[type=file][data-upload="evidence"]'), 'Bilder hinzufügen direkt in der Zeile');
-        assert.match(await page.textContent('#modalBody .case-facts'), /liegengeblieben/);
+        // Liegengeblieben: ruhige Leiste ganz oben mit „Wiedervorlage“ und „Notiz“ – nicht mehr gequetscht zwischen den Kennzahlen
+        assert.match(await page.textContent('#modalBody .idle-strip'), /Liegt seit 8 Tagen/);
+        assert.ok(await page.$('#modalBody .idle-strip [data-action="task-new"]'), 'Wiedervorlage aus der Leiste');
+        assert.doesNotMatch(await page.textContent('#modalBody .info-grid'), /liegengeblieben/);
+        await page.click('#modalBody .idle-strip [data-action="note-focus"]');
+        await page.waitForFunction(() => document.activeElement && document.activeElement.matches('#secNotes textarea[name="body"]'));
+        // Einheitliche Knöpfe: alle kleinen Knöpfe gleich hoch (am Handy dürfen Schnellaktionen zweizeilig sein), Symbol-Knöpfe rund
+        const design = await page.evaluate(() => {
+          const shown = (sel) => [...document.querySelectorAll(sel)].filter((e) => e.offsetParent !== null);
+          const close = document.querySelector('#modal .modal-close').getBoundingClientRect();
+          return {
+            sm: [...new Set(shown('#modalBody .btn-sm').filter((e) => !e.closest('.case-quick')).map((e) => Math.round(e.getBoundingClientRect().height)))],
+            close: [Math.round(close.width), Math.round(close.height), getComputedStyle(document.querySelector('#modal .modal-close')).borderTopLeftRadius],
+          };
+        });
+        assert.deepEqual(design.sm, [36], `kleine Knöpfe gleich hoch: ${design.sm}`);
+        assert.deepEqual(design.close, [40, 40, '999px'], 'Schließen-Knopf rund');
         // Eine Zeile: Titel und Knopf stehen am PC auf gleicher Höhe
         if (device === DESKTOP) {
           const [t, b] = await page.$$eval('#modalBody #secBriefs > *', (els) => [els[0].getBoundingClientRect().top, els[2].getBoundingClientRect().top]);
