@@ -594,10 +594,17 @@ details.edit-box[open] > summary::after { content: '–'; }
 .modal.open { display: flex; }
 .modal-card { width: 100%; max-width: 720px; margin: 2.5rem 0; position: relative; display: flex; flex-direction: column; background: rgba(8, 14, 32, 0.98); border: 1px solid var(--glass-border); border-top: 2px solid var(--gold-500); border-radius: 20px; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7); animation: modal-in 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
 .modal-card.wide { max-width: 1000px; }
-.modal-head { height: 0; position: relative; z-index: 2; }
-.modal-close { position: absolute; top: 0.75rem; right: 0.75rem; }
-.modal-body { padding: 1.5rem; }
-@media (min-width: 768px) { .modal-body { padding: 2rem; } }
+.modal-head { height: 0; position: relative; z-index: 10; }
+.modal-close { position: absolute; top: 0.75rem; right: 0.75rem; background: rgba(10, 16, 36, 0.96); }
+.modal-body { --mb-pad: 1.5rem; padding: var(--mb-pad); }
+@media (min-width: 768px) { .modal-body { --mb-pad: 2rem; } }
+/* Ab Tablet: Das Fenster ist höchstens so hoch wie der Bildschirm, der Inhalt scrollt darin –
+   das X oben rechts bleibt so immer sichtbar, auch weit unten in einer langen Akte */
+@media (min-width: 640px) {
+  .modal-card { margin: 1rem 0; max-height: calc(100vh - 4rem); max-height: calc(100dvh - 4rem); overflow: hidden; }
+  .modal-body { overflow-y: auto; min-height: 0; overscroll-behavior: contain; }
+  .modal-close { top: 0.5rem; right: 0.6rem; }
+}
 .modal-title { font-family: 'Cormorant Garamond', serif; font-size: 1.9rem; font-weight: 600; line-height: 1.15; margin-bottom: 0.35rem; padding-right: 2.75rem; }
 .modal-sub { color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1.25rem; }
 @keyframes modal-in { from { opacity: 0; transform: translateY(14px) scale(0.985); } to { opacity: 1; transform: none; } }
@@ -607,7 +614,7 @@ details.edit-box[open] > summary::after { content: '–'; }
   .modal-head { height: auto; display: flex; justify-content: center; align-items: center; padding: 0.55rem 0.75rem 0; flex-shrink: 0; }
   .modal-head::before { content: ''; width: 42px; height: 4px; border-radius: 4px; background: rgba(255, 255, 255, 0.2); }
   .modal-close { top: 0.4rem; right: 0.6rem; }
-  .modal-body { overflow-y: auto; min-height: 0; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 1rem 1rem calc(1.5rem + var(--safe-bottom)); }
+  .modal-body { --mb-pad: 1rem; overflow-y: auto; min-height: 0; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 1rem 1rem calc(1.5rem + var(--safe-bottom)); }
   .modal-title { font-size: 1.6rem; }
 }
 @keyframes sheet-in { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -1196,13 +1203,25 @@ textarea.field.chat-input { resize: none; min-height: 42px; height: 42px; max-he
   .todo-actions { width: 100%; justify-content: flex-start; }
 }
 
-/* Akte: Sprungleiste zu den Abschnitten – bleibt beim Scrollen oben stehen */
-.case-jump { position: sticky; top: -1rem; z-index: 6; margin: -0.25rem 0 1.25rem; padding: 0.5rem 0; background: rgba(8, 14, 32, 0.97); border-bottom: 1px solid var(--glass-border); }
-.case-jump .chip { padding: 0.32rem 0.75rem; font-size: 0.78rem; }
-#modalBody .section { scroll-margin-top: 4.25rem; }
-@media (max-width: 767px) { .case-jump { margin-left: -1rem; margin-right: -1rem; padding-left: 1rem; padding-right: 1rem; } }
-/* Handy: das X zum Schließen ragt in den Fensterinhalt – es bleibt über der Leiste und die Leiste lässt ihm rechts Platz */
-@media (max-width: 639px) { .modal-head { z-index: 10; } .case-jump { padding-right: 3.25rem; } }
+/* Akte: schlichte Reiterzeile zu den Abschnitten – über die ganze Breite, bleibt beim Scrollen oben stehen
+   (rechts Platz für das X), der Abschnitt, in dem man gerade liest, ist gold unterstrichen */
+.case-jump {
+  position: sticky; top: calc(-1 * var(--mb-pad, 1.5rem)); z-index: 6;
+  margin: -0.5rem calc(-1 * var(--mb-pad, 1.5rem)) 1.25rem; padding: 0 calc(var(--mb-pad, 1.5rem) + 2.75rem) 0 var(--mb-pad, 1.5rem);
+  background: rgba(8, 14, 32, 0.97); border-top: 1px solid var(--glass-border); border-bottom: 1px solid var(--glass-border);
+}
+.case-jump-list { display: flex; gap: 0.15rem; overflow-x: auto; scrollbar-width: none; }
+.case-jump-list::-webkit-scrollbar { display: none; }
+.case-jump .jump {
+  flex: none; display: inline-flex; align-items: baseline; gap: 0.3rem; padding: 0.95rem 0.55rem 0.8rem; margin-bottom: -1px;
+  border: 0; border-bottom: 2px solid transparent; background: none; color: var(--text-muted); font: inherit; font-size: 0.8rem;
+  white-space: nowrap; cursor: pointer; transition: color 0.15s ease, border-color 0.15s ease;
+}
+.case-jump .jump:first-child { padding-left: 0; }
+.case-jump .jump:hover, .case-jump .jump:focus-visible { color: #fff; outline: none; }
+.case-jump .jump.active { color: var(--gold-light); border-bottom-color: var(--gold-500); }
+.case-jump .jump-n { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: var(--gold-500); }
+#modalBody .section { scroll-margin-top: 3.75rem; }
 /* Menü „⋯ Mehr“ (z. B. Akte abgeben, löschen) */
 .more-menu { position: relative; display: inline-block; }
 .more-menu > summary { list-style: none; cursor: pointer; }

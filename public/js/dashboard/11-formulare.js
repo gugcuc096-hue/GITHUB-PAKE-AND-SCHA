@@ -299,7 +299,7 @@ const forms = {
     // Aus einer Akte heraus erstellt: zurück in die Akte, die Bestätigung liegt darüber (Schließen → Akte)
     const from = st.invoiceFrom;
     if (from) {
-      await navigate(from.view);
+      await returnToView(from.view);
       await openCase(from.caseId);
     } else await navigate('invoices');
     openModal(`

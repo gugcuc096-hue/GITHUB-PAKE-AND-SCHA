@@ -328,14 +328,13 @@ function stashModal() {
  * opts.key: was das Fenster zeigt (z. B. 'case:12') – dasselbe noch einmal öffnen ersetzt es nur.
  * opts.reopen: lädt das Fenster neu (für die Rückkehr aus einem Unterfenster).
  */
-// light: Fenster ohne eigene Arbeit darin (Suche, Bildansicht) – nur diese schließt ein Klick daneben
-function openModal(html, { wide = false, key = null, reopen = null, child = false, light = false } = {}) {
+function openModal(html, { wide = false, key = null, reopen = null, child = false } = {}) {
   const modal = $('#modal');
   const body = $('#modalBody');
   const same = key && st.modalCurrent && st.modalCurrent.key === key;
   // child: auch nach dem Absenden eines Formulars als Unterfenster öffnen (z. B. „Rechnung erstellt“ über der Akte)
   if (modal.classList.contains('open') && !st.modalRestoring && (child || !st.modalReplace) && !same) stashModal();
-  st.modalCurrent = { key, reopen, wide, light };
+  st.modalCurrent = { key, reopen, wide };
   body.innerHTML = html;
   $('#modalCard').classList.toggle('wide', wide);
   modal.classList.add('open');
@@ -403,7 +402,7 @@ async function modalBack() {
     body.innerHTML = '';
     body.appendChild(prev.nodes);
     Object.assign(st, prev.state);
-    st.modalCurrent = { key: prev.key || null, reopen: null, wide: !!prev.wide, light: !!prev.light };
+    st.modalCurrent = { key: prev.key || null, reopen: null, wide: !!prev.wide };
     $('#modalCard').classList.toggle('wide', !!prev.wide);
     modal.classList.add('open');
     document.body.classList.add('modal-open');
@@ -412,16 +411,7 @@ async function modalBack() {
   }
   restoreModalScroll(prev.scroll);
 }
-/**
- * Klick neben ein Fenster (Akte, Formular, Detailansicht): Es bleibt offen und „wippt“ kurz, damit klar ist,
- * dass der Klick angekommen ist. Schließen geht mit X, Esc, „Abbrechen“ oder der Zurück-Taste.
- */
-function nudgeModal() {
-  const card = $('#modalCard');
-  if (!card || typeof card.animate !== 'function' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  card.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.012)' }, { transform: 'scale(1)' }], { duration: 220, easing: 'ease-out' });
-}
-/** Vom Nutzer geschlossen (X, Esc, Abbrechen, Zurück-Taste; bei Suche und Bildansicht auch daneben): bei ungespeicherten Eingaben erst nachfragen. */
+/** Vom Nutzer geschlossen (X, Esc, daneben, Abbrechen, Zurück-Taste): bei ungespeicherten Eingaben erst nachfragen. */
 async function modalDismiss(back = modalBack) {
   if (st.modalRestoring || st.modalAsking) return;
   if (formDirty($('#modalBody'))) {
@@ -509,6 +499,28 @@ function navigate(view) {
   // Aus einem offenen Fenster heraus: dessen Verlaufseintrag durch die neue Seite ersetzen (Zurück führt nicht ins Leere)
   if (onOverlayEntry()) history.replaceState(null, '', urlWithCase(null).split('#')[0] + '#' + view);
   else if (location.hash !== '#' + view) history.pushState(null, '', '#' + view);
+  return go(view);
+}
+/**
+ * Von einer Seite zurück auf die Seite davor (Rechnung aus der Akte: Abbrechen oder Erstellen) – im Verlauf zurück
+ * statt mit einem neuen Eintrag. Sonst führte die Zurück-Taste danach wieder in das verlassene Formular.
+ */
+async function returnToView(view) {
+  const target = new URL(urlWithCase(null).split('#')[0] + '#' + view, location.href).href;
+  const nav = window.navigation;
+  const prev = nav && nav.currentEntry && nav.currentEntry.index > 0 ? nav.entries()[nav.currentEntry.index - 1] : null;
+  if (prev && prev.url === target && !onOverlayEntry() && typeof nav.traverseTo === 'function') {
+    st.hashSkip = '#' + view; // die Seite wird hier geladen – nicht noch einmal über hashchange
+    try {
+      const t = nav.traverseTo(prev.key);
+      t.committed.catch(() => {});
+      await t.finished;
+      return go(view);
+    } catch {
+      st.hashSkip = null; // Zurück abgebrochen: Eintrag des Formulars einfach ersetzen
+    }
+  }
+  history.replaceState(null, '', target);
   return go(view);
 }
 /** Lädt die Daten der aktuellen Ansicht neu, ohne einen offenen Dialog zu schließen. */

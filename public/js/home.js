@@ -64,15 +64,13 @@ function nudgeDialog(panel) {
     panel.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.012)' }, { transform: 'scale(1)' }], { duration: 220, easing: 'ease-out' });
 }
 window.nudgeDialog = nudgeDialog;
-// Klick neben das Fenster schließt es nur, wenn dabei nichts verloren geht: nicht nach dem Absenden (Aktenzeichen,
-// „Discord-Ticket beitreten“ gibt es nur dort) und nicht mit angefangenem Sachverhalt. Wer im Fenster Text markiert
-// und daneben loslässt, hat nicht daneben geklickt.
+// Klick neben das Fenster schließt es (Eingaben bleiben erhalten) – nur nicht nach dem Absenden: Aktenzeichen und
+// „Discord-Ticket beitreten“ gibt es nur dort. Wer im Fenster Text markiert und daneben loslässt, hat nicht daneben geklickt.
 let ticketPressOutside = false;
 document.getElementById('ticketModal').addEventListener('pointerdown', (e) => { ticketPressOutside = e.target.id === 'ticketModal'; });
 document.getElementById('ticketModal').addEventListener('click', (e) => {
     if (e.target.id !== 'ticketModal' || !ticketPressOutside) return;
-    const keep = !document.getElementById('ticketSuccess').classList.contains('hidden') || document.getElementById('tkDesc').value.trim();
-    if (keep) nudgeDialog(e.target.firstElementChild);
+    if (!document.getElementById('ticketSuccess').classList.contains('hidden')) nudgeDialog(e.target.firstElementChild);
     else closeTicketModal();
 });
 

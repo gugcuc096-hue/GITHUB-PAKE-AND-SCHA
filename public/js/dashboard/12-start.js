@@ -18,12 +18,10 @@ document.addEventListener('click', (e) => {
     if (!d.contains(e.target) || e.target.closest('.more-item')) d.open = false;
   });
   if (e.target.closest('a[href^="/vertrag.html"]')) st.contractTabAt = Date.now();
-  // Klick neben das Fenster: Akte, Formulare und Detailfenster bleiben offen (versehentlich daneben geklickt) –
-  // nur Suche und Bildansicht gehen zu (zurück zum vorherigen Fenster, z. B. zur Akte)
+  // Klick neben das Fenster: zurück zum vorherigen Fenster (z. B. zur Akte) bzw. schließen – bei ungespeicherten
+  // Eingaben erst mit Rückfrage. Markieren im Fenster und daneben Loslassen zählt nicht.
   if (e.target === $('#modal')) {
-    if (!modalPressOutside) return;
-    if (st.modalCurrent && st.modalCurrent.light) guard(() => modalDismiss());
-    else nudgeModal();
+    if (modalPressOutside) guard(() => modalDismiss());
     return;
   }
   const link = e.target.closest('a[href^="#"]');
@@ -359,6 +357,10 @@ document.addEventListener('change', (e) => {
 // Seitenwechsel per Zurück/Vorwärts oder Adresszeile – mit Rückfrage, wenn auf der Seite noch etwas Ungespeichertes steht
 window.addEventListener('hashchange', () =>
   guard(async () => {
+    if (st.hashSkip && location.hash === st.hashSkip) {
+      st.hashSkip = null; // diese Seite lädt bereits (returnToView)
+      return;
+    }
     const view = hashView();
     if (view !== st.view && formDirty($('#content')) && !(await askDiscard(true))) {
       history.pushState(null, '', '#' + st.view); // auf der Seite bleiben
@@ -368,6 +370,46 @@ window.addEventListener('hashchange', () =>
   })
 );
 window.addEventListener('popstate', onPopState);
+// Akte: In der Reiterzeile ist der Abschnitt markiert, in dem man gerade liest. Nach einem Klick auf einen Reiter
+// bleibt dieser markiert, bis man selbst scrollt (Abschnitte ganz unten erreichen den oberen Rand nie).
+let caseJumpFrame = 0;
+let caseJumpPinned = null;
+const unpinCaseJump = () => (caseJumpPinned = null);
+['wheel', 'touchmove', 'keydown'].forEach((t) => document.addEventListener(t, unpinCaseJump, { passive: true, capture: true }));
+document.addEventListener(
+  'scroll',
+  (e) => {
+    if (e.target.id !== 'modalBody' || caseJumpFrame) return;
+    caseJumpFrame = requestAnimationFrame(() => {
+      caseJumpFrame = 0;
+      markCaseJump();
+    });
+  },
+  true
+);
+function markCaseJump() {
+  const body = $('#modalBody');
+  const bar = $('#modalBody .case-jump');
+  if (!bar) return;
+  const items = $$('.jump', bar);
+  const line = bar.getBoundingClientRect().bottom + 12;
+  let active = null;
+  if (caseJumpPinned) active = items.find((b) => b.dataset.target === caseJumpPinned) || null;
+  else if (body.scrollTop + body.clientHeight >= body.scrollHeight - 2 && body.scrollTop > 0) active = items[items.length - 1];
+  else items.forEach((b) => {
+    const sec = document.getElementById(b.dataset.target);
+    if (sec && sec.getBoundingClientRect().top <= line) active = b;
+  });
+  if (active && active.classList.contains('active')) return;
+  items.forEach((b) => b.classList.toggle('active', b === active));
+  if (!active) return;
+  // Am Handy ist die Zeile seitlich scrollbar: den markierten Reiter sichtbar halten (nur waagerecht)
+  const list = active.parentElement;
+  const lr = list.getBoundingClientRect();
+  const ar = active.getBoundingClientRect();
+  if (ar.left < lr.left) list.scrollLeft -= lr.left - ar.left + 8;
+  else if (ar.right > lr.right) list.scrollLeft += ar.right - lr.right + 8;
+}
 // Neu laden / Tab schließen mit ungespeicherten Eingaben: Rückfrage des Browsers
 window.addEventListener('beforeunload', (e) => {
   if (st.leaving || !st.user || !unsavedInputs({ invoice: true })) return;
