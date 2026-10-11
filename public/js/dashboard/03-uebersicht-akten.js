@@ -286,7 +286,7 @@ function caseCount(f) {
   return st.cases.filter((c) => caseMatches(c, f)).length;
 }
 /** Markierung „liegt seit X Tagen“ (offene Akte ohne Aktivität, Schwelle in den Einstellungen). */
-const idleBadge = (c) => (c.idleDays ? `<span class="badge badge-amber idle-badge" title="Seit ${c.idleDays} Tagen keine Aktivität in dieser Akte">liegt seit ${c.idleDays} Tagen</span>` : '');
+const idleBadge = (c) => (c.idleDays ? `<span class="badge badge-amber idle-badge" title="Seit ${dayCount(c.idleDays)} keine Aktivität in dieser Akte">liegt seit ${dayCount(c.idleDays)}</span>` : '');
 /** VIP / Lifetime des Mandanten als Badge. */
 function memberBadge(m) {
   if (!m) return '';
@@ -663,7 +663,11 @@ function attachmentsSection(c, attachments) {
 }
 
 /* ---------------------------------------------------------------- Aktenübersicht (Kennzahlen im Aktenkopf) */
-/** Eine Zeile: nächste Frist, offene Aufgaben, letzte Aktivität – Anzahl der Dokumente und Beweise steht in der Reiterzeile. */
+/**
+ * Auf einen Blick (nur Kanzlei): die erste Zeile im Raster der Angaben – nächste Frist, Aufgaben, letzte Aktivität,
+ * jeweils Bezeichnung über dem Wert wie alle Angaben; Markierungen (z. B. „in 6 Std“) stehen in einer eigenen Zeile
+ * darunter. Ein Klick springt zum Abschnitt. Anzahl der Dokumente und Beweise steht in der Reiterzeile.
+ */
 function caseStats(c, { appointments, tasks }) {
   const cutoff = Date.now() - 60 * 60 * 1000;
   const next = appointments
@@ -671,11 +675,11 @@ function caseStats(c, { appointments, tasks }) {
     .sort(byStart)[0];
   const open = tasks.filter((t) => !t.done);
   const overdue = open.filter((t) => t.dueDate && daysUntil(t.dueDate) < 0).length;
-  const fact = (label, value, target, extra = '') =>
-    `<button type="button" class="fact" data-action="scroll-to" data-target="${target}"><span class="k">${esc(label)}</span> <span class="v">${value}</span>${extra}</button>`;
-  return `<div class="case-facts mb-5">
-      ${fact('Nächste Frist / Termin', next ? esc(next.title) : '<span class="text-dim">keine</span>', 'secEvents', next ? countdownHtml(next) : '')}
-      ${fact('Aufgaben', open.length ? `${open.length} offen` : '<span class="text-dim">keine offen</span>', 'secTasks', overdue ? `<span class="countdown cd-over">${overdue} überfällig</span>` : '')}
-      ${fact('Letzte Aktivität', esc(relDays(c.updatedAt)), 'secNotes', c.idleDays ? '<span class="countdown cd-over">liegengeblieben</span>' : '')}
-    </div>`;
+  const fact = (label, value, target, sub = '') =>
+    `<button type="button" class="fact" data-action="scroll-to" data-target="${target}"><span class="k">${esc(label)}</span><span class="v">${value}</span>${sub ? `<span class="fact-sub">${sub}</span>` : ''}</button>`;
+  return [
+    fact('Nächste Frist / Termin', next ? esc(next.title) : '<span class="text-dim">keine</span>', 'secEvents', next ? countdownHtml(next) : ''),
+    fact('Aufgaben', open.length ? `${open.length} offen` : '<span class="text-dim">keine offen</span>', 'secTasks', overdue ? `<span class="countdown cd-over">${overdue} überfällig</span>` : ''),
+    fact('Letzte Aktivität', c.idleDays ? `<span class="is-idle">${esc(relDays(c.updatedAt))}</span>` : esc(relDays(c.updatedAt)), 'secNotes'),
+  ].join('');
 }

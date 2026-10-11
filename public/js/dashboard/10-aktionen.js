@@ -157,6 +157,13 @@ const actions = {
     sec.scrollIntoView({ block: 'start', behavior: 'smooth' });
     $('#secChat .chat-input')?.focus({ preventScroll: true });
   },
+  // „Notiz“ in der Hinweisleiste einer liegengebliebenen Akte: zum Verlauf und gleich ins Notizfeld
+  'note-focus': () => {
+    const sec = $('#secNotes');
+    if (!sec) return;
+    sec.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    $('#secNotes textarea[name="body"]')?.focus({ preventScroll: true });
+  },
   'delete-note': async (el) => {
     if (!(await askDelete('Notiz löschen?', 'Die Notiz wird aus dem Verlauf der Akte entfernt.'))) return;
     const caseId = Number(el.dataset.caseId);
