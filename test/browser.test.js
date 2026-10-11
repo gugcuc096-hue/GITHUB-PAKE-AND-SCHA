@@ -937,7 +937,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.waitForSelector('#caseList tr.row');
         await settle();
         // Aktenliste: Markierung und eigener Filter
-        assert.match(await page.textContent(`#caseList tr.row[data-id="${quiet.id}"]`), /liegt seit 8 T\./);
+        assert.match(await page.textContent(`#caseList tr.row[data-id="${quiet.id}"] .td-main`), /liegt seit 8 Tagen/);
         assert.doesNotMatch(await page.textContent(`#caseList tr.row[data-id="${webCase.id}"]`), /liegt seit/);
         await page.click('[data-action="case-filter"][data-value="liegt"]');
         await page.waitForFunction(() => document.querySelectorAll('#caseList tr.row').length === 1);
@@ -949,7 +949,10 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.waitForSelector('#modalBody .case-head');
         await settle();
         assert.equal(await page.inputValue('#modalBody [data-case-priority]'), '3');
-        assert.equal((await page.textContent('#modalBody .urg-hint')).trim(), 'Mandant: Eilig');
+        assert.equal((await page.textContent('#modalBody .prop-urg')).replace(/\s+/g, ' ').trim(), 'Mandant Eilig');
+        // Kopf nicht gequetscht: Titel über die volle Breite, die Felder darunter in einer eigenen Zeile
+        const [titleBox, propsBox] = await page.$$eval('#modalBody .case-head > *', (els) => els.map((e) => e.getBoundingClientRect().toJSON()));
+        assert.ok(propsBox.top >= titleBox.bottom - 1, 'Felder unter dem Titel');
         assert.doesNotMatch(await page.textContent('#modalBody .info-grid'), /Dringlichkeit/);
         await page.click('#modalBody details.edit-box summary');
         assert.equal(await page.$('#modalBody form[data-form="case-edit"] [name="urgency"]'), null, 'nur Priorität bearbeiten');
