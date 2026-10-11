@@ -239,20 +239,50 @@ button.track-step:hover .track-node, button.track-step:focus-visible .track-node
 button.track-step:hover .track-label, button.track-step:focus-visible .track-label { color: var(--gold-light); }
 button.track-step:focus-visible { outline: 2px solid var(--gold-500); outline-offset: 3px; }
 button.track-step:disabled { cursor: progress; opacity: 0.7; }
-/* Aktenkopf: Titel links, Status + Priorität als Auswahl rechts (am Handy darunter) */
-.case-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 0.75rem 1rem; }
-.case-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; }
-.case-sel { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.72rem; color: var(--text-dim); }
-.case-sel .field { width: auto; min-height: 34px; padding: 0.3rem 2.1rem 0.3rem 0.75rem; font-size: 0.8rem; border-radius: 999px; }
-.case-sel.st-offen .field { border-color: rgba(245, 158, 11, 0.55); color: #fde68a; }
-.case-sel.st-in_bearbeitung .field { border-color: rgba(56, 189, 248, 0.45); }
-.case-sel.prio-3 .field { border-color: rgba(245, 158, 11, 0.55); color: #fde68a; }
-.case-sel.prio-4 .field { border-color: rgba(239, 68, 68, 0.6); color: #fecaca; }
-.case-sel.prio-2 .field { border-color: rgba(56, 189, 248, 0.45); }
-/* Angabe des Mandanten beim Einreichen – nur ein Hinweis, gearbeitet wird mit der Priorität */
-.urg-hint { font-size: 0.72rem; color: var(--text-dim); white-space: nowrap; cursor: help; }
-.urg-hint.urg-eilig { color: #fcd34d; }
-.urg-hint.urg-notfall { color: #fca5a5; }
+/* Aktenkopf: Titel über die volle Breite, darunter eine Leiste mit Feldern „STATUS | ● In Bearbeitung ▾“ */
+.case-props { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin-top: 1rem; }
+.prop { display: inline-flex; align-items: stretch; min-height: 40px; border: 1px solid var(--glass-border); border-radius: 12px;
+  background: rgba(15, 23, 42, 0.55); overflow: hidden; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+.prop-k { display: inline-flex; align-items: center; padding: 0 0.8rem; font-size: 0.66rem; font-weight: 600; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--text-dim); background: rgba(255, 255, 255, 0.025); border-right: 1px solid var(--glass-border); white-space: nowrap; }
+.prop-v { position: relative; display: inline-flex; align-items: center; gap: 0.55rem; padding: 0 0.95rem; font-size: 0.88rem; font-weight: 600; color: #fff; white-space: nowrap; }
+.prop-v select { appearance: none; -webkit-appearance: none; background: transparent; border: 0; color: inherit; font: inherit; height: 100%;
+  padding: 0 1.6rem 0 0; margin-right: -0.35rem; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d4af37' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 0 center; background-size: 15px; }
+.prop-v select:focus { outline: none; }
+.prop-v select option { background: #0a1228; color: #fff; }
+label.prop { cursor: pointer; }
+label.prop:hover { border-color: rgba(255, 255, 255, 0.22); }
+.prop:focus-within { border-color: var(--gold-500); box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15); }
+.prop-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
+/* Farben: Status, Priorität, Angabe des Mandanten */
+.prop.st-offen { border-color: rgba(245, 158, 11, 0.45); } .prop.st-offen .prop-v { color: #fde68a; }
+.prop.st-in_bearbeitung { border-color: rgba(56, 189, 248, 0.4); } .prop.st-in_bearbeitung .prop-v { color: #bae6fd; }
+.prop.st-geschlossen .prop-v { color: #cbd5e1; }
+.prop.prio-1 .prop-v { color: #cbd5e1; }
+.prop.prio-2 { border-color: rgba(56, 189, 248, 0.4); } .prop.prio-2 .prop-v { color: #bae6fd; }
+.prop.prio-3 { border-color: rgba(245, 158, 11, 0.45); } .prop.prio-3 .prop-v { color: #fde68a; }
+.prop.prio-4 { border-color: rgba(239, 68, 68, 0.55); } .prop.prio-4 .prop-v { color: #fecaca; }
+.prop-v .prio-bars { height: 12px; }
+.prop-v .prio-bars i { width: 3px; }
+.prop-urg { cursor: help; }
+.prop-urg.urg-eilig { border-color: rgba(245, 158, 11, 0.35); border-style: dashed; } .prop-urg.urg-eilig .prop-v { color: #fcd34d; }
+.prop-urg.urg-notfall { border-color: rgba(239, 68, 68, 0.45); border-style: dashed; } .prop-urg.urg-notfall .prop-v { color: #fca5a5; }
+.case-props > .badge { align-self: center; }
+/* Handy: Status und Priorität nebeneinander als kleine Karten (Bezeichnung oben, Wert darunter) */
+@media (max-width: 639px) {
+  .case-props { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+  .prop { flex-direction: column; min-height: 0; }
+  .prop-k { padding: 0.4rem 0.75rem 0.3rem; border-right: 0; border-bottom: 1px solid var(--glass-border); }
+  .prop-v { padding: 0 0.6rem 0 0.7rem; gap: 0.45rem; min-height: 40px; }
+  .prop-v select { flex: 1 1 auto; min-width: 0; width: 100%; font-size: 16px; padding-right: 1.2rem; background-size: 14px; }
+  /* Kanzlei: „Mandant: Eilig“ als schmale Zeile unter Status und Priorität (Mandant: Karte neben dem Status) */
+  .prop-prio ~ .prop-urg, .case-props > .badge { grid-column: 1 / -1; }
+  .prop-prio ~ .prop-urg { flex-direction: row; }
+  .prop-prio ~ .prop-urg .prop-k { border-bottom: 0; border-right: 1px solid var(--glass-border); padding: 0 0.75rem; }
+  .case-props > .badge { justify-self: start; }
+}
 /* Prioritäts-Badge mit kleiner Stufen-Anzeige (1–4 Balken) */
 .prio-badge { gap: 0.4rem; }
 .prio-bars { display: inline-flex; align-items: flex-end; gap: 1.5px; height: 10px; }

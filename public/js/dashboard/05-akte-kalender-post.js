@@ -402,8 +402,6 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     staff ? ['Kontakt', [c.clientPhone, c.clientEmail].filter(Boolean).join(' · ') || '—'] : null,
     [caseTeam(c).length > 1 ? 'Zuständige Anwälte' : 'Zuständig', teamText(c)],
     ['Rechtsgebiet', AREAS[c.area] || c.area],
-    // Kanzlei arbeitet nur mit der Priorität – die Angabe des Mandanten steht als Hinweis daneben
-    staff ? null : ['Dringlichkeit', (URGENCY[c.urgency] || [c.urgency])[0]],
     c.opponent ? ['Gegenpartei', c.opponent] : null,
     c.courtRef ? ['Gerichtsaktenzeichen', c.courtRef] : null,
     ['Eröffnet', fmtDate(c.createdAt)],
@@ -413,22 +411,36 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     .map(([k, v]) => `<div><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`)
     .join('');
 
-  // Aktenkopf: Status und Priorität als Auswahl (zuständige Anwälte), sonst als Badges
-  const urgHint =
-    staff && c.urgency !== 'normal' && URGENCY[c.urgency]
-      ? `<span class="urg-hint urg-${esc(c.urgency)}" title="Dringlichkeit, die der Mandant beim Einreichen angegeben hat">Mandant: ${esc(URGENCY[c.urgency][0])}</span>`
-      : '';
-  const headControls = c.canEdit
-    ? `${memberBadge(c.membership)}<label class="case-sel st-${esc(c.status)}"><span>Status</span><select class="field" data-case-status data-id="${c.id}" data-value="${esc(c.status)}" aria-label="Status der Akte">${Object.entries(CASE_STATUS)
+  // Aktenkopf: eine Leiste unter dem Titel – je Angabe ein Feld „STATUS | ● In Bearbeitung“. Zuständige Anwälte
+  // wählen Status und Priorität direkt aus; alle anderen sehen dieselben Felder nur zum Lesen.
+  const prio = PRIORITY[c.priority] ? c.priority : 2;
+  const prop = (cls, key, value, title = '') => {
+    const tag = value.includes('<select') ? 'label' : 'span'; // mit Auswahl: Klick auf die Bezeichnung öffnet sie
+    return `<${tag} class="prop ${cls}"${title ? ` title="${esc(title)}"` : ''}><span class="prop-k">${esc(key)}</span><span class="prop-v">${value}</span></${tag}>`;
+  };
+  const dot = '<i class="prop-dot" aria-hidden="true"></i>';
+  const statusValue = c.canEdit
+    ? `${dot}<select data-case-status data-id="${c.id}" data-value="${esc(c.status)}" aria-label="Status der Akte">${Object.entries(CASE_STATUS)
         .map(([k, [l]]) => opt(k, l, c.status === k))
-        .join('')}</select></label>${
-        staff
-          ? `<label class="case-sel prio-${c.priority || 2}"><span>Priorität</span><select class="field" data-case-priority data-id="${c.id}" data-value="${c.priority || 2}" aria-label="Priorität der Akte">${Object.entries(PRIORITY)
-              .map(([k, [l]]) => opt(k, l, Number(k) === (c.priority || 2)))
-              .join('')}</select></label>`
-          : ''
-      }${urgHint}`
-    : `${memberBadge(c.membership)}${statusBadge(CASE_STATUS, c.status)}${caseLevelBadge(c)}${urgHint}`;
+        .join('')}</select>`
+    : `${dot}<span>${esc((CASE_STATUS[c.status] || [c.status])[0])}</span>`;
+  const prioValue = c.canEdit
+    ? `${prioBars(prio)}<select data-case-priority data-id="${c.id}" data-value="${prio}" aria-label="Priorität der Akte">${Object.entries(PRIORITY)
+        .map(([k, [l]]) => opt(k, l, Number(k) === prio))
+        .join('')}</select>`
+    : `${prioBars(prio)}<span>${esc(PRIORITY[prio][0])}</span>`;
+  const urgency = URGENCY[c.urgency] ? URGENCY[c.urgency][0] : c.urgency;
+  const headProps = [
+    prop(`prop-status st-${esc(c.status)}`, 'Status', statusValue),
+    staff ? prop(`prop-prio prio-${prio}`, 'Priorität', prioValue) : '',
+    // Kanzlei: Angabe des Mandanten nur als Hinweis neben der Priorität (wenn mehr als „Normal“);
+    // der Mandant sieht hier seine eigene Dringlichkeit
+    staff && c.urgency !== 'normal'
+      ? prop(`prop-urg urg-${esc(c.urgency)}`, 'Mandant', esc(urgency), 'Dringlichkeit, die der Mandant beim Einreichen angegeben hat')
+      : '',
+    staff ? '' : prop(`prop-urg urg-${esc(c.urgency)}`, 'Dringlichkeit', esc(urgency), 'Ihre Angabe beim Einreichen'),
+    memberBadge(c.membership),
+  ].join('');
 
   const claim = c.canClaim
     ? `<div class="banner banner-amber items-center justify-between flex-wrap"><div>${icon('alert')} Diese Akte hat noch keinen zuständigen Anwalt.</div><button class="btn-gold btn-sm" data-action="claim-case" data-id="${c.id}">Akte übernehmen</button></div>`
@@ -538,10 +550,10 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     .join('')}</div></nav>`;
 
   return `
-      <div class="case-head mb-5 pr-12">
-        <div class="min-w-0"><div class="font-mono text-gold text-sm">${esc(c.caseNumber)}</div>
+      <div class="case-head mb-5">
+        <div class="pr-12"><div class="font-mono text-gold text-sm">${esc(c.caseNumber)}</div>
           <h2 id="modalTitle" class="font-serif text-2xl md:text-3xl font-semibold leading-tight">${esc(c.title)}</h2></div>
-        <div class="case-controls">${headControls}</div>
+        <div class="case-props">${headProps}</div>
       </div>
       ${jumpBar}
       ${claim}

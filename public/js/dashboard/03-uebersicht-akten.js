@@ -286,7 +286,7 @@ function caseCount(f) {
   return st.cases.filter((c) => caseMatches(c, f)).length;
 }
 /** Markierung „liegt seit X Tagen“ (offene Akte ohne Aktivität, Schwelle in den Einstellungen). */
-const idleBadge = (c) => (c.idleDays ? `<span class="badge badge-amber idle-badge" title="Seit ${c.idleDays} Tagen keine Aktivität in dieser Akte">liegt seit ${c.idleDays} T.</span>` : '');
+const idleBadge = (c) => (c.idleDays ? `<span class="badge badge-amber idle-badge" title="Seit ${c.idleDays} Tagen keine Aktivität in dieser Akte">liegt seit ${c.idleDays} Tagen</span>` : '');
 /** VIP / Lifetime des Mandanten als Badge. */
 function memberBadge(m) {
   if (!m) return '';
@@ -298,9 +298,10 @@ const memberRank = (c) => (c.status === 'geschlossen' || !c.membership ? 0 : c.m
 function priorityBadge(c) {
   const p = PRIORITY[c.priority] ? c.priority : 2;
   const [, color, text] = PRIORITY[p];
-  const bars = [1, 2, 3, 4].map((i) => `<i class="${i <= p ? 'on' : ''}"></i>`).join('');
-  return `<span class="badge badge-${color} prio-badge"><span class="prio-bars" aria-hidden="true">${bars}</span>${esc(text)}</span>`;
+  return `<span class="badge badge-${color} prio-badge">${prioBars(p)}${esc(text)}</span>`;
 }
+/** Stufen-Anzeige der Priorität (1–4 Balken). */
+const prioBars = (p) => `<span class="prio-bars" aria-hidden="true">${[1, 2, 3, 4].map((i) => `<i class="${i <= p ? 'on' : ''}"></i>`).join('')}</span>`;
 const caseTime = (c, key) => parseDate(c[key])?.getTime() || 0;
 const URGENCY_RANK = { normal: 0, eilig: 1, notfall: 2 };
 
@@ -335,12 +336,12 @@ function caseTable() {
       .map(
         (c) => `<tr class="row" data-action="open-case" data-id="${c.id}">
           <td class="td-main"><div class="font-mono text-gold text-xs">${esc(c.caseNumber)}</div><div class="font-medium">${esc(c.title)}${c.chatUnread ? ` <span class="chat-new" title="Neue Nachrichten">${icon('chat', 'ico-sm')}${c.chatUnread}</span>` : ''}</div>
-            <div class="text-xs text-dim mt-1 flex flex-wrap items-center gap-2">${esc(AREAS[c.area] || c.area)}${staff ? '' : caseLevelBadge(c)}</div></td>
+            <div class="text-xs text-dim mt-1 flex flex-wrap items-center gap-2">${esc(AREAS[c.area] || c.area)}${staff ? idleBadge(c) : caseLevelBadge(c)}</div></td>
           ${staff ? `<td data-label="Mandant">${esc(c.clientName)}${c.membership ? `<div class="mt-1">${memberBadge(c.membership)}</div>` : ''}</td>` : ''}
           <td data-label="Zuständig">${c.lawyerName ? `${esc(c.lawyerName)}${(c.coLawyers || []).length ? `<div class="text-xs text-dim">+ ${esc(c.coLawyers.map((l) => l.name).join(', '))}</div>` : ''}` : badge('Unbesetzt', 'amber')}</td>
           ${staff ? `<td data-label="Priorität">${priorityBadge(c)}</td>` : ''}
           <td data-label="Status">${statusBadge(CASE_STATUS, c.status)}</td>
-          <td data-label="Aktualisiert" class="text-dim text-xs nowrap">${esc(fmtDate(c.updatedAt))}${staff && c.idleDays ? `<div class="mt-1">${idleBadge(c)}</div>` : ''}</td></tr>`
+          <td data-label="Aktualisiert" class="text-dim text-xs nowrap">${esc(fmtDate(c.updatedAt))}</td></tr>`
       )
       .join('')}</tbody></table></div>`;
 }
