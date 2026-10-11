@@ -305,7 +305,7 @@ const actions = {
   'inv-back': async () => {
     const from = st.invoiceFrom;
     if (!from) return navigate('invoices');
-    await navigate(from.view);
+    await returnToView(from.view);
     await openCase(from.caseId);
   },
   'inv-add-item': () => {
@@ -490,7 +490,7 @@ const actions = {
           <a class="btn-ghost btn-md" href="${esc(a.url)}" download>${icon('download', 'ico-sm')}<span>Herunterladen</span></a>
           ${canDelete ? `<button class="btn-danger btn-md" data-action="att-delete" data-id="${a.id}" data-case-id="${caseId}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>` : ''}
         </div>`,
-      { wide: true, light: true }
+      { wide: true }
     );
   },
   'att-delete': async (el) => {
@@ -772,6 +772,10 @@ const actions = {
   },
   'scroll-to': (el) => {
     $('#' + el.dataset.target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (el.closest('.case-jump')) {
+      caseJumpPinned = el.dataset.target; // Reiter bleibt markiert, bis man selbst scrollt
+      markCaseJump();
+    }
   },
 
   // FiveNet-Dokumente

@@ -504,8 +504,8 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     ['secWork', 'Zeiten', 0, parts.work],
     ['secNotes', 'Verlauf', 0, true],
   ].filter((j) => j[3]);
-  const jumpBar = `<nav class="case-jump" aria-label="Abschnitte der Akte"><div class="chip-row">${jumps
-    .map(([id, label, n]) => `<button type="button" class="chip" data-action="scroll-to" data-target="${id}">${esc(label)}${n ? ` <span class="chip-count">${n}</span>` : ''}</button>`)
+  const jumpBar = `<nav class="case-jump" aria-label="Abschnitte der Akte"><div class="case-jump-list">${jumps
+    .map(([id, label, n]) => `<button type="button" class="jump" data-action="scroll-to" data-target="${id}">${esc(label)}${n ? `<span class="jump-n">${n}</span>` : ''}</button>`)
     .join('')}</div></nav>`;
 
   return `

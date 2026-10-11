@@ -87,16 +87,13 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
     await page.click('[data-act="ticket"][data-source="calc"]');
     await page.waitForFunction(() => !document.getElementById('ticketModal').classList.contains('opacity-0'));
     assert.match(await page.inputValue('#tkDesc'), /Gewünschte Leistungen/, 'Auswahl aus dem Rechner übernommen');
-    // Klick daneben: mit angefangenem Sachverhalt bleibt das Fenster offen, leer geht es zu; Esc schließt immer
+    // Klick daneben schließt das Fenster – die Eingaben bleiben erhalten; Esc schließt ebenso
     await page.mouse.click(5, 5);
-    await page.waitForTimeout(300);
-    assert.equal(await page.$eval('#ticketModal', (m) => m.classList.contains('opacity-0')), false, 'mit Text bleibt das Fenster offen');
-    await page.keyboard.press('Escape');
     await page.waitForFunction(() => document.getElementById('ticketModal').classList.contains('opacity-0'));
     await page.locator('[data-act="ticket"]').nth(1).click();
     await page.waitForFunction(() => !document.getElementById('ticketModal').classList.contains('opacity-0'));
-    await page.fill('#tkDesc', '');
-    await page.mouse.click(5, 5);
+    assert.match(await page.inputValue('#tkDesc'), /Gewünschte Leistungen/, 'Eingaben bleiben erhalten');
+    await page.keyboard.press('Escape');
     await page.waitForFunction(() => document.getElementById('ticketModal').classList.contains('opacity-0'));
     await page.locator('[data-act="faq"]').first().click();
     assert.ok(await page.$('.faq-item.open'), 'FAQ klappt auf');
@@ -162,11 +159,11 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.waitForSelector('#modalBody #secContracts', { timeout: 5000 });
         assert.ok(await page.evaluate((n) => document.querySelector('#modal').classList.contains('open') && document.querySelector('#modalBody').textContent.includes(n), data.caseNumber), `${what}: zurück in der Akte`);
       };
-      // Am Handy scrollt das Fenster selbst, am PC die Fläche dahinter
-      const scroller = device === PHONE ? '#modalBody' : '#modal';
+      // Der Inhalt scrollt im Fenster selbst (das X oben bleibt stehen)
+      const scroller = '#modalBody';
       const scrollTop = () => page.$eval(scroller, (el) => el.scrollTop);
 
-      // X, Esc und Abbrechen in einem Unterfenster → zurück in die Akte (an dieselbe Stelle)
+      // X, Esc, Klick daneben und Abbrechen in einem Unterfenster → zurück in die Akte (an dieselbe Stelle)
       await page.$eval('#modalBody [data-action="contract-new"]', (el) => el.scrollIntoView({ block: 'center' }));
       await page.waitForTimeout(300);
       const before = await scrollTop();
@@ -180,14 +177,10 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       await page.waitForSelector('#modalBody form[data-form="brief-new"]');
       await page.keyboard.press('Escape');
       await backInCase('Schriftsatz → Esc');
-      // Klick neben das Fenster schließt nichts – weder das Unterfenster noch die Akte
       await page.click('#modalBody [data-action="task-new"]');
       await page.waitForSelector('#modalBody form[data-form="task"]');
       await page.mouse.click(5, 5);
-      await page.waitForTimeout(300);
-      assert.ok(await page.$('#modalBody form[data-form="task"]'), 'Aufgabe: Klick daneben lässt das Fenster offen');
-      await page.click('.modal-close');
-      await backInCase('Aufgabe → X');
+      await backInCase('Aufgabe → Klick daneben');
       await page.click('#modalBody [data-action="new-event"]');
       await page.waitForSelector('#modalBody form[data-form="event"]');
       await page.click('#modalBody form[data-form="event"] [data-action="close-modal"]');
@@ -207,12 +200,16 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       await page.click('#invoiceForm [data-action="inv-back"]');
       await backInCase('Rechnung → Abbrechen');
 
-      // Die Akte selbst: Klick daneben (rechts daneben, am Handy über dem Fenster) lässt sie offen
-      const [besideX, besideY] = device === PHONE ? [195, 10] : [1340, 450];
-      await page.mouse.click(besideX, besideY);
+      // Weit unten in der Akte: das X bleibt oben rechts sichtbar und klickbar
+      await page.$eval(scroller, (el) => (el.scrollTop = el.scrollHeight));
       await page.waitForTimeout(300);
-      await backInCase('Akte → Klick daneben');
+      const closeVisible = await page.$eval('.modal-close', (x) => {
+        const r = x.getBoundingClientRect();
+        return r.top >= 0 && r.bottom <= window.innerHeight && x.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+      });
+      assert.ok(closeVisible, 'X auch unten in der Akte sichtbar');
       await page.$eval(scroller, (el) => (el.scrollTop = 0));
+      const [besideX, besideY] = device === PHONE ? [195, 10] : [1340, 450];
       if (device === DESKTOP) {
         // Text markieren und erst neben dem Fenster loslassen – auch das schließt nichts
         const t = await page.$eval('#modalTitle', (h) => {
@@ -232,10 +229,17 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       assert.equal(await page.$eval('#modalBody details.more-menu', (d) => d.open), false, 'Esc schließt das Menü');
       await backInCase('Esc im Menü');
 
-      // Erst in der Akte selbst schließt X das Fenster
-      await page.click('.modal-close');
+      // Klick neben die Akte (rechts daneben, am Handy über dem Fenster) schließt sie – dahinter die Aktenliste
+      await page.mouse.click(besideX, besideY);
       await page.waitForFunction(() => !document.querySelector('#modal').classList.contains('open'));
-      // Die Suche (Strg + K) ist ein leichtes Fenster: Klick daneben schließt sie
+      assert.equal(await page.evaluate(() => location.hash), '#cases', 'Akte → Klick daneben: Aktenliste');
+      // Die Zurück-Taste führt danach zur Seite davor – nicht in das abgebrochene Rechnungsformular
+      await page.waitForFunction(() => !history.state && !location.search.includes('case=')); // Eintrag der Akte ist entfernt
+      await page.goBack();
+      await page.waitForTimeout(500);
+      const afterBack = await page.evaluate(() => location.pathname + location.hash);
+      assert.ok(afterBack === '/dashboard.html' || afterBack === '/dashboard.html#overview', `Zurück nach abgebrochener Rechnung: Seite davor (${afterBack})`);
+      // Die Suche (Strg + K) schließt ebenso per Klick daneben
       await page.keyboard.press('Control+k');
       await page.waitForSelector('#gsInput');
       await page.mouse.click(besideX, besideY);
@@ -736,13 +740,18 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.waitForSelector('#modalBody .case-jump');
         assert.match(await page.textContent('#modalBody .case-jump [data-target="secInvoices"]'), /Rechnungen\s*1/);
         await page.click('#modalBody .case-jump [data-target="secInvoices"]');
-        await page.waitForTimeout(900);
-        const pos = await page.evaluate((phone) => {
-          const scroller = document.querySelector(phone ? '#modalBody' : '#modal');
-          const top = phone ? scroller.getBoundingClientRect().top : 0;
+        // weich gescrollt – warten, bis der Abschnitt angekommen ist
+        await page.waitForFunction(() => {
+          const sec = document.getElementById('secInvoices').getBoundingClientRect().top;
+          return sec >= document.querySelector('#modalBody .case-jump').getBoundingClientRect().bottom - 2 && sec < window.innerHeight / 2;
+        }, null, { timeout: 5000 });
+        await page.waitForTimeout(300);
+        const pos = await page.evaluate(() => {
+          const scroller = document.querySelector('#modalBody');
+          const top = scroller.getBoundingClientRect().top;
           const bar = document.querySelector('#modalBody .case-jump').getBoundingClientRect();
           return { scrolled: scroller.scrollTop, barTop: Math.round(bar.top - top), barBottom: bar.bottom, sec: document.getElementById('secInvoices').getBoundingClientRect().top };
-        }, device === PHONE);
+        });
         assert.ok(pos.scrolled > 200, `zu den Rechnungen gesprungen (${pos.scrolled})`);
         assert.ok(Math.abs(pos.barTop) <= 2, `Leiste klebt oben (${pos.barTop})`);
         assert.ok(pos.sec >= pos.barBottom - 2 && pos.sec < 844 / 2, `Abschnitt direkt unter der Leiste (${pos.sec} / ${pos.barBottom})`);
