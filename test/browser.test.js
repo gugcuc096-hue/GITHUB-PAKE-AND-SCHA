@@ -1024,13 +1024,26 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         const design = await page.evaluate(() => {
           const shown = (sel) => [...document.querySelectorAll(sel)].filter((e) => e.offsetParent !== null);
           const close = document.querySelector('#modal .modal-close').getBoundingClientRect();
+          // Abstand der Leisten-Knöpfe zum linken und rechten Innenrand der Leiste
+          const strip = document.querySelector('#modalBody .idle-strip .ticket-strip');
+          const cs = getComputedStyle(strip);
+          const sr = strip.getBoundingClientRect();
+          const kids = [...strip.querySelectorAll('.ts-actions > *')].map((e) => e.getBoundingClientRect());
           return {
             sm: [...new Set(shown('#modalBody .btn-sm').filter((e) => !e.closest('.case-quick')).map((e) => Math.round(e.getBoundingClientRect().height)))],
             close: [Math.round(close.width), Math.round(close.height), getComputedStyle(document.querySelector('#modal .modal-close')).borderTopLeftRadius],
+            strip: [
+              Math.round(kids[0].left - (sr.left + parseFloat(cs.borderLeftWidth) + parseFloat(cs.paddingLeft))),
+              Math.round(sr.right - parseFloat(cs.borderRightWidth) - parseFloat(cs.paddingRight) - kids[kids.length - 1].right),
+            ],
           };
         });
         assert.deepEqual(design.sm, [36], `kleine Knöpfe gleich hoch: ${design.sm}`);
         assert.deepEqual(design.close, [40, 40, '999px'], 'Schließen-Knopf rund');
+        // Knöpfe der Leiste: am PC rechts angehängt, am Handy über die ganze Zeile (wie die Schnellaktionen)
+        const [gapL, gapR] = design.strip;
+        if (device === PHONE) assert.ok(Math.abs(gapL) <= 1 && Math.abs(gapR) <= 1, `Leisten-Knöpfe füllen am Handy die Zeile (${design.strip})`);
+        else assert.ok(gapR <= 1 && gapL > 100, `Leisten-Knöpfe am PC rechts (${design.strip})`);
         // Eine Zeile: Titel und Knopf stehen am PC auf gleicher Höhe
         if (device === DESKTOP) {
           const [t, b] = await page.$$eval('#modalBody #secBriefs > *', (els) => [els[0].getBoundingClientRect().top, els[2].getBoundingClientRect().top]);

@@ -154,8 +154,6 @@ input[type="datetime-local"].field, input[type="date"].field { color-scheme: dar
 @media (max-width: 639px) {
   .case-quick { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; align-items: stretch; }
   .case-quick > .btn-outline, .case-quick > .btn-ghost, .case-quick > .more-menu > summary { width: 100%; padding-left: 0.6rem; padding-right: 0.6rem; white-space: normal; text-align: center; line-height: 1.2; }
-  /* Knöpfe in Leisten (Tickets, „liegt seit …“): gleich breit über die ganze Zeile statt rechts angehängt */
-  .ticket-strip .ts-actions { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); width: 100%; margin-left: 0; }
   .case-quick > .more-menu { grid-column: 1 / -1; display: block; }
   .case-quick .more-pop { left: 0; right: 0; min-width: 0; }
 }
@@ -1191,6 +1189,12 @@ body.ps-dialog-open { overflow: hidden; }
 .ticket-strip .ts-title .ico { width: 15px; height: 15px; color: #8c96ff; flex: none; }
 .ticket-strip .ts-label { color: var(--text-muted); overflow-wrap: anywhere; }
 .ticket-strip .ts-actions { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-left: auto; flex: 0 0 auto; }
+/* Am Handy füllen die Knöpfe einer Leiste (Tickets, „liegt seit …“) die ganze Zeile – wie die Schnellaktionen der Akte –
+   statt rechts angehängt; lange Beschriftungen brechen in die nächste Zeile um */
+@media (max-width: 639px) {
+  .ticket-strip .ts-actions { width: 100%; margin-left: 0; }
+  .ticket-strip .ts-actions > * { flex: 1 1 auto; }
+}
 .ticket-strip.strip-amber { border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.07); }
 .ticket-strip.strip-amber .ts-title { color: #fde68a; }
 .ticket-strip.strip-amber .ts-title .ico { color: #fbbf24; }
