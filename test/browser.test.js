@@ -949,7 +949,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.waitForSelector('#modalBody .case-head');
         await settle();
         assert.equal(await page.inputValue('#modalBody [data-case-priority]'), '3');
-        assert.equal((await page.textContent('#modalBody .prop-urg')).replace(/\s+/g, ' ').trim(), 'Mandant Eilig');
+        assert.equal((await page.textContent('#modalBody .prop-urg .prop-k')).trim(), 'Mandant');
+        assert.equal((await page.textContent('#modalBody .prop-urg .prop-v')).trim(), 'Eilig');
         // Kopf nicht gequetscht: Titel über die volle Breite, die Felder darunter in einer eigenen Zeile
         const [titleBox, propsBox] = await page.$$eval('#modalBody .case-head > *', (els) => els.map((e) => e.getBoundingClientRect().toJSON()));
         assert.ok(propsBox.top >= titleBox.bottom - 1, 'Felder unter dem Titel');
