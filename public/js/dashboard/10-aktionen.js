@@ -333,6 +333,13 @@ const actions = {
     await returnToView(from.view);
     await openCase(from.caseId);
   },
+  'inv-from-contract': async () => {
+    const d = st.draft;
+    if (d.items.length && !(await ask('Die bisherigen Positionen werden durch die Leistungen aus dem Vertrag ersetzt.', { title: 'Positionen ersetzen?', confirmText: 'Ersetzen' }))) return;
+    applyContractItems(d);
+    renderView();
+    toast('Leistungen aus dem Vertrag übernommen.');
+  },
   'inv-add-item': () => {
     st.draft.items.push({ description: '', quantity: 1, unitPrice: 0 });
     renderView();

@@ -173,6 +173,7 @@ function caseRow(c, u) {
     source: c.source,
     // Nur für die Kanzlei: Priorität und Prozessticket (z. B. Kanal beim DOJ)
     priority: staff ? c.priority || 2 : undefined,
+    outcome: staff ? c.outcome || null : undefined, // Ergebnis beim Abschluss (intern)
     processTicket: staff && c.process_ticket_url ? { url: c.process_ticket_url, label: c.process_ticket_label || '' } : undefined,
     // Für die Aktensuche per FiveNet-/Google-Docs-Link oder Dokument-ID (nur Team).
     externalDocIds: staff ? String(c.external_doc_ids || '').split(' ').filter(Boolean) : undefined,
@@ -472,6 +473,8 @@ function teamRow(t, withAdminFields = false) {
     // Eigenes Team-Foto hat Vorrang, sonst das Profilbild des verknüpften Kontos.
     photoUrl: teamPhotoUrl(t.photo) || avatarUrl(t.user_avatar) || null,
     duty: t.user_duty_status && t.user_duty_status !== 'off' && t.user_active !== 0 ? t.user_duty_status : null,
+    // Startseite: „Direkt anfragen“ – nur mit aktivem Anwalts-/Board-Konto (die Anfrage landet dann bei ihm)
+    bookable: !!(t.user_id && t.user_active && ['anwalt', 'admin'].includes(t.user_role)),
   };
   if (withAdminFields) {
     row.hasOwnPhoto = !!t.photo;

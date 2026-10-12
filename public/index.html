@@ -780,6 +780,9 @@
                 <h2 class="font-serif text-4xl md:text-5xl font-semibold mb-4">Mandantenstimmen</h2>
             </div>
 
+            <!-- Erfolge live aus dem Dashboard (abschaltbar unter Einstellungen → Website) -->
+            <div id="firmStats" class="hidden mb-10"></div>
+
             <div class="relative overflow-hidden">
                 <div id="testimonialTrack" class="flex">
                     <div class="w-full shrink-0 px-2">
@@ -1090,6 +1093,15 @@
             <p class="text-xs text-[var(--text-muted)] mb-6">Bitte füllen Sie das Formular aus. Ein Anwalt wird Ihre Anfrage umgehend prüfen. Sie erhalten sofort ein Aktenzeichen – ganz ohne Konto.</p>
 
             <form id="ticketForm" class="space-y-4" novalidate>
+                <!-- Wunschanwalt (Teamkarte „Direkt anfragen“): die Anfrage landet direkt bei ihm -->
+                <div id="tkLawyer" class="hidden items-center gap-3 rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] px-4 py-3">
+                    <div class="min-w-0 flex-1">
+                        <div class="text-[0.6rem] uppercase tracking-widest text-[var(--text-muted)]">Ihre Anfrage geht direkt an</div>
+                        <div id="tkLawyerName" class="text-sm text-[var(--gold-light)] font-medium truncate"></div>
+                    </div>
+                    <button type="button" data-act="ticket-lawyer-clear" class="shrink-0 text-xs text-[var(--text-muted)] hover:text-white hover:underline px-2 py-2">An alle senden</button>
+                    <input type="hidden" name="teamMemberId" value="">
+                </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label for="tkName" class="block text-xs uppercase tracking-wider text-[var(--text-muted)] mb-1">Vollständiger Name</label>

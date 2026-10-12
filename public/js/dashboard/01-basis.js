@@ -24,6 +24,18 @@ const STEP_BREAKS = { Akteneinsicht: 'Akten\u00adeinsicht', Verhandlung: 'Ver\u0
 const AREAS = { strafrecht: 'Strafrecht', zivilrecht: 'Zivilrecht', verfassungsrecht: 'Verfassungsrecht', vertragsrecht: 'Vertragsrecht', sonstiges: 'Sonstiges' };
 const URGENCY = { normal: ['Normal', 'slate'], eilig: ['Eilig', 'amber'], notfall: ['Notfall', 'red'] };
 const CASE_STATUS = { offen: ['Offen', 'amber'], in_bearbeitung: ['In Bearbeitung', 'sky'], geschlossen: ['Abgeschlossen', 'slate'] };
+// Ergebnis beim Abschluss (nur Kanzlei, wie helpers.OUTCOMES): [Bezeichnung, Erfolg? true/false, null = zählt nicht, kurz]
+const OUTCOMES = {
+  freispruch: ['Freispruch', true, 'Freispruch'],
+  eingestellt: ['Verfahren eingestellt', true, 'Eingestellt'],
+  milderung: ['Strafmilderung erreicht', true, 'Strafmilderung'],
+  gewonnen: ['Gewonnen / Anspruch durchgesetzt', true, 'Gewonnen'],
+  vergleich: ['Vergleich / Einigung', true, 'Vergleich'],
+  verloren: ['Verurteilt / verloren', false, 'Verloren'],
+  erledigt: ['Ohne Verfahren erledigt (Beratung, Vertrag)', null, 'Ohne Verfahren'],
+  beendet: ['Mandat vorzeitig beendet', null, 'Vorzeitig beendet'],
+};
+const outcomeTone = (k) => (!OUTCOMES[k] ? '' : OUTCOMES[k][1] === true ? 'oc-win' : OUTCOMES[k][1] === false ? 'oc-loss' : 'oc-neutral');
 // Priorität einer Akte (nur für die Kanzlei sichtbar)
 // [Auswahl, Farbe, Anzeige]
 const PRIORITY = {

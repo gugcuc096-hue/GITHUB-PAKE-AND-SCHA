@@ -236,6 +236,77 @@ function filterInvoiceFees(q) {
   $('#feeNone')?.classList.toggle('hidden', hits > 0);
 }
 
+/* ---------------------------------------------------------------- Rechnung aus dem Mandatsvertrag */
+/**
+ * Vertrag der gewählten Akte holen (Leistungen, Summe laut Vertrag, schon erstellte Rechnungen). auto: Positionen gleich
+ * übernehmen, wenn noch keine da sind und für die Akte noch nichts abgerechnet wurde. Liefert true, wenn übernommen.
+ */
+async function loadContractBilling(d, auto = false) {
+  const caseId = d.caseId;
+  if (!caseId) {
+    d.billing = null;
+    return false;
+  }
+  if (d.billing && d.billing.caseId === caseId) return false;
+  let r;
+  try {
+    r = await api.get(`/api/cases/${caseId}/contracts/billing`);
+  } catch {
+    r = { contract: null, items: [], invoices: [] };
+  }
+  if (st.draft !== d || d.caseId !== caseId) return false;
+  d.billing = { caseId, ...r };
+  if (auto && r.contract && !d.items.length && !r.invoices.length) {
+    applyContractItems(d);
+    return true;
+  }
+  return false;
+}
+/** Leistungen des Vertrags als Positionen (zum regulären Preis; passende Leistungen der Honorarordnung sind angehakt). */
+function applyContractItems(d) {
+  const b = d.billing;
+  if (!b || !b.contract || !b.items.length) return;
+  const feeByName = new Map(st.fees.map((f) => [f.name.trim().toLowerCase(), f]));
+  d.items = b.items.map((it) => {
+    const fee = feeByName.get(it.description.trim().toLowerCase());
+    return fee ? { feeId: fee.id, ...it } : { ...it };
+  });
+  if (!d.notes) d.notes = `Abrechnung gemäß ${b.contract.templateName}${b.contract.date ? ` vom ${b.contract.date}` : ''}.`;
+  d.fromContract = b.contract.id;
+}
+function contractStripHtml(d) {
+  const b = d.billing;
+  if (!b || !b.contract) return '';
+  const k = b.contract;
+  const applied = d.fromContract === k.id;
+  const state = { unterschrieben: 'unterschrieben', teilweise: 'teilweise unterschrieben' }[k.status] || 'Entwurf';
+  const billed = b.invoices.length
+    ? `<span class="ts-label">· bereits erstellt: ${b.invoices.map((i) => `<span class="font-mono">${esc(i.number)}</span> (${esc(money(i.total))})`).join(', ')}</span>`
+    : '';
+  return `<div class="ticket-strips">${ticketStrip({
+    title: applied ? 'Aus dem Vertrag übernommen' : 'Vertrag vorhanden',
+    ico: icon('doc'),
+    tone: 'gold',
+    badges: `<span class="ts-label">${esc(k.templateName)} · ${state} · laut Vertrag ${esc(money(k.total))}${k.discount ? ` (${esc(k.discount)})` : ''}</span>${billed}`,
+    actions: applied ? '' : `<button type="button" class="btn-outline btn-sm" data-action="inv-from-contract">${icon('plus', 'ico-sm')}<span>Leistungen übernehmen</span></button>`,
+    hint: [
+      applied ? 'Regulärer Preis je Leistung – VIP/Lifetime und Kooperation werden unten wie bei jeder Rechnung abgezogen.' : '',
+      k.extraFee ? `Zusatzgebühr laut Vertrag: ${esc(k.extraFee)} – bei Bedarf als freie Position ergänzen.` : '',
+    ]
+      .filter(Boolean)
+      .join(' '),
+  })}</div>`;
+}
+/** Summenbox: Betrag laut Vertrag – mit Hinweis, wenn die Rechnung davon abweicht (Rundung je Position zählt nicht). */
+function contractCompareHtml(d, t) {
+  const k = d.billing && d.billing.contract;
+  if (!k || d.fromContract !== k.id) return '';
+  const tolerance = Math.max(1, d.items.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0));
+  const off = Math.abs(t.total - k.total) > tolerance;
+  return `<div class="sum-row mt-2"><span class="text-muted">Laut Vertrag</span><span class="v">${money(k.total)}</span></div>
+      ${off ? `<p class="form-hint" style="color:#fcd34d">${icon('alert', 'ico-sm')} Weicht vom Vertrag ab – z. B. weil Positionen geändert wurden oder VIP/Kooperation nicht mehr gilt.</p>` : ''}`;
+}
+
 /** Nur die Zahlen der Summenbox – wird beim Tippen aktualisiert, der Button bleibt stehen. */
 function summaryFiguresHtml() {
   const d = st.draft;
@@ -250,7 +321,8 @@ function summaryFiguresHtml() {
       ${t.sp ? `<div class="sum-row" style="color:#fcd34d"><span>Zuschlag (${fmtPct(t.sp)} %)</span><span class="v">+ ${money(t.surcharge)}</span></div>` : ''}
       <div class="sum-row sum-total"><span class="font-semibold">Gesamtbetrag</span><span class="v">${money(t.total)}</span></div>
       ${t.mp && !t.total ? `<p class="form-hint">Vollständig abgedeckt – die Rechnung dokumentiert den Wert der Arbeit (${money(t.subtotal)}) und gilt sofort als bezahlt.</p>` : ''}
-      ${t.coopDropped ? '<p class="form-hint">Kooperationsrabatt entfällt – der VIP-/Lifetime-Rabatt ist höher (Rabatte werden nicht addiert).</p>' : ''}`;
+      ${t.coopDropped ? '<p class="form-hint">Kooperationsrabatt entfällt – der VIP-/Lifetime-Rabatt ist höher (Rabatte werden nicht addiert).</p>' : ''}
+      ${contractCompareHtml(d, t)}`;
 }
 function summaryHtml() {
   return `
@@ -347,6 +419,7 @@ views['invoice-new'] = {
     st.memberList = members.memberships;
     if (!st.draft) st.draft = newDraft();
     else if (st.draft.caseId && st.draft.memberId == null) applyCaseToDraft(st.draft, st.draft.caseId);
+    await loadContractBilling(st.draft, true);
     runCoopDetect(); // läuft im Hintergrund, die Seite wartet nicht auf Discord
   },
   render() {
@@ -395,6 +468,7 @@ views['invoice-new'] = {
             </section>
             <section class="panel panel-pad">
               <div class="panel-head"><h2 class="panel-title">Leistungen</h2><button type="button" class="btn-ghost btn-sm" data-action="inv-add-item">${icon('edit', 'ico-sm')}<span>Freie Position</span></button></div>
+              <div id="invContract">${contractStripHtml(d)}</div>
               ${feeList
               ? `<div class="label">Aus der Honorarordnung <span class="text-dim font-normal normal-case tracking-normal">– einfach anhaken, mehrere möglich; Menge rechts</span></div>
                    <input id="feeFilter" type="search" class="field mt-1" placeholder="Leistung suchen …" aria-label="Leistungen durchsuchen" autocomplete="off">
@@ -467,8 +541,14 @@ function onInvoiceChange(t) {
       d.coopId = null;
       d.coopAuto = false;
     }
+    d.billing = null;
     renderView();
     runCoopDetect();
+    loadContractBilling(d, true).then((applied) => {
+      if (st.draft !== d || st.view !== 'invoice-new') return;
+      if (applied) renderView();
+      else if ($('#invContract')) $('#invContract').innerHTML = contractStripHtml(d);
+    });
   } else if (t.name === 'cooperationId') {
     d.coopId = t.value ? Number(t.value) : null;
     d.coopAuto = false;

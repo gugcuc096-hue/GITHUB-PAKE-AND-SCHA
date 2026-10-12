@@ -15,6 +15,7 @@ const {
   PRIORITY_DISCORD,
   PRIORITY_FROM_URGENCY,
   CASE_STATUS,
+  OUTCOMES,
   STEPS,
   truncate,
   MAX_ATTACHMENTS_PER_CASE,
@@ -469,6 +470,7 @@ const updateSchema = z.object({
   status: z.enum(Object.keys(CASE_STATUS)).optional(),
   step: z.number().int().min(0).max(3).optional(),
   priority: z.number().int().min(1).max(4).optional(), // nur Kanzlei, intern
+  outcome: z.enum(Object.keys(OUTCOMES)).optional(), // Ergebnis beim Abschluss – nur Kanzlei, intern
   publicNote: z.string().trim().max(500).optional(),
   lawyerId: z.number().int().positive().nullable().optional(),
   // Vollständige Liste der weiteren Anwälte (ersetzt die bisherige)
@@ -589,8 +591,13 @@ router.patch(
     }
 
     const editFields = Object.keys(FIELD_COLUMNS).filter((k) => d[k] !== undefined);
-    const wantsEdit = editFields.length > 0 || d.status !== undefined || d.priority !== undefined;
+    const wantsEdit = editFields.length > 0 || d.status !== undefined || d.priority !== undefined || d.outcome !== undefined;
     if (d.priority !== undefined && !isStaff(u)) return res.status(403).json({ error: 'Die Priorität legen nur die Anwälte fest.' });
+    if (d.outcome !== undefined && !isStaff(u)) return res.status(403).json({ error: 'Das Ergebnis hält die Kanzlei fest.' });
+    // Ergebnis: beim Abschließen oder an einer bereits abgeschlossenen Akte (Korrektur)
+    if (d.outcome !== undefined && (newStatus || c.status) !== 'geschlossen') {
+      return res.status(400).json({ error: 'Das Ergebnis wird beim Abschließen der Akte festgehalten.' });
+    }
     // Wer die Akte gerade selbst übernommen hat, darf im selben Schritt weiterarbeiten.
     const canEditNow = access.canEdit || (lawyerChanged && leadAfter === u.id);
     if (wantsEdit && !canEditNow) {
@@ -608,6 +615,12 @@ router.patch(
       sets.push('priority = ?');
       values.push(d.priority);
       internalHistory.push(`Priorität: ${PRIORITIES[d.priority]}`);
+    }
+    // Ergebnis ist ebenfalls intern (Statistik der Kanzlei) – nicht im Ticket, nicht für den Mandanten
+    if (d.outcome !== undefined && d.outcome !== c.outcome) {
+      sets.push('outcome = ?');
+      values.push(d.outcome);
+      internalHistory.push(`Ergebnis: ${OUTCOMES[d.outcome].label}`);
     }
     if (newStatus && newStatus !== c.status) {
       sets.push('status = ?');
@@ -646,6 +659,7 @@ router.patch(
         fields: [
           { name: 'Mandant', value: updated.client_account_name || updated.client_name || '—' },
           { name: 'Zuständig', value: lawyerNames(updated) },
+          newStatus === 'geschlossen' && updated.outcome ? { name: 'Ergebnis', value: OUTCOMES[updated.outcome].label } : null,
           { name: 'Geändert von', value: u.display_name },
         ],
       });

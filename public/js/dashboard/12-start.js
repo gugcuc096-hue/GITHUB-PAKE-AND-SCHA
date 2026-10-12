@@ -261,6 +261,10 @@ document.addEventListener('change', (e) => {
     guard(() => setCaseStatus(t));
     return;
   }
+  if (t.dataset.caseOutcome !== undefined) {
+    guard(() => setCaseOutcome(t));
+    return;
+  }
   if (t.id === 'tierKind') {
     $('#tierDuration')?.classList.toggle('hidden', t.value === 'perma');
     return;

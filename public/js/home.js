@@ -12,6 +12,7 @@ const PAGE_ACTIONS = {
     menu: () => toggleMobileMenu(),
     ticket: (el) => openTicketModal(el.dataset.source),
     'ticket-close': () => closeTicketModal(),
+    'ticket-lawyer-clear': () => setWishLawyer(null),
     concern: (el) => window.openConcernModal(el.dataset.mode || undefined),
     'concern-close': () => window.closeConcernModal(),
     faq: (el) => toggleFaq(el),
@@ -35,10 +36,11 @@ document.getElementById('ticketForm').addEventListener('submit', (e) => window.h
 
 /* ---------- Modal Control ---------- */
 // Das Absenden (handleFormSubmit) übernimmt /js/site.js.
-function openTicketModal(source) {
+function openTicketModal(source, lawyer = null) {
     const modal = document.getElementById('ticketModal');
     document.getElementById('ticketFormWrap').classList.remove('hidden');
     document.getElementById('ticketSuccess').classList.add('hidden');
+    setWishLawyer(lawyer); // „Direkt anfragen“ auf einer Teamkarte – alle anderen Knöpfe senden an die ganze Kanzlei
     // Auswahl aus dem Tarifrechner in den Sachverhalt übernehmen
     if (source === 'calc') {
         const picked = Array.from(document.querySelectorAll('.calc-check:checked:not(#priorityAddon)')).map((cb) => cb.getAttribute('data-name'));
@@ -52,6 +54,17 @@ function openTicketModal(source) {
     document.body.style.overflow = 'hidden';
     setTimeout(() => { if (window.matchMedia('(min-width: 768px)').matches) document.getElementById('tkName').focus(); }, 50);
 }
+/** Wunschanwalt im Mandatsformular setzen ({ id, name } der Teamkarte) oder entfernen (null). */
+function setWishLawyer(lawyer) {
+    const box = document.getElementById('tkLawyer');
+    if (!box) return;
+    box.querySelector('[name="teamMemberId"]').value = lawyer ? String(lawyer.id) : '';
+    document.getElementById('tkLawyerName').textContent = lawyer ? lawyer.name : '';
+    box.classList.toggle('hidden', !lawyer);
+    box.classList.toggle('flex', !!lawyer);
+}
+window.openTicketModal = openTicketModal;
+window.setWishLawyer = setWishLawyer;
 function closeTicketModal() {
     const modal = document.getElementById('ticketModal');
     modal.classList.add('opacity-0', 'pointer-events-none');

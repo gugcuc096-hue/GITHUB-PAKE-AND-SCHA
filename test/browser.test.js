@@ -35,7 +35,9 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
     const web = await client(server.base).post('/api/public/cases', { name: 'Paul Probe', area: 'zivilrecht', description: 'Testanfrage für die Browser-Tests der Kanzlei.' });
     data.caseNumber = web.json.caseNumber;
     const admin = client(server.base);
-    await admin.login(TEAM.admin);
+    // angemeldeter Kanzlei-Zugang für Testdaten in den Tests (der Server erlaubt nur 20 Anmeldungen je 15 Minuten)
+    data.adminMe = await admin.login(TEAM.admin);
+    data.admin = admin;
     data.caseId = (await admin.get('/api/cases')).json.cases.find((c) => c.caseNumber === data.caseNumber).id;
     data.invoiceId = (await admin.post('/api/invoices', { caseId: data.caseId, items: [{ description: 'Beratung', quantity: 1, unitPrice: 15000 }] })).json.invoice.id;
     // In der Akte hinterlegte FiveNet-Dokumente (Aktenzeichen für Anträge) – das zuletzt verknüpfte steht oben
@@ -576,8 +578,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
   for (const [label, device] of [['PC', DESKTOP], ['Handy', PHONE]]) {
     it(`Mandantenkartei am ${label}: Liste, Name in der Akte öffnet die Kartei, Notiz, Vermerk in der Akte`, async () => {
       const { ctx, page, problems, settle } = await open(device);
-      const adm = client(server.base);
-      await adm.login(TEAM.admin);
+      const adm = data.admin;
       try {
         await login(page, TEAM.admin);
         await page.evaluate(() => (location.hash = '#clients'));
@@ -613,6 +614,91 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       } finally {
         await adm.put(`/api/clients/${encodeURIComponent('n:paul probe')}/flag`, { flag: '' }); // andere Tests sehen die Akte ohne Vermerk
         await ctx.close();
+      }
+    });
+  }
+
+  for (const [label, device] of [['PC', DESKTOP], ['Handy', PHONE]]) {
+    it(`Rechnung aus dem Vertrag, Abschluss mit Ergebnis und „Direkt anfragen“ am ${label}`, async () => {
+      const { ctx, page, problems, settle } = await open(device);
+      const adm = data.admin;
+      const me = data.adminMe;
+      // Akte mit Mandatsvertrag (zwei Leistungen) und einer offenen Aufgabe
+      const kase = (await adm.post('/api/cases', { title: `Rechnung aus dem Vertrag (${label})`, area: 'strafrecht', clientName: `Vera Vertrag ${label}`, lawyerId: me.id })).json.case;
+      const { templates } = (await adm.get('/api/contract-templates')).json;
+      const k = await adm.post(`/api/cases/${kase.id}/contracts`, {
+        templateId: templates.find((t) => t.key === 'mandatsvertrag').id,
+        lawyerId: me.id,
+        data: {},
+        services: [
+          { name: 'Erstberatung', price: 15000, qty: 1 },
+          { name: 'Haftprüfung', price: 10000, qty: 2 },
+        ],
+      });
+      assert.equal(k.status, 201, k.text);
+      await adm.post('/api/tasks', { title: `Akteneinsicht anfordern (${label})`, caseId: kase.id });
+      let site = null;
+      try {
+        await login(page, TEAM.admin);
+        await page.goto(server.base + `/dashboard.html?case=${kase.id}#cases`);
+        await page.waitForSelector('#modalBody .case-head');
+        await settle();
+        // „Rechnung“ in der Akte: Leistungen aus dem Vertrag stehen schon drin
+        await page.click(`#modalBody [data-action="new-invoice"][data-case-id="${kase.id}"]`);
+        await page.waitForSelector('#invContract .ticket-strip');
+        assert.match(await page.textContent('#invContract'), /Aus dem Vertrag übernommen/);
+        assert.equal(await page.$$eval('#invItems .item-row', (r) => r.length), 2);
+        assert.match(await page.textContent('#invSumFigures'), /Laut Vertrag\s*35\.000/);
+        if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Rechnung passt aufs Handy');
+        await page.click('[data-action="inv-back"]');
+        await page.waitForSelector('#modalBody .case-head');
+        await settle();
+        // Abschließen über den Status: offene Punkte, Ergebnis ist Pflicht
+        await page.selectOption('#modalBody select[data-case-status]', 'geschlossen');
+        await page.waitForSelector('#modalBody form[data-form="case-close"]');
+        const check = await page.textContent('#modalBody .close-check');
+        assert.match(check, /Noch offen/);
+        assert.match(check, new RegExp(`Akteneinsicht anfordern \\(${label}\\)`));
+        assert.match(check, /Mandatsvertrag – noch nicht unterschrieben/);
+        if (device === PHONE) assert.ok((await page.$eval('#modalBody', (b) => b.scrollWidth - b.clientWidth)) <= 1, 'Abschluss passt aufs Handy');
+        await page.click('#modalBody form[data-form="case-close"] button[type=submit]');
+        assert.ok(await page.$('#modalBody form[data-form="case-close"]'), 'ohne Ergebnis wird nicht abgeschlossen');
+        await page.selectOption('#ccOutcome', 'freispruch');
+        await page.click('#modalBody form[data-form="case-close"] button[type=submit]');
+        await page.waitForSelector('#modalBody select[data-case-outcome]');
+        assert.equal(await page.inputValue('#modalBody [data-case-outcome]'), 'freispruch');
+        assert.equal(await page.inputValue('#modalBody [data-case-status]'), 'geschlossen');
+        if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Aktenkopf mit Ergebnis passt aufs Handy');
+
+        assert.deepEqual(problems, []);
+
+        // Startseite (Besucher ohne Anmeldung): „Direkt anfragen“ auf der Teamkarte
+        site = await open(device);
+        const guest = site.page;
+        await guest.goto(server.base + '/');
+        await guest.waitForSelector('#teamGrid [data-wish]');
+        const name = await guest.getAttribute('#teamGrid [data-wish]', 'data-name');
+        await guest.click('#teamGrid [data-wish]');
+        await guest.waitForFunction(() => !document.getElementById('ticketModal').classList.contains('opacity-0'));
+        assert.ok(await guest.isVisible('#tkLawyer'));
+        assert.equal(await guest.textContent('#tkLawyerName'), name);
+        if (device === PHONE) assert.ok((await overflow(guest)) <= 1, 'Mandatsdialog passt aufs Handy');
+        await guest.click('[data-act="ticket-lawyer-clear"]');
+        assert.equal(await guest.isVisible('#tkLawyer'), false, '„An alle senden“ entfernt den Wunschanwalt');
+        if (device === DESKTOP) {
+          // Absenden (nur am PC – die Website nimmt je Stunde nur wenige Anfragen an)
+          await guest.keyboard.press('Escape');
+          await guest.click('#teamGrid [data-wish]');
+          await guest.fill('#tkName', 'Wilma Wunsch');
+          await guest.fill('#tkDesc', 'Ich möchte genau diesen Anwalt für meine Verteidigung.');
+          await guest.click('#ticketForm button[type=submit]');
+          await guest.waitForSelector('#ticketSuccess:not(.hidden)');
+          assert.ok((await guest.textContent('#ticketSuccess')).includes(`${name} wurde benachrichtigt`), 'Bestätigung nennt den Wunschanwalt');
+        }
+        assert.deepEqual(site.problems, []);
+      } finally {
+        await ctx.close();
+        if (site) await site.ctx.close();
       }
     });
   }
@@ -1167,18 +1253,23 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
           const [t, b] = await page.$$eval('#modalBody #secBriefs > *', (els) => [els[0].getBoundingClientRect().top, els[2].getBoundingClientRect().top]);
           assert.ok(Math.abs(t - b) < 20, `Schriftsätze in einer Zeile (${t} / ${b})`);
         }
-        // Bearbeitungsstand: fünf Kreise ohne Hinweistext; der fünfte schließt das Verfahren (Rückfrage, Abbrechen ändert
-        // nichts), bei abgeschlossener Akte öffnet ein Schritt sie dort wieder
+        // Bearbeitungsstand: fünf Kreise ohne Hinweistext; der fünfte öffnet den Abschluss-Dialog (X ändert nichts, mit
+        // Ergebnis wird abgeschlossen), bei abgeschlossener Akte öffnet ein Schritt sie dort wieder
         assert.equal(await page.$$eval('#modalBody .track .track-node', (n) => n.length), 5);
         assert.doesNotMatch(await page.textContent('#modalBody .track'), /anklicken/);
         await page.click('#modalBody [data-action="case-close"]');
-        await page.click('.ps-dialog [data-ps-dialog="cancel"]');
-        await page.waitForFunction(() => !document.querySelector('.ps-dialog'));
-        assert.equal(await page.inputValue('#modalBody [data-case-status]'), 'step:0', 'Abbrechen schließt nicht');
+        await page.waitForSelector('#modalBody form[data-form="case-close"]');
+        await page.click('.modal-close');
+        await page.waitForSelector('#modalBody .track');
+        await settle();
+        assert.equal(await page.inputValue('#modalBody [data-case-status]'), 'step:0', 'Schließen ohne Abschluss ändert nichts');
         await page.click('#modalBody [data-action="case-close"]');
-        await page.click('.ps-dialog [data-ps-dialog="ok"]');
+        await page.waitForSelector('#modalBody form[data-form="case-close"]');
+        await page.selectOption('#ccOutcome', 'vergleich');
+        await page.click('#modalBody form[data-form="case-close"] button[type=submit]');
         await page.waitForFunction(() => document.querySelectorAll('#modalBody .track-node.done').length === 5);
         assert.equal(await page.inputValue('#modalBody [data-case-status]'), 'geschlossen');
+        assert.equal(await page.inputValue('#modalBody [data-case-outcome]'), 'vergleich', 'Ergebnis im Aktenkopf');
         assert.match(await page.textContent('#modalBody .timeline'), /Status: In Bearbeitung → Abgeschlossen/);
         await page.click('#modalBody [data-action="case-reopen"][data-step="2"]');
         await page.click('.ps-dialog [data-ps-dialog="ok"]');

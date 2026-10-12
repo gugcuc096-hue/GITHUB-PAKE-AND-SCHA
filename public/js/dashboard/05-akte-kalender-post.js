@@ -226,8 +226,8 @@ async function setCaseStatus(sel) {
   const v = sel.value;
   try {
     if (v === 'geschlossen') {
-      if (!(await closeCase(id))) sel.value = sel.dataset.value;
-      return;
+      sel.value = sel.dataset.value; // erst der Abschluss-Dialog schließt die Akte
+      return closeCase(id);
     }
     await api.patch('/api/cases/' + id, v.startsWith('step:') ? { status: 'in_bearbeitung', step: Number(v.slice(5)) } : { status: v });
   } catch (err) {
@@ -238,17 +238,73 @@ async function setCaseStatus(sel) {
   await reloadCase(id);
 }
 
-/** Verfahren abschließen – mit Rückfrage, weil Mandant und Discord-Ticket es mitbekommen. false = abgebrochen. */
+/**
+ * Verfahren abschließen: eigenes Fenster über der Akte (X führt zurück) – oben, was noch offen ist (unbezahlte
+ * Rechnungen, fehlende Unterschriften, offene Aufgaben, kommende Termine), darunter das Ergebnis (intern, Grundlage der
+ * Erfolgsquote auf der Startseite). Abschließen geht auch mit offenen Punkten – die Liste dient nur der Kontrolle.
+ */
 async function closeCase(id) {
-  const ok = await ask('Die Akte wird als abgeschlossen markiert. Der Mandant sieht den Abschluss im Portal, ein Discord-Ticket wird archiviert. Wieder öffnen geht jederzeit über den Bearbeitungsstand.', {
-    title: 'Verfahren abschließen?',
-    confirmText: 'Abschließen',
-  });
-  if (!ok) return false;
-  await api.patch('/api/cases/' + id, { status: 'geschlossen' });
-  toast('Verfahren abgeschlossen');
+  const data = await api.get('/api/cases/' + id);
+  openModal(closeCaseHtml(data), { key: `close:${id}` });
+}
+function closeOpenItems({ invoices = [], contracts = [], tasks = [], appointments = [] }) {
+  const now = Date.now();
+  const items = [];
+  invoices
+    .filter((i) => i.status === 'offen')
+    .forEach((i) => items.push([icon('receipt', 'ico-sm'), `${INVOICE_KIND[i.kind] || 'Rechnung'} <span class="font-mono">${esc(i.number)}</span> über ${esc(money(i.total))} ist noch offen${i.overdueDays > 0 ? ` – seit ${dayCount(i.overdueDays)} überfällig` : ''}`]));
+  contracts
+    .filter((k) => !k.internal && k.status !== 'unterschrieben')
+    .forEach((k) => items.push([icon('edit', 'ico-sm'), `${esc(k.templateName)} – ${k.status === 'entwurf' ? 'noch nicht unterschrieben' : 'Unterschrift fehlt noch'}`]));
+  tasks
+    .filter((t) => !t.done)
+    .forEach((t) => items.push([icon('check', 'ico-sm'), `Aufgabe „${esc(t.title)}“${t.dueDate ? ` – fällig ${esc(fmtDateOnly(t.dueDate))}` : ''}`]));
+  appointments
+    .filter((a) => !['abgesagt', 'erledigt'].includes(a.status) && (parseDate(a.startsAt)?.getTime() || 0) > now)
+    .forEach((a) => items.push([icon('calendar', 'ico-sm'), `${esc(a.typeLabel || 'Termin')} „${esc(a.title)}“ am ${esc(fmtDate(a.startsAt))}`]));
+  return items;
+}
+function outcomeOptions(selected = '') {
+  return `<option value="">Bitte wählen …</option>${Object.entries(OUTCOMES)
+    .map(([k, [l]]) => opt(k, l, k === selected))
+    .join('')}`;
+}
+function closeCaseHtml(data) {
+  const c = data.case;
+  const open = closeOpenItems(data);
+  const check = open.length
+    ? `<div class="close-check is-open">
+        <div class="close-check-head">${icon('alert', 'ico-sm')}<span>Noch offen</span><span class="sec-count">${open.length}</span></div>
+        <ul class="close-list">${open.map(([ico, text]) => `<li>${ico}<span>${text}</span></li>`).join('')}</ul>
+        <p class="form-hint">Abschließen geht trotzdem – die Liste ist nur zur Kontrolle.</p>
+      </div>`
+    : `<div class="close-check is-done">${icon('check', 'ico-sm')}<span>Nichts mehr offen: keine unbezahlten Rechnungen, alle Unterschriften da, keine offenen Aufgaben oder Termine.</span></div>`;
+  return `
+      <p class="text-xs uppercase tracking-[0.2em] text-gold mb-1">Akte ${esc(c.caseNumber)}</p>
+      <h2 id="modalTitle" class="modal-title">Verfahren abschließen</h2>
+      <p class="modal-sub">${esc(c.title)}</p>
+      ${check}
+      <form data-form="case-close" data-id="${c.id}" class="form-grid mt-5">
+        <div><label class="label" for="ccOutcome">Ergebnis</label>
+          <select id="ccOutcome" name="outcome" class="field" required>${outcomeOptions(c.outcome || '')}</select>
+          <p class="form-hint">Nur für die Kanzlei – daraus entsteht die Erfolgsquote auf der Startseite. Beratung ohne Verfahren und vorzeitig beendete Mandate zählen dort nicht mit.</p></div>
+        <p class="text-sm text-muted">Der Mandant sieht den Abschluss im Portal, ein Discord-Ticket wird archiviert. Wieder öffnen geht jederzeit über den Bearbeitungsstand.</p>
+        <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('check', 'ico-sm')}<span>Abschließen</span></button></div>
+      </form>`;
+}
+
+/** Ergebnis einer abgeschlossenen Akte nachträglich ändern (Auswahl im Aktenkopf). */
+async function setCaseOutcome(sel) {
+  const id = Number(sel.dataset.id);
+  if (!sel.value) return void (sel.value = sel.dataset.value);
+  try {
+    await api.patch('/api/cases/' + id, { outcome: sel.value });
+  } catch (err) {
+    sel.value = sel.dataset.value;
+    throw err;
+  }
+  toast(`Ergebnis: ${OUTCOMES[sel.value][0]}`);
   await reloadCase(id);
-  return true;
 }
 
 /* ---------------------------------------------------------------- Nachrichten (Chat in Akte und Bewerbung) */
@@ -465,9 +521,19 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
         .join('')}</select>`
     : `${prioBars(prio)}<span>${esc(PRIORITY[prio][0])}</span>`;
   const urgency = URGENCY[c.urgency] ? URGENCY[c.urgency][0] : c.urgency;
+  // Ergebnis (nur Kanzlei, abgeschlossene Akte): zuständige Anwälte ändern es direkt hier
+  const outcomeValue =
+    staff && c.closed
+      ? c.canEdit
+        ? `<select data-case-outcome data-id="${c.id}" data-value="${esc(c.outcome || '')}" aria-label="Ergebnis des Verfahrens">${c.outcome ? '' : '<option value="">Nicht erfasst</option>'}${Object.entries(OUTCOMES)
+            .map(([k, [, , short]]) => opt(k, short, k === c.outcome))
+            .join('')}</select>`
+        : `<span>${esc(c.outcome && OUTCOMES[c.outcome] ? OUTCOMES[c.outcome][2] : 'Nicht erfasst')}</span>`
+      : '';
   const headProps = [
     prop(`prop-status st-${esc(c.status)}`, 'Status', statusValue),
     staff ? prop(`prop-prio prio-${prio}`, 'Priorität', prioValue) : '',
+    outcomeValue ? prop(`prop-outcome ${outcomeTone(c.outcome)}`, 'Ergebnis', outcomeValue, 'Nur für die Kanzlei – Grundlage der Erfolgsquote auf der Startseite') : '',
     // Kanzlei: Angabe des Mandanten nur als Hinweis neben der Priorität (wenn mehr als „Normal“);
     // der Mandant sieht hier seine eigene Dringlichkeit
     staff && c.urgency !== 'normal'

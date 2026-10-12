@@ -599,6 +599,8 @@ addColumn('cases', 'process_ticket_url', 'TEXT');
 addColumn('cases', 'process_ticket_label', 'TEXT');
 // Liegengebliebene Akte: wann der zuständige Anwalt zuletzt daran erinnert wurde (einmal je Ruhephase)
 addColumn('cases', 'idle_notified_at', 'TEXT');
+// Ergebnis beim Abschluss (Freispruch, Vergleich … – helpers.OUTCOMES), nur für die Kanzlei; Grundlage der Erfolgsquote
+addColumn('cases', 'outcome', 'TEXT');
 // Board-Tickets (Discord-Kanal je Bewerbung bzw. Anliegen, nur für das Board of Partners)
 for (const table of ['applications', 'concerns']) {
   addColumn(table, 'discord_channel_id', 'TEXT');
