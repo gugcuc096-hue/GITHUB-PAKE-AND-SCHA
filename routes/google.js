@@ -55,6 +55,8 @@ router.get(
       logActivity(req.user, 'Google-Konto verbunden', 'settings', null, email || '');
       require('../systemAlerts').resolve('google', { title: 'Google Docs wieder verbunden', description: email ? `Konto: ${email}` : '' });
       gdocs.retryPending();
+      gdocs.ensureAll(); // Docs für alle vorhandenen Rechnungen, Verträge und Schriftsätze nachholen
+      require('../driveBackup').afterConnect(); // gleich eine Kopie der Datensicherung in den privaten Ordner
       back('verbunden');
     } catch (err) {
       console.warn('Google-Anmeldung fehlgeschlagen:', err.message);
@@ -124,6 +126,7 @@ router.post(
     if (!t) return;
     if (!drive.connected()) return res.status(409).json({ error: 'Das Google-Konto der Kanzlei ist nicht verbunden (Einstellungen → Integrationen → Google Docs).' });
     const existed = !!gdocs.rowFor(t.kind, t.id);
+    gdocs.optIn(t.kind, t.id); // selbst angelegt → wieder automatisch gepflegt
     const options = t.kind === 'extract' && req.body && typeof req.body.options === 'object' ? req.body.options : undefined;
     const doc = await gdocs.publish(t.kind, t.id, req.user, options);
     const caseId = (gdocs.rowFor(t.kind, t.id) || {}).case_id;
@@ -142,6 +145,7 @@ router.delete(
     const r = gdocs.rowFor(t.kind, t.id);
     if (!r) return res.status(404).json({ error: 'Zu diesem Dokument gibt es kein Google Doc.' });
     await gdocs.remove(t.kind, t.id);
+    gdocs.optOut(t.kind, t.id); // bewusst beendet → nicht automatisch neu anlegen
     logActivity(req.user, 'Google Doc gelöscht', t.kind === 'invoice' ? 'invoice' : 'case', t.kind === 'invoice' ? t.id : r.case_id, LABEL[t.kind]);
     res.json({ success: true });
   })

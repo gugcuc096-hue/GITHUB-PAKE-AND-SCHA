@@ -282,7 +282,7 @@ function googleDocsPanel(g) {
   }
   return `<section class="panel panel-pad mt-4 lg:mt-5">
       <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('doc')} Google Docs</h2>${status}</div>
-      <p class="text-sm text-muted">Rechnungen, Verträge, Schriftsätze und Aktenauszüge lassen sich in der Druckansicht mit „Als Google Doc“ ausgeben – im Layout der Druckansicht, im Google Drive der Kanzlei und für <strong>jeden mit dem Link lesbar</strong>. Unterschriften, Zahlungen und Änderungen übernimmt der Server automatisch; der Link bleibt gleich. Die Druckansicht bleibt wie bisher.</p>
+      <p class="text-sm text-muted">Jede Rechnung, jeder Vertrag und jeder Schriftsatz bekommt <strong>automatisch ein Google Doc</strong> – im Layout der Druckansicht, im Google Drive der Kanzlei und für <strong>jeden mit dem Link lesbar</strong>; Aktenauszüge auf Wunsch über die Druckansicht. Unterschriften, Zahlungen und Änderungen übernimmt der Server automatisch; der Link bleibt gleich. Im Dashboard öffnet der Knopf eines fertigen Dokuments direkt das Google Doc. Außerdem legt der Server jede Nacht eine Kopie der Datensicherung in einem eigenen, <strong>nicht freigegebenen</strong> Ordner ab (Einstellungen → System).</p>
       ${body}
     </section>`;
 }
@@ -556,6 +556,23 @@ const fmtBytes = (n) =>
       : n >= 1024 * 1024
         ? `${(n / 1024 / 1024).toFixed(1).replace('.', ',')} MB`
         : `${Math.max(1, Math.round(n / 1024))} KB`;
+/** Kopie außer Haus im Google Drive (privater Ordner „Pake & Scha – Sicherungen“) – nur Stand, keine Knöpfe. */
+function driveBackupBlock(d) {
+  if (!d) return '';
+  const head = '<h3 class="section-title mt-6">Kopie im Google Drive</h3>';
+  if (!d.connected) {
+    return `${head}<p class="text-sm text-muted"><strong>Noch nicht eingerichtet.</strong> Unter Einstellungen → Integrationen → Google Docs das Google-Konto der Kanzlei verbinden – danach kommt jede Nacht automatisch eine Kopie der Datenbank in einen privaten Ordner im Google Drive, die Bilder einmal pro Woche. So sind die Daten auch dann sicher, wenn die Disk bei Render verloren geht.</p>`;
+  }
+  const folder = d.folderUrl ? `<a class="link-btn" href="${esc(d.folderUrl)}" target="_blank" rel="noopener">„Pake &amp; Scha – Sicherungen“</a>` : '„Pake &amp; Scha – Sicherungen“';
+  const facts = [
+    d.db ? `Datenbank zuletzt ${esc(fmtDate(d.db.at))}${d.db.size ? ` (${esc(fmtBytes(d.db.size))})` : ''}` : 'Datenbank: erste Kopie folgt in Kürze',
+    d.media ? `Bilder zuletzt ${esc(fmtDate(d.media.at))} (${d.media.files} ${d.media.files === 1 ? 'Bild' : 'Bilder'}, ${esc(fmtBytes(d.media.size))})` : d.mediaCheckedAt ? 'Bilder: noch keine vorhanden' : 'Bilder: erste Kopie folgt in Kürze',
+  ];
+  return `${head}<p class="text-sm text-muted">Jede neue Sicherung der Datenbank kommt automatisch in den Ordner ${folder} im Google Drive der Kanzlei, die Bilder einmal pro Woche. Der Ordner ist <strong>nicht freigegeben</strong> – nur wer im Google-Konto der Kanzlei angemeldet ist, sieht ihn. Aufbewahrt werden dieselben Stände wie hier, von den Bildern die letzten ${d.keepMedia}.</p>
+      <p class="form-hint mt-2">${facts.join(' · ')}</p>
+      ${d.error ? `<div class="banner banner-amber is-stack mt-3 mb-0"><strong>Letzter Versuch fehlgeschlagen</strong>${d.errorAt ? ` (${esc(fmtDate(d.errorAt))})` : ''}: ${esc(d.error)}. Der Server versucht es stündlich erneut; die Sicherung auf der Disk ist davon nicht betroffen.</div>` : ''}`;
+}
+
 function backupPanel() {
   const b = st.backups;
   if (!b) return '';
@@ -563,7 +580,7 @@ function backupPanel() {
   const pending = b.pendingRestore;
   return `<section class="panel panel-pad mt-4 lg:mt-5">
       <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('shield')} Datensicherung</h2>${last ? badge(`zuletzt ${fmtDate(last.createdAt)}`, 'emerald') : badge('noch keine Sicherung', 'amber')}</div>
-      <p class="text-sm text-muted">Jeden Tag wird automatisch eine Kopie der Datenbank angelegt – Akten, Konten, Verträge, Rechnungen, Nachrichten und Einstellungen (ohne Login-Sitzungen). Aufbewahrt werden die letzten ${b.keepDays} Tage, danach eine Sicherung je Woche bis ${Math.round(b.keepWeeklyDays / 7)} Wochen zurück. Laden Sie regelmäßig eine Sicherung herunter, damit es auch eine Kopie außerhalb von Render gibt. Bilder (Profilbilder, Team-Fotos, Beweismittel) gibt es unten als eigenes Archiv.</p>
+      <p class="text-sm text-muted">Jeden Tag wird automatisch eine Kopie der Datenbank angelegt – Akten, Konten, Verträge, Rechnungen, Nachrichten und Einstellungen (ohne Login-Sitzungen). Aufbewahrt werden die letzten ${b.keepDays} Tage, danach eine Sicherung je Woche bis ${Math.round(b.keepWeeklyDays / 7)} Wochen zurück.${b.drive && b.drive.connected ? ' Eine Kopie liegt zusätzlich im Google Drive der Kanzlei (unten).' : ' Laden Sie regelmäßig eine Sicherung herunter, damit es auch eine Kopie außerhalb von Render gibt – oder verbinden Sie das Google-Konto der Kanzlei, dann geht die Kopie automatisch ins Google Drive (unten).'} Bilder (Profilbilder, Team-Fotos, Beweismittel) gibt es unten als eigenes Archiv.</p>
       <p class="form-hint mt-2">Datenbank ${fmtBytes(b.dbSize)} · freier Speicher auf der Disk ${fmtBytes(b.free)}</p>
       ${
       pending
@@ -581,11 +598,12 @@ function backupPanel() {
           )
           .join('')
       : '<p class="text-sm text-dim">Die erste Sicherung entsteht automatisch kurz nach dem Start des Servers.</p>'}</div>
+      ${driveBackupBlock(b.drive)}
       <h3 class="section-title mt-6">Bilder &amp; Anhänge</h3>
       <p class="text-sm text-muted">${b.media.files} ${b.media.files === 1 ? 'Bild' : 'Bilder'} (Profilbilder, Team-Fotos, Beweismittel der Akten) · ${esc(fmtBytes(b.media.bytes))}. Das Archiv enthält alle Bilder mit ihren Ordnern; laden Sie es zusammen mit einer Datenbank-Sicherung herunter.</p>
       <div class="form-actions mt-3"><a class="btn-outline btn-md" href="/api/admin/backups/media" download>${icon('download', 'ico-sm')}<span>Bilder herunterladen (.tar.gz)</span></a></div>
       <h3 class="section-title mt-6">Sicherung einspielen</h3>
-      <p class="text-sm text-muted">Eine heruntergeladene Sicherung wieder hochladen – z. B. nach einem Umzug oder wenn die Disk verloren ging: <strong>Bilder-Archiv (.tar.gz)</strong> wird sofort ergänzt (vorhandene Bilder bleiben unverändert). Eine <strong>Datenbank-Sicherung (.db)</strong> – hochgeladen oder oben per „Einspielen“ – wird beim nächsten Neustart eingespielt und ersetzt dann die aktuelle Datenbank.</p>
+      <p class="text-sm text-muted">Eine heruntergeladene Sicherung wieder hochladen – z. B. nach einem Umzug oder wenn die Disk verloren ging: <strong>Bilder-Archiv (.tar.gz)</strong> wird sofort ergänzt (vorhandene Bilder bleiben unverändert). Eine <strong>Datenbank-Sicherung (.db)</strong> – hochgeladen oder oben per „Einspielen“ – wird beim nächsten Neustart eingespielt und ersetzt dann die aktuelle Datenbank. Kopien aus dem Google Drive dort herunterladen und hier hochladen.</p>
       <div class="form-actions mt-3"><label class="btn-outline btn-md file-btn">${icon('restore', 'ico-sm')}<span>Sicherung hochladen …</span><input type="file" accept=".db,.gz,.tgz,application/gzip,application/x-sqlite3" data-upload="backup" aria-label="Sicherung hochladen"></label></div>
     </section>`;
 }

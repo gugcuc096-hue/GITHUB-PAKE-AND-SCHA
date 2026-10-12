@@ -7,6 +7,16 @@
 /* ---------------------------------------------------------------- Verträge (Mandatsvertrag u. a.) */
 const CONTRACT_STATUS = { entwurf: ['Entwurf', 'slate'], teilweise: ['Teilweise unterschrieben', 'amber'], unterschrieben: ['Unterschrieben', 'emerald'] };
 
+/*
+ * Dokumente öffnen – ohne Druckersymbol und ohne zusätzliche Knöpfe: Für die Kanzlei öffnet der Knopf eines fertigen
+ * Dokuments (Vertrag/Schriftsatz vollständig unterschrieben, Rechnungen immer) direkt das Google Doc. Die Ansicht der
+ * Website (Druck / PDF) erreicht man über den Namen bzw. die Nummer des Dokuments.
+ */
+const safeGdoc = (u) => (typeof u === 'string' && /^https:\/\/docs\.google\.com\//.test(u) ? u : null);
+const docViewBtn = (href, cls = 'btn-outline btn-sm') => `<a class="${cls}" href="${href}" target="_blank" rel="noopener">${icon('eye', 'ico-sm')}<span>Ansehen / PDF</span></a>`;
+const gdocBtn = (url, cls = 'btn-outline btn-sm') => `<a class="${cls}" href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="Google Doc öffnen – die Ansicht der Website über den Namen">${icon('doc', 'ico-sm')}<span>Google Doc</span></a>`;
+const docTitleLink = (href, html, cls = '') => `<a class="doc-title${cls ? ` ${cls}` : ''}" href="${href}" target="_blank" rel="noopener" title="Ansicht der Website öffnen (Druck / PDF)">${html}</a>`;
+
 /** Alle unterzeichnenden Anwälte eines Vertrags – der erste zuerst. */
 const contractLawyers = (k) => [
   { userId: k.lawyerId, name: k.lawyerName || k.data.anwalt || '—', signature: k.lawyerSignature, signedAt: k.lawyerSignedAt },
@@ -22,13 +32,14 @@ function contractCard(k, c) {
   ].join(' · ');
   const mine = staff && lawyers.some((l) => l.userId === st.user.id && !l.signedAt);
   const clientCanSign = !staff && !k.clientSignedAt;
+  const gdoc = staff && !mine && k.status === 'unterschrieben' ? safeGdoc(k.googleDoc) : null;
   return `<div class="contract-row">
       <div class="contract-main">
-        <div class="flex flex-wrap items-center gap-2"><span class="font-medium">${esc(k.templateName)}</span>${statusBadge(CONTRACT_STATUS, k.status)}</div>
+        <div class="flex flex-wrap items-center gap-2">${docTitleLink(`/vertrag.html?id=${k.id}`, esc(k.templateName), 'font-medium')}${statusBadge(CONTRACT_STATUS, k.status)}</div>
         <div class="text-xs text-dim mt-1">${signs} · erstellt ${esc(fmtDate(k.createdAt))}${k.createdByName ? ' von ' + esc(k.createdByName) : ''}</div>
       </div>
       <div class="contract-actions">
-        <a class="${clientCanSign || mine ? 'btn-gold' : 'btn-outline'} btn-sm" href="/vertrag.html?id=${k.id}" target="_blank" rel="noopener">${icon(clientCanSign || mine ? 'edit' : 'printer', 'ico-sm')}<span>${clientCanSign ? 'Ansehen & unterschreiben' : mine ? 'Ansehen & unterschreiben' : 'Ansehen / PDF'}</span></a>
+        ${clientCanSign || mine ? `<a class="btn-gold btn-sm" href="/vertrag.html?id=${k.id}" target="_blank" rel="noopener">${icon('edit', 'ico-sm')}<span>Ansehen & unterschreiben</span></a>` : gdoc ? gdocBtn(gdoc) : docViewBtn(`/vertrag.html?id=${k.id}`)}
         ${staff && c.canEdit && !k.locked ? `<button type="button" class="btn-ghost btn-sm" data-action="contract-edit" data-id="${k.id}">${icon('edit', 'ico-sm')}<span>Bearbeiten</span></button>` : ''}
         ${staff && c.canEdit && !k.clientSignedAt ? `<button type="button" class="btn-ghost btn-sm" data-action="contract-record" data-id="${k.id}" data-case-id="${c.id}">${icon('check', 'ico-sm')}<span>Unterschrift Mandant erfassen</span></button>` : ''}
         ${staff && (isAdmin() || (c.canEdit && !k.locked)) ? `<button type="button" class="btn-ghost btn-sm fn-danger" data-action="contract-delete" data-id="${k.id}" data-case-id="${c.id}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>` : ''}
@@ -216,13 +227,14 @@ function briefCard(k, c) {
   ].join(' · ');
   const mine = staff && lawyers.some((l) => l.userId === st.user.id && !l.signedAt);
   const clientCanSign = !staff && k.needsClient && !k.clientSignedAt;
+  const gdoc = staff && !mine && k.status === 'unterschrieben' ? safeGdoc(k.googleDoc) : null;
   return `<div class="contract-row">
       <div class="contract-main">
-        <div class="flex flex-wrap items-center gap-2"><span class="font-medium">${esc(k.templateName)}</span>${statusBadge(CONTRACT_STATUS, k.status)}${staff ? (k.internal ? badge('nur intern', 'amber') : badge('für Mandant sichtbar', 'sky')) : ''}</div>
+        <div class="flex flex-wrap items-center gap-2">${docTitleLink(`/vertrag.html?id=${k.id}`, esc(k.templateName), 'font-medium')}${statusBadge(CONTRACT_STATUS, k.status)}${staff ? (k.internal ? badge('nur intern', 'amber') : badge('für Mandant sichtbar', 'sky')) : ''}</div>
         <div class="text-xs text-dim mt-1">${signs ? signs + ' · ' : ''}erstellt ${esc(fmtDate(k.createdAt))}${k.createdByName ? ' von ' + esc(k.createdByName) : ''}</div>
       </div>
       <div class="contract-actions">
-        <a class="${clientCanSign || mine ? 'btn-gold' : 'btn-outline'} btn-sm" href="/vertrag.html?id=${k.id}" target="_blank" rel="noopener">${icon(clientCanSign || mine ? 'edit' : 'printer', 'ico-sm')}<span>${clientCanSign || mine ? 'Ansehen & unterschreiben' : 'Ansehen / PDF'}</span></a>
+        ${clientCanSign || mine ? `<a class="btn-gold btn-sm" href="/vertrag.html?id=${k.id}" target="_blank" rel="noopener">${icon('edit', 'ico-sm')}<span>Ansehen & unterschreiben</span></a>` : gdoc ? gdocBtn(gdoc) : docViewBtn(`/vertrag.html?id=${k.id}`)}
         ${staff && c.canEdit && !k.locked ? `<button type="button" class="btn-ghost btn-sm" data-action="brief-edit" data-id="${k.id}">${icon('edit', 'ico-sm')}<span>Bearbeiten</span></button>` : ''}
         ${staff && c.canEdit && !k.needsClient ? `<button type="button" class="btn-ghost btn-sm" data-action="brief-visibility" data-id="${k.id}" data-case-id="${c.id}">${icon(k.internal ? 'eye' : 'shield', 'ico-sm')}<span>${k.internal ? 'Für Mandant freigeben' : 'Nur intern'}</span></button>` : ''}
         ${staff && c.canEdit && k.needsClient && !k.clientSignedAt ? `<button type="button" class="btn-ghost btn-sm" data-action="contract-record" data-id="${k.id}" data-case-id="${c.id}">${icon('check', 'ico-sm')}<span>Unterschrift Mandant erfassen</span></button>` : ''}

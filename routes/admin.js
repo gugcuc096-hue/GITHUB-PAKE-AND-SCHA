@@ -389,6 +389,7 @@ const backupInfo = () => ({
   keepWeeklyDays: backup.KEEP_WEEKLY_DAYS,
   media: media.stats(),
   pendingRestore: media.pendingRestore(),
+  drive: require('../driveBackup').status(),
 });
 
 router.get('/backups', (req, res) => res.json(backupInfo()));
@@ -403,6 +404,11 @@ router.post(
       return res.status(507).json({ error: `Sicherung fehlgeschlagen: ${err.message}` });
     }
     logActivity(req.user, 'Datensicherung erstellt', 'settings', null, b.name);
+    // gleich auch ins Google Drive (falls verbunden) – höchstens 20 Sekunden warten, danach läuft es im Hintergrund weiter
+    const copy = require('../driveBackup')
+      .run()
+      .catch((err) => console.warn('Sicherung im Google Drive fehlgeschlagen:', err.message));
+    await Promise.race([copy, new Promise((r) => setTimeout(r, 20000).unref())]);
     res.status(201).json({ backup: b, ...backupInfo() });
   })
 );

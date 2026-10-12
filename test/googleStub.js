@@ -6,7 +6,9 @@
  * GOOGLE_STUB_STATE=<Datei>: Nach jedem Aufruf steht dort der Stand als JSON (Dateien, Freigaben, Aufrufe);
  *   die hochgeladenen DOCX-Dateien liegen daneben in <Datei>.files/<id>-v<Version>.docx.
  * <Datei>.ctl (optional, JSON): Störungen für Tests, z. B. {"deleted":["doc-1"]} (Datei in Drive gelöscht)
- *   oder {"revoked":true} (Zugriff widerrufen → invalid_grant).
+ *   oder {"revoked":true} (Zugriff widerrufen → invalid_grant), {"failUpload":true} (Upload-Stücke scheitern),
+ *   {"partialUpload":true} (Google nimmt je Stück nur die Hälfte an → 308 mit Range),
+ *   {"add":[{id,name,parents,createdTime}]} (Dateien, die schon im Drive liegen – z. B. alte Sicherungen).
  */
 const fs = require('fs');
 const path = require('path');
@@ -14,7 +16,7 @@ const path = require('path');
 const realFetch = globalThis.fetch;
 const STATE = process.env.GOOGLE_STUB_STATE || '';
 const FILES_DIR = STATE ? `${STATE}.files` : '';
-const state = { files: {}, calls: [], revoked: [], seq: 0, lastAuthorize: null };
+const state = { files: {}, calls: [], revoked: [], removed: [], seq: 0, lastAuthorize: null };
 const sessions = {}; // Upload-Sitzungen („resumable“): upload_id → { method, id, meta }
 const save = () => STATE && fs.writeFileSync(STATE, JSON.stringify(state, null, 1));
 const control = () => {
@@ -42,11 +44,12 @@ function multipart(buf, contentType) {
   return { meta: JSON.parse(parts[0].body.toString()), media: parts[1].body, mediaType: /Content-Type:\s*([^\r\n]+)/i.exec(parts[1].headers)[1] };
 }
 
-function storeDocx(id, version, buf) {
+function storeDocx(id, version, buf, ext = '.docx') {
   if (!FILES_DIR) return;
   fs.mkdirSync(FILES_DIR, { recursive: true });
-  fs.writeFileSync(path.join(FILES_DIR, `${id}-v${version}.docx`), buf);
+  fs.writeFileSync(path.join(FILES_DIR, `${id}-v${version}${ext}`), buf);
 }
+const now = () => new Date().toISOString();
 
 globalThis.fetch = async (input, init = {}) => {
   const url = new URL(typeof input === 'string' ? input : input.url);
@@ -55,6 +58,9 @@ globalThis.fetch = async (input, init = {}) => {
   const headers = init.headers || {};
   const ctl = control();
   state.calls.push(`${method} ${url.hostname}${url.pathname}`);
+  for (const f of ctl.add || []) {
+    if (!state.files[f.id] && !state.removed.includes(f.id)) state.files[f.id] = { mimeType: 'application/octet-stream', trashed: false, permissions: [], size: 1, ...f };
+  }
   try {
     // Token-Tausch und -Erneuerung
     if (url.hostname === 'oauth2.googleapis.com' && url.pathname === '/token') {
@@ -92,7 +98,7 @@ globalThis.fetch = async (input, init = {}) => {
       const meta = JSON.parse(init.body);
       if (meta.parents && !meta.parents.every(exists)) return json(404, { error: { message: `File not found: ${meta.parents[0]}.` } });
       const id = `folder-${++state.seq}`;
-      state.files[id] = { id, name: meta.name, mimeType: meta.mimeType, parents: meta.parents || [], trashed: false };
+      state.files[id] = { id, name: meta.name, mimeType: meta.mimeType, parents: meta.parents || [], trashed: false, permissions: [], createdTime: now() };
       return json(200, { id });
     }
     // Upload-Sitzung („resumable“, für große Dateien): starten …
@@ -103,13 +109,29 @@ globalThis.fetch = async (input, init = {}) => {
       if (meta.parents && !meta.parents.every(exists)) return json(404, { error: { message: `File not found: ${meta.parents[0]}.` } });
       if (headers['X-Upload-Content-Type'] === undefined) return json(400, { error: { message: 'X-Upload-Content-Type fehlt' } });
       const uploadId = `up-${++state.seq}`;
-      sessions[uploadId] = { method, id, meta, length: Number(headers['X-Upload-Content-Length']) };
+      sessions[uploadId] = { method, id, meta, length: Number(headers['X-Upload-Content-Length']), received: Buffer.alloc(0), chunks: 0 };
       return new Response('', { status: 200, headers: { Location: `https://www.googleapis.com/upload/drive/v3/files?upload_id=${uploadId}` } });
     }
     // … und Inhalt senden
     if (method === 'PUT' && url.searchParams.get('upload_id')) {
       const sess = sessions[url.searchParams.get('upload_id')];
       if (!sess) return json(404, { error: { message: 'Upload-Sitzung unbekannt' } });
+      // In Stücken („Content-Range: bytes a-b/gesamt“, Sicherungen): 308 bis alles da ist
+      const range = headers['Content-Range'] && /^bytes (\d+)-(\d+)\/(\d+)$/.exec(headers['Content-Range']);
+      if (range) {
+        if (ctl.failUpload) return json(503, { error: { message: 'Backend Error' } });
+        let chunk = Buffer.from(init.body);
+        if (Number(range[1]) !== sess.received.length || Number(range[3]) !== sess.length || chunk.length !== Number(range[2]) - Number(range[1]) + 1) return json(400, { error: { message: 'Content-Range passt nicht' } });
+        if (ctl.partialUpload && chunk.length > 1) chunk = chunk.subarray(0, Math.ceil(chunk.length / 2));
+        sess.received = Buffer.concat([sess.received, chunk]);
+        sess.chunks += 1;
+        if (sess.received.length < sess.length) return new Response(null, { status: 308, headers: { Range: `bytes=0-${sess.received.length - 1}` } });
+        const id = `file-${++state.seq}`;
+        if (sess.meta.parents && !sess.meta.parents.every(exists)) return json(404, { error: { message: `File not found: ${sess.meta.parents[0]}.` } });
+        state.files[id] = { id, name: sess.meta.name, mimeType: sess.meta.mimeType, sourceType: headers['Content-Type'], parents: sess.meta.parents || [], trashed: false, version: 1, size: sess.length, permissions: [], upload: 'resumable', chunks: sess.chunks, createdTime: now() };
+        storeDocx(id, 1, sess.received, /\.tar\.gz$/.test(sess.meta.name) ? '.tar.gz' : path.extname(sess.meta.name) || '.bin');
+        return json(200, { id, name: sess.meta.name, size: String(sess.length) });
+      }
       const media = Buffer.from(init.body);
       if (media.length !== sess.length) return json(400, { error: { message: 'Länge stimmt nicht' } });
       let id = sess.id;
@@ -119,7 +141,7 @@ globalThis.fetch = async (input, init = {}) => {
         storeDocx(id, f.version, media);
       } else {
         id = `doc-${++state.seq}`;
-        state.files[id] = { id, name: sess.meta.name, mimeType: sess.meta.mimeType, sourceType: headers['Content-Type'], parents: sess.meta.parents || [], trashed: false, version: 1, size: media.length, permissions: [], upload: 'resumable' };
+        state.files[id] = { id, name: sess.meta.name, mimeType: sess.meta.mimeType, sourceType: headers['Content-Type'], parents: sess.meta.parents || [], trashed: false, version: 1, size: media.length, permissions: [], upload: 'resumable', createdTime: now() };
         storeDocx(id, 1, media);
       }
       return json(200, { id, webViewLink: `https://docs.google.com/document/d/${id}/edit?usp=drivesdk` });
@@ -130,7 +152,7 @@ globalThis.fetch = async (input, init = {}) => {
       const { meta, media, mediaType } = multipart(Buffer.from(init.body), headers['Content-Type']);
       if (meta.parents && !meta.parents.every(exists)) return json(404, { error: { message: `File not found: ${meta.parents[0]}.` } });
       const id = `doc-${++state.seq}`;
-      state.files[id] = { id, name: meta.name, mimeType: meta.mimeType, sourceType: mediaType, parents: meta.parents || [], trashed: false, version: 1, size: media.length, permissions: [] };
+      state.files[id] = { id, name: meta.name, mimeType: meta.mimeType, sourceType: mediaType, parents: meta.parents || [], trashed: false, version: 1, size: media.length, permissions: [], createdTime: now() };
       storeDocx(id, 1, media);
       return json(200, { id, webViewLink: `https://docs.google.com/document/d/${id}/edit?usp=drivesdk` });
     }
@@ -154,8 +176,25 @@ globalThis.fetch = async (input, init = {}) => {
       state.files[id].permissions.push(perm);
       return json(200, { id: `perm-${++state.seq}` });
     }
-    // Papierkorb
+    // Dateien eines Ordners auflisten (q: '<Ordner>' in parents and trashed = false)
+    if (method === 'GET' && url.pathname === '/drive/v3/files') {
+      const q = /^'([^']+)' in parents and trashed = false$/.exec(url.searchParams.get('q') || '');
+      if (!q) return json(400, { error: { message: 'Nicht nachgebaute Suche' } });
+      const files = Object.values(state.files)
+        .filter((f) => f.parents && f.parents.includes(q[1]) && exists(f.id))
+        .map((f) => ({ id: f.id, name: f.name, size: String(f.size || 0), createdTime: f.createdTime }));
+      return json(200, { files });
+    }
+    // Endgültig löschen
     m = url.pathname.match(/^\/drive\/v3\/files\/([^/]+)$/);
+    if (method === 'DELETE' && m) {
+      const id = decodeURIComponent(m[1]);
+      if (!exists(id)) return json(404, { error: { message: `File not found: ${id}.` } });
+      delete state.files[id];
+      state.removed.push(id);
+      return new Response(null, { status: 204 });
+    }
+    // Papierkorb
     if (method === 'PATCH' && m) {
       const id = decodeURIComponent(m[1]);
       if (!exists(id)) return json(404, { error: { message: `File not found: ${id}.` } });

@@ -65,14 +65,14 @@ function invoiceTable(rows) {
       <tbody>${rows
       .map(
         (i) => `<tr>
-          <td class="td-main"><div class="font-mono text-gold text-sm">${esc(i.number)}</div><div class="text-xs text-dim">${esc(INVOICE_KIND[i.kind])}${i.subject ? ' · ' + esc(i.subject) : ''}</div></td>
+          <td class="td-main"><div class="font-mono text-gold text-sm nowrap">${docTitleLink(`/invoice.html?id=${i.id}`, esc(i.number))}</div><div class="text-xs text-dim">${esc(INVOICE_KIND[i.kind])}${i.subject ? ' · ' + esc(i.subject) : ''}</div></td>
           <td data-label="Empfänger">${esc(i.clientName)}</td>
           <td data-label="Akte">${i.caseNumber ? `<button class="text-gold font-mono text-xs hover:underline" data-action="open-case" data-id="${i.caseId}">${esc(i.caseNumber)}</button>` : '—'}</td>
           <td data-label="Betrag" class="font-mono nowrap" style="text-align:right">${money(i.total)}</td>
           <td data-label="Status">${invoiceBadge(i, true)}${staff && paymentReported(i) && i.paymentReport.note ? `<div class="text-xs text-dim pay-note">„${esc(i.paymentReport.note)}“</div>` : ''}</td>
           <td data-label="Datum" class="text-xs text-dim nowrap"><div>${esc(fmtDate(i.createdAt))}${i.dueDate && i.status === 'offen' ? `<div${i.overdueDays > 0 ? ` class="text-red-300" title="${esc(overdueText(i))}"` : ''}>fällig ${esc(fmtDateOnly(i.dueDate))}</div>` : ''}</div></td>
           <td class="td-actions inv-actions">
-            <a class="btn-outline btn-sm" href="/invoice.html?id=${i.id}" target="_blank" rel="noopener">${icon('printer', 'ico-sm')}<span>PDF / Druck</span></a>
+            ${staff && safeGdoc(i.googleDoc) ? gdocBtn(safeGdoc(i.googleDoc)) : docViewBtn(`/invoice.html?id=${i.id}`)}
             ${
               // Zahlungserinnerung als normaler kleiner Knopf bei den Aktionen (stand früher klein unter dem Datum)
               staff && i.status === 'offen'

@@ -493,7 +493,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
   if (staff) {
     quick.push(`<button class="btn-outline btn-sm" data-action="new-event" data-case-id="${c.id}" data-return-case="${c.id}">${icon('calendar', 'ico-sm')}<span>Frist / Termin</span></button>`);
     quick.push(`<button class="btn-outline btn-sm" data-action="new-invoice" data-case-id="${c.id}">${icon('receipt', 'ico-sm')}<span>Rechnung</span></button>`);
-    quick.push(`<a class="btn-outline btn-sm" href="/aktenauszug.html?id=${c.id}" target="_blank" rel="noopener">${icon('printer', 'ico-sm')}<span>Aktenauszug (PDF)</span></a>`);
+    quick.push(`<a class="btn-outline btn-sm" href="/aktenauszug.html?id=${c.id}" target="_blank" rel="noopener">${icon('doc', 'ico-sm')}<span>Aktenauszug (PDF)</span></a>`);
     quick.push(`<button class="btn-outline btn-sm" data-action="chat-focus">${icon('chat', 'ico-sm')}<span>Mandant anschreiben</span></button>`);
     if (!c.hasClientAccount && canLinkClient(c)) quick.push(`<button class="btn-outline btn-sm" data-action="case-client-search" data-id="${c.id}">${icon('user', 'ico-sm')}<span>Mandanten-Konto verknüpfen</span></button>`);
     if (!c.processTicket && c.canEdit) quick.push(`<button class="btn-outline btn-sm" data-action="pt-toggle">${icon('plus', 'ico-sm')}<span>Prozessticket (DOJ)</span></button>`);
@@ -507,7 +507,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
   } else {
     if (!c.closed) quick.push(`<button class="btn-outline btn-sm" data-action="new-event" data-case-id="${c.id}" data-return-case="${c.id}">${icon('calendar', 'ico-sm')}<span>Termin anfragen</span></button>`);
     quick.push(`<button class="btn-outline btn-sm" data-action="chat-focus">${icon('chat', 'ico-sm')}<span>Nachricht zur Akte</span></button>`);
-    quick.push(`<a class="btn-outline btn-sm" href="/aktenauszug.html?id=${c.id}" target="_blank" rel="noopener">${icon('printer', 'ico-sm')}<span>Aktenauszug (PDF)</span></a>`);
+    quick.push(`<a class="btn-outline btn-sm" href="/aktenauszug.html?id=${c.id}" target="_blank" rel="noopener">${icon('doc', 'ico-sm')}<span>Aktenauszug (PDF)</span></a>`);
   }
 
   const editForm = c.canEdit
@@ -540,10 +540,17 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
   const invoiceList = invoices.length
     ? invoices
         .map(
-          (i) => `<div class="list-row wrap inv-row"><div class="main"><div class="title"><span class="font-mono text-gold">${esc(i.number)}</span> · ${esc(INVOICE_KIND[i.kind])}</div><div class="meta">${esc(fmtDate(i.createdAt))} · ${esc(i.issuerName)}</div></div>
-            <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end"><span class="font-mono nowrap">${money(i.total)}</span>${invoiceBadge(i)}<a class="icon-btn sm" href="/invoice.html?id=${i.id}" target="_blank" rel="noopener" aria-label="Drucken / PDF">${icon('printer', 'ico-sm')}</a></div>${
+          (i) => {
+            // Kanzlei: das Symbol öffnet direkt das Google Doc, die Nummer die Ansicht der Website
+            const gd = staff ? safeGdoc(i.googleDoc) : null;
+            const open = gd
+              ? `<a class="icon-btn sm" href="${esc(gd)}" target="_blank" rel="noopener noreferrer" aria-label="Google Doc öffnen" title="Google Doc öffnen">${icon('doc', 'ico-sm')}</a>`
+              : `<a class="icon-btn sm" href="/invoice.html?id=${i.id}" target="_blank" rel="noopener" aria-label="Ansehen / PDF" title="Ansehen / PDF">${icon('eye', 'ico-sm')}</a>`;
+            return `<div class="list-row wrap inv-row"><div class="main"><div class="title">${docTitleLink(`/invoice.html?id=${i.id}`, esc(i.number), 'font-mono text-gold')} · ${esc(INVOICE_KIND[i.kind])}</div><div class="meta">${esc(fmtDate(i.createdAt))} · ${esc(i.issuerName)}</div></div>
+            <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end"><span class="font-mono nowrap">${money(i.total)}</span>${invoiceBadge(i)}${open}</div>${
               paymentButtons(i) ? `<div class="inv-pay-row">${paymentButtons(i)}</div>` : ''
-            }</div>`
+            }</div>`;
+          }
         )
         .join('')
     : '';

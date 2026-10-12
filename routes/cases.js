@@ -407,15 +407,20 @@ function caseDetail(c, u) {
   const tasks = staff
     ? db.prepare(`${TASK_SELECT} WHERE t.case_id = ? ORDER BY t.done ASC, t.due_date IS NULL, t.due_date ASC, t.id ASC`).all(c.id)
     : [];
+  // Kanzlei: Links der Google Docs – fertige Dokumente öffnen im Dashboard direkt das Doc
+  const contracts = contractsForCase(c.id, u);
+  const gdocs = staff ? require('../googleDocs') : null;
+  const invoiceDocs = gdocs ? gdocs.urls('invoice', invoices.map((i) => i.id)) : new Map();
+  const contractDocs = gdocs ? gdocs.urls('contract', contracts.map((k) => k.id)) : new Map();
 
   return {
     case: { ...caseRow(c, u), ...access },
     notes: notes.map(noteRow),
     appointments: appointments.map((a) => apptRow(a, u)),
-    invoices: invoices.map(invoiceRow),
+    invoices: invoices.map((i) => ({ ...invoiceRow(i), googleDoc: invoiceDocs.get(i.id) })),
     attachments: attachments.map((a) => attachmentRow(a, c.id)),
     externalDocs: externalDocsForCase(c.id, u),
-    contracts: contractsForCase(c.id, u),
+    contracts: contracts.map((k) => ({ ...k, googleDoc: contractDocs.get(k.id) })),
     // Bearbeitungszeiten nur für das Board of Partners
     work: isBoard(u) ? { rows: workForCase(c.id), closedAt: c.closed_at || null } : undefined,
     tasks: staff ? tasks.map(taskRow) : undefined,

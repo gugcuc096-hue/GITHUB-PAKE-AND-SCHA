@@ -1,7 +1,8 @@
 'use strict';
 /*
  * Google Drive über das Kanzlei-Konto: einmalige Anmeldung per OAuth (Board of Partners), danach legt der Server
- * Google Docs an, schreibt sie neu, teilt sie per Link und verschiebt sie in den Papierkorb.
+ * Google Docs an, schreibt sie neu, teilt sie per Link und verschiebt sie in den Papierkorb. Außerdem landen die
+ * Datensicherungen in einem eigenen, privaten Ordner (driveBackup.js) – der wird nie freigegeben.
  *
  * Sicherheit:
  *  - Scope nur „drive.file“: Die Website sieht und ändert ausschließlich Dateien, die sie selbst angelegt hat –
@@ -13,6 +14,7 @@
  * PUBLIC_URL bzw. die aufgerufene Adresse + /api/google/callback).
  */
 const crypto = require('crypto');
+const fs = require('fs');
 const { getSetting, setSetting } = require('./db');
 const { envValue } = require('./discord');
 
@@ -28,12 +30,15 @@ const GDOC_MIME = 'application/vnd.google-apps.document';
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
 const TIMEOUT = 45000;
 const MULTIPART_MAX = 4.5 * 1024 * 1024; // Google: einfacher Upload bis 5 MB, größere Dateien „resumable“
+const CHUNK = 8 * 1024 * 1024; // Sicherungen in Stücken hochladen (Vielfaches von 256 KB, wenig Arbeitsspeicher)
+const CHUNK_TIMEOUT = 5 * 60 * 1000;
 
 const FOLDERS = {
   root: 'Pake & Scha – Dokumente',
   invoice: 'Rechnungen & Honorare',
   contract: 'Verträge & Schriftsätze',
   extract: 'Aktenauszüge',
+  backup: 'Pake & Scha – Sicherungen', // eigener Ordner ganz oben, privat (keine Freigabe)
 };
 
 /* ---------------------------------------------------------------- Einrichtung */
@@ -219,16 +224,26 @@ function folders() {
 
 async function folderFor(kind) {
   const f = folders();
-  if (!f.root) {
+  const own = kind === 'backup'; // Sicherungen nicht unter den (per Link geteilten) Dokumenten
+  if (!own && !f.root) {
     f.root = (await call('POST', `${DRIVE}/files?fields=id`, { json: { name: FOLDERS.root, mimeType: FOLDER_MIME } })).id;
     setSetting('google_folders', JSON.stringify(f));
   }
   if (!f[kind]) {
-    f[kind] = (await call('POST', `${DRIVE}/files?fields=id`, { json: { name: FOLDERS[kind], mimeType: FOLDER_MIME, parents: [f.root] } })).id;
+    f[kind] = (await call('POST', `${DRIVE}/files?fields=id`, { json: { name: FOLDERS[kind], mimeType: FOLDER_MIME, ...(own ? {} : { parents: [f.root] }) } })).id;
     setSetting('google_folders', JSON.stringify(f));
   }
   return f[kind];
 }
+
+function forgetFolder(kind) {
+  const f = folders();
+  delete f[kind];
+  setSetting('google_folders', JSON.stringify(f));
+}
+
+/** Link zum Ordner in Google Drive (öffnet nur, wer im Kanzlei-Konto angemeldet ist), sonst null. */
+const folderUrl = (kind) => (folders()[kind] ? `https://drive.google.com/drive/folders/${encodeURIComponent(folders()[kind])}` : null);
 
 /* ---------------------------------------------------------------- Dokumente */
 /** Neues Google Doc aus einer DOCX-Datei; danach „Jeder mit dem Link: Betrachter“. */
@@ -267,6 +282,92 @@ async function trashDoc(fileId) {
   }
 }
 
+/* ---------------------------------------------------------------- Sicherungen (privat, ohne Freigabe) */
+/**
+ * Datei von der Disk in den Ordner „kind“ hochladen – über eine Upload-Sitzung in Stücken zu 8 MB, damit auch
+ * große Bilder-Archive weder den Arbeitsspeicher füllen noch an einer Zeitbegrenzung scheitern.
+ */
+async function uploadFile(kind, name, file, mime, retried = false) {
+  const size = (await fs.promises.stat(file)).size;
+  if (!size) throw fail('Die Datei ist leer.', 400);
+  let res;
+  try {
+    ({ res } = await request('POST', `${UPLOAD}/files?uploadType=resumable&fields=id,name,size`, {
+      json: { name, mimeType: mime, parents: [await folderFor(kind)] },
+      headers: { 'X-Upload-Content-Type': mime, 'X-Upload-Content-Length': String(size) },
+    }));
+  } catch (err) {
+    // Ordner in Drive gelöscht → neu anlegen und noch einmal versuchen
+    if (err.code === 'not_found' && !retried) {
+      forgetFolder(kind);
+      return uploadFile(kind, name, file, mime, true);
+    }
+    throw err;
+  }
+  const session = res.headers.get('location');
+  if (!session || !/^https:\/\/www\.googleapis\.com\//.test(session)) throw fail('Google Drive: Upload-Sitzung konnte nicht gestartet werden.');
+  const fh = await fs.promises.open(file, 'r');
+  try {
+    let pos = 0;
+    for (;;) {
+      const len = Math.min(CHUNK, size - pos);
+      const buf = Buffer.alloc(len);
+      const { bytesRead } = await fh.read(buf, 0, len, pos);
+      if (bytesRead !== len) throw fail('Die Datei hat sich während des Hochladens geändert.', 500);
+      const r = await fetch(session, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${await accessToken()}`, 'Content-Type': mime, 'Content-Range': `bytes ${pos}-${pos + len - 1}/${size}` },
+        body: buf,
+        redirect: 'manual',
+        signal: AbortSignal.timeout(CHUNK_TIMEOUT),
+      });
+      if (r.status === 308) {
+        // Stück angekommen – Google meldet, bis wohin (falls weniger, ab dort weiter)
+        const got = /bytes=0-(\d+)/.exec(r.headers.get('range') || '');
+        pos = got ? Number(got[1]) + 1 : 0;
+        continue;
+      }
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const reason = data.error && (data.error.message || (data.error.errors && data.error.errors[0] && data.error.errors[0].message));
+        throw fail(`Google Drive: ${reason || `Fehler ${r.status}`}`);
+      }
+      return { id: data.id, name: data.name || name, size };
+    }
+  } finally {
+    await fh.close();
+  }
+}
+
+/** Dateien im Ordner „kind“ (nur die, die die Website selbst angelegt hat – Scope drive.file). */
+async function listFiles(kind) {
+  const folder = folders()[kind];
+  if (!folder) return [];
+  const files = [];
+  let pageToken = '';
+  do {
+    const q = new URLSearchParams({
+      q: `'${folder.replace(/['\\]/g, '')}' in parents and trashed = false`,
+      fields: 'nextPageToken,files(id,name,size,createdTime)',
+      pageSize: '1000',
+      ...(pageToken ? { pageToken } : {}),
+    });
+    const data = await call('GET', `${DRIVE}/files?${q}`);
+    files.push(...(data.files || []));
+    pageToken = data.nextPageToken || '';
+  } while (pageToken);
+  return files;
+}
+
+/** Datei endgültig löschen (alte Sicherungen sollen keinen Platz im Papierkorb belegen). */
+async function deleteFile(fileId) {
+  try {
+    await call('DELETE', `${DRIVE}/files/${encodeURIComponent(fileId)}`);
+  } catch (err) {
+    if (err.code !== 'not_found') throw err;
+  }
+}
+
 function status(req) {
   return {
     configured: configured(),
@@ -279,4 +380,4 @@ function status(req) {
   };
 }
 
-module.exports = { configured, connected, authorizeUrl, connect, disconnect, createDoc, updateDoc, trashDoc, status, DRIVE_SCOPE };
+module.exports = { configured, connected, authorizeUrl, connect, disconnect, createDoc, updateDoc, trashDoc, uploadFile, listFiles, deleteFile, folderUrl, status, DRIVE_SCOPE };

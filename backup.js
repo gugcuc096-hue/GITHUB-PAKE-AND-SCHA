@@ -5,6 +5,7 @@
  * danach eine je Woche bis 5 Wochen zurück. Login-Sitzungen werden aus den Kopien entfernt.
  * Das Board of Partners (Admin) kann unter Einstellungen → System jederzeit sichern und herunterladen.
  * Wiederherstellen: Sicherung als „restore.db“ neben die Datenbank legen und neu starten (siehe db.js / README).
+ * Ist das Google-Konto der Kanzlei verbunden, kommt jede neue Sicherung zusätzlich ins Google Drive (driveBackup.js).
  */
 const fs = require('fs');
 const path = require('path');
@@ -66,21 +67,29 @@ function isoWeek(ts) {
   return `${d.getUTCFullYear()}-${Math.ceil(((d - yearStart) / 864e5 + 1) / 7)}`;
 }
 
-/** Alte Sicherungen löschen: 7 Tage alle, bis 5 Wochen die neueste je Woche, ältere gar nicht. */
-function prune(now = Date.now()) {
+/**
+ * Welche Sicherungen weg können (Liste neueste zuerst, je { stamp }): 7 Tage alle, bis 5 Wochen die neueste je
+ * Woche, ältere gar nicht. Gilt für die Disk und für die Kopien im Google Drive (driveBackup.js).
+ */
+function expired(items, now = Date.now()) {
   const weeks = new Set();
-  for (const b of list()) {
+  return items.filter((b) => {
     const age = (now - b.stamp) / 864e5; // Alter nach dem Datum im Dateinamen
-    if (age <= KEEP_DAILY_DAYS) continue;
+    if (age <= KEEP_DAILY_DAYS) return false;
     if (age <= KEEP_WEEKLY_DAYS) {
       const wk = isoWeek(b.stamp);
       if (!weeks.has(wk)) {
         weeks.add(wk);
-        continue;
+        return false;
       }
     }
-    fs.rmSync(path.join(DIR, b.name), { force: true });
-  }
+    return true;
+  });
+}
+
+/** Alte Sicherungen auf der Disk löschen. */
+function prune(now = Date.now()) {
+  for (const b of expired(list(), now)) fs.rmSync(path.join(DIR, b.name), { force: true });
 }
 
 /** Sicherung anlegen. „auto“ = eine je Tag, „manual“ = mit Uhrzeit im Namen. */
@@ -129,6 +138,10 @@ function start() {
       console.warn('Datensicherung fehlgeschlagen:', err.message);
       alerts().backupFailed(err); // Board einmal per Discord warnen
     }
+    // Kopie außer Haus: neue Sicherung (und wöchentlich die Bilder) ins Google Drive der Kanzlei
+    require('./driveBackup')
+      .run()
+      .catch((err) => console.warn('Sicherung im Google Drive fehlgeschlagen:', err.message));
   };
   setTimeout(run, 60 * 1000).unref();
   setInterval(run, 60 * 60 * 1000).unref();
@@ -141,4 +154,4 @@ function fileOf(name) {
   return fs.existsSync(file) ? file : null;
 }
 
-module.exports = { list, create, ensureToday, prune, start, fileOf, freeBytes, dbBytes, DIR, KEEP_DAILY_DAYS, KEEP_WEEKLY_DAYS };
+module.exports = { list, create, ensureToday, prune, expired, stampOf, start, fileOf, freeBytes, dbBytes, DIR, NAME_RE, KEEP_DAILY_DAYS, KEEP_WEEKLY_DAYS };

@@ -944,6 +944,14 @@ db.exec(`
   );
   CREATE UNIQUE INDEX IF NOT EXISTS idx_google_docs_ref ON google_docs(kind, ref_id);
   CREATE INDEX IF NOT EXISTS idx_google_docs_case ON google_docs(case_id);
+  -- Freigabe eines Dokuments bewusst beendet („Freigabe beenden“): der Server legt dafür kein Google Doc mehr
+  -- automatisch an, bis jemand es selbst wieder anlegt (googleDocs.js)
+  CREATE TABLE IF NOT EXISTS google_docs_optout (
+    kind       TEXT NOT NULL,
+    ref_id     INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (kind, ref_id)
+  );
 `);
 
 /*
