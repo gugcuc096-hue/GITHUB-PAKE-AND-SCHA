@@ -54,6 +54,17 @@ const actions = {
     toast(`Bearbeitungsstand: ${STEPS[step]}`);
     await reloadCase(id);
   },
+  // Fünfter Kreis „Abgeschlossen“ im Bearbeitungsstand
+  'case-close': (el) => closeCase(Number(el.dataset.id)),
+  // Abgeschlossene Akte: Klick auf einen Schritt öffnet sie dort wieder
+  'case-reopen': async (el) => {
+    const id = Number(el.dataset.id);
+    const step = Number(el.dataset.step);
+    if (!(await ask(`Die Akte wird wieder geöffnet und steht dann auf „${STEPS[step]}“.`, { title: 'Akte wieder öffnen?', confirmText: 'Wieder öffnen' }))) return;
+    await api.patch('/api/cases/' + id, { status: 'in_bearbeitung', step });
+    toast(`Akte wieder geöffnet – ${STEPS[step]}`);
+    await reloadCase(id);
+  },
   'pt-toggle': () => {
     const box = $('#ptBox');
     if (!box) return;

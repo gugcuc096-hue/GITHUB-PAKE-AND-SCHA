@@ -494,7 +494,6 @@ async function go(view) {
   closeDutyPop();
   renderNav();
   const content = $('#content');
-  content.dataset.view = view; // z. B. darf die Aktenliste breiter werden (app.css)
   content.innerHTML = loadingHtml();
   window.scrollTo(0, 0);
   const token = ++st.navToken;

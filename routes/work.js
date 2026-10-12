@@ -99,7 +99,7 @@ router.get('/', (req, res) => {
 
   // Akten: laufende (seit Eröffnung) und im Zeitraum geschlossene (Eröffnung → Abschluss)
   const cases = db
-    .prepare('SELECT id, case_number, title, status, created_at, closed_at FROM cases WHERE status != ? OR closed_at IS NOT NULL')
+    .prepare('SELECT id, case_number, title, status, step, created_at, closed_at FROM cases WHERE status != ? OR closed_at IS NOT NULL')
     .all('geschlossen')
     .filter((c) => c.status !== 'geschlossen' || ms(c.closed_at) >= since)
     .map((c) => ({
@@ -107,6 +107,7 @@ router.get('/', (req, res) => {
       caseNumber: c.case_number,
       title: c.title,
       status: c.status,
+      step: c.step,
       closed: c.status === 'geschlossen',
       openedAt: c.created_at,
       closedAt: c.closed_at,

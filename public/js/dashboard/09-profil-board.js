@@ -950,7 +950,7 @@ views.work = {
               (c) => `<tr class="row" data-action="open-case" data-id="${c.id}">
                 <td class="td-main"><div class="font-mono text-gold text-xs">${esc(c.caseNumber)}</div><div class="font-medium">${esc(c.title)}</div></td>
                 <td data-label="Zuständig">${c.team.length ? c.team.map((t) => esc(t.name) + (t.role === 'lead' && c.team.length > 1 ? ' <span class="text-dim text-xs">(federführend)</span>' : '')).join(', ') : c.closed ? '<span class="text-dim">—</span>' : badge('Unbesetzt', 'amber')}</td>
-                <td data-label="Status">${statusBadge(CASE_STATUS, c.status)}</td>
+                <td data-label="Status">${stageBadge(c)}</td>
                 <td data-label="Dauer" class="nowrap"><span class="font-mono ${c.closed ? 'text-gold' : 'text-emerald-300'}">${esc(fmtDur(c.durationMs))}</span><div class="text-xs text-dim">${c.closed ? `bis Abschluss ${esc(fmtDate(c.closedAt))}` : `offen seit ${esc(fmtDate(c.openedAt))}`}</div></td></tr>`
             )
             .join('')}</tbody></table></div>`
@@ -962,7 +962,7 @@ views.work = {
         <div class="chip-row mb-4" role="group" aria-label="Zeitraum">${chips}</div>
         <div class="kpi-grid mb-4 lg:mb-5">
           ${kpi('Akten in Bearbeitung', String(sm.runningCases), `${sm.unassigned} davon ohne Anwalt`, 'briefcase', '#work')}
-          ${kpi('Geschlossen', String(sm.closedCases), w.days ? `in den letzten ${w.days} Tagen` : 'insgesamt', 'check', '#work')}
+          ${kpi('Abgeschlossen', String(sm.closedCases), w.days ? `in den letzten ${w.days} Tagen` : 'insgesamt', 'check', '#work')}
           ${kpi('Ø Bearbeitungsdauer', fmtDur(sm.avgClosedMs), 'Eröffnung bis Abschluss', 'clock', '#work')}
           ${kpi('Mitarbeiter', String(w.members.filter((m) => m.runningCount).length), 'mit laufenden Akten', 'users', '#work')}
         </div>
@@ -1288,7 +1288,7 @@ function appTrack(a) {
   const rejected = a.status === 'abgelehnt';
   const accepted = a.status === 'angenommen';
   return `<div class="track is-editable mb-5">
-      <div class="track-head"><span>Bewerbungsstand${rejected ? ' · <span class="text-red-300">abgelehnt</span>' : ''}</span><span class="track-hint">Schritt anklicken, um ihn zu ändern</span></div>
+      <div class="track-head"><span>Bewerbungsstand${rejected ? ' · <span class="text-red-300">abgelehnt</span>' : ''}</span></div>
       <div class="track-line"><div class="track-fill" style="width:${(idx / 3) * 75}%"></div>
       <div class="grid grid-cols-4">${APP_STEPS.map(([key, label], i) => {
         const last = i === 3;
