@@ -954,6 +954,27 @@ db.exec(`
   );
 `);
 
+// Mandantenkartei (routes/clients.js): interne Notizen und Vermerk je Mandant – Schlüssel „u<Konto-ID>“ oder „n:<name>“
+db.exec(`
+  CREATE TABLE IF NOT EXISTS client_notes (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_key  TEXT NOT NULL,
+    body        TEXT NOT NULL,
+    author_id   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    author_name TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_client_notes_key ON client_notes(client_key);
+  CREATE TABLE IF NOT EXISTS client_flags (
+    client_key  TEXT PRIMARY KEY,
+    flag        TEXT NOT NULL CHECK (flag IN ('vorkasse','sperre')),
+    reason      TEXT NOT NULL DEFAULT '',
+    set_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    set_by_name TEXT NOT NULL DEFAULT '',
+    set_at      TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
+
 /*
  * Nachrichten in der Akte (Chat Kanzlei ↔ Mandant): das sind die für den Mandanten sichtbaren Einträge in notes
  * (internal = 0, system = 0). Hier steht nur, bis wohin jemand gelesen hat (für „neu“-Hinweise und „gelesen“).

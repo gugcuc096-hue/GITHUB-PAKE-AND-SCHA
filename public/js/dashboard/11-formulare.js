@@ -8,6 +8,18 @@
    Formulare
    ================================================================ */
 const forms = {
+  'client-note': async (f) => {
+    const body = f.elements.body.value.trim();
+    if (!body) throw new Error('Bitte einen Text eingeben.');
+    f.elements.body.value = ''; // nicht als „ungespeicherte Eingabe“ nachfragen
+    showClient(await api.post(`/api/clients/${encodeURIComponent(f.dataset.key)}/notes`, { body }));
+    toast('Notiz gespeichert.');
+  },
+  'client-flag': async (f) => {
+    const flag = f.elements.flag.value;
+    showClient(await api.put(`/api/clients/${encodeURIComponent(f.dataset.key)}/flag`, { flag, reason: f.elements.reason.value.trim() }));
+    toast(flag ? 'Vermerk gespeichert.' : 'Vermerk aufgehoben.');
+  },
   'bot-ranks': async (f) => {
     const d = collectForm(f);
     const ranks = {};

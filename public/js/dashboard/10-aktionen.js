@@ -25,6 +25,19 @@ const actions = {
     toast(ok ? 'In die Zwischenablage kopiert.' : 'Kopieren nicht möglich – bitte manuell markieren.', ok ? 'ok' : 'error');
   },
 
+  // Mandantenkartei
+  'open-client': (el) => openClient(el.dataset.key),
+  'client-filter': (el) => {
+    st.clientFilter = el.dataset.value;
+    renderView();
+  },
+  'client-note-delete': async (el) => {
+    if (!(await ask('Die Notiz wird aus der Mandantenkartei gelöscht.', { title: 'Notiz löschen?', confirmText: 'Löschen', danger: true }))) return;
+    await api.del(`/api/clients/notes/${el.dataset.id}`);
+    showClient(await api.get('/api/clients/' + encodeURIComponent(st.clientCard.key)));
+    toast('Notiz gelöscht.');
+  },
+
   // Akten
   'case-filter': (el) => {
     st.caseFilter = el.dataset.value;

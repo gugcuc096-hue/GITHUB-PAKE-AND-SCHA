@@ -36,7 +36,9 @@ router.get('/', (req, res) => {
     : db.prepare(`${INVOICE_SELECT} WHERE c.client_id = ? OR i.client_user_id = ? ORDER BY i.created_at DESC, i.id DESC`).all(u.id, u.id);
   // Kanzlei: Link des Google Docs (fertige Rechnungen öffnen im Dashboard direkt das Doc)
   const docs = isStaff(u) ? require('../googleDocs').urls('invoice', rows.map((r) => r.id)) : new Map();
-  res.json({ invoices: rows.map((r) => ({ ...invoiceRow(r), googleDoc: docs.get(r.id) })) });
+  // Kanzlei: Schlüssel der Mandantenkartei (Empfänger in der Liste öffnet sie)
+  const clientKey = (r) => (r.client_user_id ? `u${r.client_user_id}` : r.case_client_id ? `u${r.case_client_id}` : r.client_name ? `n:${r.client_name}` : null);
+  res.json({ invoices: rows.map((r) => ({ ...invoiceRow(r), googleDoc: docs.get(r.id), clientKey: isStaff(u) ? clientKey(r) : undefined })) });
 });
 
 /** Briefkopf der Kanzlei (Anschrift, Kontakt) – z. B. für den Aktenauszug. */

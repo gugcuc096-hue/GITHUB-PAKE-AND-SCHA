@@ -1233,6 +1233,23 @@ body.ps-dialog-open { overflow: hidden; }
 .ticket-strip.strip-amber { border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.07); }
 .ticket-strip.strip-amber .ts-title { color: #fde68a; }
 .ticket-strip.strip-amber .ts-title .ico { color: #fbbf24; }
+.ticket-strip.strip-red { border-color: rgba(239, 68, 68, 0.45); background: rgba(239, 68, 68, 0.08); }
+.ticket-strip.strip-red .ts-title { color: #fecaca; }
+.ticket-strip.strip-red .ts-title .ico { color: #f87171; }
+
+/* Mandantenkartei */
+.section-title > .sec-count, .section-title > .sec-note { margin-right: auto; }
+@media (min-width: 768px) { .info-grid.stats-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.sec-count { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.72rem; color: var(--text-dim); padding: 0.05rem 0.45rem; border-radius: 6px; background: rgba(148, 163, 184, 0.12); }
+.sec-note { font-family: 'Inter', system-ui, sans-serif; font-size: 0.72rem; font-weight: 500; color: var(--text-dim); }
+.client-facts { line-height: 1.6; }
+.client-link { color: inherit; font-weight: inherit; text-align: left; }
+.client-link:hover { color: var(--gold-500); }
+.client-note-form { margin-bottom: 0.75rem; }
+.client-note { border-top: 1px solid var(--line); padding: 0.7rem 0.1rem; }
+.cn-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.78rem; color: var(--text-dim); }
+.cn-head strong { color: var(--text-muted); font-weight: 600; }
+.cn-body { white-space: pre-wrap; font-size: 0.9rem; margin-top: 0.25rem; word-break: break-word; }
 .ticket-strip .ts-hint { flex-basis: 100%; font-size: 0.74rem; color: var(--text-dim); line-height: 1.4; }
 .ticket-strip .pt-box { flex-basis: 100%; margin: 0.2rem 0 0.25rem; padding: 0.75rem 0.25rem 0; border: 0; border-top: 1px solid rgba(88, 101, 242, 0.35); border-radius: 0; background: none; }
 .pt-box { width: 100%; margin-bottom: 1.25rem; padding: 0.9rem 1rem; border-radius: 14px; border: 1px solid rgba(88, 101, 242, 0.45); background: rgba(88, 101, 242, 0.08); }

@@ -94,6 +94,7 @@ app.use('/api/cases/:id/external', externalRoutes.caseRouter);
 app.use('/api/cases/:id/contracts', contractRoutes.caseRouter);
 app.use('/api/cases/:id/fivenet', externalRoutes.caseRouter); // ältere Adresse, bleibt gültig
 app.use('/api/cases', require('./routes/cases'));
+app.use('/api/clients', require('./routes/clients').router);
 app.use('/api/fivenet', fivenetRoutes.router);
 app.use('/api/gdocs', externalRoutes.gdocsRouter);
 app.use('/api/gsheets', externalRoutes.gsheetsRouter);

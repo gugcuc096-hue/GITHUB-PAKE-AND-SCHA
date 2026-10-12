@@ -90,6 +90,7 @@ function notifyCreated(c, user) {
       c.urgency !== 'normal' ? { name: 'Dringlichkeit (Angabe Mandant)', value: URGENCY_LABEL[c.urgency] || c.urgency } : null,
       { name: 'Zuständig', value: lawyerNames(c) },
       { name: 'Angelegt von', value: user ? user.display_name : 'Website-Formular' },
+      require('./clients').flagField(c), // Kanzlei-Kanal, nie ins Ticket
     ],
     mentionIds: lawyerMentions(c, user),
   });
@@ -413,8 +414,15 @@ function caseDetail(c, u) {
   const invoiceDocs = gdocs ? gdocs.urls('invoice', invoices.map((i) => i.id)) : new Map();
   const contractDocs = gdocs ? gdocs.urls('contract', contracts.map((k) => k.id)) : new Map();
 
+  const clients = staff ? require('./clients') : null;
   return {
-    case: { ...caseRow(c, u), ...access },
+    case: {
+      ...caseRow(c, u),
+      ...access,
+      // Kanzlei: Mandantenkartei (Name in der Akte führt dorthin) und Vermerk wie „Nur gegen Vorkasse“
+      clientKey: clients ? clients.clientKeyForCase(c) : undefined,
+      clientFlag: clients ? clients.flagForCase(c) : undefined,
+    },
     notes: notes.map(noteRow),
     appointments: appointments.map((a) => apptRow(a, u)),
     invoices: invoices.map((i) => ({ ...invoiceRow(i), googleDoc: invoiceDocs.get(i.id) })),

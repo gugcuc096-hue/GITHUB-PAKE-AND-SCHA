@@ -86,6 +86,7 @@ router.post(
         { name: 'Rechtsgebiet', value: AREA_TITLES[d.area] },
         { name: 'Priorität', value: PRIORITY_DISCORD[c.priority] || PRIORITY_DISCORD[2] },
         d.urgency !== 'normal' ? { name: 'Dringlichkeit (Angabe Mandant)', value: URGENCY_LABEL[d.urgency] || d.urgency } : null,
+        require('./clients').flagField(c), // bekannter Mandant mit Vermerk (Kanzlei-Kanal, nie ins Ticket)
       ],
     });
 
