@@ -926,6 +926,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         assert.equal(webCase.priority, 3, 'Eilig → Hohe Priorität');
         const partner = (await adm.get('/api/directory')).json.lawyers.find((l) => l.displayName.includes('Scha'));
         const quiet = (await adm.post('/api/cases', { title: 'Körperverletzung Würfelpark', area: 'strafrecht', clientName: 'Toni', lawyerId: me.id, coLawyerIds: [partner.id] })).json.case;
+        await adm.post('/api/tasks', { title: 'Wiedervorlage Würfelpark', dueDate: new Date().toISOString().slice(0, 10) });
         // Seit 8 Tagen nichts passiert (Standard-Schwelle: 5 Tage)
         const { DatabaseSync } = require('node:sqlite');
         const sql = new DatabaseSync(path.join(ksrv.dir, 'test.db'));
@@ -934,6 +935,30 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
 
         const { ctx, page, problems, settle } = await open(device);
         await login(page, TEAM.admin, ksrv.base);
+        // Übersicht: liegengebliebene Akte wie in der Aktenliste („🕓 vor 8 Tagen“ + Streifen, kein Etikett), Aufgaben mit
+        // Fälligkeit und Knöpfen in einer Zeile, leere Pinnwand als schmale Zeile, Seite so breit wie die Aktenliste
+        await page.goto(`${ksrv.base}/dashboard.html#overview`);
+        await page.waitForSelector('#content .attention .list-row.row-idle');
+        await settle();
+        const ov = await page.evaluate(() => {
+          const idle = document.querySelector('#content .attention .list-row.row-idle');
+          const side = document.querySelector('#content .attention .task-row .side');
+          const [cd, btn] = [side.querySelector('.countdown'), side.querySelector('.icon-btn')].map((e) => e.getBoundingClientRect());
+          return {
+            idle: idle.querySelector('.act-idle')?.textContent.trim(),
+            tag: /liegt seit/.test(idle.textContent),
+            stripe: getComputedStyle(idle).boxShadow,
+            oneLine: Math.abs(cd.top + cd.bottom - btn.top - btn.bottom) <= 4,
+            quiet: [...document.querySelectorAll('#content .quiet-row .quiet-title')].map((e) => e.textContent),
+            maxWidth: getComputedStyle(document.querySelector('#content')).maxWidth,
+          };
+        });
+        assert.equal(ov.idle, 'vor 8 Tagen');
+        assert.equal(ov.tag, false, 'kein Etikett „liegt seit …“ in der Übersicht');
+        assert.match(ov.stripe, /rgb\(245, 158, 11\)/, 'Streifen wie in der Aktenliste');
+        assert.ok(ov.oneLine, 'Fälligkeit und Knöpfe der Aufgabe in einer Zeile');
+        assert.deepEqual(ov.quiet, ['Pinnwand'], 'leere Pinnwand als schmale Zeile, offene Anfrage (Lena Berg) als Kasten');
+        assert.equal(ov.maxWidth, '1760px', 'alle Seiten gleich breit');
         await page.goto(`${ksrv.base}/dashboard.html#cases`);
         await page.waitForSelector('#caseList tr.row');
         await settle();
@@ -944,6 +969,10 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         assert.match((await page.textContent(`${qRow} .case-meta`)).trim(), /^PS-\d{4}-\d{4}\s*·\s*Strafrecht$/);
         assert.ok((await page.$$eval('#caseList th', (ths) => ths.map((t) => t.textContent))).includes('Letzte Aktivität'));
         assert.equal((await page.textContent(`${qRow} td[data-label="Letzte Aktivität"] .act-idle`)).trim(), 'vor 8 Tagen');
+        // Status genauer als „In Bearbeitung“: der Schritt des Verfahrens bzw. „Offen“; Priorität kurz („Hoch“)
+        assert.equal((await page.textContent(`${qRow} td[data-label="Status"]`)).trim(), 'Eingang');
+        assert.equal((await page.textContent(`#caseList tr.row[data-id="${webCase.id}"] td[data-label="Status"]`)).trim(), 'Offen');
+        assert.equal((await page.textContent(`#caseList tr.row[data-id="${webCase.id}"] td[data-label="Priorität"]`)).trim(), 'Hoch');
         assert.match(await page.getAttribute(`${qRow} .act-idle`, 'title'), /Liegt seit 8 Tagen ohne Aktivität/);
         assert.equal((await page.textContent(`#caseList tr.row[data-id="${webCase.id}"] td[data-label="Letzte Aktivität"]`)).trim(), 'heute');
         assert.equal(await page.$(`#caseList tr.row[data-id="${webCase.id}"] .act-idle`), null);
@@ -995,9 +1024,14 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         // Status als Auswahl neben der Priorität (keine Status-Knöpfe mehr)
         assert.equal(await page.inputValue('#modalBody [data-case-status]'), 'offen');
         assert.equal(await page.$('#modalBody [data-action="case-status"]'), null);
-        await page.selectOption('#modalBody [data-case-status]', 'in_bearbeitung');
-        await page.waitForFunction(() => document.querySelector('#modalBody [data-case-status]')?.dataset.value === 'in_bearbeitung');
-        assert.match(await page.textContent('#modalBody .timeline'), /Status: Offen → In Bearbeitung/);
+        // Auswahl = genauer Stand: Offen, die vier Schritte, Abgeschlossen
+        assert.deepEqual(
+          await page.$$eval('#modalBody [data-case-status] option', (o) => o.map((x) => x.textContent)),
+          ['Offen', 'Eingang', 'Akteneinsicht', 'Strategie', 'Verhandlung', 'Abgeschlossen']
+        );
+        await page.selectOption('#modalBody [data-case-status]', 'step:1');
+        await page.waitForFunction(() => document.querySelector('#modalBody [data-case-status]')?.dataset.value === 'step:1');
+        assert.match(await page.textContent('#modalBody .timeline'), /Status: Offen → In Bearbeitung · Verfahrensstand: Akteneinsicht|Verfahrensstand: Akteneinsicht · Status: Offen → In Bearbeitung/);
         // Kennzahlen: erste Zeile im Raster der Angaben (Bezeichnung über dem Wert wie alle Angaben)
         assert.equal(await page.$$eval('#modalBody .info-grid .fact', (els) => els.length), 3);
         if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Aktenkopf passt aufs Handy');
@@ -1076,6 +1110,23 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
           const [t, b] = await page.$$eval('#modalBody #secBriefs > *', (els) => [els[0].getBoundingClientRect().top, els[2].getBoundingClientRect().top]);
           assert.ok(Math.abs(t - b) < 20, `Schriftsätze in einer Zeile (${t} / ${b})`);
         }
+        // Bearbeitungsstand: fünf Kreise ohne Hinweistext; der fünfte schließt das Verfahren (Rückfrage, Abbrechen ändert
+        // nichts), bei abgeschlossener Akte öffnet ein Schritt sie dort wieder
+        assert.equal(await page.$$eval('#modalBody .track .track-node', (n) => n.length), 5);
+        assert.doesNotMatch(await page.textContent('#modalBody .track'), /anklicken/);
+        await page.click('#modalBody [data-action="case-close"]');
+        await page.click('.ps-dialog [data-ps-dialog="cancel"]');
+        await page.waitForFunction(() => !document.querySelector('.ps-dialog'));
+        assert.equal(await page.inputValue('#modalBody [data-case-status]'), 'step:0', 'Abbrechen schließt nicht');
+        await page.click('#modalBody [data-action="case-close"]');
+        await page.click('.ps-dialog [data-ps-dialog="ok"]');
+        await page.waitForFunction(() => document.querySelectorAll('#modalBody .track-node.done').length === 5);
+        assert.equal(await page.inputValue('#modalBody [data-case-status]'), 'geschlossen');
+        assert.match(await page.textContent('#modalBody .timeline'), /Status: In Bearbeitung → Abgeschlossen/);
+        await page.click('#modalBody [data-action="case-reopen"][data-step="2"]');
+        await page.click('.ps-dialog [data-ps-dialog="ok"]');
+        await page.waitForFunction(() => document.querySelector('#modalBody [data-case-status]')?.value === 'step:2');
+        assert.equal(await page.$$eval('#modalBody .track-node.done', (n) => n.length), 2, 'wieder offen auf „Strategie“');
         // Knopf in der leeren Zeile funktioniert wie zuvor
         await page.click('#modalBody #secBriefs [data-action="brief-new"]');
         await page.waitForSelector('#modalBody form[data-form="brief-new"]');

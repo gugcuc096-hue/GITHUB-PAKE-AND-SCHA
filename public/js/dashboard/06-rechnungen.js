@@ -70,17 +70,19 @@ function invoiceTable(rows) {
           <td data-label="Akte">${i.caseNumber ? `<button class="text-gold font-mono text-xs hover:underline" data-action="open-case" data-id="${i.caseId}">${esc(i.caseNumber)}</button>` : '—'}</td>
           <td data-label="Betrag" class="font-mono nowrap" style="text-align:right">${money(i.total)}</td>
           <td data-label="Status">${invoiceBadge(i, true)}${staff && paymentReported(i) && i.paymentReport.note ? `<div class="text-xs text-dim pay-note">„${esc(i.paymentReport.note)}“</div>` : ''}</td>
-          <td data-label="Datum" class="text-xs text-dim nowrap"><div>${esc(fmtDate(i.createdAt))}${i.dueDate && i.status === 'offen' ? `<div${i.overdueDays > 0 ? ` class="text-red-300" title="${esc(overdueText(i))}"` : ''}>fällig ${esc(fmtDateOnly(i.dueDate))}</div>` : ''}${
-          staff && i.status === 'offen'
-            ? `<div><button type="button" class="remind-link" data-action="inv-remind" data-id="${i.id}" data-number="${esc(i.number)}" title="${esc(
-                i.remindedAt
-                  ? `${i.reminderCount === 1 ? '1 Erinnerung' : `${i.reminderCount} Erinnerungen`}, zuletzt ${fmtDate(i.remindedAt)} – klicken, um erneut zu erinnern (Discord-DM und Ticket)`
-                  : 'Zahlungserinnerung an den Mandanten senden (Discord-DM und Ticket)'
-              )}">${icon('bell', 'ico-sm')}<span>${i.remindedAt ? `erinnert ${esc(new Date(i.remindedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }))}` : 'Erinnern'}</span></button></div>`
-            : ''
-        }</div></td>
+          <td data-label="Datum" class="text-xs text-dim nowrap"><div>${esc(fmtDate(i.createdAt))}${i.dueDate && i.status === 'offen' ? `<div${i.overdueDays > 0 ? ` class="text-red-300" title="${esc(overdueText(i))}"` : ''}>fällig ${esc(fmtDateOnly(i.dueDate))}</div>` : ''}</div></td>
           <td class="td-actions inv-actions">
             <a class="btn-outline btn-sm" href="/invoice.html?id=${i.id}" target="_blank" rel="noopener">${icon('printer', 'ico-sm')}<span>PDF / Druck</span></a>
+            ${
+              // Zahlungserinnerung als normaler kleiner Knopf bei den Aktionen (stand früher klein unter dem Datum)
+              staff && i.status === 'offen'
+                ? `<button type="button" class="btn-ghost btn-sm" data-action="inv-remind" data-id="${i.id}" data-number="${esc(i.number)}" title="${esc(
+                    i.remindedAt
+                      ? `${i.reminderCount === 1 ? '1 Erinnerung' : `${i.reminderCount} Erinnerungen`}, zuletzt ${fmtDate(i.remindedAt)} – klicken, um erneut zu erinnern (Discord-DM und Ticket)`
+                      : 'Zahlungserinnerung an den Mandanten senden (Discord-DM und Ticket)'
+                  )}">${icon('bell', 'ico-sm')}<span>${i.remindedAt ? `erinnert ${esc(new Date(i.remindedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }))}` : 'Erinnern'}</span></button>`
+                : ''
+            }
             ${paymentButtons(i)}
             ${staff && i.status === 'offen' && !paymentReported(i) ? `<button class="btn-gold btn-sm" data-action="inv-status" data-id="${i.id}" data-status="bezahlt">Bezahlt</button><button class="btn-ghost btn-sm" data-action="inv-status" data-id="${i.id}" data-status="storniert">Storno</button>` : ''}
             ${staff && i.status !== 'offen' ? `<button class="btn-ghost btn-sm" data-action="inv-status" data-id="${i.id}" data-status="offen">Wieder offen</button>` : ''}
@@ -109,7 +111,7 @@ views.invoices = {
             <p class="page-sub">${staff ? 'Offizielle Rechnungen und Honorarvereinbarungen – als PDF speichern oder drucken.' : 'Rechnungen und Honorarvereinbarungen zu Ihren Mandaten.'}</p></div>
           ${staff ? `<div class="page-actions"><button class="btn-gold btn-md" data-action="new-invoice">${icon('plus')}<span>Neues Dokument</span></button></div>` : ''}
         </div>
-        ${staff ? `<div class="kpi-grid">
+        ${staff ? `<div class="kpi-grid kpi-grid-3">
           <div class="panel kpi"><div class="kpi-label">${icon('clock', 'ico-sm')}Offene Forderungen</div><div class="kpi-value">${money(sum('offen'))}</div><div class="kpi-sub">${count('offen')} offen</div></div>
           <div class="panel kpi"><div class="kpi-label">${icon('alert', 'ico-sm')}Überfällig</div><div class="kpi-value">${money(sum('ueberfaellig'))}</div><div class="kpi-sub">${count('ueberfaellig')} überfällig</div></div>
           <div class="panel kpi"><div class="kpi-label">${icon('check', 'ico-sm')}Bezahlt</div><div class="kpi-value">${money(sum('bezahlt'))}</div><div class="kpi-sub">${count('bezahlt')} Dokument(e)</div></div>

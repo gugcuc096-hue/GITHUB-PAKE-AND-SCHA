@@ -217,17 +217,38 @@ async function setCasePriority(sel) {
   await reloadCase(id);
 }
 
+/**
+ * Stand im Aktenkopf ändern: „offen“, „step:N“ (Schritt des Verfahrens, die Akte ist dann in Bearbeitung) oder
+ * „geschlossen“ (mit Rückfrage wie der Kreis „Abgeschlossen“).
+ */
 async function setCaseStatus(sel) {
   const id = Number(sel.dataset.id);
-  const status = sel.value;
+  const v = sel.value;
   try {
-    await api.patch('/api/cases/' + id, { status });
+    if (v === 'geschlossen') {
+      if (!(await closeCase(id))) sel.value = sel.dataset.value;
+      return;
+    }
+    await api.patch('/api/cases/' + id, v.startsWith('step:') ? { status: 'in_bearbeitung', step: Number(v.slice(5)) } : { status: v });
   } catch (err) {
     sel.value = sel.dataset.value;
     throw err;
   }
-  toast(`Status: ${CASE_STATUS[status][0]}`);
+  toast(`Stand: ${v.startsWith('step:') ? STEPS[Number(v.slice(5))] : CASE_STATUS[v][0]}`);
   await reloadCase(id);
+}
+
+/** Verfahren abschließen – mit Rückfrage, weil Mandant und Discord-Ticket es mitbekommen. false = abgebrochen. */
+async function closeCase(id) {
+  const ok = await ask('Die Akte wird als abgeschlossen markiert. Der Mandant sieht den Abschluss im Portal, ein Discord-Ticket wird archiviert. Wieder öffnen geht jederzeit über den Bearbeitungsstand.', {
+    title: 'Verfahren abschließen?',
+    confirmText: 'Abschließen',
+  });
+  if (!ok) return false;
+  await api.patch('/api/cases/' + id, { status: 'geschlossen' });
+  toast('Verfahren abgeschlossen');
+  await reloadCase(id);
+  return true;
 }
 
 /* ---------------------------------------------------------------- Nachrichten (Chat in Akte und Bewerbung) */
@@ -380,22 +401,28 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
   const staff = isStaff();
   const admin = isAdmin();
   const me = st.user.id;
-  const ratio = c.closed ? 1 : c.step / 3;
-
-  // Bearbeitungsstand: zuständige Anwälte klicken den gewünschten Schritt direkt an
-  const stepEditable = c.canEdit && !c.closed;
+  // Bearbeitungsstand: die vier Schritte des Verfahrens und als fünfter Kreis „Abgeschlossen“. Zuständige Anwälte klicken
+  // direkt an: einen Schritt, „Abgeschlossen“ (schließt das Verfahren) oder bei abgeschlossener Akte einen Schritt (öffnet
+  // sie wieder dort).
+  const stages = [...STEPS, 'Abgeschlossen'];
+  const last = stages.length - 1;
+  const at = c.closed ? last : c.step;
   const track = `
-      <div class="track ${stepEditable ? 'is-editable' : ''} mb-6">
-        ${stepEditable ? '<div class="track-head"><span>Bearbeitungsstand</span><span class="track-hint">Schritt anklicken, um ihn zu ändern</span></div>' : ''}
-        <div class="track-line"><div class="track-fill" style="width:${ratio * 75}%"></div>
-        <div class="grid grid-cols-4">${STEPS.map((s, i) => {
-        const done = c.closed || i < c.step;
-        const cur = !c.closed && i === c.step;
-        const inner = `<div class="track-node ${done ? 'done' : cur ? 'current' : ''}">${done ? '✓' : i + 1}</div><span class="track-label text-[0.7rem] sm:text-xs text-muted text-center">${s}</span>`;
-        return stepEditable && !cur
-          ? `<button type="button" class="track-step" data-action="case-step" data-id="${c.id}" data-step="${i}" title="Bearbeitungsstand: ${esc(s)}" aria-label="Bearbeitungsstand auf „${esc(s)}“ setzen">${inner}</button>`
-          : `<div class="track-step" ${cur ? 'aria-current="step"' : ''}>${inner}</div>`;
-      }).join('')}</div></div></div>`;
+      <div class="track track-5 ${c.canEdit ? 'is-editable' : ''} mb-6">
+        ${c.canEdit ? '<div class="track-head"><span>Bearbeitungsstand</span></div>' : ''}
+        <div class="track-line"><div class="track-fill" style="width:${(at / last) * 80}%"></div>
+        <div class="grid grid-cols-5">${stages
+          .map((s, i) => {
+            const done = i < at || (c.closed && i === last);
+            const cur = i === at && !c.closed;
+            const inner = `<div class="track-node ${done ? 'done' : cur ? 'current' : ''}">${done ? '✓' : i + 1}</div><span class="track-label text-[0.7rem] sm:text-xs text-muted text-center">${esc(STEP_BREAKS[s] || s)}</span>`;
+            const action = i === last ? 'case-close' : c.closed ? 'case-reopen' : 'case-step';
+            const label = i === last ? 'Verfahren abschließen' : c.closed ? `Akte wieder öffnen – Stand „${s}“` : `Bearbeitungsstand auf „${s}“ setzen`;
+            return c.canEdit && i !== at
+              ? `<button type="button" class="track-step" data-action="${action}" data-id="${c.id}" data-step="${i}" title="${esc(label)}" aria-label="${esc(label)}">${inner}</button>`
+              : `<div class="track-step" ${i === at ? 'aria-current="step"' : ''}>${inner}</div>`;
+          })
+          .join('')}</div></div></div>`;
 
   const info = [
     ['Mandant', c.clientName + (staff && !c.hasClientAccount ? ' (ohne Konto)' : '')],
@@ -419,11 +446,15 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     return `<${tag} class="prop ${cls}"${title ? ` title="${esc(title)}"` : ''}><span class="prop-k">${esc(key)}</span><span class="prop-v">${value}</span></${tag}>`;
   };
   const dot = '<i class="prop-dot" aria-hidden="true"></i>';
+  // Status = genauer Stand: Offen, ein Schritt des Verfahrens oder Abgeschlossen (statt nur „In Bearbeitung“)
+  const stageValue = c.status === 'in_bearbeitung' ? `step:${c.step}` : c.status;
   const statusValue = c.canEdit
-    ? `${dot}<select data-case-status data-id="${c.id}" data-value="${esc(c.status)}" aria-label="Status der Akte">${Object.entries(CASE_STATUS)
-        .map(([k, [l]]) => opt(k, l, c.status === k))
-        .join('')}</select>`
-    : `${dot}<span>${esc((CASE_STATUS[c.status] || [c.status])[0])}</span>`;
+    ? `${dot}<select data-case-status data-id="${c.id}" data-value="${esc(stageValue)}" aria-label="Stand der Akte">${[
+        opt('offen', 'Offen', stageValue === 'offen'),
+        ...STEPS.map((s, i) => opt(`step:${i}`, s, stageValue === `step:${i}`)),
+        opt('geschlossen', 'Abgeschlossen', stageValue === 'geschlossen'),
+      ].join('')}</select>`
+    : `${dot}<span>${esc(caseStage(c)[0])}</span>`;
   const prioValue = c.canEdit
     ? `${prioBars(prio)}<select data-case-priority data-id="${c.id}" data-value="${prio}" aria-label="Priorität der Akte">${Object.entries(PRIORITY)
         .map(([k, [l]]) => opt(k, l, Number(k) === prio))

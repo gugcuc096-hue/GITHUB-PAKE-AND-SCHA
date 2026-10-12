@@ -39,11 +39,11 @@ function caseLevelText(c) {
 /** Badge neben der Akte: Kanzlei sieht nur die Priorität, der Mandant seine Dringlichkeit. */
 const caseLevelBadge = (c) => (isStaff() ? priorityBadge(c) : c.urgency !== 'normal' && URGENCY[c.urgency] ? badge(...URGENCY[c.urgency]) : '');
 
-function caseListRow(c, extra = '') {
-  return `<div class="list-row" data-action="open-case" data-id="${c.id}" role="button" tabindex="0">
+function caseListRow(c, extra = '', cls = '') {
+  return `<div class="list-row${cls ? ` ${cls}` : ''}" data-action="open-case" data-id="${c.id}" role="button" tabindex="0">
       <div class="main"><div class="title">${esc(c.title)}</div>
         <div class="meta"><span class="font-mono text-gold">${esc(c.caseNumber)}</span> · ${esc(c.clientName)}${caseLevelText(c)}</div></div>
-      <div class="flex items-center gap-2 shrink-0">${extra || statusBadge(CASE_STATUS, c.status)}</div></div>`;
+      <div class="flex items-center gap-2 shrink-0">${extra || stageBadge(c)}</div></div>`;
 }
 
 function kpi(label, value, sub, ico, href) {
@@ -147,7 +147,7 @@ function attentionPanel() {
       ${due.length ? `<div class="task-list">${due.slice(0, 5).map((t) => taskItem(t)).join('')}</div>` : ''}
       ${due.length > 5 ? `<a href="#tasks" class="btn-ghost btn-sm mt-2">Alle ${due.length} fälligen Aufgaben anzeigen</a>` : ''}
       ${stale.length ? `<div class="${due.length ? 'mt-4' : ''}"><div class="text-xs uppercase tracking-widest text-dim mb-1">Ihre liegengebliebenen Akten (ohne Aktivität)</div>
-        ${stale.slice(0, 4).map((c) => caseListRow(c, idleBadge(c))).join('')}</div>` : ''}
+        ${stale.slice(0, 4).map((c) => caseListRow(c, activityCell(c), 'row-idle')).join('')}</div>` : ''}
     </section>`;
 }
 
@@ -252,10 +252,21 @@ views.overview = {
           ${pinned.length ? pinned.map((n) => `<div class="tl-item mb-2" style="border-left:3px solid ${NOTE_COLORS[n.color] || NOTE_COLORS.gold}"><div class="tl-meta"><strong class="text-muted">${esc(n.title || 'Notiz')}</strong> · ${esc(n.authorName)}</div><div class="tl-body">${esc(n.body.length > 220 ? n.body.slice(0, 220) + '…' : n.body)}</div></div>`).join('') : emptyLine('Keine angehefteten Notizen.', 'pin')}
         </section>`;
 
+    // Leere Bereiche (keine neuen Anfragen, nichts angeheftet) als schmale Zeile unten statt großem leerem Kasten –
+    // das Wichtige rückt nach oben; die übrigen Kästen paarweise, ein einzelner über die volle Breite
+    const quietRow = (ico, title, note, action = '') =>
+      `<div class="panel quiet-row">${icon(ico, 'ico-sm')}<span class="quiet-title">${esc(title)}</span><span class="sec-empty-note">${esc(note)}</span>${action ? `<span class="quiet-act">${action}</span>` : ''}</div>`;
+    const quiet = [
+      unassigned.length ? '' : quietRow('check', 'Neue Mandatsanfragen', 'alle Anfragen sind vergeben'),
+      pinned.length ? '' : quietRow('pin', 'Pinnwand', 'keine angehefteten Notizen', '<a href="#board" class="btn-ghost btn-sm">Zur Pinnwand</a>'),
+    ].join('');
+    const panels = [unassigned.length ? requestsPanel : '', eventsPanel, recentPanel, pinned.length ? boardPanel : ''].filter(Boolean);
+    const rows = [];
+    for (let i = 0; i < panels.length; i += 2) rows.push(`<div class="grid-2 ov-row${i ? ' mt-4 lg:mt-5' : ''}">${panels.slice(i, i + 2).join('')}</div>`);
     return `${head}
         ${attentionPanel()}
-        <div class="grid-2">${requestsPanel}${eventsPanel}</div>
-        <div class="grid-2 mt-4 lg:mt-5">${recentPanel}${boardPanel}</div>`;
+        ${rows.join('')}
+        ${quiet ? `<div class="quiet-rows">${quiet}</div>` : ''}`;
   },
 };
 
@@ -285,8 +296,6 @@ function caseMatches(c, f) {
 function caseCount(f) {
   return st.cases.filter((c) => caseMatches(c, f)).length;
 }
-/** Markierung „liegt seit X Tagen“ (offene Akte ohne Aktivität, Schwelle in den Einstellungen). */
-const idleBadge = (c) => (c.idleDays ? `<span class="badge badge-amber idle-badge" title="Seit ${dayCount(c.idleDays)} keine Aktivität in dieser Akte">liegt seit ${dayCount(c.idleDays)}</span>` : '');
 /** VIP / Lifetime des Mandanten als Badge. */
 function memberBadge(m) {
   if (!m) return '';
@@ -294,11 +303,11 @@ function memberBadge(m) {
 }
 // Offene Akten von Lifetime- und VIP-Mandanten stehen oben (sonst bleibt die Reihenfolge)
 const memberRank = (c) => (c.status === 'geschlossen' || !c.membership ? 0 : c.membership.kind === 'perma' ? 2 : 1);
-/** Prioritäts-Badge (nur Kanzlei), z. B. „Hohe Priorität“ mit Stufen-Anzeige. */
-function priorityBadge(c) {
+/** Prioritäts-Badge (nur Kanzlei), z. B. „Hohe Priorität“ mit Stufen-Anzeige; short: nur „Hoch“ (Spalte „Priorität“). */
+function priorityBadge(c, short = false) {
   const p = PRIORITY[c.priority] ? c.priority : 2;
-  const [, color, text] = PRIORITY[p];
-  return `<span class="badge badge-${color} prio-badge">${prioBars(p)}${esc(text)}</span>`;
+  const [label, color, text] = PRIORITY[p];
+  return `<span class="badge badge-${color} prio-badge"${short ? ` title="${esc(text)}"` : ''}>${prioBars(p)}${esc(short ? label : text)}</span>`;
 }
 /** Stufen-Anzeige der Priorität (1–4 Balken). */
 const prioBars = (p) => `<span class="prio-bars" aria-hidden="true">${[1, 2, 3, 4].map((i) => `<i class="${i <= p ? 'on' : ''}"></i>`).join('')}</span>`;
@@ -351,8 +360,8 @@ function caseTable() {
             <div class="font-medium">${esc(c.title)}${c.chatUnread ? ` <span class="chat-new" title="Neue Nachrichten">${icon('chat', 'ico-sm')}${c.chatUnread}</span>` : ''}</div></td>
           ${staff ? `<td data-label="Mandant">${esc(c.clientName)}${c.membership ? `<div class="mt-1">${memberBadge(c.membership)}</div>` : ''}</td>` : ''}
           <td data-label="Zuständig">${c.lawyerName ? `<div class="who"><span class="who-lead">${esc(c.lawyerName)}</span>${(c.coLawyers || []).length ? `<div class="text-xs text-dim">+ ${esc(c.coLawyers.map((l) => l.name).join(', '))}</div>` : ''}</div>` : badge('Unbesetzt', 'amber')}</td>
-          ${staff ? `<td data-label="Priorität">${priorityBadge(c)}</td>` : ''}
-          <td data-label="Status">${statusBadge(CASE_STATUS, c.status)}</td>
+          ${staff ? `<td data-label="Priorität">${priorityBadge(c, true)}</td>` : ''}
+          <td data-label="Status">${stageBadge(c)}</td>
           <td data-label="Letzte Aktivität" class="nowrap">${activityCell(c)}</td></tr>`
       )
       .join('')}</tbody></table></div>`;
@@ -391,7 +400,7 @@ function gsItem(type, x, q) {
   const ico = icon(GS_GROUPS.find((g) => g[0] === type)[2]);
   let body = '';
   if (type === 'cases')
-    body = line(`<span class="font-mono text-gold">${hl(x.caseNumber, q)}</span> · ${hl(x.title, q)}`, [hl(x.clientName, q), esc(CASE_STATUS[x.status] ? CASE_STATUS[x.status][0] : x.status), x.opponent ? `Gegenpartei: ${hl(x.opponent, q)}` : '', x.courtRef ? hl(x.courtRef, q) : ''].filter(Boolean).join(' · '));
+    body = line(`<span class="font-mono text-gold">${hl(x.caseNumber, q)}</span> · ${hl(x.title, q)}`, [hl(x.clientName, q), esc(caseStage(x)[0]), x.opponent ? `Gegenpartei: ${hl(x.opponent, q)}` : '', x.courtRef ? hl(x.courtRef, q) : ''].filter(Boolean).join(' · '));
   else if (type === 'clients')
     body = line(`${hl(x.name, q)}${x.active ? '' : ' <span class="text-dim">(gesperrt)</span>'}`, [hl(x.email, q), x.phone ? hl(x.phone, q) : '', `${x.caseCount} ${x.caseCount === 1 ? 'Akte' : 'Akten'}`].filter(Boolean).join(' · '));
   else if (type === 'invoices')
@@ -531,7 +540,7 @@ views.cases = {
   },
   render() {
     const staff = isStaff();
-    const filters = [['aktiv', 'Aktiv'], ['offen', 'Offen'], ['in_bearbeitung', 'In Bearbeitung'], ['geschlossen', 'Geschlossen'], ['alle', 'Alle']];
+    const filters = [['aktiv', 'Aktiv'], ['offen', 'Offen'], ['in_bearbeitung', 'In Bearbeitung'], ['geschlossen', 'Abgeschlossen'], ['alle', 'Alle']];
     // „Liegengeblieben“ erscheint nur, wenn es solche Akten gibt (oder der Filter gerade gewählt ist)
     if (staff && (caseCount('liegt') || st.caseFilter === 'liegt')) filters.splice(3, 0, ['liegt', 'Liegengeblieben']);
     return `

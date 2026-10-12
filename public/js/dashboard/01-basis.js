@@ -19,9 +19,11 @@ const askDelete = (title, message, confirmText = 'Löschen') => ask(message, { t
    ================================================================ */
 const ROLES = { mandant: 'Mandant', anwalt: 'Anwalt', admin: 'Board of Partners' };
 const STEPS = ['Eingang', 'Akteneinsicht', 'Strategie', 'Verhandlung'];
+// Trennstellen (weicher Trennstrich) für die Kreise des Bearbeitungsstands – am Handy sonst zu eng
+const STEP_BREAKS = { Akteneinsicht: 'Akten\u00adeinsicht', Verhandlung: 'Ver\u00adhandlung', Abgeschlossen: 'Abge\u00adschlossen' };
 const AREAS = { strafrecht: 'Strafrecht', zivilrecht: 'Zivilrecht', verfassungsrecht: 'Verfassungsrecht', vertragsrecht: 'Vertragsrecht', sonstiges: 'Sonstiges' };
 const URGENCY = { normal: ['Normal', 'slate'], eilig: ['Eilig', 'amber'], notfall: ['Notfall', 'red'] };
-const CASE_STATUS = { offen: ['Offen', 'amber'], in_bearbeitung: ['In Bearbeitung', 'sky'], geschlossen: ['Geschlossen', 'slate'] };
+const CASE_STATUS = { offen: ['Offen', 'amber'], in_bearbeitung: ['In Bearbeitung', 'sky'], geschlossen: ['Abgeschlossen', 'slate'] };
 // Priorität einer Akte (nur für die Kanzlei sichtbar)
 // [Auswahl, Farbe, Anzeige]
 const PRIORITY = {
@@ -274,6 +276,12 @@ const isAdmin = () => !!st.user && st.user.role === 'admin';
 const isBoard = () => !!st.user && !!st.user.board;
 const badge = (text, color = 'gold') => `<span class="badge badge-${color}">${esc(text)}</span>`;
 const statusBadge = (map, key) => badge(...(map[key] || [key, 'slate']));
+/**
+ * Stand einer Akte, wie ihn Liste, Suche und Aktenkopf zeigen – genauer als „In Bearbeitung“: offene Anfrage, der
+ * Schritt des Verfahrens (Eingang … Verhandlung) oder abgeschlossen. [Bezeichnung, Farbe]
+ */
+const caseStage = (c) => (c.status === 'geschlossen' ? ['Abgeschlossen', 'slate'] : c.status === 'offen' ? ['Offen', 'amber'] : [STEPS[c.step] || STEPS[0], 'sky']);
+const stageBadge = (c) => badge(...caseStage(c));
 /**
  * Leerer Abschnitt der Akte als eine Zeile: „Titel · noch keine … · Knöpfe“ statt Überschrift plus Erklärtext.
  * hint: längere Erklärung als Tooltip; actions: fertiges HTML (Knöpfe).

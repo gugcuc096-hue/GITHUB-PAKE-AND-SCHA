@@ -2,7 +2,7 @@
 const { z } = require('zod');
 
 const STEPS = ['Eingang', 'Akteneinsicht', 'Strategie', 'Verhandlung'];
-const CASE_STATUS = { offen: 'Offen', in_bearbeitung: 'In Bearbeitung', geschlossen: 'Geschlossen' };
+const CASE_STATUS = { offen: 'Offen', in_bearbeitung: 'In Bearbeitung', geschlossen: 'Abgeschlossen' };
 const AREAS = ['strafrecht', 'zivilrecht', 'verfassungsrecht', 'vertragsrecht', 'sonstiges'];
 const URGENCIES = ['normal', 'eilig', 'notfall'];
 // Dringlichkeit = Angabe des Mandanten beim Einreichen; Priorität = Einschätzung der Kanzlei (nur intern).
