@@ -505,6 +505,7 @@ caseRouter.post(
       return Number(info.lastInsertRowid);
     });
     logActivity(req.user, kind === 'schriftsatz' ? 'Schriftsatz erstellt' : 'Vertrag erstellt', 'case', c.id, `${c.case_number}: ${t.name}`);
+    require('../googleDocs').ensure('contract', id); // Google Doc gleich mit anlegen (wenn verbunden)
     if (kind === 'schriftsatz') {
       // Interne Schriftsätze erscheinen nicht im Ticket; muss der Mandant unterschreiben, wird er einmal erwähnt
       if (!internal) {

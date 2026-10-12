@@ -3,6 +3,10 @@
  * Google Docs der Kanzlei: Rechnungen, Verträge/Schriftsätze und Aktenauszüge als Google Doc mit festem Link
  * („Jeder mit dem Link kann ansehen“), angelegt im Google Drive des Kanzlei-Kontos (googleDrive.js).
  *
+ * Rechnungen, Verträge und Schriftsätze bekommen ihr Doc automatisch – gleich beim Anlegen, vorhandene Dokumente
+ * werden nachgeholt (Start, Verbinden, alle 10 Minuten). Wer die Freigabe eines Dokuments bewusst beendet, dem legt
+ * der Server dafür keins mehr an (google_docs_optout), bis jemand es selbst wieder anlegt.
+ *
  * Ändert sich etwas – Unterschrift, Rechnungsstatus, Vertragstext, Angaben der Akte –, schreibt der Server das
  * Doc automatisch neu; Link und Freigabe bleiben gleich. Ein Aktenauszug ist eine Momentaufnahme mit den
  * gewählten Abschnitten und wird auf Knopfdruck aktualisiert. Gelöschte Rechnungen/Verträge (und endgültig
@@ -235,6 +239,84 @@ function removeForCase(caseId) {
   for (const r of db.prepare("SELECT kind, ref_id FROM google_docs WHERE case_id = ? AND kind IN ('contract', 'extract')").all(caseId)) remove(r.kind, r.ref_id);
 }
 
+/* ---------------------------------------------------------------- Automatisch anlegen */
+// Aktenauszüge nicht – die entstehen mit gewählten Abschnitten auf Knopfdruck.
+const AUTO_SQL = {
+  invoice: `SELECT i.id FROM invoices i
+             WHERE NOT EXISTS (SELECT 1 FROM google_docs g WHERE g.kind = 'invoice' AND g.ref_id = i.id)
+               AND NOT EXISTS (SELECT 1 FROM google_docs_optout o WHERE o.kind = 'invoice' AND o.ref_id = i.id)
+             ORDER BY i.id`,
+  contract: `SELECT k.id FROM case_contracts k
+              WHERE NOT EXISTS (SELECT 1 FROM google_docs g WHERE g.kind = 'contract' AND g.ref_id = k.id)
+                AND NOT EXISTS (SELECT 1 FROM google_docs_optout o WHERE o.kind = 'contract' AND o.ref_id = k.id)
+              ORDER BY k.id`,
+};
+const MAX_AUTO_TRIES = 3; // je Dokument und Serverstart – danach bleibt es beim Knopf in der Druckansicht
+const autoFails = new Map();
+const optedOut = (kind, refId) => !!db.prepare('SELECT 1 FROM google_docs_optout WHERE kind = ? AND ref_id = ?').get(kind, refId);
+
+/** Doc für ein Dokument anlegen, falls es noch keins gibt (läuft in der Warteschlange). Wirft nie. */
+async function autoCreate(kind, refId) {
+  if (!drive.connected() || rowFor(kind, refId) || optedOut(kind, refId)) return;
+  const key = `${kind}:${refId}`;
+  try {
+    const doc = await build(kind, refId, {});
+    if (!doc) return; // inzwischen gelöscht
+    const f = await drive.createDoc(kind, doc.name, doc.docx);
+    db.prepare(
+      "INSERT INTO google_docs (kind, ref_id, case_id, file_id, url, options, created_by, created_by_name, synced_at) VALUES (?, ?, ?, ?, ?, '{}', NULL, '', datetime('now'))"
+    ).run(kind, refId, doc.caseId, f.id, f.url);
+    autoFails.delete(key);
+  } catch (err) {
+    autoFails.set(key, (autoFails.get(key) || 0) + 1);
+    console.warn(`Google Doc (${kind} ${refId}) konnte nicht automatisch angelegt werden:`, err.message);
+  }
+}
+
+/** Gleich nach dem Anlegen einer Rechnung bzw. eines Vertrags/Schriftsatzes. */
+function ensure(kind, refId) {
+  optIn(kind, refId); // neues Dokument (SQLite vergibt Nummern gelöschter Einträge neu) → kein alter Vermerk
+  if (!drive.connected()) return;
+  serial(() => autoCreate(kind, Number(refId))).catch(() => {});
+}
+
+/** Fehlende Docs für vorhandene Dokumente nachholen – nacheinander im Hintergrund. Anzahl der vorgemerkten. */
+let ensuring = false;
+function ensureAll() {
+  if (!drive.connected() || ensuring) return 0;
+  const todo = [];
+  for (const kind of Object.keys(AUTO_SQL)) {
+    for (const r of db.prepare(AUTO_SQL[kind]).all()) if ((autoFails.get(`${kind}:${r.id}`) || 0) < MAX_AUTO_TRIES) todo.push([kind, r.id]);
+  }
+  if (!todo.length) return 0;
+  ensuring = true;
+  (async () => {
+    try {
+      for (const [kind, id] of todo) await serial(() => autoCreate(kind, id));
+    } finally {
+      ensuring = false;
+    }
+  })();
+  return todo.length;
+}
+
+/** „Freigabe beenden“: kein automatisches Doc mehr für dieses Dokument … */
+function optOut(kind, refId) {
+  if (kind !== 'extract') db.prepare('INSERT OR IGNORE INTO google_docs_optout (kind, ref_id) VALUES (?, ?)').run(kind, Number(refId));
+}
+/** … bis jemand es selbst wieder anlegt. */
+function optIn(kind, refId) {
+  db.prepare('DELETE FROM google_docs_optout WHERE kind = ? AND ref_id = ?').run(kind, Number(refId));
+}
+
+/** Links der Docs für Listen im Dashboard: Map ref_id → url. */
+function urls(kind, refIds) {
+  const ids = [...new Set(refIds.map(Number).filter(Boolean))];
+  if (!ids.length) return new Map();
+  const rows = db.prepare(`SELECT ref_id, url FROM google_docs WHERE kind = ? AND ref_id IN (${ids.map(() => '?').join(',')})`).all(kind, ...ids);
+  return new Map(rows.map((r) => [r.ref_id, r.url]));
+}
+
 /** Markierte (z. B. wegen Störung nicht geschriebene) Docs nachholen. */
 function retryPending() {
   if (!drive.connected()) return 0;
@@ -257,8 +339,32 @@ function stats() {
 }
 
 function start() {
-  setTimeout(retryPending, 5000).unref();
-  setInterval(retryPending, RETRY_MS).unref();
+  const run = () => {
+    retryPending();
+    ensureAll();
+  };
+  setTimeout(run, 5000).unref();
+  setInterval(run, RETRY_MS).unref();
 }
 
-module.exports = { KINDS, rowFor, docInfo, publish, touch, touchCase, touchKind, remove, removeForCase, retryPending, resyncAll, stats, start, extractOptions };
+module.exports = {
+  KINDS,
+  rowFor,
+  docInfo,
+  publish,
+  touch,
+  touchCase,
+  touchKind,
+  remove,
+  removeForCase,
+  retryPending,
+  resyncAll,
+  stats,
+  start,
+  extractOptions,
+  ensure,
+  ensureAll,
+  optOut,
+  optIn,
+  urls,
+};

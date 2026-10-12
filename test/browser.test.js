@@ -201,6 +201,12 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       await page.click('#invoiceForm [data-action="inv-back"]');
       await backInCase('Rechnung → Abbrechen');
 
+      // Dokumente ohne Druckersymbol: die Nummer öffnet die Ansicht der Website, das Symbol daneben ebenso
+      // (ohne verbundenes Google-Konto gibt es kein Google Doc – sonst öffnet das Symbol direkt das Doc)
+      assert.equal(await page.$$eval('#modalBody svg path', (ps) => ps.filter((p) => (p.getAttribute('d') || '').startsWith('M17 17h2')).length), 0, 'kein Druckersymbol in der Akte');
+      assert.equal(await page.getAttribute(`#secInvoices a.doc-title[href="/invoice.html?id=${data.invoiceId}"]`, 'target'), '_blank');
+      assert.equal(await page.getAttribute(`#secInvoices a.icon-btn[href="/invoice.html?id=${data.invoiceId}"]`, 'aria-label'), 'Ansehen / PDF');
+
       // Weit unten in der Akte: das X bleibt oben rechts sichtbar und klickbar
       await page.$eval(scroller, (el) => (el.scrollTop = el.scrollHeight));
       await page.waitForTimeout(300);

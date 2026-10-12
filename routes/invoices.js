@@ -34,7 +34,9 @@ router.get('/', (req, res) => {
   const rows = isStaff(u)
     ? db.prepare(`${INVOICE_SELECT} ORDER BY i.created_at DESC, i.id DESC`).all()
     : db.prepare(`${INVOICE_SELECT} WHERE c.client_id = ? OR i.client_user_id = ? ORDER BY i.created_at DESC, i.id DESC`).all(u.id, u.id);
-  res.json({ invoices: rows.map(invoiceRow) });
+  // Kanzlei: Link des Google Docs (fertige Rechnungen öffnen im Dashboard direkt das Doc)
+  const docs = isStaff(u) ? require('../googleDocs').urls('invoice', rows.map((r) => r.id)) : new Map();
+  res.json({ invoices: rows.map((r) => ({ ...invoiceRow(r), googleDoc: docs.get(r.id) })) });
 });
 
 /** Briefkopf der Kanzlei (Anschrift, Kontakt) – z. B. für den Aktenauszug. */
@@ -224,6 +226,7 @@ router.post(
       });
     }
     const inv = db.prepare(`${INVOICE_SELECT} WHERE i.id = ?`).get(Number(info.lastInsertRowid));
+    require('../googleDocs').ensure('invoice', inv.id); // Google Doc gleich mit anlegen (wenn verbunden)
     res.status(201).json({ invoice: invoiceRow(inv) });
   })
 );

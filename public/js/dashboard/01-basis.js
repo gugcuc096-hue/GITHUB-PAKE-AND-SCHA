@@ -57,7 +57,7 @@ const DISCORD_MSG = {
 };
 
 const GOOGLE_MSG = {
-  verbunden: ['Google-Konto der Kanzlei verbunden – Google Docs sind jetzt in den Druckansichten verfügbar.', 'ok'],
+  verbunden: ['Google-Konto der Kanzlei verbunden – Rechnungen, Verträge und Schriftsätze bekommen jetzt automatisch ein Google Doc, die Datensicherung kommt zusätzlich ins Google Drive.', 'ok'],
   abgebrochen: ['Die Verbindung mit Google wurde abgebrochen.', 'error'],
   drive: ['Google hat keinen Zugriff auf Google Drive erteilt – bitte erneut verbinden und den Haken bei Google Drive setzen.', 'error'],
   dauerhaft: ['Google hat keinen dauerhaften Zugang geliefert. Bitte unter myaccount.google.com → Sicherheit den Zugriff der App entfernen und erneut verbinden.', 'error'],
