@@ -324,24 +324,36 @@ function sortCases(list) {
   return list.sort(sorters[mode] || sorters.aktualisiert);
 }
 
+/**
+ * Letzte Aktivität einer Akte: „heute“, „gestern“, „vor 5 Tagen“ (genaue Zeit im Tooltip). Liegt die Akte (nur Kanzlei),
+ * steht der Wert in Bernstein mit Uhr – statt einer eigenen Markierung unter dem Titel.
+ */
+function activityCell(c) {
+  const when = esc(relDays(c.updatedAt));
+  if (!c.idleDays) return `<span class="text-muted" title="${esc(fmtDate(c.updatedAt))}">${when}</span>`;
+  return `<span class="act-idle" title="Liegt seit ${dayCount(c.idleDays)} ohne Aktivität (zuletzt ${esc(fmtDate(c.updatedAt))})">${icon('clock', 'ico-sm')}${when}</span>`;
+}
+
 function caseTable() {
   const rows = sortCases(filteredCases());
   const staff = isStaff();
   if (!rows.length) {
     return empty(st.cases.length ? 'Keine Akten für diese Auswahl.' : staff ? 'Noch keine Akten angelegt.' : 'Sie haben noch kein Mandat eingereicht.', 'folder');
   }
+  // Je Akte zwei Zeilen: „Aktenzeichen · Rechtsgebiet“, darunter der Titel. Liegengebliebene Akten: Streifen am Zeilenanfang
+  // und „Letzte Aktivität“ in Bernstein.
   return `<div class="tbl-wrap"><table class="tbl tbl-cards">
-      <thead><tr><th>Akte</th>${staff ? '<th>Mandant</th>' : ''}<th>Zuständig</th>${staff ? '<th>Priorität</th>' : ''}<th>Status</th><th>Aktualisiert</th></tr></thead>
+      <thead><tr><th>Akte</th>${staff ? '<th>Mandant</th>' : ''}<th>Zuständig</th>${staff ? '<th>Priorität</th>' : ''}<th>Status</th><th>Letzte Aktivität</th></tr></thead>
       <tbody>${rows
       .map(
-        (c) => `<tr class="row" data-action="open-case" data-id="${c.id}">
-          <td class="td-main"><div class="font-mono text-gold text-xs">${esc(c.caseNumber)}</div><div class="font-medium">${esc(c.title)}${c.chatUnread ? ` <span class="chat-new" title="Neue Nachrichten">${icon('chat', 'ico-sm')}${c.chatUnread}</span>` : ''}</div>
-            <div class="text-xs text-dim mt-1 flex flex-wrap items-center gap-2">${esc(AREAS[c.area] || c.area)}${staff ? idleBadge(c) : caseLevelBadge(c)}</div></td>
+        (c) => `<tr class="row${c.idleDays ? ' row-idle' : ''}" data-action="open-case" data-id="${c.id}">
+          <td class="td-main"><div class="case-meta"><span class="font-mono text-gold text-xs">${esc(c.caseNumber)}</span><span class="case-dot" aria-hidden="true">·</span><span>${esc(AREAS[c.area] || c.area)}</span>${staff ? '' : caseLevelBadge(c)}</div>
+            <div class="font-medium">${esc(c.title)}${c.chatUnread ? ` <span class="chat-new" title="Neue Nachrichten">${icon('chat', 'ico-sm')}${c.chatUnread}</span>` : ''}</div></td>
           ${staff ? `<td data-label="Mandant">${esc(c.clientName)}${c.membership ? `<div class="mt-1">${memberBadge(c.membership)}</div>` : ''}</td>` : ''}
-          <td data-label="Zuständig">${c.lawyerName ? `${esc(c.lawyerName)}${(c.coLawyers || []).length ? `<div class="text-xs text-dim">+ ${esc(c.coLawyers.map((l) => l.name).join(', '))}</div>` : ''}` : badge('Unbesetzt', 'amber')}</td>
+          <td data-label="Zuständig">${c.lawyerName ? `<div class="who"><span class="who-lead">${esc(c.lawyerName)}</span>${(c.coLawyers || []).length ? `<div class="text-xs text-dim">+ ${esc(c.coLawyers.map((l) => l.name).join(', '))}</div>` : ''}</div>` : badge('Unbesetzt', 'amber')}</td>
           ${staff ? `<td data-label="Priorität">${priorityBadge(c)}</td>` : ''}
           <td data-label="Status">${statusBadge(CASE_STATUS, c.status)}</td>
-          <td data-label="Aktualisiert" class="text-dim text-xs nowrap">${esc(fmtDate(c.updatedAt))}</td></tr>`
+          <td data-label="Letzte Aktivität" class="nowrap">${activityCell(c)}</td></tr>`
       )
       .join('')}</tbody></table></div>`;
 }

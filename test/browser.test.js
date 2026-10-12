@@ -924,7 +924,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         assert.equal(web.status, 201, web.text);
         const webCase = (await adm.get('/api/cases')).json.cases.find((c) => c.caseNumber === web.json.caseNumber);
         assert.equal(webCase.priority, 3, 'Eilig → Hohe Priorität');
-        const quiet = (await adm.post('/api/cases', { title: 'Körperverletzung Würfelpark', area: 'strafrecht', clientName: 'Toni', lawyerId: me.id })).json.case;
+        const partner = (await adm.get('/api/directory')).json.lawyers.find((l) => l.displayName.includes('Scha'));
+        const quiet = (await adm.post('/api/cases', { title: 'Körperverletzung Würfelpark', area: 'strafrecht', clientName: 'Toni', lawyerId: me.id, coLawyerIds: [partner.id] })).json.case;
         // Seit 8 Tagen nichts passiert (Standard-Schwelle: 5 Tage)
         const { DatabaseSync } = require('node:sqlite');
         const sql = new DatabaseSync(path.join(ksrv.dir, 'test.db'));
@@ -936,8 +937,34 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.goto(`${ksrv.base}/dashboard.html#cases`);
         await page.waitForSelector('#caseList tr.row');
         await settle();
-        // Aktenliste: Markierung und eigener Filter
-        assert.match(await page.textContent(`#caseList tr.row[data-id="${quiet.id}"] .td-main`), /liegt seit 8 Tagen/);
+        // Aktenliste: kein Etikett unter dem Titel – „Aktenzeichen · Rechtsgebiet“ in einer Zeile, liegengeblieben steht in
+        // „Letzte Aktivität“ (Bernstein, Uhr) und als Streifen am Zeilenanfang; eigener Filter
+        const qRow = `#caseList tr.row[data-id="${quiet.id}"]`;
+        assert.doesNotMatch(await page.textContent(`${qRow} .td-main`), /liegt seit/);
+        assert.match((await page.textContent(`${qRow} .case-meta`)).trim(), /^PS-\d{4}-\d{4}\s*·\s*Strafrecht$/);
+        assert.ok((await page.$$eval('#caseList th', (ths) => ths.map((t) => t.textContent))).includes('Letzte Aktivität'));
+        assert.equal((await page.textContent(`${qRow} td[data-label="Letzte Aktivität"] .act-idle`)).trim(), 'vor 8 Tagen');
+        assert.match(await page.getAttribute(`${qRow} .act-idle`, 'title'), /Liegt seit 8 Tagen ohne Aktivität/);
+        assert.equal((await page.textContent(`#caseList tr.row[data-id="${webCase.id}"] td[data-label="Letzte Aktivität"]`)).trim(), 'heute');
+        assert.equal(await page.$(`#caseList tr.row[data-id="${webCase.id}"] .act-idle`), null);
+        const list = await page.evaluate((sel) => {
+          const row = document.querySelector(sel);
+          const lead = row.querySelector('.who-lead');
+          const card = getComputedStyle(row).display === 'block'; // Handy: Zeilen als Karten, Streifen am Kartenrand
+          return {
+            stripe: getComputedStyle(card ? row : row.cells[0]).boxShadow,
+            otherStripe: [...document.querySelectorAll('#caseList tr.row:not(.row-idle)')].map((r) => getComputedStyle(r).boxShadow + getComputedStyle(r.cells[0]).boxShadow).join(''),
+            leadLines: lead.getClientRects().length,
+            coBelow: lead.parentElement.lastElementChild.getBoundingClientRect().top >= lead.getBoundingClientRect().bottom - 1,
+            maxWidth: getComputedStyle(document.querySelector('#content')).maxWidth,
+          };
+        }, qRow);
+        assert.match(list.stripe, /rgb\(245, 158, 11\)/, `Streifen am Zeilenanfang (${list.stripe})`);
+        assert.doesNotMatch(list.otherStripe, /rgb\(245, 158, 11\)/, 'kein Streifen bei aktiven Akten');
+        // Handy-Karte: Haupt- und Mitanwälte als ein Block rechts – früher zerriss der Name mitten in der Karte
+        if (device === PHONE) assert.equal(list.leadLines, 1, 'federführender Anwalt in einer Zeile');
+        assert.ok(list.coBelow, 'Mitanwälte unter dem federführenden Anwalt');
+        assert.equal(list.maxWidth, '1760px', 'Aktenliste darf breiter werden');
         // Einheitlich: alle Markierungen (Status, Priorität, „liegt seit …“) im selben Stil – flaches Etikett, kein Knopf-Rand
         const tags = await page.$$eval('#caseList .badge', (els) => {
           const body = getComputedStyle(document.body).fontFamily;

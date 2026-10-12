@@ -209,6 +209,8 @@ input[type="datetime-local"].field, input[type="date"].field { color-scheme: dar
 .tbl tr:last-child td { border-bottom: none; }
 .tbl tr.row { cursor: pointer; transition: background 0.15s ease; }
 .tbl tr.row:hover td { background: rgba(212, 175, 55, 0.05); }
+/* Liegengebliebene Akte: dünner Streifen in Bernstein am Zeilenanfang (am Handy am Kartenrand) */
+.tbl tr.row-idle td:first-child { box-shadow: inset 3px 0 0 #f59e0b; }
 .tbl tr.is-selected td { background: rgba(212, 175, 55, 0.09); }
 .tbl tr.is-selected td:first-child { box-shadow: inset 3px 0 0 var(--gold-500); }
 .td-actions { text-align: right; white-space: nowrap; }
@@ -229,6 +231,8 @@ input[type="datetime-local"].field, input[type="date"].field { color-scheme: dar
   .tbl-cards tr.is-selected { border-color: var(--gold-500); }
   .tbl-cards tr.is-selected td { background: transparent; }
   .tbl-cards tr.is-selected td:first-child { box-shadow: none; }
+  .tbl-cards tr.row-idle td:first-child { box-shadow: none; }
+  .tbl-cards tr.row-idle { box-shadow: inset 3px 0 0 #f59e0b; }
 }
 
 /* ---------------------------------------------------------------- Aktenfortschritt */
@@ -297,6 +301,11 @@ label.prop:hover { border-color: rgba(255, 255, 255, 0.22); }
 }
 /* Prioritäts-Badge mit kleiner Stufen-Anzeige (1–4 Balken) */
 .prio-badge { gap: 0.4rem; }
+/* Aktenliste: „Aktenzeichen · Rechtsgebiet“ in einer Zeile, darunter der Titel */
+.case-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.15rem 0.45rem; margin-bottom: 0.2rem; font-size: 0.75rem; color: var(--text-dim); }
+/* Letzte Aktivität: liegengebliebene Akte in Bernstein mit Uhr */
+.act-idle { display: inline-flex; align-items: center; gap: 0.35rem; color: #fcd34d; font-weight: 500; }
+.act-idle .ico-sm { width: 15px; height: 15px; }
 .prio-bars { display: inline-flex; align-items: flex-end; gap: 1.5px; height: 10px; }
 .prio-bars i { width: 2.5px; border-radius: 1px; background: currentColor; opacity: 0.25; }
 .prio-bars i:nth-child(1) { height: 4px; }
@@ -405,6 +414,8 @@ a:hover > .brand-logo { transform: scale(1.04); }
   background: var(--gold-500); color: #02050e; font-size: 0.65rem; font-weight: 700; line-height: 1.15rem; text-align: center;
 }
 .content { padding: 1.25rem 1rem calc(var(--bottomnav-h) + var(--safe-bottom) + 2rem); max-width: 1400px; margin: 0 auto; }
+/* Aktenliste: auf großen Bildschirmen breiter, damit Titel in eine Zeile passen statt sich zu stapeln */
+.content[data-view="cases"] { max-width: 1760px; }
 .bottom-nav {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 45; display: grid; grid-template-columns: repeat(5, 1fr);
   height: calc(var(--bottomnav-h) + var(--safe-bottom)); padding-bottom: var(--safe-bottom);
