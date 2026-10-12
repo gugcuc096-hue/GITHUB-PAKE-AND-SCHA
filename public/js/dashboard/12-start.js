@@ -140,6 +140,9 @@ document.addEventListener('input', (e) => {
   if (t.id === 'caseSearch') {
     st.caseQuery = t.value;
     $('#caseList').innerHTML = caseTable();
+  } else if (t.id === 'clientSearch') {
+    st.clientQuery = t.value;
+    $('#clientList').innerHTML = clientTable();
   } else if (t.classList && t.classList.contains('chat-input')) {
     // Eingabefeld wächst mit (bis zu einigen Zeilen)
     t.style.height = 'auto';

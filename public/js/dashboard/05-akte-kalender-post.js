@@ -425,7 +425,10 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
           .join('')}</div></div></div>`;
 
   const info = [
-    ['Mandant', c.clientName + (staff && !c.hasClientAccount ? ' (ohne Konto)' : '')],
+    // Kanzlei: der Name öffnet die Mandantenkartei
+    staff && c.clientKey
+      ? ['Mandant', null, `${clientLink(c.clientKey, c.clientName)}${c.hasClientAccount ? '' : ' <span class="text-dim">(ohne Konto)</span>'}`]
+      : ['Mandant', c.clientName + (staff && !c.hasClientAccount ? ' (ohne Konto)' : '')],
     // E-Mail darf nur nach dem @ umbrechen, nicht am Bindestrich der Domain („…@pake-“ / „scha.ls“)
     staff ? ['Kontakt', null, [c.clientPhone ? esc(c.clientPhone) : '', c.clientEmail ? mailBreakHtml(c.clientEmail) : ''].filter(Boolean).join(' · ') || '—'] : null,
     [caseTeam(c).length > 1 ? 'Zuständige Anwälte' : 'Zuständig', teamText(c)],
@@ -607,6 +610,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
         <div class="case-props">${headProps}</div>
       </div>
       ${jumpBar}
+      ${staff ? clientFlagStrip(c.clientFlag, { inCase: true }) : ''}
       ${idleStrip}
       ${claim}
       ${track}

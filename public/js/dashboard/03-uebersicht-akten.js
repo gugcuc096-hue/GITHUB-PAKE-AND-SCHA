@@ -475,14 +475,7 @@ async function openSearchResult(type, id) {
   const x = list.find((r) => r.id === id);
   if (!x) return;
   if (type === 'cases') return modalInstead(() => openCase(id));
-  if (type === 'clients') {
-    // Akten des Mandanten in der Aktenverwaltung
-    st.caseQuery = x.name;
-    st.caseFilter = 'alle';
-    st.caseMine = false;
-    closeModal();
-    return navigate('cases');
-  }
+  if (type === 'clients') return modalInstead(() => openClient(`u${id}`)); // Mandantenkartei
   if (type === 'invoices') {
     if (x.caseId) return modalInstead(() => openCase(x.caseId));
     closeModal();

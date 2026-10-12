@@ -574,6 +574,50 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
   }
 
   for (const [label, device] of [['PC', DESKTOP], ['Handy', PHONE]]) {
+    it(`Mandantenkartei am ${label}: Liste, Name in der Akte öffnet die Kartei, Notiz, Vermerk in der Akte`, async () => {
+      const { ctx, page, problems, settle } = await open(device);
+      const adm = client(server.base);
+      await adm.login(TEAM.admin);
+      try {
+        await login(page, TEAM.admin);
+        await page.evaluate(() => (location.hash = '#clients'));
+        await page.waitForSelector('#clientList tr.row');
+        assert.ok(await page.$('#clientList tr[data-key="n:paul probe"]'), 'Mandant ohne Konto in der Liste');
+        await page.fill('#clientSearch', 'probe');
+        assert.equal(await page.$$eval('#clientList tr.row', (r) => r.length), 1, 'Suche filtert');
+        if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Liste passt aufs Handy');
+
+        // Der Name in der Akte öffnet die Kartei, X führt zurück in die Akte
+        await page.goto(server.base + `/dashboard.html?case=${data.caseId}#cases`);
+        await page.waitForSelector('#modalBody .case-head');
+        await settle();
+        await page.click('#modalBody .client-link');
+        await page.waitForSelector('#modalBody form[data-form="client-note"]');
+        assert.match(await page.textContent('#modalBody .modal-title'), /Paul Probe/);
+        assert.ok(await page.$(`#modalBody [data-action="open-case"][data-id="${data.caseId}"]`), 'Akte in der Kartei');
+        // interne Notiz
+        await page.fill('#modalBody form[data-form="client-note"] textarea', `Ruft lieber abends an (${label})`);
+        await page.click('#modalBody form[data-form="client-note"] button[type=submit]');
+        await page.waitForFunction((t) => [...document.querySelectorAll('#modalBody .cn-body')].some((e) => e.textContent === t), `Ruft lieber abends an (${label})`);
+        // Vermerk (Board) → erscheint in der Kartei und danach in der Akte
+        await page.selectOption('#cfFlag', 'vorkasse');
+        await page.fill('#cfReason', `Test ${label}`);
+        await page.click('#modalBody form[data-form="client-flag"] button[type=submit]');
+        await page.waitForFunction(() => /Nur gegen Vorkasse/.test(document.querySelector('#modalBody .ticket-strip')?.textContent || ''));
+        if (device === PHONE) assert.ok((await page.$eval('#modalBody', (b) => b.scrollWidth - b.clientWidth)) <= 1, 'Kartei passt aufs Handy');
+        await page.click('.modal-close');
+        await page.waitForSelector('#modalBody .case-head');
+        await settle();
+        assert.match(await page.textContent('#modalBody .ticket-strip'), /Mandantenvermerk: Nur gegen Vorkasse/);
+        assert.deepEqual(problems, []);
+      } finally {
+        await adm.put(`/api/clients/${encodeURIComponent('n:paul probe')}/flag`, { flag: '' }); // andere Tests sehen die Akte ohne Vermerk
+        await ctx.close();
+      }
+    });
+  }
+
+  for (const [label, device] of [['PC', DESKTOP], ['Handy', PHONE]]) {
     it(`Discord-Konto am ${label}: mit einem Klick registrieren, Name im Spiel, Konto direkt nach der Mandatsanfrage`, async () => {
       // Eigener Server mit Discord-Anmeldung gegen die nachgebaute Schnittstelle; die Discord-Seite selbst überspringt der Browser
       const dsrv = await startServer({

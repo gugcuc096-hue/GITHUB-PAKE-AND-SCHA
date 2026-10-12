@@ -1,5 +1,5 @@
 /*
- * Kanzlei-Dashboard – Teil 6 von 12: Rechnungen und Rechnungs-/Honorar-Generator.
+ * Kanzlei-Dashboard – Teil 6 von 12: Rechnungen, Rechnungs-/Honorar-Generator und Mandantenkartei.
  * Wird nach den vorherigen Teilen geladen (Reihenfolge siehe dashboard.html bzw. 01-basis.js).
  */
 'use strict';
@@ -66,7 +66,7 @@ function invoiceTable(rows) {
       .map(
         (i) => `<tr>
           <td class="td-main"><div class="font-mono text-gold text-sm nowrap">${docTitleLink(`/invoice.html?id=${i.id}`, esc(i.number))}</div><div class="text-xs text-dim">${esc(INVOICE_KIND[i.kind])}${i.subject ? ' · ' + esc(i.subject) : ''}</div></td>
-          <td data-label="Empfänger">${esc(i.clientName)}</td>
+          <td data-label="Empfänger">${staff && i.clientKey ? clientLink(i.clientKey, i.clientName) : esc(i.clientName)}</td>
           <td data-label="Akte">${i.caseNumber ? `<button class="text-gold font-mono text-xs hover:underline" data-action="open-case" data-id="${i.caseId}">${esc(i.caseNumber)}</button>` : '—'}</td>
           <td data-label="Betrag" class="font-mono nowrap" style="text-align:right">${money(i.total)}</td>
           <td data-label="Status">${invoiceBadge(i, true)}${staff && paymentReported(i) && i.paymentReport.note ? `<div class="text-xs text-dim pay-note">„${esc(i.paymentReport.note)}“</div>` : ''}</td>
@@ -481,3 +481,165 @@ function onInvoiceChange(t) {
     onInvoiceInput(t);
   }
 }
+
+/* ---------------------------------------------------------------- Mandantenkartei (nur Kanzlei) */
+// Alles zu einem Mandanten auf einer Seite: Akten, Rechnungen, Verträge, VIP, interne Notizen und Vermerk.
+// Erreichbar über „Mandanten“ im Menü, den Namen in der Akte bzw. in der Rechnungsliste und die globale Suche.
+const CLIENT_FLAG_TONE = { vorkasse: 'amber', sperre: 'red' };
+const CLIENT_FILTERS = [
+  ['alle', 'Alle', () => true],
+  ['offen', 'Offene Rechnungen', (c) => c.openSum > 0],
+  ['vermerk', 'Mit Vermerk', (c) => !!c.flag],
+  ['vip', 'VIP & Lifetime', (c) => !!c.membership],
+];
+const clientFlagBadge = (f) => (f ? badge(f.label, CLIENT_FLAG_TONE[f.flag] || 'amber') : '');
+/** Link zur Kartei – z. B. der Name des Mandanten in der Akte oder in der Rechnungsliste. */
+const clientLink = (key, name, cls = '') => `<button type="button" class="link-btn client-link${cls ? ` ${cls}` : ''}" data-action="open-client" data-key="${esc(key)}" title="Mandantenkartei öffnen">${esc(name)}</button>`;
+
+function filteredClients() {
+  const q = st.clientQuery.trim().toLowerCase();
+  const test = (CLIENT_FILTERS.find(([k]) => k === st.clientFilter) || CLIENT_FILTERS[0])[2];
+  return st.clients.filter((c) => test(c) && (!q || [c.name, c.email].join(' ').toLowerCase().includes(q)));
+}
+
+function clientTable() {
+  const rows = filteredClients();
+  if (!rows.length) return empty(st.clients.length ? 'Keine Mandanten für diese Auswahl.' : 'Noch keine Mandanten.', 'idCard');
+  return `<div class="tbl-wrap"><table class="tbl tbl-cards">
+      <thead><tr><th>Mandant</th><th>Akten</th><th style="text-align:right">Offene Rechnungen</th><th>Hinweise</th><th>Letzte Aktivität</th></tr></thead>
+      <tbody>${rows
+      .map(
+        (c) => `<tr class="row" data-action="open-client" data-key="${esc(c.key)}">
+          <td class="td-main"><div class="font-medium">${esc(c.name)}</div><div class="text-xs text-dim">${c.hasAccount ? esc(c.email) : 'ohne Konto'}</div></td>
+          <td data-label="Akten"><span>${c.casesTotal ? `${c.casesOpen} laufend <span class="text-dim">· ${c.casesTotal} gesamt</span>` : '<span class="text-dim">keine</span>'}</span></td>
+          <td data-label="Offene Rechnungen" class="nowrap" style="text-align:right">${c.openSum ? `<span class="font-mono">${money(c.openSum)}</span>` : '<span class="text-dim">—</span>'}</td>
+          <td data-label="Hinweise">${c.flag || c.membership ? `<div class="flex flex-wrap gap-1.5">${clientFlagBadge(c.flag)}${memberBadge(c.membership)}</div>` : '<span class="text-dim">—</span>'}</td>
+          <td data-label="Letzte Aktivität" class="nowrap text-muted">${esc(relDays(c.lastActivity))}</td></tr>`
+      )
+      .join('')}</tbody></table></div>`;
+}
+
+views.clients = {
+  async load() {
+    await load.clients();
+  },
+  render() {
+    const count = (test) => st.clients.filter(test).length;
+    return `
+        <div class="page-head">
+          <div><h1 class="page-title">Mandanten</h1>
+            <p class="page-sub">Alle Mandanten mit ihren Akten, Rechnungen, VIP-Status und internen Notizen – ein Klick öffnet die Kartei.</p></div>
+        </div>
+        <div class="toolbar">
+          <label class="search">${icon('search')}<input id="clientSearch" class="field" type="search" placeholder="Name oder E-Mail …" value="${esc(st.clientQuery)}" aria-label="Mandanten durchsuchen"></label>
+          <div class="chip-row">${CLIENT_FILTERS.map(
+            ([k, l, test]) => `<button class="chip ${st.clientFilter === k ? 'active' : ''}" data-action="client-filter" data-value="${k}">${l} <span class="chip-count">${count(test)}</span></button>`
+          ).join('')}</div>
+        </div>
+        <div id="clientList" class="panel p-2 md:p-3">${clientTable()}</div>`;
+  },
+};
+
+async function openClient(key) {
+  const d = await api.get('/api/clients/' + encodeURIComponent(key));
+  st.clientCard = d;
+  openModal(clientCard(d), { wide: true, key: `client:${d.key}`, reopen: () => openClient(d.key) });
+}
+/** Kartei neu zeichnen (nach Notiz/Vermerk) – die Liste dahinter bekommt die neuen Werte beim nächsten Laden. */
+function showClient(d) {
+  st.clientCard = d;
+  replaceModal(clientCard(d));
+  if (st.view === 'clients') load.clients().then(() => $('#clientList') && ($('#clientList').innerHTML = clientTable()), () => {});
+}
+
+/** Vermerk als ruhige Leiste (Akte und Kartei): „Nur gegen Vorkasse“ in Bernstein, „Nicht mehr annehmen“ in Rot. */
+function clientFlagStrip(f, { inCase = false } = {}) {
+  if (!f) return '';
+  return `<div class="ticket-strips">${ticketStrip({
+    title: `${inCase ? 'Mandantenvermerk: ' : ''}${f.label}`,
+    tip: 'Vom Board of Partners gesetzt. Sichtbar nur für die Kanzlei – nie für den Mandanten.',
+    ico: icon('alert'),
+    tone: CLIENT_FLAG_TONE[f.flag] || 'amber',
+    badges: `<span class="ts-label">${f.reason ? `${esc(f.reason)} · ` : ''}${esc(f.setBy || 'Board')}, ${esc(fmtDateOnly(String(f.setAt || '').slice(0, 10)))}</span>`,
+  })}</div>`;
+}
+
+function clientCard(d) {
+  const s = d.stats;
+  const facts = [
+    d.account ? mailBreakHtml(d.account.email) : '<span class="text-dim">ohne Konto</span>',
+    d.phone ? esc(d.phone) : '',
+    d.account && d.account.discord ? `${DISCORD_ICON.replace('class="ico"', 'class="ico-sm inline-block align-[-2px]"')} ${esc(d.account.discord)}` : '',
+    d.since ? `Mandant seit ${esc(fmtDateOnly(String(d.since).slice(0, 10)))}` : '',
+  ].filter(Boolean);
+  const cell = (k, v) => `<div><div class="k">${esc(k)}</div><div class="v">${v}</div></div>`;
+  const openDoc = (gdoc, href, label) =>
+    safeGdoc(gdoc)
+      ? `<a class="icon-btn sm" href="${esc(safeGdoc(gdoc))}" target="_blank" rel="noopener noreferrer" aria-label="Google Doc öffnen" title="Google Doc öffnen">${icon('doc', 'ico-sm')}</a>`
+      : `<a class="icon-btn sm" href="${href}" target="_blank" rel="noopener" aria-label="${esc(label)}" title="${esc(label)}">${icon('eye', 'ico-sm')}</a>`;
+
+  // Akten ohne den (hier überflüssigen) Mandantennamen: Aktenzeichen · Rechtsgebiet · zuständig
+  const caseRowHtml = (c) => `<div class="list-row" data-action="open-case" data-id="${c.id}" role="button" tabindex="0">
+      <div class="main"><div class="title">${esc(c.title)}</div>
+        <div class="meta"><span class="font-mono text-gold">${esc(c.caseNumber)}</span> · ${esc(AREAS[c.area] || c.area)}${c.lawyerName ? ` · ${esc(c.lawyerName)}` : ''}</div></div>
+      <div class="flex items-center gap-2 shrink-0">${stageBadge(c)}</div></div>`;
+  const casesPart = d.cases.length
+    ? `<div class="section"><h3 class="section-title">Akten <span class="sec-count">${d.cases.length}</span></h3>${d.cases.map(caseRowHtml).join('')}</div>`
+    : emptySection('', 'Akten', 'keine');
+  const invoicesPart = d.invoices.length
+    ? `<div class="section"><h3 class="section-title">Rechnungen &amp; Honorare <span class="sec-count">${d.invoices.length}</span></h3>${d.invoices
+        .map(
+          (i) => `<div class="list-row wrap inv-row"><div class="main"><div class="title">${docTitleLink(`/invoice.html?id=${i.id}`, esc(i.number), 'font-mono text-gold')} · ${esc(INVOICE_KIND[i.kind])}</div>
+              <div class="meta">${esc(fmtDate(i.createdAt))}${i.caseNumber ? ` · Akte ${esc(i.caseNumber)}` : ''}</div></div>
+            <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end"><span class="font-mono nowrap">${money(i.total)}</span>${invoiceBadge(i)}${openDoc(i.googleDoc, `/invoice.html?id=${i.id}`, 'Ansehen / PDF')}</div></div>`
+        )
+        .join('')}</div>`
+    : emptySection('', 'Rechnungen & Honorare', 'keine');
+  const contractsPart = d.contracts.length
+    ? `<div class="section"><h3 class="section-title">Verträge &amp; Schriftsätze <span class="sec-count">${d.contracts.length}</span></h3>${d.contracts
+        .map(
+          (k) => `<div class="list-row wrap"><div class="main"><div class="title">${docTitleLink(`/vertrag.html?id=${k.id}`, esc(k.templateName), 'font-medium')}</div>
+              <div class="meta">Akte ${esc(k.caseNumber)} · ${esc(fmtDate(k.createdAt))}</div></div>
+            <div class="flex items-center gap-2 shrink-0">${statusBadge(CONTRACT_STATUS, k.status)}${openDoc(k.status === 'unterschrieben' ? k.googleDoc : null, `/vertrag.html?id=${k.id}`, 'Ansehen / PDF')}</div></div>`
+        )
+        .join('')}</div>`
+    : emptySection('', 'Verträge & Schriftsätze', 'keine');
+  const notesPart = `<div class="section"><h3 class="section-title">Interne Notizen <span class="sec-note">nur für die Kanzlei</span></h3>
+      <form data-form="client-note" data-key="${esc(d.key)}" class="client-note-form">
+        <textarea name="body" class="field" rows="2" maxlength="2000" placeholder="z. B. zahlt zuverlässig, bevorzugt Kontakt über Discord …" aria-label="Neue Notiz"></textarea>
+        <div class="form-actions mt-2"><button type="submit" class="btn-outline btn-sm">${icon('plus', 'ico-sm')}<span>Notiz speichern</span></button></div>
+      </form>
+      ${d.notes
+        .map(
+          (n) => `<div class="client-note"><div class="cn-head"><span><strong>${esc(n.author)}</strong> · ${esc(fmtDate(n.createdAt))}</span>${
+            n.authorId === st.user.id || isBoard()
+              ? `<button type="button" class="icon-btn sm" data-action="client-note-delete" data-id="${n.id}" aria-label="Notiz löschen" title="Notiz löschen">${icon('trash', 'ico-sm')}</button>`
+              : ''
+          }</div><div class="cn-body">${esc(n.body)}</div></div>`
+        )
+        .join('')}</div>`;
+  const flagPart = d.canFlag
+    ? `<div class="section"><h3 class="section-title">Vermerk <span class="sec-note">nur Board of Partners</span></h3>
+        <p class="text-sm text-muted mb-3">Erscheint der Kanzlei in jeder Akte dieses Mandanten und bei neuen Anfragen in Discord – nie dem Mandanten.</p>
+        <form data-form="client-flag" data-key="${esc(d.key)}" class="form-grid cols-2">
+          <div><label class="label" for="cfFlag">Vermerk</label><select id="cfFlag" name="flag" class="field">${opt('', 'Kein Vermerk', !d.flag)}${opt('vorkasse', 'Nur gegen Vorkasse', d.flag && d.flag.flag === 'vorkasse')}${opt('sperre', 'Nicht mehr annehmen', d.flag && d.flag.flag === 'sperre')}</select></div>
+          <div><label class="label" for="cfReason">Grund</label><input id="cfReason" name="reason" class="field" maxlength="300" value="${esc(d.flag ? d.flag.reason : '')}" placeholder="z. B. zwei Rechnungen nicht bezahlt"></div>
+          <div class="span-2 form-actions"><button type="submit" class="btn-outline btn-sm">${icon('check', 'ico-sm')}<span>Vermerk speichern</span></button></div>
+        </form></div>`
+    : '';
+
+  return `
+      <div class="pr-12 mb-4"><p class="text-xs uppercase tracking-[0.2em] text-gold mb-1">Mandantenkartei</p>
+        <h2 class="modal-title mb-1">${esc(d.name)}</h2>
+        <p class="text-sm text-muted client-facts">${facts.join('<span class="text-dim"> · </span>')}</p>
+        ${d.membership || (d.account && !d.account.active) ? `<div class="flex flex-wrap gap-1.5 mt-2">${memberBadge(d.membership ? { name: d.membership.tier_name, kind: d.membership.kind } : null)}${d.account && !d.account.active ? badge('Konto deaktiviert', 'slate') : ''}</div>` : ''}
+      </div>
+      ${clientFlagStrip(d.flag)}
+      <div class="info-grid stats-4 mb-5">${cell('Laufende Akten', String(s.casesOpen))}${cell('Akten gesamt', String(s.casesTotal))}${cell('Offene Rechnungen', s.openSum ? `<span class="text-amber-300">${money(s.openSum)}</span>` : '—')}${cell('Bezahlt gesamt', s.paidSum ? money(s.paidSum) : '—')}</div>
+      ${casesPart}
+      ${invoicesPart}
+      ${contractsPart}
+      ${notesPart}
+      ${flagPart}`;
+}
+
