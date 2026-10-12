@@ -776,6 +776,8 @@ video {
   align-items: flex-end;
 }.items-center {
   align-items: center;
+}.items-stretch {
+  align-items: stretch;
 }.justify-end {
   justify-content: flex-end;
 }.justify-center {
@@ -863,6 +865,8 @@ video {
   white-space: pre-line;
 }.whitespace-pre-wrap {
   white-space: pre-wrap;
+}.text-wrap {
+  text-wrap: wrap;
 }.break-words {
   overflow-wrap: break-word;
 }.break-all {
@@ -1108,6 +1112,8 @@ video {
   padding-left: 1.25rem;
 }.pr-10 {
   padding-right: 2.5rem;
+}.pr-11 {
+  padding-right: 2.75rem;
 }.pr-12 {
   padding-right: 3rem;
 }.pr-4 {
@@ -1552,10 +1558,6 @@ video {
 
   .md\:flex {
     display: flex;
-  }
-
-  .md\:inline-flex {
-    display: inline-flex;
   }
 
   .md\:w-60 {

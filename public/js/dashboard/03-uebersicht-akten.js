@@ -123,7 +123,7 @@ function todoPanel() {
     items.push(item('mail', `${st.unread === 1 ? 'Eine ungelesene Nachricht' : `${st.unread} ungelesene Nachrichten`} in der Kanzlei-Post`, '', `<a class="btn-outline btn-sm" href="#mail">Öffnen</a>`));
   }
   if (!items.length) {
-    if (!st.cases.length) return ''; // Noch kein Mandat: darunter steht „Mandat einreichen“
+    if (!st.cases.length) return ''; // Noch kein Mandat: oben steht „Mandat einreichen“
     return `<section class="panel todo-done mb-4 lg:mb-5">${icon('check')}<div><strong>Alles erledigt.</strong> Im Moment müssen Sie nichts tun – wir melden uns, sobald es Neuigkeiten gibt.</div></section>`;
   }
   return `<section class="panel panel-pad todo mb-4 lg:mb-5" aria-labelledby="todoTitle">
@@ -221,7 +221,12 @@ views.overview = {
         <section class="panel panel-pad">
           <div class="panel-head"><h2 class="panel-title">${staff ? 'Zuletzt bearbeitet' : 'Meine Akten'}</h2><a href="#cases" class="btn-ghost btn-sm">Alle Akten</a></div>
           ${recent.length ? recent.map((c) => caseListRow(c)).join('') : emptyLine(staff ? 'Noch keine Akten.' : 'Sie haben noch kein Mandat eingereicht.', 'folder')}
-          ${!staff ? `<div class="form-actions mt-4"><button class="btn-gold btn-md" data-action="new-case">${icon('plus')}<span>Mandat einreichen</span></button><button class="btn-outline btn-md" data-action="new-event">${icon('calendar', 'ico-sm')}<span>Termin anfragen</span></button><button class="btn-outline btn-md" data-action="compose">${icon('mail', 'ico-sm')}<span>Nachricht an die Kanzlei</span></button></div>` : ''}
+          ${
+            // Mandant: „Mandat einreichen“ steht oben im Seitenkopf, hier zwei gleich breite Knöpfe (am Handy untereinander)
+            !staff
+              ? `<div class="action-grid mt-4"><button class="btn-outline btn-md" data-action="new-event">${icon('calendar', 'ico-sm')}<span>Termin anfragen</span></button><button class="btn-outline btn-md" data-action="compose">${icon('mail', 'ico-sm')}<span>Kanzlei schreiben</span></button></div>`
+              : ''
+          }
         </section>`;
 
     const head = `
@@ -230,7 +235,7 @@ views.overview = {
           <div><p class="text-xs uppercase tracking-[0.2em] text-gold mb-1">${esc(today)}</p>
             <h1 class="page-title">${esc(greet)}, ${esc(u.displayName)}</h1>
             <p class="page-sub">${esc(u.rank || ROLES[u.role])} · Pake &amp; Scha Legal Consulting</p></div>
-          <div class="page-actions"><button class="btn-outline btn-md" data-action="concern-new">${icon('chat', 'ico-sm')}<span>Anliegen ans Board</span></button>${staff ? `<button class="btn-outline btn-md" data-action="new-event">${icon('calendar', 'ico-sm')}<span>Frist / Termin</span></button><button class="btn-gold btn-md" data-action="new-case">${icon('plus')}<span>Neue Akte</span></button>` : ''}</div>
+          <div class="page-actions"><button class="btn-outline btn-md" data-action="concern-new">${icon('chat', 'ico-sm')}<span>Anliegen ans Board</span></button>${staff ? `<button class="btn-outline btn-md" data-action="new-event">${icon('calendar', 'ico-sm')}<span>Frist / Termin</span></button><button class="btn-gold btn-md" data-action="new-case">${icon('plus')}<span>Neue Akte</span></button>` : `<button class="btn-gold btn-md" data-action="new-case">${icon('plus')}<span>Mandat einreichen</span></button>`}</div>
         </div>
         ${staff ? '' : todoPanel()}
         ${dutyStrip()}

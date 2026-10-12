@@ -24,7 +24,7 @@
         const box = document.getElementById('myApplications');
         if (!list.length || !box) return;
         box.innerHTML = `<div class="text-xs uppercase tracking-widest text-dim mb-3">Auf diesem Gerät</div><div class="flex flex-col gap-2">${list
-            .map((x) => `<a class="btn-outline btn-md justify-between" href="/bewerbung.html#${esc(x.token)}"><span class="font-mono">${esc(x.number || 'Bewerbung')}</span><span class="text-xs text-dim">${esc(x.position || '')}</span></a>`)
+            .map((x) => `<a class="btn-outline btn-md btn-plain justify-between" href="/bewerbung.html#${esc(x.token)}"><span class="font-mono">${esc(x.number || 'Bewerbung')}</span><span class="text-xs text-dim">${esc(x.position || '')}</span></a>`)
             .join('')}</div>`;
         box.classList.remove('hidden');
     })();
