@@ -426,7 +426,8 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
 
   const info = [
     ['Mandant', c.clientName + (staff && !c.hasClientAccount ? ' (ohne Konto)' : '')],
-    staff ? ['Kontakt', [c.clientPhone, c.clientEmail].filter(Boolean).join(' · ') || '—'] : null,
+    // E-Mail darf nur nach dem @ umbrechen, nicht am Bindestrich der Domain („…@pake-“ / „scha.ls“)
+    staff ? ['Kontakt', null, [c.clientPhone ? esc(c.clientPhone) : '', c.clientEmail ? mailBreakHtml(c.clientEmail) : ''].filter(Boolean).join(' · ') || '—'] : null,
     [caseTeam(c).length > 1 ? 'Zuständige Anwälte' : 'Zuständig', teamText(c)],
     ['Rechtsgebiet', AREAS[c.area] || c.area],
     c.opponent ? ['Gegenpartei', c.opponent] : null,
@@ -435,7 +436,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     staff ? ['Eingang über', SOURCES[c.source] || c.source] : null,
   ]
     .filter(Boolean)
-    .map(([k, v]) => `<div><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`)
+    .map(([k, v, html]) => `<div><div class="k">${esc(k)}</div><div class="v">${html != null ? html : esc(v)}</div></div>`)
     .join('');
 
   // Aktenkopf: eine Leiste unter dem Titel – je Angabe ein Feld „STATUS | ● In Bearbeitung“. Zuständige Anwälte

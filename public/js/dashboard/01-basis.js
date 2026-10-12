@@ -386,6 +386,12 @@ function fmtDay(iso) {
   const d = parseDate(iso);
   return d ? d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
 }
+/** E-Mail-Adresse als HTML, die nur nach dem @ umbricht (die Domain bleibt zusammen). */
+function mailBreakHtml(email) {
+  const at = String(email).lastIndexOf('@');
+  if (at < 0) return esc(email);
+  return `${esc(email.slice(0, at))}@<wbr><span class="nowrap">${esc(email.slice(at + 1))}</span>`;
+}
 function fmtDateOnly(s) {
   return s ? new Date(`${s}T12:00:00`).toLocaleDateString('de-DE') : '—';
 }

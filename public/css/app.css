@@ -33,9 +33,13 @@ body {
   font-family: 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+  /* Normale Ziffern: Cormorant Garamond zeichnet sonst Mediävalziffern (1 sieht aus wie I, 0 wie o) */
+  font-variant-numeric: lining-nums;
 }
 body.modal-open { overflow: hidden; }
 .font-serif { font-family: 'Cormorant Garamond', Georgia, serif; }
+/* Überschriften gleichmäßig auf die Zeilen verteilen – kein einzelnes Wort allein in der letzten Zeile */
+h1, h2, h3, .page-title, .panel-title, .modal-title, .section-title { text-wrap: balance; }
 .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
 .text-muted { color: var(--text-muted); }
 .text-dim { color: var(--text-dim); }
@@ -193,7 +197,7 @@ input[type="datetime-local"].field, input[type="date"].field { color-scheme: dar
    Rechteck mit getönter Fläche, ohne Rand. Knöpfe sind dagegen immer Pillen mit Rand oder Füllung – so sieht keine
    Markierung wie ein Knopf aus. */
 .badge, .countdown { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.16rem 0.5rem; border: 0; border-radius: 6px;
-  font-family: inherit; font-size: 0.72rem; font-weight: 600; line-height: 1.4; letter-spacing: 0.01em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  font-family: inherit; font-size: 0.72rem; font-weight: 600; line-height: 1.4; letter-spacing: 0.01em; white-space: nowrap; font-variant-numeric: lining-nums tabular-nums; }
 .badge-gold { color: var(--gold-light); background: rgba(212, 175, 55, 0.15); }
 .badge-emerald { color: #6ee7b7; background: rgba(16, 185, 129, 0.15); }
 .badge-amber { color: #fcd34d; background: rgba(245, 158, 11, 0.15); }
@@ -447,6 +451,9 @@ a:hover > .brand-logo { transform: scale(1.04); }
 .page-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.9rem, 5vw, 2.7rem); font-weight: 600; line-height: 1.08; }
 .page-sub { color: var(--text-dim); font-size: 0.875rem; margin-top: 0.3rem; }
 .page-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+/* Mehrere gleichrangige Knöpfe unter einer Liste: gleich breit, bei wenig Platz untereinander */
+.action-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 0.5rem; }
+.action-grid > * { justify-content: center; }
 @media (max-width: 639px) {
   .page-actions { width: 100%; }
   .page-actions > * { flex: 1; }
@@ -539,7 +546,7 @@ a:hover > .brand-logo { transform: scale(1.04); }
 .ev-bar { width: 4px; align-self: stretch; border-radius: 4px; flex-shrink: 0; }
 .ev-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .ev-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ev-meta { font-size: 0.74rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ev-meta { font-size: 0.74rem; color: var(--text-dim); } /* bricht um statt das Datum abzuschneiden */
 .ev-side { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem; }
 .ev-bg-mandant { background: var(--emerald); } .ev-bg-gericht { background: var(--gold-500); } .ev-bg-frist { background: var(--red); } .ev-bg-intern { background: var(--sky); }
 .ev-done { opacity: 0.55; }

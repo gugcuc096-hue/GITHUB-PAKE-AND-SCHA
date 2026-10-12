@@ -512,6 +512,13 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         const kpis = await page.$eval('#content .kpi-grid', (el) => el.getBoundingClientRect().top);
         assert.ok(top < kpis, 'Karte steht ganz oben (vor den Kennzahlen)');
         if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Übersicht passt aufs Handy');
+        // Kennzahlen mit normalen Ziffern (die Schmuckschrift zeichnet sonst „1“ wie „I“ und „0“ wie „o“)
+        assert.match(await page.$eval('#content .kpi-value', (el) => getComputedStyle(el).fontVariantNumeric), /lining-nums/);
+        // „Mandat einreichen“ steht im Seitenkopf, darunter zwei gleich breite Knöpfe statt einer umbrechenden Reihe
+        assert.ok(await page.$('#content .page-actions [data-action="new-case"]'), 'Mandat einreichen im Seitenkopf');
+        const widths = await page.$$eval('#content .action-grid > *', (els) => els.map((e) => Math.round(e.getBoundingClientRect().width)));
+        assert.equal(widths.length, 2);
+        assert.ok(Math.abs(widths[0] - widths[1]) <= 1, `gleich breit (${widths.join(' / ')})`);
 
         // Zahlung melden – mit Hinweis und Screenshot
         await page.click(`#content section.todo [data-action="inv-pay-report"][data-id="${inv.id}"]`);
