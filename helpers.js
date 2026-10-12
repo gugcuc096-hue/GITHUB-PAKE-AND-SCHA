@@ -11,6 +11,18 @@ const PRIORITIES = { 1: 'Niedrig', 2: 'Normal', 3: 'Hoch', 4: 'Kritisch' };
 const PRIORITY_DISCORD = { 1: '⚪ Niedrige Priorität', 2: '🔵 Normale Priorität', 3: '🟠 Hohe Priorität', 4: '🔴 Kritische Priorität' };
 // Start-Priorität einer neuen Akte aus der Dringlichkeit – danach legen die Anwälte sie fest.
 const PRIORITY_FROM_URGENCY = { normal: 2, eilig: 3, notfall: 4 };
+// Ergebnis eines abgeschlossenen Verfahrens (nur Kanzlei) – Grundlage der Erfolgsquote auf der Startseite.
+// success: true = Erfolg, false = kein Erfolg, null = zählt nicht mit (z. B. Beratung ohne Verfahren).
+const OUTCOMES = {
+  freispruch: { label: 'Freispruch', success: true },
+  eingestellt: { label: 'Verfahren eingestellt', success: true },
+  milderung: { label: 'Strafmilderung erreicht', success: true },
+  gewonnen: { label: 'Gewonnen / Anspruch durchgesetzt', success: true },
+  vergleich: { label: 'Vergleich / Einigung', success: true },
+  verloren: { label: 'Verurteilt / verloren', success: false },
+  erledigt: { label: 'Ohne Verfahren erledigt (Beratung, Vertrag)', success: null },
+  beendet: { label: 'Mandat vorzeitig beendet', success: null },
+};
 const EVENT_TYPES = { mandant: 'Mandantengespräch', gericht: 'Gerichtstermin', frist: 'Frist', intern: 'Intern' };
 const FEE_CATEGORIES = ['rechtsberatung', 'strafrecht', 'notfall', 'gericht', 'vertraege'];
 const DUTY_STATUS = { dienst: 'Im Dienst', gericht: 'Im Gericht', pause: 'Pause', off: 'Außer Dienst' };
@@ -264,6 +276,7 @@ module.exports = {
   PRIORITIES,
   PRIORITY_DISCORD,
   PRIORITY_FROM_URGENCY,
+  OUTCOMES,
   EVENT_TYPES,
   FEE_CATEGORIES,
   DUTY_STATUS,

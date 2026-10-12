@@ -164,6 +164,14 @@ const forms = {
     toast('Akte gespeichert.');
     await reloadCase(id);
   },
+  'case-close': async (f) => {
+    const id = Number(f.dataset.id);
+    const outcome = f.elements.outcome.value;
+    if (!outcome) throw new Error('Bitte das Ergebnis wählen.');
+    await api.patch('/api/cases/' + id, { status: 'geschlossen', outcome });
+    await returnOrClose();
+    toast(`Verfahren abgeschlossen – ${OUTCOMES[outcome][0]}`);
+  },
   'process-ticket': async (f) => {
     const fd = new FormData(f);
     const id = Number(f.dataset.id);
@@ -535,7 +543,7 @@ const forms = {
     renderView();
   },
   'settings-website': async (f) => {
-    const res = await api.patch('/api/admin/settings', { showDutyPublic: !!f.elements.showDutyPublic.checked });
+    const res = await api.patch('/api/admin/settings', { showDutyPublic: !!f.elements.showDutyPublic.checked, showSuccessPublic: !!f.elements.showSuccessPublic.checked });
     st.settings = res.settings;
     toast('Website-Einstellungen gespeichert.');
   },

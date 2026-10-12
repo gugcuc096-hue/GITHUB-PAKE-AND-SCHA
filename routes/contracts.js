@@ -461,6 +461,59 @@ caseRouter.get('/defaults', wrap(async (req, res) => {
   });
 }));
 
+/** „15.000 $“ → 15000 (Grundgebühr als Text); null, wenn keine Zahl darin steht. */
+function parseUsd(text) {
+  const m = String(text || '').replace(/(\d)[.\s'’](?=\d{3}\b)/g, '$1').match(/\d+/);
+  const n = m ? Number(m[0]) : NaN;
+  return Number.isFinite(n) && n > 0 && n <= 1e9 ? n : null;
+}
+
+/**
+ * Rechnung aus dem Mandatsvertrag: Positionen aus dem unterschriebenen (sonst dem neuesten) Vertrag der Akte.
+ * Leistungen zum regulären Preis – VIP/Lifetime und Kooperation zieht der Rechnungs-Generator wie bei jeder Rechnung ab;
+ * ohne Leistungen die Grundgebühr. Dazu die schon erstellten Rechnungen der Akte (nicht doppelt abrechnen).
+ */
+caseRouter.get('/billing', (req, res) => {
+  const c = loadCase(req, res);
+  if (!c) return;
+  const candidates = db
+    .prepare(`${CONTRACT_SELECT} WHERE k.case_id = ? AND k.kind = 'vertrag' AND k.internal = 0 ORDER BY k.id DESC`)
+    .all(c.id)
+    .map((k) => {
+      const data = parseData(k.data);
+      const services = Array.isArray(data.services) ? data.services.filter((x) => x && x.name && x.qty > 0) : [];
+      const items = services.length
+        ? services.map((x) => ({ description: String(x.name).slice(0, 200), quantity: Math.min(999, x.qty), unitPrice: Math.round(x.listPrice > x.price ? x.listPrice : x.price) }))
+        : parseUsd(data.grundgebuehr)
+          ? [{ description: 'Grundgebühr laut Mandatsvertrag', quantity: 1, unitPrice: parseUsd(data.grundgebuehr) }]
+          : [];
+      const total = services.length ? services.reduce((sum, x) => sum + x.qty * x.price, 0) : items.length ? items[0].unitPrice : 0;
+      const discount = services.find((x) => x.listPrice > x.price && x.discount);
+      return { k, data, items, total, discount: discount ? discount.discount : '' };
+    })
+    .filter((x) => x.items.length);
+  const pick = candidates.find((x) => fullySigned(x.k)) || candidates[0] || null;
+  const invoices = db
+    .prepare("SELECT id, number, kind, total, status FROM invoices WHERE case_id = ? AND status != 'storniert' ORDER BY id")
+    .all(c.id);
+  res.json({
+    contract: pick
+      ? {
+          id: pick.k.id,
+          templateName: pick.k.template_name,
+          status: statusOf(pick.k),
+          date: pick.data.datum || '',
+          createdAt: pick.k.created_at,
+          total: pick.total,
+          discount: pick.discount, // z. B. „VIP Gold −20 %“ – im Vertrag schon abgezogen
+          extraFee: String(pick.data.zusatzgebuehr || '').trim(), // Zusatzgebühr (Text) – nur als Hinweis
+        }
+      : null,
+    items: pick ? pick.items : [],
+    invoices: invoices.map((i) => ({ id: i.id, number: i.number, kind: i.kind, total: i.total, status: i.status })),
+  });
+});
+
 caseRouter.post(
   '/',
   wrap(async (req, res) => {

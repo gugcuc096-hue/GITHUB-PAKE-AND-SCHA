@@ -3,8 +3,8 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { z } = require('zod');
 const { db, tx, nextCaseNumber, randomPin, getSetting } = require('../db');
-const { wrap, parseBody, AREAS, URGENCIES, URGENCY_LABEL, PRIORITY_DISCORD, PRIORITY_FROM_URGENCY, truncate } = require('../helpers');
-const { addSystemNote, getCase, onDutyMembers } = require('../models');
+const { wrap, parseBody, AREAS, URGENCIES, URGENCY_LABEL, PRIORITY_DISCORD, PRIORITY_FROM_URGENCY, OUTCOMES, truncate } = require('../helpers');
+const { addSystemNote, getCase, onDutyMembers, syncCaseWork } = require('../models');
 const discord = require('../discord');
 const tickets = require('../tickets');
 
@@ -31,6 +31,35 @@ router.get('/on-duty', (req, res) => {
 });
 
 /*
+ * Erfolge der Kanzlei für die Startseite (abschaltbar unter Einstellungen → Website). Gezählt werden abgeschlossene
+ * Akten; die Erfolgsquote kommt aus dem Ergebnis, das beim Abschließen gewählt wird (Beratung ohne Verfahren und
+ * vorzeitig beendete Mandate zählen nicht mit), dazu die Durchschnittsbewertung der Mandantenstimmen. Kleine Zahlen
+ * sagen nichts aus – erst ab einer Mindestanzahl.
+ */
+const STATS_MIN_CLOSED = 10;
+const STATS_MIN_RATED = 5;
+router.get('/stats', (req, res) => {
+  if (getSetting('show_success_public', '1') !== '1') return res.json({ visible: false });
+  const closed = db.prepare("SELECT COUNT(*) AS n FROM cases WHERE status = 'geschlossen'").get().n;
+  let won = 0;
+  let rated = 0;
+  for (const r of db.prepare("SELECT outcome, COUNT(*) AS n FROM cases WHERE status = 'geschlossen' AND outcome IS NOT NULL GROUP BY outcome").all()) {
+    const o = OUTCOMES[r.outcome];
+    if (!o || o.success === null) continue;
+    rated += r.n;
+    if (o.success) won += r.n;
+  }
+  // Durchschnitt aller freigegebenen Mandantenstimmen (wie das Karussell erst ab drei)
+  const rv = db.prepare("SELECT COUNT(*) AS n, AVG(rating) AS avg FROM reviews WHERE status = 'freigegeben'").get();
+  res.json({
+    visible: true,
+    closed: closed >= STATS_MIN_CLOSED ? closed : null,
+    successRate: rated >= STATS_MIN_RATED ? Math.round((won / rated) * 100) : null,
+    rating: rv.n >= 3 ? { avg: Math.round(rv.avg * 10) / 10, count: rv.n } : null,
+  });
+});
+
+/*
  * Mandat einreichen direkt von der Startseite -- auch ohne Konto. Der Besucher
  * erhält das Aktenzeichen (der Pin dient nur dem direkten Beitritt zum Discord-Ticket); das Team wird per
  * Discord benachrichtigt. Angemeldete Mandanten bekommen die Akte ins Konto.
@@ -41,8 +70,22 @@ const requestSchema = z.object({
   area: z.enum(AREAS),
   urgency: z.enum(URGENCIES).default('normal'),
   description: z.string().trim().min(10).max(4000),
+  teamMemberId: z.number().int().positive().optional(), // Wunschanwalt (Teamkarte „Direkt anfragen“)
   website: z.string().max(0).optional(), // Honeypot-Feld: bleibt bei Menschen leer
 });
+
+/** Wunschanwalt: sichtbare Teamkarte mit aktivem Anwalts-/Board-Konto – sonst geht die Anfrage wie immer an alle. */
+function wishLawyer(teamMemberId) {
+  if (!teamMemberId) return null;
+  return (
+    db
+      .prepare(
+        `SELECT u.id, u.display_name, u.discord_id FROM team_members t JOIN users u ON u.id = t.user_id
+          WHERE t.id = ? AND t.visible = 1 AND u.active = 1 AND u.role IN ('anwalt','admin')`
+      )
+      .get(teamMemberId) || null
+  );
+}
 
 const AREA_TITLES = {
   strafrecht: 'Strafrecht / Festnahme',
@@ -61,17 +104,19 @@ router.post(
     const account = req.user && req.user.role === 'mandant' ? req.user : null;
     const title = truncate(`${AREA_TITLES[d.area]}: ${d.description.replace(/\s+/g, ' ')}`, 110);
     const pin = randomPin();
+    const lawyer = wishLawyer(d.teamMemberId);
 
     const id = tx(() => {
       const info = db
         .prepare(
-          `INSERT INTO cases (case_number, access_pin, title, area, urgency, priority, description, client_id, client_name, client_phone, status, source)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'offen', 'web')`
+          `INSERT INTO cases (case_number, access_pin, title, area, urgency, priority, description, client_id, client_name, client_phone, lawyer_id, status, source)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'web')`
         )
         // Start-Priorität aus der Dringlichkeit, die der Mandant angibt (die Kanzlei passt sie danach an)
-        .run(nextCaseNumber(), pin, title, d.area, d.urgency, PRIORITY_FROM_URGENCY[d.urgency] || 2, d.description, account ? account.id : null, account ? '' : d.name, d.phone || '');
+        .run(nextCaseNumber(), pin, title, d.area, d.urgency, PRIORITY_FROM_URGENCY[d.urgency] || 2, d.description, account ? account.id : null, account ? '' : d.name, d.phone || '', lawyer ? lawyer.id : null, lawyer ? 'in_bearbeitung' : 'offen');
       const newId = Number(info.lastInsertRowid);
-      addSystemNote(newId, null, 'Mandatsanfrage über das Website-Formular eingegangen.');
+      addSystemNote(newId, null, `Mandatsanfrage über das Website-Formular eingegangen${lawyer ? ` – gewünscht: ${lawyer.display_name}` : ''}.`);
+      if (lawyer) syncCaseWork(newId);
       return newId;
     });
 
@@ -84,10 +129,12 @@ router.post(
         { name: 'Mandant', value: account ? account.display_name : d.name },
         { name: 'Telefon', value: d.phone || '—' },
         { name: 'Rechtsgebiet', value: AREA_TITLES[d.area] },
+        lawyer ? { name: 'Wunschanwalt', value: `${lawyer.display_name} (zugewiesen)` } : null,
         { name: 'Priorität', value: PRIORITY_DISCORD[c.priority] || PRIORITY_DISCORD[2] },
         d.urgency !== 'normal' ? { name: 'Dringlichkeit (Angabe Mandant)', value: URGENCY_LABEL[d.urgency] || d.urgency } : null,
         require('./clients').flagField(c), // bekannter Mandant mit Vermerk (Kanzlei-Kanal, nie ins Ticket)
       ],
+      mentionIds: lawyer && lawyer.discord_id ? [lawyer.discord_id] : [], // Wunschanwalt wird gepingt
     });
 
     tickets.caseCreated(id);
@@ -96,6 +143,7 @@ router.post(
       caseNumber: c.case_number,
       pin,
       linkedToAccount: !!account,
+      lawyerName: lawyer ? lawyer.display_name : null,
       // Discord-Ticket: ohne verknüpftes Konto kann der Mandant mit Aktenzeichen + Pin beitreten
       discordTicket: tickets.active() && discord.oauthConfigured(),
       // … oder gleich ein Konto mit Discord anlegen (die Akte hängt dann daran)

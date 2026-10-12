@@ -271,6 +271,7 @@ function settingsPayload() {
     invoiceReminderDays: require('../paymentReminders').reminderDays(),
     caseIdleDays: idleLimit(),
     showDutyPublic: getSetting('show_duty_public', '1') === '1',
+    showSuccessPublic: getSetting('show_success_public', '1') === '1',
     fivenetUrl: getSetting('fivenet_url', ''),
     fivenetInstance: fivenet.instance(),
     fivenetEnvUrl: process.env.FIVENET_URL || '',
@@ -296,6 +297,7 @@ router.patch(
       invoiceReminderDays: z.number().int().min(0).max(60).optional(),
       caseIdleDays: z.number().int().min(0).max(60).optional(),
       showDutyPublic: z.boolean().optional(),
+      showSuccessPublic: z.boolean().optional(),
       fivenetUrl: z.string().trim().max(200).optional(),
     });
     const d = parseBody(schema, req, res);
@@ -338,6 +340,7 @@ router.patch(
     const fivenetBefore = getSetting('fivenet_url', '');
     tx(() => {
       if (d.showDutyPublic !== undefined) setSetting('show_duty_public', d.showDutyPublic ? '1' : '0');
+      if (d.showSuccessPublic !== undefined) setSetting('show_success_public', d.showSuccessPublic ? '1' : '0');
       if (d.discordWebhookUrl !== undefined) setSetting('discord_webhook_url', d.discordWebhookUrl);
       if (d.discordEvents !== undefined) {
         setSetting('discord_events', JSON.stringify(d.discordEvents.filter((e) => discord.EVENTS[e])));

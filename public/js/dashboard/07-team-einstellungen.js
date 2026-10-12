@@ -525,13 +525,14 @@ function discordLoginPanel(s) {
       </section>`;
 }
 
-/** Kanzlei & Rechnungen → Website (Dienststatus öffentlich). */
+/** Kanzlei & Rechnungen → Website (Dienststatus und Erfolge öffentlich). */
 function websitePanel(s) {
   return `
       <section class="panel panel-pad">
         <div class="panel-head"><h2 class="panel-title">Website</h2></div>
         <form data-form="settings-website" class="form-grid">
           <label class="check"><input type="checkbox" name="showDutyPublic" ${s.showDutyPublic ? 'checked' : ''}> Dienststatus öffentlich anzeigen – „Eilnotdienst: 2 Anwälte im Dienst“ in der Kopfzeile und grüne Punkte bei den Teamkarten</label>
+          <label class="check"><input type="checkbox" name="showSuccessPublic" ${s.showSuccessPublic ? 'checked' : ''}> Erfolge öffentlich anzeigen – „Abgeschlossene Verfahren“ (ab 10) und „Erfolgsquote“ (ab 5 Akten mit Ergebnis) über den Mandantenstimmen</label>
           <div class="form-actions"><button type="submit" class="btn-outline btn-md">Speichern</button><a href="/karriere.html" target="_blank" rel="noopener" class="btn-ghost btn-md">${icon('globe', 'ico-sm')}<span>Karriereseite</span></a></div>
         </form>
       </section>`;

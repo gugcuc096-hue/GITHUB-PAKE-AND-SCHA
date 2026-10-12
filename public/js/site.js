@@ -49,7 +49,7 @@
       <div class="w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center justify-center mx-auto mb-4">
         <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg></div>
       <h3 class="font-serif text-2xl font-semibold text-white text-center mb-2">Mandat eingegangen</h3>
-      <p class="text-sm text-[var(--text-muted)] text-center mb-5">Ein Anwalt der Kanzlei wurde benachrichtigt und meldet sich umgehend.${res.linkedToAccount ? ' Die Akte wurde Ihrem Konto hinzugefügt.' : ''}</p>
+      <p class="text-sm text-[var(--text-muted)] text-center mb-5">${res.lawyerName ? `${esc(res.lawyerName)} wurde benachrichtigt und meldet sich umgehend.` : 'Ein Anwalt der Kanzlei wurde benachrichtigt und meldet sich umgehend.'}${res.linkedToAccount ? ' Die Akte wurde Ihrem Konto hinzugefügt.' : ''}</p>
       <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3 text-center mb-3"><div class="text-[0.6rem] uppercase tracking-widest text-[var(--text-muted)]">Ihr Aktenzeichen</div><div class="font-mono text-lg text-[var(--gold-light)]">${esc(res.caseNumber)}</div></div>
       <p class="text-xs text-[var(--text-muted)] text-center mb-5">Bitte geben Sie das Aktenzeichen bei Rückfragen an.${res.linkedToAccount ? '' : ' Mit einem Mandantenkonto sehen Sie den Stand Ihrer Akte jederzeit im Mandantenportal.'}</p>
       <div class="flex flex-col sm:flex-row gap-2">
@@ -92,6 +92,8 @@
       description: form.elements.description.value.trim(),
       website: form.elements.website.value,
     };
+    const wish = Number(form.elements.teamMemberId && form.elements.teamMemberId.value);
+    if (wish) data.teamMemberId = wish; // Wunschanwalt von der Teamkarte
     if (data.name.length < 2) return showToast('Angaben fehlen', 'Bitte Ihren vollständigen Namen angeben.');
     if (data.description.length < 10) return showToast('Angaben fehlen', 'Bitte beschreiben Sie Ihr Anliegen kurz (mind. 10 Zeichen).');
 
@@ -100,6 +102,7 @@
     try {
       const res = await api.post('/api/public/cases', data);
       form.reset();
+      if (typeof window.setWishLawyer === 'function') window.setWishLawyer(null);
       updateAuthNav();
       showTicketSuccess(res);
     } catch (err) {
@@ -152,7 +155,7 @@
           ? `<img src="${esc(m.photoUrl)}" alt="${esc(m.name)}" loading="lazy" class="w-24 h-24 rounded-full object-cover ring-4 ring-[rgba(212,175,55,0.18)] ${lead ? 'shadow-[0_0_40px_rgba(212,175,55,0.35)]' : ''}">`
           : `<div class="w-24 h-24 rounded-full ${lead ? 'bg-gradient-to-br from-[#d4af37] to-[#8f7322] text-[#02050e] shadow-[0_0_40px_rgba(212,175,55,0.35)]' : 'bg-gradient-to-br from-slate-600 to-slate-800 text-white'} flex items-center justify-center font-serif text-3xl font-bold ring-4 ring-[rgba(212,175,55,0.12)]">${esc(m.initials)}</div>`;
         return `
-        <article class="glass-card team-card p-7 text-center">
+        <article class="glass-card team-card p-7 text-center flex flex-col">
           <div class="relative w-24 h-24 mx-auto mb-5">${portrait}
             ${duty ? `<span class="absolute bottom-1 right-1 w-5 h-5 rounded-full border-[3px] border-[#0a1228] ${duty[1]}" title="${esc(duty[0])}"></span>` : ''}</div>
           ${duty ? `<div class="flex items-center justify-center gap-1.5 text-[0.7rem] ${duty[2]} mb-2"><span class="w-1.5 h-1.5 rounded-full ${duty[1]} animate-pulse"></span>${esc(duty[0])}</div>` : ''}
@@ -160,10 +163,16 @@
           <h3 class="font-serif text-2xl font-semibold text-white mb-1">${esc(m.name)}</h3>
           <div class="text-xs uppercase tracking-widest ${lead ? 'text-[var(--gold-500)]' : 'text-slate-300'} mb-4">${esc(m.roleTitle)}</div>
           <p class="text-sm text-[var(--text-muted)] leading-relaxed">${esc(m.description || '')}</p>
+          ${m.bookable ? `<div class="mt-auto pt-6"><button type="button" class="btn-outline w-full py-3 text-xs uppercase tracking-wider" data-wish="${Number(m.id)}" data-name="${esc(m.name)}">Direkt anfragen</button></div>` : ''}
         </article>`;
       })
       .join('');
   }
+  // „Direkt anfragen“: Mandatsformular mit diesem Anwalt als Wunschanwalt (die Karten werden nachgeladen)
+  document.getElementById('teamGrid')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-wish]');
+    if (btn && typeof window.openTicketModal === 'function') window.openTicketModal('team', { id: Number(btn.dataset.wish), name: btn.dataset.name });
+  });
 
   /* ---------------------------------------------------------------- Honorarordnung & Tarifrechner */
   function renderFees(fees) {
@@ -280,6 +289,38 @@
       const grid = document.getElementById('vipTiers');
       if (grid) grid.innerHTML = '<p class="md:col-span-3 text-center text-sm text-[var(--text-muted)] py-8">Angebote konnten nicht geladen werden.</p>';
     });
+
+  /* ---------------------------------------------------------------- Erfolge (über den Mandantenstimmen) */
+  // Abgeschlossene Verfahren, Erfolgsquote und Durchschnittsbewertung der Mandantenstimmen – vom Server, jeweils erst
+  // ab einer Mindestanzahl. Abschaltbar unter Einstellungen → Website.
+  const firmStats = { visible: false, closed: null, successRate: null, rating: null, ratingCount: 0 };
+  function renderStats() {
+    const box = document.getElementById('firmStats');
+    if (!box) return;
+    const cards = [];
+    if (firmStats.visible && firmStats.closed) cards.push([firmStats.closed.toLocaleString('de-DE'), 'Verfahren abgeschlossen']);
+    if (firmStats.visible && firmStats.successRate != null) cards.push([`${firmStats.successRate} %`, 'Erfolgsquote']);
+    if (firmStats.visible && firmStats.rating) cards.push([`${firmStats.rating.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ★`, `Ø aus ${firmStats.ratingCount} Bewertungen`]);
+    box.classList.toggle('hidden', !cards.length);
+    if (!cards.length) return;
+    box.innerHTML = `
+      <div class="stats-row grid gap-3 sm:gap-4 mx-auto" style="grid-template-columns:repeat(${cards.length},minmax(0,1fr));max-width:${cards.length * 15}rem">
+        ${cards.map(([v, l]) => `<div class="glass-card px-3 py-5 sm:p-6 text-center"><div class="font-serif text-3xl sm:text-4xl font-semibold text-[var(--gold-light)] lining-nums">${esc(v)}</div><div class="text-[0.62rem] sm:text-[0.68rem] uppercase tracking-widest text-[var(--text-muted)] mt-2 leading-snug">${esc(l)}</div></div>`).join('')}
+      </div>
+      ${firmStats.visible && firmStats.successRate != null ? '<p class="text-[0.7rem] text-center text-[var(--text-dim)] mt-3">Erfolgsquote: Freispruch, Einstellung, Strafmilderung, Vergleich oder gewonnen – reine Beratungen zählen nicht mit.</p>' : ''}`;
+  }
+  api.get('/api/public/stats')
+    .then((d) => {
+      Object.assign(firmStats, {
+        visible: !!d.visible,
+        closed: d.closed || null,
+        successRate: d.successRate ?? null,
+        rating: d.rating ? d.rating.avg : null,
+        ratingCount: d.rating ? d.rating.count : 0,
+      });
+      renderStats();
+    })
+    .catch(() => {});
 
   /* ---------------------------------------------------------------- Mandantenstimmen */
   // Karussell; ab drei vom Board freigegebenen Bewertungen ersetzen echte Stimmen die bisherigen Texte.
