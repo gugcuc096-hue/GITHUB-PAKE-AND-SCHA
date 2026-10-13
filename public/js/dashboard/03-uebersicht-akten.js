@@ -590,7 +590,7 @@ function taskList() {
     .map(([key, label]) => {
       const items = list.filter((t) => bucket(t) === key);
       if (!items.length) return '';
-      return `<h3 class="task-group ${key === 'overdue' ? 'is-overdue' : ''}">${esc(label)} <span>${items.length}</span></h3><div class="task-list">${items.map((t) => taskItem(t)).join('')}</div>`;
+      return `<h2 class="task-group ${key === 'overdue' ? 'is-overdue' : ''}">${esc(label)} <span>${items.length}</span></h2><div class="task-list">${items.map((t) => taskItem(t)).join('')}</div>`;
     })
     .join('');
 }
@@ -628,8 +628,12 @@ function rememberCase(data) {
   st.caseInfo = data.case;
 }
 async function openCase(id) {
-  await load.lawyers();
-  const data = await api.get('/api/cases/' + id);
+  // Dauert das Laden, öffnet sich die Akte sofort mit Platzhaltern
+  const data = await withModalPlaceholder({ wide: true }, async () => {
+    await load.lawyers();
+    return api.get('/api/cases/' + id);
+  });
+  if (!data) return;
   // Erst öffnen (ein vorheriges Fenster wird samt seinem Zustand beiseitegelegt), dann die Akte merken
   openModal(caseDetail(data), { wide: true, key: `case:${id}`, reopen: () => openCase(id) });
   rememberCase(data);

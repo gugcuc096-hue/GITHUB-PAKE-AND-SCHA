@@ -41,8 +41,8 @@ app.use(
         // Strenge Richtlinie: nur Skriptdateien der eigenen Domain – keine Inline-Skripte, keine onclick-Attribute
         scriptSrc: ["'self'"],
         scriptSrcAttr: ["'none'"],
-        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-        fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        fontSrc: ["'self'", 'data:'], // Schriften kommen vom eigenen Server (public/fonts)
         imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
         connectSrc: ["'self'"],
         objectSrc: ["'none'"],
@@ -144,6 +144,8 @@ app.use(
 );
 
 /* ---------------------------------------------------------------- Frontend */
+// Schriften ändern sich praktisch nie – 30 Tage im Browser behalten
+app.use('/fonts', express.static(path.join(__dirname, 'public', 'fonts'), { maxAge: '30d' }));
 app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.use((req, res) => res.status(404).sendFile(path.join(__dirname, 'public', 'index.html')));

@@ -16,9 +16,9 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <script src="/js/pwa.js" defer></script>
     <title>Konto erstellen | Pake & Scha Legal Consulting</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="preload" href="/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="/fonts/cormorant-garamond-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="/css/fonts.css">
     <link rel="stylesheet" href="/css/app.css">
     <!-- Tailwind fest gebaut (npm run build:css) – zuletzt eingebunden wie zuvor beim Play-CDN -->
     <link rel="stylesheet" href="/css/tailwind.css">
@@ -82,7 +82,7 @@
             </form>
 
             <p class="text-sm text-muted mt-6">
-                Bereits registriert? <a id="loginLink" href="/login.html" class="text-gold hover:underline">Anmelden</a>
+                Bereits registriert? <a id="loginLink" href="/login.html" class="text-gold underline underline-offset-4 decoration-[rgba(212,175,55,0.45)] hover:decoration-[var(--gold-500)]">Anmelden</a>
             </p>
         </div>
     </main>

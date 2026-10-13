@@ -91,7 +91,15 @@ function renderNav() {
   mailBadge.textContent = st.unread > 99 ? '99+' : String(st.unread);
   mailBadge.classList.toggle('hidden', !st.unread);
   $('#pageTitle').textContent = viewLabel(st.view);
-  document.title = `${viewLabel(st.view)} | Pake & Scha`;
+  // Tab und App-Symbol (installierte App) zeigen, wie viel Neues wartet – die Summe der Zähler im Menü
+  const waiting = groups.reduce((n, g) => n + g.items.reduce((m, k) => m + navCount(k), 0), 0);
+  document.title = `${waiting ? `(${waiting > 99 ? '99+' : waiting}) ` : ''}${viewLabel(st.view)} | Pake & Scha`;
+  setAppBadge(waiting);
+}
+/** Zahl auf dem App-Symbol (Handy/PC, wenn als App installiert) – nur wo der Browser das kann. */
+function setAppBadge(n) {
+  if (!('setAppBadge' in navigator)) return;
+  (n ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(() => {});
 }
 
 function myDutyStatus() {
@@ -356,13 +364,22 @@ function stashModal() {
 function openModal(html, { wide = false, key = null, reopen = null, child = false } = {}) {
   const modal = $('#modal');
   const body = $('#modalBody');
-  const same = key && st.modalCurrent && st.modalCurrent.key === key;
+  // Dasselbe Fenster noch einmal oder die Platzhalter, die gerade geladen werden: nur ersetzen, nicht stapeln
+  const same = (key && st.modalCurrent && st.modalCurrent.key === key) || !!(st.modalCurrent && st.modalCurrent.placeholder);
   // child: auch nach dem Absenden eines Formulars als Unterfenster öffnen (z. B. „Rechnung erstellt“ über der Akte)
   if (modal.classList.contains('open') && !st.modalRestoring && (child || !st.modalReplace) && !same) stashModal();
+  const wasOpen = modal.classList.contains('open');
   st.modalCurrent = { key, reopen, wide };
   body.innerHTML = html;
+  // Titel für Screenreader: das Fenster heißt wie seine erste Überschrift (wo kein id="modalTitle" gesetzt ist)
+  if (!body.querySelector('#modalTitle')) {
+    const head = body.querySelector('.modal-title, h1, h2, h3');
+    if (head) head.id = 'modalTitle';
+  }
   $('#modalCard').classList.toggle('wide', wide);
   modal.classList.add('open');
+  // Fensterwechsel (neues Fenster über dem alten, Zurück, Inhalt nach dem Laden): weich statt hart
+  if (wasOpen) playIn(body, 'swap-in');
   modal.scrollTop = 0;
   body.scrollTop = 0;
   document.body.classList.add('modal-open');
@@ -370,6 +387,38 @@ function openModal(html, { wide = false, key = null, reopen = null, child = fals
   const focusTarget = $('#modalBody [autofocus]');
   if (focusTarget && window.matchMedia('(min-width: 768px)').matches) focusTarget.focus();
   scheduleHistory();
+}
+/** Platzhalter für ein Fenster, das noch lädt (Kopf, Kennzahlen, Abschnitte). */
+function modalSkeletonHtml() {
+  const row = (w) => `<div class="skel-row"><div class="flex-1">${skelLine(w)}${skelLine('34%', 'mt-2 skel-sm')}</div>${skelLine('64px', 'skel-pill')}</div>`;
+  return `<div class="skel-page pr-12" aria-busy="true">
+      <h2 id="modalTitle" class="sr-only">Wird geladen …</h2>
+      ${skelLine('110px', 'skel-sm')}${skelLine('min(420px, 75%)', 'skel-title mt-3')}
+      <div class="flex flex-wrap gap-3 mt-5">${skelLine('150px', 'skel-pill')}${skelLine('130px', 'skel-pill')}</div>
+      <div class="grid grid-cols-3 gap-4 mt-8">${skelLine('80%')}${skelLine('70%')}${skelLine('60%')}${skelLine('65%', 'skel-sm')}${skelLine('75%', 'skel-sm')}${skelLine('55%', 'skel-sm')}</div>
+      <div class="mt-8">${['70%', '55%', '62%'].map(row).join('')}</div>
+    </div>`;
+}
+/**
+ * Fenster, das erst Daten laden muss: Dauert es, erscheint sofort ein Fenster mit Platzhaltern, das die Daten danach
+ * füllen (openModal ersetzt es). Wird es vorher geschlossen, bleibt es zu – Ergebnis dann null.
+ */
+async function withModalPlaceholder({ wide = false } = {}, loadFn) {
+  let shown = null;
+  const t = setTimeout(() => {
+    openModal(modalSkeletonHtml(), { wide });
+    shown = st.modalCurrent;
+    shown.placeholder = true;
+  }, 150);
+  try {
+    const data = await loadFn();
+    return shown && st.modalCurrent !== shown ? null : data; // inzwischen geschlossen oder anderswo hin
+  } catch (e) {
+    if (shown && st.modalCurrent === shown) await modalBack();
+    throw e;
+  } finally {
+    clearTimeout(t);
+  }
 }
 function replaceModal(html) {
   const body = $('#modalBody');
@@ -426,6 +475,7 @@ async function modalBack() {
   } else {
     body.innerHTML = '';
     body.appendChild(prev.nodes);
+    playIn(body, 'swap-in');
     Object.assign(st, prev.state);
     st.modalCurrent = { key: prev.key || null, reopen: null, wide: !!prev.wide };
     $('#modalCard').classList.toggle('wide', !!prev.wide);
@@ -471,8 +521,23 @@ function restoreModalScroll([top, bodyTop]) {
   }
 }
 
-const loadingHtml = () =>
-  `<div class="stack">${'<div class="panel panel-pad"><div class="skeleton" style="width:40%"></div><div class="skeleton mt-4"></div><div class="skeleton mt-3" style="width:70%"></div></div>'.repeat(2)}</div>`;
+/**
+ * Platzhalter in der Form der Seite, solange sie lädt: Titelzeile, je nach Seite Kennzahlen, darunter eine Liste.
+ * Graue Flächen statt „wird geladen …“ – die Seite springt danach nicht.
+ */
+const skelLine = (w, cls = '') => `<div class="skeleton ${cls}" style="width:${w}"></div>`;
+function loadingHtml(view = st.view) {
+  const line = skelLine;
+  const kpis = ['overview', 'invoices', 'duty', 'work'].includes(view)
+    ? `<div class="kpi-grid kpi-grid-3 skel-kpis">${'<div class="panel kpi">' + line('45%') + line('60%', 'skel-lg mt-3') + '</div>'}${'<div class="panel kpi">' + line('40%') + line('55%', 'skel-lg mt-3') + '</div>'}${'<div class="panel kpi">' + line('50%') + line('35%', 'skel-lg mt-3') + '</div>'}</div>`
+    : '';
+  const row = (w) => `<div class="skel-row"><div class="skel-dot"></div><div class="flex-1">${line(w)}${line('38%', 'mt-2 skel-sm')}</div>${line('70px', 'skel-pill')}</div>`;
+  return `<div class="skel-page" aria-busy="true"><p class="sr-only" role="status">Wird geladen …</p>
+      <div class="page-head"><div class="flex-1">${line('min(320px, 60%)', 'skel-title')}${line('min(460px, 85%)', 'mt-3')}</div></div>
+      ${kpis}
+      <div class="panel panel-pad">${['72%', '58%', '66%', '50%', '62%'].map(row).join('')}</div>
+    </div>`;
+}
 const errorHtml = (msg) =>
   `<div class="panel">${empty(msg || 'Daten konnten nicht geladen werden.', 'alert')}<div class="text-center pb-6"><button class="btn-outline btn-md" data-action="reload-view">Erneut versuchen</button></div></div>`;
 
@@ -483,6 +548,8 @@ function handleError(e) {
   }
   toast(e?.message || 'Unbekannter Fehler.', 'error');
 }
+/** Sofort angezeigte Änderung ließ sich nicht speichern: Hinweis, dass sie zurückgesprungen ist (401 bleibt 401). */
+const notSaved = (err, what = 'Nicht gespeichert') => Object.assign(new Error(`${what} – ${err?.message || 'Unbekannter Fehler.'}`), { status: err?.status });
 async function guard(fn) {
   try {
     await fn();
@@ -502,19 +569,30 @@ async function go(view) {
   closeDutyPop();
   renderNav();
   const content = $('#content');
-  content.innerHTML = loadingHtml();
   window.scrollTo(0, 0);
   const token = ++st.navToken;
+  // Platzhalter erst, wenn das Laden dauert – schnelle Seiten erscheinen ohne kurzes Aufblitzen
+  const slow = setTimeout(() => token === st.navToken && (content.innerHTML = loadingHtml(view)), 120);
   try {
     if (views[view].load) await views[view].load();
   } catch (e) {
     if (token !== st.navToken) return;
+    clearTimeout(slow);
     handleError(e);
     content.innerHTML = errorHtml(e.message);
     return;
   }
+  clearTimeout(slow);
   if (token !== st.navToken) return;
   renderView();
+  playIn(content, 'view-in');
+}
+/** Sanft einblenden (Seitenwechsel, neues Fenster) – nicht bei jedem Neuzeichnen, sonst flackert es. */
+function playIn(el, cls) {
+  if (!el) return;
+  el.classList.remove(cls);
+  void el.offsetWidth; // Animation neu starten
+  el.classList.add(cls);
 }
 function renderView() {
   $('#content').innerHTML = views[st.view].render();

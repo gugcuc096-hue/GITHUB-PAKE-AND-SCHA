@@ -57,6 +57,16 @@ describe('Strenge Content-Security-Policy', () => {
     }
   });
 
+  it('Schriften kommen vom eigenen Server (keine Google-Fonts-Anfragen)', () => {
+    for (const page of htmlPages) assert.doesNotMatch(read(page), /fonts\.(googleapis|gstatic)\.com/, `${rel(page)} lädt Schriften von Google`);
+    const css = read(path.join(PUBLIC, 'css', 'fonts.css'));
+    const files = [...css.matchAll(/url\((\/fonts\/[^)]+)\)/g)].map((m) => m[1]);
+    assert.ok(files.length >= 10, 'fonts.css nennt die Schriftdateien');
+    for (const f of files) assert.ok(fs.existsSync(path.join(PUBLIC, f)), `${f} fehlt`);
+    for (const family of ['Inter', 'Cormorant-Garamond', 'JetBrains-Mono', 'Tinos', 'Roboto-Serif', 'Allura', 'Dancing-Script'])
+      assert.ok(fs.existsSync(path.join(PUBLIC, 'fonts', 'licenses', `${family}.txt`)), `Lizenz für ${family} fehlt`);
+  });
+
   it('alle Browser-Skripte sind gültiges JavaScript', () => {
     for (const file of browserScripts) assert.doesNotThrow(() => new vm.Script(read(file), { filename: rel(file) }), rel(file));
   });

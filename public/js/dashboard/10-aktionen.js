@@ -18,6 +18,7 @@ const actions = {
     if (unsavedInputs({ invoice: true }) && !(await askDiscard(true))) return;
     st.leaving = true; // keine zweite Rückfrage des Browsers
     window.PS.drafts.clearAll(); // Entwürfe gehören zu diesem Konto – nicht für den Nächsten am selben Gerät
+    setAppBadge(0); // Zahl auf dem App-Symbol gehört ebenfalls zu diesem Konto
     await api.post('/api/auth/logout');
     location.href = '/login.html';
   },
@@ -60,10 +61,14 @@ const actions = {
     const step = Number(el.dataset.step);
     const steps = $$('button.track-step');
     steps.forEach((b) => (b.disabled = true)); // kein Doppelklick während des Speicherns
+    const undo = previewStage(`step:${step}`); // Kreise springen sofort um
     try {
       await api.patch('/api/cases/' + id, { step });
+    } catch (err) {
+      undo();
+      throw notSaved(err);
     } finally {
-      steps.forEach((b) => (b.disabled = false));
+      steps.forEach((b) => b.isConnected && (b.disabled = false));
     }
     toast(`Bearbeitungsstand: ${STEPS[step]}`);
     await reloadCase(id);
@@ -1334,9 +1339,19 @@ const actions = {
   },
   'task-toggle': async (el) => {
     const done = el.dataset.done !== '1';
+    // Haken sofort setzen bzw. entfernen – scheitert das Speichern, springt er zurück
+    const show = (on) => {
+      el.closest('.task-row')?.classList.toggle('is-done', on);
+      el.innerHTML = on ? icon('check', 'ico-sm') : '';
+      el.dataset.done = on ? '1' : '0';
+    };
+    show(done);
     el.disabled = true;
     try {
       await api.patch('/api/tasks/' + el.dataset.id, { done });
+    } catch (err) {
+      if (el.isConnected) show(!done);
+      throw notSaved(err);
     } finally {
       if (el.isConnected) el.disabled = false;
     }

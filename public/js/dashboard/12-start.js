@@ -139,6 +139,33 @@ document.addEventListener('submit', (e) => {
   });
 });
 
+/* ---------------------------------------------------------------- Beschriftungen mit ihren Feldern verbinden */
+// „<label>Kontakt</label><input …>“ ohne for: Screenreader lesen die Beschriftung sonst nicht vor, ein Klick auf sie
+// setzt keinen Fokus. Gilt für alles, was neu gezeichnet wird (Seiten, Fenster, Reiter).
+let labelSeq = 0;
+function linkLabels(root) {
+  for (const label of root.querySelectorAll('label:not([for])')) {
+    if (label.querySelector('input, select, textarea')) continue; // umschließt sein Feld schon
+    let field = label.nextElementSibling;
+    if (field && !field.matches('input, select, textarea')) {
+      const inner = field.querySelectorAll('input:not([type="hidden"]), select, textarea');
+      field = inner.length === 1 ? inner[0] : null; // nur eindeutig: genau ein Feld im Block danach
+    }
+    if (!field || field.type === 'hidden') continue;
+    if (!field.id) field.id = `fld${++labelSeq}`;
+    label.htmlFor = field.id;
+  }
+}
+let labelsQueued = false;
+new MutationObserver(() => {
+  if (labelsQueued) return;
+  labelsQueued = true;
+  requestAnimationFrame(() => {
+    labelsQueued = false;
+    linkLabels(document.body);
+  });
+}).observe(document.body, { childList: true, subtree: true });
+
 /* ---------------------------------------------------------------- Bilder einfügen (Strg+V) und hineinziehen */
 // Screenshots landen dort, wo man sonst „Bilder hinzufügen“ wählt: in der Akte bei den Beweismitteln, beim Melden einer
 // Zahlung als Nachweis, im Profil als Profilbild … Externe Dokumente haben ihr eigenes Einfügen (onExternalPaste).
@@ -559,9 +586,12 @@ setInterval(() => {
   if (typeof pollAppChat === 'function') pollAppChat();
 }, 6000);
 
-// Ungelesene Post, neue Bewerbungen und Dienststatus regelmäßig aktualisieren (Badges in der Navigation)
+// Ungelesene Post, neue Bewerbungen und Dienststatus regelmäßig aktualisieren (Badges in der Navigation, Zahl im
+// Tab und auf dem App-Symbol) – im Hintergrund seltener, damit der Tab trotzdem zeigt, wenn etwas Neues da ist
+let badgeTick = 0;
 setInterval(() => {
-  if (document.hidden || !st.user) return;
+  badgeTick++;
+  if (!st.user || (document.hidden && badgeTick % 2)) return;
   Promise.all([load.chatUnread().catch(() => {}), load.unread(), load.appCount(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {}), load.paymentReports().catch(() => {})])
     .then(renderNav)
     .catch(() => {});

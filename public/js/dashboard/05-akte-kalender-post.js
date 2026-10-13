@@ -207,11 +207,19 @@ async function searchClientAccounts(input) {
 async function setCasePriority(sel) {
   const id = Number(sel.dataset.id);
   const priority = Number(sel.value);
+  // Balken und Farbe springen sofort um – scheitert das Speichern, zurück auf den alten Stand
+  const box = sel.closest('.prop');
+  const show = (p) => {
+    box.className = box.className.replace(/\bprio-\d\b/, `prio-${p}`);
+    $$('.prio-bars i', box).forEach((i, k) => i.classList.toggle('on', k < p));
+  };
+  show(priority);
   try {
     await api.patch('/api/cases/' + id, { priority });
   } catch (err) {
     sel.value = sel.dataset.value;
-    throw err;
+    if (box.isConnected) show(Number(sel.dataset.value));
+    throw notSaved(err);
   }
   toast(`Priorität: ${PRIORITY[priority][0]}`);
   await reloadCase(id);
@@ -224,18 +232,52 @@ async function setCasePriority(sel) {
 async function setCaseStatus(sel) {
   const id = Number(sel.dataset.id);
   const v = sel.value;
+  if (v === 'geschlossen') {
+    sel.value = sel.dataset.value; // erst der Abschluss-Dialog schließt die Akte
+    return closeCase(id);
+  }
+  const undo = previewStage(v);
   try {
-    if (v === 'geschlossen') {
-      sel.value = sel.dataset.value; // erst der Abschluss-Dialog schließt die Akte
-      return closeCase(id);
-    }
     await api.patch('/api/cases/' + id, v.startsWith('step:') ? { status: 'in_bearbeitung', step: Number(v.slice(5)) } : { status: v });
   } catch (err) {
-    sel.value = sel.dataset.value;
-    throw err;
+    undo();
+    throw notSaved(err);
   }
   toast(`Stand: ${v.startsWith('step:') ? STEPS[Number(v.slice(5))] : CASE_STATUS[v][0]}`);
   await reloadCase(id);
+}
+
+/**
+ * Stand sofort zeigen, bevor der Server antwortet – im Aktenkopf (Auswahl und Farbpunkt) und im Bearbeitungsstand.
+ * stage: „offen“ oder „step:N“. Gibt eine Funktion zurück, die alles auf den alten Stand zurücksetzt.
+ */
+function previewStage(stage) {
+  const body = $('#modalBody');
+  const sel = body.querySelector('[data-case-status]');
+  const box = sel && sel.closest('.prop');
+  const track = body.querySelector('.track');
+  const before = { cls: box && box.className, track: track && track.innerHTML };
+  if (sel) {
+    sel.value = stage;
+    box.className = box.className.replace(/\bst-\S+/, `st-${stage.startsWith('step:') ? 'in_bearbeitung' : stage}`);
+  }
+  if (track && stage.startsWith('step:')) {
+    const at = Number(stage.slice(5));
+    const nodes = $$('.track-node', track);
+    nodes.forEach((n, i) => {
+      n.classList.toggle('done', i < at);
+      n.classList.toggle('current', i === at);
+      n.textContent = i < at ? '✓' : String(i + 1);
+    });
+    track.querySelector('.track-fill').style.width = `${(at / (nodes.length - 1)) * 80}%`;
+  }
+  return () => {
+    if (sel && sel.isConnected) {
+      sel.value = sel.dataset.value;
+      box.className = before.cls;
+    }
+    if (track && track.isConnected) track.innerHTML = before.track;
+  };
 }
 
 /**
@@ -347,7 +389,7 @@ function chatReceipts(list, otherRead) {
   if (!list) return;
   if (otherRead !== undefined) list.dataset.otherRead = String(otherRead);
   const read = Number(list.dataset.otherRead) || 0;
-  const outs = $$('.chat-msg.out', list);
+  const outs = $$('.chat-msg.out:not(.pending)', list);
   outs.forEach((el) => (el.querySelector('.chat-receipt').textContent = ''));
   const last = outs[outs.length - 1];
   if (last) last.querySelector('.chat-receipt').textContent = Number(last.dataset.id) <= read ? '· gelesen' : '· gesendet';
@@ -364,6 +406,45 @@ function chatAppend(list, messages, toBubble) {
   list.dataset.lastId = String(Math.max(Number(list.dataset.lastId) || 0, ...fresh.map((m) => m.id)));
   if (atBottom || fresh.some((m) => toBubble(m).side === 'out')) list.scrollTop = list.scrollHeight;
   chatReceipts(list);
+}
+/**
+ * Nachricht sofort als blasse Sprechblase zeigen („wird gesendet …“) und dann senden. Klappt es nicht, verschwindet
+ * sie wieder und der Text steht zurück im Eingabefeld. listSel: Nachrichtenliste; send(body) → gespeicherte Nachricht.
+ */
+async function chatSendNow(f, listSel, toBubble, send) {
+  const input = f.elements.body;
+  const body = input.value.trim();
+  if (!body) return null;
+  input.value = '';
+  input.style.height = '';
+  input.focus();
+  window.PS.drafts.clear(f); // gesendet ist gesendet – auch wer jetzt sofort neu lädt, bekommt sie nicht als Entwurf zurück
+  const list = $(listSel);
+  let pending = null;
+  if (list) {
+    list.querySelector('.chat-empty')?.remove();
+    const days = $$('.chat-day span', list);
+    list.insertAdjacentHTML('beforeend', chatBubble({ id: '', side: 'out', author: '', body, createdAt: new Date().toISOString() }, days.length ? days[days.length - 1].textContent : null));
+    pending = list.lastElementChild;
+    pending.classList.add('pending');
+    pending.querySelector('.chat-receipt').textContent = '· wird gesendet …';
+    list.scrollTop = list.scrollHeight;
+  }
+  try {
+    const msg = await send(body);
+    pending?.remove();
+    if (msg) chatAppend($(listSel), [msg], toBubble);
+    return msg;
+  } catch (err) {
+    pending?.remove();
+    // Formular inzwischen neu gezeichnet? Dann das aktuelle Eingabefeld (das input-Ereignis legt den Entwurf wieder an)
+    const box = input.isConnected ? input : $(`form[data-form="${f.dataset.form}"] textarea[name="body"]`);
+    if (box) {
+      box.value = box.value.trim() ? `${body}\n${box.value}` : body;
+      box.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    throw notSaved(err, 'Nicht gesendet, der Text steht wieder im Eingabefeld');
+  }
 }
 function chatForm({ form, attrs, placeholder }) {
   return `<form data-form="${form}" ${attrs} class="chat-form">

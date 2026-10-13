@@ -262,7 +262,7 @@ button.track-step { cursor: pointer; }
 button.track-step:hover .track-node, button.track-step:focus-visible .track-node { border-color: var(--gold-500); box-shadow: 0 0 0 5px rgba(212, 175, 55, 0.22); transform: scale(1.1); }
 button.track-step:hover .track-label, button.track-step:focus-visible .track-label { color: var(--gold-light); }
 button.track-step:focus-visible { outline: 2px solid var(--gold-500); outline-offset: 3px; }
-button.track-step:disabled { cursor: progress; opacity: 0.7; }
+button.track-step:disabled { cursor: progress; } /* der neue Stand ist schon zu sehen – nicht ausgrauen */
 /* Aktenkopf: Titel über die volle Breite, darunter eine Leiste mit Feldern „STATUS | ● In Bearbeitung ▾“ */
 .case-props { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin-top: 1rem; }
 .prop { display: inline-flex; align-items: stretch; min-height: 40px; border: 1px solid var(--glass-border); border-radius: 12px;
@@ -1284,6 +1284,7 @@ html.pwa-standalone .pwa-hide-standalone { display: none !important; }
 .chat-bubble { max-width: min(80%, 560px); padding: 0.45rem 0.75rem 0.3rem; border-radius: 14px; font-size: 0.875rem; line-height: 1.45; min-width: 0; }
 .chat-msg.in .chat-bubble { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); border-bottom-left-radius: 4px; }
 .chat-msg.out .chat-bubble { background: rgba(212, 175, 55, 0.12); border: 1px solid var(--gold-hairline); border-bottom-right-radius: 4px; }
+.chat-msg.pending .chat-bubble { opacity: 0.6; } /* sofort angezeigt, wird noch gesendet */
 .chat-author { font-size: 0.72rem; font-weight: 600; color: var(--gold-light); margin-bottom: 0.1rem; }
 .chat-author span { color: var(--text-dim); font-weight: 400; }
 .chat-text { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-main); }
@@ -1391,3 +1392,25 @@ textarea.field.chat-input { resize: none; min-height: 42px; height: 42px; max-he
 .chat-duty.s-gericht { color: var(--gold-light); border-color: rgba(212, 175, 55, 0.35); background: rgba(212, 175, 55, 0.06); }
 .chat-duty.s-pause { color: #fde68a; border-color: rgba(245, 158, 11, 0.35); background: rgba(245, 158, 11, 0.06); }
 .chat-duty .duty-dot { flex: none; }
+
+/* Sanfte Übergänge: Seitenwechsel im Dashboard, Fensterwechsel und – wo der Browser es kann – von Seite zu Seite.
+   „Weniger Bewegung“ im Betriebssystem schaltet alles ab (siehe prefers-reduced-motion oben). */
+@view-transition { navigation: auto; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.22s; }
+#content.view-in { animation: view-in 0.24s cubic-bezier(0.16, 1, 0.3, 1); }
+#modalBody.swap-in { animation: swap-in 0.2s ease-out; }
+@keyframes view-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes swap-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }
+/* Ladeplatzhalter in der Form der Seite */
+.skel-page { animation: skel-in 0.3s ease-out; }
+@keyframes skel-in { from { opacity: 0; } to { opacity: 1; } }
+.skel-title { height: 30px; border-radius: 10px; }
+.skel-lg { height: 26px; }
+.skel-sm { height: 10px; }
+.skel-pill { height: 22px; border-radius: 999px; flex: none; }
+.skel-row { display: flex; align-items: center; gap: 0.9rem; padding: 0.85rem 0.25rem; border-bottom: 1px solid var(--glass-border); }
+.skel-row:last-child { border-bottom: 0; }
+.skel-dot { width: 34px; height: 34px; border-radius: 10px; flex: none; background: rgba(255, 255, 255, 0.05); }
+.skel-kpis { margin-bottom: 1.25rem; }
+@media (max-width: 639px) { #modalBody .skel-page .grid-cols-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
