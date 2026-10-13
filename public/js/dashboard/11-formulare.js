@@ -210,26 +210,17 @@ const forms = {
     if (st.view === 'overview' || st.view === 'cases') refreshBehind();
   },
   'chat-send': async (f) => {
-    const input = f.elements.body;
-    const body = input.value.trim();
-    if (!body) return;
     const caseId = Number(f.dataset.caseId);
-    const r = await api.post(`/api/cases/${caseId}/notes`, { body, internal: false });
-    input.value = '';
-    input.style.height = '';
-    if (r.message) chatAppend($('#chatList'), [r.message], caseBubble);
-    input.focus();
+    await chatSendNow(f, '#chatList', caseBubble, async (body) => (await api.post(`/api/cases/${caseId}/notes`, { body, internal: false })).message);
   },
   'app-message': async (f) => {
-    const input = f.elements.body;
-    const body = input.value.trim();
-    if (!body) return;
-    const r = await api.post(`/api/admin/applications/${f.dataset.id}/messages`, { body });
-    input.value = '';
-    input.style.height = '';
-    chatAppend($('#appChatList'), [r.message], appBubble);
-    if (!r.discordSent) toast('Gesendet – der Bewerber sieht die Nachricht auf seiner Bewerberseite.');
-    input.focus();
+    let discordSent = true;
+    const msg = await chatSendNow(f, '#appChatList', appBubble, async (body) => {
+      const r = await api.post(`/api/admin/applications/${f.dataset.id}/messages`, { body });
+      discordSent = r.discordSent;
+      return r.message;
+    });
+    if (msg && !discordSent) toast('Gesendet – der Bewerber sieht die Nachricht auf seiner Bewerberseite.');
   },
   'add-note': async (f) => {
     const fd = new FormData(f);

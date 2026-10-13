@@ -53,7 +53,6 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
 
   async function open(device) {
     const ctx = await browser.newContext({ ...device, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
-    await ctx.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
     const page = await ctx.newPage();
     const problems = [];
     page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
@@ -786,7 +785,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.goto(qsrv.base + '/');
         await page.locator('[data-act="ticket"]:visible').first().click();
         await page.fill('#tkDesc', `Angefangene Anfrage (${label})`);
-        await page.waitForTimeout(400);
+        // erst neu laden, wenn der Entwurf gespeichert ist (statt fester Wartezeit – auf langsamen Rechnern dauert es länger)
+        await page.waitForFunction((t) => Object.keys(localStorage).some((k) => k.startsWith('ps.draft:') && (localStorage.getItem(k) || '').includes(t)), `Angefangene Anfrage (${label})`);
         await page.reload();
         await page.locator('[data-act="ticket"]:visible').first().click();
         assert.equal(await page.inputValue('#tkDesc'), `Angefangene Anfrage (${label})`);
@@ -1427,6 +1427,87 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       }
       assert.deepEqual(problems, []);
       await ctx.close();
+    });
+  }
+
+  for (const [label, device] of [['PC', DESKTOP], ['Handy', PHONE]]) {
+    it(`Sofort-Reaktion am ${label}: Haken, Nachricht, Priorität und Stand sofort – bei Fehler zurück mit Hinweis`, async () => {
+      const osrv = await startServer(); // eigener Server: der gemeinsame ist nahe am Anmelde-Limit
+      const { ctx, page, problems, settle } = await open(device);
+      try {
+        const adm = client(osrv.base);
+        const me = await adm.login(TEAM.admin);
+        const kase = (await adm.post('/api/cases', { title: 'Beschlagnahmtes Fahrzeug', area: 'zivilrecht', clientName: 'Sofia Sofort', lawyerId: me.id })).json.case;
+        assert.equal((await adm.post('/api/tasks', { title: 'Akteneinsicht beantragen', caseId: kase.id, assignedTo: me.id })).status, 201);
+        await login(page, TEAM.admin, osrv.base);
+        await page.goto(osrv.base + `/dashboard.html?case=${kase.id}#cases`);
+        await page.waitForSelector('#modalBody .case-head');
+        await settle();
+        // Server antwortet langsam bzw. mit Fehler – die Anzeige wartet nicht darauf
+        const slow = (method) => async (route) => {
+          if (route.request().method() !== method) return route.continue();
+          await new Promise((r) => setTimeout(r, 1500));
+          await route.continue().catch(() => {});
+        };
+        const fail = (method) => (route) =>
+          route.request().method() === method ? route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Datenbank nicht erreichbar.' }) }) : route.continue();
+        const hint = (text) => page.waitForFunction((t) => (document.querySelector('#psToastRoot') || {}).textContent?.includes(t), text);
+
+        // Aufgabe abhaken
+        await page.route('**/api/tasks/*', slow('PATCH'));
+        await page.click('#secTasks .task-check');
+        assert.equal(await page.$eval('#secTasks .task-row', (r) => r.classList.contains('is-done')), true, 'Haken sofort da');
+        await settle();
+        await page.unroute('**/api/tasks/*');
+        await page.route('**/api/tasks/*', fail('PATCH'));
+        await page.click('#secTasks .task-check');
+        await hint('Nicht gespeichert – Datenbank nicht erreichbar.');
+        assert.equal(await page.$eval('#secTasks .task-row', (r) => r.classList.contains('is-done')), true, 'Haken springt zurück');
+        await page.unroute('**/api/tasks/*');
+
+        // Nachricht: sofort blass sichtbar, danach normal; scheitert sie, steht der Text wieder im Feld
+        const chat = '#modalBody form[data-form="chat-send"] textarea';
+        const send = '#modalBody form[data-form="chat-send"] button[type=submit]';
+        await page.route(`**/api/cases/${kase.id}/notes`, slow('POST'));
+        await page.fill(chat, `Termin ist am Freitag (${label})`);
+        await page.click(send);
+        assert.match(await page.textContent('#chatList .chat-msg.pending'), /Termin ist am Freitag.*wird gesendet/s, 'Nachricht sofort sichtbar');
+        assert.equal(await page.inputValue(chat), '', 'Eingabefeld sofort frei');
+        await page.waitForFunction(() => !document.querySelector('#chatList .chat-msg.pending'));
+        assert.equal(await page.$$eval('#chatList .chat-msg.out', (m) => m.filter((x) => Number(x.dataset.id) > 0).length), 1, 'gespeicherte Nachricht ersetzt die blasse');
+        await page.unroute(`**/api/cases/${kase.id}/notes`);
+        await page.route(`**/api/cases/${kase.id}/notes`, fail('POST'));
+        await page.fill(chat, 'Diese Nachricht scheitert');
+        await page.click(send);
+        await hint('Nicht gesendet');
+        assert.equal(await page.inputValue(chat), 'Diese Nachricht scheitert', 'Text wieder im Eingabefeld');
+        assert.equal(await page.$$eval('#chatList .chat-msg.out', (m) => m.length), 1, 'keine gescheiterte Sprechblase übrig');
+        await page.unroute(`**/api/cases/${kase.id}/notes`);
+        await page.fill(chat, '');
+
+        // Priorität und Bearbeitungsstand
+        await page.route(`**/api/cases/${kase.id}`, slow('PATCH'));
+        await page.selectOption('#modalBody [data-case-priority]', '4');
+        assert.equal(await page.$$eval('#modalBody .prop-prio .prio-bars i.on', (b) => b.length), 4, 'Priorität sofort');
+        await settle();
+        await page.click('#modalBody button.track-step[data-step="2"]');
+        assert.deepEqual(await page.$$eval('#modalBody .track-node', (n) => n.map((x) => (x.classList.contains('current') ? 'c' : x.classList.contains('done') ? 'd' : '-'))), ['d', 'd', 'c', '-', '-'], 'Stand sofort');
+        assert.equal(await page.$eval('#modalBody [data-case-status]', (s) => s.value), 'step:2');
+        await settle();
+        await page.unroute(`**/api/cases/${kase.id}`);
+        await page.route(`**/api/cases/${kase.id}`, fail('PATCH'));
+        await page.click('#modalBody button.track-step[data-step="3"]');
+        await hint('Nicht gespeichert');
+        assert.equal(await page.$eval('#modalBody .track-node.current', (n) => n.textContent.trim()), '3', 'Stand springt zurück');
+        assert.equal(await page.$eval('#modalBody [data-case-status]', (s) => s.value), 'step:2');
+        const saved = (await adm.get(`/api/cases/${kase.id}`)).json.case;
+        assert.equal(saved.step, 2);
+        assert.equal(saved.priority, 4);
+        assert.deepEqual(problems, []);
+      } finally {
+        await ctx.close();
+        await osrv.stop();
+      }
     });
   }
 

@@ -12,7 +12,7 @@ function memberCard(m, i, total) {
   return `<div class="panel member-card">
       <span class="avatar-wrap"><span class="avatar lg ${m.tier === 'leitung' ? '' : 'slate'}">${m.photoUrl ? avatarImg(m.photoUrl, m.name) : esc(m.initials)}</span>${m.duty ? `<span class="presence s-${esc(m.duty)}"></span>` : ''}</span>
       <div class="body">
-        <div class="flex flex-wrap items-center gap-2"><h3 class="font-serif text-xl font-semibold">${esc(m.name)}</h3>${m.visible ? '' : badge('Auf Website ausgeblendet', 'amber')}</div>
+        <div class="flex flex-wrap items-center gap-2"><h2 class="font-serif text-xl font-semibold">${esc(m.name)}</h2>${m.visible ? '' : badge('Auf Website ausgeblendet', 'amber')}</div>
         <div class="text-xs uppercase tracking-widest text-gold mt-0.5">${esc(m.roleTitle)} · ${m.tier === 'leitung' ? 'Board of Partners' : 'Associate Attorneys'}</div>
         ${m.description ? `<p class="text-sm text-muted mt-2">${esc(m.description)}</p>` : ''}
         <div class="flex flex-wrap items-center gap-2 mt-3">${account}</div>
@@ -104,7 +104,7 @@ function userTable() {
   );
   if (!rows.length) return empty('Keine Benutzer gefunden.', 'users');
   return `<div class="tbl-wrap"><table class="tbl tbl-cards">
-      <thead><tr><th>Name</th><th>Rolle</th><th>Rang</th><th>Discord</th><th>Letzter Login</th><th></th></tr></thead>
+      <thead><tr><th>Name</th><th>Rolle</th><th>Rang</th><th>Discord</th><th>Letzter Login</th><th><span class="sr-only">Aktionen</span></th></tr></thead>
       <tbody>${rows
       .map((u) => {
         const self = u.id === st.user.id;

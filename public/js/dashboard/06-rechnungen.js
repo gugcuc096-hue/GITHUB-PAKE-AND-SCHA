@@ -61,7 +61,7 @@ function invoiceTable(rows) {
   const staff = isStaff();
   if (!rows.length) return empty(st.invoices.length ? 'Keine Dokumente für diese Auswahl.' : staff ? 'Noch keine Rechnungen erstellt.' : 'Es liegen keine Rechnungen vor.', 'receipt');
   return `<div class="tbl-wrap"><table class="tbl tbl-cards">
-      <thead><tr><th>Dokument</th><th>Empfänger</th><th>Akte</th><th style="text-align:right">Betrag</th><th>Status</th><th>Datum</th><th></th></tr></thead>
+      <thead><tr><th>Dokument</th><th>Empfänger</th><th>Akte</th><th style="text-align:right">Betrag</th><th>Status</th><th>Datum</th><th><span class="sr-only">Aktionen</span></th></tr></thead>
       <tbody>${rows
       .map(
         (i) => `<tr>
@@ -650,7 +650,8 @@ views.clients = {
 };
 
 async function openClient(key) {
-  const d = await api.get('/api/clients/' + encodeURIComponent(key));
+  const d = await withModalPlaceholder({ wide: true }, () => api.get('/api/clients/' + encodeURIComponent(key)));
+  if (!d) return;
   st.clientCard = d;
   openModal(clientCard(d), { wide: true, key: `client:${d.key}`, reopen: () => openClient(d.key) });
 }
