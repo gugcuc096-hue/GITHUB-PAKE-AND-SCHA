@@ -337,10 +337,20 @@ function rankSelect(name, current, { id = '', required = false, emptyLabel = '�
 const caseTeam = (c) => [...(c.lawyerId ? [{ id: c.lawyerId, name: c.lawyerName || '—', lead: true }] : []), ...(c.coLawyers || []).map((l) => ({ ...l, lead: false }))];
 /** Arbeitet der Benutzer an der Akte mit (federführend oder als weiterer Anwalt)? */
 const onCase = (c, uid = st.user.id) => c.lawyerId === uid || (c.coLawyers || []).some((l) => l.id === uid);
-function teamText(c) {
+// Dienststatus der zuständigen Anwälte in der Akte (c.lawyerDuty: { Anwalts-ID: Status }) – „Außer Dienst“ steht nicht da
+const DUTY_SHORT = { dienst: 'im Dienst', gericht: 'im Gericht', pause: 'in Pause' };
+/** Zuständige Anwälte mit grünem Punkt „im Dienst“ (bzw. im Gericht / in Pause). */
+function teamHtml(c) {
   const team = caseTeam(c);
-  if (!team.length) return 'Noch nicht zugewiesen';
-  return team.map((l) => (l.lead && team.length > 1 ? `${l.name} (federführend)` : l.name)).join(', ');
+  if (!team.length) return esc('Noch nicht zugewiesen');
+  const duty = c.lawyerDuty || {};
+  return team
+    .map((l) => {
+      const name = esc(l.lead && team.length > 1 ? `${l.name} (federführend)` : l.name);
+      const s = duty[l.id];
+      return DUTY_SHORT[s] ? `${name} <span class="duty-tag s-${s}"><span class="duty-dot s-${s}"></span>${DUTY_SHORT[s]}</span>` : name;
+    })
+    .join(', ');
 }
 
 /**

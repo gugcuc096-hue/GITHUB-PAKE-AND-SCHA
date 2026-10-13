@@ -658,7 +658,7 @@ function attachmentsSection(c, attachments) {
       'Beweismittel & Anhänge',
       'noch keine',
       canUpload ? `<label class="btn-outline btn-sm file-btn">${icon('camera', 'ico-sm')}<span>Bilder hinzufügen</span><input type="file" accept="image/*" multiple data-upload="evidence" data-case-id="${c.id}" aria-label="Bilder hinzufügen"></label>` : '',
-      staff ? 'Fotos, Screenshots und Belege (bis 40 Bilder). Neue Bilder sind zunächst nur für die Kanzlei sichtbar.' : 'Fotos, Screenshots und Belege zu Ihrem Fall (bis 40 Bilder).'
+      `${staff ? 'Fotos, Screenshots und Belege (bis 40 Bilder). Neue Bilder sind zunächst nur für die Kanzlei sichtbar.' : 'Fotos, Screenshots und Belege zu Ihrem Fall (bis 40 Bilder).'} Screenshots auch einfach mit Strg+V einfügen oder ins Fenster ziehen.`
     );
   return `<div class="section" id="secEvidence">
       <h3 class="section-title">Beweismittel & Anhänge <span class="text-xs text-dim font-normal" style="font-family:Inter,sans-serif">${attachments.length} / 40</span></h3>
@@ -678,6 +678,7 @@ function attachmentsSection(c, attachments) {
         ? `<label class="att-add file-btn">${icon('camera')}<span>Bilder hinzufügen</span><input type="file" accept="image/*" multiple data-upload="evidence" data-case-id="${c.id}" aria-label="Bilder hinzufügen"></label>`
         : ''}
       </div>
+      ${canUpload && attachments.length < 40 ? '<p class="form-hint paste-hint">Tipp: Screenshots einfach mit Strg+V einfügen oder ins Fenster ziehen.</p>' : ''}
     </div>`;
 }
 

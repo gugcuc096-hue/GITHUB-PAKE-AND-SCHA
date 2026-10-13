@@ -112,6 +112,7 @@
         btn.textContent = 'Wird gesendet …';
         try {
             const res = await api.post('/api/public/applications', body);
+            window.PS.drafts.clear(form);
             form.classList.add('hidden');
             const box = document.getElementById('applySuccess');
             const portal = `${location.origin}${res.portal}`;
@@ -165,4 +166,6 @@
         e.preventDefault();
         checkStatus();
     });
+    // Angefangene Bewerbung bleibt auf diesem Gerät erhalten
+    window.PS.drafts.watch({ scope: 'website' });
 })();

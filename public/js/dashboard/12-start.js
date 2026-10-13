@@ -126,13 +126,119 @@ document.addEventListener('submit', (e) => {
   e.preventDefault();
   const buttons = $$('button[type="submit"]', f);
   buttons.forEach((b) => (b.disabled = true));
+  // Entwurf: während des Absendens nicht wieder ins (neu gezeichnete) Formular schreiben; gelöscht wird er erst bei Erfolg
+  const draftDone = window.PS.drafts.hold(f);
+  let ok = false;
   // Ein Fenster, das nach dem Absenden aufgeht (z. B. Zugangsdaten), ersetzt das Formular – zurück geht es nie zum abgeschickten Formular
-  guard(() => modalInstead(() => forms[f.dataset.form](f))).finally(() => buttons.forEach((b) => b.isConnected && (b.disabled = false)));
+  guard(async () => {
+    await modalInstead(() => forms[f.dataset.form](f));
+    ok = true;
+  }).finally(() => {
+    draftDone(ok);
+    buttons.forEach((b) => b.isConnected && (b.disabled = false));
+  });
 });
 
+/* ---------------------------------------------------------------- Bilder einfügen (Strg+V) und hineinziehen */
+// Screenshots landen dort, wo man sonst „Bilder hinzufügen“ wählt: in der Akte bei den Beweismitteln, beim Melden einer
+// Zahlung als Nachweis, im Profil als Profilbild … Externe Dokumente haben ihr eigenes Einfügen (onExternalPaste).
+const IMAGE_FILE = /^image\/(png|jpeg|webp|gif|bmp)$/;
+const IMAGE_TARGETS = {
+  evidence: 'als Beweismittel zur Akte',
+  proof: 'als Nachweis zur Zahlung',
+  'pay-proof': 'als Nachweis zur Zahlung',
+  'fn-pending': 'zum Dokument',
+  team: 'als Teamfoto',
+  avatar: 'als Profilbild',
+};
+const imageKind = (input) => input.dataset.upload || input.name;
+/** Wohin mit Bildern? Zuerst das Formular, in dem man gerade ist, sonst das eindeutige Bild-Feld im Fenster bzw. auf der Seite. */
+function imageTarget(from) {
+  const usable = (i) => !i.disabled && /image/.test(i.accept || '') && !!IMAGE_TARGETS[imageKind(i)];
+  const form = from && from.closest ? from.closest('form') : null;
+  const inForm = form ? [...form.querySelectorAll('input[type="file"]')].filter(usable) : [];
+  if (inForm.length) return inForm[0];
+  const root = $('#modal').classList.contains('open') ? $('#modalBody') : $('#content');
+  // Auf eine bestimmte Zeile gezogen (z. B. eine von mehreren Rechnungen): deren Bild-Feld
+  for (let el = from && root.contains(from) ? from : null; el && el !== root; el = el.parentElement) {
+    const near = [...el.querySelectorAll('input[type="file"]')].filter(usable);
+    if (near.length === 1) return near[0];
+    if (near.length > 1) break;
+  }
+  const all = $$('input[type="file"]', root).filter(usable);
+  for (const kind of Object.keys(IMAGE_TARGETS)) {
+    const hits = all.filter((i) => imageKind(i) === kind);
+    if (hits.length === 1 || (hits.length && kind === 'evidence')) return hits[0];
+  }
+  return null;
+}
+const imagesOf = (list) => [...(list || [])].filter((f) => f && IMAGE_FILE.test(f.type));
+/** Bilder in das Feld legen – danach läuft alles wie bei „Bilder hinzufügen“ (Hochladen bzw. Anzeige im Formular). */
+function sendImages(input, files) {
+  const dt = new DataTransfer();
+  (input.multiple ? files : files.slice(0, 1)).forEach((f) => dt.items.add(f));
+  input.files = dt.files;
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+  if (imageKind(input) === 'proof') toast('Screenshot übernommen – er wird mit der Meldung gesendet.');
+}
 document.addEventListener('paste', (e) => {
   const form = e.target && e.target.closest ? e.target.closest('form[data-form="ext-link"], form[data-form="ext-edit"]') : null;
-  if (form) onExternalPaste(e, form.dataset.provider);
+  if (form) return onExternalPaste(e, form.dataset.provider);
+  const cd = e.clipboardData;
+  const files = imagesOf(cd && [...cd.items].filter((i) => i.kind === 'file').map((i) => i.getAsFile()));
+  if (!files.length) return;
+  // Text mit Bild (z. B. aus Word) in ein Textfeld: wie gewohnt als Text einfügen
+  const editable = e.target.matches && e.target.matches('input, textarea, [contenteditable="true"]');
+  if (editable && (cd.getData('text/plain') || '').trim()) return;
+  const input = imageTarget(e.target);
+  if (!input) return;
+  e.preventDefault();
+  sendImages(input, files);
+});
+// Hineinziehen: Hinweis, wohin die Bilder gehen – und nie die Seite verlassen, weil der Browser das Bild öffnet
+let dragDepth = 0;
+const dragsFiles = (e) => [...((e.dataTransfer && e.dataTransfer.types) || [])].includes('Files');
+function dropHint(show, input) {
+  let el = $('#dropHint');
+  if (!show) return el && el.remove();
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'dropHint';
+    el.className = 'drop-hint';
+    el.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(el);
+  }
+  el.classList.toggle('is-off', !input);
+  el.innerHTML = input
+    ? `${icon('camera')}<span>Bilder loslassen – ${esc(IMAGE_TARGETS[imageKind(input)])}</span>`
+    : `${icon('alert')}<span>Hier lassen sich keine Bilder ablegen – bitte in einer Akte.</span>`;
+}
+document.addEventListener('dragenter', (e) => {
+  if (!dragsFiles(e)) return;
+  e.preventDefault();
+  dragDepth++;
+  dropHint(true, imageTarget(e.target));
+});
+document.addEventListener('dragover', (e) => {
+  if (!dragsFiles(e)) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = imageTarget(e.target) ? 'copy' : 'none';
+});
+document.addEventListener('dragleave', (e) => {
+  if (!dragsFiles(e)) return;
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (!dragDepth) dropHint(false);
+});
+document.addEventListener('drop', (e) => {
+  if (!dragsFiles(e)) return;
+  e.preventDefault();
+  dragDepth = 0;
+  dropHint(false);
+  const files = imagesOf(e.dataTransfer.files);
+  const input = imageTarget(e.target);
+  if (!files.length) return toast('Nur Bilder (PNG, JPG, WebP, GIF) lassen sich hier ablegen.', 'error');
+  if (!input) return toast('Bilder bitte in einer Akte ablegen – sie landen dann bei den Beweismitteln.', 'error');
+  sendImages(input, files);
 });
 
 document.addEventListener('input', (e) => {
@@ -365,9 +471,12 @@ window.addEventListener('hashchange', () =>
       return;
     }
     const view = hashView();
-    if (view !== st.view && formDirty($('#content')) && !(await askDiscard(true))) {
-      history.pushState(null, '', '#' + st.view); // auf der Seite bleiben
-      return;
+    if (view !== st.view && formDirty($('#content'))) {
+      if (!(await askDiscard(true))) {
+        history.pushState(null, '', '#' + st.view); // auf der Seite bleiben
+        return;
+      }
+      discardDrafts($('#content'));
     }
     await go(view);
   })
@@ -476,6 +585,8 @@ setInterval(() => {
     return;
   }
   renderUser();
+  // Angefangene Texte je Konto im Browser behalten (Rechnungs-Entwurf eigens, siehe 06-rechnungen)
+  window.PS.drafts.watch({ scope: `u${st.user.id}`, onRestore: () => toast('Angefangene Eingaben wiederhergestellt.') });
 
   const params = new URLSearchParams(location.search);
   const discordState = params.get('discord');

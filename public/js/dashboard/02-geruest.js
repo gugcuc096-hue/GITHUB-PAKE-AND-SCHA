@@ -302,6 +302,10 @@ function unsavedInputs({ invoice = false } = {}) {
   // Rechnungs-Entwurf (geht nur beim Neuladen verloren)
   return invoice && st.view === 'invoice-new' && !!st.draft && (st.draft.items.length > 0 || !!st.draft.subject || !!st.draft.notes);
 }
+/** „Verwerfen“ bestätigt: die Entwürfe dieser Formulare (im Browser gemerkt) ebenfalls löschen. */
+function discardDrafts(...roots) {
+  roots.filter(Boolean).forEach((root) => $$('form[data-form]', root).forEach((f) => window.PS.drafts.clear(f)));
+}
 const askDiscard = (page = false) =>
   ask(page ? 'Ihre Eingaben auf dieser Seite sind noch nicht gespeichert und gehen sonst verloren.' : 'Ihre Eingaben in diesem Fenster sind noch nicht gespeichert und gehen sonst verloren.', {
     title: 'Eingaben verwerfen?',
@@ -311,7 +315,10 @@ const askDiscard = (page = false) =>
   });
 /** Zu einer anderen Seite – bei ungespeicherten Eingaben erst nachfragen. */
 async function leaveTo(view) {
-  if (unsavedInputs() && !(await askDiscard(true))) return;
+  if (unsavedInputs()) {
+    if (!(await askDiscard(true))) return;
+    discardDrafts($('#modalBody'), $('#content'), ...st.modalStack.map((m) => m.nodes));
+  }
   closeSidebar();
   return navigate(view || 'overview');
 }
@@ -436,6 +443,7 @@ async function modalDismiss(back = modalBack) {
     st.modalAsking = true;
     try {
       if (!(await askDiscard())) return;
+      discardDrafts($('#modalBody'));
     } finally {
       st.modalAsking = false;
     }
