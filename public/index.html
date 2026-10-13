@@ -73,11 +73,6 @@
         .font-mono { font-family: 'JetBrains Mono', monospace; }
         h1, h2, h3 { text-wrap: balance; } /* kein einzelnes Wort allein in der letzten Zeile */
 
-        /* Sanfter Übergang zu Login, Karriere & Co. (Browser ohne Unterstützung wechseln wie bisher) */
-        @view-transition { navigation: auto; }
-        ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.22s; }
-        @media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }
-
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
         }

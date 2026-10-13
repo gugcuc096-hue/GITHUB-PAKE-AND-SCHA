@@ -1393,15 +1393,13 @@ textarea.field.chat-input { resize: none; min-height: 42px; height: 42px; max-he
 .chat-duty.s-pause { color: #fde68a; border-color: rgba(245, 158, 11, 0.35); background: rgba(245, 158, 11, 0.06); }
 .chat-duty .duty-dot { flex: none; }
 
-/* Sanfte Übergänge: Seitenwechsel im Dashboard, Fensterwechsel und – wo der Browser es kann – von Seite zu Seite.
-   „Weniger Bewegung“ im Betriebssystem schaltet alles ab (siehe prefers-reduced-motion oben). */
-@view-transition { navigation: auto; }
-::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.22s; }
+/* Sanfte Übergänge: Seitenwechsel im Dashboard und Fensterwechsel. „Weniger Bewegung“ im Betriebssystem schaltet sie ab
+   (siehe prefers-reduced-motion oben). Bewusst ohne @view-transition zwischen Seiten: neuere Chromium-Versionen brechen
+   den Übergang beim Weiterleiten (z. B. Login → Dashboard) mit einem Fehler ab. */
 #content.view-in { animation: view-in 0.24s cubic-bezier(0.16, 1, 0.3, 1); }
 #modalBody.swap-in { animation: swap-in 0.2s ease-out; }
 @keyframes view-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @keyframes swap-in { from { opacity: 0; } to { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }
 /* Ladeplatzhalter in der Form der Seite */
 .skel-page { animation: skel-in 0.3s ease-out; }
 @keyframes skel-in { from { opacity: 0; } to { opacity: 1; } }

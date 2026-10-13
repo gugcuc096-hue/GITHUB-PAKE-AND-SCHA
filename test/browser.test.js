@@ -785,7 +785,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.goto(qsrv.base + '/');
         await page.locator('[data-act="ticket"]:visible').first().click();
         await page.fill('#tkDesc', `Angefangene Anfrage (${label})`);
-        await page.waitForTimeout(400);
+        // erst neu laden, wenn der Entwurf gespeichert ist (statt fester Wartezeit – auf langsamen Rechnern dauert es länger)
+        await page.waitForFunction((t) => Object.keys(localStorage).some((k) => k.startsWith('ps.draft:') && (localStorage.getItem(k) || '').includes(t)), `Angefangene Anfrage (${label})`);
         await page.reload();
         await page.locator('[data-act="ticket"]:visible').first().click();
         assert.equal(await page.inputValue('#tkDesc'), `Angefangene Anfrage (${label})`);
