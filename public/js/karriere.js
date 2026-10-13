@@ -2,32 +2,75 @@
 (() => {
     'use strict';
     const { api, esc, copy, toast } = window.PS;
-    const STORE = 'ps.bewerbungen'; // persönliche Links der Bewerbungen auf diesem Gerät (siehe bewerbung.js)
-    function remembered() {
-        try {
-            const list = JSON.parse(localStorage.getItem(STORE) || '[]');
-            return Array.isArray(list) ? list.filter((x) => x && typeof x.token === 'string') : [];
-        } catch {
-            return [];
-        }
-    }
+    const STORE = 'ps.bewerbungen'; // persönliche Links der Bewerbungen auf diesem Gerät (siehe bewerbung.js, PS.applications)
     function remember(entry) {
         try {
-            localStorage.setItem(STORE, JSON.stringify([entry, ...remembered().filter((x) => x.token !== entry.token)].slice(0, 5)));
+            localStorage.setItem(STORE, JSON.stringify([entry, ...window.PS.applications.list().filter((x) => x.token !== entry.token)].slice(0, 5)));
         } catch {
             /* ohne Speicher funktioniert der Link trotzdem */
         }
     }
-    // Bereits beworben (auf diesem Gerät): direkt zur Bewerberseite
-    (() => {
-        const list = remembered();
-        const box = document.getElementById('myApplications');
-        if (!list.length || !box) return;
-        box.innerHTML = `<div class="text-xs uppercase tracking-widest text-dim mb-3">Auf diesem Gerät</div><div class="flex flex-col gap-2">${list
-            .map((x) => `<a class="btn-outline btn-md btn-plain justify-between" href="/bewerbung.html#${esc(x.token)}"><span class="font-mono">${esc(x.number || 'Bewerbung')}</span><span class="text-xs text-dim">${esc(x.position || '')}</span></a>`)
-            .join('')}</div>`;
+
+    /* Handy-Menü: erst zuklappen, dann zum Abschnitt springen (sonst landet man um die Menühöhe zu tief) */
+    const menu = document.getElementById('karMenu');
+    const menuBtn = document.getElementById('karMenuBtn');
+    function setMenu(open) {
+        menu.classList.toggle('open', open);
+        menuBtn.setAttribute('aria-expanded', String(open));
+        menuBtn.setAttribute('aria-label', open ? 'Menü schließen' : 'Menü öffnen');
+        document.getElementById('karMenuOpen').classList.toggle('hidden', open);
+        document.getElementById('karMenuClose').classList.toggle('hidden', !open);
+    }
+    menuBtn.addEventListener('click', () => setMenu(!menu.classList.contains('open')));
+    menu.addEventListener('click', (e) => {
+        const link = e.target.closest('a[href^="#"]');
+        if (!link) return setMenu(false);
+        const target = document.querySelector(link.getAttribute('href'));
+        if (!target) return;
+        e.preventDefault();
+        setMenu(false);
+        let done = false;
+        const jump = () => {
+            if (done) return;
+            done = true;
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            history.pushState(null, '', link.getAttribute('href'));
+        };
+        menu.addEventListener('transitionend', jump, { once: true });
+        setTimeout(jump, 450); // ohne Übergang (z. B. reduzierte Bewegung)
+    });
+
+    /* Bereits beworben (auf diesem Gerät): oben direkt zur Bewerberseite – mit Stand und neuen Nachrichten */
+    const STATUS_COLOR = { eingegangen: 'amber', in_pruefung: 'sky', gespraech: 'gold', angenommen: 'emerald', abgelehnt: 'red' };
+    const ARROW = '<svg class="go w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>';
+    function myApplicationsHtml(list) {
+        return `<p class="text-xs uppercase tracking-widest text-dim mb-3">${list.length === 1 ? 'Ihre Bewerbung' : 'Ihre Bewerbungen'} auf diesem Gerät</p>${list
+            .map((a) => {
+                const status = a.statusLabel ? `<span class="badge badge-${STATUS_COLOR[a.status] || 'slate'}">${esc(a.statusLabel)}</span>` : '';
+                const unread = a.unread ? `<span class="badge badge-gold">${a.unread === 1 ? '1 neue Nachricht' : `${a.unread} neue Nachrichten`}</span>` : '';
+                return `<a class="glass-card my-app" href="/bewerbung.html#${encodeURIComponent(a.token)}">
+                    <span class="min-w-0"><span class="block font-mono text-[var(--gold-light)]">${esc(a.number || 'Bewerbung')}</span><span class="block text-sm text-muted truncate">${esc(a.positionTitle || a.position || '')}</span></span>
+                    <span class="right flex items-center gap-2 shrink-0">${status}${unread}${status || unread ? '' : '<span class="text-sm text-muted">Stand ansehen</span>'}${ARROW}</span>
+                </a>`;
+            })
+            .join('')}`;
+    }
+    function showMine(list) {
+        const box = document.getElementById('meine');
+        if (!list.length) {
+            box.classList.add('hidden');
+            return;
+        }
+        box.innerHTML = myApplicationsHtml(list);
         box.classList.remove('hidden');
-    })();
+        // „Meine Bewerbung“ oben im Menü: eine Bewerbung → direkt zur Bewerberseite, mehrere → zur Liste oben
+        document.querySelectorAll('[data-my-link]').forEach((a) => (a.href = list.length === 1 ? `/bewerbung.html#${encodeURIComponent(list[0].token)}` : '#meine'));
+    }
+    const mine = window.PS.applications.list();
+    if (mine.length) {
+        showMine(mine);
+        window.PS.applications.summary().then(showMine).catch(() => {});
+    }
     const form = document.getElementById('applyForm');
     const select = document.getElementById('apPosition');
     document.getElementById('year').textContent = new Date().getFullYear();
@@ -51,14 +94,22 @@
         choosePosition(el.dataset.apply);
     });
 
-    // Offene Stellen
+    // Offene Stellen – drei nebeneinander, wenn es aufgeht (sonst zwei bzw. eine mittig), damit keine Lücke bleibt
     api.get('/api/public/positions').then(({ positions }) => {
         const root = document.getElementById('positions');
         select.innerHTML = positions.map((p) => `<option value="${p.id}">${esc(p.title)}</option>`).join('') + '<option value="">Initiativbewerbung</option>';
         const wanted = Number(new URLSearchParams(location.search).get('stelle'));
         if (wanted && positions.some((p) => p.id === wanted)) select.value = String(wanted);
-        if (!positions.length) {
-            root.innerHTML = `<div class="md:col-span-2 glass-card p-8 text-center"><p class="text-muted mb-4">Aktuell sind keine Stellen ausgeschrieben – wir freuen uns trotzdem über Ihre Initiativbewerbung.</p><button class="btn-gold btn-md" data-apply="">Initiativ bewerben</button></div>`;
+        if (positions.length) {
+            const fact = document.getElementById('factPositions');
+            fact.querySelector('span').textContent = positions.length === 1 ? '1 offene Stelle' : `${positions.length} offene Stellen`;
+            fact.classList.remove('hidden');
+        }
+        const n = positions.length;
+        root.className = `grid grid-cols-1 gap-4 md:gap-6 ${n === 1 ? 'max-w-xl mx-auto' : n % 3 === 0 ? 'md:grid-cols-2 lg:grid-cols-3' : 'md:grid-cols-2'}`;
+        if (!n) {
+            root.className = 'grid grid-cols-1 max-w-2xl mx-auto';
+            root.innerHTML = `<div class="glass-card p-8 text-center"><p class="text-muted mb-4">Aktuell sind keine Stellen ausgeschrieben – wir freuen uns trotzdem über Ihre Initiativbewerbung.</p><button class="btn-gold btn-md" data-apply="">Initiativ bewerben</button></div>`;
             return;
         }
         root.innerHTML = positions.map((p) => `
@@ -66,7 +117,7 @@
                 <div class="flex items-start justify-between gap-3 mb-3"><h3 class="font-serif text-2xl font-semibold leading-tight">${esc(p.title)}</h3><span class="badge badge-emerald shrink-0">Offen</span></div>
                 ${p.description ? `<p class="text-sm text-muted leading-relaxed mb-4">${esc(p.description)}</p>` : ''}
                 ${p.requirements ? `<div class="qa mb-5"><div class="q">Das bringen Sie mit</div><div class="a">${esc(p.requirements)}</div></div>` : ''}
-                <button type="button" class="btn-gold btn-md mt-auto self-start" data-apply="${p.id}">Jetzt bewerben</button>
+                <button type="button" class="btn-gold btn-md mt-auto w-full" data-apply="${p.id}">Jetzt bewerben</button>
             </article>`).join('');
     }).catch(() => {
         document.getElementById('positions').innerHTML = '<p class="md:col-span-2 text-center text-sm text-muted py-8">Stellen konnten nicht geladen werden.</p>';
@@ -117,6 +168,7 @@
             const box = document.getElementById('applySuccess');
             const portal = `${location.origin}${res.portal}`;
             remember({ token: res.token, number: res.number, position: res.positionTitle });
+            showMine(window.PS.applications.list());
             const text = `Bewerbungsnummer: ${res.number}\nZugangscode: ${res.code}\nBewerberseite: ${portal}`;
             box.innerHTML = `
                 <div class="w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center justify-center mx-auto mb-4">

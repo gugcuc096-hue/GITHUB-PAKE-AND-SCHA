@@ -619,6 +619,8 @@ video {
   margin-top: 0.125rem;
 }.mt-1 {
   margin-top: 0.25rem;
+}.mt-10 {
+  margin-top: 2.5rem;
 }.mt-2 {
   margin-top: 0.5rem;
 }.mt-3 {
@@ -1592,6 +1594,10 @@ video {
     display: flex;
   }
 
+  .md\:hidden {
+    display: none;
+  }
+
   .md\:w-60 {
     width: 15rem;
   }
@@ -1638,6 +1644,10 @@ video {
 
   .md\:gap-4 {
     gap: 1rem;
+  }
+
+  .md\:gap-5 {
+    gap: 1.25rem;
   }
 
   .md\:gap-6 {

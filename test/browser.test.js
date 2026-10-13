@@ -323,9 +323,34 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       if (device === PHONE) assert.ok((await overflow(portal)) <= 1, 'Bewerberseite: nichts ragt über den Rand');
       // Board sieht die Antwort im offenen Fenster (Nachladen)
       await page.waitForFunction((t) => [...document.querySelectorAll('#appChatList .chat-text')].some((e) => e.textContent === t), `Antwort des Bewerbers (${label})`, { timeout: 12000 });
-      // Karriereseite: Bewerbung ist auf dem Gerät gemerkt
+      // Karriereseite: Bewerbung ist auf dem Gerät gemerkt – oben mit Stand, „Meine Bewerbung“ führt direkt hin
       await portal.goto(server.base + '/karriere.html');
-      await portal.waitForSelector(`#myApplications a[href="${app.portal}"]`);
+      await portal.waitForSelector(`#meine a[href="${app.portal}"] .badge`);
+      assert.match(await portal.textContent('#meine'), /In Prüfung/);
+      for (const href of await portal.$$eval('[data-my-link]', (as) => as.map((a) => a.getAttribute('href')))) assert.equal(href, app.portal);
+      if (device === PHONE) {
+        assert.equal(await portal.isVisible('#karMenu a[href="#ablauf"]'), false, 'Menü zu');
+        await portal.click('#karMenuBtn');
+        await portal.waitForSelector('#karMenu a[href="#ablauf"]', { state: 'visible' });
+        await portal.click('#karMenu a[href="#ablauf"]');
+        await portal.waitForFunction(() => Math.abs(document.getElementById('ablauf').getBoundingClientRect().top - 88) < 40);
+        assert.ok((await overflow(portal)) <= 1, 'Karriereseite: nichts ragt über den Rand');
+      } else {
+        assert.equal(await portal.$$eval('#positions > article', (a) => new Set(a.map((x) => Math.round(x.getBoundingClientRect().top))).size), 1, 'drei Stellen in einer Reihe');
+      }
+      // Startseite: „Karriere“ in der Leiste springt zum Karriere-Abschnitt; dort „Meine Bewerbung“ mit Stand
+      await portal.goto(server.base + '/');
+      if (device === PHONE) {
+        await portal.click('#menuToggle');
+        await portal.click('#mobileMenu a[href="#karriere"]');
+      } else {
+        await portal.click('header nav[aria-label="Hauptnavigation"] a[href="#karriere"]');
+      }
+      await portal.waitForFunction(() => Math.abs(document.getElementById('karriere').getBoundingClientRect().top - 96) < 40);
+      assert.equal(await portal.getAttribute('#careerStatus', 'href'), app.portal);
+      assert.equal((await portal.textContent('#careerStatus')).trim(), 'Meine Bewerbung');
+      await portal.waitForSelector('#careerMine:not(.hidden)');
+      assert.match(await portal.textContent('#careerMine'), new RegExp(`${app.number}: In Prüfung`));
       assert.deepEqual(problems, []);
       await ctx.close();
     });

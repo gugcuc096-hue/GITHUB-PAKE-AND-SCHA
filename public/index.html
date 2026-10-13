@@ -217,8 +217,9 @@
         .topstrip { background: rgba(2, 5, 14, 0.96); border-bottom: 1px solid rgba(255, 255, 255, 0.06); font-size: 0.72rem; color: var(--text-muted); }
 
         /* Mobile Menu */
-        #mobileMenu { max-height: 0; overflow: hidden; transition: max-height 0.4s cubic-bezier(0.16,1,0.3,1); }
-        #mobileMenu.open { max-height: 820px; }
+        /* zugeklappt auch für Tastatur und Screenreader weg (visibility erst nach dem Zuklappen) */
+        #mobileMenu { max-height: 0; overflow: hidden; visibility: hidden; transition: max-height 0.4s cubic-bezier(0.16,1,0.3,1), visibility 0s linear 0.4s; }
+        #mobileMenu.open { max-height: 820px; visibility: visible; transition: max-height 0.4s cubic-bezier(0.16,1,0.3,1), visibility 0s; }
 
         /* Team-Karten (Anzahl variabel, unvollständige Reihen zentriert) */
         .team-card { width: 100%; }
@@ -314,7 +315,7 @@
             </div>
             <div class="flex items-center gap-5 shrink-0">
                 <span class="hidden lg:inline text-[var(--text-dim)]">Kanzleisitz: Würfelpark, Los Santos</span>
-                <a href="/karriere.html" class="hidden sm:inline text-[var(--text-muted)] hover:text-[var(--gold-light)] transition-colors">Karriere</a>
+                <a href="/karriere.html" class="hidden sm:inline xl:hidden text-[var(--text-muted)] hover:text-[var(--gold-light)] transition-colors">Karriere</a>
                 <a href="/login.html" data-auth-link class="text-[var(--gold-500)] hover:text-[var(--gold-light)] font-medium transition-colors"><span data-auth-label data-auth-out="Mandantenportal →" data-auth-in="Zum Dashboard →">Mandantenportal →</span></a>
             </div>
         </div>
@@ -337,6 +338,7 @@
                 <a href="#vip" data-section="vip" class="nav-link hover:text-[var(--gold-500)] transition-colors">VIP &amp; Lifetime</a>
                 <a href="#team" data-section="team" class="nav-link hover:text-[var(--gold-500)] transition-colors">Team</a>
                 <a href="#raenge" data-section="raenge" class="nav-link hover:text-[var(--gold-500)] transition-colors">Kanzleiränge</a>
+                <a href="#karriere" data-section="karriere" class="nav-link hover:text-[var(--gold-500)] transition-colors">Karriere</a>
                 <a href="#kontakt" data-section="kontakt" class="nav-link hover:text-[var(--gold-500)] transition-colors">Kontakt</a>
             </nav>
 
@@ -367,8 +369,8 @@
                 <a href="#vip" data-act="menu" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">VIP &amp; Lifetime</a>
                 <a href="#team" data-act="menu" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Team</a>
                 <a href="#raenge" data-act="menu" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Kanzleiränge</a>
-                <a href="#kontakt" data-act="menu" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Kontakt</a>
-                <a href="/karriere.html" class="py-3 hover:text-[var(--gold-500)] flex items-center justify-between">Karriere <span class="text-[0.6rem] normal-case tracking-normal px-2 py-0.5 rounded-full border border-emerald-500/40 text-emerald-300">Wir stellen ein</span></a>
+                <a href="#karriere" data-act="menu" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)] flex items-center justify-between">Karriere <span class="text-[0.6rem] normal-case tracking-normal px-2 py-0.5 rounded-full border border-emerald-500/40 text-emerald-300">Wir stellen ein</span></a>
+                <a href="#kontakt" data-act="menu" class="py-3 hover:text-[var(--gold-500)]">Kontakt</a>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 normal-case tracking-normal">
                     <a href="/login.html" data-auth-link class="btn-outline py-3 text-sm font-semibold inline-flex items-center justify-center gap-2">
                         <svg class="w-4 h-4 text-[var(--gold-500)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
@@ -1006,10 +1008,12 @@
                         Wir wachsen und suchen engagierte Anwältinnen und Anwälte, Nachwuchstalente und Kanzleiassistenz. Mentoring durch die Partner, echte Mandate ab dem ersten Tag und ein modernes Kanzlei-System.
                     </p>
                     <p id="careerCount" class="text-sm text-emerald-300 mt-4 hidden"></p>
+                    <!-- Auf diesem Gerät beworben: Stand der eigenen Bewerbung (site.js) -->
+                    <p id="careerMine" class="text-sm text-[var(--text-muted)] mt-2 hidden"></p>
                 </div>
                 <div class="flex flex-col gap-3 shrink-0">
                     <a href="/karriere.html" class="btn-gold px-8 py-3.5 text-xs uppercase tracking-wider text-center">Offene Stellen ansehen</a>
-                    <a href="/karriere.html#status" class="btn-outline px-8 py-3.5 text-xs uppercase tracking-wider text-center">Bewerbungsstatus prüfen</a>
+                    <a id="careerStatus" href="/karriere.html#status" class="btn-outline px-8 py-3.5 text-xs uppercase tracking-wider text-center">Bewerbungsstatus prüfen</a>
                 </div>
             </div>
         </section>

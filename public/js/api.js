@@ -1,4 +1,4 @@
-/* Gemeinsame Helfer für alle Seiten: window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm, drafts } */
+/* Gemeinsame Helfer für alle Seiten: window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm, drafts, applications } */
 (() => {
   'use strict';
 
@@ -357,5 +357,37 @@
     return { watch, clear, clearAll, hold, store, key: (name) => `${DRAFT_PREFIX}${scope}|${name}` };
   })();
 
-  window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog, closeToDashboard, drafts };
+  /*
+   * Bewerbungen, deren persönlicher Link auf diesem Gerät gespeichert ist (Karriereseite und Bewerberseite merken ihn):
+   * list() liest sie, summary() holt Stand und neue Nachrichten vom Server (ohne sie als gelesen zu markieren) und
+   * vergisst Links, die es nicht mehr gibt.
+   */
+  const applications = (() => {
+    const KEY = 'ps.bewerbungen';
+    function list() {
+      try {
+        const l = JSON.parse(localStorage.getItem(KEY) || '[]');
+        return Array.isArray(l) ? l.filter((x) => x && typeof x.token === 'string' && x.token.length >= 20 && x.token.length <= 64) : [];
+      } catch {
+        return [];
+      }
+    }
+    async function summary() {
+      const mine = list().slice(0, 5);
+      if (!mine.length) return [];
+      const r = await api.post('/api/public/application-summary', { tokens: mine.map((x) => x.token) });
+      const known = new Set(r.applications.map((a) => a.token));
+      if (known.size !== mine.length) {
+        try {
+          localStorage.setItem(KEY, JSON.stringify(mine.filter((x) => known.has(x.token))));
+        } catch {
+          /* ohne Speicher bleibt die Liste eben */
+        }
+      }
+      return r.applications;
+    }
+    return { list, summary };
+  })();
+
+  window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog, closeToDashboard, drafts, applications };
 })();
