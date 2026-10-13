@@ -238,5 +238,30 @@ describe('Nachrichten, Bewerberseite und VIP-Preise', () => {
       // gültig, aber Discord-Anmeldung (OAuth) ist im Test nicht eingerichtet
       assert.equal((await post(state.app.token)).headers.get('location'), '/bewerbung.html?discord=disabled');
     });
+
+    it('Kurzübersicht für Start- und Karriereseite: Stand und neue Nachrichten, ohne sie als gelesen zu markieren', async () => {
+      const pub = client(server.base);
+      await pub.post('/api/public/application-portal', { token: state.app.token }); // alles gelesen
+      assert.equal((await as.admin.post(`/api/admin/applications/${state.appId}/messages`, { body: 'Kurze Rückfrage zu Ihrer Erfahrung.' })).status, 201);
+      const summary = () => pub.post('/api/public/application-summary', { tokens: [state.app.token, 'y'.repeat(32)] });
+      let r = await summary();
+      assert.equal(r.status, 200, r.text);
+      assert.equal(r.json.applications.length, 1, 'unbekannter Link fehlt in der Antwort');
+      const a = r.json.applications[0];
+      assert.equal(a.token, state.app.token);
+      assert.equal(a.number, state.app.number);
+      assert.equal(a.status, 'abgelehnt'); // Stand aus dem Test davor
+      assert.equal(a.statusLabel, 'Abgelehnt');
+      assert.equal(a.unread, 1);
+      assert.equal(a.name, undefined, 'nur Stand, keine persönlichen Angaben');
+      r = await summary();
+      assert.equal(r.json.applications[0].unread, 1, 'Abfrage markiert nichts als gelesen');
+      await pub.post('/api/public/application-portal', { token: state.app.token });
+      assert.equal((await summary()).json.applications[0].unread, 0, 'erst die Bewerberseite liest');
+      // nur gültige Links, höchstens 5
+      assert.equal((await pub.post('/api/public/application-summary', { tokens: ['kurz'] })).status, 400);
+      assert.equal((await pub.post('/api/public/application-summary', { tokens: [] })).status, 400);
+      assert.equal((await pub.post('/api/public/application-summary', { tokens: Array.from({ length: 6 }, (_, i) => `${'z'.repeat(31)}${i}`) })).status, 400);
+    });
   });
 });

@@ -31,6 +31,45 @@
         .site-page .btn-gold, .site-page .btn-outline { text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.75rem; }
         .site-page .btn-lg { font-size: 0.875rem; }
         .site-page .btn-plain { text-transform: none; letter-spacing: normal; font-size: 0.875rem; }
+        /* Handy-Menü (wie auf der Startseite) */
+        #karMenu { max-height: 0; overflow: hidden; visibility: hidden; transition: max-height 0.4s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s linear 0.4s; }
+        #karMenu.open { max-height: 420px; visibility: visible; transition: max-height 0.4s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s; }
+        /* Eigene Bewerbung oben (auf diesem Gerät gespeichert) */
+        .my-app { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; text-align: left; border-color: var(--gold-hairline); transition: border-color 0.2s ease, transform 0.2s ease; }
+        .my-app:hover { border-color: var(--gold-500); transform: translateY(-1px); }
+        .my-app + .my-app { margin-top: 0.75rem; }
+        .my-app .go { color: var(--gold-500); flex: none; }
+        @media (max-width: 480px) { .my-app { flex-direction: column; align-items: flex-start; } .my-app .right { width: 100%; justify-content: space-between; } }
+        /* Kennzahlen unter den Knöpfen */
+        .facts { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem 1.75rem; font-size: 0.8rem; color: var(--text-muted); }
+        .facts span { display: inline-flex; align-items: center; gap: 0.45rem; }
+        .facts i { width: 6px; height: 6px; border-radius: 50%; background: var(--gold-500); }
+        .facts i.live { background: #34d399; box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.15); }
+        /* Ablauf der Bewerbung: vier Kreise wie auf der Bewerberseite */
+        .steps { display: grid; gap: 1.5rem; list-style: none; margin: 0; padding: 0; }
+        .steps li { display: grid; grid-template-columns: 44px 1fr; column-gap: 1rem; align-items: start; }
+        .steps .dot { grid-row: span 2; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--gold-hairline); background: var(--navy-900, #060b19); color: var(--gold-light); display: inline-flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; position: relative; z-index: 1; }
+        .steps h3 { font-size: 1.35rem; font-weight: 600; color: #fff; line-height: 1.2; margin-top: 0.5rem; }
+        .steps p { font-size: 0.875rem; color: var(--text-muted); line-height: 1.6; margin-top: 0.35rem; }
+        @media (min-width: 768px) {
+            .steps { grid-template-columns: repeat(4, minmax(0, 1fr)); position: relative; }
+            .steps::before { content: ''; position: absolute; top: 22px; left: 12.5%; right: 12.5%; height: 1px; background: linear-gradient(90deg, var(--gold-500), var(--glass-border)); }
+            .steps li { display: block; text-align: center; padding: 0 0.5rem; }
+            .steps .dot { margin: 0 auto 0.75rem; }
+        }
+        /* Bewerbungsformular in drei Schritten */
+        .form-step { display: flex; align-items: center; gap: 0.65rem; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: var(--gold-500); padding-top: 0.75rem; }
+        .form-step:first-child { padding-top: 0; }
+        .form-step b { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--gold-hairline); display: inline-flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-weight: 500; letter-spacing: 0; color: var(--gold-light); flex: none; }
+        .form-step::after { content: ''; flex: 1; height: 1px; background: var(--glass-border); }
+        /* Fragen & Antworten */
+        .kfaq summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.15rem 0; font-weight: 500; color: #fff; }
+        .kfaq summary::-webkit-details-marker { display: none; }
+        .kfaq summary svg { width: 20px; height: 20px; color: var(--gold-500); flex: none; transition: transform 0.3s ease; }
+        .kfaq[open] summary svg { transform: rotate(45deg); }
+        .kfaq summary:focus-visible { outline: 2px solid var(--gold-500); outline-offset: 4px; border-radius: 6px; }
+        .kfaq + .kfaq { border-top: 1px solid var(--glass-border); }
+        .kfaq p { font-size: 0.875rem; color: var(--text-muted); line-height: 1.7; padding: 0 2rem 1.15rem 0; }
         /* Große Bildschirme: alles wächst mit (Größen in rem) – die Seite wirkt auf breiten Monitoren nicht mehr klein */
         @media (min-width: 1920px) { html { font-size: 18px; } }
         @media (min-width: 2400px) { html { font-size: 20px; } }
@@ -51,17 +90,32 @@
                     <div class="hidden sm:block text-[0.6rem] uppercase tracking-[0.25em] text-[var(--gold-500)] font-medium whitespace-nowrap">Legal Consulting &amp; Advocacy</div>
                 </div>
             </a>
-            <div class="flex items-center gap-5 shrink-0">
+            <div class="flex items-center gap-2 sm:gap-3 md:gap-5 shrink-0">
                 <nav class="hidden md:flex items-center gap-5 text-[0.7rem] uppercase tracking-wider font-medium text-[var(--text-muted)]" aria-label="Karriere-Navigation">
                     <a href="/" class="hover:text-[var(--gold-500)] transition-colors">Startseite</a>
                     <a href="#stellen" class="hover:text-[var(--gold-500)] transition-colors">Stellen</a>
-                    <a href="#status" class="hover:text-[var(--gold-500)] transition-colors">Meine Bewerbung</a>
+                    <a href="#ablauf" class="hover:text-[var(--gold-500)] transition-colors">Ablauf</a>
+                    <a href="#status" data-my-link class="hover:text-[var(--gold-500)] transition-colors">Meine Bewerbung</a>
                 </nav>
                 <a href="/login.html" data-auth-link class="btn-outline h-10 px-3 md:px-4 font-semibold inline-flex items-center justify-center gap-2" aria-label="Login">
                     <svg class="w-4 h-4 text-[var(--gold-500)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                    <span data-auth-label>Login</span>
+                    <span data-auth-label class="hidden sm:inline">Login</span>
                 </a>
+                <button id="karMenuBtn" type="button" aria-label="Menü öffnen" aria-expanded="false" aria-controls="karMenu" class="md:hidden w-10 h-10 rounded-lg border border-[var(--glass-border)] flex items-center justify-center shrink-0">
+                    <svg id="karMenuOpen" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                    <svg id="karMenuClose" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
             </div>
+        </div>
+        <!-- Handy-Menü -->
+        <div id="karMenu" class="md:hidden border-t border-[var(--glass-border)]">
+            <nav class="flex flex-col px-6 py-3 text-sm uppercase tracking-widest text-[var(--text-muted)]" aria-label="Karriere-Navigation (Handy)">
+                <a href="#stellen" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Offene Stellen</a>
+                <a href="#ablauf" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Ablauf der Bewerbung</a>
+                <a href="#bewerben" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Jetzt bewerben</a>
+                <a href="#status" data-my-link class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Meine Bewerbung</a>
+                <a href="/" class="py-3 hover:text-[var(--gold-500)]">Zur Startseite</a>
+            </nav>
         </div>
     </header>
 
@@ -80,6 +134,13 @@
                 <a href="#stellen" class="btn-gold btn-lg px-8">Offene Stellen ansehen</a>
                 <a href="#bewerben" data-apply="" class="btn-outline btn-lg px-8">Initiativ bewerben</a>
             </div>
+            <div class="facts mt-8">
+                <span id="factPositions" class="hidden"><i class="live"></i><span></span></span>
+                <span><i></i>Bewerbung in ca. 5 Minuten</span>
+                <span><i></i>Stand jederzeit online</span>
+            </div>
+            <!-- Auf diesem Gerät beworben: direkt zur eigenen Bewerberseite (karriere.js) -->
+            <div id="meine" class="hidden max-w-xl mx-auto mt-10" aria-live="polite"></div>
         </section>
 
         <!-- Vorteile -->
@@ -116,6 +177,20 @@
             </div>
         </section>
 
+        <!-- Ablauf: dieselben vier Schritte wie die Kreise auf der Bewerberseite -->
+        <section id="ablauf" class="max-w-6xl mx-auto px-5 sm:px-6 py-16 border-t border-[var(--glass-border)]">
+            <div class="text-center max-w-3xl mx-auto mb-12">
+                <p class="text-xs uppercase tracking-widest text-gold mb-2">Ablauf</p>
+                <h2 class="font-serif text-4xl md:text-5xl font-semibold">So läuft Ihre Bewerbung</h2>
+            </div>
+            <ol class="steps">
+                <li><span class="dot">1</span><h3 class="font-serif">Eingegangen</h3><p>Sie bekommen sofort Ihre Bewerbungsnummer und eine persönliche Bewerberseite.</p></li>
+                <li><span class="dot">2</span><h3 class="font-serif">In Prüfung</h3><p>Das Board of Partners liest Ihre Bewerbung. Rückfragen stehen auf Ihrer Bewerberseite.</p></li>
+                <li><span class="dot">3</span><h3 class="font-serif">Gespräch</h3><p>Passt es, laden wir Sie zum Gespräch ein – den Termin sehen Sie auf Ihrer Bewerberseite.</p></li>
+                <li><span class="dot">4</span><h3 class="font-serif">Entscheidung</h3><p>Bei einer Zusage legt das Board Ihr Konto für das Kanzlei-Dashboard an.</p></li>
+            </ol>
+        </section>
+
         <!-- Bewerbungsformular -->
         <section id="bewerben" class="max-w-3xl mx-auto px-5 sm:px-6 py-16 border-t border-[var(--glass-border)]">
             <div class="text-center mb-10">
@@ -126,6 +201,7 @@
 
             <div class="glass-card card-gold p-5 sm:p-8">
                 <form id="applyForm" class="form-grid cols-2" novalidate>
+                    <div class="form-step span-2"><b>1</b>Stelle &amp; Kontakt</div>
                     <div class="span-2">
                         <label class="label" for="apPosition">Stelle</label>
                         <select id="apPosition" name="positionId" class="field"><option value="">Initiativbewerbung</option></select>
@@ -150,6 +226,7 @@
                         <label class="label" for="apEmail">E-Mail (optional)</label>
                         <input id="apEmail" name="email" type="email" class="field" maxlength="120" placeholder="wird bei einer Einstellung als Login vorgeschlagen">
                     </div>
+                    <div class="form-step span-2"><b>2</b>Motivation &amp; Erfahrung</div>
                     <div class="span-2">
                         <label class="label" for="apMotivation">Warum möchten Sie bei Pake &amp; Scha arbeiten?</label>
                         <textarea id="apMotivation" name="motivation" rows="6" class="field" required minlength="50" maxlength="4000" placeholder="Erzählen Sie uns von sich, Ihrer Motivation und was Sie in die Kanzlei einbringen möchten."></textarea>
@@ -159,6 +236,7 @@
                         <label class="label" for="apExperience">Bisherige Erfahrung</label>
                         <textarea id="apExperience" name="experience" rows="4" class="field" maxlength="3000" placeholder="z. B. frühere Tätigkeit bei Justiz, Behörden oder einer Kanzlei – auch auf anderen Servern."></textarea>
                     </div>
+                    <div class="form-step span-2"><b>3</b>Erreichbarkeit &amp; Absenden</div>
                     <div class="span-2">
                         <label class="label" for="apAvailability">Wann sind Sie meistens aktiv?</label>
                         <input id="apAvailability" name="availability" class="field" maxlength="500" placeholder="z. B. werktags ab 18 Uhr, am Wochenende nachmittags">
@@ -174,14 +252,31 @@
             </div>
         </section>
 
-        <!-- Bereits beworben: zur persönlichen Bewerberseite (Stand, Gesprächstermin, Nachrichten) -->
+        <!-- Fragen & Antworten -->
+        <section id="fragen" class="max-w-3xl mx-auto px-5 sm:px-6 py-16 border-t border-[var(--glass-border)]">
+            <div class="text-center mb-8">
+                <p class="text-xs uppercase tracking-widest text-gold mb-2">Gut zu wissen</p>
+                <h2 class="font-serif text-4xl md:text-5xl font-semibold">Fragen &amp; Antworten</h2>
+            </div>
+            <div class="glass-card px-5 sm:px-8 py-2">
+                <details class="kfaq"><summary>Brauche ich Vorerfahrung?<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg></summary>
+                    <p>Nicht unbedingt. Was eine Stelle voraussetzt, steht bei der Ausschreibung unter „Das bringen Sie mit“. Wer neu einsteigt, wird von den Partnern und dem Senior-Team begleitet.</p></details>
+                <details class="kfaq"><summary>Wie erfahre ich, wie es weitergeht?<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg></summary>
+                    <p>Auf Ihrer persönlichen Bewerberseite: Dort sehen Sie den Stand und Ihren Gesprächstermin und schreiben direkt mit dem Board of Partners. Auf diesem Gerät finden Sie sie oben auf dieser Seite und über „Meine Bewerbung“.</p></details>
+                <details class="kfaq"><summary>Ich habe mich auf einem anderen Gerät beworben<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg></summary>
+                    <p>Kein Problem: Unten bei „Ihre Bewerbung“ Bewerbungsnummer und Zugangscode eingeben – beides stand in der Bestätigung nach dem Absenden.</p></details>
+                <details class="kfaq"><summary>Was passiert nach einer Zusage?<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg></summary>
+                    <p>Das Board of Partners legt Ihr Konto für das Kanzlei-Dashboard an. Dort arbeiten Sie mit Akten, Kalender, Kanzlei-Post und Stempeluhr – am PC und am Handy.</p></details>
+            </div>
+        </section>
+
+        <!-- Bereits beworben (anderes Gerät): Nummer + Zugangscode → persönliche Bewerberseite -->
         <section id="status" class="max-w-3xl mx-auto px-5 sm:px-6 py-16 border-t border-[var(--glass-border)]">
             <div class="text-center mb-8">
                 <p class="text-xs uppercase tracking-widest text-gold mb-2">Bereits beworben?</p>
                 <h2 class="font-serif text-4xl md:text-5xl font-semibold">Ihre Bewerbung</h2>
-                <p class="text-sm text-muted mt-3 max-w-xl mx-auto">Auf Ihrer Bewerberseite sehen Sie den Stand, Ihren Gesprächstermin und schreiben direkt mit dem Board of Partners.</p>
+                <p class="text-sm text-muted mt-3 max-w-xl mx-auto">Auf Ihrer Bewerberseite sehen Sie den Stand, Ihren Gesprächstermin und schreiben direkt mit dem Board of Partners. Auf einem anderen Gerät beworben? Nummer und Zugangscode eingeben.</p>
             </div>
-            <div id="myApplications" class="hidden glass-card p-5 sm:p-8 mb-5"></div>
             <div class="glass-card p-5 sm:p-8">
                 <form id="statusForm" data-nodraft class="flex flex-col sm:flex-row gap-3" novalidate>
                     <input id="stNumber" class="field font-mono" placeholder="Bewerbungsnummer, z. B. BW-2026-0001" autocapitalize="characters" aria-label="Bewerbungsnummer">

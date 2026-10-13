@@ -406,6 +406,26 @@
       el.classList.remove('hidden');
     })
     .catch(() => {});
+  // Auf diesem Gerät beworben: „Meine Bewerbung“ führt direkt zur Bewerberseite, darüber Stand und neue Nachrichten
+  if (window.PS.applications.list().length) {
+    const mine = window.PS.applications.list();
+    const btn = document.getElementById('careerStatus');
+    if (btn) {
+      btn.textContent = 'Meine Bewerbung';
+      btn.href = mine.length === 1 ? `/bewerbung.html#${encodeURIComponent(mine[0].token)}` : '/karriere.html#meine';
+    }
+    window.PS.applications
+      .summary()
+      .then((list) => {
+        const el = document.getElementById('careerMine');
+        if (!el || !list.length) return;
+        const a = list[0];
+        const unread = a.unread ? ` · <span class="text-[var(--gold-light)]">${a.unread === 1 ? '1 neue Nachricht' : `${a.unread} neue Nachrichten`}</span>` : '';
+        el.innerHTML = `Ihre Bewerbung <span class="font-mono text-[var(--gold-light)]">${esc(a.number)}</span>: ${esc(a.statusLabel)}${unread}${list.length > 1 ? ` <span class="text-[var(--text-dim)]">(+${list.length - 1} weitere)</span>` : ''}`;
+        el.classList.remove('hidden');
+      })
+      .catch(() => {});
+  }
 
   /* ---------------------------------------------------------------- Anliegen an das Board of Partners */
   // Jeder kann ein Anliegen einreichen (auch ohne Konto). Sehen kann es nur das Board of Partners;

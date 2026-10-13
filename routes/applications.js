@@ -180,6 +180,35 @@ publicRouter.post(
   })
 );
 
+/**
+ * Kurzübersicht für Start- und Karriereseite: Stand und neue Nachrichten der Bewerbungen, deren persönlicher Link auf
+ * diesem Gerät gespeichert ist – ohne Nachrichten als gelesen zu markieren. Unbekannte Links fehlen in der Antwort.
+ */
+publicRouter.post(
+  '/application-summary',
+  portalLimiter,
+  wrap(async (req, res) => {
+    const d = parseBody(z.object({ tokens: z.array(tokenSchema).min(1).max(5) }), req, res);
+    if (!d) return;
+    const applications = [];
+    for (const token of new Set(d.tokens)) {
+      const a = byToken(token);
+      if (!a) continue;
+      const unread = db.prepare('SELECT COUNT(*) AS n FROM application_messages WHERE application_id = ? AND from_board = 1 AND id > ?').get(a.id, a.applicant_read_id || 0).n;
+      applications.push({
+        token,
+        number: a.number,
+        positionTitle: a.position_title,
+        status: a.status,
+        statusLabel: APPLICATION_STATUS[a.status] || a.status,
+        interviewAt: a.status === 'gespraech' ? a.interview_at : null,
+        unread,
+      });
+    }
+    res.json({ applications });
+  })
+);
+
 /** Bewerberseite: Stand, Gesprächstermin, Nachrichten (after: nur neuere – zum Nachladen). */
 publicRouter.post(
   '/application-portal',
