@@ -2,7 +2,7 @@
 const crypto = require('crypto');
 const express = require('express');
 const { z } = require('zod');
-const { db, tx, nextCaseNumber, randomPin } = require('../db');
+const { db, tx, nextCaseNumber, randomPin, getSetting } = require('../db');
 const { requireAuth, requireAdmin, isStaff, findUserByLogin } = require('../auth');
 const {
   wrap,
@@ -416,10 +416,22 @@ function caseDetail(c, u) {
   const contractDocs = gdocs ? gdocs.urls('contract', contracts.map((k) => k.id)) : new Map();
 
   const clients = staff ? require('./clients') : null;
+  // Dienststatus der zuständigen Anwälte („im Dienst“ in der Akte) – Mandanten nur, wenn er auch öffentlich angezeigt wird
+  const teamIds = caseLawyers(c).map((l) => l.id);
+  const lawyerDuty =
+    teamIds.length && (staff || getSetting('show_duty_public', '1') === '1')
+      ? Object.fromEntries(
+          db
+            .prepare(`SELECT id, duty_status FROM users WHERE active = 1 AND duty_status != 'off' AND id IN (${teamIds.map(() => '?').join(',')})`)
+            .all(...teamIds)
+            .map((r) => [r.id, r.duty_status])
+        )
+      : {};
   return {
     case: {
       ...caseRow(c, u),
       ...access,
+      lawyerDuty,
       // Kanzlei: Mandantenkartei (Name in der Akte führt dorthin) und Vermerk wie „Nur gegen Vorkasse“
       clientKey: clients ? clients.clientKeyForCase(c) : undefined,
       clientFlag: clients ? clients.flagForCase(c) : undefined,

@@ -403,12 +403,21 @@ function chatSection(c, chat, ticket) {
         ? 'Der Mandant hat kein Portal-Konto – Nachrichten erreichen ihn über das Discord-Ticket.'
         : 'Der Mandant hat noch kein Portal-Konto und ist nicht im Discord-Ticket – Nachrichten liest er erst, wenn er eines davon hat.';
   const empty = staff ? 'Noch keine Nachrichten. Schreiben Sie dem Mandanten direkt hier.' : 'Noch keine Nachrichten. Schreiben Sie Ihrer Kanzlei – Ihr Anwalt wird benachrichtigt.';
+  // Mandant: Ist sein Anwalt gerade da? (Stempeluhr der Kanzlei)
+  const duty = c.lawyerDuty || {};
+  const present = staff ? [] : caseTeam(c).filter((l) => DUTY_SHORT[duty[l.id]]);
+  const dutyLine = present.length
+    ? `<p class="chat-duty s-${duty[present[0].id]}"><span class="duty-dot s-${duty[present[0].id]}"></span><span>${present
+        .map((l) => `<strong>${esc(l.name)}</strong> ist ${DUTY_SHORT[duty[l.id]]}`)
+        .join(', ')}${duty[present[0].id] === 'dienst' ? ' – Antworten kommen meist schnell.' : '.'}</span></p>`
+    : '';
   return `<div class="section" id="secChat">
       <h3 class="section-title">Nachrichten <span class="text-xs text-dim font-normal" style="font-family:Inter,sans-serif">${staff ? 'mit dem Mandanten' : 'mit Ihrer Kanzlei'}</span></h3>
       <div class="chat">
         <div class="chat-list" id="chatList" data-case-id="${c.id}" data-last-id="${list.length ? list[list.length - 1].id : 0}" data-other-read="${chat ? chat.read.other : 0}" aria-live="polite">
           ${list.length ? chatBubbles(list, caseBubble) : `<p class="chat-empty">${esc(empty)}</p>`}
         </div>
+        ${dutyLine}
         ${chatForm({ form: 'chat-send', attrs: `data-case-id="${c.id}"`, placeholder: staff ? `Nachricht an ${c.clientName === '—' ? 'den Mandanten' : c.clientName} …` : 'Nachricht an Ihre Kanzlei …' })}
         <p class="chat-hint"><span class="hidden md:inline">Enter sendet · Umschalt + Enter für eine neue Zeile. </span>${reach}</p>
       </div>
@@ -487,7 +496,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       : ['Mandant', c.clientName + (staff && !c.hasClientAccount ? ' (ohne Konto)' : '')],
     // E-Mail darf nur nach dem @ umbrechen, nicht am Bindestrich der Domain („…@pake-“ / „scha.ls“)
     staff ? ['Kontakt', null, [c.clientPhone ? esc(c.clientPhone) : '', c.clientEmail ? mailBreakHtml(c.clientEmail) : ''].filter(Boolean).join(' · ') || '—'] : null,
-    [caseTeam(c).length > 1 ? 'Zuständige Anwälte' : 'Zuständig', teamText(c)],
+    [caseTeam(c).length > 1 ? 'Zuständige Anwälte' : 'Zuständig', null, teamHtml(c)],
     ['Rechtsgebiet', AREAS[c.area] || c.area],
     c.opponent ? ['Gegenpartei', c.opponent] : null,
     c.courtRef ? ['Gerichtsaktenzeichen', c.courtRef] : null,

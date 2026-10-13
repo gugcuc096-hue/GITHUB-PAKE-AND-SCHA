@@ -704,6 +704,101 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
   }
 
   for (const [label, device] of [['PC', DESKTOP], ['Handy', PHONE]]) {
+    it(`Entwürfe, Bilder per Strg+V und Ziehen, Dienststatus am ${label}`, async () => {
+      // Eigener Server: der gemeinsame ist nahe am Anmelde-Limit (20 je 15 Minuten)
+      const qsrv = await startServer();
+      const { ctx, page, problems, settle } = await open(device);
+      page.on('dialog', (d) => d.accept()); // „Seite verlassen?“ beim Neuladen mit ungespeicherten Eingaben
+      try {
+        const adm = client(qsrv.base);
+        const me = await adm.login(TEAM.admin);
+        const kase = (await adm.post('/api/cases', { title: 'Abgeschlepptes Fahrzeug', area: 'zivilrecht', clientName: 'Dora Dienst', lawyerId: me.id })).json.case;
+        assert.equal((await adm.post('/api/duty', { status: 'dienst' })).status, 200);
+        await login(page, TEAM.admin, qsrv.base);
+        const openKase = async () => {
+          await page.goto(qsrv.base + `/dashboard.html?case=${kase.id}#cases`);
+          await page.waitForSelector('#modalBody .case-head');
+          await settle();
+        };
+        await openKase();
+        // Dienststatus beim zuständigen Anwalt
+        assert.match(await page.textContent('#modalBody .duty-tag'), /im Dienst/);
+
+        // Angefangene Nachricht übersteht das Neuladen – nach dem Senden ist sie weg
+        const chat = '#modalBody form[data-form="chat-send"] textarea';
+        await page.fill(chat, `Bitte morgen anrufen (${label})`);
+        await page.waitForTimeout(400);
+        await page.reload();
+        await page.waitForSelector('#modalBody .case-head');
+        await settle();
+        assert.equal(await page.inputValue(chat), `Bitte morgen anrufen (${label})`, 'Entwurf wiederhergestellt');
+
+        // Screenshot mit Strg+V → Beweismittel; Hineinziehen zeigt, wohin, und lädt hoch
+        const png = 'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEklEQVR4nGP4z8CAFTEMLQkAJfgP8Wm1nyQAAAAASUVORK5CYII=';
+        const fire = (type) =>
+          page.evaluate(
+            ([b64, t]) => {
+              const bin = atob(b64);
+              const bytes = Uint8Array.from(bin, (ch) => ch.charCodeAt(0));
+              const dt = new DataTransfer();
+              dt.items.add(new File([bytes], 'screenshot.png', { type: 'image/png' }));
+              const target = document.querySelector('#modalBody .case-head');
+              const ev = t === 'paste' ? new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }) : new DragEvent(t, { dataTransfer: dt, bubbles: true, cancelable: true });
+              target.dispatchEvent(ev);
+            },
+            [png, type]
+          );
+        const atts = () => page.$$eval('#modalBody .att', (a) => a.length);
+        await fire('paste');
+        await page.waitForFunction(() => document.querySelectorAll('#modalBody .att').length === 1);
+        await fire('dragenter');
+        assert.match(await page.textContent('#dropHint'), /als Beweismittel zur Akte/);
+        await fire('drop');
+        await page.waitForFunction(() => document.querySelectorAll('#modalBody .att').length === 2);
+        assert.equal(await page.$('#dropHint'), null, 'Hinweis verschwindet');
+        assert.equal(await atts(), 2);
+        if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Akte passt aufs Handy');
+
+        await page.click('#modalBody form[data-form="chat-send"] button[type=submit]');
+        await page.waitForFunction((t) => [...document.querySelectorAll('#chatList .bubble, #chatList [class*="bubble"]')].some((b) => b.textContent.includes(t)), `Bitte morgen anrufen (${label})`);
+        await page.reload();
+        await page.waitForSelector('#modalBody .case-head');
+        await settle();
+        assert.equal(await page.inputValue(chat), '', 'nach dem Senden kein Entwurf mehr');
+
+        // Rechnung: angefangene Positionen überstehen das Neuladen; „Abbrechen“ verwirft sie
+        await page.click(`#modalBody [data-action="new-invoice"][data-case-id="${kase.id}"]`);
+        await page.waitForSelector('#invoiceForm');
+        await page.click('[data-action="inv-add-item"]');
+        await page.fill('#invItems .item-desc', `Abschleppkosten prüfen (${label})`);
+        await page.waitForTimeout(500);
+        await page.reload();
+        await page.waitForSelector('#invItems .item-desc');
+        assert.equal(await page.inputValue('#invItems .item-desc'), `Abschleppkosten prüfen (${label})`, 'Rechnungs-Entwurf wiederhergestellt');
+        await page.click('[data-action="inv-back"][data-cancel]');
+        await page.waitForFunction(() => !document.querySelector('#invoiceForm'));
+        await openKase();
+        await page.click(`#modalBody [data-action="new-invoice"][data-case-id="${kase.id}"]`);
+        await page.waitForSelector('#invoiceForm');
+        assert.equal(await page.$$eval('#invItems .item-row', (r) => r.length), 0, 'nach „Abbrechen“ frisch');
+
+        // Startseite: angefangene Mandatsanfrage bleibt erhalten
+        await page.goto(qsrv.base + '/');
+        await page.locator('[data-act="ticket"]:visible').first().click();
+        await page.fill('#tkDesc', `Angefangene Anfrage (${label})`);
+        await page.waitForTimeout(400);
+        await page.reload();
+        await page.locator('[data-act="ticket"]:visible').first().click();
+        assert.equal(await page.inputValue('#tkDesc'), `Angefangene Anfrage (${label})`);
+        assert.deepEqual(problems, []);
+      } finally {
+        await ctx.close();
+        await qsrv.stop();
+      }
+    });
+  }
+
+  for (const [label, device] of [['PC', DESKTOP], ['Handy', PHONE]]) {
     it(`Discord-Konto am ${label}: mit einem Klick registrieren, Name im Spiel, Konto direkt nach der Mandatsanfrage`, async () => {
       // Eigener Server mit Discord-Anmeldung gegen die nachgebaute Schnittstelle; die Discord-Seite selbst überspringt der Browser
       const dsrv = await startServer({

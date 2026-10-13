@@ -1228,7 +1228,7 @@
 
             <div id="concernStatusPane" class="hidden">
                 <div id="concernSaved" class="hidden mb-4"></div>
-                <form id="concernLookup" class="grid grid-cols-1 sm:grid-cols-[1fr_9rem] gap-3 mb-3" novalidate>
+                <form id="concernLookup" data-nodraft class="grid grid-cols-1 sm:grid-cols-[1fr_9rem] gap-3 mb-3" novalidate>
                     <input id="clRef" type="text" autocomplete="off" autocapitalize="characters" placeholder="Vorgangsnummer, z. B. AN-2026-0001" aria-label="Vorgangsnummer" class="w-full bg-slate-900/80 border border-[var(--glass-border)] rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--gold-500)] font-mono">
                     <input id="clPin" type="text" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Pin" aria-label="Pin (6 Ziffern)" class="w-full bg-slate-900/80 border border-[var(--glass-border)] rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--gold-500)] font-mono tracking-widest">
                     <button type="submit" class="btn-gold sm:col-span-2 py-3 text-xs uppercase tracking-wider disabled:opacity-60">Anliegen öffnen</button>

@@ -1,4 +1,4 @@
-/* Gemeinsame Helfer für alle Seiten: window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm } */
+/* Gemeinsame Helfer für alle Seiten: window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm, drafts } */
 (() => {
   'use strict';
 
@@ -224,5 +224,138 @@
     });
   }
 
-  window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog, closeToDashboard };
+  /*
+   * Entwürfe: Angefangene Texte in Formularen bleiben im Browser erhalten – nach Neuladen, abgelaufener Anmeldung,
+   * geschlossenem Tab oder wenn das Handy die App beendet. Gespeichert werden nur Textfelder (keine Passwörter, Dateien,
+   * versteckten Felder oder Auswahlen), je Formular und Datensatz, höchstens 7 Tage. Nach erfolgreichem Absenden oder
+   * „Verwerfen“ ist der Entwurf weg. Formulare mit data-nodraft (oder Felder damit) bleiben außen vor.
+   */
+  const DRAFT_PREFIX = 'ps.draft:';
+  const DRAFT_TTL = 7 * 864e5;
+  const drafts = (() => {
+    let scope = 'gast';
+    let onRestore = null;
+    const held = new Set(); // Formulare, die gerade abgeschickt werden – nicht wieder befüllen
+    const timers = new WeakMap();
+    const store = {
+      get(k) {
+        try {
+          const raw = localStorage.getItem(k);
+          const d = raw ? JSON.parse(raw) : null;
+          if (!d || Date.now() - d.t > DRAFT_TTL) {
+            if (raw) localStorage.removeItem(k);
+            return null;
+          }
+          return d.v;
+        } catch {
+          return null;
+        }
+      },
+      set(k, v) {
+        try {
+          localStorage.setItem(k, JSON.stringify({ v, t: Date.now() }));
+        } catch {
+          /* Speicher voll oder gesperrt – dann eben ohne Entwurf */
+        }
+      },
+      del(k) {
+        try {
+          localStorage.removeItem(k);
+        } catch {
+          /* egal */
+        }
+      },
+      keys(prefix) {
+        try {
+          return Object.keys(localStorage).filter((k) => k.startsWith(prefix));
+        } catch {
+          return [];
+        }
+      },
+    };
+    /** Formular-Schlüssel: Name (data-form bzw. id) und alle data-Angaben (Akte, Datensatz …). */
+    function formKey(form) {
+      if (!form || form.matches('[data-nodraft]')) return null;
+      const name = form.dataset.form || form.id;
+      if (!name) return null;
+      const extra = Object.keys(form.dataset)
+        .filter((k) => k !== 'form' && !k.startsWith('draft'))
+        .sort()
+        .map((k) => `${k}=${form.dataset[k]}`)
+        .join('&');
+      return `${DRAFT_PREFIX}${scope}|${name}${extra ? `|${extra}` : ''}|`;
+    }
+    const TEXT_TYPES = new Set(['text', 'email', 'tel', 'url', 'number', 'date', 'datetime-local', 'time', 'month']);
+    function eligible(el) {
+      if (!el || !el.form || el.disabled || el.readOnly || el.matches('[data-nodraft], [aria-hidden="true"]')) return false;
+      if (el.tagName === 'TEXTAREA') return !!(el.name || el.id);
+      return el.tagName === 'INPUT' && TEXT_TYPES.has(el.type) && !!(el.name || el.id);
+    }
+    function fieldKey(el) {
+      const name = el.name || el.id;
+      const same = [...el.form.elements].filter((x) => (x.name || x.id) === name);
+      return `${name}#${Math.max(0, same.indexOf(el))}`;
+    }
+    function save(el) {
+      const fk = formKey(el.form);
+      if (!fk || !eligible(el)) return;
+      const k = fk + fieldKey(el);
+      if (el.value === el.defaultValue || !el.value.trim()) store.del(k);
+      else store.set(k, el.value);
+    }
+    function restore(form) {
+      const fk = formKey(form);
+      if (!fk || held.has(fk)) return;
+      let restored = 0;
+      for (const el of form.elements) {
+        if (!eligible(el) || el.value !== el.defaultValue) continue;
+        const v = store.get(fk + fieldKey(el));
+        if (v == null || v === el.value) continue;
+        el.value = v;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        restored++;
+      }
+      if (restored && onRestore) onRestore(form);
+    }
+    function clear(form) {
+      const fk = formKey(form);
+      if (fk) store.keys(fk).forEach(store.del);
+    }
+    /** Beim Absenden: Formular nicht wieder befüllen; done(true) löscht den Entwurf, done(false) behält ihn. */
+    function hold(form) {
+      const fk = formKey(form);
+      if (!fk) return () => {};
+      held.add(fk);
+      return (ok) => {
+        held.delete(fk);
+        if (ok) store.keys(fk).forEach(store.del);
+      };
+    }
+    function scan(node) {
+      if (!node || node.nodeType !== 1) return;
+      if (node.tagName === 'FORM') restore(node);
+      else node.querySelectorAll('form').forEach(restore);
+    }
+    /** Einschalten (einmal je Seite): scope trennt die Entwürfe verschiedener Konten im selben Browser. */
+    function watch(opts = {}) {
+      scope = opts.scope || 'gast';
+      onRestore = opts.onRestore || null;
+      store.keys(DRAFT_PREFIX).forEach((k) => store.get(k)); // abgelaufene aufräumen
+      document.addEventListener('input', (e) => {
+        const el = e.target;
+        if (!eligible(el)) return;
+        clearTimeout(timers.get(el));
+        timers.set(el, setTimeout(() => save(el), 250));
+      });
+      // reset() (z. B. nach dem Absenden) und Auswahl aus der Autovervollständigung
+      document.addEventListener('change', (e) => eligible(e.target) && save(e.target));
+      new MutationObserver((list) => list.forEach((m) => m.addedNodes.forEach(scan))).observe(document.body, { childList: true, subtree: true });
+      scan(document.body);
+    }
+    /** Alle Entwürfe dieses Kontos löschen (Abmelden). */
+    const clearAll = () => store.keys(`${DRAFT_PREFIX}${scope}|`).forEach(store.del);
+    return { watch, clear, clearAll, hold, store, key: (name) => `${DRAFT_PREFIX}${scope}|${name}` };
+  })();
+
+  window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog, closeToDashboard, drafts };
 })();

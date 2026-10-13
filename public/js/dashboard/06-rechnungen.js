@@ -124,6 +124,29 @@ views.invoices = {
 };
 
 /* ---------------------------------------------------------------- Rechnungs-/Honorar-Generator */
+// Angefangene Rechnung je Akte im Browser behalten (übersteht Neuladen und abgelaufene Anmeldung) – gelöscht beim
+// Erstellen, bei „Abbrechen“ und beim Abmelden. Die Felder des Formulars selbst laufen nicht über die allgemeinen Entwürfe.
+const invDraftKey = (caseId) => window.PS.drafts.key(`invoice|${caseId || 'ohne'}`);
+let invDraftTimer = null;
+function keepInvoiceDraft() {
+  const d = st.draft;
+  if (!d) return;
+  clearTimeout(invDraftTimer);
+  invDraftTimer = setTimeout(() => {
+    if (st.draft !== d) return;
+    const { store } = window.PS.drafts;
+    const { billing, ...rest } = d;
+    if (d.items.length || (d.notes || '').trim()) {
+      store.set(invDraftKey(d.caseId), rest);
+      store.set(window.PS.drafts.key('invoice|last'), d.caseId || 'ohne');
+    } else store.del(invDraftKey(d.caseId));
+  }, 300);
+}
+function savedInvoiceDraft(caseId) {
+  const v = window.PS.drafts.store.get(invDraftKey(caseId));
+  return v && Array.isArray(v.items) ? { ...newDraft(caseId), ...v, caseId: caseId || null, billing: null } : null;
+}
+const forgetInvoiceDraft = (caseId) => window.PS.drafts.store.del(invDraftKey(caseId));
 function newDraft(caseId = null) {
   const d = {
     kind: 'rechnung',
@@ -329,13 +352,14 @@ function summaryHtml() {
       <div id="invSumFigures">${summaryFiguresHtml()}</div>
       <p class="form-hint mb-4">Nach dem Erstellen öffnet sich die Druckansicht – dort „Als PDF speichern“ wählen.</p>
       <button type="submit" class="btn-gold btn-lg btn-block">${icon('check')}<span>Dokument erstellen</span></button>
-      ${st.invoiceFrom ? `<button type="button" class="btn-ghost btn-md btn-block mt-2" data-action="inv-back">Abbrechen</button>` : '<a href="#invoices" class="btn-ghost btn-md btn-block mt-2">Abbrechen</a>'}`;
+      <button type="button" class="btn-ghost btn-md btn-block mt-2" data-action="inv-back" data-cancel="1">Abbrechen</button>`;
 }
 function updateInvoiceSummary() {
   // Nicht die ganze Box ersetzen: Verlässt man ein Feld per Klick auf „Dokument erstellen“, würde der
   // Button sonst während des Klicks ausgetauscht und der Klick ginge verloren.
   const box = $('#invSumFigures');
   if (box) box.innerHTML = summaryFiguresHtml();
+  keepInvoiceDraft();
   st.draft.items.forEach((it, i) => {
     const el = $(`[data-item-total="${i}"]`);
     if (el) el.textContent = money((Number(it.quantity) || 0) * (Number(it.unitPrice) || 0));
@@ -417,13 +441,17 @@ views['invoice-new'] = {
     ]);
     st.coopList = coops.cooperations;
     st.memberList = members.memberships;
-    if (!st.draft) st.draft = newDraft();
-    else if (st.draft.caseId && st.draft.memberId == null) applyCaseToDraft(st.draft, st.draft.caseId);
+    if (!st.draft) {
+      // Seite neu geladen: die zuletzt angefangene Rechnung wieder aufnehmen
+      const last = window.PS.drafts.store.get(window.PS.drafts.key('invoice|last'));
+      st.draft = (last && savedInvoiceDraft(last === 'ohne' ? null : Number(last))) || newDraft();
+    } else if (st.draft.caseId && st.draft.memberId == null) applyCaseToDraft(st.draft, st.draft.caseId);
     await loadContractBilling(st.draft, true);
     runCoopDetect(); // läuft im Hintergrund, die Seite wartet nicht auf Discord
   },
   render() {
     const d = st.draft;
+    keepInvoiceDraft();
     // Leistungen aus der Honorarordnung zum Abhaken – angehakte stehen sofort als Position in der Rechnung
     const picked = new Map(d.items.filter((it) => it.feeId).map((it) => [it.feeId, it]));
     const feeList = Object.entries(FEE_CATEGORIES)
@@ -452,7 +480,7 @@ views['invoice-new'] = {
             <h1 class="page-title mt-1">Rechnung / Honorar erstellen</h1>
             <p class="page-sub">Positionen aus der Honorarordnung übernehmen oder frei erfassen – Summen werden live berechnet.</p></div>
         </div>
-        <form id="invoiceForm" data-form="invoice" class="inv-layout" novalidate>
+        <form id="invoiceForm" data-form="invoice" data-nodraft class="inv-layout" novalidate>
           <div class="stack">
             <section class="panel panel-pad">
               <div class="seg mb-4">
@@ -534,6 +562,7 @@ function onInvoiceChange(t) {
     d.kind = t.value;
     renderView();
   } else if (t.name === 'caseId') {
+    forgetInvoiceDraft(d.caseId); // der Entwurf zieht zur neuen Akte um
     d.caseId = t.value ? Number(t.value) : null;
     applyCaseToDraft(d, d.caseId);
     if (d.coopAuto) {

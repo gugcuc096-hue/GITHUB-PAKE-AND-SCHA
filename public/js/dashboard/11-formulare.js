@@ -314,6 +314,7 @@ const forms = {
       dueDate: d.dueDate || null,
       notes: d.notes.trim(),
     });
+    forgetInvoiceDraft(d.caseId);
     st.draft = null;
     const inv = res.invoice;
     // Aus einer Akte heraus erstellt: zurück in die Akte, die Bestätigung liegt darüber (Schließen → Akte)

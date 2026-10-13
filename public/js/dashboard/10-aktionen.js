@@ -17,6 +17,7 @@ const actions = {
   logout: async () => {
     if (unsavedInputs({ invoice: true }) && !(await askDiscard(true))) return;
     st.leaving = true; // keine zweite Rückfrage des Browsers
+    window.PS.drafts.clearAll(); // Entwürfe gehören zu diesem Konto – nicht für den Nächsten am selben Gerät
     await api.post('/api/auth/logout');
     location.href = '/login.html';
   },
@@ -323,12 +324,21 @@ const actions = {
     await load.cases();
     // Aus der Akte heraus: Abbrechen und Erstellen führen zurück in diese Akte
     const from = el.dataset.caseId && st.modalCaseId === Number(el.dataset.caseId) ? { view: st.view, caseId: st.modalCaseId, caseNumber: st.caseInfo ? st.caseInfo.caseNumber : '' } : null;
-    st.draft = newDraft(el.dataset.caseId ? Number(el.dataset.caseId) : null);
+    const caseId = el.dataset.caseId ? Number(el.dataset.caseId) : null;
+    // Für diese Akte schon angefangen (auch vor dem Neuladen): dort weitermachen
+    const saved = savedInvoiceDraft(caseId);
+    st.draft = saved || newDraft(caseId);
     st.invoiceFrom = from;
     await navigate('invoice-new');
+    if (saved) toast('Angefangene Rechnung wiederhergestellt.');
   },
-  'inv-back': async () => {
+  'inv-back': async (el) => {
     const from = st.invoiceFrom;
+    if (el.dataset.cancel && st.draft) {
+      // „Abbrechen“: Entwurf verwerfen
+      forgetInvoiceDraft(st.draft.caseId);
+      st.draft = null;
+    }
     if (!from) return navigate('invoices');
     await returnToView(from.view);
     await openCase(from.caseId);

@@ -101,6 +101,7 @@
     btn.disabled = true;
     try {
       const res = await api.post('/api/public/cases', data);
+      window.PS.drafts.clear(form);
       form.reset();
       if (typeof window.setWishLawyer === 'function') window.setWishLawyer(null);
       updateAuthNav();
@@ -267,6 +268,9 @@
   });
 
   /* ---------------------------------------------------------------- Start */
+  // Angefangene Texte (Mandat, Anliegen, Antwort) bleiben auf diesem Gerät erhalten
+  window.PS.drafts.watch({ scope: 'website' });
+
   api.get('/api/auth/session')
     .then((r) => (me = r?.user ?? null))
     .catch(() => (me = null))
@@ -588,6 +592,7 @@
     btn.disabled = true;
     try {
       const res = await api.post('/api/public/concerns', data);
+      window.PS.drafts.clear(form);
       form.reset();
       syncConcernPersonal();
       showConcernSuccess(res);
@@ -615,7 +620,7 @@
       : '<p class="text-sm text-[var(--text-dim)] italic">Noch keine Antwort – das Board of Partners meldet sich hier.</p>';
     const reply = d.closed
       ? '<p class="text-xs text-[var(--text-dim)] mt-4">Dieses Anliegen ist abgeschlossen. Für etwas Neues reichen Sie bitte ein neues Anliegen ein.</p>'
-      : `<form id="concernReply" class="mt-4 space-y-3">
+      : `<form id="concernReply" class="mt-4 space-y-3" data-ref="${esc(concernAccess ? concernAccess.reference : '')}">
           <label for="crText" class="block text-xs uppercase tracking-wider text-[var(--text-muted)]">Nachricht an das Board</label>
           <textarea id="crText" rows="3" maxlength="5000" required class="w-full bg-slate-900/80 border border-[var(--glass-border)] rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--gold-500)]"></textarea>
           <button type="submit" class="btn-outline w-full py-2.5 text-xs uppercase tracking-wider disabled:opacity-60">Nachricht senden</button>
@@ -640,6 +645,7 @@
       btn.disabled = true;
       try {
         await api.post('/api/public/concern-reply', { ...concernAccess, body: text });
+        window.PS.drafts.clear(e.target);
         showToast('Gesendet', 'Ihre Nachricht ist beim Board of Partners eingegangen.');
         await lookupConcern();
       } catch (err) {

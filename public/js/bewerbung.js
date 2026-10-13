@@ -138,7 +138,7 @@
                 <div class="bw-head"><h2 class="font-serif text-2xl font-semibold">Nachrichten</h2><span class="text-xs text-dim">mit dem Board of Partners</span></div>
                 <div class="chat">
                     <div class="chat-list" id="bwChat" aria-live="polite">${d.messages.length ? bubbles(d.messages) : '<p class="chat-empty">Noch keine Nachrichten. Fragen zu Ihrer Bewerbung? Schreiben Sie uns hier.</p>'}</div>
-                    <form id="bwForm" class="chat-form">
+                    <form id="bwForm" class="chat-form" data-app="${esc(d.number)}">
                         <textarea name="body" rows="1" maxlength="3000" required class="field chat-input" placeholder="Nachricht an das Board of Partners …" aria-label="Nachricht schreiben"></textarea>
                         <button type="submit" class="btn-gold chat-send" aria-label="Senden" title="Senden">${SEND_ICON}</button>
                     </form>
@@ -193,6 +193,7 @@
         form.querySelector('button').disabled = true;
         try {
             const r = await api.post('/api/public/application-portal/messages', { token, body });
+            window.PS.drafts.clear(form);
             input.value = '';
             input.style.height = '';
             append([r.message]);
@@ -239,7 +240,7 @@
             <div class="glass-card bw-card">
                 <h2 class="font-serif text-2xl font-semibold mb-2">Mit Bewerbungsnummer öffnen</h2>
                 <p class="text-sm text-muted mb-4">Bewerbungsnummer und Zugangscode haben Sie nach dem Absenden erhalten.</p>
-                <form id="accessForm" class="flex flex-col sm:flex-row gap-3" novalidate>
+                <form id="accessForm" data-nodraft class="flex flex-col sm:flex-row gap-3" novalidate>
                     <input id="acNumber" class="field font-mono" placeholder="Bewerbungsnummer, z. B. BW-2026-0001" autocapitalize="characters" aria-label="Bewerbungsnummer">
                     <input id="acCode" class="field font-mono sm:w-48" inputmode="numeric" maxlength="6" placeholder="Zugangscode" aria-label="Zugangscode">
                     <button type="submit" class="btn-gold btn-md">Öffnen</button>
@@ -298,6 +299,7 @@
         history.replaceState(null, '', location.pathname + location.hash);
     }
 
+    window.PS.drafts.watch({ scope: 'website' }); // angefangene Nachricht bleibt erhalten
     window.addEventListener('hashchange', load);
     setInterval(poll, 10000);
     document.addEventListener('visibilitychange', () => !document.hidden && poll());
