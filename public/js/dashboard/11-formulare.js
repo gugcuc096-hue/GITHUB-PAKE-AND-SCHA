@@ -209,6 +209,12 @@ const forms = {
     toast(`Danke, ${r.user.displayName}! Ihr Konto ist eingerichtet.`);
     if (st.view === 'overview' || st.view === 'cases') refreshBehind();
   },
+  'tf-off': async (f) => {
+    st.twoFactor = await api.patch('/api/auth/two-factor', { enabled: false, password: f.elements.password.value });
+    closeModal();
+    toast('Zwei-Faktor-Anmeldung ausgeschaltet.');
+    renderView();
+  },
   'chat-send': async (f) => {
     const caseId = Number(f.dataset.caseId);
     await chatSendNow(f, '#chatList', caseBubble, async (body) => (await api.post(`/api/cases/${caseId}/notes`, { body, internal: false })).message);

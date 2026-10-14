@@ -5,6 +5,28 @@
 'use strict';
 
 /* ---------------------------------------------------------------- Profil */
+/**
+ * Zwei-Faktor-Anmeldung: Beim Login kommt zusätzlich ein Code per Discord-DM. Für das Board Pflicht, sonst wählbar;
+ * ohne Bot oder ohne verknüpftes Discord nicht möglich (dann steht hier, was fehlt).
+ */
+function twoFactorPanel(tf) {
+  if (!tf || (!tf.botReady && !tf.mandatory && !tf.switchedOff)) return ''; // ohne Kanzlei-Bot für Mandanten kein Thema
+  const head = `<div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('shield')} Zwei-Faktor-Anmeldung</h2>${tf.on ? badge('Aktiv', 'emerald') : badge('Aus', 'slate')}</div>`;
+  const devices = tf.trustedDevices
+    ? `<div class="flex flex-wrap items-center justify-between gap-2 mt-4 text-sm"><span class="text-muted">${tf.trustedDevices === 1 ? 'Ein vertrautes Gerät braucht' : `${tf.trustedDevices} vertraute Geräte brauchen`} bis zu 30 Tage keinen Code.</span><button type="button" class="btn-ghost btn-sm" data-action="tf-forget">Vertraute Geräte vergessen</button></div>`
+    : '';
+  let body;
+  if (tf.switchedOff) body = '<p class="text-sm text-muted">Gerade per Notschalter ausgeschaltet (Render-Variable <code>TWO_FACTOR_OFF</code>). Bitte die Variable wieder entfernen, sobald Discord wieder läuft.</p>';
+  else if (!tf.botReady) body = '<p class="text-sm text-muted">Der Kanzlei-Bot ist noch nicht eingerichtet – ohne ihn kann kein Code verschickt werden. Bis dahin gilt nur das Passwort.</p>';
+  else if (!tf.hasDiscord)
+    body = `<p class="text-sm text-muted">Beim Login kommt zusätzlich ein 6-stelliger Code als Discord-Direktnachricht – ein geklautes Passwort allein reicht dann nicht mehr. ${tf.mandatory ? '<strong class="text-amber-300">Für das Board of Partners Pflicht:</strong> ' : ''}Bitte zuerst unten Discord verbinden.</p>`;
+  else if (tf.mandatory) body = '<p class="text-sm text-muted">Beim Login kommt nach dem Passwort ein 6-stelliger Code als Discord-Direktnachricht. Für das Board of Partners ist das Pflicht.</p>';
+  else
+    body = `<p class="text-sm text-muted">Beim Login kommt nach dem Passwort ein 6-stelliger Code als Discord-Direktnachricht – ein geklautes Passwort allein reicht dann nicht mehr.</p>
+      <div class="form-actions mt-3">${tf.on ? '<button type="button" class="btn-outline btn-md" data-action="tf-off">Ausschalten</button>' : `<button type="button" class="btn-gold btn-md" data-action="tf-on">${icon('shield', 'ico-sm')}<span>Einschalten</span></button>`}</div>`;
+  return `<section class="panel panel-pad" id="secTwoFactor">${head}${body}${devices}</section>`;
+}
+
 views.profile = {
   async load() {
     const [me, ds, coops, names, member, sessions] = await Promise.all([
@@ -17,6 +39,7 @@ views.profile = {
       load.fivenet(),
     ]);
     st.otherSessions = sessions.others;
+    st.twoFactor = me.twoFactor;
     st.myCoops = coops ? coops.matches : [];
     st.myNameRequests = names.requests;
     st.myMembership = member ? member.membership : null;
@@ -69,6 +92,7 @@ views.profile = {
           } Fremdes Gerät benutzt oder Handy verloren? Hier melden Sie sich überall sonst ab – dieses Gerät bleibt angemeldet.</p>
             <div class="form-actions mt-3"><button type="button" class="btn-outline btn-md" data-action="logout-others" ${st.otherSessions ? '' : 'disabled'}>${icon('logout', 'ico-sm')}<span>Auf allen anderen Geräten abmelden</span></button></div>
           </section>
+          ${twoFactorPanel(st.twoFactor)}
           <section class="panel panel-pad">
             <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${DISCORD_ICON} Discord</h2>${u.discord ? badge('Verbunden', 'emerald') : ''}</div>
             ${discord}
@@ -992,6 +1016,229 @@ function caseWorkSection(c, work) {
       <p class="text-sm text-muted mb-2">${end ? `Bearbeitungsdauer bis zum Abschluss: <strong>${esc(fmtDur(total))}</strong>` : `Offen seit <strong>${esc(fmtDur(total))}</strong>`}</p>
       ${rows}</div>`;
 }
+
+/* ---------------------------------------------------------------- Kanzlei-Statistik (Board of Partners) */
+/*
+ * Säulen in Gold (Reihe 1) und Blau (Reihe 2), geprüft auf dem dunklen Kartenhintergrund (Farbsehschwächen,
+ * Abstand, Kontrast). Schrift bleibt in den Textfarben; Werte gibt es zusätzlich per Tooltip und als Tabelle.
+ */
+const STAT_MONTH = (key) => new Date(`${key}-15T12:00:00`).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+const fmtNum = (n, digits = 1) => Number(n).toLocaleString('de-DE', { maximumFractionDigits: digits });
+/** Achsen-Beschriftung kurz: 12.500 → „12,5k“, 2.000.000 → „2 Mio.“ */
+function compactNum(n) {
+  if (n >= 1e6) return `${fmtNum(n / 1e6)} Mio.`;
+  if (n >= 1e3) return `${fmtNum(n / 1e3, n >= 1e4 ? 0 : 1)}k`;
+  return fmtNum(n, 0);
+}
+/** Runde Obergrenze für die y-Achse: Schritte 1 · 2 · 2,5 · 5 × 10ⁿ, 3 bis 6 Schritte – die knappste über dem Höchstwert. */
+function niceScale(max, integer = false) {
+  if (!max) return { top: integer ? 4 : 1000, step: integer ? 1 : 250 };
+  let best = null;
+  for (const n of [4, 5, 3, 6]) {
+    const raw = max / n;
+    const pow = 10 ** Math.floor(Math.log10(raw));
+    const step = [1, 2, 2.5, 5, 10].map((f) => f * pow).find((x) => x >= raw && (!integer || Number.isInteger(x))) || Math.ceil(raw);
+    if (!best || step * n < best.top) best = { top: step * n, step };
+  }
+  return best;
+}
+const fmtDays = (d) => (d == null ? '—' : fmtDur(d * 864e5));
+
+/**
+ * Säulendiagramm über die 12 Monate. series: [{ key, label, cls }], fmt: Wert → Text.
+ * Ein Monat = eine Spalte (ganze Höhe als Trefferfläche) mit Tooltip bei Maus, Fokus und Tippen; Pfeiltasten wechseln.
+ */
+function columnChart(months, series, { fmt, axis, integer = false, label, labelValues = false, note = () => '' }) {
+  const max = Math.max(0, ...months.flatMap((m) => series.map((s) => m[s.key])));
+  const { top, step } = niceScale(max, integer);
+  const ticks = [];
+  for (let v = 0; v <= top + 1e-9; v += step) ticks.push(v);
+  const pct = (v) => `${Math.round((v / top) * 1000) / 10}%`;
+  // Beschriftung nur am höchsten und am jüngsten Monat (eine Reihe), nie an jeder Säule
+  const s0 = series[0].key;
+  const maxIdx = months.reduce((b, m, i) => (m[s0] > months[b][s0] ? i : b), 0);
+  const labelled = labelValues ? new Set([maxIdx, months.length - 1].filter((i) => months[i][s0] > 0)) : new Set();
+  const cols = months
+    .map((m, i) => {
+      const full = STAT_MONTH(m.key);
+      const tip = `<div class="chart-tip-title">${esc(full)}</div>${series
+        .map((s) => `<div class="chart-tip-row"><i class="sw ${s.cls}"></i>${esc(s.label)}<b>${esc(fmt(m[s.key]))}</b></div>`)
+        .join('')}${note(m) ? `<div class="chart-tip-note">${esc(note(m))}</div>` : ''}`;
+      const aria = `${full}: ${series.map((s) => `${s.label} ${fmt(m[s.key])}`).join(', ')}${note(m) ? `, ${note(m)}` : ''}`;
+      const bars = series
+        .map(
+          (s, si) =>
+            `<span class="vchart-bar ${s.cls}" style="height:${pct(m[s.key])}">${si === 0 && labelled.has(i) ? `<b class="vchart-val">${esc(compactNum(m[s.key]))}</b>` : ''}</span>`
+        )
+        .join('');
+      return `<div class="vchart-col${series.length > 1 ? ' grouped' : ''}" role="img" tabindex="${i === months.length - 1 ? 0 : -1}" aria-label="${esc(aria)}" data-tip="${esc(tip)}">${bars}</div>`;
+    })
+    .join('');
+  return `<div class="vchart">
+      <div class="vchart-y" aria-hidden="true">${ticks.map((v) => `<span style="bottom:${pct(v)}">${esc(axis(v))}</span>`).join('')}</div>
+      <div class="vchart-main">
+        <div class="vchart-grid" aria-hidden="true">${ticks.map((v, i) => `<i${i === 0 ? ' class="base"' : ''} style="bottom:${pct(v)}"></i>`).join('')}</div>
+        <div class="vchart-cols" role="group" aria-label="${esc(label)}">${cols}</div>
+        <div class="vchart-x" aria-hidden="true">${months.map((m) => `<span>${esc(m.label.split(' ')[0])}</span>`).join('')}</div>
+        <div class="chart-tip" role="tooltip" hidden></div>
+      </div>
+    </div>`;
+}
+const chartLegend = (series) =>
+  `<div class="chart-legend">${series.map((s) => `<span><i class="sw ${s.cls}"></i>${esc(s.label)}</span>`).join('')}</div>`;
+const chartTable = (head, rows) =>
+  `<details class="chart-table"><summary>Werte als Tabelle</summary><div class="tbl-wrap"><table class="tbl">
+      <thead><tr>${head.map((h, i) => `<th${i ? ' style="text-align:right"' : ''}>${esc(h)}</th>`).join('')}</tr></thead>
+      <tbody>${rows.map((r) => `<tr>${r.map((c, i) => `<td${i ? ' class="font-mono nowrap" style="text-align:right"' : ''}>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></details>`;
+
+/* Tooltip: eine Blase je Diagramm, über der Spalte; Maus, Tastatur und Tippen */
+function chartTipShow(col) {
+  const main = col.closest('.vchart-main');
+  const tip = main && main.querySelector('.chart-tip');
+  if (!tip) return;
+  main.querySelectorAll('.vchart-col.is-active').forEach((c) => c !== col && c.classList.remove('is-active'));
+  col.classList.add('is-active');
+  tip.innerHTML = col.dataset.tip;
+  tip.hidden = false;
+  const half = tip.offsetWidth / 2;
+  const center = col.offsetLeft + col.offsetWidth / 2;
+  tip.style.left = `${Math.min(Math.max(center, half), main.clientWidth - half)}px`;
+}
+function chartTipHide(col) {
+  const main = col.closest('.vchart-main');
+  col.classList.remove('is-active');
+  const tip = main && main.querySelector('.chart-tip');
+  if (tip && !main.querySelector('.vchart-col.is-active')) tip.hidden = true;
+}
+document.addEventListener('pointerover', (e) => {
+  const col = e.target.closest?.('.vchart-col');
+  if (col) chartTipShow(col);
+});
+document.addEventListener('pointerout', (e) => {
+  const col = e.pointerType === 'mouse' && e.target.closest?.('.vchart-col');
+  if (col && !col.contains(e.relatedTarget) && document.activeElement !== col) chartTipHide(col);
+});
+document.addEventListener('focusin', (e) => {
+  const col = e.target.closest?.('.vchart-col');
+  if (col) chartTipShow(col);
+});
+document.addEventListener('focusout', (e) => {
+  const col = e.target.closest?.('.vchart-col');
+  if (col) chartTipHide(col);
+});
+document.addEventListener('keydown', (e) => {
+  const col = e.target.closest?.('.vchart-col');
+  if (!col) return;
+  if (e.key === 'Escape') return chartTipHide(col);
+  const all = [...col.parentElement.children];
+  const i = all.indexOf(col);
+  const next = { ArrowLeft: i - 1, ArrowRight: i + 1, Home: 0, End: all.length - 1 }[e.key];
+  if (next == null || !all[next]) return;
+  e.preventDefault();
+  all.forEach((c) => (c.tabIndex = c === all[next] ? 0 : -1));
+  all[next].focus();
+});
+
+function statKpi(label, value, sub, ico) {
+  return `<div class="panel kpi"><div class="kpi-label">${icon(ico, 'ico-sm')}${esc(label)}</div><div class="kpi-value">${esc(value)}</div><div class="kpi-sub">${esc(sub)}</div></div>`;
+}
+/** „▲ 12 % ggü. Vorzeitraum“ (die 30 Tage davor) – ohne Vergleichswert nur dessen Summe. */
+function trendText(now, before) {
+  if (!before) return `30 Tage davor: ${money(0)}`;
+  const d = Math.round(((now - before) / before) * 100);
+  return `${d > 0 ? '▲' : d < 0 ? '▼' : '='} ${Math.abs(d)} % ggü. Vorzeitraum`;
+}
+const successCell = (s) =>
+  s.pct == null
+    ? '<span class="text-dim" title="Noch keine abgeschlossene Akte mit gewertetem Ergebnis">—</span>'
+    : `<span class="nowrap"><span class="stat-meter" aria-hidden="true"><span style="width:${s.pct}%"></span></span><span class="tabular-nums">${s.pct} %</span> <span class="text-dim text-xs tabular-nums">(${s.won}/${s.rated})</span></span>`;
+const OUTCOME_KIND = (o) => (o.success === true ? 'zählt als Erfolg' : o.success === false ? 'kein Erfolg' : 'ohne Wertung');
+
+views.stats = {
+  async load() {
+    st.stats = await api.get('/api/stats');
+  },
+  render() {
+    const s = st.stats;
+    const k = s.kpis;
+    const months = s.months;
+    const span = `${STAT_MONTH(months[0].key)} – ${STAT_MONTH(months[months.length - 1].key)}`;
+    const revenueSeries = [{ key: 'revenue', label: 'Umsatz', cls: 'ser1' }];
+    const caseSeries = [
+      { key: 'opened', label: 'Neu angelegt', cls: 'ser1' },
+      { key: 'closed', label: 'Abgeschlossen', cls: 'ser2' },
+    ];
+    const hasRevenue = months.some((m) => m.revenue > 0);
+    const hasCases = months.some((m) => m.opened || m.closed);
+    const revenueChart = hasRevenue
+      ? columnChart(months, revenueSeries, {
+        fmt: money,
+        note: (m) => (m.paid ? `${m.paid} ${m.paid === 1 ? 'Rechnung' : 'Rechnungen'} bezahlt` : ''),
+        axis: compactNum,
+        label: `Umsatz je Monat, ${span}`,
+        labelValues: true,
+      }) +
+        chartTable(
+          ['Monat', 'Umsatz', 'Rechnungen'],
+          months.map((m) => [STAT_MONTH(m.key), money(m.revenue), String(m.paid)])
+        )
+      : empty('Noch keine bezahlten Rechnungen in den letzten 12 Monaten.', 'receipt');
+    const caseChart = hasCases
+      ? chartLegend(caseSeries) +
+        columnChart(months, caseSeries, { fmt: (v) => String(v), axis: (v) => fmtNum(v, 0), integer: true, label: `Akten je Monat, ${span}` }) +
+        chartTable(
+          ['Monat', 'Neu angelegt', 'Abgeschlossen'],
+          months.map((m) => [STAT_MONTH(m.key), String(m.opened), String(m.closed)])
+        )
+      : empty('Noch keine Akten in den letzten 12 Monaten.', 'folder');
+    const lawyerRows = s.lawyers.length
+      ? `<div class="tbl-wrap"><table class="tbl tbl-cards stat-tbl">
+          <thead><tr><th>Anwalt</th><th style="text-align:right">Laufend</th><th style="text-align:right">Abgeschlossen</th><th>Erfolgsquote</th><th style="text-align:right">Ø bis Abschluss</th></tr></thead>
+          <tbody>${[...s.lawyers, { total: true, name: 'Kanzlei gesamt', open: k.casesOpen, closed: k.casesClosed, success: k.success, avgDays: k.avgDays }]
+            .map(
+              (l) => `<tr${l.total ? ' class="stat-total"' : ''}>
+                <td class="td-main"><div class="font-medium">${esc(l.name)}</div><div class="text-xs text-dim">${l.total ? 'alle Akten' : `${esc(l.rank || 'ohne Rang')}${l.active ? '' : ' · deaktiviert'}`}</div></td>
+                <td data-label="Laufend" class="tabular-nums" style="text-align:right">${l.open}</td>
+                <td data-label="Abgeschlossen" class="tabular-nums" style="text-align:right">${l.closed}</td>
+                <td data-label="Erfolgsquote" class="nowrap">${successCell(l.success)}</td>
+                <td data-label="Ø bis Abschluss" class="nowrap" style="text-align:right">${esc(fmtDays(l.avgDays))}</td></tr>`
+            )
+            .join('')}</tbody></table></div>
+          ${s.unassignedOpen ? `<p class="form-hint mt-3">${s.unassignedOpen} laufende ${s.unassignedOpen === 1 ? 'Akte hat' : 'Akten haben'} noch keinen federführenden Anwalt.</p>` : ''}`
+      : empty('Noch keine Akten mit federführendem Anwalt.', 'users');
+    const outMax = Math.max(1, ...s.outcomes.map((o) => o.count));
+    const outTotal = s.outcomes.reduce((a, o) => a + o.count, 0);
+    const outcomes = s.outcomes.length
+      ? `<div class="hbars">${[...s.outcomes]
+          .sort((a, b) => b.count - a.count)
+          .map(
+            (o) => `<div class="hbar-row">
+                <div class="hbar-label">${esc(o.label)}<span class="text-xs text-dim">${esc(OUTCOME_KIND(o))}</span></div>
+                <div class="hbar-track"><span class="hbar-fill ser1" style="width:${Math.max(2, Math.round((o.count / outMax) * 100))}%"></span></div>
+                <div class="hbar-val tabular-nums">${o.count} <span class="text-dim">· ${Math.round((o.count / outTotal) * 100)} %</span></div>
+              </div>`
+          )
+          .join('')}</div>`
+      : empty('Noch keine abgeschlossene Akte mit Ergebnis.', 'scale');
+    const success = k.success;
+    return `
+        <div class="page-head">
+          <div><h1 class="page-title">Kanzlei-Statistik</h1><p class="page-sub">Umsatz, Akten und Erfolgsquote auf einen Blick – berechnet aus Rechnungen und Akten. Nur für das Board of Partners sichtbar.</p></div>
+        </div>
+        <div class="kpi-grid mb-4 lg:mb-5">
+          ${statKpi('Umsatz 30 Tage', money(k.revenue30), trendText(k.revenue30, k.revenuePrev30), 'receipt')}
+          ${statKpi('Offene Forderungen', money(k.openSum), `${k.openCount} offen${k.overdueCount ? ` · ${k.overdueCount} überfällig` : ''}`, 'clock')}
+          ${statKpi('Abgeschlossen', String(k.closed30), `in 30 Tagen · ${k.opened30} neu`, 'check')}
+          ${statKpi('Erfolgsquote', success.pct == null ? '—' : `${success.pct} %`, success.rated ? `${success.won} von ${success.rated} mit Ergebnis` : 'noch kein Ergebnis', 'scale')}
+        </div>
+        <div class="grid-2 mb-4 lg:mb-5 items-start">
+          <section class="panel panel-pad"><div class="panel-head"><div><h2 class="panel-title">Umsatz je Monat</h2><div class="text-xs text-dim">bezahlte Rechnungen nach Zahlungsdatum · ${esc(span)}</div></div></div>${revenueChart}</section>
+          <section class="panel panel-pad"><div class="panel-head"><div><h2 class="panel-title">Akten je Monat</h2><div class="text-xs text-dim">neu angelegt und abgeschlossen · ${esc(span)}</div></div></div>${caseChart}</section>
+        </div>
+        <section class="panel panel-pad mb-4 lg:mb-5"><div class="panel-head"><div><h2 class="panel-title">Je Anwalt</h2><div class="text-xs text-dim">nach federführendem Anwalt · alle Akten</div></div></div>${lawyerRows}</section>
+        <section class="panel panel-pad"><div class="panel-head"><div><h2 class="panel-title">Ergebnisse</h2><div class="text-xs text-dim">abgeschlossene Akten · alle Zeit</div></div></div>${outcomes}</section>`;
+  },
+};
 
 /* ---------------------------------------------------------------- Abmeldungen */
 const ABSENCE_BADGE = { aktiv: ['abgemeldet', 'amber'], geplant: ['geplant', 'sky'], vorbei: ['beendet', 'slate'] };

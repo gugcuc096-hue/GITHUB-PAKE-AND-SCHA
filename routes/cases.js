@@ -44,6 +44,7 @@ const {
 } = require('../models');
 const discord = require('../discord');
 const tickets = require('../tickets');
+const reviewRequest = require('../reviewRequest');
 const trash = require('../trash');
 const caseChat = require('../caseChat');
 const { contractsForCase } = require('./contracts');
@@ -123,7 +124,8 @@ router.get('/', (req, res) => {
     ? db.prepare(`${CASE_SELECT} ORDER BY c.updated_at DESC`).all()
     : db.prepare(`${CASE_SELECT} WHERE c.client_id = ? ORDER BY c.updated_at DESC`).all(u.id);
   const unread = caseChat.unreadFor(u).cases;
-  res.json({ cases: rows.map((c) => ({ ...caseRow(c, u), chatUnread: unread[c.id] || 0 })) });
+  // Liste ohne Sachverhalt (steht in der Akte selbst) – bei vielen Akten deutlich weniger zu laden
+  res.json({ cases: rows.map((c) => ({ ...caseRow(c, u), description: undefined, chatUnread: unread[c.id] || 0 })) });
 });
 
 /* ---------------------------------------------------------------- Nachrichten (Chat Kanzlei ↔ Mandant) */
@@ -741,8 +743,9 @@ function ticketUpdate(before, c, u, { history, editFields, d, newStatus, newlyAs
   const changed = editFields.filter((k) => FIELD_LABELS[k] && d[k] !== undefined && String(d[k]) !== String(before[FIELD_COLUMNS[k]] ?? ''));
   const lines = [...history];
   if (changed.length) lines.push(`Angaben aktualisiert: ${changed.map((k) => FIELD_LABELS[k]).join(', ')}`);
-  if (!lines.length && !noteChanged) return;
   const closing = statusChanged && newStatus === 'geschlossen';
+  if (closing) reviewRequest.afterClose(c.id).catch(() => {}); // Mandant einmal um eine Bewertung bitten (Portal + Discord-DM)
+  if (!lines.length && !noteChanged) return;
   const reopening = statusChanged && before.status === 'geschlossen';
   const stepChanged = d.step !== undefined && d.step !== before.step;
   const title = closing

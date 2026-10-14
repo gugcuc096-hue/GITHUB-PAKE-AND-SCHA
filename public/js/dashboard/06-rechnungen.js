@@ -62,8 +62,8 @@ function invoiceTable(rows) {
   if (!rows.length) return empty(st.invoices.length ? 'Keine Dokumente für diese Auswahl.' : staff ? 'Noch keine Rechnungen erstellt.' : 'Es liegen keine Rechnungen vor.', 'receipt');
   return `<div class="tbl-wrap"><table class="tbl tbl-cards">
       <thead><tr><th>Dokument</th><th>Empfänger</th><th>Akte</th><th style="text-align:right">Betrag</th><th>Status</th><th>Datum</th><th><span class="sr-only">Aktionen</span></th></tr></thead>
-      <tbody>${rows
-      .map(
+      <tbody>${lazyRows(
+        rows,
         (i) => `<tr>
           <td class="td-main"><div class="font-mono text-gold text-sm nowrap">${docTitleLink(`/invoice.html?id=${i.id}`, esc(i.number))}</div><div class="text-xs text-dim">${esc(INVOICE_KIND[i.kind])}${i.subject ? ' · ' + esc(i.subject) : ''}</div></td>
           <td data-label="Empfänger">${staff && i.clientKey ? clientLink(i.clientKey, i.clientName) : esc(i.clientName)}</td>
@@ -87,9 +87,9 @@ function invoiceTable(rows) {
             ${staff && i.status === 'offen' && !paymentReported(i) ? `<button class="btn-gold btn-sm" data-action="inv-status" data-id="${i.id}" data-status="bezahlt">Bezahlt</button><button class="btn-ghost btn-sm" data-action="inv-status" data-id="${i.id}" data-status="storniert">Storno</button>` : ''}
             ${staff && i.status !== 'offen' ? `<button class="btn-ghost btn-sm" data-action="inv-status" data-id="${i.id}" data-status="offen">Wieder offen</button>` : ''}
             ${isAdmin() ? `<button class="icon-btn sm" data-action="inv-delete" data-id="${i.id}" data-number="${esc(i.number)}" aria-label="Löschen">${icon('trash', 'ico-sm')}</button>` : ''}
-          </td></tr>`
-      )
-      .join('')}</tbody></table></div>`;
+          </td></tr>`,
+        7
+      )}</tbody></table></div>`;
 }
 
 views.invoices = {
@@ -616,16 +616,16 @@ function clientTable() {
   if (!rows.length) return empty(st.clients.length ? 'Keine Mandanten für diese Auswahl.' : 'Noch keine Mandanten.', 'idCard');
   return `<div class="tbl-wrap"><table class="tbl tbl-cards">
       <thead><tr><th>Mandant</th><th>Akten</th><th style="text-align:right">Offene Rechnungen</th><th>Hinweise</th><th>Letzte Aktivität</th></tr></thead>
-      <tbody>${rows
-      .map(
+      <tbody>${lazyRows(
+        rows,
         (c) => `<tr class="row" data-action="open-client" data-key="${esc(c.key)}">
           <td class="td-main"><div class="font-medium">${esc(c.name)}</div><div class="text-xs text-dim">${c.hasAccount ? esc(c.email) : 'ohne Konto'}</div></td>
           <td data-label="Akten"><span>${c.casesTotal ? `${c.casesOpen} laufend <span class="text-dim">· ${c.casesTotal} gesamt</span>` : '<span class="text-dim">keine</span>'}</span></td>
           <td data-label="Offene Rechnungen" class="nowrap" style="text-align:right">${c.openSum ? `<span class="font-mono">${money(c.openSum)}</span>` : '<span class="text-dim">—</span>'}</td>
           <td data-label="Hinweise">${c.flag || c.membership ? `<div class="flex flex-wrap gap-1.5">${clientFlagBadge(c.flag)}${memberBadge(c.membership)}</div>` : '<span class="text-dim">—</span>'}</td>
-          <td data-label="Letzte Aktivität" class="nowrap text-muted">${esc(relDays(c.lastActivity))}</td></tr>`
-      )
-      .join('')}</tbody></table></div>`;
+          <td data-label="Letzte Aktivität" class="nowrap text-muted">${esc(relDays(c.lastActivity))}</td></tr>`,
+        5
+      )}</tbody></table></div>`;
 }
 
 views.clients = {

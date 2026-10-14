@@ -64,6 +64,25 @@
                 <button id="submitBtn" type="submit" class="btn-gold btn-lg btn-block">Anmelden</button>
             </form>
 
+            <!-- Zwei-Faktor: Code aus der Discord-Direktnachricht (login.js) -->
+            <form id="codeForm" class="space-y-4 hidden" novalidate>
+                <div class="rounded-xl p-4 text-sm" style="background:rgba(88,101,242,.1);border:1px solid rgba(88,101,242,.45)">
+                    <strong class="block mb-1">Code per Discord</strong>
+                    Der Kanzlei-Bot hat <strong id="codeTo">Ihrem Discord</strong> gerade einen 6-stelligen Code geschickt.
+                </div>
+                <div>
+                    <label class="label" for="code">Anmeldecode</label>
+                    <input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" class="field font-mono text-center text-xl tracking-[0.35em]" placeholder="000000">
+                </div>
+                <label class="check"><input type="checkbox" id="trustDevice"> Diesem Gerät 30 Tage vertrauen</label>
+                <p id="codeError" class="form-error" role="alert"></p>
+                <button id="codeBtn" type="submit" class="btn-gold btn-lg btn-block">Bestätigen</button>
+                <div class="flex items-center justify-between text-xs">
+                    <button type="button" id="resendBtn" class="text-gold hover:underline">Neuen Code senden</button>
+                    <button type="button" id="codeBack" class="text-muted hover:underline">Zurück</button>
+                </div>
+            </form>
+
             <div id="discordBlock" class="hidden">
                 <div class="divider">oder</div>
                 <a href="/api/discord/login" class="btn-discord btn-lg btn-block">

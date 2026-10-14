@@ -270,12 +270,15 @@ document.addEventListener('drop', (e) => {
 
 document.addEventListener('input', (e) => {
   const t = e.target;
+  // Suche in langen Listen: erst neu zeichnen, wenn kurz nicht getippt wird (jede Taste einzeln wäre bei vielen Akten zäh)
   if (t.id === 'caseSearch') {
     st.caseQuery = t.value;
-    $('#caseList').innerHTML = caseTable();
+    clearTimeout(st.listSearchTimer);
+    st.listSearchTimer = setTimeout(() => $('#caseList') && ($('#caseList').innerHTML = caseTable()), 120);
   } else if (t.id === 'clientSearch') {
     st.clientQuery = t.value;
-    $('#clientList').innerHTML = clientTable();
+    clearTimeout(st.listSearchTimer);
+    st.listSearchTimer = setTimeout(() => $('#clientList') && ($('#clientList').innerHTML = clientTable()), 120);
   } else if (t.classList && t.classList.contains('chat-input')) {
     // Eingabefeld wächst mit (bis zu einigen Zeilen)
     t.style.height = 'auto';
@@ -609,7 +612,9 @@ setInterval(() => {
    ================================================================ */
 (async function start() {
   try {
-    st.user = (await api.get('/api/auth/me')).user;
+    const me = await api.get('/api/auth/me');
+    st.user = me.user;
+    st.twoFactor = me.twoFactor;
   } catch {
     location.href = '/login.html?next=' + encodeURIComponent('/dashboard.html' + location.search + location.hash);
     return;
@@ -641,7 +646,11 @@ setInterval(() => {
   st.histPaused = true;
   try {
     await go(hashView());
-    if (Number.isInteger(caseParam) && caseParam > 0) await guard(() => openCase(caseParam));
+    if (Number.isInteger(caseParam) && caseParam > 0) {
+      await guard(() => openCase(caseParam));
+      // „Jetzt bewerten“ aus der Discord-Nachricht: gleich zur Bewertung in der Akte
+      if (params.get('bewerten')) $('#secReview')?.scrollIntoView({ block: 'start' });
+    }
   } finally {
     st.histPaused = false;
     syncHistory();

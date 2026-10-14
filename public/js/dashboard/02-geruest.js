@@ -388,6 +388,53 @@ function openModal(html, { wide = false, key = null, reopen = null, child = fals
   if (focusTarget && window.matchMedia('(min-width: 768px)').matches) focusTarget.focus();
   scheduleHistory();
 }
+/*
+ * Lange Listen (Akten, Rechnungen, Mandanten, Aufgaben): erst LIST_PAGE Einträge zeichnen, beim Scrollen kommen die
+ * nächsten von selbst (oder per Klick auf „… weitere“). Gefiltert und gesucht wird weiter über alle Einträge – so
+ * bleiben Seite und Suche auch mit vielen hundert Akten flüssig.
+ */
+const LIST_PAGE = 50;
+const moreLists = new Map(); // Kennung → { rows, render, pos, cols }
+let moreSeq = 0;
+function moreRowHtml(id, left, cols) {
+  const label = `${left === 1 ? '1 weiterer Eintrag' : `${left} weitere Einträge`} …`;
+  return cols
+    ? `<tr class="more-rows" data-more="${id}"><td colspan="${cols}"><button type="button" class="more-btn" data-action="list-more" data-id="${id}">${label}</button></td></tr>`
+    : `<div class="more-rows" data-more="${id}"><button type="button" class="more-btn" data-action="list-more" data-id="${id}">${label}</button></div>`;
+}
+/** rows: alle Einträge, render: Eintrag → HTML; cols: Anzahl Spalten, wenn die Einträge Tabellenzeilen sind. */
+function lazyRows(rows, render, cols = 0) {
+  if (rows.length <= LIST_PAGE) return rows.map(render).join('');
+  for (const id of moreLists.keys()) if (!document.querySelector(`[data-more="${id}"]`)) moreLists.delete(id); // alte Listen vergessen
+  const id = `l${++moreSeq}`;
+  moreLists.set(id, { rows, render, pos: LIST_PAGE, cols });
+  queueMicrotask(watchMoreRows);
+  return rows.slice(0, LIST_PAGE).map(render).join('') + moreRowHtml(id, rows.length - LIST_PAGE, cols);
+}
+/** Nächste Einträge einer Liste anhängen. */
+function showMoreRows(id) {
+  const list = moreLists.get(id);
+  const marker = document.querySelector(`[data-more="${id}"]`);
+  if (!list || !marker) return;
+  const next = list.rows.slice(list.pos, list.pos + LIST_PAGE);
+  list.pos += next.length;
+  marker.insertAdjacentHTML('beforebegin', next.map(list.render).join(''));
+  const left = list.rows.length - list.pos;
+  if (left > 0) marker.outerHTML = moreRowHtml(id, left, list.cols);
+  else {
+    marker.remove();
+    moreLists.delete(id);
+  }
+  watchMoreRows();
+}
+// Rechtzeitig nachladen, bevor man unten ankommt (auch im Fenster mit eigenem Scrollbereich)
+const moreObserver = 'IntersectionObserver' in window ? new IntersectionObserver((entries) => entries.forEach((e) => e.isIntersecting && showMoreRows(e.target.dataset.more)), { rootMargin: '600px 0px' }) : null;
+function watchMoreRows() {
+  if (!moreObserver) return;
+  moreObserver.disconnect();
+  $$('[data-more]').forEach((el) => moreObserver.observe(el));
+}
+
 /** Platzhalter für ein Fenster, das noch lädt (Kopf, Kennzahlen, Abschnitte). */
 function modalSkeletonHtml() {
   const row = (w) => `<div class="skel-row"><div class="flex-1">${skelLine(w)}${skelLine('34%', 'mt-2 skel-sm')}</div>${skelLine('64px', 'skel-pill')}</div>`;
@@ -528,7 +575,7 @@ function restoreModalScroll([top, bodyTop]) {
 const skelLine = (w, cls = '') => `<div class="skeleton ${cls}" style="width:${w}"></div>`;
 function loadingHtml(view = st.view) {
   const line = skelLine;
-  const kpis = ['overview', 'invoices', 'duty', 'work'].includes(view)
+  const kpis = ['overview', 'invoices', 'duty', 'work', 'stats'].includes(view)
     ? `<div class="kpi-grid kpi-grid-3 skel-kpis">${'<div class="panel kpi">' + line('45%') + line('60%', 'skel-lg mt-3') + '</div>'}${'<div class="panel kpi">' + line('40%') + line('55%', 'skel-lg mt-3') + '</div>'}${'<div class="panel kpi">' + line('50%') + line('35%', 'skel-lg mt-3') + '</div>'}</div>`
     : '';
   const row = (w) => `<div class="skel-row"><div class="skel-dot"></div><div class="flex-1">${line(w)}${line('38%', 'mt-2 skel-sm')}</div>${line('70px', 'skel-pill')}</div>`;

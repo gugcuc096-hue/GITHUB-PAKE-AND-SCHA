@@ -106,7 +106,7 @@ function create(kind = 'manual') {
     // Keine gültigen Login-Sitzungen in Sicherungen (Tokens) – restlos entfernen
     const copy = new DatabaseSync(tmp);
     try {
-      copy.exec('PRAGMA secure_delete = ON; DELETE FROM sessions; VACUUM;');
+      copy.exec('PRAGMA secure_delete = ON; DELETE FROM sessions; DELETE FROM login_challenges; DELETE FROM trusted_devices; VACUUM;');
     } finally {
       copy.close();
     }

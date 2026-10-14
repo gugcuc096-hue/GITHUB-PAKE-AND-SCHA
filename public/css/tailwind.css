@@ -1209,6 +1209,9 @@ video {
 }.lining-nums {
   --tw-numeric-figure: lining-nums;
   font-variant-numeric: var(--tw-ordinal) var(--tw-slashed-zero) var(--tw-numeric-figure) var(--tw-numeric-spacing) var(--tw-numeric-fraction);
+}.tabular-nums {
+  --tw-numeric-spacing: tabular-nums;
+  font-variant-numeric: var(--tw-ordinal) var(--tw-slashed-zero) var(--tw-numeric-figure) var(--tw-numeric-spacing) var(--tw-numeric-fraction);
 }.leading-\[1\.08\] {
   line-height: 1.08;
 }.leading-relaxed {
@@ -1223,6 +1226,8 @@ video {
   letter-spacing: 0.25em;
 }.tracking-\[0\.2em\] {
   letter-spacing: 0.2em;
+}.tracking-\[0\.35em\] {
+  letter-spacing: 0.35em;
 }.tracking-normal {
   letter-spacing: 0em;
 }.tracking-tight {
