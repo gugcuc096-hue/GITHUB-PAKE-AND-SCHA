@@ -255,7 +255,7 @@ const DEFAULT_POSITIONS = [
   ],
   [
     'Junior Associate (m/w/d)',
-    'Einstieg in die Anwaltschaft mit Mentoring durch die Partner: Recherche, Akteneinsicht, Vorbereitung von Beweisanträgen und Begleitung zu Gerichtsterminen.',
+    'Einstieg in die Anwaltschaft mit Mentoring durch das Board of Partners: Recherche, Akteneinsicht, Vorbereitung von Beweisanträgen und Begleitung zu Gerichtsterminen.',
     'Interesse am Rechtssystem, Lernbereitschaft und Teamgeist. Vorerfahrung ist kein Muss.',
   ],
   [
@@ -293,6 +293,21 @@ function fixCourtWording() {
       'Eigenständige Mandatsbearbeitung im Tagesgeschäft: Ticketbearbeitung, Beratungsgespräche, Vertretung bei Festnahmen und vor dem District Court.'
     );
     setSetting('fixed_court_wording', new Date().toISOString());
+  });
+}
+
+/**
+ * Einmalige Textkorrektur: Mentoring durch das Board of Partners (nicht „durch die Partner“). Nur die Stellenanzeige,
+ * die noch genau dem früheren Standardtext entspricht – im Dashboard selbst angepasste Texte bleiben unberührt.
+ */
+function fixMentoringWording() {
+  if (getSetting('fixed_mentoring_wording')) return;
+  tx(() => {
+    db.prepare('UPDATE positions SET description = ? WHERE description = ?').run(
+      'Einstieg in die Anwaltschaft mit Mentoring durch das Board of Partners: Recherche, Akteneinsicht, Vorbereitung von Beweisanträgen und Begleitung zu Gerichtsterminen.',
+      'Einstieg in die Anwaltschaft mit Mentoring durch die Partner: Recherche, Akteneinsicht, Vorbereitung von Beweisanträgen und Begleitung zu Gerichtsterminen.'
+    );
+    setSetting('fixed_mentoring_wording', new Date().toISOString());
   });
 }
 
@@ -438,6 +453,7 @@ function runBootstrap() {
   ensureDefaultFees();
   ensureDefaultPositions();
   fixCourtWording();
+  fixMentoringWording();
   ensureContractTemplates();
   backfillCaseWork();
 }
