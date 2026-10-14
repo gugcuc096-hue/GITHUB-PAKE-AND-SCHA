@@ -609,7 +609,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.waitForSelector('#clientList tr.row');
         assert.ok(await page.$('#clientList tr[data-key="n:paul probe"]'), 'Mandant ohne Konto in der Liste');
         await page.fill('#clientSearch', 'probe');
-        assert.equal(await page.$$eval('#clientList tr.row', (r) => r.length), 1, 'Suche filtert');
+        await page.waitForFunction(() => document.querySelectorAll('#clientList tr.row').length === 1); // Suche filtert (kurz verzögert beim Tippen)
         if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Liste passt aufs Handy');
 
         // Der Name in der Akte öffnet die Kartei, X führt zurück in die Akte
@@ -1477,6 +1477,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         const fail = (method) => (route) =>
           route.request().method() === method ? route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Datenbank nicht erreichbar.' }) }) : route.continue();
         const hint = (text) => page.waitForFunction((t) => (document.querySelector('#psToastRoot') || {}).textContent?.includes(t), text);
+        // Fehlermeldungen stehen 6 Sekunden – vor jedem Fehlerfall die alten entfernen, damit hint() auf die neue wartet
+        const clearToasts = () => page.evaluate(() => document.querySelectorAll('#psToastRoot .ps-toast').forEach((t) => t.remove()));
 
         // Aufgabe abhaken
         await page.route('**/api/tasks/*', slow('PATCH'));
@@ -1485,6 +1487,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await settle();
         await page.unroute('**/api/tasks/*');
         await page.route('**/api/tasks/*', fail('PATCH'));
+        await clearToasts();
         await page.click('#secTasks .task-check');
         await hint('Nicht gespeichert – Datenbank nicht erreichbar.');
         assert.equal(await page.$eval('#secTasks .task-row', (r) => r.classList.contains('is-done')), true, 'Haken springt zurück');
@@ -1503,6 +1506,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.unroute(`**/api/cases/${kase.id}/notes`);
         await page.route(`**/api/cases/${kase.id}/notes`, fail('POST'));
         await page.fill(chat, 'Diese Nachricht scheitert');
+        await clearToasts();
         await page.click(send);
         await hint('Nicht gesendet');
         assert.equal(await page.inputValue(chat), 'Diese Nachricht scheitert', 'Text wieder im Eingabefeld');
@@ -1521,6 +1525,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await settle();
         await page.unroute(`**/api/cases/${kase.id}`);
         await page.route(`**/api/cases/${kase.id}`, fail('PATCH'));
+        await clearToasts();
         await page.click('#modalBody button.track-step[data-step="3"]');
         await hint('Nicht gespeichert');
         assert.equal(await page.$eval('#modalBody .track-node.current', (n) => n.textContent.trim()), '3', 'Stand springt zurück');
@@ -1532,6 +1537,91 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       } finally {
         await ctx.close();
         await osrv.stop();
+      }
+    });
+  }
+
+  for (const [label, device] of [['PC', DESKTOP], ['Handy', PHONE]]) {
+    it(`Anmeldung mit Discord-Code, Kanzlei-Statistik und lange Listen am ${label}`, async () => {
+      const fs = require('node:fs');
+      const os = require('node:os');
+      const stateFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pake-scha-2fa-browser-')), 'state.json');
+      const zsrv = await startServer({ env: { DISCORD_BOT_TOKEN: 'test-token', DISCORD_STUB_STATE: stateFile }, preload: [require.resolve('./discordStub')] });
+      const { ctx, page, problems, settle } = await open(device);
+      try {
+        // Testdaten: 120 laufende Akten (Liste lädt in Fünfziger-Schritten), eine bezahlte Rechnung, ein Abschluss
+        const adm = client(zsrv.base);
+        const me = await adm.login(TEAM.admin); // noch ohne Discord: nur Passwort
+        const ids = [];
+        for (let i = 1; i <= 120; i++) ids.push((await adm.post('/api/cases', { title: `Sammelakte ${i}`, area: 'zivilrecht', clientName: `Mandant ${i}`, lawyerId: me.id })).json.case.id);
+        const inv = (await adm.post('/api/invoices', { caseId: ids[0], items: [{ description: 'Beratung', quantity: 1, unitPrice: 18000 }] })).json.invoice;
+        assert.equal((await adm.patch(`/api/invoices/${inv.id}`, { status: 'bezahlt' })).status, 200);
+        assert.equal((await adm.patch(`/api/cases/${ids[0]}`, { status: 'geschlossen', outcome: 'gewonnen' })).status, 200);
+        const { DatabaseSync } = require('node:sqlite');
+        const sql = new DatabaseSync(path.join(zsrv.dir, 'test.db'));
+        sql.prepare('UPDATE users SET discord_id = ?, discord_username = ? WHERE id = ?').run('900000000000000101', 'jaywa', me.id);
+        sql.close();
+
+        // Board: nach dem Passwort der Code aus der Discord-DM – sechs Ziffern schicken das Formular von selbst ab
+        await page.goto(zsrv.base + '/login.html');
+        await page.fill('#email', TEAM.admin);
+        await page.fill('#password', PASSWORD);
+        await page.click('button[type=submit]');
+        await page.waitForSelector('#codeForm:not(.hidden)');
+        assert.match(await page.textContent('#codeTo'), /@jaywa/);
+        assert.equal(await page.isVisible('#loginForm'), false, 'Passwort-Schritt ausgeblendet');
+        if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Code-Schritt passt aufs Handy');
+        // „Zurück“: wieder beim Passwort, Knopf bereit
+        await page.click('#codeBack');
+        assert.equal(await page.isVisible('#loginForm'), true);
+        assert.deepEqual(await page.$eval('#submitBtn', (b) => [b.disabled, b.textContent.trim()]), [false, 'Anmelden']);
+        await page.fill('#password', PASSWORD);
+        await page.click('#submitBtn');
+        await page.waitForSelector('#codeForm:not(.hidden)');
+        const lastCode = () => JSON.parse(fs.readFileSync(stateFile, 'utf8')).dms.pop().content.match(/\*\*(\d{6})\*\*/)[1];
+        const code = lastCode();
+        await page.fill('#code', code === '000000' ? '111111' : '000000');
+        await page.waitForFunction(() => /Noch 4 Versuche/.test(document.querySelector('#codeError').textContent));
+        await page.fill('#code', code);
+        await page.waitForURL(/dashboard/);
+        await page.waitForSelector('#nav a.nav-item');
+
+        // Kanzlei-Statistik: Kennzahlen, zwei Diagramme mit Tooltip, Werte als Tabelle
+        await page.goto(zsrv.base + '/dashboard.html#stats');
+        await page.waitForSelector('#content .vchart');
+        await settle();
+        assert.equal(await page.$$eval('#content .vchart', (c) => c.length), 2);
+        assert.match(await page.textContent('#content .kpi-grid'), /18\.000 \$/);
+        const last = page.locator('#content .vchart-col').nth(11);
+        if (device === PHONE) await last.tap();
+        else await last.hover();
+        await page.waitForSelector('#content .chart-tip:not([hidden])');
+        assert.match(await page.textContent('#content .chart-tip:not([hidden])'), /Umsatz\s*18\.000 \$/);
+        assert.match(await page.textContent('#content .chart-tip:not([hidden])'), /1 Rechnung bezahlt/);
+        await page.click('#content .chart-table > summary');
+        assert.equal(await page.$$eval('#content .chart-table[open] tbody tr', (r) => r.length), 12);
+        assert.match(await page.textContent('#content .stat-tbl'), /Kanzlei gesamt/);
+        if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Statistik passt aufs Handy');
+
+        // Lange Aktenliste: erst 50, beim Scrollen die nächsten 50, Rest per Knopf
+        await page.goto(zsrv.base + '/dashboard.html#cases');
+        await page.waitForSelector('#content tr[data-action="open-case"]');
+        await settle();
+        const rows = () => page.$$eval('#content tr[data-action="open-case"]', (r) => r.length);
+        assert.equal(await rows(), 50);
+        await page.locator('#content tr.more-rows').scrollIntoViewIfNeeded();
+        await page.waitForFunction(() => document.querySelectorAll('#content tr[data-action="open-case"]').length === 100);
+        assert.match(await page.textContent('#content tr.more-rows'), /19 weitere Einträge/);
+        await page.click('#content tr.more-rows .more-btn');
+        assert.equal(await rows(), 119);
+        assert.equal(await page.$$('#content tr.more-rows').then((x) => x.length), 0, 'kein Knopf mehr');
+        // Suche filtert weiterhin über alle Akten
+        await page.fill('#caseSearch', 'Sammelakte 117');
+        await page.waitForFunction(() => document.querySelectorAll('#content tr[data-action="open-case"]').length === 1);
+        assert.deepEqual(problems, []);
+      } finally {
+        await ctx.close();
+        await zsrv.stop();
       }
     });
   }

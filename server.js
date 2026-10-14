@@ -105,6 +105,7 @@ app.use('/api/reviews', require('./routes/reviews').router);
 app.use('/api/contracts', contractRoutes.router);
 app.use('/api/absences', require('./routes/absences').router);
 app.use('/api/work', require('./routes/work').router);
+app.use('/api/stats', require('./routes/stats'));
 app.use('/api/concerns', concernRoutes.router);
 app.use('/api/personnel', require('./routes/personnel').router);
 app.use('/api/cooperations', require('./routes/cooperations').router);

@@ -66,12 +66,81 @@
         btn.disabled = true;
         btn.textContent = 'Anmeldung läuft …';
         try {
-            await api.post('/api/auth/login', { email, password });
+            const r = await api.post('/api/auth/login', { email, password });
+            if (r.twoFactor) return showCodeStep(r.twoFactor);
             location.replace(nextUrl());
         } catch (ex) {
             err.textContent = ex.message;
+        }
+        btn.disabled = false;
+        btn.textContent = 'Anmelden';
+    });
+
+    /* Zwei-Faktor: Code aus der Discord-Direktnachricht eingeben */
+    const codeForm = document.getElementById('codeForm');
+    const codeInput = document.getElementById('code');
+    const codeError = document.getElementById('codeError');
+    let challenge = null;
+    let sending = false;
+    let discordShown = false;
+    function showCodeStep(tf) {
+        challenge = tf.challenge;
+        document.getElementById('codeTo').textContent = tf.to || 'Ihrem Discord';
+        document.getElementById('loginForm').classList.add('hidden');
+        const discord = document.getElementById('discordBlock');
+        discordShown = !discord.classList.contains('hidden');
+        discord.classList.add('hidden');
+        codeForm.classList.remove('hidden');
+        codeError.textContent = '';
+        codeInput.value = '';
+        codeInput.focus();
+    }
+    function backToLogin(message) {
+        challenge = null;
+        codeForm.classList.add('hidden');
+        document.getElementById('loginForm').classList.remove('hidden');
+        document.getElementById('discordBlock').classList.toggle('hidden', !discordShown);
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = false;
+        btn.textContent = 'Anmelden';
+        document.getElementById('formError').textContent = message || '';
+        document.getElementById('password').value = '';
+        document.getElementById('password').focus();
+    }
+    async function sendCode() {
+        const code = codeInput.value.replace(/\D/g, '');
+        if (code.length !== 6) { codeError.textContent = 'Bitte den 6-stelligen Code aus der Discord-Nachricht eingeben.'; return; }
+        if (sending) return; // Enter und automatisches Absenden gleichzeitig: nur einmal schicken
+        sending = true;
+        const btn = document.getElementById('codeBtn');
+        btn.disabled = true;
+        codeError.textContent = '';
+        try {
+            await api.post('/api/auth/login/code', { challenge, code, trust: document.getElementById('trustDevice').checked });
+            location.replace(nextUrl()); // Seite wechselt – Knopf bleibt gesperrt
+        } catch (ex) {
+            sending = false;
             btn.disabled = false;
-            btn.textContent = 'Anmelden';
+            if (ex.status === 410) return backToLogin(ex.message);
+            codeError.textContent = ex.message;
+            codeInput.select();
+        }
+    }
+    codeForm.addEventListener('submit', (e) => { e.preventDefault(); sendCode(); });
+    // Sechs Ziffern eingefügt oder getippt: gleich bestätigen
+    codeInput.addEventListener('input', () => { if (codeInput.value.replace(/\D/g, '').length === 6) sendCode(); });
+    document.getElementById('codeBack').addEventListener('click', () => backToLogin(''));
+    document.getElementById('resendBtn').addEventListener('click', async (e) => {
+        e.target.disabled = true;
+        try {
+            await api.post('/api/auth/login/resend', { challenge });
+            codeError.textContent = '';
+            window.PS.toast('Neuer Code ist unterwegs – der alte gilt nicht mehr.');
+        } catch (ex) {
+            if (ex.status === 410) return backToLogin(ex.message);
+            codeError.textContent = ex.message;
+        } finally {
+            e.target.disabled = false;
         }
     });
 })();

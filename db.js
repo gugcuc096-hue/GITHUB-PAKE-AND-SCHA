@@ -601,6 +601,31 @@ addColumn('cases', 'process_ticket_label', 'TEXT');
 addColumn('cases', 'idle_notified_at', 'TEXT');
 // Ergebnis beim Abschluss (Freispruch, Vergleich … – helpers.OUTCOMES), nur für die Kanzlei; Grundlage der Erfolgsquote
 addColumn('cases', 'outcome', 'TEXT');
+// Nach dem Abschluss einmal um eine Bewertung gebeten (Mandantenportal + Discord-DM)
+addColumn('cases', 'review_requested_at', 'TEXT');
+
+// Zwei-Faktor-Anmeldung per Discord-DM: je Konto wählbar (für das Board Pflicht), offene Anmeldecodes, vertraute Geräte
+addColumn('users', 'two_factor', 'INTEGER NOT NULL DEFAULT 0');
+db.exec(`
+  CREATE TABLE IF NOT EXISTS login_challenges (
+    token_hash TEXT PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    code_hash  TEXT NOT NULL,
+    attempts   INTEGER NOT NULL DEFAULT 0,
+    sends      INTEGER NOT NULL DEFAULT 1,
+    sent_at    TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS trusted_devices (
+    token_hash   TEXT PRIMARY KEY,
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    label        TEXT NOT NULL DEFAULT '',
+    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    last_used_at TEXT,
+    expires_at   TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_trusted_devices_user ON trusted_devices(user_id);
+`);
 // Board-Tickets (Discord-Kanal je Bewerbung bzw. Anliegen, nur für das Board of Partners)
 for (const table of ['applications', 'concerns']) {
   addColumn(table, 'discord_channel_id', 'TEXT');

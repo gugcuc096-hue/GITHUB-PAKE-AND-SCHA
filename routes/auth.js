@@ -18,6 +18,7 @@ const {
 const { wrap, parseBody, firmEmail, EMAIL_HINT } = require('../helpers');
 const { logActivity } = require('../models');
 const { imageBody, saveImage, removeFile } = require('../uploads');
+const twoFactor = require('../twoFactor');
 
 const router = express.Router();
 
@@ -76,11 +77,85 @@ router.post(
       return res.status(401).json({ error: 'E-Mail-Adresse oder Passwort ist falsch.' });
     }
     if (!user.active) return res.status(403).json({ error: 'Dieser Zugang wurde gesperrt. Bitte wenden Sie sich an das Board of Partners.' });
+    // Zwei-Faktor: erst der Code aus der Discord-DM öffnet die Sitzung (vertraute Geräte überspringen das 30 Tage lang)
+    if (twoFactor.required(user) && !twoFactor.isTrusted(req, user.id)) {
+      try {
+        return res.json({ twoFactor: await twoFactor.start(user, req) });
+      } catch (err) {
+        return res.status(err.status || 502).json({ error: err.message });
+      }
+    }
     createSession(res, user.id);
     if (isStaff(user)) logActivity(user, 'Anmeldung', 'user', user.id);
     res.json({ success: true, user: publicUser(user) });
   })
 );
+
+/** Zweiter Schritt: Code aus der Discord-DM; „trust“ = diesem Gerät 30 Tage vertrauen. */
+router.post(
+  '/login/code',
+  loginLimiter,
+  wrap(async (req, res) => {
+    const data = parseBody(z.object({ challenge: z.string().min(20).max(128), code: z.string().trim().min(1).max(12), trust: z.boolean().optional() }), req, res);
+    if (!data) return;
+    let user;
+    try {
+      user = twoFactor.verify(data.challenge, data.code);
+    } catch (err) {
+      return res.status(err.status || 400).json({ error: err.message, restart: err.status === 410 });
+    }
+    createSession(res, user.id);
+    if (data.trust) twoFactor.trustDevice(req, res, user.id);
+    if (isStaff(user)) logActivity(user, 'Anmeldung (mit Discord-Code)', 'user', user.id);
+    res.json({ success: true, user: publicUser(user) });
+  })
+);
+
+router.post(
+  '/login/resend',
+  loginLimiter,
+  wrap(async (req, res) => {
+    const data = parseBody(z.object({ challenge: z.string().min(20).max(128) }), req, res);
+    if (!data) return;
+    try {
+      res.json(await twoFactor.resend(data.challenge, req));
+    } catch (err) {
+      res.status(err.status || 400).json({ error: err.message, restart: err.status === 410 });
+    }
+  })
+);
+
+/* ---------------------------------------------------------------- Zwei-Faktor im Profil */
+router.get('/two-factor', requireAuth, (req, res) => res.json(twoFactor.status(req.user)));
+
+/** Ein- oder ausschalten (aus nur mit Passwort; für das Board nicht abschaltbar). */
+router.patch(
+  '/two-factor',
+  requireAuth,
+  wrap(async (req, res) => {
+    const data = parseBody(z.object({ enabled: z.boolean(), password: z.string().max(200).optional() }), req, res);
+    if (!data) return;
+    const st = twoFactor.status(req.user);
+    if (!data.enabled && st.mandatory) return res.status(400).json({ error: 'Für das Board of Partners ist die Zwei-Faktor-Anmeldung Pflicht.' });
+    if (data.enabled && !st.possible) {
+      return res.status(400).json({ error: st.hasDiscord ? 'Der Kanzlei-Bot ist gerade nicht eingerichtet – ohne ihn kann kein Code verschickt werden.' : 'Bitte zuerst Discord verbinden – dorthin kommt der Code.' });
+    }
+    if (!data.enabled && !verifyPassword(data.password || '', req.user.password_hash)) {
+      return res.status(400).json({ error: 'Zum Ausschalten bitte Ihr Passwort eingeben.' });
+    }
+    db.prepare('UPDATE users SET two_factor = ? WHERE id = ?').run(data.enabled ? 1 : 0, req.user.id);
+    if (!data.enabled) twoFactor.forgetDevices(req.user.id);
+    logActivity(req.user, data.enabled ? 'Zwei-Faktor-Anmeldung eingeschaltet' : 'Zwei-Faktor-Anmeldung ausgeschaltet', 'user', req.user.id);
+    res.json(twoFactor.status(db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id)));
+  })
+);
+
+/** Vertraute Geräte vergessen (beim nächsten Login wieder mit Code – auch auf diesem Gerät). */
+router.delete('/two-factor/devices', requireAuth, (req, res) => {
+  const n = twoFactor.forgetDevices(req.user.id);
+  res.clearCookie(twoFactor.TRUST_COOKIE, { path: '/' });
+  res.json({ forgotten: n, ...twoFactor.status(req.user) });
+});
 
 // Hinweis „Ihre Login-E-Mail wurde umgestellt“ gelesen
 router.post('/email-notice', requireAuth, (req, res) => {
@@ -100,12 +175,13 @@ router.get('/sessions', requireAuth, (req, res) => {
 
 router.post('/logout-others', requireAuth, (req, res) => {
   const ended = destroyOtherSessions(req, req.user.id);
+  twoFactor.forgetDevices(req.user.id, req); // andere Geräte brauchen beim nächsten Mal wieder den Code
   logActivity(req.user, 'Auf anderen Geräten abgemeldet', 'user', req.user.id, `${ended} Anmeldung(en) beendet`);
   res.json({ ended, others: 0 });
 });
 
 router.get('/me', requireAuth, (req, res) => {
-  res.json({ user: publicUser(req.user) });
+  res.json({ user: publicUser(req.user), twoFactor: twoFactor.status(req.user) });
 });
 
 // Für öffentliche Seiten: liefert ohne Anmeldung { user: null } statt 401.
@@ -185,6 +261,7 @@ router.post(
     }
     db.prepare('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?').run(hashPassword(data.newPassword), req.user.id);
     destroyOtherSessions(req, req.user.id);
+    twoFactor.forgetDevices(req.user.id, req);
     res.json({ success: true });
   })
 );

@@ -182,6 +182,10 @@ views.overview = {
       ...(isAdmin() ? st.alerts : []).map(
         (a) => `<div class="banner banner-red">${icon('alert')}<div><strong>Systemwarnung: ${esc(a.title)}</strong> <span class="opacity-80">(seit ${esc(fmtDate(a.since))})</span>${a.description ? `<br>${esc(a.description)}` : ''}</div></div>`
       ),
+      // Board ohne Discord: Die Zwei-Faktor-Anmeldung ist Pflicht, der Code kann aber nirgends hin
+      isBoard() && st.twoFactor && st.twoFactor.botReady && !st.twoFactor.hasDiscord
+        ? `<div class="banner banner-amber items-center justify-between flex-wrap"><div>${icon('shield')} <strong>Zwei-Faktor-Anmeldung:</strong> Für das Board of Partners ist sie Pflicht – bitte Discord verbinden, dorthin kommt beim Login der Code.</div><a href="#profile" class="btn-outline btn-sm">Zum Profil</a></div>`
+        : '',
       u.emailNotice
         ? `<div class="banner banner-gold items-center justify-between flex-wrap"><div>${icon('mail')} <strong>Ihre Login-E-Mail lautet jetzt ${esc(u.email)}</strong>${u.emailNotice.oldEmail ? ` (vorher ${esc(u.emailNotice.oldEmail)})` : ''}. Alle Konten der Kanzlei enden auf @${EMAIL_DOMAIN}. Ihr Passwort bleibt gleich – die alte Adresse funktioniert beim Login weiterhin.</div><button class="btn-outline btn-sm" data-action="email-notice-ok">Verstanden</button></div>`
         : '',
@@ -358,8 +362,8 @@ function caseTable() {
   // und „Letzte Aktivität“ in Bernstein.
   return `<div class="tbl-wrap"><table class="tbl tbl-cards">
       <thead><tr><th>Akte</th>${staff ? '<th>Mandant</th>' : ''}<th>Zuständig</th>${staff ? '<th>Priorität</th>' : ''}<th>Status</th><th>Letzte Aktivität</th></tr></thead>
-      <tbody>${rows
-      .map(
+      <tbody>${lazyRows(
+        rows,
         (c) => `<tr class="row${c.idleDays ? ' row-idle' : ''}" data-action="open-case" data-id="${c.id}">
           <td class="td-main"><div class="case-meta"><span class="font-mono text-gold text-xs">${esc(c.caseNumber)}</span><span class="case-dot" aria-hidden="true">·</span><span>${esc(AREAS[c.area] || c.area)}</span>${staff ? '' : caseLevelBadge(c)}</div>
             <div class="font-medium">${esc(c.title)}${c.chatUnread ? ` <span class="chat-new" title="Neue Nachrichten">${icon('chat', 'ico-sm')}${c.chatUnread}</span>` : ''}</div></td>
@@ -367,9 +371,9 @@ function caseTable() {
           <td data-label="Zuständig">${c.lawyerName ? `<div class="who"><span class="who-lead">${esc(c.lawyerName)}</span>${(c.coLawyers || []).length ? `<div class="text-xs text-dim">+ ${esc(c.coLawyers.map((l) => l.name).join(', '))}</div>` : ''}</div>` : badge('Unbesetzt', 'amber')}</td>
           ${staff ? `<td data-label="Priorität">${priorityBadge(c, true)}</td>` : ''}
           <td data-label="Status">${stageBadge(c)}</td>
-          <td data-label="Letzte Aktivität" class="nowrap">${activityCell(c)}</td></tr>`
-      )
-      .join('')}</tbody></table></div>`;
+          <td data-label="Letzte Aktivität" class="nowrap">${activityCell(c)}</td></tr>`,
+        staff ? 6 : 4
+      )}</tbody></table></div>`;
 }
 
 /* ---------------------------------------------------------------- Globale Suche (Strg + K) */
@@ -579,7 +583,7 @@ function taskList() {
           : 'Keine offenen Aufgaben im Team.';
     return empty(msg, 'tasks');
   }
-  if (st.taskState === 'done') return `<div class="task-list">${list.map((t) => taskItem(t)).join('')}</div>`;
+  if (st.taskState === 'done') return `<div class="task-list">${lazyRows(list, (t) => taskItem(t))}</div>`;
   const bucket = (t) => {
     if (!t.dueDate) return 'none';
     const d = daysUntil(t.dueDate);
@@ -590,7 +594,7 @@ function taskList() {
     .map(([key, label]) => {
       const items = list.filter((t) => bucket(t) === key);
       if (!items.length) return '';
-      return `<h2 class="task-group ${key === 'overdue' ? 'is-overdue' : ''}">${esc(label)} <span>${items.length}</span></h2><div class="task-list">${items.map((t) => taskItem(t)).join('')}</div>`;
+      return `<h2 class="task-group ${key === 'overdue' ? 'is-overdue' : ''}">${esc(label)} <span>${items.length}</span></h2><div class="task-list">${lazyRows(items, (t) => taskItem(t))}</div>`;
     })
     .join('');
 }

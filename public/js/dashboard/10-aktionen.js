@@ -50,6 +50,8 @@ const actions = {
     renderView();
   },
   'new-case': newCaseModal,
+  // Lange Listen: nächste Einträge (passiert beim Scrollen auch von selbst)
+  'list-more': (el) => showMoreRows(el.dataset.id),
   'open-case': (el) => openCase(Number(el.dataset.id)),
   // „Was ist zu tun?“: Akte öffnen und direkt zu den Nachrichten springen
   'open-case-chat': async (el) => {
@@ -137,6 +139,26 @@ const actions = {
   },
   'case-trash': () => openTrash(),
   'global-search': () => openSearch(),
+  // Zwei-Faktor-Anmeldung (Profil)
+  'tf-on': async () => {
+    st.twoFactor = await api.patch('/api/auth/two-factor', { enabled: true });
+    toast('Zwei-Faktor-Anmeldung ist aktiv – beim nächsten Login kommt der Code per Discord.');
+    renderView();
+  },
+  'tf-off': () =>
+    openModal(`
+      <h2 class="modal-title">Zwei-Faktor-Anmeldung ausschalten?</h2>
+      <p class="modal-sub">Dann reicht beim Login wieder das Passwort. Zur Sicherheit bitte Ihr Passwort eingeben.</p>
+      <form data-form="tf-off" class="form-grid">
+        <div><label class="label" for="tfPw">Passwort</label><input id="tfPw" name="password" type="password" autocomplete="current-password" required class="field" autofocus></div>
+        <div class="form-actions"><button type="submit" class="btn-danger btn-md">Ausschalten</button><button type="button" class="btn-ghost btn-md" data-action="close-modal">Abbrechen</button></div>
+      </form>`),
+  'tf-forget': async () => {
+    if (!(await ask('Alle Geräte – auch dieses – brauchen beim nächsten Login wieder den Code.', { title: 'Vertraute Geräte vergessen?', confirmText: 'Vergessen' }))) return;
+    st.twoFactor = await api.del('/api/auth/two-factor/devices');
+    toast('Vertraute Geräte vergessen.');
+    renderView();
+  },
   'logout-others': async () => {
     if (!(await ask('Alle anderen Anmeldungen (andere Browser, Handy, App) werden beendet. Dieses Gerät bleibt angemeldet.', { title: 'Auf allen anderen Geräten abmelden?', confirmText: 'Abmelden' }))) return;
     const r = await api.post('/api/auth/logout-others', {});
