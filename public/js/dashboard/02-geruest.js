@@ -38,6 +38,7 @@ function navCount(key) {
 function navActive(key) {
   if (key === 'invoices') return st.view === 'invoices' || st.view === 'invoice-new';
   if (key === 'concerns-board' && concernsMerged()) return st.view === 'concerns-board' || st.view === 'concerns';
+  if (key === 'stats') return st.view === 'stats' || st.view === 'work'; // Aktenbearbeitung = Reiter der Statistik
   return st.view === key;
 }
 function renderNav() {

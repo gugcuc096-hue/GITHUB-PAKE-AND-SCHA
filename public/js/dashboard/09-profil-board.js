@@ -942,6 +942,15 @@ function workCaseLine(w) {
     </div>`;
 }
 
+/** Kanzlei-Statistik: Reiter „Überblick“ und „Aktenbearbeitung“ (ein Menüpunkt, zwei Seiten). */
+const statsTabs = () =>
+  `<div class="chip-row settings-tabs mb-4" role="tablist" aria-label="Kanzlei-Statistik">${[
+    ['stats', 'Überblick', 'chart'],
+    ['work', 'Aktenbearbeitung', 'briefcase'],
+  ]
+    .map(([k, l, ico]) => `<a href="#${k}" class="chip ${st.view === k ? 'active' : ''}" role="tab" aria-selected="${st.view === k}">${icon(ico, 'ico-sm')}<span>${l}</span></a>`)
+    .join('')}</div>`;
+
 views.work = {
   async load() {
     st.work = await api.get('/api/work?days=' + (st.workDays ?? 90));
@@ -981,8 +990,9 @@ views.work = {
       : empty('Keine Akten im Zeitraum.', 'folder');
     return `
         <div class="page-head">
-          <div><h1 class="page-title">Aktenbearbeitung</h1><p class="page-sub">Wer bearbeitet welche Akten – und wie lange. Nur für das Board of Partners sichtbar; erfasst wird automatisch bei Zuweisung, Abgabe und Abschluss.</p></div>
+          <div><h1 class="page-title">Kanzlei-Statistik</h1><p class="page-sub">Wer bearbeitet welche Akten – und wie lange. Nur für das Board of Partners sichtbar; erfasst wird automatisch bei Zuweisung, Abgabe und Abschluss.</p></div>
         </div>
+        ${statsTabs()}
         <div class="chip-row mb-4" role="group" aria-label="Zeitraum">${chips}</div>
         <div class="kpi-grid mb-4 lg:mb-5">
           ${kpi('Akten in Bearbeitung', String(sm.runningCases), `${sm.unassigned} davon ohne Anwalt`, 'briefcase', '#work')}
@@ -1225,6 +1235,7 @@ views.stats = {
         <div class="page-head">
           <div><h1 class="page-title">Kanzlei-Statistik</h1><p class="page-sub">Umsatz, Akten und Erfolgsquote auf einen Blick – berechnet aus Rechnungen und Akten. Nur für das Board of Partners sichtbar.</p></div>
         </div>
+        ${statsTabs()}
         <div class="kpi-grid mb-4 lg:mb-5">
           ${statKpi('Umsatz 30 Tage', money(k.revenue30), trendText(k.revenue30, k.revenuePrev30), 'receipt')}
           ${statKpi('Offene Forderungen', money(k.openSum), `${k.openCount} offen${k.overdueCount ? ` · ${k.overdueCount} überfällig` : ''}`, 'clock')}
