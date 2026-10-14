@@ -168,7 +168,7 @@ const VIEWS = {
   team: { label: 'Team', icon: 'users', admin: true, section: 'Verwaltung' },
   users: { label: 'Benutzer', icon: 'key', admin: true, section: 'Verwaltung' },
   stats: { label: 'Kanzlei-Statistik', short: 'Statistik', icon: 'chart', board: true, section: 'Verwaltung' },
-  work: { label: 'Aktenbearbeitung', icon: 'briefcase', board: true, section: 'Verwaltung' },
+  work: { label: 'Kanzlei-Statistik', short: 'Statistik', icon: 'briefcase', board: true, hidden: true }, // Reiter „Aktenbearbeitung“ der Kanzlei-Statistik
   vip: { label: 'VIP & Lifetime', short: 'VIP', icon: 'crown', board: true, section: 'Verwaltung' },
   cooperations: { label: 'Kooperationen', icon: 'tag', board: true, section: 'Verwaltung' },
   fees: { label: 'Honorarordnung', icon: 'scale', admin: true, section: 'Verwaltung' },
