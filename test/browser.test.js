@@ -1477,6 +1477,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         const fail = (method) => (route) =>
           route.request().method() === method ? route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Datenbank nicht erreichbar.' }) }) : route.continue();
         const hint = (text) => page.waitForFunction((t) => (document.querySelector('#psToastRoot') || {}).textContent?.includes(t), text);
+        // Fehlermeldungen stehen 6 Sekunden – vor jedem Fehlerfall die alten entfernen, damit hint() auf die neue wartet
+        const clearToasts = () => page.evaluate(() => document.querySelectorAll('#psToastRoot .ps-toast').forEach((t) => t.remove()));
 
         // Aufgabe abhaken
         await page.route('**/api/tasks/*', slow('PATCH'));
@@ -1485,6 +1487,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await settle();
         await page.unroute('**/api/tasks/*');
         await page.route('**/api/tasks/*', fail('PATCH'));
+        await clearToasts();
         await page.click('#secTasks .task-check');
         await hint('Nicht gespeichert – Datenbank nicht erreichbar.');
         assert.equal(await page.$eval('#secTasks .task-row', (r) => r.classList.contains('is-done')), true, 'Haken springt zurück');
@@ -1503,6 +1506,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.unroute(`**/api/cases/${kase.id}/notes`);
         await page.route(`**/api/cases/${kase.id}/notes`, fail('POST'));
         await page.fill(chat, 'Diese Nachricht scheitert');
+        await clearToasts();
         await page.click(send);
         await hint('Nicht gesendet');
         assert.equal(await page.inputValue(chat), 'Diese Nachricht scheitert', 'Text wieder im Eingabefeld');
@@ -1521,6 +1525,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await settle();
         await page.unroute(`**/api/cases/${kase.id}`);
         await page.route(`**/api/cases/${kase.id}`, fail('PATCH'));
+        await clearToasts();
         await page.click('#modalBody button.track-step[data-step="3"]');
         await hint('Nicht gespeichert');
         assert.equal(await page.$eval('#modalBody .track-node.current', (n) => n.textContent.trim()), '3', 'Stand springt zurück');
