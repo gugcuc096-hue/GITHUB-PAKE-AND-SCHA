@@ -273,6 +273,7 @@ function settingsPayload() {
     invoiceReminderDays: require('../paymentReminders').reminderDays(),
     caseIdleDays: idleLimit(),
     cleanupDays: require('../cleanup').days(),
+    weeklyReport: require('../weeklyReport').enabled(),
     onboardingTemplate: require('../onboarding').template(),
     showDutyPublic: getSetting('show_duty_public', '1') === '1',
     showSuccessPublic: getSetting('show_success_public', '1') === '1',
@@ -301,6 +302,7 @@ router.patch(
       invoiceReminderDays: z.number().int().min(0).max(60).optional(),
       caseIdleDays: z.number().int().min(0).max(60).optional(),
       cleanupDays: z.number().int().min(0).max(365).optional(),
+      weeklyReport: z.boolean().optional(),
       onboardingTemplate: z.string().max(4000).optional(),
       showDutyPublic: z.boolean().optional(),
       showSuccessPublic: z.boolean().optional(),
@@ -362,6 +364,7 @@ router.patch(
       if (d.invoiceReminderDays !== undefined) require('../paymentReminders').setReminderDays(d.invoiceReminderDays);
       if (d.caseIdleDays !== undefined) setIdleLimit(d.caseIdleDays);
       if (d.cleanupDays !== undefined) require('../cleanup').setDays(d.cleanupDays);
+      if (d.weeklyReport !== undefined) require('../weeklyReport').setEnabled(d.weeklyReport);
       if (d.onboardingTemplate !== undefined) require('../onboarding').setTemplate(d.onboardingTemplate);
       if (d.fivenetUrl !== undefined) setSetting('fivenet_url', d.fivenetUrl);
     });
@@ -370,6 +373,18 @@ router.patch(
     // Links „DOC - Nummer“ in Schriftsätzen zeigen auf die FiveNet-Instanz → bei neuer Adresse deren Google Docs neu schreiben
     if (d.fivenetUrl !== undefined && d.fivenetUrl !== fivenetBefore) require('../googleDocs').touchKind('contract');
     res.json({ settings: settingsPayload() });
+  })
+);
+
+/** Wochenbericht ausprobieren: jetzt an das eigene Discord senden. */
+router.post(
+  '/weekly-report/test',
+  wrap(async (req, res) => {
+    if (!req.user.discord_id) return res.status(400).json({ error: 'Verknüpfe zuerst dein Discord (Mein Profil → Discord verbinden).' });
+    const r = await require('../weeklyReport').send([req.user]);
+    if (r.error) return res.status(400).json({ error: r.error });
+    if (!r.sent) return res.status(502).json({ error: 'Die Direktnachricht kam nicht an – erlaubt Discord Nachrichten vom Kanzlei-Bot?' });
+    res.json({ success: true });
   })
 );
 

@@ -740,6 +740,7 @@ const forms = {
       invoiceReminderDays: Number(val(fd, 'invoiceReminderDays') || 0),
       caseIdleDays: Number(val(fd, 'caseIdleDays') || 0),
       cleanupDays: Number(val(fd, 'cleanupDays') || 0),
+      weeklyReport: fd.has('weeklyReport'),
       onboardingTemplate: String(fd.get('onboardingTemplate') || ''),
     });
     st.settings = res.settings;
