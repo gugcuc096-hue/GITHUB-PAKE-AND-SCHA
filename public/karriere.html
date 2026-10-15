@@ -28,7 +28,7 @@
         .counter { font-size: 0.72rem; color: var(--text-dim); text-align: right; margin-top: 0.25rem; }
         .counter.ok { color: #6ee7b7; }
         /* Knöpfe wie auf der Startseite: Großbuchstaben mit Sperrung (Formularfelder bleiben normal) */
-        .site-page .btn-gold, .site-page .btn-outline { text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.75rem; }
+        .site-page .btn-gold, .site-page .btn-outline, .site-page .btn-discord { text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.75rem; }
         .site-page .btn-lg { font-size: 0.875rem; }
         .site-page .btn-plain { text-transform: none; letter-spacing: normal; font-size: 0.875rem; }
         /* Handy-Menü (wie auf der Startseite) */
@@ -196,7 +196,7 @@
             <div class="text-center mb-10">
                 <p class="text-xs uppercase tracking-widest text-gold mb-2">Online-Bewerbung</p>
                 <h2 class="font-serif text-4xl md:text-5xl font-semibold mb-3">Jetzt bewerben</h2>
-                <p class="text-sm text-muted">Dauert etwa 5 Minuten. Sie erhalten sofort eine Bewerbungsnummer und einen Zugangscode, um den Stand Ihrer Bewerbung abzufragen.</p>
+                <p class="text-sm text-muted">Dauert etwa 5 Minuten. Danach sehen Sie den Stand auf Ihrer persönlichen Bewerberseite – mit verbundenem Discord kommt der Link auch per Nachricht.</p>
             </div>
 
             <div class="glass-card card-gold p-5 sm:p-8">
@@ -264,21 +264,26 @@
                 <details class="kfaq"><summary>Wie erfahre ich, wie es weitergeht?<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg></summary>
                     <p>Auf Ihrer persönlichen Bewerberseite: Dort sehen Sie den Stand und Ihren Gesprächstermin und schreiben direkt mit dem Board of Partners. Auf diesem Gerät finden Sie sie oben auf dieser Seite und über „Meine Bewerbung“.</p></details>
                 <details class="kfaq"><summary>Ich habe mich auf einem anderen Gerät beworben<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg></summary>
-                    <p>Kein Problem: Unten bei „Ihre Bewerbung“ Bewerbungsnummer und Zugangscode eingeben – beides stand in der Bestätigung nach dem Absenden.</p></details>
+                    <p>Kein Problem: Öffnen Sie die Discord-Nachricht des Kanzlei-Bots („Zur Bewerbung“) – oder unten bei „Ihre Bewerbung“ auf „Mit Discord öffnen“. Haben Sie Discord nicht verbunden, schickt Ihnen das Board of Partners den Link.</p></details>
                 <details class="kfaq"><summary>Was passiert nach einer Zusage?<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg></summary>
                     <p>Das Board of Partners legt Ihr Konto für das Kanzlei-Dashboard an. Dort arbeiten Sie mit Akten, Kalender, Kanzlei-Post und Stempeluhr – am PC und am Handy.</p></details>
             </div>
         </section>
 
-        <!-- Bereits beworben (anderes Gerät): Nummer + Zugangscode → persönliche Bewerberseite -->
+        <!-- Bereits beworben (anderes Gerät): mit Discord öffnen; Nummer + Zugangscode nur, wenn die Discord-Anmeldung fehlt -->
         <section id="status" class="max-w-3xl mx-auto px-5 sm:px-6 py-16 border-t border-[var(--glass-border)]">
             <div class="text-center mb-8">
                 <p class="text-xs uppercase tracking-widest text-gold mb-2">Bereits beworben?</p>
                 <h2 class="font-serif text-4xl md:text-5xl font-semibold">Ihre Bewerbung</h2>
-                <p class="text-sm text-muted mt-3 max-w-xl mx-auto">Auf Ihrer Bewerberseite sehen Sie den Stand, Ihren Gesprächstermin und schreiben direkt mit dem Board of Partners. Auf einem anderen Gerät beworben? Nummer und Zugangscode eingeben.</p>
+                <p class="text-sm text-muted mt-3 max-w-xl mx-auto">Auf Ihrer Bewerberseite sehen Sie den Stand, Ihren Gesprächstermin und schreiben direkt mit dem Board of Partners.</p>
             </div>
             <div class="glass-card p-5 sm:p-8">
-                <form id="statusForm" data-nodraft class="flex flex-col sm:flex-row gap-3" novalidate>
+                <div id="statusDiscord" class="text-center">
+                    <p class="text-sm text-muted mb-4">Auf einem anderen Gerät beworben? Melden Sie sich mit dem Discord an, das Sie mit Ihrer Bewerbung verbunden haben – oder öffnen Sie die Nachricht des Kanzlei-Bots („Zur Bewerbung“).</p>
+                    <a href="/api/discord/application-open" class="btn-discord btn-md"><svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.37a19.79 19.79 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.865-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.74 19.74 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.1 13.1 0 01-1.872-.892.077.077 0 01-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 01.078-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.009c.12.1.246.198.373.292a.077.077 0 01-.006.127 12.3 12.3 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.84 19.84 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg><span>Mit Discord öffnen</span></a>
+                    <p class="text-xs text-dim mt-4">Discord nicht verbunden? Das Board of Partners schickt Ihnen den Link zu Ihrer Bewerberseite.</p>
+                </div>
+                <form id="statusForm" data-nodraft class="hidden flex-col sm:flex-row gap-3" novalidate>
                     <input id="stNumber" class="field font-mono" placeholder="Bewerbungsnummer, z. B. BW-2026-0001" autocapitalize="characters" aria-label="Bewerbungsnummer">
                     <input id="stCode" class="field font-mono sm:w-48" inputmode="numeric" maxlength="6" placeholder="Zugangscode" aria-label="Zugangscode">
                     <button type="submit" class="btn-gold btn-md">Öffnen</button>
@@ -287,6 +292,11 @@
             </div>
         </section>
     </main>
+
+    <!-- Discord verbinden (nach dem Absenden): POST, damit der persönliche Link nicht in Adresszeile oder Verlauf landet -->
+    <form id="discordJoinForm" method="post" action="/api/discord/application-join" class="hidden">
+        <input type="hidden" name="token">
+    </form>
 
     <footer class="border-t border-[var(--glass-border)] py-8 bg-[rgba(2,5,14,0.95)]">
         <div class="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-muted">

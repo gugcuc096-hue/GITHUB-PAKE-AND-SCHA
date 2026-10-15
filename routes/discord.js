@@ -18,10 +18,11 @@ function stateCookieOptions() {
 }
 
 /**
- * mode: login | signup | link | case | application. Außer beim reinen Login wird zusätzlich „guilds.join“
- * angefragt (nur wenn Discord-Tickets aktiv sind) – damit fügt der Bot den Mandanten dem Server hinzu.
+ * mode: login | signup | link | case | application | application-open. Außer beim reinen Anmelden (login,
+ * application-open) wird zusätzlich „guilds.join“ angefragt (nur wenn Discord-Tickets aktiv sind) – damit fügt der Bot
+ * den Mandanten dem Server hinzu.
  */
-const FAIL_TARGET = { login: '/login.html', signup: '/register.html', case: '/', application: '/bewerbung.html' };
+const FAIL_TARGET = { login: '/login.html', signup: '/register.html', case: '/', application: '/bewerbung.html', 'application-open': '/bewerbung.html' };
 function startFlow(req, res, mode, extra = '') {
   const cfg = discord.oauthConfig(req);
   if (!cfg) {
@@ -30,7 +31,7 @@ function startFlow(req, res, mode, extra = '') {
   }
   const state = crypto.randomBytes(24).toString('hex');
   res.cookie(STATE_COOKIE, [mode, state, extra].filter(Boolean).join('.'), { ...stateCookieOptions(), maxAge: STATE_MAX_AGE });
-  const scopes = mode !== 'login' && tickets.active() ? ['identify', 'guilds.join'] : ['identify'];
+  const scopes = !['login', 'application-open'].includes(mode) && tickets.active() ? ['identify', 'guilds.join'] : ['identify'];
   // Ticket-Beitritt immer mit Discord-Bestätigung (kein stilles Durchwinken)
   res.redirect(discord.authorizeUrl(cfg, state, scopes, ['case', 'application', 'signup'].includes(mode) ? 'consent' : 'none'));
 }
@@ -187,6 +188,12 @@ router.post('/application-join', express.urlencoded({ extended: false, limit: '2
   startFlow(req, res, 'application', String(a.id));
 });
 
+/*
+ * Bewerbung auf einem anderen Gerät öffnen: Anmelden mit dem Discord, das mit der Bewerbung verbunden ist, führt
+ * direkt zur Bewerberseite (statt Bewerbungsnummer + Zugangscode).
+ */
+router.get('/application-open', joinLimiter, (req, res) => startFlow(req, res, 'application-open'));
+
 /** Wartet höchstens ms auf den Abgleich (die Weiterleitung soll nicht hängen). */
 const within = (promise, ms) => Promise.race([promise, new Promise((r) => setTimeout(r, ms))]);
 
@@ -254,6 +261,13 @@ router.get(
       return res.redirect('/?ticket=pending');
     }
 
+    // Bewerber öffnet seine Bewerbung über das verbundene Discord (neueste Bewerbung dieses Discord-Kontos)
+    if (mode === 'application-open') {
+      const a = db.prepare('SELECT access_token FROM applications WHERE discord_user_id = ? ORDER BY id DESC LIMIT 1').get(profile.id);
+      if (!a) return fail('keine');
+      return res.redirect(`/bewerbung.html?discord=geoeffnet#${a.access_token}`);
+    }
+
     // Bewerber: Discord an der Bewerbung merken (für Direktnachrichten), dem Server beitreten, Bestätigung schicken
     if (mode === 'application') {
       const appId = Number(extra);
@@ -264,7 +278,10 @@ router.get(
       await within(
         require('./applications').dmApplicant(
           { ...a, discord_user_id: profile.id },
-          { title: '🔔 Benachrichtigungen aktiv', description: 'Ihr Discord ist mit Ihrer Bewerbung verbunden. Antworten des Board of Partners und neue Stände Ihrer Bewerbung erhalten Sie ab jetzt hier als Direktnachricht.' }
+          {
+            title: '🔔 Ihre Bewerberseite',
+            description: `Ihr Discord ist mit Ihrer Bewerbung **${a.number}** verbunden. Über den Knopf „Zur Bewerbung“ öffnen Sie Ihre Bewerberseite jederzeit – auf jedem Gerät, ohne Nummer oder Code.\n\nAntworten des Board of Partners und neue Stände Ihrer Bewerbung erhalten Sie ab jetzt hier als Direktnachricht.`,
+          }
         ),
         6000
       );

@@ -1,8 +1,8 @@
 /*
  * Bewerberseite (bewerbung.html#<persönlicher Link>): Stand der Bewerbung als Fortschritt, Gesprächstermin und
  * Nachrichten mit dem Board of Partners – ohne Konto und ohne Statusabfrage. Der Link wird auf dem Gerät gemerkt;
- * Bewerbungsnummer + Zugangscode führen ebenfalls hierher. Mit verbundenem Discord kommen Antworten zusätzlich
- * als Direktnachricht.
+ * mit verbundenem Discord schickt der Bot ihn per Direktnachricht, und „Mit Discord öffnen“ führt auf jedem Gerät
+ * hierher (Antworten kommen ebenfalls per DM). Bewerbungsnummer + Zugangscode nur, solange die Discord-Anmeldung fehlt.
  */
 (() => {
     'use strict';
@@ -121,8 +121,8 @@
         const discord = !d.discord.available
             ? ''
             : d.discord.connected
-              ? `<div class="glass-card bw-card"><div class="flex items-center gap-2 mb-2"><span class="badge badge-emerald">Discord verbunden</span></div><p class="text-sm text-muted">Antworten des Board of Partners und neue Stände Ihrer Bewerbung bekommen Sie zusätzlich als Discord-Direktnachricht.</p></div>`
-              : `<div class="glass-card bw-card"><h2 class="font-serif text-2xl font-semibold mb-2">Benachrichtigung per Discord</h2><p class="text-sm text-muted mb-4">Verbinden Sie Ihr Discord – dann bekommen Sie Antworten und neue Stände direkt als Nachricht und müssen hier nicht nachsehen.</p><button type="button" class="btn-discord btn-sm" id="bwDiscord">${DISCORD_ICON}<span>Discord verbinden</span></button></div>`;
+              ? `<div class="glass-card bw-card"><div class="flex items-center gap-2 mb-2"><span class="badge badge-emerald">Discord verbunden</span></div><p class="text-sm text-muted">Antworten des Board of Partners und neue Stände Ihrer Bewerbung bekommen Sie zusätzlich als Discord-Direktnachricht. Auf einem anderen Gerät öffnen Sie diese Seite über die Nachricht des Kanzlei-Bots oder „Mit Discord öffnen“ auf der Karriereseite.</p></div>`
+              : `<div class="glass-card bw-card"><h2 class="font-serif text-2xl font-semibold mb-2">Discord verbinden</h2><p class="text-sm text-muted mb-4">Der Kanzlei-Bot schickt Ihnen den Link zu dieser Seite per Direktnachricht – damit öffnen Sie sie auf jedem Gerät. Antworten und neue Stände kommen ebenfalls dorthin.</p><button type="button" class="btn-discord btn-sm" id="bwDiscord">${DISCORD_ICON}<span>Discord verbinden</span></button></div>`;
         root.innerHTML = `
             <div class="text-center mb-8">
                 <p class="text-xs uppercase tracking-widest text-gold mb-2">Ihre Bewerbung</p>
@@ -227,9 +227,10 @@
         }
     }
 
-    /* ------------------------------------------------ Ohne (gültigen) Link: gemerkte Bewerbungen oder Nummer + Code */
-    function showAccess(message) {
+    /* ------------------------------------------------ Ohne (gültigen) Link: gemerkte Bewerbungen, Discord (Notlösung: Nummer + Code) */
+    async function showAccess(message) {
         const list = remembered();
+        const viaDiscord = await api.get('/api/discord/status').then((st) => !!st.oauth, () => true);
         root.innerHTML = `
             <div class="text-center mb-8">
                 <p class="text-xs uppercase tracking-widest text-gold mb-2">Karriere</p>
@@ -237,7 +238,14 @@
             </div>
             ${message ? `<div class="banner banner-amber mb-5"><div>${esc(message)}</div></div>` : ''}
             ${list.length ? `<div class="glass-card bw-card mb-5"><h2 class="font-serif text-2xl font-semibold mb-3">Auf diesem Gerät</h2><div class="flex flex-col gap-2">${list.map((x) => `<a class="btn-outline btn-md justify-between" href="#${esc(x.token)}"><span class="font-mono">${esc(x.number || 'Bewerbung')}</span><span class="text-xs text-dim">${esc(x.position || '')}</span></a>`).join('')}</div></div>` : ''}
-            <div class="glass-card bw-card">
+            ${viaDiscord
+                ? `<div class="glass-card bw-card text-center">
+                <h2 class="font-serif text-2xl font-semibold mb-2">Mit Discord öffnen</h2>
+                <p class="text-sm text-muted mb-4">Melden Sie sich mit dem Discord an, das Sie mit Ihrer Bewerbung verbunden haben – oder öffnen Sie die Nachricht des Kanzlei-Bots („Zur Bewerbung“).</p>
+                <a href="/api/discord/application-open" class="btn-discord btn-md">${DISCORD_ICON}<span>Mit Discord öffnen</span></a>
+                <p class="text-xs text-dim mt-4">Discord nicht verbunden? Das Board of Partners schickt Ihnen den Link zu Ihrer Bewerberseite.<br>Noch nicht beworben? <a href="/karriere.html" class="text-gold hover:underline">Zu den offenen Stellen</a></p>
+            </div>`
+                : `<div class="glass-card bw-card">
                 <h2 class="font-serif text-2xl font-semibold mb-2">Mit Bewerbungsnummer öffnen</h2>
                 <p class="text-sm text-muted mb-4">Bewerbungsnummer und Zugangscode haben Sie nach dem Absenden erhalten.</p>
                 <form id="accessForm" data-nodraft class="flex flex-col sm:flex-row gap-3" novalidate>
@@ -247,8 +255,8 @@
                 </form>
                 <p id="accessError" class="form-error mt-3" role="alert"></p>
                 <p class="text-xs text-dim mt-4">Noch nicht beworben? <a href="/karriere.html" class="text-gold hover:underline">Zu den offenen Stellen</a></p>
-            </div>`;
-        document.getElementById('accessForm').addEventListener('submit', async (e) => {
+            </div>`}`;
+        if (!viaDiscord) document.getElementById('accessForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const err = document.getElementById('accessError');
             err.textContent = '';
@@ -279,7 +287,7 @@
             data = await api.post('/api/public/application-portal', { token });
         } catch (ex) {
             if (ex.status === 404) forget(token);
-            return showAccess(ex.status === 404 ? 'Dieser Link gehört zu keiner Bewerbung (mehr). Öffnen Sie Ihre Bewerbung mit Bewerbungsnummer und Zugangscode.' : ex.message);
+            return showAccess(ex.status === 404 ? 'Dieser Link gehört zu keiner Bewerbung (mehr).' : ex.message);
         }
         remember({ token, number: data.number, position: data.positionTitle });
         document.title = `Bewerbung ${data.number} | Pake & Scha Legal Consulting`;
@@ -290,7 +298,9 @@
     const dc = new URLSearchParams(location.search).get('discord');
     if (dc) {
         const msg = {
-            verbunden: ['Discord verbunden – Antworten kommen ab jetzt auch als Direktnachricht.', 'ok'],
+            verbunden: ['Discord verbunden – der Link zu dieser Seite ist unterwegs, Antworten kommen ab jetzt auch als Direktnachricht.', 'ok'],
+            geoeffnet: ['Ihre Bewerbung wurde über Discord geöffnet.', 'ok'],
+            keine: ['Mit diesem Discord ist keine Bewerbung verbunden. Das Board of Partners schickt Ihnen den Link zu Ihrer Bewerberseite.', 'error'],
             denied: ['Die Verbindung mit Discord wurde abgebrochen.', 'error'],
             disabled: ['Die Discord-Anmeldung ist noch nicht eingerichtet.', 'error'],
             notfound: ['Diese Bewerbung wurde nicht gefunden.', 'error'],
