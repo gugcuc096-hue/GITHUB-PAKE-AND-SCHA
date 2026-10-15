@@ -137,6 +137,7 @@ router.post(
         mentionIds: a.assigned_discord_id && a.assigned_to !== u.id ? [a.assigned_discord_id] : [],
       });
     }
+    require('../googleDocs').touchExtract(a.case_id); // Termine stehen im Aktenauszug
     res.status(201).json({ event: apptRow(a, u) });
   })
 );
@@ -214,6 +215,9 @@ router.patch(
       const label = { bestaetigt: '✅ Termin bestätigt', abgesagt: '❌ Termin abgesagt', erledigt: '✔️ Termin erledigt', angefragt: '📅 Termin wieder offen' }[updated.status];
       if (label) ticketAppointment(updated, updated.type === 'frist' && updated.status === 'erledigt' ? '✔️ Frist erledigt' : label, { by: u });
     } else if (moved) ticketAppointment(updated, updated.type === 'frist' ? '⏳ Frist geändert' : '🔁 Termin verlegt', { by: u });
+    const gdocs = require('../googleDocs');
+    gdocs.touchExtract(updated.case_id);
+    if (a.case_id !== updated.case_id) gdocs.touchExtract(a.case_id);
     res.json({ event: apptRow(getAppointment(a.id), u) });
   })
 );
@@ -229,6 +233,7 @@ router.delete(
       return res.status(403).json({ error: 'Nur Ersteller, Zuständige oder das Board of Partners können diesen Eintrag löschen.' });
     }
     db.prepare('DELETE FROM appointments WHERE id = ?').run(a.id);
+    require('../googleDocs').touchExtract(a.case_id);
     res.json({ success: true });
   })
 );

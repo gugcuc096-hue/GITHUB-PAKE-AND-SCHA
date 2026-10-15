@@ -108,7 +108,7 @@ views.invoices = {
     return `
         <div class="page-head">
           <div><h1 class="page-title">${staff ? 'Rechnungen & Honorare' : 'Meine Rechnungen'}</h1>
-            <p class="page-sub">${staff ? 'Offizielle Rechnungen und Honorarvereinbarungen – als PDF speichern oder drucken.' : 'Rechnungen und Honorarvereinbarungen zu Ihren Mandaten.'}</p></div>
+            <p class="page-sub">${staff ? 'Offizielle Rechnungen und Honorarvereinbarungen – jede mit eigenem Google Doc.' : 'Rechnungen und Honorarvereinbarungen zu Ihren Mandaten.'}</p></div>
           ${staff ? `<div class="page-actions"><button class="btn-gold btn-md" data-action="new-invoice">${icon('plus')}<span>Neues Dokument</span></button></div>` : ''}
         </div>
         ${staff ? `<div class="kpi-grid kpi-grid-3">
@@ -350,7 +350,6 @@ function summaryFiguresHtml() {
 function summaryHtml() {
   return `
       <div id="invSumFigures">${summaryFiguresHtml()}</div>
-      <p class="form-hint mb-4">Nach dem Erstellen öffnet sich die Druckansicht – dort „Als PDF speichern“ wählen.</p>
       <button type="submit" class="btn-gold btn-lg btn-block">${icon('check')}<span>Dokument erstellen</span></button>
       <button type="button" class="btn-ghost btn-md btn-block mt-2" data-action="inv-back" data-cancel="1">Abbrechen</button>`;
 }
@@ -701,7 +700,7 @@ function clientCard(d) {
         .map(
           (i) => `<div class="list-row wrap inv-row"><div class="main"><div class="title">${docTitleLink(`/invoice.html?id=${i.id}`, esc(i.number), 'font-mono text-gold')} · ${esc(INVOICE_KIND[i.kind])}</div>
               <div class="meta">${esc(fmtDate(i.createdAt))}${i.caseNumber ? ` · Akte ${esc(i.caseNumber)}` : ''}</div></div>
-            <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end"><span class="font-mono nowrap">${money(i.total)}</span>${invoiceBadge(i)}${openDoc(i.googleDoc, `/invoice.html?id=${i.id}`, 'Ansehen / PDF')}</div></div>`
+            <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end"><span class="font-mono nowrap">${money(i.total)}</span>${invoiceBadge(i)}${openDoc(i.googleDoc, `/invoice.html?id=${i.id}`, 'Ansehen')}</div></div>`
         )
         .join('')}</div>`
     : emptySection('', 'Rechnungen & Honorare', 'keine');
@@ -710,7 +709,7 @@ function clientCard(d) {
         .map(
           (k) => `<div class="list-row wrap"><div class="main"><div class="title">${docTitleLink(`/vertrag.html?id=${k.id}`, esc(k.templateName), 'font-medium')}</div>
               <div class="meta">Akte ${esc(k.caseNumber)} · ${esc(fmtDate(k.createdAt))}</div></div>
-            <div class="flex items-center gap-2 shrink-0">${statusBadge(CONTRACT_STATUS, k.status)}${openDoc(k.status === 'unterschrieben' ? k.googleDoc : null, `/vertrag.html?id=${k.id}`, 'Ansehen / PDF')}</div></div>`
+            <div class="flex items-center gap-2 shrink-0">${statusBadge(CONTRACT_STATUS, k.status)}${openDoc(k.status === 'unterschrieben' ? k.googleDoc : null, `/vertrag.html?id=${k.id}`, 'Ansehen')}</div></div>`
         )
         .join('')}</div>`
     : emptySection('', 'Verträge & Schriftsätze', 'keine');

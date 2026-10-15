@@ -90,6 +90,17 @@ app.use('/api', (req, res, next) => {
 /* ---------------------------------------------------------------- API */
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.use('/api/auth', require('./routes/auth'));
+// Jede Änderung an einer Akte (Notizen, Anhänge, Status, Verträge …) schreibt das Google Doc ihres Aktenauszugs neu –
+// ohne Knopf. Chat und „gelesen“ stehen nicht im Auszug.
+app.use('/api/cases/:id', (req, res, next) => {
+  const id = Number(req.params.id);
+  if (req.method !== 'GET' && id > 0 && !/^\/chat(\/|$)/.test(req.path)) {
+    res.on('finish', () => {
+      if (res.statusCode < 400) require('./googleDocs').touchExtract(id);
+    });
+  }
+  next();
+});
 app.use('/api/cases/:id/external', externalRoutes.caseRouter);
 app.use('/api/cases/:id/contracts', contractRoutes.caseRouter);
 app.use('/api/cases/:id/fivenet', externalRoutes.caseRouter); // ältere Adresse, bleibt gültig

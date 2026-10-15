@@ -1,10 +1,12 @@
 /*
- * Knopf „Google Doc“ in den Druckansichten (Rechnung, Vertrag/Schriftsatz, Aktenauszug).
- * Kanzlei: Google Doc anlegen bzw. sofort aktualisieren · alle mit Zugriff: Doc öffnen und Link kopieren.
- * Das Doc liegt im Google Drive der Kanzlei, ist „Jeder mit dem Link: ansehen“ und wird bei Änderungen
- * (Unterschrift, Bezahlt …) automatisch neu geschrieben – der Link bleibt gleich.
+ * Knopf „Google Doc“ in den Ansichten (Rechnung, Vertrag/Schriftsatz, Aktenauszug).
+ * Kanzlei: Google Doc anlegen bzw. löschen · alle mit Zugriff: Doc öffnen und Link kopieren.
+ * Das Doc liegt im Google Drive der Kanzlei, ist „Jeder mit dem Link: ansehen“ und wird bei jeder Änderung
+ * (Unterschrift, Bezahlt, Akte …) vom Server automatisch neu geschrieben – der Link bleibt gleich, einen Knopf
+ * „Aktualisieren“ gibt es nicht. Beim Aktenauszug übernimmt das Doc auch eine geänderte Auswahl der Abschnitte.
  *
- * Aufruf, sobald die Seite ihre Daten hat: window.PS.googleDoc.mount({ kind, id, getOptions })
+ * Aufruf, sobald die Seite ihre Daten hat: const g = window.PS.googleDoc.mount({ kind, id, getOptions })
+ * Aktenauszug: g.optionsChanged() nach jeder Änderung der Auswahl.
  */
 (() => {
   'use strict';
@@ -52,12 +54,11 @@
 
   function mount({ kind, id, getOptions }) {
     const actions = document.querySelector('.toolbar .actions');
-    const printBtn = document.getElementById('printBtn');
-    if (!actions || !id) return;
+    if (!actions || !id) return { optionsChanged() {} };
     let box = actions.querySelector('.gdoc');
     if (!box) {
       box = el('span', { class: 'gdoc' });
-      actions.insertBefore(box, printBtn && printBtn.parentNode === actions ? printBtn : null);
+      actions.append(box);
     }
     let info = null;
     let busy = false;
@@ -73,13 +74,10 @@
         copyBtn.addEventListener('click', async () => toast((await copy(doc.url)) ? 'Link kopiert – jeder mit dem Link kann das Google Doc ansehen.' : doc.url));
         box.append(open, copyBtn);
         if (canCreate) {
-          const refresh = el('button', { class: 'btn', type: 'button', title: kind === 'extract' ? 'Google Doc mit der aktuellen Auswahl der Abschnitte neu schreiben' : 'Google Doc jetzt neu schreiben (passiert bei Änderungen sonst automatisch)' }, busy ? 'Wird aktualisiert …' : 'Aktualisieren');
-          refresh.disabled = busy || !available;
-          refresh.addEventListener('click', () => publish(false));
           const del = el('button', { class: 'btn', type: 'button', title: 'Google Doc löschen – der Link funktioniert danach nicht mehr' }, 'Löschen');
           del.disabled = busy || !available;
           del.addEventListener('click', unpublish);
-          box.append(refresh, del);
+          box.append(del);
         }
         if (doc.error && canCreate) box.append(el('span', { class: 'gdoc-warn', title: doc.error }, '⚠ Letzte Aktualisierung fehlgeschlagen'));
         return;
@@ -100,7 +98,7 @@
       box.append(create);
     }
 
-    async function publish(isNew) {
+    async function publish(isNew, { quiet = false } = {}) {
       if (busy) return;
       busy = true;
       draw();
@@ -121,7 +119,7 @@
         info.doc = r.doc;
         if (win) win.location.href = r.doc.url;
         // Kein automatisches Kopieren: Das neue Fenster hat den Fokus, der Browser würde es ohnehin verweigern.
-        toast(isNew ? 'Google Doc erstellt – jeder mit dem Link kann es ansehen. Zum Teilen „Link kopieren“.' : 'Google Doc aktualisiert.');
+        if (!quiet) toast(isNew ? 'Google Doc erstellt – jeder mit dem Link kann es ansehen. Zum Teilen „Link kopieren“.' : 'Google Doc aktualisiert.');
       } catch (err) {
         if (win) win.close();
         toast(err.message || 'Google Doc konnte nicht erstellt werden.', 'error');
@@ -161,6 +159,18 @@
       .catch(() => {
         /* ohne Zugriff bzw. ohne Google: kein Knopf */
       });
+
+    // Aktenauszug: andere Auswahl der Abschnitte → vorhandenes Doc gleich mitziehen (gesammelt, ohne Knopf)
+    let timer = null;
+    const optionsChanged = () => {
+      clearTimeout(timer);
+      timer = setTimeout(function again() {
+        if (!info || !info.doc || !info.canCreate || !info.available) return;
+        if (busy) return (timer = setTimeout(again, 800));
+        publish(false, { quiet: true });
+      }, 800);
+    };
+    return { optionsChanged };
   }
 
   window.PS.googleDoc = { mount };

@@ -1,5 +1,5 @@
 /*
- * Aktenauszug (Druckansicht / PDF): Stammdaten, Sachverhalt, Termine, externe Dokumente, Verträge, Rechnungen,
+ * Aktenauszug (Ansicht + Google Doc): Stammdaten, Sachverhalt, Termine, externe Dokumente, Verträge, Rechnungen,
  * Verlauf und Anhänge einer Akte – Abschnitte frei wählbar. Die Daten kommen aus derselben Schnittstelle wie die
  * Akte im Dashboard; Mandanten sehen dort ohnehin nur, was für sie freigegeben ist. Interne Angaben (interne
  * Notizen, Aufgaben, Priorität, interne Dokumente/Anhänge) kommen nur auf Wunsch der Kanzlei in den Auszug.
@@ -51,6 +51,7 @@
   let firm = { address: '', contact: '' };
   let staff = false;
   let opts = {};
+  let gdoc = null; // Google-Doc-Leiste (nur Kanzlei)
 
   function loadOpts() {
     const defaults = Object.fromEntries(OPTIONS.map(([k, , d]) => [k, d]));
@@ -83,7 +84,7 @@
     }
     html += `<p class="note">${
       staff
-        ? 'Ohne „Interne Angaben“ enthält der Auszug nur, was auch der Mandant im Portal sieht – geeignet zur Weitergabe. Ein Google Doc übernimmt diese Auswahl; jeder mit dem Link kann es lesen.'
+        ? 'Ohne „Interne Angaben“ enthält der Auszug nur, was auch der Mandant im Portal sieht – geeignet zur Weitergabe. Das Google Doc übernimmt diese Auswahl automatisch; jeder mit dem Link kann es lesen.'
         : 'Der Auszug enthält alles, was Sie im Mandantenportal zu dieser Akte sehen.'
     } Die Auswahl merkt sich dieser Browser.</p>`;
     panel.innerHTML = html;
@@ -96,10 +97,7 @@
     saveOpts();
     renderPanel();
     render();
-  });
-  document.getElementById('printBtn').addEventListener('click', () => {
-    document.getElementById('opts').open = false;
-    window.print();
+    if (gdoc) gdoc.optionsChanged();
   });
   // Klick außerhalb schließt die Auswahl
   document.addEventListener('click', (e) => {
@@ -300,7 +298,7 @@
       renderPanel();
       render();
       // Google Doc mit den hier gewählten Abschnitten (nur Kanzlei)
-      if (staff) window.PS.googleDoc.mount({ kind: 'extract', id, getOptions: () => ({ ...opts }) });
+      if (staff) gdoc = window.PS.googleDoc.mount({ kind: 'extract', id, getOptions: () => ({ ...opts }) });
       if (new URLSearchParams(location.search).get('print') === '1') setTimeout(() => window.print(), 600);
     })
     .catch((err) => {

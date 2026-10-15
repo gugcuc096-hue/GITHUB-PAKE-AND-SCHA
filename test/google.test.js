@@ -254,6 +254,16 @@ describe('Google Docs', () => {
     assert.doesNotMatch(text, /Rechnungen & Honorare/);
   });
 
+  it('Aktenauszug folgt Änderungen an der Akte und an der Auswahl automatisch – ohne Knopf', async () => {
+    const before = fileOf((await as.admin.get(`/api/google/docs/extract/${data.caseId}`)).json.doc.url);
+    const n = await as.admin.post(`/api/cases/${data.caseId}/notes`, { body: 'Vermerk landet automatisch im Google Doc' });
+    assert.equal(n.status, 201, n.text);
+    const f = await waitForVersion(before.id, before.version + 1);
+    assert.ok(f.version > before.version, 'neu geschrieben');
+    assert.match(docxText(docx(f.id, f.version)), /Vermerk landet automatisch im Google Doc/);
+    assert.equal(fileOf((await as.admin.get(`/api/google/docs/extract/${data.caseId}`)).json.doc.url).id, before.id, 'Link bleibt gleich');
+  });
+
   it('große Dokumente (Aktenauszug mit Bildern über 5 MB) gehen per Upload-Sitzung', async () => {
     // Bilder aus Zufallsrauschen (lassen sich nicht komprimieren): ~2,4 MB je PNG
     for (let i = 1; i <= 3; i++) {

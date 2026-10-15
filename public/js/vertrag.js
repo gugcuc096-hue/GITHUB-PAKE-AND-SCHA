@@ -1,7 +1,4 @@
 /* Verträge und Schriftsätze – Druckansicht, Unterschreiben, Vorlagen-Vorschau (vertrag.html) – früher Inline-Skript in der Seite, jetzt eigene Datei (strenge Content-Security-Policy). */
-// „Drucken / PDF“ (früher onclick in der Seite)
-document.getElementById('printBtn').addEventListener('click', () => window.print());
-
 (() => {
     'use strict';
     const { api, esc, parseDate } = window.PS;

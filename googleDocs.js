@@ -8,9 +8,10 @@
  * der Server dafür keins mehr an (google_docs_optout), bis jemand es selbst wieder anlegt.
  *
  * Ändert sich etwas – Unterschrift, Rechnungsstatus, Vertragstext, Angaben der Akte –, schreibt der Server das
- * Doc automatisch neu; Link und Freigabe bleiben gleich. Ein Aktenauszug ist eine Momentaufnahme mit den
- * gewählten Abschnitten und wird auf Knopfdruck aktualisiert. Gelöschte Rechnungen/Verträge (und endgültig
- * gelöschte Akten) wandern auch in Google Drive in den Papierkorb.
+ * Doc automatisch neu; Link und Freigabe bleiben gleich. Ein Aktenauszug behält die gewählten Abschnitte und
+ * folgt ebenfalls automatisch jeder Änderung an der Akte (Notizen, Anhänge, Termine, Verträge, Rechnungen …).
+ * Einen Knopf „Aktualisieren“ gibt es nicht. Gelöschte Rechnungen/Verträge (und endgültig gelöschte Akten)
+ * wandern auch in Google Drive in den Papierkorb.
  */
 const fs = require('fs');
 const { db } = require('./db');
@@ -206,14 +207,22 @@ function touch(kind, refId) {
         serial(() => sync(kind, r.ref_id));
       }, DEBOUNCE_MS).unref()
     );
+    // Der Aktenauszug listet Verträge und Rechnungen mit Stand – zieht mit
+    if (kind !== 'extract' && r.case_id) touch('extract', r.case_id);
   } catch (err) {
     console.warn('Google Doc: Aktualisierung nicht vorgemerkt:', err.message);
   }
 }
 
-/** Angaben der Akte geändert (Aktenzeichen, Titel, Gericht …): Verträge der Akte neu schreiben. */
+/** Angaben der Akte geändert (Aktenzeichen, Titel, Gericht …): Verträge und Aktenauszug der Akte neu schreiben. */
 function touchCase(caseId) {
   for (const r of db.prepare("SELECT ref_id FROM google_docs WHERE kind = 'contract' AND case_id = ?").all(caseId)) touch('contract', r.ref_id);
+  touchExtract(caseId);
+}
+
+/** Irgendetwas an der Akte geändert: Aktenauszug (falls es ein Google Doc gibt) neu schreiben. */
+function touchExtract(caseId) {
+  if (Number(caseId) > 0) touch('extract', Number(caseId));
 }
 
 /** Z. B. Kopfzeile der Verträge oder Anschrift der Kanzlei geändert: alle Docs dieser Art neu schreiben. */
@@ -226,6 +235,7 @@ function remove(kind, refId) {
   const r = rowFor(kind, Number(refId));
   if (!r) return Promise.resolve(false);
   db.prepare('DELETE FROM google_docs WHERE id = ?').run(r.id);
+  if (kind !== 'extract' && r.case_id) touchExtract(r.case_id);
   return serial(() => drive.trashDoc(r.file_id))
     .then(() => true)
     .catch((err) => {
@@ -354,6 +364,7 @@ module.exports = {
   publish,
   touch,
   touchCase,
+  touchExtract,
   touchKind,
   remove,
   removeForCase,

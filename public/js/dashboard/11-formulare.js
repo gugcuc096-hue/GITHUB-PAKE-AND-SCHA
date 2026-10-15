@@ -325,7 +325,7 @@ const forms = {
         <h2 class="modal-title">${esc(INVOICE_KIND[inv.kind])} erstellt</h2>
         <p class="modal-sub">Nummer <span class="font-mono text-gold">${esc(inv.number)}</span> über <strong>${money(inv.total)}</strong> an ${esc(inv.clientName)}.</p>
         <div class="form-actions">
-          <a class="btn-gold btn-md" href="/invoice.html?id=${inv.id}" target="_blank" rel="noopener">${icon('eye', 'ico-sm')}<span>Ansehen / Als PDF speichern</span></a>
+          <a class="btn-gold btn-md" href="/invoice.html?id=${inv.id}" target="_blank" rel="noopener">${icon('eye', 'ico-sm')}<span>Ansehen</span></a>
           <button class="btn-ghost btn-md" data-action="close-modal">Schließen</button>
         </div>`, { child: !!from });
   },
@@ -680,7 +680,7 @@ const forms = {
     const caseId = Number(f.dataset.caseId);
     const vis = $('#bf_visible', f);
     const res = await api.post(`/api/cases/${caseId}/contracts`, { templateId: Number(new FormData(f).get('templateId')), ...briefBody(f), internal: vis ? !vis.checked : true });
-    toast(res.contract.needsClient ? 'Erstellt – der Mandant kann jetzt im Portal unterschreiben.' : 'Schriftsatz erstellt – jetzt ansehen, unterschreiben und drucken.');
+    toast(res.contract.needsClient ? 'Erstellt – der Mandant kann jetzt im Portal unterschreiben.' : 'Schriftsatz erstellt – jetzt ansehen und unterschreiben.');
     st.contractTabAt = Date.now();
     window.open(`/vertrag.html?id=${res.contract.id}`, '_blank', 'noopener');
     await returnOrClose();
