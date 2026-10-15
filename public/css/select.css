@@ -1,0 +1,77 @@
+/*
+ * Auswahllisten (alle <select>) im Stil der Kanzlei: dunkles Panel mit Goldrand, großzügige Zeilen,
+ * Gold-Häkchen bei der gewählten Option, sanftes Aufklappen. Nutzt „appearance: base-select“
+ * (Chrome/Edge/Opera ab 2025) – ältere Browser zeigen weiter die normale Liste des Systems.
+ * :is(select.field, select) hebt die Spezifität an, damit diese Regeln die älteren Option-Farben überschreiben.
+ */
+@supports (appearance: base-select) {
+  :is(select.field, select):not([multiple]):not([size]),
+  :is(select.field, select):not([multiple]):not([size])::picker(select) {
+    appearance: base-select;
+  }
+  :is(select.field, select):not([multiple]):not([size]) {
+    cursor: pointer;
+  }
+  /* Eigener Gold-Pfeil (Hintergrundbild) bei .field und in der Aktenleiste – sonst der eingebaute, in Gold */
+  select::picker-icon { color: #d4af37; transition: rotate 0.2s ease; }
+  select:open::picker-icon { rotate: 180deg; }
+  select.field::picker-icon, .prop-v select::picker-icon { display: none; }
+  select.field:open { border-color: var(--gold-500, #d4af37); box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15); }
+
+  :is(select.field, select)::picker(select) {
+    margin-block: 6px;
+    padding: 6px;
+    min-width: anchor-size(width);
+    max-height: min(22rem, 60vh);
+    overflow-y: auto;
+    background: #0b1530;
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    border-radius: 12px;
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+    color: #e2e8f0;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(212, 175, 55, 0.35) transparent;
+    opacity: 0;
+    translate: 0 -4px;
+    transition: opacity 0.15s ease, translate 0.15s ease, overlay 0.15s allow-discrete, display 0.15s allow-discrete;
+  }
+  :is(select.field, select):open::picker(select) { opacity: 1; translate: 0 0; }
+  @starting-style {
+    :is(select.field, select):open::picker(select) { opacity: 0; translate: 0 -4px; }
+  }
+
+  :is(select.field, select) option {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-height: 40px;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    background: transparent;
+    color: #cbd5e1;
+    font-size: 0.9rem;
+    font-weight: 400;
+    letter-spacing: normal;
+    text-transform: none;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  :is(select.field, select) option:hover,
+  :is(select.field, select) option:focus-visible { background: rgba(212, 175, 55, 0.12); color: #fff; outline: none; }
+  :is(select.field, select) option:checked { color: #f3e5ab; font-weight: 600; background: rgba(212, 175, 55, 0.07); }
+  :is(select.field, select) option::checkmark { order: 1; margin-left: auto; content: '✓'; color: #d4af37; font-weight: 700; }
+  :is(select.field, select) option:disabled { opacity: 0.45; cursor: default; }
+  :is(select.field, select) option:disabled:hover { background: transparent; color: #cbd5e1; }
+
+  /* Gruppen (z. B. „Board of Partners“ / „Associate Attorneys“): kleine Überschrift, Trennlinie */
+  :is(select.field, select) optgroup {
+    padding: 0.55rem 0.5rem 0.2rem;
+    background: transparent;
+    color: #94a3b8;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  :is(select.field, select) optgroup + optgroup { margin-top: 4px; border-top: 1px solid rgba(255, 255, 255, 0.07); }
+}
