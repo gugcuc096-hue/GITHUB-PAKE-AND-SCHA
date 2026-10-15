@@ -45,7 +45,13 @@ const roles = [
 ];
 
 const state = { calls: [], channelMessages: [], dms: [], channels: [], seq: 0, channelSeq: 0 };
-const save = () => STATE && fs.writeFileSync(STATE, JSON.stringify(state, null, 1));
+// In einem Zug ersetzen (erst Hilfsdatei, dann umbenennen): Tests lesen die Datei parallel und dürfen nie eine halb
+// geschriebene Datei sehen.
+const save = () => {
+  if (!STATE) return;
+  fs.writeFileSync(`${STATE}.tmp`, JSON.stringify(state, null, 1));
+  fs.renameSync(`${STATE}.tmp`, STATE);
+};
 const json = (status, body) => new Response(body === null ? null : JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
 globalThis.fetch = async (input, init = {}) => {
