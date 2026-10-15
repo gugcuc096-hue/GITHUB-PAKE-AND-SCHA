@@ -10,12 +10,12 @@ const CONTRACT_STATUS = { entwurf: ['Entwurf', 'slate'], teilweise: ['Teilweise 
 /*
  * Dokumente öffnen – ohne Druckersymbol und ohne zusätzliche Knöpfe: Für die Kanzlei öffnet der Knopf eines fertigen
  * Dokuments (Vertrag/Schriftsatz vollständig unterschrieben, Rechnungen immer) direkt das Google Doc. Die Ansicht der
- * Website (Druck / PDF) erreicht man über den Namen bzw. die Nummer des Dokuments.
+ * Website erreicht man über den Namen bzw. die Nummer des Dokuments.
  */
 const safeGdoc = (u) => (typeof u === 'string' && /^https:\/\/docs\.google\.com\//.test(u) ? u : null);
-const docViewBtn = (href, cls = 'btn-outline btn-sm') => `<a class="${cls}" href="${href}" target="_blank" rel="noopener">${icon('eye', 'ico-sm')}<span>Ansehen / PDF</span></a>`;
+const docViewBtn = (href, cls = 'btn-outline btn-sm') => `<a class="${cls}" href="${href}" target="_blank" rel="noopener">${icon('eye', 'ico-sm')}<span>Ansehen</span></a>`;
 const gdocBtn = (url, cls = 'btn-outline btn-sm') => `<a class="${cls}" href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="Google Doc öffnen – die Ansicht der Website über den Namen">${icon('doc', 'ico-sm')}<span>Google Doc</span></a>`;
-const docTitleLink = (href, html, cls = '') => `<a class="doc-title${cls ? ` ${cls}` : ''}" href="${href}" target="_blank" rel="noopener" title="Ansicht der Website öffnen (Druck / PDF)">${html}</a>`;
+const docTitleLink = (href, html, cls = '') => `<a class="doc-title${cls ? ` ${cls}` : ''}" href="${href}" target="_blank" rel="noopener" title="Ansicht der Website öffnen">${html}</a>`;
 
 /** Alle unterzeichnenden Anwälte eines Vertrags – der erste zuerst. */
 const contractLawyers = (k) => [
@@ -56,7 +56,7 @@ function contractsSection(c, list) {
       'Verträge',
       'noch keiner',
       c.canEdit ? `<button type="button" class="btn-outline btn-sm" data-action="contract-new" data-case-id="${c.id}">${icon('plus', 'ico-sm')}<span>Mandatsvertrag erstellen</span></button>` : '',
-      'Füllt die Vorlage der Kanzlei mit den Daten dieser Akte – danach unterschreiben Anwalt (auf Wunsch mehrere) und Mandant (im Portal oder im Spiel); drucken oder als PDF speichern.'
+      'Füllt die Vorlage der Kanzlei mit den Daten dieser Akte – danach unterschreiben Anwalt (auf Wunsch mehrere) und Mandant (im Portal oder im Spiel); das Google Doc dazu entsteht automatisch.'
     );
   return `<div class="section" id="secContracts">
       <h3 class="section-title">Verträge ${staff && c.canEdit ? `<span class="ext-add"><button type="button" class="btn-outline btn-sm" data-action="contract-new" data-case-id="${c.id}">${icon('doc', 'ico-sm')}<span>Mandatsvertrag erstellen</span></button></span>` : ''}</h3>
@@ -252,7 +252,7 @@ function briefsSection(c, list) {
       'Schriftsätze',
       'noch keine',
       c.canEdit ? `<button type="button" class="btn-outline btn-sm" data-action="brief-new" data-case-id="${c.id}">${icon('plus', 'ico-sm')}<span>Schriftsatz erstellen</span></button>` : '',
-      'Vorlage der Kanzlei (z. B. Vollmacht, Akteneinsicht, Haftbeschwerde) mit den Daten dieser Akte füllen; drucken oder als PDF speichern. Zunächst nur für die Kanzlei sichtbar.'
+      'Vorlage der Kanzlei (z. B. Vollmacht, Akteneinsicht, Haftbeschwerde) mit den Daten dieser Akte füllen; das Google Doc dazu entsteht automatisch. Zunächst nur für die Kanzlei sichtbar.'
     );
   return `<div class="section" id="secBriefs">
       <h3 class="section-title">Schriftsätze ${staff && c.canEdit ? `<span class="ext-add"><button type="button" class="btn-outline btn-sm" data-action="brief-new" data-case-id="${c.id}">${icon('doc', 'ico-sm')}<span>Schriftsatz erstellen</span></button></span>` : ''}</h3>

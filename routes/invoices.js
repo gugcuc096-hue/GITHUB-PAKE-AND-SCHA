@@ -230,6 +230,7 @@ router.post(
     }
     const inv = db.prepare(`${INVOICE_SELECT} WHERE i.id = ?`).get(Number(info.lastInsertRowid));
     require('../googleDocs').ensure('invoice', inv.id); // Google Doc gleich mit anlegen (wenn verbunden)
+    require('../googleDocs').touchExtract(inv.case_id); // Rechnungen stehen im Aktenauszug
     res.status(201).json({ invoice: invoiceRow(inv) });
   })
 );
@@ -436,12 +437,13 @@ router.delete(
   requireAdmin,
   wrap(async (req, res) => {
     const id = idParam(req);
-    const inv = id && db.prepare('SELECT id, number, payment_proof FROM invoices WHERE id = ?').get(id);
+    const inv = id && db.prepare('SELECT id, number, payment_proof, case_id FROM invoices WHERE id = ?').get(id);
     if (!inv) return res.status(404).json({ error: 'Dokument nicht gefunden.' });
     db.prepare('DELETE FROM invoices WHERE id = ?').run(inv.id);
     if (inv.payment_proof) removeFile('evidence', inv.payment_proof);
     logActivity(req.user, 'Rechnung gelöscht', 'invoice', inv.id, inv.number);
     require('../googleDocs').remove('invoice', inv.id);
+    require('../googleDocs').touchExtract(inv.case_id);
     res.json({ success: true });
   })
 );

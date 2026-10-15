@@ -206,7 +206,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       // (ohne verbundenes Google-Konto gibt es kein Google Doc – sonst öffnet das Symbol direkt das Doc)
       assert.equal(await page.$$eval('#modalBody svg path', (ps) => ps.filter((p) => (p.getAttribute('d') || '').startsWith('M17 17h2')).length), 0, 'kein Druckersymbol in der Akte');
       assert.equal(await page.getAttribute(`#secInvoices a.doc-title[href="/invoice.html?id=${data.invoiceId}"]`, 'target'), '_blank');
-      assert.equal(await page.getAttribute(`#secInvoices a.icon-btn[href="/invoice.html?id=${data.invoiceId}"]`, 'aria-label'), 'Ansehen / PDF');
+      assert.equal(await page.getAttribute(`#secInvoices a.icon-btn[href="/invoice.html?id=${data.invoiceId}"]`, 'aria-label'), 'Ansehen');
 
       // Weit unten in der Akte: das X bleibt oben rechts sichtbar und klickbar
       await page.$eval(scroller, (el) => (el.scrollTop = el.scrollHeight));
@@ -1684,20 +1684,18 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
     });
   }
 
-  it('Druckansichten: Rechnung und Aktenauszug', async () => {
+  it('Ansichten Rechnung und Aktenauszug ohne Drucken/PDF', async () => {
     const { ctx, page, problems } = await open(DESKTOP);
     await login(page, TEAM.admin);
     await page.goto(`${server.base}/invoice.html?id=${data.invoiceId}`);
     await page.waitForSelector('.paper');
-    await page.evaluate(() => {
-      window.__printed = 0;
-      window.print = () => window.__printed++;
-    });
-    await page.click('#printBtn');
-    assert.equal(await page.evaluate(() => window.__printed), 1, 'Druckknopf');
+    // Kein Drucken/PDF mehr – die Kanzlei arbeitet mit Google Docs
+    assert.equal(await page.locator('#printBtn').count(), 0);
+    assert.doesNotMatch(await page.textContent('.toolbar'), /Drucken|PDF/);
     await page.goto(`${server.base}/aktenauszug.html?id=${data.caseId}`);
     await page.waitForSelector('.paper h1');
     assert.ok((await page.textContent('.paper')).includes(data.caseNumber));
+    assert.doesNotMatch(await page.textContent('.toolbar'), /Drucken|PDF|Aktualisieren/);
     assert.deepEqual(problems, []);
     await ctx.close();
   });
