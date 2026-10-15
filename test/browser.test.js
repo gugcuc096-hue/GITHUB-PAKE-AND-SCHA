@@ -1288,6 +1288,9 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         assert.equal(await page.inputValue('#modalBody [data-case-priority]'), '3');
         assert.equal((await page.textContent('#modalBody .prop-urg .prop-k')).trim(), 'Mandant');
         assert.equal((await page.textContent('#modalBody .prop-urg .prop-v')).trim(), 'Eilig');
+        // Auswahl im Aktenkopf: Text senkrecht mittig (nicht oben angeklebt, auch mit gestalteter Auswahlliste)
+        const sel = await page.$eval('#modalBody [data-case-priority]', (s) => ({ appearance: getComputedStyle(s).appearance, align: getComputedStyle(s).alignItems }));
+        if (sel.appearance === 'base-select') assert.equal(sel.align, 'center', 'Status/Priorität senkrecht mittig');
         // Kopf nicht gequetscht: Titel über die volle Breite, die Felder darunter in einer eigenen Zeile
         const [titleBox, propsBox] = await page.$$eval('#modalBody .case-head > *', (els) => els.map((e) => e.getBoundingClientRect().toJSON()));
         assert.ok(propsBox.top >= titleBox.bottom - 1, 'Felder unter dem Titel');

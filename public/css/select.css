@@ -9,8 +9,10 @@
   :is(select.field, select):not([multiple]):not([size])::picker(select) {
     appearance: base-select;
   }
+  /* base-select legt den Text als Flex-Inhalt an – senkrecht mittig wie vorher (z. B. Status/Priorität im Aktenkopf) */
   :is(select.field, select):not([multiple]):not([size]) {
     cursor: pointer;
+    align-items: center;
   }
   /* Eigener Gold-Pfeil (Hintergrundbild) bei .field und in der Aktenleiste – sonst der eingebaute, in Gold */
   select::picker-icon { color: #d4af37; transition: rotate 0.2s ease; }
