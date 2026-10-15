@@ -18,7 +18,12 @@ const STATE = process.env.GOOGLE_STUB_STATE || '';
 const FILES_DIR = STATE ? `${STATE}.files` : '';
 const state = { files: {}, calls: [], revoked: [], removed: [], seq: 0, lastAuthorize: null };
 const sessions = {}; // Upload-Sitzungen („resumable“): upload_id → { method, id, meta }
-const save = () => STATE && fs.writeFileSync(STATE, JSON.stringify(state, null, 1));
+// In einem Zug ersetzen – sonst kann ein Test eine halb geschriebene Datei lesen
+const save = () => {
+  if (!STATE) return;
+  fs.writeFileSync(`${STATE}.tmp`, JSON.stringify(state, null, 1));
+  fs.renameSync(`${STATE}.tmp`, STATE);
+};
 const control = () => {
   try {
     return JSON.parse(fs.readFileSync(`${STATE}.ctl`, 'utf8'));

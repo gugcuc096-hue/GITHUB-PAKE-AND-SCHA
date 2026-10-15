@@ -1773,4 +1773,49 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       }
     });
   }
+  for (const [label, device] of [
+    ['PC', DESKTOP],
+    ['Handy', PHONE],
+  ]) {
+    it(`Kalender im Kanzlei-Stil am ${label}: Termin mit Uhrzeit, reines Datum, Esc schließt nur den Kalender`, async () => {
+      const ksrv = await startServer();
+      const { ctx, page, problems } = await open(device);
+      const tap = (sel) => (label === 'Handy' ? page.tap(sel) : page.click(sel));
+      try {
+        await login(page, TEAM.admin, ksrv.base);
+        await page.goto(ksrv.base + '/dashboard.html#calendar');
+        await page.waitForSelector('#content .page-title');
+        await page.evaluate(() => openModal(eventForm(null)));
+        await tap('#evStart');
+        await page.waitForSelector('.dp');
+        assert.equal(await page.locator('.dp .dp-day').count(), 42, 'sechs Wochen, Montag zuerst');
+        assert.equal((await page.textContent('.dp .dp-wd')).trim(), 'Mo');
+        await page.click('.dp [data-dp-nav="1"]');
+        await page.click('.dp .dp-day:not(.out) >> text="15"');
+        await page.selectOption('.dp [data-dp-time="hh"]', '14');
+        await page.selectOption('.dp [data-dp-time="mm"]', '30');
+        await page.click('.dp [data-dp-act="ok"]');
+        assert.match(await page.inputValue('#evStart'), /^\d{4}-\d{2}-15T14:30$/);
+        assert.equal(await page.locator('.dp').count(), 0);
+        assert.equal(await page.inputValue('#evStart') !== '' && (await page.$eval('#evStart', (i) => i.readOnly)), false, 'nach dem Schließen wieder normal');
+        await tap('#evEnd');
+        await page.waitForSelector('.dp');
+        await page.keyboard.press('Escape');
+        assert.equal(await page.locator('.dp').count(), 0);
+        assert.equal(await page.locator('#modalBody form[data-form="event"]').count(), 1, 'Esc schließt nur den Kalender');
+        // Reines Datum: Tag antippen = übernommen
+        await page.evaluate(() => taskModal(null));
+        await tap('#modalBody input[name="dueDate"]');
+        await page.waitForSelector('.dp');
+        assert.equal(await page.locator('.dp [data-dp-time]').count(), 0, 'keine Uhrzeit bei reinem Datum');
+        await page.click('.dp .dp-day:not(.out) >> text="20"');
+        assert.match(await page.inputValue('#modalBody input[name="dueDate"]'), /^\d{4}-\d{2}-20$/);
+        assert.ok((await overflow(page)) <= 1);
+        assert.deepEqual(problems, []);
+      } finally {
+        await ctx.close();
+        await ksrv.stop();
+      }
+    });
+  }
 });
