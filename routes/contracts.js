@@ -563,6 +563,7 @@ caseRouter.post(
       // Interne Schriftsätze erscheinen nicht im Ticket; muss der Mandant unterschreiben, wird er einmal erwähnt
       if (!internal) {
         tickets.post(c.id, {
+          event: needs.client ? 'contract' : 'document',
           title: `📄 ${t.name} erstellt`,
           description: needs.client
             ? `Das Dokument liegt im Mandantenportal unter der Akte ${c.case_number} bereit – bitte prüfen und unterschreiben.`
@@ -576,6 +577,7 @@ caseRouter.post(
       return res.status(201).json({ contract: contractRow(db.prepare(`${CONTRACT_SELECT} WHERE k.id = ?`).get(id)) });
     }
     tickets.post(c.id, {
+      event: 'contract',
       title: `📝 ${t.name} erstellt`,
       description: `Der Vertrag liegt im Mandantenportal unter der Akte ${c.case_number} bereit – bitte prüfen und unterschreiben.${signButtons(id) ? ' Oder gleich hier: **„Lesen & unterschreiben“**.' : ''}`,
       fields: [{ name: names.length > 1 ? 'Unterzeichnende Anwälte' : 'Unterzeichnender Anwalt', value: names.join('\n') }],
@@ -672,6 +674,7 @@ router.patch(
         logActivity(req.user, req.body.internal ? 'Schriftsatz auf intern gestellt' : 'Schriftsatz freigegeben', 'case', c.id, `${c.case_number}: ${k.template_name}`);
         if (!req.body.internal) {
           tickets.post(c.id, {
+            event: 'document',
             title: `📄 ${k.template_name} freigegeben`,
             description: `Das Dokument ist jetzt im Mandantenportal unter der Akte ${c.case_number} abrufbar.`,
             by: req.user.display_name,
@@ -756,6 +759,7 @@ function afterSign(k, c, who, u, note) {
   const pingIds = who === 'anwalt' ? [] : discordIdsOf(lawyers.filter((l) => !l.signedAt));
   notifySigned(c, updated, who === 'anwalt' ? 'Anwalt' : 'Mandanten', u, pingIds);
   if (!updated.internal) tickets.post(c.id, {
+    event: 'contract',
     title: full ? `✅ ${k.template_name} vollständig unterschrieben` : `✍️ ${k.template_name} vom ${who === 'anwalt' ? 'Anwalt' : 'Mandanten'} unterschrieben`,
     description: full
       ? k.kind === 'schriftsatz'

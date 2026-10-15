@@ -1054,6 +1054,50 @@ for (const row of db.prepare("SELECT id FROM applications WHERE access_token = '
   db.prepare('UPDATE applications SET access_token = ? WHERE id = ?').run(crypto.randomBytes(24).toString('base64url'), row.id);
 }
 
+/* Ränge (vom Board in den Einstellungen gepflegt) – Inhalt der Rang-Karten auf der Startseite */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS ranks (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL UNIQUE,
+    level       TEXT NOT NULL DEFAULT 'associate' CHECK (level IN ('board','associate')),
+    badge       TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    footer      TEXT NOT NULL DEFAULT '',
+    sort        INTEGER NOT NULL DEFAULT 0
+  );
+`);
+/* Website-Texte, die das Board direkt auf der Seite geändert hat (Schlüssel = Fingerabdruck des Originaltexts) */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS site_texts (
+    page        TEXT NOT NULL,
+    key         TEXT NOT NULL,
+    original    TEXT NOT NULL DEFAULT '',
+    text        TEXT NOT NULL,
+    updated_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (page, key)
+  );
+`);
+/* Einarbeitung neuer Anwälte: Checkliste je Person, Mentor aus dem Board */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS onboarding (
+    user_id     INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    mentor_id   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    started_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    done_at     TEXT
+  );
+  CREATE TABLE IF NOT EXISTS onboarding_items (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    label       TEXT NOT NULL,
+    sort        INTEGER NOT NULL DEFAULT 0,
+    done_at     TEXT,
+    done_by     TEXT NOT NULL DEFAULT ''
+  );
+  CREATE INDEX IF NOT EXISTS idx_onboarding_items_user ON onboarding_items(user_id);
+`);
+addColumn('appointments', 'client_reminded', 'INTEGER NOT NULL DEFAULT 0');
+
 /**
  * Fortlaufende Nummer pro Jahr, z. B. PS-2026-0007. Lücken durch Löschen führen nicht zu Dubletten.
  * also: weitere [Tabelle, Spalte], deren Nummern ebenfalls belegt sind (Akten im Papierkorb).

@@ -52,9 +52,16 @@ const EVENT_STATUS = { angefragt: ['Angefragt', 'amber'], bestaetigt: ['Bestäti
 const INVOICE_STATUS = { offen: ['Offen', 'amber'], bezahlt: ['Bezahlt', 'emerald'], storniert: ['Storniert', 'slate'] };
 const INVOICE_KIND = { rechnung: 'Rechnung', honorarvereinbarung: 'Honorarvereinbarung' };
 const FEE_CATEGORIES = { rechtsberatung: 'Rechtsberatung', strafrecht: 'Strafrecht & Haftvertretung', notfall: 'Notfall & Sofortdienst', gericht: 'Gerichtsverfahren', vertraege: 'Verträge & Dokumente' };
-// Ränge der Kanzlei – es gibt nur diese sechs (siehe helpers.js auf dem Server).
+// Ränge der Kanzlei – Vorgabe; beim Start kommen die aktuellen Ränge vom Server (Einstellungen → Ränge).
 const RANK_GROUPS = { 'Board of Partners': ['Founding Partner', 'Equity Partner', 'Partner'], 'Associate Attorneys': ['Senior Associate', 'Associate', 'Junior Associate'] };
 const RANKS = Object.values(RANK_GROUPS).flat();
+/** Ränge vom Server übernehmen (gleiche Objekte, damit alle Ansichten sie sehen). */
+function setRanks(groups) {
+  if (!groups) return;
+  for (const k of Object.keys(RANK_GROUPS)) delete RANK_GROUPS[k];
+  Object.assign(RANK_GROUPS, groups);
+  RANKS.splice(0, RANKS.length, ...Object.values(groups).flat());
+}
 const NOTE_COLORS = { gold: '#d4af37', blue: '#60a5fa', green: '#34d399', red: '#f87171', slate: '#94a3b8' };
 const DISCORD_MSG = {
   linked: ['Discord-Konto erfolgreich verbunden.', 'ok'],

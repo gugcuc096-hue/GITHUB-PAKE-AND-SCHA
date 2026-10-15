@@ -18,7 +18,7 @@ const rateLimit = require('express-rate-limit');
 const { z } = require('zod');
 const { db, tx, nextConcernNumber, randomPin } = require('../db');
 const { requireAuth } = require('../auth');
-const { wrap, parseBody, idParam, truncate, isBoard } = require('../helpers');
+const { wrap, parseBody, idParam, truncate, isBoard, BOARD_RANK_SQL } = require('../helpers');
 const { logActivity } = require('../models');
 const discord = require('../discord');
 const tickets = require('../tickets');
@@ -56,7 +56,7 @@ const SELECT = `
   LEFT JOIN users au ON au.id = k.author_id
   LEFT JOIN users asg ON asg.id = k.assigned_to`;
 
-const BOARD_MEMBER_SQL = "active = 1 AND (role = 'admin' OR (role = 'anwalt' AND rank IN ('Founding Partner','Equity Partner','Partner')))";
+const boardMemberSql = () => `active = 1 AND (role = 'admin' OR (role = 'anwalt' AND ${BOARD_RANK_SQL()}))`;
 
 /** Name der einreichenden Person aus Sicht des Betrachters. */
 function authorLabel(k, viewer) {
@@ -259,7 +259,7 @@ router.get('/:id', (req, res) => {
     .map((m) => messageRow(m, k, u));
   const boardMembers = board
     ? db
-        .prepare(`SELECT id, display_name, rank FROM users WHERE ${BOARD_MEMBER_SQL} ORDER BY display_name`)
+        .prepare(`SELECT id, display_name, rank FROM users WHERE ${boardMemberSql()} ORDER BY display_name`)
         .all()
         .map((b) => ({ id: b.id, name: b.display_name, rank: b.rank }))
     : undefined;
@@ -336,7 +336,7 @@ function changeConcern(k, u, d, via = '') {
   if (d.assignedTo !== undefined && d.assignedTo !== k.assigned_to) {
     let name = null;
     if (d.assignedTo !== null) {
-      const m = db.prepare(`SELECT id, display_name FROM users WHERE id = ? AND ${BOARD_MEMBER_SQL}`).get(d.assignedTo);
+      const m = db.prepare(`SELECT id, display_name FROM users WHERE id = ? AND ${boardMemberSql()}`).get(d.assignedTo);
       if (!m) return { status: 400, error: 'Zuständig kann nur ein Mitglied des Board of Partners sein.' };
       name = m.display_name;
     }

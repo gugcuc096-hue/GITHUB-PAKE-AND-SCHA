@@ -89,6 +89,8 @@ router.post(
     logActivity(req.user, 'Konto angelegt', 'user', user.id, `${user.display_name} (${ROLE_LABEL[user.role]})`);
     // Neues Mitarbeiterkonto = Einstellung (Personalprotokoll)
     if (user.role !== 'mandant') personnel.recordHire({ userId: user.id, name: user.display_name, rank: user.rank, by: req.user });
+    // Neue Anwälte: Einarbeitung mit Checkliste, Mentor ist zunächst, wer das Konto angelegt hat
+    if (user.role === 'anwalt') require('../onboarding').start(user.id, req.user.id);
     res.status(201).json({ user: userRow(user), credentials: { email, password } });
   })
 );
@@ -270,6 +272,8 @@ function settingsPayload() {
     firmContact: getSetting('firm_contact', 'kontakt@pake-scha.ls'),
     invoiceReminderDays: require('../paymentReminders').reminderDays(),
     caseIdleDays: idleLimit(),
+    cleanupDays: require('../cleanup').days(),
+    onboardingTemplate: require('../onboarding').template(),
     showDutyPublic: getSetting('show_duty_public', '1') === '1',
     showSuccessPublic: getSetting('show_success_public', '1') === '1',
     fivenetUrl: getSetting('fivenet_url', ''),
@@ -296,6 +300,8 @@ router.patch(
       firmContact: z.string().trim().max(120).optional(),
       invoiceReminderDays: z.number().int().min(0).max(60).optional(),
       caseIdleDays: z.number().int().min(0).max(60).optional(),
+      cleanupDays: z.number().int().min(0).max(365).optional(),
+      onboardingTemplate: z.string().max(4000).optional(),
       showDutyPublic: z.boolean().optional(),
       showSuccessPublic: z.boolean().optional(),
       fivenetUrl: z.string().trim().max(200).optional(),
@@ -355,6 +361,8 @@ router.patch(
       if (d.firmContact !== undefined) setSetting('firm_contact', d.firmContact);
       if (d.invoiceReminderDays !== undefined) require('../paymentReminders').setReminderDays(d.invoiceReminderDays);
       if (d.caseIdleDays !== undefined) setIdleLimit(d.caseIdleDays);
+      if (d.cleanupDays !== undefined) require('../cleanup').setDays(d.cleanupDays);
+      if (d.onboardingTemplate !== undefined) require('../onboarding').setTemplate(d.onboardingTemplate);
       if (d.fivenetUrl !== undefined) setSetting('fivenet_url', d.fivenetUrl);
     });
     // Anschrift/Zahlungshinweis stehen auf den Rechnungen → deren Google Docs neu schreiben

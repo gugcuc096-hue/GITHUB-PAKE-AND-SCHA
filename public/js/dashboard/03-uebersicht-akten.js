@@ -162,6 +162,7 @@ views.overview = {
       load.duty(),
       load.myTasks(),
       isStaff() ? api.get('/api/absences').then((r) => (st.absences = r)) : null,
+      isStaff() ? api.get('/api/onboarding').then((r) => (st.onboarding = r), () => (st.onboarding = null)) : null,
       isAdmin() ? api.get('/api/admin/alerts').then((r) => (st.alerts = r.alerts), () => (st.alerts = [])) : null,
       !isStaff() ? api.get('/api/contracts/to-sign').then((r) => (st.toSign = r.contracts), () => (st.toSign = [])) : null,
     ]);
@@ -189,6 +190,12 @@ views.overview = {
       u.emailNotice
         ? `<div class="banner banner-gold items-center justify-between flex-wrap"><div>${icon('mail')} <strong>Ihre Login-E-Mail lautet jetzt ${esc(u.email)}</strong>${u.emailNotice.oldEmail ? ` (vorher ${esc(u.emailNotice.oldEmail)})` : ''}. Alle Konten der Kanzlei enden auf @${EMAIL_DOMAIN}. Ihr Passwort bleibt gleich – die alte Adresse funktioniert beim Login weiterhin.</div><button class="btn-outline btn-sm" data-action="email-notice-ok">Verstanden</button></div>`
         : '',
+      (() => {
+        const mine = staff && st.onboarding && st.onboarding.list.find((e) => e.userId === u.id && !e.doneAt);
+        return mine
+          ? `<div class="banner banner-gold items-center justify-between flex-wrap"><div>${icon('star')} <strong>Deine Einarbeitung:</strong> ${mine.done} von ${mine.total} Punkten erledigt${mine.mentor ? ` · Mentor: ${esc(mine.mentor.name)}` : ''}</div><a href="#personnel" class="btn-outline btn-sm">Checkliste</a></div>`
+          : '';
+      })(),
       !staff && st.cases.some((c) => c.status === 'geschlossen' && !c.reviewed)
         ? (() => {
             const c = st.cases.find((x) => x.status === 'geschlossen' && !x.reviewed);

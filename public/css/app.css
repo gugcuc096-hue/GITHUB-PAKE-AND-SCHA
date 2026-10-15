@@ -1478,3 +1478,17 @@ textarea.field.chat-input { resize: none; min-height: 42px; height: 42px; max-he
   .tbl-cards tr.more-rows td { display: block; padding: 0; }
   .tbl-cards tr.more-rows td::before { display: none; }
 }
+
+/* Einstellungen → Discord: Was ins Mandats-Ticket kommt (Häkchen in zwei Spalten) */
+.ev-checks { display: grid; gap: 0.55rem 1.25rem; }
+@media (min-width: 640px) { .ev-checks { grid-template-columns: 1fr 1fr; } }
+/* Kleine Auswahl/Eingabe in Listenzeilen (Mentor, weiterer Punkt) */
+.field.field-sm { min-height: 38px; padding: 0.4rem 0.65rem; font-size: 0.85rem; width: auto; max-width: 100%; }
+select.field.field-sm { padding-right: 2.25rem; }
+form .field.field-sm { flex: 1 1 auto; }
+/* Einarbeitung: Fortschrittsbalken und Checkliste */
+.ob-bar { height: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); overflow: hidden; margin: 0.6rem 0 0.75rem; }
+.ob-bar span { display: block; height: 100%; background: var(--gold-500); border-radius: 999px; transition: width 0.3s ease; }
+.ob-items { display: grid; gap: 0.5rem; }
+@media (min-width: 900px) { .ob-items { grid-template-columns: 1fr 1fr; } }
+.ob-items .check input:checked + span { color: var(--text-dim, #64748b); text-decoration: line-through; }

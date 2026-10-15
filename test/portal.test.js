@@ -509,4 +509,26 @@ describe('Mandantenportal: Discord-Konto, Zahlung melden, Unterschriften', () =>
       assert.deepEqual(portal.discord, { connected: true, available: true });
     });
   });
+  describe('Discord-Tickets: nur das Wichtige, Stand im Kanalnamen', () => {
+    const titles = () => stub().channelMessages.filter((m) => m.channel === state.channel).map((m) => m.embeds && m.embeds[0] && m.embeds[0].title);
+    it('Stand-Wechsel: keine Nachricht, aber das Zeichen vor dem Kanalnamen – zuschaltbar in den Einstellungen', async () => {
+      const before = titles().length;
+      assert.equal((await as.anwalt.patch(`/api/cases/${state.caseId}`, { step: 3 })).status, 200);
+      const renamed = await waitFor(() => (stub().renames || []).find((r) => r.channel === state.channel && r.name.startsWith('⚖️・')), 'Kanalname mit ⚖️');
+      assert.match(renamed.name, /^⚖️・ps-/);
+      await sleep(300);
+      assert.equal(titles().length, before, 'keine Nachricht für den Stand');
+      // Ein Anhang kommt nicht mehr ins Ticket, eine Chat-Nachricht schon
+      const note = await as.anwalt.post(`/api/cases/${state.caseId}/notes`, { body: 'Bitte morgen um 18 Uhr in die Kanzlei kommen.' });
+      assert.equal(note.status, 201, note.text);
+      await waitFor(() => titles().some((t) => /Nachricht von/.test(t || '')), 'Chat-Nachricht im Ticket');
+      // Meldung „Stand geändert“ zuschalten → kommt wieder
+      const s = await as.admin.patch('/api/tickets/settings', { events: { step: true } });
+      assert.equal(s.json.events.step.on, true);
+      assert.equal(s.json.events.attachment.on, false, 'Rest bleibt wie ab Werk');
+      assert.equal((await as.anwalt.patch(`/api/cases/${state.caseId}`, { step: 2 })).status, 200);
+      await waitFor(() => titles().some((t) => /Stand der Akte/.test(t || '')), 'Nachricht „Stand der Akte aktualisiert“');
+      await as.admin.patch('/api/tickets/settings', { events: { step: false } });
+    });
+  });
 });

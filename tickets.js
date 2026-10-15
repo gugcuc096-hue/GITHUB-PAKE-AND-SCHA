@@ -18,7 +18,7 @@
  */
 const crypto = require('crypto');
 const { db, getSetting, setSetting } = require('./db');
-const { truncate, CASE_STATUS, STEPS, URGENCY_LABEL } = require('./helpers');
+const { truncate, CASE_STATUS, STEPS, URGENCY_LABEL, BOARD_RANKS } = require('./helpers');
 const { getCase, caseLawyers } = require('./models');
 const discord = require('./discord');
 
@@ -135,6 +135,7 @@ class DiscordApiError extends Error {
     super(describeError(status, body));
     this.status = status;
     this.code = body && body.code;
+    this.retryAfter = body && Number(body.retry_after);
   }
 }
 
@@ -172,7 +173,7 @@ async function rest(method, path, body, opts = {}) {
     body: body === undefined ? undefined : JSON.stringify(body),
     signal: AbortSignal.timeout(12000),
   });
-  if (res.status === 429 && attempt < 3) {
+  if (res.status === 429 && attempt < 3 && !opts.noRetry) {
     const info = await res.json().catch(() => ({}));
     await sleep(Math.min(15, Number(info.retry_after) || 1) * 1000 + 250);
     return rest(method, path, body, { ...opts, attempt: attempt + 1 });
@@ -293,7 +294,73 @@ function slug(s) {
     .replace(/^-+|-+$/g, '')
     .slice(0, 40);
 }
-const channelName = (c) => [String(c.case_number).toLowerCase(), slug(c.client_account_name || c.client_name)].filter(Boolean).join('-').slice(0, 90);
+/* ---------------------------------------------------------------- Stand im Kanalnamen */
+// Zeichen vor dem Kanalnamen: Stand der Akte bzw. der Bewerbung/des Anliegens, z. B. „⚖️・ps-2026-0014-john-doe“
+const STEP_MARK = ['📥', '🔍', '♟️', '⚖️'];
+const BOARD_MARK = {
+  application: { eingegangen: '📨', in_pruefung: '🔎', gespraech: '🗣️', angenommen: '✅', abgelehnt: '❌' },
+  concern: { offen: '📨', in_bearbeitung: '🛠️', erledigt: '✅', abgelehnt: '❌' },
+};
+const marked = (mark, name) => (mark ? `${mark}・${name}` : name).slice(0, 100);
+const caseMark = (c) => (c.status === 'geschlossen' ? '🔒' : STEP_MARK[c.step] || STEP_MARK[0]);
+const channelName = (c) => marked(caseMark(c), [String(c.case_number).toLowerCase(), slug(c.client_account_name || c.client_name)].filter(Boolean).join('-').slice(0, 90));
+
+const NAMED = new Map(); // Kanal → zuletzt gesetzter Name
+const renameLater = new Map();
+/**
+ * Kanal umbenennen, wenn sich der Stand geändert hat. Discord erlaubt nur 2 Umbenennungen je Kanal in
+ * 10 Minuten – dann wird es später mit dem dann aktuellen Stand nachgeholt (retry), ohne die Warteschlange aufzuhalten.
+ */
+async function syncName(channelId, name, retry) {
+  if (!channelId || NAMED.get(channelId) === name) return;
+  try {
+    await rest('PATCH', `/channels/${channelId}`, { name }, { noRetry: true, reason: 'Stand geändert' });
+    NAMED.set(channelId, name);
+  } catch (err) {
+    if (err.status !== 429) return console.warn('Discord-Kanal nicht umbenannt:', err.message);
+    if (renameLater.has(channelId)) return;
+    const t = setTimeout(() => {
+      renameLater.delete(channelId);
+      retry();
+    }, Math.min(900, err.retryAfter || 300) * 1000 + 1000);
+    t.unref();
+    renameLater.set(channelId, t);
+  }
+}
+
+/* ---------------------------------------------------------------- Was ins Ticket kommt */
+// Nur, was für die Leute im Ticket wichtig ist. Das Board kann einzelne Meldungen in den Einstellungen zuschalten.
+const EVENTS = {
+  chat: ['Nachrichten aus dem Akten-Chat', true],
+  contract: ['Verträge & Schriftsätze zum Unterschreiben, Unterschriften', true],
+  appointment: ['Termine & Fristen: neu, verlegt, abgesagt', true],
+  reminder: ['Erinnerung 24 h vor Frist oder Gerichtstermin', true],
+  invoice: ['Rechnungen, Zahlungserinnerungen, Zahlungen', true],
+  note: ['Hinweis der Kanzlei an den Mandanten', true],
+  lawyer: ['Neuer zuständiger Anwalt', true],
+  closed: ['Akte geschlossen / wieder geöffnet', true],
+  step: ['Stand der Akte geändert (steht auch im Kanalnamen)', false],
+  update: ['Angaben der Akte geändert (Titel, Gegenseite …)', false],
+  document: ['Dokument freigegeben (ohne Unterschrift)', false],
+  attachment: ['Neuer Anhang', false],
+  deadlineDone: ['Frist oder Termin erledigt', false],
+  account: ['Mandanten-Konto verknüpft', false],
+  restored: ['Akte aus dem Papierkorb geholt', false],
+};
+function events() {
+  let saved = {};
+  try {
+    saved = JSON.parse(getSetting('discord_ticket_events', '{}') || '{}');
+  } catch {
+    saved = {};
+  }
+  return Object.fromEntries(Object.entries(EVENTS).map(([k, [label, def]]) => [k, { label, on: typeof saved[k] === 'boolean' ? saved[k] : def }]));
+}
+const eventOn = (ev) => {
+  if (!ev) return true;
+  const all = events();
+  return (Array.isArray(ev) ? ev : [ev]).some((k) => !all[k] || all[k].on);
+};
 const channelUrl = (c) => (c.discord_channel_id && isId(config().guildId) ? `https://discord.com/channels/${config().guildId}/${c.discord_channel_id}` : null);
 
 /** Discord-IDs des Mandanten: verknüpftes Konto und/oder über die Website („Discord-Ticket beitreten“). */
@@ -467,6 +534,7 @@ async function syncMembers(c) {
 }
 
 async function syncArchive(c) {
+  await syncName(c.discord_channel_id, channelName(c), () => syncCase(c.id));
   const cfg = config();
   const closed = c.status === 'geschlossen';
   if (!!c.discord_archived === closed) return;
@@ -666,6 +734,8 @@ function syncCase(caseId, { recreate = false } = {}) {
  */
 function post(caseId, msg) {
   if (!active()) return Promise.resolve();
+  // Abgeschaltete Meldung: nichts schreiben, nur Kanalname/Archiv angleichen
+  if (!eventOn(msg.event)) return syncCase(caseId);
   return enqueue(caseId, async () => {
     let c = await ensure(caseId);
     if (!c) return;
@@ -702,6 +772,17 @@ function post(caseId, msg) {
     await syncArchive(c);
     await refreshCasePanel(caseId);
   });
+}
+
+/** Direktnachricht an den Mandanten der Akte (z. B. Erinnerung an seinen Termin). */
+async function dmClient(caseId, e) {
+  if (!token()) return false;
+  const c = getCase(caseId);
+  const id = c && clientDiscordId(c);
+  if (!id) return false;
+  const ch = await rest('POST', '/users/@me/channels', { recipient_id: id });
+  await rest('POST', `/channels/${ch.id}/messages`, { embeds: [embed(e)] });
+  return true;
 }
 
 /** Akte gelöscht → Hinweis im Kanal und ins Archiv (der Verlauf bleibt erhalten). */
@@ -784,7 +865,6 @@ async function backfill() {
  * Anders als Mandats-Tickets sind das interne Kanäle: Bewerber bzw. Einreichende sind nicht drin,
  * deshalb erscheinen hier auch interne Notizen. Anonyme Anliegen bleiben anonym.
  */
-const BOARD_RANK_LIST = ['Founding Partner', 'Equity Partner', 'Partner'];
 const BOARD_KINDS = {
   application: { table: 'applications', closed: ['angenommen', 'abgelehnt'], flag: 'discord_ticket_board_apps', label: 'Bewerbung' },
   concern: { table: 'concerns', closed: ['erledigt', 'abgelehnt'], flag: 'discord_ticket_board_concerns', label: 'Anliegen' },
@@ -821,8 +901,8 @@ const boardArchive = () => boardConfig().archiveId || config().archiveId;
 /** Discord-IDs aller Board-Mitglieder (Rolle „Board of Partners“ oder Partner-Rang) mit verknüpftem Discord. */
 function boardMemberIds() {
   return db
-    .prepare(`SELECT discord_id FROM users WHERE active = 1 AND (role = 'admin' OR (role = 'anwalt' AND rank IN (${BOARD_RANK_LIST.map(() => '?').join(',')})))`)
-    .all(...BOARD_RANK_LIST)
+    .prepare(`SELECT discord_id FROM users WHERE active = 1 AND (role = 'admin' OR (role = 'anwalt' AND rank IN (${BOARD_RANKS.map(() => '?').join(',')})))`)
+    .all(...BOARD_RANKS)
     .map((u) => u.discord_id)
     .filter(isId);
 }
@@ -845,9 +925,11 @@ const CONCERN_STATUS_LABEL = { offen: 'Offen', in_bearbeitung: 'In Bearbeitung',
 const concernFrom = (k) => `${k.anonymous ? 'Anonym' : k.author_name} (${CONCERN_GROUP[k.author_group] || 'Mitarbeiter'})`;
 
 function boardChannelName(kind, r) {
-  return kind === 'application'
-    ? [String(r.number).toLowerCase(), slug(r.name)].filter(Boolean).join('-').slice(0, 90)
-    : [String(r.reference || `an-${r.id}`).toLowerCase(), slug(r.subject)].filter(Boolean).join('-').slice(0, 90);
+  const base =
+    kind === 'application'
+      ? [String(r.number).toLowerCase(), slug(r.name)].filter(Boolean).join('-').slice(0, 90)
+      : [String(r.reference || `an-${r.id}`).toLowerCase(), slug(r.subject)].filter(Boolean).join('-').slice(0, 90);
+  return marked((BOARD_MARK[kind] || {})[r.status], base);
 }
 
 function boardIntro(kind, r) {
@@ -959,6 +1041,7 @@ async function ensureBoard(kind, id) {
 }
 
 async function syncBoardArchive(kind, r) {
+  await syncName(r.discord_channel_id, boardChannelName(kind, r), () => boardSync(kind, r.id));
   const closed = boardClosed(kind, r);
   if (!!r.discord_archived === closed) return;
   const archive = boardArchive();
@@ -1197,6 +1280,7 @@ function status() {
     lastTest = null;
   }
   return {
+    events: events(),
     tokenSet: !!token(),
     active: active(),
     botName: getSetting('discord_bot_name', '') || null,
@@ -1370,6 +1454,8 @@ async function registerCommands({ force = false } = {}) {
 
 module.exports = {
   rest, // für Kooperationen (Discord-Rollen lesen) und Bot-Befehle
+  events, // Was ins Ticket kommt (Einstellungen)
+  dmClient,
   embed,
   deleteTicket,
   siteBase,

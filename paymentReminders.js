@@ -66,7 +66,7 @@ async function sendReminder(invoiceId, by = null) {
   if (clientId && (await dm(clientId, { title, description, fields, color: tickets.COLORS.gold }))) sent.push('Discord-DM');
   const c = inv.case_id ? getCase(inv.case_id) : null;
   if (c && tickets.active() && !c.discord_deleted) {
-    tickets.post(c.id, { title, description, fields, color: tickets.COLORS.gold, mention: 'client', by: by ? by.display_name : undefined, byDiscordId: by ? by.discord_id : undefined });
+    tickets.post(c.id, { event: 'invoice', title, description, fields, color: tickets.COLORS.gold, mention: 'client', by: by ? by.display_name : undefined, byDiscordId: by ? by.discord_id : undefined });
     sent.push('Ticket');
   }
   db.prepare('UPDATE invoices SET reminded_at = ?, reminder_count = reminder_count + 1 WHERE id = ?').run(new Date().toISOString(), inv.id);

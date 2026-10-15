@@ -1057,11 +1057,22 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.waitForFunction(() => !document.querySelector('#modal').classList.contains('open'));
         assert.equal((await adm.get(`/api/cases/${kase.id}`)).status, 404, 'Akte gelöscht (Papierkorb)');
 
-        // Einstellungen: fünf Reiter, Discord mit Webhook und Login als Module, System mit Datensicherung
+        // Einstellungen: sechs Reiter, Discord mit Webhook und Login als Module, System mit Datensicherung
         await page.evaluate(() => (location.hash = '#settings'));
         await settle();
-        assert.deepEqual(await page.$$eval('#content .settings-tabs .chip', (els) => els.map((e) => e.textContent.trim())), ['Kanzlei & Rechnungen', 'Discord', 'Integrationen', 'System', 'Vertragsvorlagen']);
+        assert.deepEqual(await page.$$eval('#content .settings-tabs .chip', (els) => els.map((e) => e.textContent.trim())), ['Kanzlei & Rechnungen', 'Website & Ränge', 'Discord', 'Integrationen', 'System', 'Vertragsvorlagen']);
         assert.ok(await page.$('#content form[data-form="settings-firm"]'));
+        // Website & Ränge: Bearbeiten-Links, Ränge mit Knöpfen, Rang-Dialog
+        await page.click('#content .settings-tabs [data-tab="site"]');
+        await settle();
+        assert.equal(await page.locator('#content a[href="/?bearbeiten"]').count(), 1);
+        assert.equal(await page.locator('#content [data-action="rank-edit"][data-id]').count(), 6, 'sechs Ränge');
+        assert.ok((await overflow(page)) <= 1, `${label}: Website & Ränge passt in die Breite`);
+        await page.locator('#content [data-action="rank-edit"][data-id]').first().click();
+        await page.waitForSelector('form[data-form="rank"]');
+        assert.equal(await page.inputValue('form[data-form="rank"] input[name="name"]'), 'Founding Partner');
+        await page.keyboard.press('Escape');
+        await settle();
         await page.click('#content .settings-tabs [data-tab="integrations"]');
         await settle();
         assert.match(await page.textContent('#content'), /FiveNet[\s\S]*Google Docs/);
@@ -1687,4 +1698,37 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
     assert.deepEqual(problems, []);
     await ctx.close();
   });
+  for (const [label, device] of [
+    ['PC', DESKTOP],
+    ['Handy', PHONE],
+  ]) {
+    it(`Website-Texte im Bearbeitungsmodus am ${label}: anklicken, ändern, gespeichert; ohne Board kein Bearbeitungsmodus`, async () => {
+      const wsrv = await startServer();
+      const { ctx, page, problems } = await open(device);
+      try {
+        // Ohne Anmeldung: ?bearbeiten zeigt die normale Seite
+        await page.goto(wsrv.base + '/?bearbeiten');
+        await page.waitForTimeout(300);
+        assert.equal(await page.locator('#stBar').count(), 0);
+        await login(page, TEAM.admin, wsrv.base);
+        await page.goto(wsrv.base + '/?bearbeiten#raenge');
+        await page.waitForSelector('#stBar');
+        const h2 = page.locator('#raenge h2[data-t]');
+        await h2.click();
+        await page.keyboard.press('ControlOrMeta+A');
+        await page.keyboard.type('Unsere Ränge');
+        await page.keyboard.press('Enter');
+        await page.waitForFunction(() => document.querySelector('#stBar .st-msg').textContent === 'Gespeichert.');
+        assert.ok((await overflow(page)) <= 1, 'Leiste passt in die Breite');
+        await page.click('#stBar .st-done');
+        await page.waitForURL((u) => !u.search.includes('bearbeiten'));
+        assert.equal((await page.textContent('#raenge h2')).trim(), 'Unsere Ränge');
+        assert.equal(await page.locator('#raenge h4', { hasText: 'Junior Associate' }).count(), 1, 'Rang-Karten aus der Datenbank');
+        assert.deepEqual(problems, []);
+      } finally {
+        await ctx.close();
+        await wsrv.stop();
+      }
+    });
+  }
 });

@@ -39,6 +39,7 @@ router.patch(
         boardRoleIds: z.string().trim().max(300).optional(),
         boardApplications: z.boolean().optional(),
         boardConcerns: z.boolean().optional(),
+        events: z.record(z.string(), z.boolean()).optional(),
       }),
       req,
       res
@@ -68,6 +69,10 @@ router.patch(
     for (const [k, key] of Object.entries(map)) {
       if (d[k] === undefined) continue;
       setSetting(key, typeof d[k] === 'boolean' ? (d[k] ? '1' : '0') : String(d[k]));
+    }
+    if (d.events) {
+      const known = tickets.events();
+      setSetting('discord_ticket_events', JSON.stringify(Object.fromEntries(Object.keys(known).map((k) => [k, d.events[k] ?? known[k].on]))));
     }
     if (d.chatImport) setSetting('discord_ticket_chat_import_error', ''); // neuer Versuch – alte Fehlermeldung weg
     logActivity(req.user, 'Einstellungen geändert', 'settings', null, `Discord-Tickets: ${Object.keys(d).join(', ')}`);

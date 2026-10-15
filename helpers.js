@@ -207,19 +207,28 @@ function deriveInitials(name) {
   return '??';
 }
 
-/* Ränge der Kanzlei: Board of Partners und Associate Attorneys (keine weiteren). */
+/*
+ * Ränge der Kanzlei: Ebene „Board of Partners“ und „Associate Attorneys“. Das Board legt sie in den
+ * Einstellungen selbst an (Tabelle ranks, siehe ranks.js). Die Listen hier sind „lebendig“: ranks.js
+ * füllt sie beim Start und nach jeder Änderung neu (gleiche Array-Objekte, damit alle Module sie sehen).
+ */
 const BOARD_RANKS = ['Founding Partner', 'Equity Partner', 'Partner'];
 const ASSOCIATE_RANKS = ['Senior Associate', 'Associate', 'Junior Associate'];
 const RANKS = [...BOARD_RANKS, ...ASSOCIATE_RANKS];
+/** Einer der aktuellen Ränge. */
+const rankEnum = () => z.string().trim().refine((r) => RANKS.includes(r), { message: 'Unbekannter Rang.' });
 /** Leer (kein Rang) oder einer der Ränge. */
-const rankField = z.union([z.enum(RANKS), z.literal('')]);
+const rankField = z.union([rankEnum(), z.literal('')]);
 /**
  * Gehört zum Board of Partners? Board of Partners und Kanzleileitung sind dasselbe:
- * die Dashboard-Rolle „Board of Partners“ (admin) oder ein Partner-Rang.
+ * die Dashboard-Rolle „Board of Partners“ (admin) oder ein Rang der Ebene Board of Partners.
  */
 const isBoard = (u) => !!u && (u.role === 'admin' || (u.role === 'anwalt' && BOARD_RANKS.includes(u.rank)));
-/** SQL-Sortierung nach Rang (Founding Partner zuerst … Junior Associate, dann ohne Rang). */
-const RANK_ORDER_SQL = (col = 'rank') => `CASE ${col} ${RANKS.map((r, i) => `WHEN '${r}' THEN ${i}`).join(' ')} ELSE ${RANKS.length} END`;
+const sqlStr = (v) => `'${String(v).replace(/'/g, "''")}'`;
+/** SQL-Sortierung nach Rang (höchster Rang zuerst, dann ohne Rang). */
+const RANK_ORDER_SQL = (col = 'rank') => (RANKS.length ? `CASE ${col} ${RANKS.map((r, i) => `WHEN ${sqlStr(r)} THEN ${i}`).join(' ')} ELSE ${RANKS.length} END` : '0');
+/** SQL-Bedingung „Rang gehört zum Board“. */
+const BOARD_RANK_SQL = (col = 'rank') => `${col} IN (${BOARD_RANKS.map(sqlStr).join(',') || "''"})`;
 
 /* ---------------------------------------------------------------- Login-E-Mail der Kanzlei */
 // Alle Konten haben eine Adresse mit dieser Endung – frei wählbar ist nur der Teil vor dem @.
@@ -266,6 +275,8 @@ module.exports = {
   ASSOCIATE_RANKS,
   RANKS,
   rankField,
+  rankEnum,
+  BOARD_RANK_SQL,
   isBoard,
   RANK_ORDER_SQL,
   STEPS,
