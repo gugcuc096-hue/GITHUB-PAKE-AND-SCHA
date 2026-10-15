@@ -911,6 +911,8 @@ video {
 }.border-\[\#0a1228\] {
   --tw-border-opacity: 1;
   border-color: rgb(10 18 40 / var(--tw-border-opacity, 1));
+}.border-\[rgba\(88\2c 101\2c 242\2c 0\.45\)\] {
+  border-color: rgba(88,101,242,0.45);
 }.border-\[var\(--glass-border\)\] {
   border-color: var(--glass-border);
 }.border-\[var\(--gold-hairline\)\] {
@@ -974,6 +976,8 @@ video {
   background-color: rgba(212,175,55,0.15);
 }.bg-\[rgba\(3\2c 7\2c 18\2c 0\.8\)\] {
   background-color: rgba(3,7,18,0.8);
+}.bg-\[rgba\(88\2c 101\2c 242\2c 0\.1\)\] {
+  background-color: rgba(88,101,242,0.1);
 }.bg-\[var\(--gold-500\)\] {
   background-color: var(--gold-500);
 }.bg-amber-400 {

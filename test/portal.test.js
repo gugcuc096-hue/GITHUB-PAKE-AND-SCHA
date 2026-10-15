@@ -474,4 +474,39 @@ describe('Mandantenportal: Discord-Konto, Zahlung melden, Unterschriften', () =>
       assert.equal(off.json.chatImport, false);
     });
   });
+
+  describe('Bewerbung: Zugang über Discord statt Zugangscode', () => {
+    const applicant = '900000000000000161';
+    it('ohne Zugangscode; „Discord verbinden“ schickt den Link zur Bewerberseite per DM', async () => {
+      const web = client(server.base);
+      const r = await web.post('/api/public/applications', {
+        positionId: null,
+        name: 'Lena Link',
+        discord: 'lena.link',
+        motivation: 'Ich möchte bei Pake & Scha als Associate einsteigen und meine Erfahrung im Strafrecht einbringen.',
+        accept: true,
+      });
+      assert.equal(r.status, 201, r.text);
+      assert.equal(r.json.discord, true, 'Discord-Weg verfügbar');
+      assert.equal(r.json.code, undefined, 'kein Zugangscode mehr');
+      state.bw = r.json;
+      const { authorize, cb } = await oauth(web, '/api/discord/application-join', applicant, { method: 'POST', form: { token: r.json.token } });
+      assert.equal(authorize.searchParams.get('prompt'), 'consent');
+      assert.equal(cb.location, `/bewerbung.html?discord=verbunden#${r.json.token}`);
+      const dm = await waitFor(() => stub().dms.find((x) => x.to === applicant), 'Direktnachricht an den Bewerber');
+      assert.match(dm.embeds[0].title, /Ihre Bewerberseite/);
+      assert.match(dm.embeds[0].description, new RegExp(r.json.number));
+      assert.equal(dm.components[0].components[0].url, `https://kanzlei.example/bewerbung.html#${r.json.token}`);
+    });
+
+    it('„Mit Discord öffnen“ führt auf einem anderen Gerät zur eigenen Bewerbung – ohne verbundene Bewerbung nicht', async () => {
+      const { authorize, cb } = await oauth(client(server.base), '/api/discord/application-open', applicant);
+      assert.equal(authorize.searchParams.get('scope'), 'identify', 'nur anmelden, kein Server-Beitritt');
+      assert.equal(cb.location, `/bewerbung.html?discord=geoeffnet#${state.bw.token}`);
+      assert.equal((await oauth(client(server.base), '/api/discord/application-open', '900000000000000162')).cb.location, '/bewerbung.html?discord=keine');
+      // Die Bewerberseite meldet Discord als verfügbar und verbunden
+      const portal = (await client(server.base).post('/api/public/application-portal', { token: state.bw.token })).json;
+      assert.deepEqual(portal.discord, { connected: true, available: true });
+    });
+  });
 });

@@ -1626,6 +1626,50 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
     });
   }
 
+  for (const [label, device] of [['PC', DESKTOP], ['Handy', PHONE]]) {
+    it(`Bewerbung ohne Zugangscode am ${label}: „Discord verbinden“ nach dem Absenden, „Mit Discord öffnen“ auf anderen Geräten`, async () => {
+      const bsrv = await startServer({
+        env: { DISCORD_BOT_TOKEN: 'test-token', DISCORD_CLIENT_ID: '900000000000000003', DISCORD_CLIENT_SECRET: 'test-secret' },
+        preload: [require.resolve('./discordStub')],
+      });
+      const { ctx, page, problems } = await open(device);
+      try {
+        await page.goto(bsrv.base + '/karriere.html');
+        await page.waitForSelector('#applyForm');
+        await page.evaluate(() => {
+          const f = document.getElementById('applyForm');
+          f.elements.name.value = 'Lena Link';
+          f.elements.discord.value = 'lena.link';
+          f.elements.motivation.value = 'Ich möchte bei Pake & Scha als Associate einsteigen und meine Erfahrung im Strafrecht einbringen.';
+          f.elements.accept.checked = true;
+          f.requestSubmit();
+        });
+        await page.waitForSelector('#applySuccess:not(.hidden) #joinApply');
+        const box = await page.textContent('#applySuccess');
+        assert.match(box, /Jetzt Discord verbinden/);
+        assert.doesNotMatch(box, /Zugangscode/, 'kein Zugangscode mehr');
+        assert.equal(await page.isVisible('#statusDiscord a[href="/api/discord/application-open"]'), true, '„Mit Discord öffnen“ unten');
+        assert.equal(await page.isVisible('#statusForm'), false, 'kein Nummer-/Code-Formular');
+        if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Karriereseite passt aufs Handy');
+        // Anderes Gerät (ohne gespeicherte Bewerbung): Bewerberseite bietet „Mit Discord öffnen“
+        const other = await ctx.browser().newContext({ ...device });
+        const p2 = await other.newPage();
+        await p2.goto(bsrv.base + '/bewerbung.html');
+        await p2.waitForSelector('#portal a[href="/api/discord/application-open"]');
+        assert.equal(await p2.$('#accessForm'), null, 'kein Code-Formular');
+        await other.close();
+        // Ohne Discord-Anmeldung (gemeinsamer Test-Server): Nummer + Zugangscode als Notlösung
+        await page.goto(server.base + '/karriere.html#status');
+        await page.waitForSelector('#statusForm.flex');
+        assert.equal(await page.isVisible('#statusDiscord'), false);
+        assert.deepEqual(problems, []);
+      } finally {
+        await ctx.close();
+        await bsrv.stop();
+      }
+    });
+  }
+
   it('Druckansichten: Rechnung und Aktenauszug', async () => {
     const { ctx, page, problems } = await open(DESKTOP);
     await login(page, TEAM.admin);

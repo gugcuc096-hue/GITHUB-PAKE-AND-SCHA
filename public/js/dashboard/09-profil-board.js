@@ -1568,7 +1568,7 @@ function appChatSection(a, { messages = [], applicantRead = 0, portal, discordCo
       <h3 class="section-title">Nachrichten <span class="text-xs text-dim font-normal" style="font-family:Inter,sans-serif">mit dem Bewerber</span></h3>
       <div class="app-reach">
         ${discordConnected ? badge('Discord verbunden', 'emerald') : badge('Discord nicht verbunden', 'slate')}
-        <span class="text-xs text-dim">${discordConnected ? 'Nachrichten und neue Stände bekommt der Bewerber zusätzlich als Discord-Direktnachricht.' : 'Der Bewerber liest Nachrichten auf seiner Bewerberseite – dort kann er auch sein Discord verbinden.'}</span>
+        <span class="text-xs text-dim">${discordConnected ? 'Nachrichten und neue Stände bekommt der Bewerber zusätzlich als Discord-Direktnachricht.' : 'Der Bewerber liest Nachrichten auf seiner Bewerberseite – dort kann er auch sein Discord verbinden. Link verloren? „Link zur Bewerberseite“ kopieren und ihm schicken.'}</span>
         <button type="button" class="btn-ghost btn-sm ml-auto" data-action="copy" data-text="${esc(link)}" title="${esc(link)}">${icon('link', 'ico-sm')}<span>Link zur Bewerberseite</span></button>
       </div>
       <div class="chat">

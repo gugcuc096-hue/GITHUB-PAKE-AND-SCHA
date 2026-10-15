@@ -2,6 +2,7 @@
 (() => {
     'use strict';
     const { api, esc, copy, toast } = window.PS;
+    const DISCORD_SVG = '<svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.37a19.79 19.79 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.865-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.74 19.74 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.1 13.1 0 01-1.872-.892.077.077 0 01-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 01.078-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.009c.12.1.246.198.373.292a.077.077 0 01-.006.127 12.3 12.3 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.84 19.84 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>';
     const STORE = 'ps.bewerbungen'; // persönliche Links der Bewerbungen auf diesem Gerät (siehe bewerbung.js, PS.applications)
     function remember(entry) {
         try {
@@ -170,12 +171,18 @@
             remember({ token: res.token, number: res.number, position: res.positionTitle });
             showMine(window.PS.applications.list());
             const text = `Bewerbungsnummer: ${res.number}\nZugangscode: ${res.code}\nBewerberseite: ${portal}`;
-            box.innerHTML = `
-                <div class="w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center justify-center mx-auto mb-4">
-                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg></div>
-                <h3 class="font-serif text-3xl font-semibold mb-2">Vielen Dank für Ihre Bewerbung!</h3>
-                <p class="text-sm text-muted mb-6">Ihre Bewerbung als <strong>${esc(res.positionTitle)}</strong> ist eingegangen. Auf Ihrer persönlichen Bewerberseite sehen Sie den Stand und schreiben direkt mit dem Board of Partners.</p>
-                <div class="grid grid-cols-2 gap-3 mb-3 max-w-md mx-auto">
+            // Mit Discord: Der Bot schickt den Link zur Bewerberseite per DM – kein Zugangscode nötig
+            const access = res.discord
+                ? `<p class="text-xs text-dim mb-4">Bewerbungsnummer <span class="font-mono text-[var(--gold-light)]">${esc(res.number)}</span></p>
+                <div class="rounded-xl border border-[rgba(88,101,242,0.45)] bg-[rgba(88,101,242,0.1)] p-4 mb-6 max-w-md mx-auto text-left">
+                    <div class="font-semibold mb-1">Jetzt Discord verbinden</div>
+                    <p class="text-sm text-muted">Der Kanzlei-Bot schickt Ihnen den Link zu Ihrer Bewerberseite per Direktnachricht – damit öffnen Sie sie auf jedem Gerät. Antworten und neue Stände kommen ebenfalls dorthin. Auf diesem Gerät ist die Bewerbung schon gespeichert.</p>
+                </div>
+                <div class="flex flex-col sm:flex-row justify-center gap-2">
+                    <button type="button" id="joinApply" class="btn-discord btn-md">${DISCORD_SVG}<span>Discord verbinden</span></button>
+                    <a href="${esc(res.portal)}" id="checkApply" class="btn-outline btn-md">Zur Bewerberseite</a>
+                </div>`
+                : `<div class="grid grid-cols-2 gap-3 mb-3 max-w-md mx-auto">
                     <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3"><div class="text-[0.6rem] uppercase tracking-widest text-muted">Bewerbungsnummer</div><div class="font-mono text-lg text-[var(--gold-light)]">${esc(res.number)}</div></div>
                     <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3"><div class="text-[0.6rem] uppercase tracking-widest text-muted">Zugangscode</div><div class="font-mono text-lg tracking-[0.2em] text-[var(--gold-light)]">${esc(res.code)}</div></div>
                 </div>
@@ -184,10 +191,21 @@
                     <button type="button" id="copyApply" class="btn-outline btn-md">Daten kopieren</button>
                     <a href="${esc(res.portal)}" id="checkApply" class="btn-gold btn-md">Zur Bewerberseite</a>
                 </div>`;
+            box.innerHTML = `
+                <div class="w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg></div>
+                <h3 class="font-serif text-3xl font-semibold mb-2">Vielen Dank für Ihre Bewerbung!</h3>
+                <p class="text-sm text-muted ${res.discord ? 'mb-2' : 'mb-6'}">Ihre Bewerbung als <strong>${esc(res.positionTitle)}</strong> ist eingegangen. Auf Ihrer persönlichen Bewerberseite sehen Sie den Stand und schreiben direkt mit dem Board of Partners.</p>
+                ${access}`;
             box.classList.remove('hidden');
             box.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            document.getElementById('copyApply').addEventListener('click', async () => {
+            document.getElementById('copyApply')?.addEventListener('click', async () => {
                 toast((await copy(text)) ? 'Bewerbungsdaten kopiert.' : 'Bitte die Angaben notieren.');
+            });
+            document.getElementById('joinApply')?.addEventListener('click', () => {
+                const f = document.getElementById('discordJoinForm');
+                f.elements.token.value = res.token;
+                f.submit();
             });
         } catch (ex) {
             err.textContent = ex.message;
@@ -197,7 +215,16 @@
         }
     });
 
-    // Bewerbungsnummer + Zugangscode → persönliche Bewerberseite
+    // Andere Geräte: „Mit Discord öffnen“ – Nummer + Zugangscode nur, solange die Discord-Anmeldung fehlt
+    api.get('/api/discord/status')
+        .then((st) => {
+            if (st.oauth) return;
+            document.getElementById('statusDiscord').classList.add('hidden');
+            document.getElementById('statusForm').classList.replace('hidden', 'flex');
+        })
+        .catch(() => {});
+
+    // Bewerbungsnummer + Zugangscode → persönliche Bewerberseite (Notlösung ohne Discord)
     async function checkStatus() {
         const out = document.getElementById('statusResult');
         const number = document.getElementById('stNumber').value.trim().toUpperCase();
