@@ -428,6 +428,8 @@ views.settings = {
       api.get('/api/bot').catch(() => null),
       api.get('/api/admin/backups').catch(() => null),
       load.fivenet(true),
+      api.get('/api/site/ranks').then((x) => (st.siteRanks = x.ranks), () => (st.siteRanks = [])),
+      api.get('/api/site/texts').then((x) => (st.siteTexts = x.texts), () => (st.siteTexts = [])),
     ]);
     st.google = await api.get('/api/google/status').catch(() => null);
     st.backups = backups;
@@ -449,6 +451,7 @@ views.settings = {
     if (tab === 'contracts') return head + contractTemplatesPanel();
     if (tab === 'integrations') return `${head}${fivenetSettingsPanel(s)}${googleDocsPanel(st.google)}`;
     if (tab === 'system') return `${head}${backupPanel()}<div class="mt-4 lg:mt-5">${emergencyPanel()}</div>`;
+    if (tab === 'site') return `${head}${websitePanel(s)}<div class="mt-4 lg:mt-5">${siteTextsPanel()}</div><div class="mt-4 lg:mt-5">${ranksPanel()}</div>`;
     return `${head}
         <section class="panel panel-pad">
           <div class="panel-head"><h2 class="panel-title">Kanzleidaten & Erinnerungen</h2></div>
@@ -458,18 +461,22 @@ views.settings = {
             <div><label class="label">Kontakt</label><input name="firmContact" maxlength="120" class="field" value="${esc(s.firmContact)}"></div>
             <div><label class="label">Zahlungserinnerung (Tage nach Fälligkeit)</label><input type="number" name="invoiceReminderDays" min="0" max="60" step="1" class="field" value="${esc(s.invoiceReminderDays)}">
               <p class="form-hint">Offene Rechnungen erinnern den Mandanten so viele Tage nach dem Fälligkeitsdatum einmal automatisch – per Discord-DM und im Ticket der Akte. 0 = aus. Von Hand geht es jederzeit mit „Erinnern“ an der Rechnung.</p></div>
+            <div><label class="label">Automatisch aufräumen (Tage)</label><input type="number" name="cleanupDays" min="0" max="365" step="1" class="field" value="${esc(s.cleanupDays)}">
+              <p class="form-hint">Abgelehnte Bewerbungen sowie erledigte oder abgelehnte Anliegen werden so viele Tage nach der letzten Änderung gelöscht – samt Discord-Ticket. 0 = aus.</p></div>
+            <div><label class="label">Einarbeitung neuer Anwälte (Checkliste)</label><textarea name="onboardingTemplate" rows="5" maxlength="4000" class="field">${esc(s.onboardingTemplate)}</textarea>
+              <p class="form-hint">Ein Punkt je Zeile. Jeder neue Anwalt bekommt diese Liste (unter „Beförderungen &amp; Einstellungen“), dazu einen Mentor aus dem Board.</p></div>
             <div><label class="label">Liegengebliebene Akten (Tage ohne Aktivität)</label><input type="number" name="caseIdleDays" min="0" max="60" step="1" class="field" value="${esc(s.caseIdleDays)}">
               <p class="form-hint">Offene Akten, an denen sich so viele Tage nichts getan hat, werden in der Aktenliste markiert; der zuständige Anwalt bekommt einmal eine Discord-DM (nie ins Ticket des Mandanten). 0 = aus.</p></div>
             <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button></div>
           </form>
-        </section>
-        <div class="mt-4 lg:mt-5">${websitePanel(s)}</div>`;
+        </section>`;
   },
 };
 
 /* Einstellungen in Reitern – „bot“ ist der Discord-Reiter (Webhook, Login, Tickets und Bot-Module; alte Links ?tab=bot gelten weiter) */
 const SETTINGS_TABS = [
   ['general', 'Kanzlei & Rechnungen', 'receipt'],
+  ['site', 'Website & Ränge', 'globe'],
   ['bot', 'Discord', 'discord'],
   ['integrations', 'Integrationen', 'link'],
   ['system', 'System', 'shield'],
@@ -536,6 +543,88 @@ function websitePanel(s) {
           <div class="form-actions"><button type="submit" class="btn-outline btn-md">Speichern</button><a href="/karriere.html" target="_blank" rel="noopener" class="btn-ghost btn-md">${icon('globe', 'ico-sm')}<span>Karriereseite</span></a></div>
         </form>
       </section>`;
+}
+
+/** Website & Ränge → Website-Texte: Seiten im Bearbeitungsmodus öffnen, geänderte Texte zurücksetzen. */
+function siteTextsPanel() {
+  const list = st.siteTexts || [];
+  return `
+      <section class="panel panel-pad">
+        <div class="panel-head"><h2 class="panel-title">Website-Texte</h2>${list.length ? badge(`${list.length} geändert`, 'gold') : ''}</div>
+        <p class="text-sm text-muted mb-4">Öffnet die Seite im Bearbeitungsmodus: Text anklicken, ändern, Enter oder daneben klicken – gespeichert. Ein leeres Feld stellt das Original wieder her. Gleichlautende Texte (z. B. derselbe Knopf an mehreren Stellen) ändern sich gemeinsam.</p>
+        <div class="form-actions mb-4">
+          <a class="btn-gold btn-md" href="/?bearbeiten" target="_blank" rel="noopener">${icon('edit')}<span>Startseite bearbeiten</span></a>
+          <a class="btn-outline btn-md" href="/karriere.html?bearbeiten" target="_blank" rel="noopener">${icon('edit')}<span>Karriereseite bearbeiten</span></a>
+        </div>
+        ${
+          list.length
+            ? `<div class="ev-list">${list
+                .map(
+                  (t) => `<div class="ev-item">
+                <div class="ev-top"><span class="ev-name">${esc(t.text)}</span>
+                  <button type="button" class="btn-ghost btn-sm" data-action="site-text-reset" data-page="${esc(t.page)}" data-key="${esc(t.key)}">Original</button></div>
+                <p class="text-xs text-dim mt-1">${esc(t.pageLabel)} · vorher: „${esc(t.original)}“ · ${esc(t.updatedBy || '—')}, ${esc(fmtDate(t.updatedAt))}</p>
+              </div>`
+                )
+                .join('')}</div>`
+            : '<p class="text-sm text-dim">Noch keine Texte geändert.</p>'
+        }
+      </section>`;
+}
+
+/** Website & Ränge → Ränge: anlegen, bearbeiten, verschieben, löschen. */
+function ranksPanel() {
+  const ranks = st.siteRanks || [];
+  const group = (level, title) => {
+    const list = ranks.filter((r) => r.level === level);
+    return `<div class="label mt-2">${esc(title)}</div>
+        <div class="ev-list mb-4">${list
+          .map(
+            (r, i) => `<div class="ev-item">
+              <div class="ev-top"><span class="ev-name">${esc(r.name)}</span>${r.badge ? badge(r.badge, level === 'board' ? 'gold' : 'slate') : ''}
+                <span class="text-xs text-dim">Rang ${String(r.number).padStart(2, '0')}${r.inUse ? ` · ${r.inUse}× vergeben` : ''}</span>
+                <span class="ml-auto flex gap-1">
+                  <button type="button" class="icon-btn sm" data-action="rank-move" data-id="${r.id}" data-dir="-1" ${i ? '' : 'disabled'} aria-label="Nach oben" title="Nach oben">${icon('chevronUp', 'ico-sm')}</button>
+                  <button type="button" class="icon-btn sm" data-action="rank-move" data-id="${r.id}" data-dir="1" ${i < list.length - 1 ? '' : 'disabled'} aria-label="Nach unten" title="Nach unten">${icon('chevronDown', 'ico-sm')}</button>
+                  <button type="button" class="icon-btn sm" data-action="rank-edit" data-id="${r.id}" aria-label="Bearbeiten" title="Bearbeiten">${icon('edit', 'ico-sm')}</button>
+                  <button type="button" class="icon-btn sm" data-action="rank-delete" data-id="${r.id}" aria-label="Löschen" title="Löschen">${icon('trash', 'ico-sm')}</button>
+                </span></div>
+              ${r.description ? `<p class="text-xs text-muted mt-1">${esc(r.description)}</p>` : ''}
+            </div>`
+          )
+          .join('')}</div>`;
+  };
+  return `
+      <section class="panel panel-pad">
+        <div class="panel-head"><h2 class="panel-title">Ränge</h2><button type="button" class="btn-gold btn-sm" data-action="rank-edit">${icon('plus', 'ico-sm')}<span>Rang anlegen</span></button></div>
+        <p class="text-sm text-muted mb-2">So erscheinen sie auf der Startseite unter „Kanzleiränge“, in allen Auswahllisten und beim Discord-Rang-Sync. Ränge im <strong>Board of Partners</strong> haben volle Board-Rechte.</p>
+        ${group('board', 'Board of Partners')}${group('associate', 'Associate Attorneys')}
+      </section>`;
+}
+
+/** Nach einer Rang-Änderung: Auswahllisten im ganzen Dashboard auffrischen. */
+async function refreshRanks() {
+  setRanks((await api.get('/api/auth/me')).ranks);
+}
+
+/** Dialog: Rang anlegen oder bearbeiten. */
+function rankForm(r = null) {
+  return `
+      <h2 id="modalTitle" class="modal-title">${r ? `${esc(r.name)} bearbeiten` : 'Neuer Rang'}</h2>
+      <p class="modal-sub">Wird so auf der Startseite gezeigt. Beim Umbenennen behalten alle Mitarbeiter mit diesem Rang ihn unter dem neuen Namen.</p>
+      <form data-form="rank" ${r ? `data-id="${r.id}"` : ''} class="form-grid cols-2">
+        <div><label class="label">Name</label><input name="name" class="field" required minlength="2" maxlength="40" value="${esc(r ? r.name : '')}"></div>
+        <div><label class="label">Ebene</label><select name="level" class="field">${[
+          ['board', 'Board of Partners (volle Board-Rechte)'],
+          ['associate', 'Associate Attorneys'],
+        ]
+          .map(([v, l]) => `<option value="${v}" ${(r ? r.level : 'associate') === v ? 'selected' : ''}>${esc(l)}</option>`)
+          .join('')}</select></div>
+        <div><label class="label">Abzeichen <span class="text-dim font-normal normal-case tracking-normal">(z. B. Senior Level)</span></label><input name="badge" class="field" maxlength="30" value="${esc(r ? r.badge : '')}"></div>
+        <div><label class="label">Fußzeile <span class="text-dim font-normal normal-case tracking-normal">(z. B. Befugnis: Alle Gerichte)</span></label><input name="footer" class="field" maxlength="80" value="${esc(r ? r.footer : '')}"></div>
+        <div class="span-2"><label class="label">Beschreibung</label><textarea name="description" rows="4" maxlength="600" class="field">${esc(r ? r.description : '')}</textarea></div>
+        <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>${r ? 'Speichern' : 'Rang anlegen'}</span></button></div>
+      </form>`;
 }
 
 /** System → Notfall-Zugang. */

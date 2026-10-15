@@ -17,6 +17,7 @@ const TYPE_ICON = { mandant: '🤝', gericht: '⚖️', frist: '⏳', intern: '�
 function ticketAppointment(a, title, { by, mention = 'client', note } = {}) {
   if (!a || !a.case_id || !a.client_visible) return;
   tickets.post(a.case_id, {
+    event: /Erinnerung/.test(title) ? 'reminder' : /erledigt/.test(title) ? 'deadlineDone' : 'appointment',
     title: `${title}: ${truncate(a.title, 180)}`,
     description: note,
     color: a.status === 'abgesagt' ? tickets.COLORS.slate : tickets.COLORS.blue,
@@ -174,6 +175,7 @@ router.patch(
     if (d.startsAt !== undefined) {
       set('starts_at', new Date(d.startsAt).toISOString());
       set('reminded', 0);
+      set('client_reminded', 0);
     }
     if (d.endsAt !== undefined) set('ends_at', d.endsAt ? new Date(d.endsAt).toISOString() : null);
     if (d.location !== undefined) set('location', d.location);
@@ -261,5 +263,37 @@ function sendDueReminders() {
   }
 }
 
+/**
+ * Mandanten an ihren bestätigten Termin erinnern: per Discord-Direktnachricht etwa 1 Stunde vorher
+ * (nicht, wenn der Termin selbst erst kurz vorher vereinbart wurde).
+ */
+const CLIENT_REMIND_MIN = 60;
+function sendClientReminders() {
+  const now = Date.now();
+  const due = db
+    .prepare(
+      `${APPT_SELECT}
+       WHERE a.type = 'mandant' AND a.status = 'bestaetigt' AND a.client_visible = 1 AND a.client_reminded = 0 AND a.case_id IS NOT NULL
+         AND a.starts_at > ? AND a.starts_at <= ?`
+    )
+    .all(new Date(now).toISOString(), new Date(now + CLIENT_REMIND_MIN * 60000).toISOString());
+  for (const a of due) {
+    db.prepare('UPDATE appointments SET client_reminded = 1 WHERE id = ?').run(a.id);
+    const created = Date.parse(String(a.created_at || '').replace(' ', 'T') + 'Z');
+    if (created && Date.parse(a.starts_at) - created < CLIENT_REMIND_MIN * 60000) continue;
+    tickets
+      .dmClient(a.case_id, {
+        title: `⏰ Erinnerung: ${truncate(a.title, 200)}`,
+        description: 'Ihr Termin bei Pake & Scha beginnt bald. Bitte seien Sie pünktlich – falls etwas dazwischenkommt, sagen Sie den Termin im Mandantenportal ab.',
+        fields: [{ name: 'Wann', value: fmtDiscordTime(a.starts_at), inline: false }, ...(a.location ? [{ name: 'Ort', value: a.location }] : [])],
+        color: tickets.COLORS.blue,
+      })
+      .catch((err) => console.warn('Terminerinnerung an Mandanten fehlgeschlagen:', err.message));
+  }
+}
+
 module.exports = router;
-module.exports.sendDueReminders = sendDueReminders;
+module.exports.sendDueReminders = () => {
+  sendDueReminders();
+  sendClientReminders();
+};

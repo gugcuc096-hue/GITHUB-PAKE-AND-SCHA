@@ -489,6 +489,7 @@ adminRouter.post(
         ).run(a.name, d.rank || 'Mitarbeiter', d.description || '', deriveInitials(a.name), BOARD_RANKS.includes(d.rank) ? 'leitung' : 'anwalt', maxOrder + 1, userId, d.visible === false ? 0 : 1);
       }
       db.prepare("UPDATE applications SET status = 'angenommen', hired_user_id = ?, updated_at = datetime('now') WHERE id = ?").run(userId, a.id);
+      if (d.role === 'anwalt') require('../onboarding').start(userId, req.user.id); // Einarbeitung mit Checkliste
       addMessage(a, { fromBoard: true, user: req.user, body: WELCOME });
     });
     dmApplicant({ ...a, status: 'angenommen' }, { title: '🎉 Willkommen bei Pake & Scha', description: WELCOME });

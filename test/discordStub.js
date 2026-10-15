@@ -105,6 +105,7 @@ globalThis.fetch = async (input, init = {}) => {
       } else state.channelMessages.push({ channel: m[1], ...body });
       return json(200, { id: `msg-${++state.seq}`, channel_id: m[1] });
     }
+    if (method === 'PATCH' && /^\/channels\/[^/]+$/.test(path) && body && body.name) (state.renames = state.renames || []).push({ channel: path.split('/')[2], name: body.name });
     if (method === 'PUT' || method === 'PATCH' || method === 'DELETE') return json(204, null);
     return json(200, {});
   } finally {

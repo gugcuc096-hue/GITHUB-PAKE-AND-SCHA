@@ -2,7 +2,7 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { db } = require('./db');
-const { EMAIL_DOMAIN } = require('./helpers');
+const { EMAIL_DOMAIN, isBoard } = require('./helpers');
 const { avatarUrl } = require('./uploads');
 
 const SESSION_COOKIE = 'sid';
@@ -101,7 +101,7 @@ function publicUser(u) {
     phone: u.phone || null,
     rank: u.rank || null,
     // Board of Partners: Rolle „Board of Partners“ (admin) oder Partner-Rang – z. B. für die Aktenbearbeitung
-    board: u.role === 'admin' || (u.role === 'anwalt' && ['Founding Partner', 'Equity Partner', 'Partner'].includes(u.rank)),
+    board: isBoard(u),
     active: !!u.active,
     mustChangePassword: !!u.must_change_password,
     // Konto per Discord angelegt: Name im Spiel noch einmal abfragen

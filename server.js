@@ -114,6 +114,8 @@ app.use('/api/name-requests', require('./routes/nameRequests').router);
 app.use('/api/contract-templates', contractRoutes.templatesRouter);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/messages', require('./routes/messages'));
+app.use('/api/site', require('./routes/site'));
+app.use('/api/onboarding', require('./routes/onboarding'));
 app.use('/api/board', require('./routes/board'));
 app.use('/api/invoices', require('./routes/invoices'));
 app.use('/api/fees', fees.publicRouter);
@@ -147,9 +149,12 @@ app.use(
 /* ---------------------------------------------------------------- Frontend */
 // Schriften ändern sich praktisch nie – 30 Tage im Browser behalten
 app.use('/fonts', express.static(path.join(__dirname, 'public', 'fonts'), { maxAge: '30d' }));
+// Startseite und Karriere: Rang-Karten, vom Board geänderte Texte und Vorschaubild werden beim Ausliefern eingesetzt
+const sitePages = require('./sitePages');
+app.get(['/', '/index.html', '/index'], sitePages.handler('index'));
+app.get(['/karriere', '/karriere.html'], sitePages.handler('karriere'));
 app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.use((req, res) => res.status(404).sendFile(path.join(__dirname, 'public', 'index.html')));
+app.use((req, res, next) => sitePages.handler('index')(req, res.status(404), next));
 
 /* ---------------------------------------------------------------- Fehler */
 // eslint-disable-next-line no-unused-vars
@@ -163,6 +168,7 @@ app.use((err, req, res, next) => {
 
 /* ---------------------------------------------------------------- Start */
 runBootstrap();
+require('./ranks').init(); // Ränge aus der Datenbank (beim ersten Start: die bisherigen sechs)
 
 // Discord-Erinnerungen an Fristen/Gerichtstermine (24 h vorher).
 const reminderTimer = setInterval(() => {
@@ -175,6 +181,8 @@ const reminderTimer = setInterval(() => {
     require('./paymentReminders').sweep().catch((err) => console.warn('Zahlungserinnerungen fehlgeschlagen:', err.message));
     // Liegengebliebene Akten: zuständigen Anwalt einmal je Ruhephase erinnern
     require('./idleCases').sweep().catch((err) => console.warn('Hinweis auf liegengebliebene Akten fehlgeschlagen:', err.message));
+    // Abgelehnte Bewerbungen und erledigte Anliegen nach X Tagen löschen (Einstellung, 0 = aus)
+    require('./cleanup').sweep();
   } catch (err) {
     console.warn('Hintergrundaufgabe fehlgeschlagen:', err.message);
   }

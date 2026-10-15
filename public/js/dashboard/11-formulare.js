@@ -80,6 +80,7 @@ const forms = {
       boardRoleIds: val(fd, 'boardRoleIds'),
       boardApplications: fd.has('boardApplications'),
       boardConcerns: fd.has('boardConcerns'),
+      events: Object.fromEntries(Object.keys(st.ticketSettings.events || {}).map((k) => [k, fd.getAll('ev').includes(k)])),
     });
     toast('Discord-Tickets gespeichert.');
     renderView();
@@ -327,6 +328,21 @@ const forms = {
           <a class="btn-gold btn-md" href="/invoice.html?id=${inv.id}" target="_blank" rel="noopener">${icon('eye', 'ico-sm')}<span>Ansehen / Als PDF speichern</span></a>
           <button class="btn-ghost btn-md" data-action="close-modal">Schließen</button>
         </div>`, { child: !!from });
+  },
+  rank: async (f) => {
+    const fd = new FormData(f);
+    const body = { name: val(fd, 'name'), level: val(fd, 'level'), badge: val(fd, 'badge'), footer: val(fd, 'footer'), description: val(fd, 'description') };
+    const res = f.dataset.id ? await api.patch(`/api/site/ranks/${f.dataset.id}`, body) : await api.post('/api/site/ranks', body);
+    st.siteRanks = res.ranks;
+    await refreshRanks();
+    toast(f.dataset.id ? 'Rang gespeichert.' : `Rang „${body.name}“ angelegt.`);
+    await modalBack();
+    renderView();
+  },
+  'onboarding-item': async (f) => {
+    await api.post(`/api/onboarding/${f.dataset.user}/items`, { label: val(new FormData(f), 'label') });
+    f.reset();
+    await refreshOnboarding();
   },
   coop: async (f) => {
     const fd = new FormData(f);
@@ -723,6 +739,8 @@ const forms = {
       firmContact: val(fd, 'firmContact'),
       invoiceReminderDays: Number(val(fd, 'invoiceReminderDays') || 0),
       caseIdleDays: Number(val(fd, 'caseIdleDays') || 0),
+      cleanupDays: Number(val(fd, 'cleanupDays') || 0),
+      onboardingTemplate: String(fd.get('onboardingTemplate') || ''),
     });
     st.settings = res.settings;
     toast('Einstellungen gespeichert.');

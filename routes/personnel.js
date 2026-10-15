@@ -16,7 +16,7 @@ const express = require('express');
 const { z } = require('zod');
 const { db, tx } = require('../db');
 const { requireAuth, requireStaff, userAvatarUrl } = require('../auth');
-const { wrap, parseBody, idParam, isBoard, RANKS, BOARD_RANKS, RANK_ORDER_SQL, truncate } = require('../helpers');
+const { wrap, parseBody, idParam, isBoard, RANKS, rankEnum, BOARD_RANKS, RANK_ORDER_SQL, truncate } = require('../helpers');
 const { logActivity } = require('../models');
 const discord = require('../discord');
 const tickets = require('../tickets');
@@ -178,7 +178,7 @@ router.post(
     const u = req.user;
     if (!isBoard(u)) return res.status(403).json({ error: 'Beförderungen kann nur das Board of Partners vornehmen.' });
     const d = parseBody(
-      z.object({ userId: z.number().int().positive(), rank: z.enum(RANKS), note: z.string().trim().max(500).optional() }),
+      z.object({ userId: z.number().int().positive(), rank: rankEnum(), note: z.string().trim().max(500).optional() }),
       req,
       res
     );

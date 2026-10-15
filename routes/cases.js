@@ -318,6 +318,7 @@ router.post(
     if (c.discord_channel_id) db.prepare('UPDATE cases SET discord_archived = 1 WHERE id = ?').run(c.id);
     addSystemNote(c.id, req.user, 'Akte aus dem Papierkorb wiederhergestellt', true);
     tickets.post(c.id, {
+      event: 'restored',
       title: '♻️ Akte wiederhergestellt',
       description: `Die Akte **${c.case_number}** ist wieder da – das Ticket geht wie gewohnt weiter.`,
       color: tickets.COLORS.green,
@@ -377,6 +378,7 @@ router.put(
     // Discord-Ticket: Mandant kommt hinein (verknüpftes Discord) bzw. wird entfernt
     if (account) {
       tickets.post(c.id, {
+        event: 'account',
         title: '👤 Mandanten-Konto verknüpft',
         description: `Die Akte ist jetzt mit dem Portal-Konto von **${account.display_name}** verbunden – Termine, Verträge, Rechnungen und Nachrichten sieht der Mandant im Mandantenportal.`,
         color: tickets.COLORS.green,
@@ -766,7 +768,16 @@ function ticketUpdate(before, c, u, { history, editFields, d, newStatus, newlyAs
   ]
     .filter(Boolean)
     .join('\n\n');
+  const lawyerChanged = newlyAssigned.length > 0 || history.some((h) => /Federführend|Anwälte|abgegeben|arbeitet nicht mehr/.test(h));
+  const event = [
+    ...(closing || reopening ? ['closed'] : []),
+    ...(noteChanged ? ['note'] : []),
+    ...(lawyerChanged ? ['lawyer'] : []),
+    ...(statusChanged || stepChanged ? ['step'] : []),
+    ...(changed.length ? ['update'] : []),
+  ];
   tickets.post(c.id, {
+    event: event.length ? event : 'update',
     title,
     description,
     color: closing ? tickets.COLORS.slate : reopening ? tickets.COLORS.green : tickets.COLORS.gold,
@@ -847,6 +858,7 @@ router.post(
     const row = db.prepare('SELECT * FROM case_attachments WHERE id = ?').get(Number(info.lastInsertRowid));
     if (!internal) {
       tickets.post(c.id, {
+        event: 'attachment',
         title: '📎 Neuer Anhang in der Akte',
         description: `${caption ? `**${caption}**\n` : ''}Im ${isStaff(req.user) ? 'Mandantenportal' : 'Portal'} unter der Akte ${c.case_number} abrufbar.`,
         color: tickets.COLORS.blue,
@@ -915,6 +927,7 @@ router.post(
     // Interne Notizen bleiben intern – ins Ticket kommt nur, was auch der Mandant sieht.
     if (!internal) {
       tickets.post(c.id, {
+        event: 'chat',
         title: `💬 Nachricht von ${req.user.display_name}`,
         description: d.body,
         color: isStaff(req.user) ? tickets.COLORS.gold : tickets.COLORS.blue,

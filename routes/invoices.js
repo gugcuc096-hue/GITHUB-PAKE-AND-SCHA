@@ -214,6 +214,7 @@ router.post(
 
     if (c) {
       tickets.post(c.id, {
+        event: 'invoice',
         title: `🧾 ${label} ${number}`,
         description: `${d.subject ? `${truncate(d.subject, 300)}\n` : ''}Im Mandantenportal unter „Rechnungen“ abrufbar.`,
         fields: [
@@ -289,7 +290,7 @@ const loadInvoice = (id) => (id ? db.prepare(`${INVOICE_SELECT} WHERE i.id = ?`)
 function tellClient(inv, msg, by) {
   const c = inv.case_id ? getCase(inv.case_id) : null;
   if (c && tickets.active() && !c.discord_deleted) {
-    tickets.post(c.id, { ...msg, mention: 'client', by: by.display_name, byDiscordId: by.discord_id });
+    tickets.post(c.id, { event: 'invoice', ...msg, mention: 'client', by: by.display_name, byDiscordId: by.discord_id });
     return;
   }
   const clientId = inv.client_user_id || inv.case_client_id;
@@ -343,6 +344,7 @@ router.post(
     });
     if (c) {
       tickets.post(c.id, {
+        event: 'invoice',
         title: `💸 Zahlung gemeldet: ${label} ${inv.number}`,
         description: 'Der Mandant hat die Zahlung über das Mandantenportal gemeldet. Die Kanzlei prüft den Eingang und bestätigt ihn.',
         fields,

@@ -8,7 +8,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { z } = require('zod');
 const { requireAuth, requireAdmin } = require('../auth');
-const { wrap, parseBody, RANKS } = require('../helpers');
+const { wrap, parseBody, RANKS, rankEnum } = require('../helpers');
 const { logActivity } = require('../models');
 const { db } = require('../db');
 const bot = require('../discordBot');
@@ -66,7 +66,7 @@ router.put(
     const d = parseBody(
       z.object({
         enabled: z.boolean(),
-        ranks: z.record(z.enum(RANKS), idOrEmpty),
+        ranks: z.record(rankEnum(), idOrEmpty),
         staff: idOrEmpty,
         board: idOrEmpty,
         associates: idOrEmpty,

@@ -773,6 +773,47 @@ const actions = {
     openModal(coopForm());
     await loadCoopRoles([]);
   },
+  'rank-edit': (el) => openModal(rankForm(el.dataset.id ? (st.siteRanks || []).find((r) => r.id === Number(el.dataset.id)) : null)),
+  'rank-move': async (el) => {
+    st.siteRanks = (await api.post(`/api/site/ranks/${el.dataset.id}/move`, { dir: Number(el.dataset.dir) })).ranks;
+    await refreshRanks();
+    renderView();
+  },
+  'rank-delete': async (el) => {
+    const r = (st.siteRanks || []).find((x) => x.id === Number(el.dataset.id));
+    if (!r || !(await askDelete(`Rang „${r.name}“ löschen?`, 'Er verschwindet von der Startseite und aus allen Auswahllisten. Löschen geht nur, wenn niemand mehr diesen Rang hat.'))) return;
+    st.siteRanks = (await api.del(`/api/site/ranks/${r.id}`)).ranks;
+    await refreshRanks();
+    toast('Rang gelöscht.');
+    renderView();
+  },
+  'site-text-reset': async (el) => {
+    await api.del(`/api/site/texts/${encodeURIComponent(el.dataset.page)}/${encodeURIComponent(el.dataset.key)}`);
+    st.siteTexts = (await api.get('/api/site/texts')).texts;
+    toast('Originaltext wiederhergestellt.');
+    renderView();
+  },
+  'onboarding-tick': async (el) => {
+    await api.patch(`/api/onboarding/items/${el.dataset.id}`, { done: el.checked });
+    await refreshOnboarding();
+  },
+  'onboarding-start': async () => {
+    const sel = $('#obCandidate');
+    if (!sel || !sel.value) return;
+    await api.post('/api/onboarding', { userId: Number(sel.value) });
+    toast('Einarbeitung begonnen.');
+    await refreshOnboarding();
+  },
+  'onboarding-mentor': async (el) => {
+    await api.patch(`/api/onboarding/${el.dataset.user}`, { mentorId: el.value ? Number(el.value) : null });
+    toast('Mentor gespeichert.');
+    await refreshOnboarding();
+  },
+  'onboarding-end': async (el) => {
+    if (!(await askDelete(`Einarbeitung von ${el.dataset.name} beenden?`, 'Die Checkliste wird entfernt.'))) return;
+    await api.del(`/api/onboarding/${el.dataset.user}`);
+    await refreshOnboarding();
+  },
   'coop-edit': async (el) => {
     const k = st.coops.cooperations.find((x) => x.id === Number(el.dataset.id));
     if (!k) return;

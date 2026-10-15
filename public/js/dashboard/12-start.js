@@ -341,6 +341,11 @@ document.addEventListener('input', (e) => {
 document.addEventListener('change', (e) => {
   if (e.target.id === 'prUser' || e.target.id === 'prRank') updatePromotePreview();
   const t = e.target;
+  // Häkchen und Auswahllisten mit data-change lösen direkt eine Aktion aus (z. B. Einarbeitung abhaken)
+  if (t.dataset && t.dataset.change && actions[t.dataset.change]) {
+    guard(() => actions[t.dataset.change](t));
+    return;
+  }
   if (t.id === 'bf_tpl') {
     syncBriefForm(t.form);
     return;
@@ -615,6 +620,7 @@ setInterval(() => {
     const me = await api.get('/api/auth/me');
     st.user = me.user;
     st.twoFactor = me.twoFactor;
+    setRanks(me.ranks);
   } catch {
     location.href = '/login.html?next=' + encodeURIComponent('/dashboard.html' + location.search + location.hash);
     return;

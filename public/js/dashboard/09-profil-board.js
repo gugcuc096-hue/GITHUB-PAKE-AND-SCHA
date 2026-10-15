@@ -713,7 +713,7 @@ function personnelItem(e) {
 
 views.personnel = {
   async load() {
-    st.personnel = await api.get('/api/personnel');
+    [st.personnel, st.onboarding] = await Promise.all([api.get('/api/personnel'), api.get('/api/onboarding').catch(() => null)]);
     st.personnelNew = 0;
   },
   render() {
@@ -730,9 +730,53 @@ views.personnel = {
           <div class="panel kpi"><div class="kpi-label">${icon('star', 'ico-sm')}Beförderungen</div><div class="kpi-value">${n('befoerderung')}</div><div class="kpi-sub">in den letzten 30 Tagen</div></div>
           <div class="panel kpi"><div class="kpi-label">${icon('userAdd', 'ico-sm')}Einstellungen</div><div class="kpi-value">${n('einstellung')}</div><div class="kpi-sub">in den letzten 30 Tagen</div></div>
         </div>
+        ${onboardingPanel()}
         <div class="panel p-2 md:p-3">${p.events.length ? p.events.map(personnelItem).join('') : empty('Noch keine Einträge. Einstellungen und Beförderungen erscheinen hier automatisch.', 'star')}</div>`;
   },
 };
+
+/* ---------------------------------------------------------------- Einarbeitung */
+async function refreshOnboarding() {
+  st.onboarding = await api.get('/api/onboarding');
+  renderView();
+}
+
+/** Einarbeitung neuer Anwälte: Checkliste mit Fortschritt, Mentor aus dem Board. */
+function onboardingPanel() {
+  const o = st.onboarding;
+  if (!o || (!o.list.length && !o.board)) return '';
+  const person = (e) => {
+    const pct = e.total ? Math.round((e.done / e.total) * 100) : 0;
+    const mentor = o.board
+      ? `<select class="field field-sm" data-change="onboarding-mentor" data-user="${e.userId}" aria-label="Mentor von ${esc(e.name)}"><option value="">Kein Mentor</option>${o.mentors
+          .map((m) => `<option value="${m.id}" ${e.mentor && e.mentor.id === m.id ? 'selected' : ''}>${esc(m.name)}</option>`)
+          .join('')}</select>`
+      : `<span class="text-sm text-muted">Mentor: ${esc(e.mentor ? e.mentor.name : '—')}</span>`;
+    return `<div class="ev-item">
+        <div class="ev-top"><span class="ev-name">${esc(e.name)}</span>${e.rank ? `<span class="text-xs text-dim">${esc(e.rank)}</span>` : ''}
+          ${e.doneAt ? badge('Fertig', 'emerald') : `<span class="text-xs text-dim">${e.done} von ${e.total}</span>`}
+          <span class="ml-auto flex items-center gap-2">${mentor}${o.board ? `<button type="button" class="icon-btn sm" data-action="onboarding-end" data-user="${e.userId}" data-name="${esc(e.name)}" aria-label="Einarbeitung beenden" title="Einarbeitung beenden">${icon('x', 'ico-sm')}</button>` : ''}</span></div>
+        <div class="ob-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" aria-label="Fortschritt"><span style="width:${pct}%"></span></div>
+        <div class="ob-items">${e.items
+          .map(
+            (i) => `<label class="check" ${i.doneAt ? `title="Erledigt – ${esc(i.doneBy)}"` : ''}><input type="checkbox" data-change="onboarding-tick" data-id="${i.id}" ${i.doneAt ? 'checked' : ''}> <span>${esc(i.label)}</span></label>`
+          )
+          .join('')}</div>
+        ${o.board ? `<form data-form="onboarding-item" data-user="${e.userId}" class="flex gap-2 mt-2"><input name="label" class="field field-sm" maxlength="160" minlength="2" required placeholder="Weiteren Punkt hinzufügen" aria-label="Weiteren Punkt für ${esc(e.name)}"><button type="submit" class="btn-outline btn-sm">${icon('plus', 'ico-sm')}<span>Hinzufügen</span></button></form>` : ''}
+      </div>`;
+  };
+  return `
+        <section class="panel panel-pad mb-4">
+          <div class="panel-head"><h2 class="panel-title">Einarbeitung</h2>${
+            o.board && o.candidates.length
+              ? `<div class="flex gap-2"><select id="obCandidate" class="field field-sm" aria-label="Mitarbeiter für die Einarbeitung">${o.candidates
+                  .map((c) => `<option value="${c.id}">${esc(c.name)}</option>`)
+                  .join('')}</select><button type="button" class="btn-outline btn-sm" data-action="onboarding-start">${icon('plus', 'ico-sm')}<span>Beginnen</span></button></div>`
+              : ''
+          }</div>
+          ${o.list.length ? `<div class="ev-list">${o.list.map(person).join('')}</div>` : '<p class="text-sm text-dim">Gerade wird niemand eingearbeitet. Neue Anwälte bekommen die Checkliste automatisch.</p>'}
+        </section>`;
+}
 
 /** Rangauswahl für Beförderungen: Ränge über maxRank (eigener Rang eines Partners) sind gesperrt. */
 function promoteRankSelect(maxRank) {

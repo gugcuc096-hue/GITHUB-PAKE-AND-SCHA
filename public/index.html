@@ -21,6 +21,10 @@
     <meta property="og:site_name" content="Pake & Scha Legal Consulting">
     <meta property="og:title" content="Pake & Scha – Recht haben. Recht bekommen.">
     <meta property="og:description" content="Ihre Kanzlei für Zivil-, Straf- und Verfassungsrecht in Los Santos. Mandat online anfragen, Termine vereinbaren.">
+    <meta property="og:image" content="/img/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
 
     <!-- Typografie: Cormorant Garamond (Serif), Inter (Sans), JetBrains Mono (Zahlen) -->
     <link rel="preload" href="/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
@@ -884,7 +888,7 @@
                         <span class="self-start sm:self-auto text-xs font-mono text-[var(--gold-500)] px-3 py-1 rounded-full border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.05)]">Höchste Entscheidungsgewalt</span>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4"><!--ranks:board-->
                         <div class="glass-card p-6 border-t-2 border-t-[var(--gold-500)] flex flex-col justify-between">
                             <div>
                                 <div class="flex items-center justify-between mb-3">
@@ -932,6 +936,7 @@
                                 Vollmacht: Alle Gerichte · Teamführung
                             </div>
                         </div>
+<!--/ranks:board-->
                     </div>
                 </div>
 
@@ -945,7 +950,7 @@
                         <span class="self-start sm:self-auto text-xs font-mono text-slate-400 px-3 py-1 rounded-full border border-slate-700 bg-slate-800/40">Operative Anwaltschaft</span>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4"><!--ranks:associate-->
                         <div class="glass-card p-6 border-t-2 border-t-amber-500/60 flex flex-col justify-between">
                             <div>
                                 <div class="flex items-center justify-between mb-3">
@@ -993,6 +998,7 @@
                                 Befugnis: Alle Gerichte · im Mentoring
                             </div>
                         </div>
+<!--/ranks:associate-->
                     </div>
                 </div>
             </div>
@@ -1258,5 +1264,6 @@
     <!-- Backend-Anbindung: Login-Button, Mandatsanfrage, Team & Honorarordnung live -->
     <script src="/js/api.js"></script>
     <script src="/js/site.js"></script>
+    <script src="/js/sitetext.js" defer></script>
 </body>
 </html>

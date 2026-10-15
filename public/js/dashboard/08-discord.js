@@ -1050,6 +1050,11 @@ function ticketSettingsPanel(t) {
           </fieldset>
           <div><label class="label" for="tkPing">Pings in Mandats-Tickets</label><select id="tkPing" name="pingCooldownMin" class="field">${PING_COOLDOWNS.map(([v, label]) => opt(v, label, v === (t.pingCooldownMin ?? 60))).join('')}</select>
             <p class="form-hint">Dieselbe Person (Mandant oder Anwalt) wird im selben Ticket höchstens so oft erwähnt – die Nachrichten selbst erscheinen immer. Gepingt wird ohnehin nur, wer gerade etwas tun soll (z. B. der Mandant einmal, wenn er den Vertrag unterschreiben soll).</p></div>
+          <div><div class="label">Was ins Mandats-Ticket kommt</div>
+            <p class="form-hint mb-2">Nur angehakte Meldungen erscheinen im Ticket. Den Stand zeigt immer das Zeichen vor dem Kanalnamen: 📥 Eingang · 🔍 Akteneinsicht · ♟️ Strategie · ⚖️ Verhandlung · 🔒 Abgeschlossen (Bewerbungen und Anliegen ebenso).</p>
+            <div class="ev-checks">${Object.entries(t.events || {})
+              .map(([k, e]) => `<label class="check"><input type="checkbox" name="ev" value="${esc(k)}" ${e.on ? 'checked' : ''}> ${esc(e.label)}</label>`)
+              .join('')}</div></div>
           <div class="form-actions">
             <button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button>
             <button type="button" class="btn-outline btn-md" data-action="tickets-test" ${t.tokenSet ? '' : 'disabled'}>Verbindung testen</button>
