@@ -1734,4 +1734,43 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       }
     });
   }
+  for (const [label, device] of [
+    ['PC', DESKTOP],
+    ['Handy', PHONE],
+  ]) {
+    it(`Dokumentart mit eigener Vorschlagsliste am ${label}: tippen filtert, Pfeil + Enter übernimmt, Esc schließt nur die Liste`, async () => {
+      const csrv = await startServer();
+      const { ctx, page, problems } = await open(device);
+      try {
+        const adm = client(csrv.base);
+        const me = await adm.login(TEAM.admin);
+        const kase = (await adm.post('/api/cases', { title: 'Missbrauch der Amtsgewalt', area: 'strafrecht', clientName: 'Toni Test', lawyerId: me.id })).json.case;
+        await login(page, TEAM.admin, csrv.base);
+        await page.goto(`${csrv.base}/dashboard.html?case=${kase.id}#cases`);
+        await page.waitForSelector('#modalBody .case-head');
+        await page.evaluate(async () => {
+          await load.fivenet();
+          openModal(externalForm('fivenet', null, st.caseInfo), { child: true });
+        });
+        await page.click('#fnDocType');
+        assert.ok((await page.locator('#fnDocTypeList li:visible').count()) > 5, 'beim Antippen alle Vorschläge');
+        await page.keyboard.type('zeug');
+        assert.deepEqual(await page.locator('#fnDocTypeList li:visible').allTextContents(), ['Zeugenaussage']);
+        await page.keyboard.press('ArrowDown');
+        await page.keyboard.press('Enter');
+        assert.equal(await page.inputValue('#fnDocType'), 'Zeugenaussage');
+        assert.equal(await page.locator('#modalBody form[data-form="ext-link"]').count(), 1, 'Enter schickt das Formular nicht ab');
+        await page.fill('#fnDocType', 'Eigene Art');
+        await page.keyboard.press('Escape');
+        assert.ok(await page.locator('#fnDocTypeList').isHidden());
+        assert.equal(await page.locator('#modalBody form[data-form="ext-link"]').count(), 1, 'Esc schließt nur die Liste');
+        assert.equal(await page.inputValue('#fnDocType'), 'Eigene Art', 'eigener Text bleibt erlaubt');
+        assert.ok((await overflow(page)) <= 1);
+        assert.deepEqual(problems, []);
+      } finally {
+        await ctx.close();
+        await csrv.stop();
+      }
+    });
+  }
 });

@@ -708,3 +708,95 @@ function showCredentials(cred, name) {
         </div>
       </div>`);
 }
+
+/* ---------------------------------------------------------------- Eingabe mit Vorschlägen */
+/**
+ * Freitext-Feld mit eigener Vorschlagsliste im Stil der Auswahllisten (statt <datalist>, das sich nicht gestalten lässt).
+ * Tippen filtert, Pfeiltasten wählen, Enter übernimmt, Esc schließt – eigener Text bleibt erlaubt.
+ */
+function comboField({ id, name, value = '', options = [], maxlength = 120, placeholder = '' }) {
+  return `<div class="combo">
+      <input id="${esc(id)}" name="${esc(name)}" class="field combo-input" maxlength="${maxlength}" value="${esc(value || '')}" placeholder="${esc(placeholder)}"
+        autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="${esc(id)}List" data-combo>
+      <button type="button" class="combo-toggle" tabindex="-1" aria-label="Vorschläge zeigen" data-combo-toggle>${icon('chevronDown', 'ico-sm')}</button>
+      <ul class="combo-list" id="${esc(id)}List" role="listbox" hidden>${options
+        .map((o) => `<li role="option" data-value="${esc(o)}">${esc(o)}</li>`)
+        .join('')}</ul>
+    </div>`;
+}
+
+const combo = {
+  list: (input) => input.parentElement.querySelector('.combo-list'),
+  items: (input) => [...combo.list(input).children].filter((li) => !li.hidden),
+  open(input, all = false) {
+    const q = all ? '' : input.value.trim().toLowerCase();
+    const list = combo.list(input);
+    let any = false;
+    for (const li of list.children) {
+      li.hidden = !!q && !li.dataset.value.toLowerCase().includes(q);
+      li.classList.remove('active');
+      li.setAttribute('aria-selected', String(li.dataset.value === input.value));
+      any = any || !li.hidden;
+    }
+    list.hidden = !any;
+    input.setAttribute('aria-expanded', String(any));
+  },
+  close(input) {
+    combo.list(input).hidden = true;
+    input.setAttribute('aria-expanded', 'false');
+  },
+  pick(input, li) {
+    input.value = li.dataset.value;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    combo.close(input);
+  },
+  move(input, dir) {
+    const items = combo.items(input);
+    if (!items.length) return;
+    const i = items.findIndex((li) => li.classList.contains('active'));
+    items.forEach((li) => li.classList.remove('active'));
+    const next = items[(i + dir + items.length) % items.length];
+    next.classList.add('active');
+    next.scrollIntoView({ block: 'nearest' });
+  },
+};
+document.addEventListener('focusin', (e) => e.target.matches('[data-combo]') && combo.open(e.target, true));
+document.addEventListener('input', (e) => e.target.matches('[data-combo]') && e.isTrusted && combo.open(e.target));
+document.addEventListener('focusout', (e) => e.target.matches('[data-combo]') && combo.close(e.target));
+document.addEventListener('mousedown', (e) => {
+  const li = e.target.closest('.combo-list li');
+  const toggle = e.target.closest('[data-combo-toggle]');
+  if (!li && !toggle) return;
+  e.preventDefault(); // Fokus bleibt im Feld
+  const input = (li || toggle).closest('.combo').querySelector('[data-combo]');
+  if (li) combo.pick(input, li);
+  else if (combo.list(input).hidden) {
+    input.focus();
+    combo.open(input, true);
+  } else combo.close(input);
+});
+document.addEventListener(
+  'keydown',
+  (e) => {
+    const input = e.target.closest && e.target.closest('[data-combo]');
+    if (!input) return;
+    const open = !combo.list(input).hidden;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!open) combo.open(input, true);
+      combo.move(input, e.key === 'ArrowDown' ? 1 : -1);
+    } else if (e.key === 'Enter' && open) {
+      const active = combo.list(input).querySelector('li.active');
+      if (active) {
+        e.preventDefault();
+        combo.pick(input, active);
+      }
+    } else if (e.key === 'Escape' && open) {
+      // Nur die Liste schließen, nicht das Fenster
+      e.preventDefault();
+      e.stopPropagation();
+      combo.close(input);
+    }
+  },
+  true
+);

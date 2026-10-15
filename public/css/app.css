@@ -1492,3 +1492,20 @@ form .field.field-sm { flex: 1 1 auto; }
 .ob-items { display: grid; gap: 0.5rem; }
 @media (min-width: 900px) { .ob-items { grid-template-columns: 1fr 1fr; } }
 .ob-items .check input:checked + span { color: var(--text-dim, #64748b); text-decoration: line-through; }
+
+/* Eingabe mit Vorschlägen (Dokumentart): Liste im Stil der Auswahllisten */
+.combo { position: relative; }
+.combo .combo-input { padding-right: 2.5rem; }
+.combo-toggle { position: absolute; top: 0; right: 0; bottom: 0; width: 2.5rem; display: flex; align-items: center; justify-content: center;
+  color: var(--gold-500); background: none; border: 0; cursor: pointer; }
+.combo-toggle .ico-sm { transition: transform 0.2s ease; }
+.combo-input[aria-expanded='true'] + .combo-toggle .ico-sm { transform: rotate(180deg); }
+.combo-list { position: absolute; z-index: 60; top: calc(100% + 6px); left: 0; right: 0; margin: 0; padding: 6px; list-style: none;
+  max-height: min(16rem, 50vh); overflow-y: auto; background: #0b1530; border: 1px solid rgba(212, 175, 55, 0.35); border-radius: 12px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55); scrollbar-width: thin; scrollbar-color: rgba(212, 175, 55, 0.35) transparent; }
+.combo-list li { display: flex; align-items: center; min-height: 40px; padding: 0.5rem 0.75rem; border-radius: 8px; color: #cbd5e1;
+  font-size: 0.9rem; cursor: pointer; }
+.combo-list li[hidden] { display: none; }
+.combo-list li:hover, .combo-list li.active { background: rgba(212, 175, 55, 0.12); color: #fff; }
+.combo-list li[aria-selected='true'] { color: #f3e5ab; font-weight: 600; }
+.combo-list li[aria-selected='true']::after { content: '✓'; margin-left: auto; color: #d4af37; font-weight: 700; }
