@@ -164,6 +164,25 @@ describe('Zwei-Faktor-Anmeldung per Discord-DM', () => {
     await sleep(400);
     assert.equal(toErika().length, 1, 'nur einmal je Akte');
   });
+
+  it('Wochenbericht: „An mich senden“ schickt den Bericht der Woche per Discord-DM', async () => {
+    const toBoard = () => dms().filter((m) => m.to === MEMBERS.jaywa);
+    const before = toBoard().length;
+    const r = await admin.post('/api/admin/weekly-report/test');
+    assert.equal(r.status, 200, r.text);
+    assert.equal(toBoard().length, before + 1);
+    const e = toBoard().pop().embeds[0];
+    assert.match(e.title, /^📊 Wochenbericht – KW \d+$/);
+    assert.deepEqual(
+      e.fields.map((f) => f.name),
+      ['💰 Umsatz', '📁 Akten', '🧾 Offene Rechnungen', '⏸️ Liegengeblieben', '📅 Nächste 7 Tage', '📥 Board-Eingang']
+    );
+    assert.match(e.fields[1].value, /1 abgeschlossen/, 'die eben abgeschlossene Akte zählt');
+    assert.match(e.description, /https:\/\/kanzlei\.example\/dashboard\.html#stats/);
+    // Abschaltbar in den Einstellungen
+    const off = await admin.patch('/api/admin/settings', { weeklyReport: false });
+    assert.equal(off.json.settings.weeklyReport, false);
+  });
 });
 
 describe('Kanzlei-Statistik und Anmeldung ohne Bot', () => {

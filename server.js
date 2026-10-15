@@ -183,6 +183,8 @@ const reminderTimer = setInterval(() => {
     require('./idleCases').sweep().catch((err) => console.warn('Hinweis auf liegengebliebene Akten fehlgeschlagen:', err.message));
     // Abgelehnte Bewerbungen und erledigte Anliegen nach X Tagen löschen (Einstellung, 0 = aus)
     require('./cleanup').sweep();
+    // Wochenbericht fürs Board: montags ab 10 Uhr einmal per Discord-DM
+    require('./weeklyReport').sweep().catch((err) => console.warn('Wochenbericht fehlgeschlagen:', err.message));
   } catch (err) {
     console.warn('Hintergrundaufgabe fehlgeschlagen:', err.message);
   }

@@ -787,6 +787,10 @@ const actions = {
     toast('Rang gelöscht.');
     renderView();
   },
+  'weekly-report-test': async () => {
+    await api.post('/api/admin/weekly-report/test');
+    toast('Wochenbericht an dein Discord gesendet.');
+  },
   'site-text-reset': async (el) => {
     await api.del(`/api/site/texts/${encodeURIComponent(el.dataset.page)}/${encodeURIComponent(el.dataset.key)}`);
     st.siteTexts = (await api.get('/api/site/texts')).texts;

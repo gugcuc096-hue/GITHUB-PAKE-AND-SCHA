@@ -461,6 +461,8 @@ views.settings = {
             <div><label class="label">Kontakt</label><input name="firmContact" maxlength="120" class="field" value="${esc(s.firmContact)}"></div>
             <div><label class="label">Zahlungserinnerung (Tage nach Fälligkeit)</label><input type="number" name="invoiceReminderDays" min="0" max="60" step="1" class="field" value="${esc(s.invoiceReminderDays)}">
               <p class="form-hint">Offene Rechnungen erinnern den Mandanten so viele Tage nach dem Fälligkeitsdatum einmal automatisch – per Discord-DM und im Ticket der Akte. 0 = aus. Von Hand geht es jederzeit mit „Erinnern“ an der Rechnung.</p></div>
+            <div class="span-2"><label class="check"><input type="checkbox" name="weeklyReport" ${s.weeklyReport ? 'checked' : ''}> Wochenbericht fürs Board – jeden Montag ab 10 Uhr per Discord-DM: Umsatz, Akten, offene Rechnungen, liegengebliebene Akten, Fristen der Woche und Board-Eingang</label>
+              <button type="button" class="btn-ghost btn-sm mt-2" data-action="weekly-report-test">${DISCORD_ICON}<span>Jetzt an mich senden</span></button></div>
             <div><label class="label">Automatisch aufräumen (Tage)</label><input type="number" name="cleanupDays" min="0" max="365" step="1" class="field" value="${esc(s.cleanupDays)}">
               <p class="form-hint">Abgelehnte Bewerbungen sowie erledigte oder abgelehnte Anliegen werden so viele Tage nach der letzten Änderung gelöscht – samt Discord-Ticket. 0 = aus.</p></div>
             <div><label class="label">Einarbeitung neuer Anwälte (Checkliste)</label><textarea name="onboardingTemplate" rows="5" maxlength="4000" class="field">${esc(s.onboardingTemplate)}</textarea>
