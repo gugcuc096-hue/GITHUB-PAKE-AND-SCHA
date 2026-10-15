@@ -800,3 +800,194 @@ document.addEventListener(
   },
   true
 );
+
+/* ---------------------------------------------------------------- Kalender für Datums- und Terminfelder */
+/**
+ * Eigener Kalender im Stil der Kanzlei für alle Datums- und Uhrzeitfelder (input.field type="date" / "datetime-local").
+ * Die Felder bleiben echte Datumsfelder (gleicher Wert, Tippen am PC geht weiter) – nur das Aufklapp-Fenster ist unseres.
+ * Datum: Tag anklicken = übernommen. Termin: Tag + Uhrzeit wählen, „Übernehmen“.
+ */
+const DP_MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+const DP_SEL = 'input.field[type="date"], input.field[type="datetime-local"]';
+const pad2 = (n) => String(n).padStart(2, '0');
+const dpKey = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const dp = { el: null, input: null, view: null, day: '', hh: '', mm: '' };
+
+function dpParse(input) {
+  const [date, time = ''] = String(input.value || '').split('T');
+  const [hh = '', mm = ''] = time.split(':');
+  return { date, hh, mm };
+}
+
+function dpRender() {
+  const input = dp.input;
+  const withTime = input.type === 'datetime-local';
+  const min = String(input.min || '').slice(0, 10);
+  const max = String(input.max || '').slice(0, 10);
+  const y = dp.view.getFullYear();
+  const m = dp.view.getMonth();
+  const first = new Date(y, m, 1);
+  const start = new Date(y, m, 1 - ((first.getDay() + 6) % 7)); // Woche beginnt Montag
+  const today = dpKey(new Date());
+  const days = Array.from({ length: 42 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
+  const cell = (d) => {
+    const k = dpKey(d);
+    const off = (min && k < min) || (max && k > max);
+    return `<button type="button" class="dp-day${d.getMonth() !== m ? ' out' : ''}${k === today ? ' today' : ''}${k === dp.day ? ' sel' : ''}" data-dp-day="${k}" ${off ? 'disabled' : ''} aria-label="${d.getDate()}. ${DP_MONTHS[d.getMonth()]} ${d.getFullYear()}" aria-pressed="${k === dp.day}">${d.getDate()}</button>`;
+  };
+  const mins = Array.from({ length: 12 }, (_, i) => pad2(i * 5));
+  if (dp.mm && !mins.includes(dp.mm)) mins.push(dp.mm), mins.sort();
+  dp.el.innerHTML = `
+    <div class="dp-head">
+      <button type="button" class="dp-nav" data-dp-nav="-1" aria-label="Voriger Monat">${icon('chevronLeft', 'ico-sm')}</button>
+      <div class="dp-title">${DP_MONTHS[m]} ${y}</div>
+      <button type="button" class="dp-nav" data-dp-nav="1" aria-label="Nächster Monat">${icon('chevronRight', 'ico-sm')}</button>
+    </div>
+    <div class="dp-grid">${['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((w) => `<span class="dp-wd">${w}</span>`).join('')}${days.map(cell).join('')}</div>
+    ${
+      withTime
+        ? `<div class="dp-time"><span class="dp-time-label">${icon('clock', 'ico-sm')}Uhrzeit</span>
+            <select class="field field-sm" data-dp-time="hh" aria-label="Stunde">${Array.from({ length: 24 }, (_, h) => pad2(h))
+              .map((h) => `<option ${h === dp.hh ? 'selected' : ''}>${h}</option>`)
+              .join('')}</select><span class="dp-colon">:</span>
+            <select class="field field-sm" data-dp-time="mm" aria-label="Minute">${mins.map((x) => `<option ${x === dp.mm ? 'selected' : ''}>${x}</option>`).join('')}</select></div>`
+        : ''
+    }
+    <div class="dp-foot">
+      <button type="button" class="btn-ghost btn-sm" data-dp-act="today">${withTime ? 'Jetzt' : 'Heute'}</button>
+      ${input.required ? '' : '<button type="button" class="btn-ghost btn-sm" data-dp-act="clear">Leeren</button>'}
+      ${withTime ? '<button type="button" class="btn-gold btn-sm" data-dp-act="ok">Übernehmen</button>' : ''}
+    </div>`;
+  dpPlace();
+}
+
+function dpPlace() {
+  if (!dp.el || !dp.input) return;
+  const r = dp.input.getBoundingClientRect();
+  const w = dp.el.offsetWidth;
+  const h = dp.el.offsetHeight;
+  const left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
+  const below = r.bottom + 6;
+  const top = below + h > window.innerHeight - 8 && r.top - h - 6 > 8 ? r.top - h - 6 : Math.max(8, Math.min(below, window.innerHeight - h - 8));
+  dp.el.style.left = `${left}px`;
+  dp.el.style.top = `${top}px`;
+}
+
+function dpOpen(input) {
+  if (dp.input === input) return;
+  dpClose();
+  const v = dpParse(input);
+  dp.input = input;
+  dp.day = v.date;
+  const now = new Date();
+  dp.hh = v.hh || pad2(Math.min(23, now.getHours() + 1));
+  dp.mm = v.mm || '00';
+  const base = v.date ? new Date(`${v.date}T00:00`) : input.min ? new Date(`${String(input.min).slice(0, 10)}T00:00`) : now;
+  dp.view = new Date(base.getFullYear(), base.getMonth(), 1);
+  dp.el = document.createElement('div');
+  dp.el.className = 'dp';
+  dp.el.setAttribute('role', 'dialog');
+  dp.el.setAttribute('aria-label', input.type === 'datetime-local' ? 'Datum und Uhrzeit wählen' : 'Datum wählen');
+  dp.el.style.width = `${Math.min(360, Math.max(304, input.offsetWidth))}px`; // so breit wie das Feld
+  document.body.appendChild(dp.el);
+  input.setAttribute('aria-expanded', 'true');
+  if (input.dataset.dpRo) input.blur(); // am Handy keine Eingabe-Markierung im Feld
+  dpRender();
+  // Passt der Kalender weder unter noch über das Feld (Handy), Feld nach oben holen statt es zu verdecken
+  const r = input.getBoundingClientRect();
+  const h = dp.el.offsetHeight;
+  if (r.bottom + h + 14 > window.innerHeight && r.top - h - 14 < 0) {
+    input.scrollIntoView({ block: 'start', behavior: 'instant' });
+    dpPlace();
+  }
+}
+
+function dpClose() {
+  if (!dp.el) return;
+  dp.el.remove();
+  if (dp.input) {
+    dp.input.removeAttribute('aria-expanded');
+    if (dp.input.dataset.dpRo) {
+      dp.input.readOnly = false; // nur fürs Antippen gesperrt, damit sich nicht das System-Rad öffnet
+      delete dp.input.dataset.dpRo;
+    }
+  }
+  dp.el = null;
+  dp.input = null;
+}
+
+function dpSet(value) {
+  const input = dp.input;
+  input.value = value;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function dpCommit() {
+  if (!dp.day) return;
+  dpSet(dp.input.type === 'datetime-local' ? `${dp.day}T${dp.hh}:${dp.mm}` : dp.day);
+  dpClose();
+}
+
+// Antippen am Handy: kurz schreibschützen, damit nicht das System-Rad aufgeht
+document.addEventListener('pointerdown', (e) => {
+  const input = e.target.closest && e.target.closest(DP_SEL);
+  if (input && e.pointerType !== 'mouse' && !input.readOnly && !input.disabled) {
+    input.readOnly = true;
+    input.dataset.dpRo = '1';
+  }
+});
+document.addEventListener('click', (e) => {
+  const input = e.target.closest && e.target.closest(DP_SEL);
+  if (input && !input.disabled && (!input.readOnly || input.dataset.dpRo)) return dpOpen(input);
+  if (!dp.el) return;
+  if (!dp.el.contains(e.target)) return dpClose();
+  const nav = e.target.closest('[data-dp-nav]');
+  const day = e.target.closest('[data-dp-day]');
+  const act = e.target.closest('[data-dp-act]');
+  if (nav) {
+    dp.view = new Date(dp.view.getFullYear(), dp.view.getMonth() + Number(nav.dataset.dpNav), 1);
+    dpRender();
+  } else if (day && !day.disabled) {
+    dp.day = day.dataset.dpDay;
+    if (dp.input.type === 'datetime-local') dpRender();
+    else dpCommit();
+  } else if (act) {
+    const a = act.dataset.dpAct;
+    if (a === 'clear') {
+      dpSet('');
+      dpClose();
+    } else if (a === 'today') {
+      const n = new Date();
+      dp.day = dpKey(n);
+      dp.view = new Date(n.getFullYear(), n.getMonth(), 1);
+      if (dp.input.type === 'datetime-local') {
+        dp.hh = pad2(n.getHours());
+        dp.mm = pad2(Math.floor(n.getMinutes() / 5) * 5);
+        dpRender();
+      } else dpCommit();
+    } else if (a === 'ok') dpCommit();
+  }
+});
+document.addEventListener('change', (e) => {
+  const t = e.target.closest && e.target.closest('[data-dp-time]');
+  if (t) dp[t.dataset.dpTime] = t.value;
+});
+// Fenster offen lassen, wenn man darin klickt (Fokus bleibt im Feld)
+document.addEventListener('mousedown', (e) => {
+  if (dp.el && dp.el.contains(e.target) && !e.target.closest('select')) e.preventDefault();
+});
+document.addEventListener(
+  'keydown',
+  (e) => {
+    if (!dp.el) return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation(); // nur den Kalender schließen, nicht das Fenster dahinter
+      dpClose();
+    } else if (e.key === 'Tab' && e.target === dp.input) dpClose();
+  },
+  true
+);
+window.addEventListener('resize', () => dpPlace());
+document.addEventListener('scroll', () => dpPlace(), true);

@@ -1509,3 +1509,35 @@ form .field.field-sm { flex: 1 1 auto; }
 .combo-list li:hover, .combo-list li.active { background: rgba(212, 175, 55, 0.12); color: #fff; }
 .combo-list li[aria-selected='true'] { color: #f3e5ab; font-weight: 600; }
 .combo-list li[aria-selected='true']::after { content: '✓'; margin-left: auto; color: #d4af37; font-weight: 700; }
+
+/* Datums- und Terminfelder: Gold-Kalendersymbol statt des System-Symbols, Kalender im Kanzlei-Stil (dashboard/02-geruest.js) */
+input.field[type="date"], input.field[type="datetime-local"] {
+  cursor: pointer; padding-right: 2.5rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d4af37' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M16 3v4M8 3v4M3 11h18'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 0.8rem center; background-size: 17px; }
+input.field[type="date"]::-webkit-calendar-picker-indicator, input.field[type="datetime-local"]::-webkit-calendar-picker-indicator { display: none; }
+input.field[aria-expanded="true"] { border-color: var(--gold-500); box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15); }
+.dp { position: fixed; z-index: 2000; width: 304px; max-width: calc(100vw - 16px); padding: 12px; background: #0b1530;
+  border: 1px solid rgba(212, 175, 55, 0.35); border-radius: 14px; box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55); color: #e2e8f0;
+  animation: dp-in 0.15s ease; }
+@keyframes dp-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.dp-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.dp-title { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 1.2rem; font-weight: 600; color: #fff; }
+.dp-nav { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px;
+  color: var(--gold-500); border: 1px solid transparent; background: none; cursor: pointer; }
+.dp-nav:hover { border-color: rgba(212, 175, 55, 0.35); background: rgba(212, 175, 55, 0.08); }
+.dp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.dp-wd { text-align: center; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #94a3b8; padding: 4px 0 6px; }
+.dp-day { height: 38px; border-radius: 9px; border: 1px solid transparent; background: none; color: #cbd5e1; font-size: 0.88rem;
+  font-variant-numeric: tabular-nums; cursor: pointer; }
+.dp-day:hover:not(:disabled) { background: rgba(212, 175, 55, 0.12); color: #fff; }
+.dp-day.out { color: #55607a; }
+.dp-day.today { border-color: rgba(212, 175, 55, 0.45); color: #f3e5ab; }
+.dp-day.sel { background: var(--gold-500); border-color: var(--gold-500); color: #0a1228; font-weight: 700; }
+.dp-day:disabled { opacity: 0.3; cursor: default; }
+.dp-time { display: flex; align-items: center; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.07); }
+.dp-time-label { display: inline-flex; align-items: center; gap: 6px; margin-right: auto; font-size: 0.82rem; color: #94a3b8; }
+.dp-time select.field.field-sm { width: 4.6rem; }
+.dp-colon { color: var(--gold-500); font-weight: 700; }
+.dp-foot { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+.dp-foot .btn-gold { margin-left: auto; }
