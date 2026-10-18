@@ -2098,7 +2098,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
     }
   });
 
-  it('Gold-Spotlight und Goldschimmer, Anwalts-Profil mit „Mandat bei mir anfragen“, wer ist in der Akte und wer schreibt – PC und Handy', async () => {
+  it('Gold-Spotlight und Goldschimmer, Anwalts-Profil mit „Mandat anfragen“, wer ist in der Akte und wer schreibt – PC und Handy', async () => {
     const psrv = await startServer();
     const A = await open(DESKTOP); // Anwalt
     const B = await open(DESKTOP); // Partner (Board)
@@ -2117,15 +2117,18 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       const card = A.page.locator('#teamGrid .team-card').first();
       await card.locator('.team-name').waitFor();
       await card.scrollIntoViewIfNeeded();
+      // Die Karte hebt sich beim Darüberfahren an (0,35 s) – erst danach messen, wo sie steht
+      const start = await card.boundingBox();
+      await A.page.mouse.move(start.x + 30, start.y + 30);
+      await A.page.waitForTimeout(600);
       const box = await card.boundingBox();
-      await A.page.mouse.move(box.x + 30, box.y + 30);
       await A.page.mouse.move(box.x + 60, box.y + 80);
       await A.page.waitForFunction(() => document.querySelector('#teamGrid .team-card.ps-spot-on'));
       const spot = await card.evaluate((el) => [parseFloat(el.style.getPropertyValue('--mx')), parseFloat(el.style.getPropertyValue('--my'))]);
       assert.ok(Math.abs(spot[0] - 60) <= 2 && Math.abs(spot[1] - 80) <= 2, `Licht an der Maus: ${spot}`);
       await A.page.mouse.move(2, 2);
       await A.page.waitForFunction(() => !document.querySelector('.ps-spot-on'));
-      // Name auf der Karte → Profilseite → „Mandat bei mir anfragen“ öffnet das Formular mit Wunschanwalt
+      // Name auf der Karte → Profilseite → „Mandat anfragen“ öffnet das Formular mit Wunschanwalt
       const name = (await card.locator('.team-name').textContent()).trim();
       await card.locator('.team-name').click();
       await A.page.waitForURL(/\/team\/[a-z0-9-]+$/);
@@ -2139,6 +2142,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       assert.equal(await overflow(M.page), 0);
       const cta = await M.page.locator('.pf-actions a.btn-gold').boundingBox();
       assert.ok(cta.width > 300, `Knopf breit: ${cta.width}`);
+      assert.equal(await M.page.textContent('.pf-actions a.btn-gold'), 'Mandat anfragen');
 
       // Dashboard: Kachel leuchtet unter der Maus
       await login(A.page, TEAM.anwalt, psrv.base);

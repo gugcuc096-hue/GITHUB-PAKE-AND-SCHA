@@ -277,7 +277,7 @@
     .catch(() => (me = null))
     .finally(updateAuthNav);
 
-  // Von einer Profilseite (/team/<name>): „Mandat bei … anfragen“ → /?anwalt=<id>, sonst „Mandat anfragen“ → /?mandat=1
+  // Von einer Profilseite (/team/<name>): „Mandat anfragen“ → /?anwalt=<id> (Wunschanwalt) bzw. /?mandat=1 (ohne Konto)
   const wish = new URLSearchParams(location.search);
   const wishId = Number(wish.get('anwalt')) || 0;
   if (wishId || wish.has('mandat')) history.replaceState(null, '', location.pathname + location.hash);

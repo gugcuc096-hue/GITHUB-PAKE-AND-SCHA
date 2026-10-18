@@ -56,7 +56,7 @@ function memberModal(m) {
            </div>`;
   openModal(`
       <h2 class="modal-title">${isNew ? 'Teammitglied hinzufügen' : 'Teammitglied bearbeiten'}</h2>
-      <p class="modal-sub">Änderungen erscheinen sofort im Bereich „Unser Team“ auf der Website.</p>
+      <p class="modal-sub">Änderungen erscheinen sofort im Bereich „Unser Team“ und auf der Profilseite.${m && m.visible && m.slug ? ` <a href="/team/${esc(m.slug)}" target="_blank" rel="noopener" class="text-gold" style="text-decoration:underline">Profilseite ansehen</a>` : ''}</p>
       <form data-form="team" data-id="${m ? m.id : ''}" class="form-grid cols-2">
         ${m
         ? `<div class="span-2 flex flex-wrap items-center gap-4">
@@ -67,7 +67,11 @@ function memberModal(m) {
         <div class="span-2"><label class="label" for="tmName">Name</label><input id="tmName" name="name" class="field" required minlength="2" maxlength="80" value="${esc(v.name || '')}" placeholder="z. B. Dr. jur. Damat Lex" autofocus></div>
         <div><label class="label" for="tmRank">Rang</label>${rankSelect('roleTitle', v.roleTitle || '', { id: 'tmRank', required: true, emptyLabel: 'Rang wählen …' })}</div>
         <div><label class="label" for="tmTier">Ebene auf der Website</label><select id="tmTier" name="tier" class="field">${opt('leitung', 'Board of Partners (gold)', v.tier === 'leitung')}${opt('anwalt', 'Associate Attorneys', v.tier !== 'leitung')}</select></div>
-        <div class="span-2"><label class="label" for="tmDesc">Kurzbeschreibung</label><textarea id="tmDesc" name="description" class="field" rows="3" maxlength="400" placeholder="Schwerpunkte, Zuständigkeiten …">${esc(v.description || '')}</textarea></div>
+        <div class="span-2"><label class="label" for="tmDesc">Kurzbeschreibung</label><textarea id="tmDesc" name="description" class="field" rows="3" maxlength="400" placeholder="Ein, zwei Sätze über ihn – stehen auf der Teamkarte und der Profilseite">${esc(v.description || '')}</textarea></div>
+        <div class="span-2"><label class="label" for="tmFocus">Schwerpunkte</label><input id="tmFocus" name="focus" class="field" maxlength="300" value="${esc((v.focus || []).join(', '))}" placeholder="z. B. Strafrecht, Haftprüfung, Verkehrsrecht">
+          <p class="form-hint">Mit Komma trennen, höchstens 6. Leer lassen = automatisch aus den Rechtsgebieten seiner Akten.</p></div>
+        <div class="span-2"><label class="label" for="tmWins">Besondere Erfolge</label><textarea id="tmWins" name="highlights" class="field" rows="3" maxlength="900" placeholder="z. B. Freispruch im Bankraub-Prozess vor dem Supreme Court">${esc((v.highlights || []).join('\n'))}</textarea>
+          <p class="form-hint">Einer pro Zeile, höchstens 6 – stehen auf der Profilseite über den automatisch gezählten Erfolgen.</p></div>
         <div><label class="label" for="tmInit">Initialen</label><input id="tmInit" name="initials" class="field" maxlength="5" value="${esc(v.initials || '')}" placeholder="automatisch"></div>
         <div class="flex items-end pb-2"><label class="check"><input type="checkbox" name="visible" ${v.visible ? 'checked' : ''}> Auf der Website anzeigen</label></div>
         <fieldset class="span-2 rounded-2xl p-4" style="border:1px solid var(--glass-border);background:rgba(15,23,42,.35)">

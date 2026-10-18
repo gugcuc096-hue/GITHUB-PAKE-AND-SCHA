@@ -36,6 +36,8 @@ const APPLICATION_STATUS = {
 
 // Deutsche Feldnamen für Validierungsfehler
 const FIELD_LABELS = {
+  focus: 'Schwerpunkte',
+  highlights: 'Besondere Erfolge',
   invoiceReminderDays: 'Zahlungserinnerung (Tage nach Fälligkeit, 0–60)',
   intervalMinutes: 'Abstand (mindestens 5 Minuten, höchstens 30 Tage)',
   everyMessages: 'Anzahl Nachrichten (1–1000)',
@@ -199,6 +201,7 @@ function issueText(i) {
   if (i.code === 'too_big') return chars ? `Höchstens ${i.maximum} Zeichen.` : `Höchstens ${i.maximum}.`;
   if (i.code === 'invalid_enum_value') return 'Bitte eine der Möglichkeiten auswählen.';
   if (i.code === 'invalid_string' && i.validation === 'email') return 'Bitte eine gültige E-Mail-Adresse angeben.';
+  if (i.code === 'custom' && i.message) return i.message; // eigene Prüfung mit eigenem Satz
   return 'Bitte prüfen.';
 }
 

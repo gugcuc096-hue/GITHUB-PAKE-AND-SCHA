@@ -133,7 +133,7 @@ describe('Website & Ränge selbst pflegen', () => {
     for (const p of ['/', '/karriere.html', '/login', '/vertrag.html']) assert.match((await client(server.base).get(p)).text, new RegExp(`\\?v=${v}"`), p);
   });
 
-  it('Anwalts-Profilseiten: eigene Adresse mit Link-Vorschau, Zahlen erst ab mehreren Akten, „Mandat bei … anfragen“', async () => {
+  it('Anwalts-Profilseiten: eigene Adresse mit Link-Vorschau, Zahlen erst ab mehreren Akten, Schwerpunkte und Erfolge vom Board, „Mandat anfragen“', async () => {
     const meta = (html, prop) => (html.match(new RegExp(`<meta (?:property|name)="${prop}" content="([^"]*)"`)) || [])[1];
     const me = await as.anwalt.login(TEAM.anwalt);
     const team = (await client(server.base).get('/api/team')).json.team;
@@ -148,7 +148,7 @@ describe('Website & Ränge selbst pflegen', () => {
     assert.equal(meta(r.text, 'og:url'), `${server.base}/team/${m.slug}`);
     assert.match(meta(r.text, 'og:image'), new RegExp(`^${server.base.replace(/[.]/g, '\\.')}/`), 'absolutes Bild für Discord');
     assert.equal(meta(r.text, 'theme-color'), '#d4af37');
-    assert.match(r.text, new RegExp(`href="/\\?anwalt=${m.id}"[^>]*>Mandat bei `));
+    assert.match(r.text, new RegExp(`href="/\\?anwalt=${m.id}"[^>]*>Mandat anfragen</a>`));
     assert.doesNotMatch(r.text, /\{\{\w+\}\}/, 'alle Platzhalter ersetzt');
     assert.doesNotMatch(r.text, /Abgeschlossene Mandate|Erfolgsquote/, 'ohne genug Akten keine Zahlen');
     // drei abgeschlossene Strafsachen (zwei gewonnen, eine verloren) → Zahlen, Schwerpunkt und Erfolge
@@ -172,6 +172,23 @@ describe('Website & Ränge selbst pflegen', () => {
     r = await client(server.base).get(`/team/irgendwas-${m.id}`, { Accept: 'text/html' });
     assert.equal(r.status, 301);
     assert.equal(r.location, `/team/${m.slug}`);
+    // Board pflegt Schwerpunkte und besondere Erfolge selbst – sie ersetzen bzw. ergänzen die automatischen
+    const edit = (body) => as.admin.patch(`/api/admin/team/${m.id}`, body);
+    let e = await edit({ focus: 'Haftprüfung, Verkehrsrecht', highlights: 'Freispruch im Bankraub-Prozess\n\nSieg vor dem Supreme Court' });
+    assert.equal(e.status, 200, e.text);
+    const adminRow = (await as.admin.get('/api/admin/team')).json.team.find((t) => t.id === m.id);
+    assert.deepEqual([adminRow.focus, adminRow.highlights, adminRow.slug], [['Haftprüfung', 'Verkehrsrecht'], ['Freispruch im Bankraub-Prozess', 'Sieg vor dem Supreme Court'], m.slug]);
+    r = await page();
+    assert.match(r.text, /<span class="pf-chip">Haftprüfung<\/span><span class="pf-chip">Verkehrsrecht<\/span><\/div>/);
+    assert.doesNotMatch(r.text, /pf-chip">Strafrecht/, 'eigene Schwerpunkte ersetzen die automatischen');
+    assert.match(r.text, /<li>Freispruch im Bankraub-Prozess<\/li><li>Sieg vor dem Supreme Court<\/li>/);
+    assert.match(r.text, /<b>2×<\/b><span>Freispruch<\/span>/, 'gezählte Erfolge bleiben');
+    e = await edit({ focus: 'a, b, c, d, e, f, g' });
+    assert.equal(e.status, 400);
+    assert.equal(e.json.fields.focus, 'Höchstens 6 Schwerpunkte.');
+    assert.equal((await as.anwalt.patch(`/api/admin/team/${m.id}`, { focus: 'Hack' })).status, 403, 'nur das Board');
+    assert.equal((await edit({ focus: '', highlights: '' })).status, 200);
+    assert.match((await page()).text, /<span class="pf-chip">Strafrecht<\/span>/, 'leer = wieder automatisch');
     r = await client(server.base).get('/team/gibt-es-nicht', { Accept: 'text/html' });
     assert.equal(r.status, 404);
     assert.match(r.text, /Seite nicht gefunden/);

@@ -474,6 +474,8 @@ const forms = {
       roleTitle: val(fd, 'roleTitle'),
       tier: val(fd, 'tier'),
       description: val(fd, 'description'),
+      focus: val(fd, 'focus'),
+      highlights: val(fd, 'highlights'),
       initials: val(fd, 'initials'),
       visible: fd.get('visible') === 'on',
     };

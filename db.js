@@ -577,6 +577,9 @@ addColumn('users', 'duty_status', "TEXT NOT NULL DEFAULT 'off'");
 addColumn('users', 'duty_note', "TEXT NOT NULL DEFAULT ''");
 addColumn('users', 'duty_since', 'TEXT');
 addColumn('team_members', 'photo', 'TEXT');
+// Profilseite: vom Board gepflegte Schwerpunkte und besondere Erfolge (je Zeile ein Eintrag; leer = automatisch)
+addColumn('team_members', 'focus', "TEXT NOT NULL DEFAULT ''");
+addColumn('team_members', 'highlights', "TEXT NOT NULL DEFAULT ''");
 // FiveNet: Abschrift des Dokumenttexts und aus FiveNet übernommene Bilder
 addColumn('case_external_docs', 'content_text', "TEXT NOT NULL DEFAULT ''");
 addColumn('case_external_docs', 'content_at', 'TEXT');

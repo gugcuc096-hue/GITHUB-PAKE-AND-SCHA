@@ -35,11 +35,21 @@ const accountSchema = z.object({
   email: z.string().trim().min(1).max(120), // Teil vor dem @ oder Adresse mit @pake-scha.ls
   role: z.enum(['anwalt', 'admin']),
 });
+// Liste aus einem Textfeld (Komma bzw. Zeilen) für die Profilseite: höchstens max Einträge mit je itemMax Zeichen
+const textList = (sep, max, itemMax, what) =>
+  z
+    .string()
+    .max(2000)
+    .transform((s) => s.split(sep).map((x) => x.trim()).filter(Boolean))
+    .refine((a) => a.length <= max, `Höchstens ${max} ${what}.`)
+    .refine((a) => a.every((x) => x.length <= itemMax), `Je Eintrag höchstens ${itemMax} Zeichen.`);
 const memberSchema = z.object({
   name: z.string().trim().min(2).max(80),
   roleTitle: rankEnum(),
   tier: z.enum(['leitung', 'anwalt']).optional(),
   description: z.string().trim().max(400).optional(),
+  focus: textList(/[,\n]/, 6, 40, 'Schwerpunkte').optional(),
+  highlights: textList(/\n/, 6, 140, 'Erfolge').optional(),
   initials: z.string().trim().max(5).optional(),
   visible: z.boolean().optional(),
   userId: z.number().int().positive().nullable().optional(),
@@ -80,7 +90,8 @@ function checkLinkTarget(userId, memberId = null) {
 
 adminRouter.get('/', (req, res) => {
   const rows = db.prepare(`${TEAM_SELECT} ${ORDER}`).all();
-  res.json({ team: rows.map((t) => teamRow(t, true)) });
+  const slugs = require('../profiles').slugMap();
+  res.json({ team: rows.map((t) => ({ ...teamRow(t, true), slug: slugs.get(t.id) || null })) });
 });
 
 adminRouter.post(
@@ -105,10 +116,10 @@ adminRouter.post(
       const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order), 0) AS m FROM team_members').get().m;
       const info = db
         .prepare(
-          `INSERT INTO team_members (name, role_title, description, initials, tier, sort_order, user_id, visible)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO team_members (name, role_title, description, initials, tier, sort_order, user_id, visible, focus, highlights)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
-        .run(d.name, d.roleTitle, d.description || '', d.initials || deriveInitials(d.name), d.tier || 'anwalt', maxOrder + 1, userId, d.visible === false ? 0 : 1);
+        .run(d.name, d.roleTitle, d.description || '', d.initials || deriveInitials(d.name), d.tier || 'anwalt', maxOrder + 1, userId, d.visible === false ? 0 : 1, (d.focus || []).join('\n'), (d.highlights || []).join('\n'));
       if (userId && d.userId) {
         db.prepare('UPDATE users SET display_name = ?, rank = ? WHERE id = ?').run(d.name, d.roleTitle.slice(0, 60), userId);
       }
@@ -154,7 +165,7 @@ adminRouter.patch(
       // Initialen automatisch nachziehen, wenn der Name geändert und keine eigenen angegeben wurden.
       const initials = d.initials !== undefined ? d.initials || deriveInitials(name) : d.name !== undefined ? deriveInitials(name) : m.initials;
       db.prepare(
-        'UPDATE team_members SET name = ?, role_title = ?, description = ?, initials = ?, tier = ?, visible = ?, user_id = ? WHERE id = ?'
+        'UPDATE team_members SET name = ?, role_title = ?, description = ?, initials = ?, tier = ?, visible = ?, user_id = ?, focus = ?, highlights = ? WHERE id = ?'
       ).run(
         name,
         roleTitle,
@@ -163,6 +174,8 @@ adminRouter.patch(
         d.tier ?? m.tier,
         d.visible === undefined ? m.visible : d.visible ? 1 : 0,
         userId || null,
+        d.focus ? d.focus.join('\n') : m.focus || '',
+        d.highlights ? d.highlights.join('\n') : m.highlights || '',
         m.id
       );
       // Verknüpftes Login-Konto synchron halten (Name im Dashboard, Rang in Nachrichten/Rechnungen).

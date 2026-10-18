@@ -475,6 +475,9 @@ function teamRow(t, withAdminFields = false) {
     duty: t.user_duty_status && t.user_duty_status !== 'off' && t.user_active !== 0 ? t.user_duty_status : null,
     // Startseite: „Direkt anfragen“ – nur mit aktivem Anwalts-/Board-Konto (die Anfrage landet dann bei ihm)
     bookable: !!(t.user_id && t.user_active && ['anwalt', 'admin'].includes(t.user_role)),
+    // Profilseite: vom Board gepflegt (leer = Schwerpunkte automatisch aus den Akten)
+    focus: String(t.focus || '').split('\n').filter(Boolean),
+    highlights: String(t.highlights || '').split('\n').filter(Boolean),
   };
   if (withAdminFields) {
     row.hasOwnPhoto = !!t.photo;

@@ -51,7 +51,11 @@
         .pf-stars { color: var(--gold-500); letter-spacing: 0.12em; font-size: 0.9rem; }
         .pf-review blockquote { margin: 0.4rem 0; font-family: var(--font-display); font-style: italic; font-size: 1.15rem; line-height: 1.5; color: var(--text-main); }
         .pf-review figcaption { font-size: 0.78rem; color: var(--text-dim); }
-        .pf-actions { margin-top: 2.5rem; display: flex; flex-wrap: wrap; gap: 0.75rem; }
+        .pf-highlights { list-style: none; margin: 0 0 0.75rem; padding: 0; display: grid; gap: 0.5rem; }
+        .pf-highlights li { position: relative; padding: 0.75rem 1rem 0.75rem 2.6rem; border-radius: 14px; border: 1px solid var(--gold-hairline); background: rgba(212, 175, 55, 0.05); color: var(--text-main); font-size: 0.95rem; line-height: 1.5; }
+        .pf-highlights li::before { content: '✓'; position: absolute; left: 1rem; top: 0.75rem; color: var(--gold-500); font-weight: 700; }
+        .pf-actions { margin-top: 2.5rem; display: flex; justify-content: center; }
+        .pf-actions .btn-gold { min-width: 220px; }
         @media (max-width: 479px) { .pf-actions > * { flex: 1 1 100%; } }
     </style>
     <link rel="stylesheet" href="/css/calm.css" media="(prefers-reduced-motion: reduce)" data-calm>
