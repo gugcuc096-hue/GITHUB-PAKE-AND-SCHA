@@ -116,7 +116,7 @@ const loginUrl = () => (tickets.siteBase() ? `${tickets.siteBase()}/login.html` 
 
 function accessEmbed(kind, acc) {
   const login = loginUrl();
-  const base = { color: 0xd4af37, footer: { text: 'Pake & Scha Legal Consulting · Nachricht nicht weitergeben' }, timestamp: now() };
+  const base = require('./discord').brandEmbed({ color: 0xd4af37, footer: { text: 'Pake & Scha Legal Consulting · Nachricht nicht weitergeben' }, timestamp: now() });
   if (kind === 'neu') {
     return {
       ...base,

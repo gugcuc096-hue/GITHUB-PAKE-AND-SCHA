@@ -1790,6 +1790,106 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       }
     });
   }
+  it('Live: neue Nachricht und geänderte Akte erscheinen ohne Neuladen – angefangener Text bleibt', async () => {
+    const lsrv = await startServer();
+    const { ctx, page, problems } = await open(DESKTOP);
+    try {
+      const anwalt = client(lsrv.base);
+      await anwalt.login(TEAM.anwalt);
+      const reg = client(lsrv.base);
+      assert.equal((await reg.post('/api/auth/register', { displayName: 'Lia Live', email: 'lia.live', password: 'Mandanten-Passwort-1' })).status, 201);
+      const kase = (await anwalt.post('/api/cases', { title: 'Live im Portal', area: 'zivilrecht', clientEmail: 'lia.live' })).json.case;
+      await page.goto(lsrv.base + '/login.html');
+      await page.fill('#email', 'lia.live');
+      await page.fill('#password', 'Mandanten-Passwort-1');
+      await page.click('button[type=submit]');
+      await page.waitForURL(/dashboard/);
+      await page.waitForSelector('#nav a.nav-item');
+      await page.evaluate((id) => openCase(id), kase.id);
+      await page.waitForSelector('#modalBody #secChat .chat-input');
+      await page.waitForFunction(() => live.ok, null, { timeout: 5000 });
+      // Mandant tippt schon eine Antwort, da schreibt die Kanzlei
+      await page.fill('#secChat .chat-input', 'Ich schreibe gerade …');
+      assert.equal((await anwalt.post(`/api/cases/${kase.id}/notes`, { body: 'Ihr Termin ist bestätigt.' })).status, 201);
+      // ohne Live käme sie erst mit dem nächsten Abruf (30 s) – so nach höchstens 3 s
+      await page.waitForFunction(() => /Ihr Termin ist bestätigt/.test(document.querySelector('#chatList').textContent), null, { timeout: 3000 });
+      assert.equal(await page.inputValue('#secChat .chat-input'), 'Ich schreibe gerade …', 'angefangene Antwort bleibt');
+      // Akte ändert sich, während der Mandant tippt: erst nach dem Verlassen des Feldes neu zeichnen – Text bleibt
+      assert.equal((await anwalt.patch(`/api/cases/${kase.id}`, { title: 'Live im Portal – geändert' })).status, 200);
+      await page.waitForTimeout(800);
+      assert.doesNotMatch(await page.textContent('#modalBody'), /Live im Portal – geändert/, 'nicht mitten im Tippen');
+      await page.locator('#secChat .chat-input').blur();
+      await page.waitForFunction(() => /Live im Portal – geändert/.test(document.querySelector('#modalBody').textContent), null, { timeout: 4000 });
+      assert.equal(await page.inputValue('#secChat .chat-input'), 'Ich schreibe gerade …', 'Text bleibt auch nach dem Neuzeichnen');
+      assert.deepEqual(problems, []);
+    } finally {
+      await ctx.close();
+      await lsrv.stop();
+    }
+  });
+  it('Fehler direkt am Feld: eigene Prüfung, Prüfung des Browsers und Antwort des Servers – PC und Handy', async () => {
+    // Handy: Registrierung – zu kurzes Passwort steht unter dem Passwort, vergebene Adresse unter der E-Mail
+    {
+      const { ctx, page, problems, settle } = await open(PHONE);
+      await page.goto(server.base + '/register.html');
+      await page.fill('#displayName', 'Max Feldtest');
+      await page.fill('#email', 'damat.lex');
+      await page.fill('#password', 'kurz');
+      await page.fill('#password2', 'kurz');
+      await page.click('#registerForm button[type=submit]');
+      const err = page.locator('#registerForm .ps-field-error');
+      await err.waitFor();
+      assert.equal(await err.count(), 1);
+      assert.match(await err.textContent(), /Mindestens 10 Zeichen \(aktuell 4\)/);
+      assert.equal(await page.evaluate(() => document.activeElement.id), 'password', 'Feld wird angesprungen');
+      assert.equal(await page.getAttribute('#password', 'aria-invalid'), 'true');
+      assert.equal(await page.evaluate(() => document.getElementById('password').nextElementSibling?.className.includes('ps-field-error') || document.getElementById('password').closest('div').nextElementSibling?.className.includes('ps-field-error')), true, 'Hinweis direkt am Passwortfeld');
+      assert.equal(await overflow(page), 0);
+      await page.fill('#password', 'langesPasswort1');
+      assert.equal(await err.count(), 0, 'Tippen entfernt den Hinweis');
+      await page.fill('#password2', 'langesPasswort1');
+      await page.click('#registerForm button[type=submit]');
+      await err.waitFor();
+      await settle();
+      assert.match(await err.textContent(), /bereits registriert/);
+      assert.equal(await page.evaluate(() => document.querySelector('.email-group').nextElementSibling.classList.contains('ps-field-error')), true, 'unter der Gruppe mit @pake-scha.ls');
+      assert.equal(await page.textContent('#formError'), '', 'keine doppelte Meldung');
+      assert.deepEqual(problems, []);
+      await ctx.close();
+    }
+    // PC: Dashboard-Formular mit Prüfung des Browsers (Pflichtfeld + Mindestlänge) – keine graue Sprechblase
+    {
+      const { ctx, page, problems, settle } = await open(DESKTOP);
+      await login(page, TEAM.anwalt);
+      await page.click('[data-action="new-case"]');
+      await page.waitForSelector('form[data-form="new-case"]');
+      await page.fill('#ncTitle', 'ab');
+      await page.click('form[data-form="new-case"] button[type=submit]');
+      const err = page.locator('form[data-form="new-case"] .ps-field-error');
+      await err.waitFor();
+      assert.equal(await err.textContent(), 'Mindestens 3 Zeichen (aktuell 2).');
+      assert.equal(await page.evaluate(() => document.activeElement.id), 'ncTitle');
+      await page.fill('#ncTitle', 'Feldtest Akte');
+      assert.equal(await err.count(), 0);
+      await settle();
+      assert.deepEqual(problems, []);
+      await ctx.close();
+    }
+  });
+
+  it('404: eigene Seite im Kanzlei-Design, am Handy ohne Überstand', async () => {
+    for (const device of [DESKTOP, PHONE]) {
+      const { ctx, page, problems } = await open(device);
+      const res = await page.goto(server.base + '/akte/gibt-es-nicht');
+      assert.equal(res.status(), 404);
+      assert.equal(await page.textContent('h1'), 'Seite nicht gefunden');
+      assert.equal(await page.getAttribute('.nf-actions a.btn-gold', 'href'), '/');
+      assert.equal(await overflow(page), 0);
+      assert.deepEqual(problems, []);
+      await ctx.close();
+    }
+  });
+
   it('Übergänge: Seitenblöcke gestaffelt, Fenster blendet weich aus, Menügruppe klappt weich auf, bei „Bewegung reduzieren“ nur Überblenden', async () => {
     const tsrv = await startServer();
     const { ctx, page, problems } = await open(DESKTOP);
@@ -1798,6 +1898,11 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       // Seitenwechsel: die Blöcke der Seite kommen nacheinander (höchstens 0,2 s versetzt)
       await page.evaluate(() => (location.hash = '#calendar'));
       await page.waitForSelector('#content.view-in .page-title');
+      // Auf langsamen Rechnern kann die Seite noch nachgezeichnet werden (Ladeplatzhalter → Inhalt): warten, bis alle Blöcke einblenden
+      await page.waitForFunction(() => {
+        const els = [...document.querySelectorAll('#content.view-in > *')];
+        return els.length >= 2 && els.every((e) => getComputedStyle(e).animationName === 'view-in');
+      }, null, { timeout: 5000 });
       const anim = await page.$$eval('#content.view-in > *', (els) => els.map((e) => [getComputedStyle(e).animationName, parseFloat(getComputedStyle(e).animationDelay)]));
       assert.ok(anim.length >= 2, 'mehrere Blöcke');
       assert.ok(anim.every(([n]) => n === 'view-in'));

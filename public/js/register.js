@@ -1,6 +1,6 @@
 /* Registrierung (register.html) – früher Inline-Skript in der Seite, jetzt eigene Datei (strenge Content-Security-Policy). */
 (() => {
-    const { api } = window.PS;
+    const { api, fieldError, fieldErrors, clearFieldErrors } = window.PS;
     const form = document.getElementById('registerForm');
     const params = new URLSearchParams(location.search);
 
@@ -42,12 +42,14 @@
         // Nur der Teil vor dem @ – eine eingefügte komplette Adresse mit @pake-scha.ls wird gekürzt
         const email = form.elements.email.value.trim().toLowerCase().replace(/@pake-scha\.ls$/, '');
         const password = form.elements.password.value;
-        if (displayName.length < 2) { err.textContent = 'Bitte Ihren Namen angeben.'; return; }
-        if (!email) { err.textContent = 'Bitte den Teil vor dem @ angeben, z. B. max.mustermann.'; return; }
-        if (email.includes('@')) { err.textContent = 'Die Endung ist immer @pake-scha.ls – bitte nur den Teil davor eingeben.'; return; }
-        if (!/^[a-z0-9](?:[a-z0-9._-]{0,46}[a-z0-9])?$/.test(email) || /[._-]{2}/.test(email)) { err.textContent = 'Vor dem @ bitte nur Buchstaben (a–z), Zahlen, Punkt, Bindestrich oder Unterstrich – z. B. max.mustermann.'; return; }
-        if (password.length < 10) { err.textContent = 'Das Passwort muss mindestens 10 Zeichen lang sein.'; return; }
-        if (password !== form.elements.password2.value) { err.textContent = 'Die beiden Passwörter stimmen nicht überein.'; return; }
+        const f = form.elements;
+        clearFieldErrors(form);
+        if (displayName.length < 2) return fieldError(f.displayName, 'Bitte Ihren Namen angeben.');
+        if (!email) return fieldError(f.email, 'Bitte den Teil vor dem @ angeben, z. B. max.mustermann.');
+        if (email.includes('@')) return fieldError(f.email, 'Die Endung ist immer @pake-scha.ls – bitte nur den Teil davor eingeben.');
+        if (!/^[a-z0-9](?:[a-z0-9._-]{0,46}[a-z0-9])?$/.test(email) || /[._-]{2}/.test(email)) return fieldError(f.email, 'Vor dem @ bitte nur Buchstaben (a–z), Zahlen, Punkt, Bindestrich oder Unterstrich – z. B. max.mustermann.');
+        if (password.length < 10) return fieldError(f.password, `Mindestens 10 Zeichen (aktuell ${password.length}).`);
+        if (password !== f.password2.value) return fieldError(f.password2, 'Die beiden Passwörter stimmen nicht überein.');
 
         const body = { displayName, email, password };
         if (form.elements.phone.value.trim()) body.phone = form.elements.phone.value.trim();
@@ -57,7 +59,7 @@
             await api.post('/api/auth/register', body);
             location.replace(nextUrl());
         } catch (ex) {
-            err.textContent = ex.message;
+            if (!fieldErrors(form, ex)) err.textContent = ex.message;
             btn.disabled = false;
         }
     });

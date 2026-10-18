@@ -130,8 +130,15 @@ document.addEventListener('submit', (e) => {
   const draftDone = window.PS.drafts.hold(f);
   let ok = false;
   // Ein Fenster, das nach dem Absenden aufgeht (z. B. Zugangsdaten), ersetzt das Formular – zurück geht es nie zum abgeschickten Formular
+  window.PS.clearFieldErrors(f);
   guard(async () => {
-    await modalInstead(() => forms[f.dataset.form](f));
+    try {
+      await modalInstead(() => forms[f.dataset.form](f));
+    } catch (err) {
+      // Lehnt der Server einzelne Angaben ab, steht der Hinweis direkt am Feld statt oben in der Ecke
+      if (f.isConnected && window.PS.fieldErrors(f, err)) return;
+      throw err;
+    }
     ok = true;
   }).finally(() => {
     draftDone(ok);
@@ -576,33 +583,133 @@ window.addEventListener('focus', () => {
     return;
   }
   if (!id || !$('#secContracts') || document.body.classList.contains('ps-dialog-open')) return;
-  const dirty = [...document.querySelectorAll('#modal input, #modal textarea, #modal select')].some((el) => {
-    if (el.type === 'checkbox' || el.type === 'radio') return el.checked !== el.defaultChecked;
-    if (el.tagName === 'SELECT') {
-      const def = [...el.options].findIndex((o) => o.defaultSelected);
-      return el.selectedIndex !== (def < 0 ? 0 : def);
-    }
-    return el.value !== el.defaultValue;
-  });
-  if (!dirty) reloadCase(id).catch(() => {});
+  if (!formDirty($('#modalBody'))) reloadCase(id).catch(() => {});
 });
 
-// Offener Chat (Akte oder Bewerbung): neue Nachrichten alle paar Sekunden nachladen
+/* ================================================================
+   Live-Aktualisierung (Server-Sent Events, GET /api/events)
+   Der Server meldet nur, DASS sich etwas geändert hat (Akte X, Bereich Y) – geladen wird über die normale API.
+   Nie neu gezeichnet wird, solange jemand tippt oder ungespeicherte Eingaben hat; das wird danach nachgeholt.
+   ================================================================ */
+// Welche Seiten ein Bereich betrifft (sonst nur die Zähler im Menü)
+const LIVE_VIEWS = {
+  cases: ['cases', 'overview', 'clients'],
+  tasks: ['tasks', 'overview'],
+  calendar: ['calendar', 'overview'],
+  invoices: ['invoices', 'overview'],
+  messages: ['mail'],
+  concerns: ['concerns', 'concerns-board'],
+  board: ['concerns-board'],
+  applications: ['applications'],
+  'name-requests': ['name-requests'],
+  memberships: ['vip'],
+  reviews: ['reviews'],
+  personnel: ['personnel'],
+  duty: ['duty', 'overview'],
+  absences: ['duty'],
+  work: ['work', 'stats'],
+  clients: ['clients'],
+  cooperations: ['cooperations'],
+  team: ['team'],
+};
+const live = { es: null, ok: false, down: false, timers: new Map(), pendingView: false, pendingCase: null };
+function liveLater(key, fn, ms = 300) {
+  clearTimeout(live.timers.get(key));
+  live.timers.set(key, setTimeout(() => (live.timers.delete(key), fn()), ms));
+}
+// Tippt gerade jemand (Feld mit Fokus und Inhalt) oder gibt es Ungespeichertes? Dann später.
+// Eine angefangene Chat-Nachricht zählt nicht – die übernimmt das Neuzeichnen der Akte (reloadCase).
+const liveBusy = (root) =>
+  !root ||
+  formDirty(root, { skip: '.chat-input' }) ||
+  (root.contains(document.activeElement) && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName) && !!document.activeElement.value);
+function liveView() {
+  if (liveBusy($('#content'))) {
+    live.pendingView = true;
+    return;
+  }
+  live.pendingView = false;
+  refreshBehind();
+}
+function liveCase(ev) {
+  const open = $('#modal').classList.contains('open') && st.modalCaseId === ev.id;
+  if (open) pollChat(); // neue Nachrichten anhängen – stört auch beim Tippen nicht
+  if (open && !ev.chat) {
+    if (document.body.classList.contains('ps-dialog-open') || liveBusy($('#modalBody'))) live.pendingCase = ev.id;
+    else reloadCase(ev.id).catch(() => {}); // zeichnet auch die Seite dahinter neu
+  }
+  if (!open && LIVE_VIEWS.cases.includes(st.view)) liveView();
+  liveLater('badges', refreshBadges, 800);
+}
+function liveArea(area) {
+  if ((LIVE_VIEWS[area] || []).includes(st.view)) liveView();
+  if (area === 'duty' && isStaff()) load.duty().then(renderUser).catch(() => {});
+  if (area === 'applications' && typeof pollAppChat === 'function') pollAppChat();
+  liveLater('badges', refreshBadges, 800);
+}
+// Was beim Tippen zurückgestellt wurde, nach dem Verlassen des Feldes bzw. Speichern nachholen
+document.addEventListener('focusout', () =>
+  liveLater(
+    'pending',
+    () => {
+      if (live.pendingCase && st.modalCaseId === live.pendingCase) liveCase({ id: live.pendingCase });
+      else live.pendingCase = null;
+      if (live.pendingView) liveView();
+    },
+    1200
+  )
+);
+function liveConnect() {
+  if (!window.EventSource || live.es || !st.user) return;
+  const es = new EventSource('/api/events?tab=' + encodeURIComponent(window.PS.tab));
+  live.es = es;
+  es.onopen = () => {
+    // Nach einem Verbindungsabbruch einmal alles nachholen, was in der Zwischenzeit passiert ist
+    if (live.down) {
+      refreshBadges();
+      liveView();
+    }
+    live.ok = true;
+    live.down = false;
+  };
+  es.onerror = () => {
+    live.ok = false;
+    live.down = true;
+  };
+  es.onmessage = (m) => {
+    let ev;
+    try {
+      ev = JSON.parse(m.data);
+    } catch {
+      return;
+    }
+    if (ev.k === 'case') liveLater(`case${ev.id}${ev.chat ? 'c' : ''}`, () => liveCase(ev));
+    else if (ev.k === 'area') liveLater(`area:${ev.a}`, () => liveArea(ev.a));
+  };
+}
+
+// Offener Chat (Akte oder Bewerbung): neue Nachrichten nachladen – alle paar Sekunden, mit Live-Verbindung nur noch
+// zur Sicherheit alle 30 Sekunden (neue Nachrichten kommen dann sofort, siehe Live-Aktualisierung unten)
+let chatTick = 0;
 setInterval(() => {
-  if (!st.user) return;
+  chatTick++;
+  if (!st.user || (live.ok && chatTick % 5)) return;
   pollChat();
   if (typeof pollAppChat === 'function') pollAppChat();
 }, 6000);
 
-// Ungelesene Post, neue Bewerbungen und Dienststatus regelmäßig aktualisieren (Badges in der Navigation, Zahl im
-// Tab und auf dem App-Symbol) – im Hintergrund seltener, damit der Tab trotzdem zeigt, wenn etwas Neues da ist
+// Ungelesene Post, neue Bewerbungen und Dienststatus (Badges in der Navigation, Zahl im Tab und auf dem App-Symbol)
+function refreshBadges() {
+  return Promise.all([load.chatUnread().catch(() => {}), load.unread(), load.appCount(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {}), load.paymentReports().catch(() => {})])
+    .then(renderNav)
+    .catch(() => {});
+}
+// Regelmäßig nachsehen – im Hintergrund seltener; mit Live-Verbindung nur noch alle zwei Minuten zur Sicherheit
 let badgeTick = 0;
 setInterval(() => {
   badgeTick++;
-  if (!st.user || (document.hidden && badgeTick % 2)) return;
-  Promise.all([load.chatUnread().catch(() => {}), load.unread(), load.appCount(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {}), load.paymentReports().catch(() => {})])
-    .then(renderNav)
-    .catch(() => {});
+  if (!st.user || (document.hidden && badgeTick % 2) || (live.ok && badgeTick % 4)) return;
+  refreshBadges();
 }, 30000);
 setInterval(() => {
   if (document.hidden || !st.user || !isStaff() || st.view === 'duty') return;
@@ -662,6 +769,7 @@ setInterval(() => {
     syncHistory();
   }
   if (st.user.needsName) askInitialName();
+  liveConnect();
 })();
 
 /** Konto per Discord angelegt: einmal nach dem Namen im Spiel fragen (erscheint in Akten, Verträgen, Nachrichten). */

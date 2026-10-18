@@ -91,4 +91,22 @@ function handler(page) {
   };
 }
 
-module.exports = { PAGES, texts, render, handler, keyOf };
+/**
+ * Weitere Seiten mit Link-Vorschau (Anmeldung, Registrierung, Bewerberseite): nur die absolute Adresse des
+ * Vorschaubilds einsetzen – sonst zeigt Discord kein Bild.
+ */
+const previewRaw = {};
+function previewHandler(file) {
+  return (req, res, next) => {
+    try {
+      if (!previewRaw[file] || process.env.NODE_ENV !== 'production') previewRaw[file] = fs.readFileSync(path.join(__dirname, 'public', file), 'utf8');
+      const origin = `${req.protocol}://${req.get('host')}`;
+      res.set('Cache-Control', 'no-cache');
+      res.type('html').send(previewRaw[file].replace(/(content=")\/img\/og-image\.png"/g, `$1${origin}/img/og-image.png"`));
+    } catch (err) {
+      next(err);
+    }
+  };
+}
+
+module.exports = { PAGES, texts, render, handler, previewHandler, keyOf };

@@ -1609,7 +1609,7 @@ function appBubble(m) {
 function appChatSection(a, { messages = [], applicantRead = 0, portal, discordConnected }) {
   const link = `${location.origin}${portal}`;
   return `<div class="section" id="secAppChat">
-      <h3 class="section-title">Nachrichten <span class="text-xs text-dim font-normal" style="font-family:Inter,sans-serif">mit dem Bewerber</span></h3>
+      <h3 class="section-title">Nachrichten <span class="text-xs text-dim font-normal sec-meta">mit dem Bewerber</span></h3>
       <div class="app-reach">
         ${discordConnected ? badge('Discord verbunden', 'emerald') : badge('Discord nicht verbunden', 'slate')}
         <span class="text-xs text-dim">${discordConnected ? 'Nachrichten und neue Stände bekommt der Bewerber zusätzlich als Discord-Direktnachricht.' : 'Der Bewerber liest Nachrichten auf seiner Bewerberseite – dort kann er auch sein Discord verbinden. Link verloren? „Link zur Bewerberseite“ kopieren und ihm schicken.'}</span>

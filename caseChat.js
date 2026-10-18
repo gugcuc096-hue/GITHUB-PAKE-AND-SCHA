@@ -132,6 +132,7 @@ function importFromDiscord(d) {
   db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(c.id);
   const id = Number(info.lastInsertRowid);
   if (author.id) markRead(c.id, author.id, id); // eigene Nachricht gilt als gelesen
+  require('./live').caseChanged(c.id, { chat: true }); // erscheint sofort im offenen Chat auf der Website
   return messages(c.id, id - 1)[0] || null;
 }
 

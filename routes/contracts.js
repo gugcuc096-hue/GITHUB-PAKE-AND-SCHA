@@ -839,6 +839,7 @@ function signViaDiscord(kid, discordId, channelId, typedName, discordName) {
   const account = r.c.client_id ? db.prepare('SELECT * FROM users WHERE id = ?').get(r.c.client_id) : null;
   const actor = account && account.discord_id === discordId ? account : { id: null, display_name: signature, role: 'mandant', discord_id: discordId };
   afterSign(r.k, r.c, 'mandant', actor, `${r.k.template_name} vom Mandanten über Discord unterschrieben (${signature}${discordName ? `, Discord: ${discordName}` : ''}).`);
+  require('../live').caseChanged(r.c.id); // Akte auf der Website zeigt die Unterschrift sofort
   return { ok: true, k: r.k, signature };
 }
 

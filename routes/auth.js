@@ -56,7 +56,7 @@ router.post(
     const email = firmEmail(data.email);
     if (!email) return res.status(400).json({ error: EMAIL_HINT });
     if (db.prepare('SELECT id FROM users WHERE email = ?').get(email)) {
-      return res.status(409).json({ error: 'Diese E-Mail-Adresse ist bereits registriert.' });
+      return res.status(409).json({ error: 'Diese E-Mail-Adresse ist bereits registriert.', fields: { email: 'Diese Adresse ist bereits registriert – bitte anmelden.' } });
     }
     const info = db
       .prepare("INSERT INTO users (email, password_hash, display_name, role, phone) VALUES (?, ?, ?, 'mandant', ?)")

@@ -6,7 +6,7 @@
  */
 (() => {
   'use strict';
-  const { api, esc, money, copy } = window.PS;
+  const { api, esc, money, copy, fieldError, fieldErrors, clearFieldErrors } = window.PS;
   let me = null;
 
   // Dienststatus: [Beschriftung, Punktfarbe, Textfarbe]
@@ -94,8 +94,9 @@
     };
     const wish = Number(form.elements.teamMemberId && form.elements.teamMemberId.value);
     if (wish) data.teamMemberId = wish; // Wunschanwalt von der Teamkarte
-    if (data.name.length < 2) return showToast('Angaben fehlen', 'Bitte Ihren vollständigen Namen angeben.');
-    if (data.description.length < 10) return showToast('Angaben fehlen', 'Bitte beschreiben Sie Ihr Anliegen kurz (mind. 10 Zeichen).');
+    clearFieldErrors(form);
+    if (data.name.length < 2) return fieldError(form.elements.name, 'Bitte Ihren vollständigen Namen angeben.');
+    if (data.description.length < 10) return fieldError(form.elements.description, `Bitte beschreiben Sie Ihr Anliegen kurz (mind. 10 Zeichen, aktuell ${data.description.length}).`);
 
     const btn = form.querySelector('button[type="submit"]');
     btn.disabled = true;
@@ -107,7 +108,7 @@
       updateAuthNav();
       showTicketSuccess(res);
     } catch (err) {
-      showToast('Das hat nicht geklappt', err.message);
+      if (!fieldErrors(form, err)) showToast('Das hat nicht geklappt', err.message);
     } finally {
       btn.disabled = false;
     }
@@ -593,6 +594,7 @@
     e.preventDefault();
     const form = e.target;
     const anonymous = form.elements.anonymous.checked;
+    clearFieldErrors(form);
     const data = {
       category: form.elements.category.value,
       urgency: (form.querySelector('input[name="urgency"]:checked') || {}).value || 'normal',
@@ -604,10 +606,10 @@
     if (!form.dataset.account && !anonymous) {
       data.name = form.elements.name.value.trim();
       data.contact = form.elements.contact.value.trim();
-      if (data.name.length < 2) return showToast('Angaben fehlen', 'Bitte Ihren Namen angeben – oder anonym einreichen.');
+      if (data.name.length < 2) return fieldError(form.elements.name, 'Bitte Ihren Namen angeben – oder anonym einreichen.');
     }
-    if (data.subject.length < 3) return showToast('Angaben fehlen', 'Bitte einen Betreff angeben (mind. 3 Zeichen).');
-    if (data.body.length < 10) return showToast('Angaben fehlen', 'Bitte beschreiben Sie Ihr Anliegen (mind. 10 Zeichen).');
+    if (data.subject.length < 3) return fieldError(form.elements.subject, 'Bitte einen Betreff angeben (mind. 3 Zeichen).');
+    if (data.body.length < 10) return fieldError(form.elements.body, `Bitte beschreiben Sie Ihr Anliegen (mind. 10 Zeichen, aktuell ${data.body.length}).`);
     const btn = form.querySelector('button[type="submit"]');
     btn.disabled = true;
     try {
@@ -617,7 +619,7 @@
       syncConcernPersonal();
       showConcernSuccess(res);
     } catch (err) {
-      showToast('Das hat nicht geklappt', err.message);
+      if (!fieldErrors(form, err)) showToast('Das hat nicht geklappt', err.message);
     } finally {
       btn.disabled = false;
     }

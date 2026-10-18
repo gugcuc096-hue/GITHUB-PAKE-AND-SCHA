@@ -178,10 +178,28 @@ function parseBody(schema, req, res) {
   const result = schema.safeParse(req.body ?? {});
   if (result.success) return result.data;
   const fields = [...new Set(result.error.issues.map((i) => FIELD_LABELS[i.path[0]] || i.path[0]).filter(Boolean))];
+  // Je Feld ein kurzer Hinweis – das Formular zeigt ihn direkt unter dem Feld an
+  const fieldErrors = {};
+  for (const i of result.error.issues) {
+    const name = i.path[0];
+    if (typeof name === 'string' && !fieldErrors[name]) fieldErrors[name] = issueText(i);
+  }
   res.status(400).json({
     error: fields.length ? `Bitte prüfen Sie folgende Angaben: ${fields.join(', ')}.` : 'Ungültige Angaben.',
+    fields: fieldErrors,
   });
   return null;
+}
+
+/** Zod-Fehler als kurzer deutscher Satz für die Anzeige am Feld. */
+function issueText(i) {
+  const chars = i.type === 'string';
+  if (i.code === 'invalid_type' && i.received === 'undefined') return 'Bitte ausfüllen.';
+  if (i.code === 'too_small') return chars ? (i.minimum <= 1 ? 'Bitte ausfüllen.' : `Mindestens ${i.minimum} Zeichen.`) : `Mindestens ${i.minimum}.`;
+  if (i.code === 'too_big') return chars ? `Höchstens ${i.maximum} Zeichen.` : `Höchstens ${i.maximum}.`;
+  if (i.code === 'invalid_enum_value') return 'Bitte eine der Möglichkeiten auswählen.';
+  if (i.code === 'invalid_string' && i.validation === 'email') return 'Bitte eine gültige E-Mail-Adresse angeben.';
+  return 'Bitte prüfen.';
 }
 
 function idParam(req, name = 'id') {
