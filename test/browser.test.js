@@ -2098,6 +2098,101 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
     }
   });
 
+  it('Gold-Spotlight und Goldschimmer, Anwalts-Profil mit „Mandat bei mir anfragen“, wer ist in der Akte und wer schreibt – PC und Handy', async () => {
+    const psrv = await startServer();
+    const A = await open(DESKTOP); // Anwalt
+    const B = await open(DESKTOP); // Partner (Board)
+    const M = await open(PHONE); // Mandant am Handy
+    try {
+      const anwalt = client(psrv.base);
+      const anwaltMe = await anwalt.login(TEAM.anwalt);
+      const partnerMe = await client(psrv.base).login(TEAM.partner);
+      assert.equal((await client(psrv.base).post('/api/auth/register', { displayName: 'Mia Mandant', email: 'mia.mandant', password: 'Mandanten-Passwort-1' })).status, 201);
+      const kase = (await anwalt.post('/api/cases', { title: 'Präsenz-Akte', area: 'zivilrecht', clientEmail: 'mia.mandant' })).json.case;
+
+      // Startseite: Goldschimmer über „Recht bekommen.“, Licht folgt der Maus über die Teamkarte
+      await A.page.emulateMedia({ reducedMotion: 'no-preference' });
+      await A.page.goto(psrv.base + '/');
+      assert.equal(await A.page.$eval('.gold-shine', (el) => getComputedStyle(el).animationName), 'ps-shine');
+      const card = A.page.locator('#teamGrid .team-card').first();
+      await card.locator('.team-name').waitFor();
+      await card.scrollIntoViewIfNeeded();
+      const box = await card.boundingBox();
+      await A.page.mouse.move(box.x + 30, box.y + 30);
+      await A.page.mouse.move(box.x + 60, box.y + 80);
+      await A.page.waitForFunction(() => document.querySelector('#teamGrid .team-card.ps-spot-on'));
+      const spot = await card.evaluate((el) => [parseFloat(el.style.getPropertyValue('--mx')), parseFloat(el.style.getPropertyValue('--my'))]);
+      assert.ok(Math.abs(spot[0] - 60) <= 2 && Math.abs(spot[1] - 80) <= 2, `Licht an der Maus: ${spot}`);
+      await A.page.mouse.move(2, 2);
+      await A.page.waitForFunction(() => !document.querySelector('.ps-spot-on'));
+      // Name auf der Karte → Profilseite → „Mandat bei mir anfragen“ öffnet das Formular mit Wunschanwalt
+      const name = (await card.locator('.team-name').textContent()).trim();
+      await card.locator('.team-name').click();
+      await A.page.waitForURL(/\/team\/[a-z0-9-]+$/);
+      assert.equal((await A.page.textContent('h1.pf-name')).trim(), name);
+      await A.page.click('.pf-actions a.btn-gold');
+      await A.page.waitForFunction(() => !document.getElementById('ticketModal').classList.contains('pointer-events-none'));
+      assert.equal(await A.page.textContent('#tkLawyerName'), name);
+      assert.equal(new URL(A.page.url()).search, '', 'Adresse wieder sauber');
+      // Profil am Handy: nichts ragt über den Rand, Knopf über die ganze Breite
+      await M.page.goto(psrv.base + new URL(await A.page.evaluate(() => document.querySelector('#teamGrid .team-name').href)).pathname);
+      assert.equal(await overflow(M.page), 0);
+      const cta = await M.page.locator('.pf-actions a.btn-gold').boundingBox();
+      assert.ok(cta.width > 300, `Knopf breit: ${cta.width}`);
+
+      // Dashboard: Kachel leuchtet unter der Maus
+      await login(A.page, TEAM.anwalt, psrv.base);
+      await login(B.page, TEAM.partner, psrv.base);
+      const kpi = await A.page.locator('#content .kpi').first().boundingBox();
+      await A.page.mouse.move(kpi.x + 20, kpi.y + 20);
+      await A.page.mouse.move(kpi.x + 40, kpi.y + 30);
+      await A.page.waitForFunction(() => document.querySelector('#content .kpi.ps-spot-on'));
+      await A.page.mouse.move(2, 400);
+
+      // Beide öffnen dieselbe Akte: jeder sieht den anderen neben dem Aktenzeichen
+      for (const P of [A, B]) {
+        await P.page.evaluate((id) => openCase(id), kase.id);
+        await P.page.waitForSelector('#modalBody [data-case-head]');
+      }
+      const first = (n) => n.replace(/\b(Dr|Prof|jur|med|rer|nat)\.\s*/gi, '').trim().split(/\s+/)[0];
+      await A.page.waitForFunction((n) => (document.querySelector('#caseHere:not([hidden])')?.textContent || '').includes(`${n} ist auch hier`), first(partnerMe.displayName), { timeout: 6000 });
+      await B.page.waitForFunction((n) => (document.querySelector('#caseHere:not([hidden])')?.textContent || '').includes(`${n} ist auch hier`), first(anwaltMe.displayName), { timeout: 6000 });
+      // Mandant (Handy) öffnet sie auch: sieht keine Präsenz, taucht selbst nicht auf
+      await M.page.goto(psrv.base + '/login.html');
+      await M.page.fill('#email', 'mia.mandant');
+      await M.page.fill('#password', 'Mandanten-Passwort-1');
+      await M.page.click('button[type=submit]');
+      await M.page.waitForURL(/dashboard/);
+      await M.page.evaluate((id) => openCase(id), kase.id);
+      await M.page.waitForSelector('#modalBody #secChat .chat-input');
+      await M.page.waitForFunction(() => live.ok);
+      await M.page.waitForTimeout(2000);
+      assert.equal(await M.page.locator('#caseHere').count(), 0);
+      assert.equal((await A.page.textContent('#caseHere')).includes('Mia'), false);
+
+      // Anwalt tippt: Kollege sieht den Namen, Mandant „Die Kanzlei schreibt gerade …“
+      await A.page.locator('#secChat .chat-input').pressSequentially('Guten Tag', { delay: 40 });
+      await B.page.waitForFunction((n) => (document.querySelector('#chatTyping')?.textContent || '').includes(`${n} schreibt gerade`), anwaltMe.displayName, { timeout: 5000 });
+      await M.page.waitForFunction(() => (document.querySelector('#chatTyping')?.textContent || '').includes('Die Kanzlei schreibt gerade'), null, { timeout: 5000 });
+      assert.equal(await A.page.locator('#chatTyping').count(), 0, 'eigenes Tippen wird nicht angezeigt');
+      // Nachricht kommt an → Hinweis verschwindet
+      await A.page.keyboard.press('Enter');
+      await M.page.waitForFunction(() => /Guten Tag/.test(document.querySelector('#chatList').textContent) && !document.querySelector('#chatTyping'), null, { timeout: 5000 });
+      // Mandant tippt: die Kanzlei sieht seinen Namen
+      await M.page.locator('#secChat .chat-input').pressSequentially('Danke', { delay: 40 });
+      await A.page.waitForFunction(() => (document.querySelector('#chatTyping')?.textContent || '').includes('Mia Mandant schreibt gerade'), null, { timeout: 5000 });
+      assert.equal(await overflow(M.page), 0);
+
+      // Partner schließt die Akte → beim Anwalt verschwindet sein Bild
+      await B.page.evaluate(() => closeModal());
+      await A.page.waitForFunction(() => document.querySelector('#caseHere')?.hidden, null, { timeout: 6000 });
+      for (const P of [A, B, M]) assert.deepEqual(P.problems, []);
+    } finally {
+      for (const P of [A, B, M]) await P.ctx.close();
+      await psrv.stop();
+    }
+  });
+
   it('404: eigene Seite im Kanzlei-Design, am Handy ohne Überstand', async () => {
     for (const device of [DESKTOP, PHONE]) {
       const { ctx, page, problems } = await open(device);

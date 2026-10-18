@@ -687,6 +687,8 @@ function liveConnect() {
     }
     live.ok = true;
     live.down = false;
+    hereSent = undefined; // neue Verbindung: offene Akte neu melden
+    hereSync();
   };
   es.onerror = () => {
     live.ok = false;
@@ -701,8 +703,55 @@ function liveConnect() {
     }
     if (ev.k === 'case') liveLater(`case${ev.id}${ev.chat ? 'c' : ''}`, () => liveCase(ev));
     else if (ev.k === 'area') liveLater(`area:${ev.a}`, () => liveArea(ev.a));
+    else if (ev.k === 'presence') hereShow(ev.id, ev.users);
+    else if (ev.k === 'typing') typingShow(ev.id, ev.name);
   };
 }
+
+/*
+ * „Wer ist gerade hier?“: welche Akte dieser Tab gerade offen hat, meldet er dem Server (nur bei Änderung; die Angabe
+ * hängt an der Live-Verbindung). Im Akten-Chat meldet Tippen höchstens alle 2,5 Sekunden „schreibt gerade“.
+ */
+let hereSent;
+let typedAt = 0;
+const hereCaseId = () => (document.hidden ? null : Number($('#modal.open [data-case-head]')?.dataset.caseHead) || null);
+function hereShow(caseId, users) {
+  st.here = { caseId, users: (users || []).filter((u) => u.id !== st.user.id) };
+  hereRender();
+}
+function herePost(caseId, typing) {
+  // bewusst nicht über api.post: das wäre eine „Änderung“ (ps:changed) und keine
+  return fetch('/api/events/presence', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-PS-Tab': window.PS.tab },
+    body: JSON.stringify({ caseId, typing }),
+  }).then((r) => (r.ok ? r.json() : null));
+}
+function hereSync() {
+  if (!st.user || !live.ok) return;
+  const id = hereCaseId();
+  if (id === hereSent) return;
+  hereSent = id;
+  if (!id) st.here = { caseId: null, users: [] };
+  herePost(id, false)
+    .then((r) => {
+      if (!r || !r.ok) hereSent = undefined; // nächster Takt versucht es noch einmal
+      else if (id && hereCaseId() === id) hereShow(id, r.users);
+    })
+    .catch(() => (hereSent = undefined));
+}
+setInterval(hereSync, 1500);
+document.addEventListener('visibilitychange', hereSync);
+document.addEventListener('input', (e) => {
+  const f = e.target.closest && e.target.closest('form[data-form="chat-send"]');
+  if (!f || !live.ok || !e.target.value.trim() || Date.now() - typedAt < 2500) return;
+  const id = Number(f.dataset.caseId);
+  if (!id || id !== hereCaseId()) return;
+  typedAt = Date.now();
+  herePost(id, true).catch(() => {});
+});
+document.addEventListener('submit', (e) => e.target.matches && e.target.matches('form[data-form="chat-send"]') && (typedAt = 0), true);
 
 // Offener Chat (Akte oder Bewerbung): neue Nachrichten nachladen – alle paar Sekunden, mit Live-Verbindung nur noch
 // zur Sicherheit alle 30 Sekunden (neue Nachrichten kommen dann sofort, siehe Live-Aktualisierung unten)

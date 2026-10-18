@@ -20,6 +20,8 @@ html { scroll-behavior: auto !important; }
 .btn-gold:hover, .btn-gold:active, .btn-outline:active, .btn-ghost:active, .btn-danger:active, .icon-btn:active { transform: none !important; }
 .sidebar { transition: none !important; }
 .ps-field-error { animation: none !important; }
+.gold-shine { animation: none !important; }
+.typing-dots i { animation: none !important; opacity: 0.8; } /* „schreibt gerade“: ruhige Punkte */ /* Goldschimmer der Überschrift: bleibt einfach gold */
 /* Startseite: alles Bewegte aus (nur das Einblenden der Seite selbst bleibt) */
 body.site-home *, body.site-home *::before, body.site-home *::after {
   animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important;

@@ -230,6 +230,9 @@
         .team-card { width: 100%; }
         @media (min-width: 640px) { .team-card { width: calc(50% - 0.75rem); } }
         @media (min-width: 1024px) { .team-card { width: calc(33.333% - 1rem); } }
+        /* Name führt zur Profilseite (/team/<name>) */
+        .team-name { color: inherit; text-decoration: none; transition: color 0.2s ease; }
+        .team-card:hover .team-name, .team-name:focus-visible { color: var(--gold-light); }
 
         /* Formularfelder im Mandats-Dialog: 16px verhindert Auto-Zoom auf iOS */
         @media (max-width: 767px) { #ticketModal input, #ticketModal select, #ticketModal textarea, #honorar input { font-size: 16px; } }
@@ -399,7 +402,7 @@
 
             <h1 class="font-serif text-[2.6rem] sm:text-7xl lg:text-8xl font-normal leading-[1.08] tracking-tight mb-8">
                 Recht haben.<br>
-                <span class="text-[var(--gold-500)] italic font-semibold drop-shadow-[0_0_35px_rgba(212,175,55,0.3)]">Recht bekommen.</span>
+                <span class="text-[var(--gold-500)] italic font-semibold drop-shadow-[0_0_35px_rgba(212,175,55,0.3)] gold-shine">Recht bekommen.</span>
             </h1>
 
             <p class="text-[var(--text-muted)] text-base sm:text-xl max-w-4xl mx-auto mb-10 sm:mb-12 leading-relaxed font-normal">

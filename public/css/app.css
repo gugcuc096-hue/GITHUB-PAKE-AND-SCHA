@@ -409,6 +409,13 @@ a:hover > .brand-logo { transform: scale(1.04); }
 .avatar.lg { width: 64px; height: 64px; font-size: 1.4rem; }
 .avatar.xl { width: 84px; height: 84px; font-size: 1.8rem; }
 .avatar.slate { background: linear-gradient(135deg, #334155, #1e293b); color: #fff; }
+/* „Wer ist gerade hier?“ im Aktenkopf: kleine Profilbilder der Kolleginnen und Kollegen in derselben Akte */
+.case-num-row { display: flex; align-items: center; flex-wrap: wrap; gap: 0.3rem 0.75rem; }
+.case-here { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.15rem 0.6rem 0.15rem 0.2rem; border-radius: 999px; background: rgba(52, 211, 153, 0.08); border: 1px solid rgba(52, 211, 153, 0.3); color: #a7f3d0; font-size: 0.74rem; animation: pop-in 0.25s ease-out; }
+.case-here[hidden] { display: none; }
+.case-here-faces { display: inline-flex; }
+.case-here-faces .avatar { width: 22px; height: 22px; font-size: 0.6rem; box-shadow: 0 0 0 2px var(--navy-900, #0a1228); }
+.case-here-faces .avatar + .avatar { margin-left: -7px; }
 
 .app-main { min-width: 0; min-height: 100vh; min-height: 100dvh; }
 .topbar { position: sticky; top: 0; z-index: 40; height: var(--topbar-h); display: flex; align-items: center; gap: 0.6rem; padding: 0 1rem; }
@@ -1367,6 +1374,12 @@ textarea.field.chat-input { resize: none; min-height: 42px; height: 42px; max-he
 .chat-new { display: inline-flex; align-items: center; gap: 0.2rem; margin-left: 0.35rem; padding: 0.05rem 0.45rem; border-radius: 6px; background: rgba(212, 175, 55, 0.18); color: var(--gold-light); font-size: 0.7rem; font-weight: 600; vertical-align: middle; white-space: nowrap; }
 .chat-new .ico-sm { width: 12px; height: 12px; }
 @media (max-width: 640px) { .chat-list { max-height: 55vh; padding: 0.65rem; } .chat-bubble { max-width: 88%; } }
+.chat-typing { display: inline-flex; align-items: center; gap: 0.5rem; align-self: flex-start; padding: 0.4rem 0.75rem; border-radius: 14px; border-bottom-left-radius: 4px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--glass-border); color: var(--text-dim); font-size: 0.78rem; animation: pop-in 0.2s ease-out; }
+.typing-dots { display: inline-flex; gap: 3px; }
+.typing-dots i { width: 5px; height: 5px; border-radius: 999px; background: var(--gold-500); opacity: 0.35; animation: typing-dot 1.2s ease-in-out infinite; }
+.typing-dots i:nth-child(2) { animation-delay: 0.15s; }
+.typing-dots i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes typing-dot { 0%, 60%, 100% { opacity: 0.35; transform: none; } 30% { opacity: 1; transform: translateY(-3px); } }
 .ticket-strips:has(> .pt-box[hidden]:only-child) { display: none; }
 .track-node.rejected { border-color: var(--red); background: rgba(248, 113, 113, 0.18); color: #fecaca; font-weight: 700; }
 .app-reach { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; margin-bottom: 0.6rem; }

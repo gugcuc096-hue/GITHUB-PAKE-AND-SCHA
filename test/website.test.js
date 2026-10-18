@@ -133,6 +133,51 @@ describe('Website & Ränge selbst pflegen', () => {
     for (const p of ['/', '/karriere.html', '/login', '/vertrag.html']) assert.match((await client(server.base).get(p)).text, new RegExp(`\\?v=${v}"`), p);
   });
 
+  it('Anwalts-Profilseiten: eigene Adresse mit Link-Vorschau, Zahlen erst ab mehreren Akten, „Mandat bei … anfragen“', async () => {
+    const meta = (html, prop) => (html.match(new RegExp(`<meta (?:property|name)="${prop}" content="([^"]*)"`)) || [])[1];
+    const me = await as.anwalt.login(TEAM.anwalt);
+    const team = (await client(server.base).get('/api/team')).json.team;
+    const m = team.find((t) => t.name === me.displayName);
+    assert.ok(m && m.slug, 'Teamkarte kennt die Adresse ihrer Profilseite');
+    assert.match(m.slug, /^[a-z0-9-]+$/);
+    const page = () => client(server.base).get(`/team/${m.slug}`, { Accept: 'text/html' });
+    let r = await page();
+    assert.equal(r.status, 200, r.text);
+    assert.equal(r.headers.get('cache-control'), 'no-cache');
+    assert.equal(meta(r.text, 'og:title'), `${m.name} – ${m.roleTitle}`);
+    assert.equal(meta(r.text, 'og:url'), `${server.base}/team/${m.slug}`);
+    assert.match(meta(r.text, 'og:image'), new RegExp(`^${server.base.replace(/[.]/g, '\\.')}/`), 'absolutes Bild für Discord');
+    assert.equal(meta(r.text, 'theme-color'), '#d4af37');
+    assert.match(r.text, new RegExp(`href="/\\?anwalt=${m.id}"[^>]*>Mandat bei `));
+    assert.doesNotMatch(r.text, /\{\{\w+\}\}/, 'alle Platzhalter ersetzt');
+    assert.doesNotMatch(r.text, /Abgeschlossene Mandate|Erfolgsquote/, 'ohne genug Akten keine Zahlen');
+    // drei abgeschlossene Strafsachen (zwei gewonnen, eine verloren) → Zahlen, Schwerpunkt und Erfolge
+    for (const outcome of ['freispruch', 'freispruch', 'verloren']) {
+      const c = (await as.anwalt.post('/api/cases', { title: 'Profil-Akte', area: 'strafrecht', clientName: 'Paul Profil' })).json.case;
+      assert.equal((await as.anwalt.patch(`/api/cases/${c.id}`, { status: 'geschlossen', outcome })).status, 200);
+    }
+    r = await page();
+    assert.match(r.text, /Abgeschlossene Mandate/);
+    assert.match(r.text, /<div class="kpi-value">67 %<\/div>/);
+    assert.match(r.text, /<span class="pf-chip">Strafrecht<\/span>/);
+    assert.match(r.text, /<b>2×<\/b><span>Freispruch<\/span>/);
+    // Board schaltet „Erfolge öffentlich“ aus → keine Zahlen mehr, Schwerpunkte bleiben
+    const set = (on) => as.admin.patch('/api/admin/settings', { showSuccessPublic: on });
+    assert.equal((await set(false)).status, 200);
+    r = await page();
+    assert.doesNotMatch(r.text, /Erfolgsquote|Freispruch/);
+    assert.match(r.text, /Strafrecht/);
+    await set(true);
+    // Adresse nicht genau getroffen bzw. mit Nummer → weiter zur richtigen; Unbekanntes → 404-Seite
+    r = await client(server.base).get(`/team/irgendwas-${m.id}`, { Accept: 'text/html' });
+    assert.equal(r.status, 301);
+    assert.equal(r.location, `/team/${m.slug}`);
+    r = await client(server.base).get('/team/gibt-es-nicht', { Accept: 'text/html' });
+    assert.equal(r.status, 404);
+    assert.match(r.text, /Seite nicht gefunden/);
+    assert.equal((await client(server.base).get('/team')).location, '/#team');
+  });
+
   it('404: eigene Seite für Menschen, schlichte Antwort für Programme', async () => {
     const page = await client(server.base).get('/gibt-es-nicht', { Accept: 'text/html' });
     assert.equal(page.status, 404);

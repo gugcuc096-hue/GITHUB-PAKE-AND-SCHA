@@ -158,11 +158,11 @@
           : `<div class="w-24 h-24 rounded-full ${lead ? 'bg-gradient-to-br from-[#d4af37] to-[#8f7322] text-[#02050e] shadow-[0_0_40px_rgba(212,175,55,0.35)]' : 'bg-gradient-to-br from-slate-600 to-slate-800 text-white'} flex items-center justify-center font-serif text-3xl font-bold ring-4 ring-[rgba(212,175,55,0.12)]">${esc(m.initials)}</div>`;
         return `
         <article class="glass-card team-card p-7 text-center flex flex-col">
-          <div class="relative w-24 h-24 mx-auto mb-5">${portrait}
-            ${duty ? `<span class="absolute bottom-1 right-1 w-5 h-5 rounded-full border-[3px] border-[#0a1228] ${duty[1]}" title="${esc(duty[0])}"></span>` : ''}</div>
+          <a href="/team/${esc(m.slug)}" class="relative block w-24 h-24 mx-auto mb-5" tabindex="-1" aria-hidden="true">${portrait}
+            ${duty ? `<span class="absolute bottom-1 right-1 w-5 h-5 rounded-full border-[3px] border-[#0a1228] ${duty[1]}" title="${esc(duty[0])}"></span>` : ''}</a>
           ${duty ? `<div class="flex items-center justify-center gap-1.5 text-[0.7rem] ${duty[2]} mb-2"><span class="w-1.5 h-1.5 rounded-full ${duty[1]} animate-pulse"></span>${esc(duty[0])}</div>` : ''}
           <span class="inline-block text-[0.6rem] uppercase tracking-[0.22em] px-3 py-1 rounded-full mb-3 ${lead ? 'text-[var(--gold-light)] border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.08)]' : 'text-slate-300 border border-slate-600 bg-slate-800/40'}">${lead ? 'Board of Partners' : 'Associate Attorneys'}</span>
-          <h3 class="font-serif text-2xl font-semibold text-white mb-1">${esc(m.name)}</h3>
+          <h3 class="font-serif text-2xl font-semibold text-white mb-1"><a href="/team/${esc(m.slug)}" class="team-name">${esc(m.name)}</a></h3>
           <div class="text-xs uppercase tracking-widest ${lead ? 'text-[var(--gold-500)]' : 'text-slate-300'} mb-4">${esc(m.roleTitle)}</div>
           <p class="text-sm text-[var(--text-muted)] leading-relaxed">${esc(m.description || '')}</p>
           ${m.bookable ? `<div class="mt-auto pt-6"><button type="button" class="btn-outline w-full py-3 text-xs uppercase tracking-wider" data-wish="${Number(m.id)}" data-name="${esc(m.name)}">Direkt anfragen</button></div>` : ''}
@@ -277,8 +277,17 @@
     .catch(() => (me = null))
     .finally(updateAuthNav);
 
+  // Von einer Profilseite (/team/<name>): „Mandat bei … anfragen“ → /?anwalt=<id>, sonst „Mandat anfragen“ → /?mandat=1
+  const wish = new URLSearchParams(location.search);
+  const wishId = Number(wish.get('anwalt')) || 0;
+  if (wishId || wish.has('mandat')) history.replaceState(null, '', location.pathname + location.hash);
+  if (!wishId && wish.has('mandat') && typeof window.openTicketModal === 'function') window.openTicketModal('profile');
   api.get('/api/team')
-    .then((r) => renderTeam(r.team || []))
+    .then((r) => {
+      renderTeam(r.team || []);
+      const m = wishId && (r.team || []).find((x) => x.id === wishId && x.bookable);
+      if (wishId && typeof window.openTicketModal === 'function') window.openTicketModal('profile', m ? { id: m.id, name: m.name } : null);
+    })
     .catch(() => {
       const grid = document.getElementById('teamGrid');
       if (grid) grid.innerHTML = '<p class="w-full text-center text-sm text-[var(--text-muted)] py-8">Team konnte nicht geladen werden.</p>';

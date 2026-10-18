@@ -533,6 +533,7 @@ async function pollChat() {
     const caseId = Number(list.dataset.caseId);
     const r = await api.get(`/api/cases/${caseId}/chat?after=${Number(list.dataset.lastId) || 0}`);
     if (!list.isConnected) return;
+    if (r.messages.length) typingHide();
     chatAppend(list, r.messages, caseBubble);
     chatReceipts(list, r.read.other);
     if (r.messages.length) await markChatRead(caseId, Number(list.dataset.lastId), r.read.mine);
@@ -541,6 +542,50 @@ async function pollChat() {
   } finally {
     st.chatPolling = false;
   }
+}
+
+/*
+ * „Wer ist gerade hier?“: Kolleginnen und Kollegen, die dieselbe Akte gerade offen haben (Live-Verbindung, siehe
+ * 12-start.js), als kleine Profilbilder neben dem Aktenzeichen – und „… schreibt gerade“ im Akten-Chat.
+ */
+function hereStrip(caseId) {
+  const users = st.here.caseId === caseId ? st.here.users : [];
+  if (!users.length) return '<span class="case-here" id="caseHere" hidden></span>';
+  const first = (n) => String(n || '').replace(/\b(Dr|Prof|jur|med|rer|nat)\.\s*/gi, '').trim().split(/\s+/)[0] || 'Jemand';
+  const text = users.length === 1 ? `${first(users[0].name)} ist auch hier` : users.length === 2 ? `${first(users[0].name)} und ${first(users[1].name)} sind auch hier` : `${first(users[0].name)} und ${users.length - 1} weitere sind auch hier`;
+  const all = users.map((u) => u.name).join(', ');
+  return `<span class="case-here" id="caseHere" title="Gerade in dieser Akte: ${esc(all)}" aria-label="Gerade in dieser Akte: ${esc(all)}">
+      <span class="case-here-faces">${users
+        .slice(0, 3)
+        .map((u) => `<span class="avatar">${avatarImg(u.avatarUrl, u.name)}</span>`)
+        .join('')}</span><span class="case-here-text">${esc(text)}</span></span>`;
+}
+function hereRender() {
+  const el = $('#caseHere');
+  const head = el && el.closest('[data-case-head]');
+  if (head) el.outerHTML = hereStrip(Number(head.dataset.caseHead));
+}
+let typingTimer = 0;
+function typingShow(caseId, name) {
+  const list = $('#chatList');
+  if (!list || Number(list.dataset.caseId) !== caseId) return;
+  let el = $('#chatTyping');
+  const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 60;
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'chatTyping';
+    el.className = 'chat-typing';
+    el.setAttribute('role', 'status');
+    list.appendChild(el);
+  } else list.appendChild(el); // bleibt immer ganz unten
+  el.innerHTML = `<span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>${esc(name || 'Jemand')} schreibt gerade …</span>`;
+  if (atBottom) list.scrollTop = list.scrollHeight;
+  clearTimeout(typingTimer);
+  typingTimer = setTimeout(typingHide, 4500);
+}
+function typingHide() {
+  clearTimeout(typingTimer);
+  $('#chatTyping')?.remove();
 }
 
 function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, clientSuggestions, review, chat }) {
@@ -760,8 +805,8 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     .join('')}</div></nav>`;
 
   return `
-      <div class="case-head mb-5">
-        <div class="pr-12"><div class="font-mono text-gold text-sm">${esc(c.caseNumber)}</div>
+      <div class="case-head mb-5" data-case-head="${c.id}">
+        <div class="pr-12"><div class="case-num-row"><span class="font-mono text-gold text-sm">${esc(c.caseNumber)}</span>${staff ? hereStrip(c.id) : ''}</div>
           <h2 id="modalTitle" class="font-serif text-2xl md:text-3xl font-semibold leading-tight">${esc(c.title)}</h2></div>
         <div class="case-props">${headProps}</div>
       </div>

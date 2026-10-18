@@ -48,6 +48,8 @@ describe('Live-Aktualisierung', () => {
     server = await startServer();
     as.anwalt = client(server.base);
     as.anwalt.me = await as.anwalt.login(TEAM.anwalt);
+    as.partner = client(server.base);
+    as.partner.me = await as.partner.login(TEAM.partner);
     as.mandant = client(server.base);
     as.fremd = client(server.base);
     for (const [c, name, email] of [
@@ -99,6 +101,53 @@ describe('Live-Aktualisierung', () => {
     await as.mandant.patch(`/api/cases/${ids.other}`, { title: 'Hack' });
     await settle();
     assert.equal(anwaltOther.events.length, before);
+  });
+
+  it('Wer ist gerade hier? Präsenz nur unter Kollegen, „schreibt gerade“ an die anderen in der Akte', async () => {
+    const presence = (who, tab, body) => who.post('/api/events/presence', body, { 'X-PS-Tab': tab });
+    // ohne Anmeldung bzw. ohne Live-Verbindung: nichts
+    assert.equal((await client(server.base).post('/api/events/presence', { caseId: ids.own })).status, 401);
+    assert.deepEqual((await presence(as.anwalt, 'p-none', { caseId: ids.own })).json, { ok: false, users: [] });
+    const anwalt = await listen(as.anwalt, 'p-a');
+    const partner = await listen(as.partner, 'p-p');
+    const mandant = await listen(as.mandant, 'p-m');
+    const fremd = await listen(as.fremd, 'p-f');
+    await settle();
+    // fremde Akte: nicht erlaubt
+    assert.equal((await presence(as.fremd, 'p-f', { caseId: ids.own })).status, 404);
+    const a = await presence(as.anwalt, 'p-a', { caseId: ids.own });
+    assert.equal(a.status, 200, a.text);
+    assert.deepEqual(a.json.users.map((u) => u.id), [as.anwalt.me.id]);
+    const p = await presence(as.partner, 'p-p', { caseId: ids.own });
+    assert.deepEqual(p.json.users.map((u) => u.id).sort(), [as.anwalt.me.id, as.partner.me.id].sort());
+    // Mandant öffnet die Akte: taucht nicht in der Präsenz auf und bekommt keine Liste
+    const m = await presence(as.mandant, 'p-m', { caseId: ids.own });
+    assert.deepEqual(m.json, { ok: true, users: [] });
+    await settle();
+    const last = (s) => s.events.filter((e) => e.k === 'presence').pop();
+    assert.deepEqual(last(anwalt).users.map((u) => u.name).sort(), [as.anwalt.me.displayName, as.partner.me.displayName].sort());
+    assert.equal(mandant.events.filter((e) => e.k === 'presence').length, 0, 'Mandanten sehen keine Präsenz');
+    assert.equal(fremd.events.length, 0);
+    // Tippen: Kollege sieht den Namen, der Mandant nur „Die Kanzlei“, der Tippende selbst nichts
+    await presence(as.anwalt, 'p-a', { caseId: ids.own, typing: true });
+    await settle();
+    assert.deepEqual(partner.events.filter((e) => e.k === 'typing'), [{ k: 'typing', id: ids.own, name: as.anwalt.me.displayName }]);
+    assert.deepEqual(mandant.events.filter((e) => e.k === 'typing'), [{ k: 'typing', id: ids.own, name: 'Die Kanzlei' }]);
+    assert.equal(anwalt.events.filter((e) => e.k === 'typing').length, 0);
+    // Mandant tippt: die Kanzlei sieht seinen Namen
+    await presence(as.mandant, 'p-m', { caseId: ids.own, typing: true });
+    await settle();
+    assert.deepEqual(anwalt.events.filter((e) => e.k === 'typing').pop(), { k: 'typing', id: ids.own, name: 'Lena Live' });
+    // Akte geschlossen bzw. Tab zu: die anderen sehen es sofort
+    await presence(as.partner, 'p-p', { caseId: null });
+    await settle();
+    assert.deepEqual(last(anwalt).users.map((u) => u.id), [as.anwalt.me.id]);
+    await presence(as.partner, 'p-p', { caseId: ids.own });
+    await settle();
+    assert.equal(last(anwalt).users.length, 2);
+    partner.close();
+    await settle();
+    assert.deepEqual(last(anwalt).users.map((u) => u.id), [as.anwalt.me.id], 'Verbindung weg = nicht mehr da');
   });
 
   it('Eingänge über die öffentlichen Seiten erreichen nur die Kanzlei – Abfragen melden nichts', async () => {
