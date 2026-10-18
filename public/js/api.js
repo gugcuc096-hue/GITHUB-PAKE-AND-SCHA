@@ -5,6 +5,46 @@
   // Kennung dieses Tabs: Der Server meldet eigene Änderungen nicht noch einmal live an denselben Tab zurück
   const tab = Math.random().toString(36).slice(2, 12);
 
+  /*
+   * Animationen je Gerät: „auto“ folgt dem System („Bewegung reduzieren“, z. B. Windows: Animationseffekte aus),
+   * „on“ zeigt sie immer, „off“ nie (Mein Profil → Animationen). Die gedämpfte Fassung steckt in /css/calm.css –
+   * dessen media-Attribut wird hier gesetzt; Animationen per Skript fragen motion.calm().
+   */
+  const MOTION_KEY = 'ps.motion';
+  const motion = {
+    get() {
+      try {
+        const v = localStorage.getItem(MOTION_KEY);
+        return v === 'on' || v === 'off' ? v : 'auto';
+      } catch {
+        return 'auto';
+      }
+    },
+    set(v) {
+      try {
+        if (v === 'on' || v === 'off') localStorage.setItem(MOTION_KEY, v);
+        else localStorage.removeItem(MOTION_KEY);
+      } catch {
+        /* ohne Speicher bleibt es beim System */
+      }
+      motion.apply();
+    },
+    apply() {
+      const v = motion.get();
+      const media = v === 'on' ? 'not all' : v === 'off' ? 'all' : '(prefers-reduced-motion: reduce)';
+      document.querySelectorAll('link[data-calm]').forEach((l) => l.media !== media && (l.media = media));
+      document.documentElement.dataset.motion = v;
+    },
+    /** Gedämpft (keine Bewegung)? */
+    calm() {
+      const v = motion.get();
+      return v === 'off' || (v !== 'on' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    },
+    /** Meldet das System selbst „Bewegung reduzieren“? */
+    systemCalm: () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  };
+  motion.apply();
+
   async function request(method, url, body) {
     const opts = { method, credentials: 'same-origin', headers: { Accept: 'application/json', 'X-PS-Tab': tab } };
     if (body instanceof Blob) {
@@ -425,8 +465,7 @@
   const FE_CSS = `.ps-invalid,.ps-invalid:focus{border-color:#f87171!important;box-shadow:0 0 0 3px rgba(248,113,113,.18)!important}
 .ps-field-error{display:flex;align-items:flex-start;gap:.35rem;margin:.35rem 0 0;color:#fca5a5;font-size:.8rem;line-height:1.35;text-align:left;animation:psFeIn .18s ease-out}
 .ps-field-error::before{content:'!';flex:none;display:inline-flex;align-items:center;justify-content:center;width:1rem;height:1rem;margin-top:.05rem;border-radius:50%;background:rgba(248,113,113,.18);color:#fca5a5;font-size:.68rem;font-weight:700}
-@keyframes psFeIn{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){.ps-field-error{animation:none}}`;
+@keyframes psFeIn{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}`;
   function feStyle() {
     if (document.getElementById('psFieldErrorCss')) return;
     const st = document.createElement('style');
@@ -474,7 +513,7 @@
     feVals.set(el, feValue(el));
     if (focus) {
       el.focus({ preventScroll: true });
-      el.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      el.scrollIntoView({ block: 'center', behavior: motion.calm() ? 'auto' : 'smooth' });
     }
   }
   /** Alle Hinweise eines Formulars entfernen. */
@@ -602,7 +641,7 @@
   const NUM_RE = /-?\d{1,3}(?:\.\d{3})+(?:,\d+)?|-?\d+(?:,\d+)?/;
   function countUp(root, { whenVisible = false } = {}) {
     if (!root || !root.querySelectorAll) return;
-    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduce = motion.calm();
     root.querySelectorAll('[data-count]').forEach((el) => {
       const text = el.textContent;
       const m = text.match(NUM_RE);
@@ -636,5 +675,5 @@
     });
   }
 
-  window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog, closeToDashboard, drafts, applications, tab, fieldError, fieldErrors, clearFieldErrors, countUp };
+  window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog, closeToDashboard, drafts, applications, tab, fieldError, fieldErrors, clearFieldErrors, countUp, motion };
 })();

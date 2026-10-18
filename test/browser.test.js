@@ -2045,6 +2045,59 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
     }
   });
 
+  it('Animationen je Gerät: bei „Bewegung reduzieren“ gedämpft – „Immer an“ in Mein Profil zeigt sie trotzdem, überall auf der Website', async () => {
+    const msrv = await startServer();
+    const { ctx, page, problems } = await open(DESKTOP);
+    try {
+      const adm = client(msrv.base);
+      const me = await adm.login(TEAM.admin);
+      await adm.post('/api/cases', { title: 'Animations-Akte', area: 'zivilrecht', clientName: 'Anna Animiert', lawyerId: me.id });
+      await page.emulateMedia({ reducedMotion: 'reduce' }); // wie Windows mit ausgeschalteten Animationseffekten
+      await login(page, TEAM.admin, msrv.base);
+      const calmMedia = () => page.$eval('link[data-calm]', (l) => l.media);
+      const calm = () => page.evaluate(() => window.PS.motion.calm());
+      assert.equal(await calmMedia(), '(prefers-reduced-motion: reduce)');
+      assert.equal(await calm(), true);
+      await page.evaluate(() => (location.hash = '#profile'));
+      await page.waitForSelector('[data-action="motion-set"][data-value="on"]');
+      assert.match(await page.textContent('#content'), /Bewegung reduzieren/, 'Hinweis auf die Systemeinstellung');
+      await page.click('[data-action="motion-set"][data-value="on"]');
+      assert.equal(await calmMedia(), 'not all', 'gedämpfte Fassung abgeschaltet');
+      assert.equal(await calm(), false);
+      assert.equal(await page.getAttribute('[data-action="motion-set"][data-value="on"]', 'aria-pressed'), 'true');
+      // Akte klappt jetzt auch mit „Bewegung reduzieren“ auf
+      await page.evaluate(() => {
+        window.__morphs = 0;
+        const animate = Element.prototype.animate;
+        Element.prototype.animate = function (frames, opts) {
+          if (this.classList.contains('modal-card')) window.__morphs++;
+          return animate.call(this, frames, opts);
+        };
+        location.hash = '#cases';
+      });
+      await page.waitForSelector('#content [data-action="open-case"]');
+      await page.click('#content [data-action="open-case"] >> nth=0');
+      await page.waitForSelector('#modalBody .case-jump');
+      assert.equal(await page.evaluate(() => window.__morphs), 1);
+      // gilt auf dem ganzen Gerät: auch auf der Startseite und nach dem Neuladen
+      await page.goto(msrv.base + '/');
+      assert.equal(await calmMedia(), 'not all');
+      await page.goto(msrv.base + '/dashboard.html#profile');
+      await page.waitForSelector('[data-action="motion-set"][data-value="off"]');
+      await page.click('[data-action="motion-set"][data-value="off"]');
+      assert.equal(await calmMedia(), 'all');
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      assert.equal(await calm(), true, '„Aus“ gilt auch ohne Systemeinstellung');
+      await page.click('[data-action="motion-set"][data-value="auto"]');
+      assert.equal(await calmMedia(), '(prefers-reduced-motion: reduce)');
+      assert.equal(await calm(), false, '„Wie System“: System ohne Einschränkung → Animationen an');
+      assert.deepEqual(problems, []);
+    } finally {
+      await ctx.close();
+      await msrv.stop();
+    }
+  });
+
   it('404: eigene Seite im Kanzlei-Design, am Handy ohne Überstand', async () => {
     for (const device of [DESKTOP, PHONE]) {
       const { ctx, page, problems } = await open(device);

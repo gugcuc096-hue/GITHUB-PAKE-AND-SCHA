@@ -56,6 +56,12 @@ const actions = {
   // Lange Listen: nächste Einträge (passiert beim Scrollen auch von selbst)
   'list-more': (el) => showMoreRows(el.dataset.id),
   'open-case': (el) => openCaseFrom(el),
+  // Mein Profil → Animationen (je Gerät)
+  'motion-set': (el) => {
+    window.PS.motion.set(el.dataset.value);
+    renderView();
+    toast({ on: 'Animationen sind auf diesem Gerät jetzt immer an.', off: 'Animationen sind auf diesem Gerät aus.' }[el.dataset.value] || 'Animationen folgen jetzt der Einstellung des Systems.');
+  },
   // „Was ist zu tun?“: Akte öffnen und direkt zu den Nachrichten springen
   'open-case-chat': async (el) => {
     await openCase(Number(el.dataset.id));

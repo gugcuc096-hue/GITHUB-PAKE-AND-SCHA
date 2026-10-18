@@ -80,12 +80,7 @@
         /* Seite beim Laden weich einblenden (wie Karriere, Anmeldung und Dashboard) */
         body.page-in { animation: page-in 0.35s ease-out; }
         @keyframes page-in { from { opacity: 0; } to { opacity: 1; } }
-        /* auch bei „Bewegung reduzieren“: reines Überblenden ist keine Bewegung */
-        @media (prefers-reduced-motion: reduce) { body.page-in { animation-duration: 0.35s !important; } }
-
-        @media (prefers-reduced-motion: reduce) {
-            *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
-        }
+        /* „Bewegung reduzieren“: /css/calm.css (Einblenden der Seite bleibt – reines Überblenden ist keine Bewegung) */
 
         /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 8px; }
@@ -308,8 +303,9 @@
     <!-- Tailwind fest gebaut (npm run build:css) – zuletzt eingebunden wie zuvor beim Play-CDN -->
     <link rel="stylesheet" href="/css/tailwind.css">
     <link rel="stylesheet" href="/css/select.css">
+    <link rel="stylesheet" href="/css/calm.css" media="(prefers-reduced-motion: reduce)" data-calm>
 </head>
-<body class="min-h-screen flex flex-col justify-between page-in">
+<body class="min-h-screen flex flex-col justify-between page-in site-home">
 
     <div class="ambient-bg">
         <div class="glow-orb orb-1"></div>

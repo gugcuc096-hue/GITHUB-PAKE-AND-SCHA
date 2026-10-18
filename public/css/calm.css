@@ -1,0 +1,26 @@
+/*
+ * Gedämpfte Animationen: keine Bewegung, aber weiche Überblendungen bleiben. Gilt bei „Bewegung reduzieren“
+ * (z. B. Windows: Einstellungen → Barrierefreiheit → Visuelle Effekte → Animationseffekte aus) – oder, je nach
+ * Einstellung „Animationen“ unter Mein Profil, immer bzw. nie: api.js (PS.motion) setzt das media-Attribut dieser Datei.
+ * Muss als letztes Stylesheet geladen werden (die Keyframes hier ersetzen die gleichnamigen aus app.css).
+ */
+html { scroll-behavior: auto !important; }
+.glow-orb { animation: none !important; }
+@keyframes view-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modal-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sheet-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes toast-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes nav-reveal { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pop-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dp-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modal-out { to { opacity: 0; } }
+@keyframes sheet-out { to { opacity: 0; } }
+@keyframes toast-out { to { opacity: 0; } }
+.skeleton, .cd-red { animation: none !important; } /* Schimmern und Pulsieren laufen endlos */
+.btn-gold:hover, .btn-gold:active, .btn-outline:active, .btn-ghost:active, .btn-danger:active, .icon-btn:active { transform: none !important; }
+.sidebar { transition: none !important; }
+.ps-field-error { animation: none !important; }
+/* Startseite: alles Bewegte aus (nur das Einblenden der Seite selbst bleibt) */
+body.site-home *, body.site-home *::before, body.site-home *::after {
+  animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important;
+}

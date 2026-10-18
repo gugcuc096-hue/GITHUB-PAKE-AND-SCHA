@@ -31,7 +31,7 @@
      * als würde sie gerade gezogen; eine eben geleistete Unterschrift bekommt dazu kurz ein goldenes Siegel.
      * Nur Optik (im Ausdruck/Google Doc steht sie einfach da), nicht bei „Bewegung reduzieren“.
      */
-    const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const calm = window.PS.motion.calm();
     const shownSigs = new Set();
     const sigKey = (el) => `${el.className}|${el.textContent.trim()}`;
     const sigObserver = !calm && 'IntersectionObserver' in window
