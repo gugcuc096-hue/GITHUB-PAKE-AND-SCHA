@@ -121,12 +121,12 @@ describe('Website & Ränge selbst pflegen', () => {
     const v = (html.match(/\/js\/api\.js\?v=([a-f0-9]{12})"/) || [])[1];
     assert.ok(v, 'Versionsnummer an den Skripten');
     assert.match(html, new RegExp(`<script src="/js/dashboard\\.bundle\\.js\\?v=${v}"></script>`));
-    assert.doesNotMatch(html, /\/js\/dashboard\/\d\d-/, 'keine zwölf Einzelteile mehr');
+    assert.doesNotMatch(html, /\/js\/dashboard\/\d\d-/, 'keine Einzelteile mehr');
     assert.match(html, new RegExp(`href="/css/app\\.css\\?v=${v}"`));
     const bundle = await fetch(`${server.base}/js/dashboard.bundle.js?v=${v}`);
     assert.equal(bundle.headers.get('cache-control'), YEAR);
     const code = await bundle.text();
-    assert.ok(code.indexOf('---- 01-basis.js ----') >= 0 && code.indexOf('---- 01-basis.js ----') < code.indexOf('---- 12-start.js ----'), 'Teile in fester Reihenfolge');
+    assert.ok(code.indexOf('---- 01-basis.js ----') >= 0 && code.indexOf('---- 01-basis.js ----') < code.indexOf('---- 14-start.js ----'), 'Teile in fester Reihenfolge');
     assert.equal((await fetch(`${server.base}/css/app.css?v=${v}`)).headers.get('cache-control'), YEAR);
     assert.notEqual((await fetch(`${server.base}/css/app.css`)).headers.get('cache-control'), YEAR, 'ohne Nummer: beim Server nachfragen');
     assert.notEqual((await fetch(`${server.base}/js/api.js?v=alt`)).headers.get('cache-control'), YEAR, 'alte Nummer: nicht ein Jahr behalten');

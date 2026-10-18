@@ -1,5 +1,5 @@
 /*
- * Kanzlei-Dashboard – Teil 9 von 12: Profil, VIP & Lifetime, Namensänderungen, Mandantenstimmen, Anliegen, Personal, Kooperationen, Aktenbearbeitung, Abmeldungen, Bewerbungen, Protokoll, Bild-Uploads.
+ * Kanzlei-Dashboard – Teil 9 von 14: Profil, VIP & Lifetime, Namensänderungen, Mandantenstimmen, Anliegen, Personal, Kooperationen, Aktenbearbeitung, Abmeldungen, Bewerbungen, Protokoll, Bild-Uploads.
  * Wird nach den vorherigen Teilen geladen (Reihenfolge siehe dashboard.html bzw. 01-basis.js).
  */
 'use strict';

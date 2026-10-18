@@ -374,7 +374,7 @@ const K_GOLD = 'B8975A';
 const K_INK = '000000';
 const K_MUTED = '666666';
 const K_SOFT = '1A1A1A';
-const OPTIONAL_LINES = new Set(['begruendung']);
+const OPTIONAL_LINES = new Set(['begruendung', 'anklagepunkte']);
 const CO_DIRECTIVE = /^\[weitere anw(?:ä|ae)lte\]$/i;
 const coLawyersOf = (sig) => (sig && Array.isArray(sig.coLawyers) ? sig.coLawyers : []);
 

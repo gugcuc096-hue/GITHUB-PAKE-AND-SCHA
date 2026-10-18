@@ -28,7 +28,7 @@ const contractDiscord = require('../contractDiscord');
 const header = () => getSetting('contract_header', contracts.DEFAULT_HEADER);
 const AREA_LABEL = { strafrecht: 'Strafrecht', zivilrecht: 'Zivilrecht', verfassungsrecht: 'Verfassungsrecht', vertragsrecht: 'Vertragsrecht', sonstiges: 'Sonstiges' };
 const text = (max) => z.string().trim().max(max);
-const FIELD_MAX = { grundgebuehr: 200, zusatzgebuehr: 200, leistungen: 3000, empfaenger: 400, betreff: 200, festnahme: 200, begruendung: 6000, fivenet_az: 300 };
+const FIELD_MAX = { grundgebuehr: 200, zusatzgebuehr: 200, leistungen: 3000, empfaenger: 400, betreff: 200, festnahme: 200, begruendung: 6000, fivenet_az: 300, anklagepunkte: 3000 };
 const fieldSchema = z.object(Object.fromEntries(Object.keys(contracts.FIELDS).map((k) => [k, text(FIELD_MAX[k] || 120).optional()])));
 // Aus der Honorarordnung gewählte Leistungen (Mehrfachauswahl mit Menge)
 // listPrice/discount: VIP-, Lifetime- oder Kooperationspreis – price ist dann der ermäßigte Preis
@@ -457,6 +457,7 @@ caseRouter.get('/defaults', wrap(async (req, res) => {
       ort: contracts.DEFAULT_PLACE,
       betreff: c.title || '',
       fivenet_az: fivenetDocs.length ? fivenetDocs[0].ref : fivenet.docReference(c.court_ref || ''),
+      anklagepunkte: require('../penal').chargesText(c.id),
     },
   });
 }));

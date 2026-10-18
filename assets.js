@@ -3,7 +3,7 @@
  * Schneller laden: Skripte und Stylesheets bekommen in den Seiten eine Versionsnummer (?v=…, aus dem Inhalt aller
  * Dateien) und bleiben dann ein Jahr im Browser – ohne Nachfragen beim Server. Nach einem Update ändert sich die
  * Nummer, und jeder lädt automatisch die neue Fassung (kein Strg+F5 nötig). Die Seiten selbst werden immer frisch
- * geladen (no-cache). Die zwölf Dashboard-Teile kommen als eine Datei (/js/dashboard.bundle.js, gleiche Reihenfolge,
+ * geladen (no-cache). Die Dashboard-Teile kommen als eine Datei (/js/dashboard.bundle.js, gleiche Reihenfolge,
  * alle im strikten Modus – zusammengefügt verhalten sie sich wie einzeln geladen).
  */
 const fs = require('fs');

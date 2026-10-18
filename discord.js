@@ -46,11 +46,14 @@ const EVENTS = {
   'review.created': 'Neue Mandantenstimme (Bewertung) zur Freigabe',
   'invoice.payment': 'Mandant meldet eine Rechnung als bezahlt',
   'case.idle': 'Liegengebliebene Akte – nur wenn die Discord-DM an den zuständigen Anwalt nicht möglich ist',
+  'case.victory': 'Sieg-Moment: Akte mit Erfolg abgeschlossen (ohne Namen des Mandanten)',
+  'resolution.created': 'Board-Beschluss zur Abstimmung gestellt bzw. entschieden',
+  'lawyer.month': 'Anwalt des Monats (zum Monatswechsel)',
 };
 
 // Ereignisse, die nach dem Speichern der Auswahl dazugekommen sind, sind eingeschaltet (bis jemand sie abwählt).
 // discord_events_known = Ereignisse, die es beim letzten Speichern gab; ältere Speicherstände kennen alle außer diesen:
-const ADDED_LATER = ['system.alert', 'review.created', 'invoice.payment', 'case.idle'];
+const ADDED_LATER = ['system.alert', 'review.created', 'invoice.payment', 'case.idle', 'case.victory', 'resolution.created', 'lawyer.month'];
 
 function isValidWebhookUrl(url) {
   return WEBHOOK_RE.test(String(url || '').trim());

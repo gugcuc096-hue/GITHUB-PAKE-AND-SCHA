@@ -1,5 +1,5 @@
 /*
- * Kanzlei-Dashboard – Teil 10 von 12: Aktionen (Klicks auf data-action).
+ * Kanzlei-Dashboard – Teil 10 von 14: Aktionen (Klicks auf data-action).
  * Wird nach den vorherigen Teilen geladen (Reihenfolge siehe dashboard.html bzw. 01-basis.js).
  */
 'use strict';

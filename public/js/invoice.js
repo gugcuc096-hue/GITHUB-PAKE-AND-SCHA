@@ -60,6 +60,34 @@
         if (new URLSearchParams(location.search).get('print') === '1') setTimeout(() => window.print(), 400);
     }
 
+    /** Kanzlei: offene Rechnung stornieren – steht hier statt in der Rechnungsliste (dort passt so alles in eine Zeile). */
+    function voidButton(inv) {
+        if (inv.status !== 'offen') return;
+        api.get('/api/auth/session').then(({ user }) => {
+            if (!user || (user.role !== 'anwalt' && user.role !== 'admin')) return;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn';
+            btn.textContent = 'Stornieren';
+            btn.addEventListener('click', async () => {
+                const ok = await window.PS.confirm(`${KIND[inv.kind]} ${inv.number} wird storniert. Der Mandant sieht sie danach als „Storniert“.`, { title: 'Dokument stornieren?', confirmText: 'Stornieren', danger: true });
+                if (!ok) return;
+                btn.disabled = true;
+                try {
+                    await api.patch('/api/invoices/' + id, { status: 'storniert' });
+                    window.PS.toast('Dokument storniert.');
+                    btn.remove();
+                    const fresh = await api.get('/api/invoices/' + id);
+                    render(fresh.invoice, fresh.firm);
+                } catch (err) {
+                    btn.disabled = false;
+                    window.PS.toast(err.message, 'error');
+                }
+            });
+            document.querySelector('.toolbar .actions').append(btn);
+        }).catch(() => {});
+    }
+
     if (!Number.isInteger(id) || id <= 0) {
         root.innerHTML = 'Kein Dokument angegeben. <a href="/dashboard.html#invoices">Zum Dashboard</a>';
         return;
@@ -73,6 +101,7 @@
             }
             render(invoice, firm);
             window.PS.googleDoc.mount({ kind: 'invoice', id });
+            voidButton(invoice);
         })
         .catch((err) => {
             if (err.status === 401) {

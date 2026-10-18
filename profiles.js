@@ -18,6 +18,10 @@ const MIN_RATED = 3; // Akten mit Ergebnis (Erfolg oder nicht) für die Erfolgsq
 const MIN_REVIEWS = 3; // freigegebene Bewertungen für den Durchschnitt
 const AREA_LABEL = { strafrecht: 'Strafrecht', zivilrecht: 'Zivilrecht', verfassungsrecht: 'Verfassungsrecht', vertragsrecht: 'Vertragsrecht' };
 
+// Lorbeerzweig (Anwalt des Monats) – dasselbe Zeichen wie an der Teamkarte der Startseite
+const LAUREL =
+  '<svg class="lotm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 20c-2.5-2.5-3.5-6-2.5-10M17 20c2.5-2.5 3.5-6 2.5-10"/><path d="M5.2 15.5c-1.6-.2-2.6-1.2-3-2.6 1.5-.2 2.6.4 3.3 1.4M4.6 11.6c-1.4-.6-2.1-1.8-2.1-3.2 1.4.2 2.4 1 2.8 2.2M18.8 15.5c1.6-.2 2.6-1.2 3-2.6-1.5-.2-2.6.4-3.3 1.4M19.4 11.6c1.4-.6 2.1-1.8 2.1-3.2-1.4.2-2.4 1-2.8 2.2"/><path d="M12 6.5l1.2 2.4 2.6.4-1.9 1.8.5 2.6L12 12.5l-2.4 1.2.5-2.6-1.9-1.8 2.6-.4z" fill="currentColor" stroke="none"/></svg>';
+
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const num = (n, d = 0) => n.toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d });
 
@@ -140,7 +144,9 @@ function render(member, facts, { origin, url }) {
     imageAlt: esc(member.photoUrl ? `Foto von ${member.name}` : 'Pake & Scha Legal Consulting'),
     card: member.photoUrl ? 'summary' : 'summary_large_image',
     portrait,
-    tier: `<span class="pf-tier ${lead ? '' : 'slate'}">${lead ? 'Board of Partners' : 'Associate Attorneys'}</span>`,
+    tier: `<span class="pf-tier ${lead ? '' : 'slate'}">${lead ? 'Board of Partners' : 'Associate Attorneys'}</span>${
+      member.lawyerOfMonth ? `<span class="lotm-badge" title="Für herausragende Arbeit im ${esc(member.lawyerOfMonth)}">${LAUREL}Anwalt des Monats</span>` : ''
+    }`,
     name: esc(member.name),
     rank: esc(member.roleTitle),
     duty,
@@ -162,6 +168,8 @@ function handler(req, res, next) {
     if (!id) return next();
     if (slugs.get(id) !== want) return res.redirect(301, `/team/${slugs.get(id)}`);
     const member = teamRow(db.prepare(`${TEAM_SELECT} WHERE t.id = ? AND t.visible = 1`).get(id));
+    const lotm = require('./lawyerOfMonth').current();
+    if (lotm && lotm.memberId === id) member.lawyerOfMonth = lotm.label;
     if (getSetting('show_duty_public', '1') !== '1') member.duty = null;
     const row = db.prepare('SELECT user_id FROM team_members WHERE id = ?').get(id);
     const showSuccess = getSetting('show_success_public', '1') === '1';
