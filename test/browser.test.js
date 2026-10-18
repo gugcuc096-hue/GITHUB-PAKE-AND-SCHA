@@ -2117,8 +2117,11 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       const card = A.page.locator('#teamGrid .team-card').first();
       await card.locator('.team-name').waitFor();
       await card.scrollIntoViewIfNeeded();
+      // Die Karte hebt sich beim Darüberfahren an (0,35 s) – erst danach messen, wo sie steht
+      const start = await card.boundingBox();
+      await A.page.mouse.move(start.x + 30, start.y + 30);
+      await A.page.waitForTimeout(600);
       const box = await card.boundingBox();
-      await A.page.mouse.move(box.x + 30, box.y + 30);
       await A.page.mouse.move(box.x + 60, box.y + 80);
       await A.page.waitForFunction(() => document.querySelector('#teamGrid .team-card.ps-spot-on'));
       const spot = await card.evaluate((el) => [parseFloat(el.style.getPropertyValue('--mx')), parseFloat(el.style.getPropertyValue('--my'))]);
