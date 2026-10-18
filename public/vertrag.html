@@ -67,6 +67,16 @@
         .k-script { height: 15mm; display: flex; align-items: flex-end; font-size: 23pt; line-height: 1; padding: 0 2mm 1mm; white-space: nowrap; overflow: visible; }
         .k-script.lawyer { font-family: 'Allura', cursive; color: #0000ff; font-size: 26pt; }
         .k-script.client { font-family: 'Dancing Script', cursive; color: #000; }
+        /* Unterschrift „schreibt sich“ von links nach rechts (vertrag.js) und kurzes goldenes Siegel nach dem Unterschreiben */
+        .k-sign { position: relative; }
+        .k-script.sig-wait { clip-path: inset(-40% 100% -40% -8%); }
+        .k-script.sig-draw { animation: sig-draw 1.2s cubic-bezier(0.55, 0.1, 0.35, 1) both; }
+        @keyframes sig-draw { from { clip-path: inset(-40% 100% -40% -8%); } to { clip-path: inset(-40% -15% -40% -8%); } }
+        .sig-seal { position: absolute; right: 1mm; top: -3mm; width: 14mm; height: 14mm; border-radius: 50%; display: grid; place-items: center; pointer-events: none;
+            background: radial-gradient(circle at 35% 30%, #f8ebb4, #d4af37 55%, #a07c18); color: #3a2c06; font: 700 7mm/1 Georgia, serif;
+            box-shadow: 0 0 0 1.2mm rgba(212, 175, 55, 0.3), 0 2mm 6mm rgba(110, 80, 10, 0.35); animation: seal-in 2.8s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+        @keyframes seal-in { 0% { opacity: 0; transform: scale(1.9) rotate(-28deg); } 12% { opacity: 1; transform: scale(0.94) rotate(-10deg); } 20% { transform: scale(1) rotate(-12deg); } 82% { opacity: 1; transform: scale(1) rotate(-12deg); } 100% { opacity: 0; transform: scale(1.04) rotate(-12deg); } }
+        @media print { .sig-seal { display: none; } .k-script.sig-wait, .k-script.sig-draw { clip-path: none; animation: none; } }
         .k-line { border-top: 1px solid #333; }
         .k-sname { font: 600 10.5pt 'Roboto Serif', serif; margin-top: 2mm; }
         .k-srole { font: 400 9pt 'Roboto Serif', serif; color: var(--muted); }

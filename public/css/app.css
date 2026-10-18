@@ -347,6 +347,13 @@ label.prop:hover { border-color: rgba(255, 255, 255, 0.22); }
   box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6); animation: toast-in 0.3s ease;
 }
 .ps-toast.error { border-left-color: #ef4444; }
+/* Meldung mit Knopf („Gelöscht · Rückgängig“) */
+.ps-toast.has-action { display: flex; align-items: center; gap: 1rem; }
+.ps-toast-action { margin-left: auto; flex: none; min-height: 32px; padding: 0.3rem 0.85rem; border-radius: 999px; border: 1px solid var(--gold-hairline);
+  background: rgba(212, 175, 55, 0.1); color: var(--gold-light); font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: background-color 0.15s ease; }
+.ps-toast-action:hover, .ps-toast-action:focus-visible { background: rgba(212, 175, 55, 0.22); outline: none; }
+/* Gelöscht, aber noch rückgängig zu machen: sofort weg (Dashboard: undoDelete) */
+.undo-hidden { display: none !important; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (max-width: 767px) {
   .ps-toast-root { left: 1rem; right: 1rem; bottom: 1rem; max-width: none; }
@@ -1473,6 +1480,10 @@ textarea.field.chat-input { resize: none; min-height: 42px; height: 42px; max-he
 .modal.open { animation: swap-in 0.2s ease-out; }
 .modal-ghost { display: flex; z-index: 69; pointer-events: none; animation: fade-out 0.18s ease-in forwards; }
 .modal-ghost .modal-card { animation: modal-out 0.18s ease-in forwards; }
+/* Akte wächst aus ihrer Zeile hervor bzw. zieht sich zurück (Dashboard: morphOpen/fadeOutModal) – Einblenden übernimmt das Skript */
+.modal.morphing .modal-card { animation: none; }
+.modal-ghost.morph-out { animation: fade-out 0.34s ease-in forwards; }
+.modal-ghost.morph-out .modal-card { animation: none; }
 @keyframes fade-out { to { opacity: 0; } }
 @keyframes modal-out { to { opacity: 0; transform: translateY(10px) scale(0.985); } }
 @media (max-width: 639px) { .modal-ghost .modal-card { animation: sheet-out 0.2s ease-in forwards; } }

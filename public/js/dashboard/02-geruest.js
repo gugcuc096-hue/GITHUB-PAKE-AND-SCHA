@@ -396,12 +396,16 @@ function openModal(html, { wide = false, key = null, reopen = null, child = fals
   }
   $('#modalCard').classList.toggle('wide', wide);
   modal.classList.add('open');
+  // Aus einer Akten-Zeile geöffnet: Fenster wächst aus der Zeile hervor (nur beim ersten Öffnen, nicht beim Ersetzen)
+  if (!wasOpen && st.morphFrom) morphOpen(st.morphFrom);
+  st.morphFrom = null;
   // Fensterwechsel (neues Fenster über dem alten, Zurück, Inhalt nach dem Laden): weich statt hart
   if (wasOpen) playIn(body, 'swap-in');
   modal.scrollTop = 0;
   body.scrollTop = 0;
   document.body.classList.add('modal-open');
   tickCountdowns();
+  hidePendingDeletes();
   const focusTarget = $('#modalBody [autofocus]');
   if (focusTarget && window.matchMedia('(min-width: 768px)').matches) focusTarget.focus();
   scheduleHistory();
@@ -494,13 +498,49 @@ function replaceModal(html) {
   body.scrollTop = y1;
   modal.scrollTop = y2;
   tickCountdowns();
+  hidePendingDeletes();
 }
+/*
+ * Akte „fliegt auf“: Aus einer Liste geöffnet, wächst das Fenster aus der angeklickten Zeile hervor; beim Schließen
+ * zieht es sich dorthin zurück. Reine Optik über clip-path (kein Verzerren der Schrift) – geöffnet bzw. geschlossen
+ * ist sofort, wie ohne Animation. Nur am PC (am Handy kommt das Blatt von unten), nicht bei „Bewegung reduzieren“.
+ */
+const MORPH_MS = 380;
+const morphOk = () => window.matchMedia('(min-width: 640px)').matches && !window.matchMedia('(prefers-reduced-motion: reduce)').matches && typeof Element.prototype.animate === 'function';
+/** Ausschnitt des Fensters, der genau über der Zeile liegt (liegt die Zeile außerhalb: der nächste Rand). */
+function morphClip(card, rect) {
+  const r = card.getBoundingClientRect();
+  const cut = (v, max) => Math.min(Math.max(0, v), Math.max(0, max - 48));
+  return `inset(${cut(rect.top - r.top, r.height)}px ${cut(r.right - rect.right, r.width)}px ${cut(r.bottom - rect.bottom, r.height)}px ${cut(rect.left - r.left, r.width)}px round 14px)`;
+}
+function morphOpen(rect) {
+  const modal = $('#modal');
+  const card = $('#modalCard');
+  if (!morphOk()) return;
+  modal.classList.add('morphing'); // eigenes Einblenden des Fensters aus (app.css)
+  const anim = card.animate([{ clipPath: morphClip(card, rect), opacity: 0.6 }, { clipPath: 'inset(0px 0px 0px 0px round 20px)', opacity: 1 }], { duration: MORPH_MS, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+  anim.onfinish = anim.oncancel = () => modal.classList.remove('morphing');
+}
+/** Zeile der offenen Akte in der Liste dahinter – nur, wenn sie zu sehen ist. */
+function morphRow() {
+  const row = st.modalCaseId && document.querySelector(`#content [data-action="open-case"][data-id="${st.modalCaseId}"]`);
+  if (!row || !morphOk()) return null;
+  const r = row.getBoundingClientRect();
+  return r.height && r.bottom > 0 && r.top < window.innerHeight ? r : null;
+}
+/** Openers: Akten-Zeile merken, aus der das Fenster hervorwachsen soll. */
+function openCaseFrom(el) {
+  st.morphFrom = morphOk() && !$('#modal').classList.contains('open') ? el.getBoundingClientRect() : null;
+  return openCase(Number(el.dataset.id)).finally(() => (st.morphFrom = null));
+}
+
 /**
  * Weiches Schließen: Das echte Fenster ist sofort zu (Zustand und Tests bleiben einfach); eine stumme Kopie ohne ids
  * an derselben Scrollposition blendet kurz aus und liegt unter einem gleich danach geöffneten Fenster.
  * Bei „Bewegung reduzieren“ blendet sie nur aus, ohne zu gleiten (app.css, Ende).
  */
-function fadeOutModal(modal) {
+function fadeOutModal(modal, { morph = false } = {}) {
+  const rowRect = morph ? morphRow() : null;
   const ghost = modal.cloneNode(true);
   const body = $('#modalBody');
   const ghostBody = ghost.querySelector('#modalBody');
@@ -513,16 +553,22 @@ function fadeOutModal(modal) {
   document.body.appendChild(ghost);
   ghost.scrollTop = modal.scrollTop;
   if (ghostBody && body) ghostBody.scrollTop = body.scrollTop;
-  setTimeout(() => ghost.remove(), 240);
+  const card = rowRect && ghost.querySelector('.modal-card');
+  if (card) {
+    // Zurück in die Zeile: die Kopie zieht sich auf die Zeile zusammen und blendet aus
+    ghost.classList.add('morph-out');
+    card.animate([{ clipPath: 'inset(0px 0px 0px 0px round 20px)', opacity: 1 }, { clipPath: morphClip(card, rowRect), opacity: 0.25 }], { duration: MORPH_MS - 60, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', fill: 'forwards' });
+  }
+  setTimeout(() => ghost.remove(), card ? MORPH_MS : 240);
 }
-/** Alles schließen – auch die vorherigen Fenster (Seitenwechsel, Abmelden). */
-function closeModal() {
+/** Alles schließen – auch die vorherigen Fenster (Seitenwechsel, Abmelden). morph: Akte zieht sich in ihre Zeile zurück. */
+function closeModal({ morph = false } = {}) {
   st.modalStack = [];
   st.modalCurrent = null;
   const modal = $('#modal');
   if (!modal.classList.contains('open')) return;
   scheduleHistory();
-  fadeOutModal(modal);
+  fadeOutModal(modal, { morph });
   modal.classList.remove('open');
   $('#modalBody').innerHTML = '';
   document.body.classList.remove('modal-open');
@@ -544,7 +590,7 @@ async function modalInstead(fn) {
 async function modalBack() {
   if (st.modalRestoring) return; // vorheriges Fenster lädt gerade (z. B. Doppelklick auf X)
   const prev = st.modalStack.pop();
-  if (!prev) return closeModal();
+  if (!prev) return closeModal({ morph: true });
   const modal = $('#modal');
   const body = $('#modalBody');
   if (prev.reopen) {
@@ -684,6 +730,8 @@ function renderView() {
   $('#content').innerHTML = views[st.view].render();
   renderNav();
   tickCountdowns();
+  hidePendingDeletes();
+  window.PS.countUp($('#content')); // Kennzahlen zählen hoch (erstes Erscheinen bzw. bei Änderung)
 }
 function navigate(view) {
   // Aus einem offenen Fenster heraus: dessen Verlaufseintrag durch die neue Seite ersetzen (Zurück führt nicht ins Leere)
@@ -723,6 +771,99 @@ async function refreshBehind() {
   }
 }
 /** Nach dem Speichern in einem Unterfenster (z. B. aus der Akte heraus) dorthin zurück, sonst schließen. */
+/*
+ * Löschen mit „Rückgängig“ statt Nachfrage (Aufgaben, Notizen, Termine): Der Eintrag verschwindet sofort, unten steht
+ * ein paar Sekunden „… gelöscht · Rückgängig“. Erst danach wird wirklich gelöscht. Verlässt man die Seite vorher,
+ * wird sofort gelöscht (keepalive) – und weil der Browser solche Anfragen beim Verlassen abbrechen kann, merkt sich
+ * das Dashboard sie und holt sie beim nächsten Öffnen nach (die Nummern werden nie neu vergeben, doppelt ist harmlos).
+ * Wird zwischendurch neu gezeichnet, bleibt der Eintrag trotzdem ausgeblendet.
+ */
+const UNDO_MS = 6000;
+const UNDO_KEY = 'ps.undoDeletes';
+const pendingDeletes = new Map(); // url → { hide, commit }
+const undoStore = {
+  list() {
+    try {
+      const l = JSON.parse(localStorage.getItem(UNDO_KEY) || '[]');
+      return Array.isArray(l) ? l : [];
+    } catch {
+      return [];
+    }
+  },
+  save(l) {
+    try {
+      if (l.length) localStorage.setItem(UNDO_KEY, JSON.stringify(l));
+      else localStorage.removeItem(UNDO_KEY);
+    } catch {
+      /* ohne Speicher eben nur keepalive */
+    }
+  },
+  add: (url) => undoStore.save([...undoStore.list().filter((x) => x.url !== url), { url, uid: st.user && st.user.id, at: Date.now() }]),
+  remove: (url) => undoStore.save(undoStore.list().filter((x) => x.url !== url)),
+};
+/** Beim Start: Löschungen nachholen, die beim letzten Verlassen der Seite nicht mehr durchkamen. */
+function replayUndoDeletes() {
+  const now = Date.now();
+  for (const x of undoStore.list()) {
+    if (!st.user || x.uid !== st.user.id || pendingDeletes.has(x.url)) continue;
+    if (now - x.at < UNDO_MS + 500) continue; // läuft in einem anderen Tab noch (Rückgängig möglich)
+    undoStore.remove(x.url);
+    if (now - x.at < 7 * 864e5) api.del(x.url).catch(() => {});
+  }
+}
+function hidePendingDeletes() {
+  for (const p of pendingDeletes.values()) $$(p.hide).forEach((el) => el.classList.add('undo-hidden'));
+}
+/** hide: Selektor aller Stellen, an denen der Eintrag steht; after: nach dem Löschen neu laden. */
+function undoDelete({ url, hide, label, after }) {
+  if (pendingDeletes.has(url)) return;
+  let timer = 0;
+  const show = () => $$(hide).forEach((el) => el.classList.remove('undo-hidden'));
+  const commit = async () => {
+    clearTimeout(timer);
+    if (!pendingDeletes.delete(url)) return;
+    note.close();
+    try {
+      await api.del(url).catch((err) => {
+        if (err.status !== 404) throw err; // schon weg (z. B. von einem anderen Tab nachgeholt)
+      });
+      undoStore.remove(url);
+      if (after) await after();
+    } catch (err) {
+      undoStore.remove(url);
+      show();
+      handleError(err);
+    }
+  };
+  pendingDeletes.set(url, { hide, commit });
+  undoStore.add(url);
+  hidePendingDeletes();
+  const note = toast(`${label} gelöscht.`, 'ok', {
+    duration: UNDO_MS,
+    action: {
+      label: 'Rückgängig',
+      onClick: () => {
+        clearTimeout(timer);
+        undoStore.remove(url);
+        if (pendingDeletes.delete(url)) show();
+      },
+    },
+  });
+  timer = setTimeout(commit, UNDO_MS);
+}
+// Seite wird verlassen: Ausstehendes jetzt löschen (keepalive überlebt das Schließen des Tabs). Bleibt gemerkt und
+// wird beim nächsten Start nachgeholt, falls der Browser die Anfrage abbricht.
+window.addEventListener('pagehide', () => {
+  const list = undoStore.list();
+  for (const url of pendingDeletes.keys()) {
+    const x = list.find((e) => e.url === url);
+    if (x) x.at = Date.now() - UNDO_MS - 1000; // Rückgängig-Zeit vorbei: beim nächsten Start sofort nachholbar
+    fetch(url, { method: 'DELETE', keepalive: true, credentials: 'same-origin', headers: { Accept: 'application/json', 'X-PS-Tab': window.PS.tab } }).catch(() => {});
+  }
+  undoStore.save(list);
+  pendingDeletes.clear();
+});
+
 async function returnOrClose() {
   const caseId = st.returnCase;
   st.returnCase = null;

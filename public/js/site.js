@@ -310,9 +310,10 @@
     if (!cards.length) return;
     box.innerHTML = `
       <div class="stats-row grid gap-3 sm:gap-4 mx-auto" style="grid-template-columns:repeat(${cards.length},minmax(0,1fr));max-width:${cards.length * 15}rem">
-        ${cards.map(([v, l]) => `<div class="glass-card px-3 py-5 sm:p-6 text-center"><div class="font-serif text-3xl sm:text-4xl font-semibold text-[var(--gold-light)] lining-nums">${esc(v)}</div><div class="text-[0.62rem] sm:text-[0.68rem] uppercase tracking-widest text-[var(--text-muted)] mt-2 leading-snug">${esc(l)}</div></div>`).join('')}
+        ${cards.map(([v, l]) => `<div class="glass-card px-3 py-5 sm:p-6 text-center"><div class="font-serif text-3xl sm:text-4xl font-semibold text-[var(--gold-light)] lining-nums" data-count="stat:${esc(l)}">${esc(v)}</div><div class="text-[0.62rem] sm:text-[0.68rem] uppercase tracking-widest text-[var(--text-muted)] mt-2 leading-snug">${esc(l)}</div></div>`).join('')}
       </div>
       ${firmStats.visible && firmStats.successRate != null ? '<p class="text-[0.7rem] text-center text-[var(--text-dim)] mt-3">Erfolgsquote: Freispruch, Einstellung, Strafmilderung, Vergleich oder gewonnen – reine Beratungen zählen nicht mit.</p>' : ''}`;
+    window.PS.countUp(box, { whenVisible: true }); // Zahlen zählen hoch, sobald sie ins Bild scrollen
   }
   api.get('/api/public/stats')
     .then((d) => {
