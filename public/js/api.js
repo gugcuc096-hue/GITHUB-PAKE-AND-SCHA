@@ -678,7 +678,8 @@
   /*
    * Gold-Spotlight: Über Karten (Startseite, Karriere) und Kacheln (Dashboard) folgt ein weiches Licht der Maus,
    * der goldene Rand leuchtet in ihrer Nähe auf. Nur mit Maus; Karten mit Formularfeldern bleiben ruhig.
-   * Dazu der einmalige Goldschimmer über großen Überschriften (.gold-shine) – gedämpft ohne Bewegung (calm.css).
+   * Dazu der einmalige Goldschimmer über großen Überschriften (.gold-shine) – gedämpft ohne Bewegung (calm.css) –
+   * und der Lorbeer „Anwalt des Monats“ (Teamkarte der Startseite, Profilseite).
    */
   const FX_CSS = `.ps-spot-rel{position:relative}.ps-spot{isolation:isolate}
 .ps-spot::after,.ps-spot::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .35s ease}
@@ -686,7 +687,16 @@
 .ps-spot::before{padding:1px;background:radial-gradient(260px circle at var(--mx,50%) var(--my,50%),rgba(240,208,110,.95),rgba(212,175,55,.25) 45%,transparent 72%);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
 .ps-spot.ps-spot-on::after,.ps-spot.ps-spot-on::before{opacity:1}
 .gold-shine{background:linear-gradient(110deg,var(--gold-500,#d4af37) 0 41%,#fff7d6 50%,var(--gold-500,#d4af37) 59% 100%) 0 0/250% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;padding:0 .14em;margin:0 -.14em;-webkit-box-decoration-break:clone;box-decoration-break:clone;animation:ps-shine 2.2s ease-in-out .5s both}
-@keyframes ps-shine{from{background-position:100% 0}to{background-position:0 0}}`;
+@keyframes ps-shine{from{background-position:100% 0}to{background-position:0 0}}
+.lotm-badge{display:inline-flex;align-items:center;gap:.4rem;padding:.32rem .85rem .32rem .6rem;border-radius:999px;font-size:.62rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;line-height:1.2;color:#1a1405;background:linear-gradient(110deg,#b8902a 0%,#f3d77a 45%,#d4af37 60%,#9c7a20 100%) 0 0/220% 100%;box-shadow:0 6px 22px rgba(212,175,55,.35),inset 0 1px 0 rgba(255,255,255,.45);animation:lotm-shine 3.2s ease-in-out .6s infinite alternate;white-space:nowrap}
+@keyframes lotm-shine{from{background-position:100% 0}to{background-position:0 0}}
+.lotm-ico{width:15px;height:15px;flex:none}
+.pf-head .lotm-badge{margin-left:.5rem;vertical-align:middle}
+@media (max-width:479px){.pf-head .lotm-badge{margin:.5rem 0 0}}
+.lotm-on-card{position:absolute;top:-.85rem;left:50%;transform:translateX(-50%);z-index:2}
+.team-card.is-lotm{position:relative;overflow:visible;border-color:rgba(212,175,55,.55);box-shadow:0 0 0 1px rgba(212,175,55,.25),0 18px 60px rgba(212,175,55,.14)}
+.ps-tilt{will-change:transform;transition:transform .14s ease-out,box-shadow .35s ease,border-color .35s ease!important}
+.ps-tilt:not(.ps-spot-on){transition:transform .7s cubic-bezier(.16,1,.3,1),box-shadow .35s ease,border-color .35s ease!important}`;
   const fxStyle = document.createElement('style');
   fxStyle.id = 'psFxCss';
   fxStyle.textContent = FX_CSS;
@@ -704,9 +714,14 @@
     return spotOk.get(el) ? el : null;
   }
   function spotOff() {
-    if (spotEl) spotEl.classList.remove('ps-spot-on');
+    if (spotEl) {
+      spotEl.classList.remove('ps-spot-on');
+      if (spotEl.classList.contains('ps-tilt')) spotEl.style.transform = '';
+    }
     spotEl = null;
   }
+  // Teamkarten (Startseite) neigen sich zusätzlich in 3D zur Maus – nicht bei gedämpften Animationen
+  const TILT_SEL = '.team-card';
   document.addEventListener(
     'pointermove',
     (e) => {
@@ -727,9 +742,16 @@
         spotRaf = 0;
         if (!spotEl || !spotEl.isConnected) return spotOff();
         const r = spotEl.getBoundingClientRect();
-        spotEl.style.setProperty('--mx', `${Math.round(spotXY[0] - r.left)}px`);
-        spotEl.style.setProperty('--my', `${Math.round(spotXY[1] - r.top)}px`);
+        // Lage in der Karte von der Mitte aus – stimmt auch, solange die Karte geneigt ist
+        spotEl.style.setProperty('--mx', `${Math.round(spotXY[0] - (r.left + r.width / 2) + spotEl.offsetWidth / 2)}px`);
+        spotEl.style.setProperty('--my', `${Math.round(spotXY[1] - (r.top + r.height / 2) + spotEl.offsetHeight / 2)}px`);
         spotEl.classList.add('ps-spot-on');
+        if (spotEl.matches(TILT_SEL) && !motion.calm()) {
+          const px = Math.max(-0.5, Math.min(0.5, (spotXY[0] - r.left) / r.width - 0.5));
+          const py = Math.max(-0.5, Math.min(0.5, (spotXY[1] - r.top) / r.height - 0.5));
+          spotEl.classList.add('ps-tilt');
+          spotEl.style.transform = `perspective(900px) translateY(-6px) rotateX(${(-py * 9).toFixed(2)}deg) rotateY(${(px * 11).toFixed(2)}deg) scale(1.015)`;
+        }
       });
     },
     { passive: true }

@@ -20,8 +20,11 @@ html { scroll-behavior: auto !important; }
 .btn-gold:hover, .btn-gold:active, .btn-outline:active, .btn-ghost:active, .btn-danger:active, .icon-btn:active { transform: none !important; }
 .sidebar { transition: none !important; }
 .ps-field-error { animation: none !important; }
-.gold-shine { animation: none !important; }
-.typing-dots i { animation: none !important; opacity: 0.8; } /* „schreibt gerade“: ruhige Punkte */ /* Goldschimmer der Überschrift: bleibt einfach gold */
+.gold-shine, .lotm-badge { animation: none !important; } /* Goldschimmer der Überschrift: bleibt einfach gold */
+.typing-dots i { animation: none !important; opacity: 0.8; } /* „schreibt gerade“: ruhige Punkte */
+.hr-live, .hr-speech-over { animation: none !important; }
+.victory-seal, .victory-title, .victory-kicker { animation: view-in 0.3s ease-out both !important; } /* Sieg-Moment: Siegel erscheint ohne Stempel-Bewegung */
+.wiki-card:hover { transform: none !important; } /* Verhandlungsmodus: Live-Punkt und Redezeit pulsieren nicht */
 /* Startseite: alles Bewegte aus (nur das Einblenden der Seite selbst bleibt) */
 body.site-home *, body.site-home *::before, body.site-home *::after {
   animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important;

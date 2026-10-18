@@ -1,5 +1,5 @@
 /*
- * Kanzlei-Dashboard – Teil 7 von 12: Team, Benutzer, Honorarordnung, Einstellungen.
+ * Kanzlei-Dashboard – Teil 7 von 14: Team, Benutzer, Honorarordnung, Einstellungen.
  * Wird nach den vorherigen Teilen geladen (Reihenfolge siehe dashboard.html bzw. 01-basis.js).
  */
 'use strict';
@@ -455,7 +455,7 @@ views.settings = {
     if (tab === 'contracts') return head + contractTemplatesPanel();
     if (tab === 'integrations') return `${head}${fivenetSettingsPanel(s)}${googleDocsPanel(st.google)}`;
     if (tab === 'system') return `${head}${backupPanel()}<div class="mt-4 lg:mt-5">${emergencyPanel()}</div>`;
-    if (tab === 'site') return `${head}${websitePanel(s)}<div class="mt-4 lg:mt-5">${siteTextsPanel()}</div><div class="mt-4 lg:mt-5">${ranksPanel()}</div>`;
+    if (tab === 'site') return `${head}${websitePanel(s)}<div class="mt-4 lg:mt-5">${lotmPanel(s)}</div><div class="mt-4 lg:mt-5">${siteTextsPanel()}</div><div class="mt-4 lg:mt-5">${ranksPanel()}</div>`;
     return `${head}
         <section class="panel panel-pad">
           <div class="panel-head"><h2 class="panel-title">Kanzleidaten & Erinnerungen</h2></div>

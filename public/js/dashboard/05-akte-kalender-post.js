@@ -1,5 +1,5 @@
 /*
- * Kanzlei-Dashboard – Teil 5 von 12: Akte: Aufgaben & Wiedervorlagen, Tickets, Aktenansicht · Kalender, Kanzlei-Post, Pinnwand.
+ * Kanzlei-Dashboard – Teil 5 von 14: Akte: Aufgaben & Wiedervorlagen, Tickets, Aktenansicht · Kalender, Kanzlei-Post, Pinnwand.
  * Wird nach den vorherigen Teilen geladen (Reihenfolge siehe dashboard.html bzw. 01-basis.js).
  */
 'use strict';
@@ -546,7 +546,7 @@ async function pollChat() {
 
 /*
  * „Wer ist gerade hier?“: Kolleginnen und Kollegen, die dieselbe Akte gerade offen haben (Live-Verbindung, siehe
- * 12-start.js), als kleine Profilbilder neben dem Aktenzeichen – und „… schreibt gerade“ im Akten-Chat.
+ * 14-start.js), als kleine Profilbilder neben dem Aktenzeichen – und „… schreibt gerade“ im Akten-Chat.
  */
 function hereStrip(caseId) {
   const users = st.here.caseId === caseId ? st.here.users : [];
@@ -588,7 +588,7 @@ function typingHide() {
   $('#chatTyping')?.remove();
 }
 
-function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, clientSuggestions, review, chat }) {
+function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, clientSuggestions, review, chat, charges }) {
   const staff = isStaff();
   const admin = isAdmin();
   const me = st.user.id;
@@ -704,6 +704,9 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     if (!c.processTicket && c.canEdit) quick.push(`<button class="btn-outline btn-sm" data-action="pt-toggle">${icon('plus', 'ico-sm')}<span>Prozessticket (DOJ)</span></button>`);
     // Seltene bzw. folgenreiche Aktionen stehen im Menü „⋯ Mehr“ statt zwischen den täglichen Knöpfen
     const more = [
+      // Strafsachen haben den Abschnitt „Anklagepunkte“ immer – sonst kommt er von hier
+      c.area !== 'strafrecht' && c.canEdit && charges && !charges.charges.length ? `<button type="button" class="more-item" data-action="charge-pick" data-id="${c.id}">${icon('scale', 'ico-sm')}<span>Anklagepunkte</span></button>` : '',
+      c.area !== 'strafrecht' && !(charges && charges.charges.length) ? `<button type="button" class="more-item" data-action="hearing-start" data-id="${c.id}">${icon('scale', 'ico-sm')}<span>Verhandlungsmodus</span></button>` : '',
       c.lawyerId === me ? `<button type="button" class="more-item" data-action="release-case" data-id="${c.id}">${icon('logout', 'ico-sm')}<span>Akte abgeben</span></button>` : '',
       c.isCoLawyer ? `<button type="button" class="more-item" data-action="leave-case" data-id="${c.id}">${icon('logout', 'ico-sm')}<span>Mitarbeit beenden</span></button>` : '',
       admin ? `<button type="button" class="more-item danger" data-action="delete-case" data-id="${c.id}" data-number="${esc(c.caseNumber)}">${icon('trash', 'ico-sm')}<span>Akte löschen</span></button>` : '',
@@ -778,6 +781,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
   const contractList = contracts.filter((k) => k.kind !== 'schriftsatz');
   const briefList = contracts.filter((k) => k.kind === 'schriftsatz');
   const parts = {
+    charges: chargesSection(c, charges),
     chat: chatSection(c, chat, ticket),
     contracts: contractsSection(c, contractList),
     briefs: briefsSection(c, briefList),
@@ -789,6 +793,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
   };
   const openTasks = tasks.filter((t) => !t.done).length;
   const jumps = [
+    ['secCharges', 'Anklage', charges ? charges.charges.length : 0, parts.charges],
     ['secChat', 'Nachrichten', chat ? chat.messages.length : 0, parts.chat],
     ['secEvents', 'Termine', appointments.length, true],
     ['secContracts', 'Verträge', contractList.length, parts.contracts],
@@ -823,6 +828,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       ${staff ? '' : reviewSection(c, review)}
       ${c.description ? `<div class="section"><h3 class="section-title">Sachverhalt</h3><p class="text-sm whitespace-pre-wrap text-muted">${esc(c.description)}</p></div>` : emptySection('', 'Sachverhalt', 'noch nicht beschrieben', '', c.canEdit ? 'Unter „Akte bearbeiten“ ergänzen.' : '')}
       ${c.publicNote ? `<div class="section"><h3 class="section-title">Statushinweis</h3><div class="banner banner-gold mb-0"><p class="text-sm whitespace-pre-wrap">${esc(c.publicNote)}</p></div></div>` : ''}
+      ${parts.charges}
       ${parts.chat}
       ${eventsSection}
       ${parts.contracts}

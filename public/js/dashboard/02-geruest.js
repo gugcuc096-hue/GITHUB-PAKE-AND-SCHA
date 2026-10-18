@@ -1,5 +1,5 @@
 /*
- * Kanzlei-Dashboard – Teil 2 von 12: Grundgerüst: Navigation, Dialog, Routing.
+ * Kanzlei-Dashboard – Teil 2 von 14: Grundgerüst: Navigation, Dialog, Routing.
  * Wird nach den vorherigen Teilen geladen (Reihenfolge siehe dashboard.html bzw. 01-basis.js).
  */
 'use strict';
@@ -46,7 +46,7 @@ function toggleNavGroup(group) {
 const concernsMerged = () => isBoard();
 function navCount(key) {
   if (key === 'concerns-board') return (st.concernOpen || 0) + (st.concernUnseen || 0);
-  return { cases: st.chatUnread, mail: st.unread, applications: st.newApplications, tasks: st.dueTasks, concerns: st.concernUnseen, personnel: st.personnelNew, 'name-requests': st.nameOpen, vip: st.vipReqOpen, reviews: st.reviewOpen, invoices: st.paymentReports }[key] || 0;
+  return { cases: st.chatUnread, mail: st.unread, applications: st.newApplications, tasks: st.dueTasks, concerns: st.concernUnseen, personnel: st.personnelNew, 'name-requests': st.nameOpen, vip: st.vipReqOpen, reviews: st.reviewOpen, invoices: st.paymentReports, resolutions: st.resolutionOpen }[key] || 0;
 }
 function navActive(key) {
   if (key === 'invoices') return st.view === 'invoices' || st.view === 'invoice-new';
@@ -703,6 +703,40 @@ async function go(view) {
   const content = $('#content');
   window.scrollTo(0, 0);
   const token = ++st.navToken;
+  const seen = st.seenViews || (st.seenViews = new Set());
+  // Schon einmal geladen: sofort mit dem letzten Stand zeigen und im Hintergrund auffrischen (kein Warten beim Menüwechsel).
+  // Formularseiten nicht – dort sollen keine Eingaben unter den Fingern neu gezeichnet werden.
+  if (seen.has(view) && !INSTANT_SKIP.has(view)) {
+    let shown = null;
+    try {
+      shown = views[view].render();
+      renderView();
+      playIn(content, 'view-in');
+    } catch {
+      shown = null; // alter Stand passt nicht mehr – normal laden
+    }
+    if (shown !== null) {
+      // Hat die Person schon geklickt, gescrollt oder getippt, wird nicht mehr unter ihr neu gezeichnet
+      // (die frischen Daten stehen trotzdem bereit und erscheinen beim nächsten Zeichnen)
+      let touched = false;
+      const mark = () => (touched = true);
+      const EVENTS = ['pointerdown', 'keydown', 'wheel', 'touchstart'];
+      EVENTS.forEach((ev) => window.addEventListener(ev, mark, { capture: true, passive: true }));
+      try {
+        if (views[view].load) await views[view].load();
+      } catch {
+        return; // offline o. Ä.: der zuletzt geladene Stand bleibt stehen
+      } finally {
+        EVENTS.forEach((ev) => window.removeEventListener(ev, mark, { capture: true }));
+      }
+      seen.add(view);
+      if (touched || token !== st.navToken || views[view].render() === shown || liveBusy(content)) return;
+      const y = window.scrollY;
+      renderView();
+      window.scrollTo(0, y);
+      return;
+    }
+  }
   // Platzhalter erst, wenn das Laden dauert – schnelle Seiten erscheinen ohne kurzes Aufblitzen
   const slow = setTimeout(() => token === st.navToken && (content.innerHTML = loadingHtml(view)), 120);
   try {
@@ -716,9 +750,11 @@ async function go(view) {
   }
   clearTimeout(slow);
   if (token !== st.navToken) return;
+  seen.add(view);
   renderView();
   playIn(content, 'view-in');
 }
+const INSTANT_SKIP = new Set(['invoice-new', 'settings', 'profile']);
 /** Sanft einblenden (Seitenwechsel, neues Fenster) – nicht bei jedem Neuzeichnen, sonst flackert es. */
 function playIn(el, cls) {
   if (!el) return;

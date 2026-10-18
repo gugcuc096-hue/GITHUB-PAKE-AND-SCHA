@@ -1,5 +1,5 @@
 /*
- * Kanzlei-Dashboard – Teil 4 von 12: Akte: Verträge, Schriftsätze, externe Dokumente (FiveNet, Google Docs & Sheets) und ihre Reihenfolge.
+ * Kanzlei-Dashboard – Teil 4 von 14: Akte: Verträge, Schriftsätze, externe Dokumente (FiveNet, Google Docs & Sheets) und ihre Reihenfolge.
  * Wird nach den vorherigen Teilen geladen (Reihenfolge siehe dashboard.html bzw. 01-basis.js).
  */
 'use strict';
@@ -195,6 +195,7 @@ const BRIEF_FIELDS = [
   ['mandant', 'Name des Mandanten', 'input', ''],
   ['mandant_geburtsdatum', 'Geburtsdatum Mandant (IC)', 'input', 'TT.MM.JJJJ'],
   ['festnahme', 'Festnahme bzw. Haft', 'input', 'z. B. Festnahme am 01.10.2026, Mission Row'],
+  ['anklagepunkte', 'Anklagepunkte', 'textarea', 'Kommt aus dem Strafmaß-Rechner der Akte – je Zeile einer'],
   ['begruendung', 'Begründung / eigener Text', 'textarea', 'Leer lassen, wenn der Absatz entfallen soll.'],
   ['datum', 'Datum', 'input', 'TT.MM.JJJJ'],
   ['ort', 'Ort', 'input', ''],
@@ -269,7 +270,7 @@ function briefForm(c, { templates, defaults, k = null }) {
   const field = ([name, label, type, ph]) =>
     `<div class="${type === 'textarea' ? 'span-2' : ''}" data-bf="${name}"><label class="label" for="bf_${name}">${esc(label)}</label>${
       type === 'textarea'
-        ? `<textarea id="bf_${name}" name="${name}" rows="${name === 'begruendung' ? 6 : 3}" maxlength="${name === 'begruendung' ? 6000 : 400}" class="field" placeholder="${esc(ph)}">${esc(v[name] || '')}</textarea>`
+        ? `<textarea id="bf_${name}" name="${name}" rows="${name === 'begruendung' ? 6 : 3}" maxlength="${name === 'begruendung' ? 6000 : name === 'anklagepunkte' ? 3000 : 400}" class="field" placeholder="${esc(ph)}">${esc(v[name] || '')}</textarea>`
         : `<input id="bf_${name}" name="${name}" class="field" maxlength="200" value="${esc(v[name] || '')}" placeholder="${esc(ph)}">`
     }${name === 'fivenet_az' ? fivenetRefHint(defaults) : ''}</div>`;
   return `

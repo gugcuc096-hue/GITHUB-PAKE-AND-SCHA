@@ -1,5 +1,5 @@
 /*
- * Kanzlei-Dashboard – Teil 11 von 12: Formulare (data-form).
+ * Kanzlei-Dashboard – Teil 11 von 14: Formulare (data-form).
  * Wird nach den vorherigen Teilen geladen (Reihenfolge siehe dashboard.html bzw. 01-basis.js).
  */
 'use strict';
@@ -171,7 +171,9 @@ const forms = {
     if (!outcome) throw new Error('Bitte das Ergebnis wählen.');
     await api.patch('/api/cases/' + id, { status: 'geschlossen', outcome });
     await returnOrClose();
-    toast(`Verfahren abgeschlossen – ${OUTCOMES[outcome][0]}`);
+    // Sieg-Moment: Erfolg mit goldenem Siegel feiern, sonst nur die Meldung
+    if (OUTCOMES[outcome][1] === true) victoryMoment(OUTCOMES[outcome][2]);
+    else toast(`Verfahren abgeschlossen – ${OUTCOMES[outcome][0]}`);
   },
   'process-ticket': async (f) => {
     const fd = new FormData(f);

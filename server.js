@@ -108,6 +108,7 @@ app.use('/api/cases/:id', (req, res, next) => {
 });
 app.use('/api/cases/:id/external', externalRoutes.caseRouter);
 app.use('/api/cases/:id/contracts', contractRoutes.caseRouter);
+app.use('/api/cases/:id/charges', require('./routes/penal').caseRouter); // Anklagepunkte & Strafmaß-Rechner
 app.use('/api/cases/:id/fivenet', externalRoutes.caseRouter); // ältere Adresse, bleibt gültig
 app.use('/api/cases', require('./routes/cases'));
 app.use('/api/clients', require('./routes/clients').router);
@@ -115,6 +116,9 @@ app.use('/api/fivenet', fivenetRoutes.router);
 app.use('/api/gdocs', externalRoutes.gdocsRouter);
 app.use('/api/gsheets', externalRoutes.gsheetsRouter);
 app.use('/api/tasks', require('./routes/tasks'));
+app.use('/api/penal', require('./routes/penal').router); // Strafkatalog (StGB)
+app.use('/api/wiki', require('./routes/wiki').router); // Kanzlei-Wiki
+app.use('/api/resolutions', require('./routes/resolutions').router); // Board-Beschlüsse
 app.use('/api/search', require('./routes/search'));
 app.use('/api/google', require('./routes/google'));
 app.use('/api/reviews', require('./routes/reviews').router);
@@ -198,6 +202,8 @@ app.use((err, req, res, next) => {
 /* ---------------------------------------------------------------- Start */
 runBootstrap();
 require('./ranks').init(); // Ränge aus der Datenbank (beim ersten Start: die bisherigen sechs)
+require('./penal').init(); // Strafgesetzbuch & Strafkatalog (beim ersten Start aus seeds/stgb.json)
+require('./routes/wiki').seed(); // Kanzlei-Wiki: Grundlagen-Artikel beim ersten Start
 
 // Discord-Erinnerungen an Fristen/Gerichtstermine (24 h vorher).
 const reminderTimer = setInterval(() => {
@@ -214,6 +220,10 @@ const reminderTimer = setInterval(() => {
     require('./cleanup').sweep();
     // Wochenbericht fürs Board: montags ab 10 Uhr einmal per Discord-DM
     require('./weeklyReport').sweep().catch((err) => console.warn('Wochenbericht fehlgeschlagen:', err.message));
+    // Board-Beschlüsse: abgelaufene Abstimmungen entscheiden
+    require('./routes/resolutions').sweep();
+    // Anwalt des Monats: zum Monatswechsel in Discord verkünden
+    require('./lawyerOfMonth').sweep();
   } catch (err) {
     console.warn('Hintergrundaufgabe fehlgeschlagen:', err.message);
   }

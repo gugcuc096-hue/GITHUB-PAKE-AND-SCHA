@@ -26,6 +26,7 @@ const FIELDS = {
   fivenet_az: 'Aktenzeichen aus FiveNet („DOC - Nummer“, wird zum Link auf das FiveNet-Dokument)',
   festnahme: 'Festnahme bzw. Haft (Datum, Ort, Behörde)',
   begruendung: 'Begründung bzw. eigener Text (mehrzeilig; leer = Absatz entfällt)',
+  anklagepunkte: 'Anklagepunkte aus dem Strafmaß-Rechner der Akte (je Zeile einer)',
 };
 
 /** Arten von Vorlagen: Verträge (Mandant und Anwalt unterschreiben) und Schriftsätze (meist nur der Anwalt). */

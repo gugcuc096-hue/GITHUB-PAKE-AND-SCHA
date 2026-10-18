@@ -1,5 +1,5 @@
 /*
- * Kanzlei-Dashboard – Teil 6 von 12: Rechnungen, Rechnungs-/Honorar-Generator und Mandantenkartei.
+ * Kanzlei-Dashboard – Teil 6 von 14: Rechnungen, Rechnungs-/Honorar-Generator und Mandantenkartei.
  * Wird nach den vorherigen Teilen geladen (Reihenfolge siehe dashboard.html bzw. 01-basis.js).
  */
 'use strict';
@@ -18,7 +18,8 @@ function paymentButtons(i) {
       : `<label class="btn-ghost btn-sm file-btn" title="Screenshot der Überweisung nachreichen">${icon('camera', 'ico-sm')}<span>Screenshot nachreichen</span><input type="file" accept="image/*" data-upload="pay-proof" data-id="${i.id}" aria-label="Screenshot der Überweisung hochladen"></label>`;
   }
   if (!i.paymentReport) return '';
-  return `${i.paymentReport.proof ? `<a class="btn-outline btn-sm" href="/api/invoices/${i.id}/payment-proof" target="_blank" rel="noopener">${icon('eye', 'ico-sm')}<span>Nachweis</span></a>` : ''}<button class="btn-gold btn-sm" data-action="inv-status" data-id="${i.id}" data-status="bezahlt" data-reported="1">${icon('check', 'ico-sm')}<span>Eingang bestätigen</span></button><button class="btn-ghost btn-sm" data-action="inv-pay-reject" data-id="${i.id}" data-number="${esc(i.number)}">Nicht eingegangen</button>`;
+  // In der Rechnungsliste am PC kurze Beschriftungen (alles in einer Zeile), sonst die langen
+  return `${i.paymentReport.proof ? `<a class="btn-outline btn-sm" href="/api/invoices/${i.id}/payment-proof" target="_blank" rel="noopener" title="Zahlungsnachweis ansehen">${icon('eye', 'ico-sm')}<span class="inv-lbl">Nachweis</span></a>` : ''}<button class="btn-gold btn-sm" data-action="inv-status" data-id="${i.id}" data-status="bezahlt" data-reported="1" title="Zahlungseingang bestätigen">${icon('check', 'ico-sm')}<span class="lbl-long">Eingang bestätigen</span><span class="lbl-short">Bestätigen</span></button><button class="btn-ghost btn-sm" data-action="inv-pay-reject" data-id="${i.id}" data-number="${esc(i.number)}" title="Zahlung ist nicht eingegangen"><span class="lbl-long">Nicht eingegangen</span><span class="lbl-short">Ablehnen</span></button>`;
 }
 
 /** Nach einer Änderung an einer Rechnung: Akte (falls die Rechnung dort angeklickt wurde) bzw. Ansicht und Badge neu laden. */
@@ -60,31 +61,32 @@ function paymentRejectModal(id, number) {
 function invoiceTable(rows) {
   const staff = isStaff();
   if (!rows.length) return empty(st.invoices.length ? 'Keine Dokumente für diese Auswahl.' : staff ? 'Noch keine Rechnungen erstellt.' : 'Es liegen keine Rechnungen vor.', 'receipt');
-  return `<div class="tbl-wrap"><table class="tbl tbl-cards">
+  return `<div class="tbl-wrap"><table class="tbl tbl-cards inv-tbl">
       <thead><tr><th>Dokument</th><th>Empfänger</th><th>Akte</th><th style="text-align:right">Betrag</th><th>Status</th><th>Datum</th><th><span class="sr-only">Aktionen</span></th></tr></thead>
       <tbody>${lazyRows(
         rows,
         (i) => `<tr>
           <td class="td-main"><div class="font-mono text-gold text-sm nowrap">${docTitleLink(`/invoice.html?id=${i.id}`, esc(i.number))}</div><div class="text-xs text-dim">${esc(INVOICE_KIND[i.kind])}${i.subject ? ' · ' + esc(i.subject) : ''}</div></td>
           <td data-label="Empfänger">${staff && i.clientKey ? clientLink(i.clientKey, i.clientName) : esc(i.clientName)}</td>
-          <td data-label="Akte">${i.caseNumber ? `<button class="text-gold font-mono text-xs hover:underline" data-action="open-case" data-id="${i.caseId}">${esc(i.caseNumber)}</button>` : '—'}</td>
+          <td data-label="Akte" class="nowrap">${i.caseNumber ? `<button class="text-gold font-mono text-xs hover:underline" data-action="open-case" data-id="${i.caseId}">${esc(i.caseNumber)}</button>` : '—'}</td>
           <td data-label="Betrag" class="font-mono nowrap" style="text-align:right">${money(i.total)}</td>
           <td data-label="Status">${invoiceBadge(i, true)}${staff && paymentReported(i) && i.paymentReport.note ? `<div class="text-xs text-dim pay-note">„${esc(i.paymentReport.note)}“</div>` : ''}</td>
-          <td data-label="Datum" class="text-xs text-dim nowrap"><div>${esc(fmtDate(i.createdAt))}${i.dueDate && i.status === 'offen' ? `<div${i.overdueDays > 0 ? ` class="text-red-300" title="${esc(overdueText(i))}"` : ''}>fällig ${esc(fmtDateOnly(i.dueDate))}</div>` : ''}</div></td>
+          <td data-label="Datum" class="text-xs text-dim nowrap"><div><span title="${esc(fmtDate(i.createdAt))}">${esc(parseDate(i.createdAt)?.toLocaleDateString('de-DE') || '—')}</span>${i.dueDate && i.status === 'offen' ? `<div${i.overdueDays > 0 ? ` class="text-red-300" title="${esc(overdueText(i))}"` : ''}>fällig ${esc(fmtDateOnly(i.dueDate))}</div>` : ''}</div></td>
           <td class="td-actions inv-actions">
-            ${staff && safeGdoc(i.googleDoc) ? gdocBtn(safeGdoc(i.googleDoc)) : docViewBtn(`/invoice.html?id=${i.id}`)}
+            ${(staff && safeGdoc(i.googleDoc) ? gdocBtn(safeGdoc(i.googleDoc)) : docViewBtn(`/invoice.html?id=${i.id}`).replace('<a ', '<a title="Dokument ansehen" ')).replace(/<span>/, '<span class="inv-lbl">')}
             ${
               // Zahlungserinnerung als normaler kleiner Knopf bei den Aktionen (stand früher klein unter dem Datum)
-              staff && i.status === 'offen'
-                ? `<button type="button" class="btn-ghost btn-sm" data-action="inv-remind" data-id="${i.id}" data-number="${esc(i.number)}" title="${esc(
+              staff && i.status === 'offen' && !paymentReported(i)
+                ? `<button type="button" class="btn-ghost btn-sm inv-remind${i.remindedAt ? ' reminded' : ''}" data-action="inv-remind" data-id="${i.id}" data-number="${esc(i.number)}" title="${esc(
                     i.remindedAt
                       ? `${i.reminderCount === 1 ? '1 Erinnerung' : `${i.reminderCount} Erinnerungen`}, zuletzt ${fmtDate(i.remindedAt)} – klicken, um erneut zu erinnern (Discord-DM und Ticket)`
                       : 'Zahlungserinnerung an den Mandanten senden (Discord-DM und Ticket)'
-                  )}">${icon('bell', 'ico-sm')}<span>${i.remindedAt ? `erinnert ${esc(new Date(i.remindedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }))}` : 'Erinnern'}</span></button>`
+                  )}">${icon('bell', 'ico-sm')}<span class="rem-lbl">${i.remindedAt ? `erinnert ${esc(new Date(i.remindedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }))}` : 'Erinnern'}</span></button>`
                 : ''
             }
             ${paymentButtons(i)}
-            ${staff && i.status === 'offen' && !paymentReported(i) ? `<button class="btn-gold btn-sm" data-action="inv-status" data-id="${i.id}" data-status="bezahlt">Bezahlt</button><button class="btn-ghost btn-sm" data-action="inv-status" data-id="${i.id}" data-status="storniert">Storno</button>` : ''}
+            ${staff && i.status === 'offen' && !paymentReported(i) ? `<button class="btn-gold btn-sm" data-action="inv-status" data-id="${i.id}" data-status="bezahlt">Bezahlt</button>` : ''}
+            ${/* Stornieren steht in der Rechnung selbst (Leiste oben) – hier bleibt alles in einer Zeile */ ''}
             ${staff && i.status !== 'offen' ? `<button class="btn-ghost btn-sm" data-action="inv-status" data-id="${i.id}" data-status="offen">Wieder offen</button>` : ''}
             ${isAdmin() ? `<button class="icon-btn sm" data-action="inv-delete" data-id="${i.id}" data-number="${esc(i.number)}" aria-label="Löschen">${icon('trash', 'ico-sm')}</button>` : ''}
           </td></tr>`,

@@ -1,5 +1,5 @@
 /*
- * Kanzlei-Dashboard – Teil 8 von 12: Einstellungen: Discord-Bot und Discord-Tickets.
+ * Kanzlei-Dashboard – Teil 8 von 14: Einstellungen: Discord-Bot und Discord-Tickets.
  * Wird nach den vorherigen Teilen geladen (Reihenfolge siehe dashboard.html bzw. 01-basis.js).
  */
 'use strict';

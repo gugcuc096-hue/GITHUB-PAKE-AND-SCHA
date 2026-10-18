@@ -1,5 +1,5 @@
 /*
- * Kanzlei-Dashboard – Teil 3 von 12: Ansichten: Übersicht, Akten, Globale Suche, Papierkorb, Aufgaben-Übersicht, Aktenkennzahlen.
+ * Kanzlei-Dashboard – Teil 3 von 14: Ansichten: Übersicht, Akten, Globale Suche, Papierkorb, Aufgaben-Übersicht, Aktenkennzahlen.
  * Wird nach den vorherigen Teilen geladen (Reihenfolge siehe dashboard.html bzw. 01-basis.js).
  */
 'use strict';
@@ -391,23 +391,29 @@ $$('.topbar-search').forEach((b) => (b.title = `Suchen (${KEY_MOD} + K)`));
 const GS_GROUPS = [
   ['cases', 'Akten', 'folder'],
   ['clients', 'Mandanten', 'user'],
+  ['notes', 'Notizen & Chat', 'chat'],
   ['invoices', 'Rechnungen', 'receipt'],
   ['tasks', 'Aufgaben', 'tasks'],
   ['events', 'Termine & Fristen', 'calendar'],
   ['messages', 'Kanzlei-Post', 'mail'],
+  ['wiki', 'Kanzlei-Wiki', 'book'],
+  ['penal', 'Strafgesetzbuch', 'scale'],
 ];
-/** Treffer hervorheben – Text und Treffer werden einzeln escaped. */
+/**
+ * Treffer hervorheben – der ganze Suchbegriff, seine einzelnen Wörter und die Wörter, die der Server trotz Tippfehler
+ * oder Umlaut gefunden hat (st.gsTerms). Text und Treffer werden einzeln escaped.
+ */
 function hl(text, q) {
   const s = String(text ?? '');
   if (!q) return esc(s);
-  const lower = s.toLowerCase();
-  const needle = q.toLowerCase();
+  const needles = [...new Set([q, ...q.split(/\s+/), ...(st.gsTerms || [])].map((n) => n.trim()).filter((n) => n.length >= 2))].sort((a, b) => b.length - a.length);
+  if (!needles.length) return esc(s);
+  const re = new RegExp(needles.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'gi');
   let out = '';
   let i = 0;
-  let j;
-  while (needle && (j = lower.indexOf(needle, i)) !== -1) {
-    out += `${esc(s.slice(i, j))}<mark>${esc(s.slice(j, j + needle.length))}</mark>`;
-    i = j + needle.length;
+  for (const m of s.matchAll(re)) {
+    out += `${esc(s.slice(i, m.index))}<mark>${esc(m[0])}</mark>`;
+    i = m.index + m[0].length;
   }
   return out + esc(s.slice(i));
 }
@@ -425,6 +431,10 @@ function gsItem(type, x, q) {
     body = line(`${x.done ? '✓ ' : ''}${hl(x.title, q)}`, [x.dueDate ? `fällig ${esc(fmtDateOnly(x.dueDate))}` : 'ohne Datum', x.assignedName ? esc(x.assignedName) : '', x.caseNumber ? esc(x.caseNumber) : '', x.done ? 'erledigt' : ''].filter(Boolean).join(' · '));
   else if (type === 'events')
     body = line(hl(x.title, q), [esc(fmtDate(x.startsAt)), esc(EVENT_TYPES[x.type] || x.type), x.location ? hl(x.location, q) : '', x.caseNumber ? esc(x.caseNumber) : ''].filter(Boolean).join(' · '));
+  else if (type === 'notes')
+    body = line(`<span class="font-mono text-gold">${esc(x.caseNumber)}</span> · ${esc(x.caseTitle)}`, [hl(x.preview, q), `${esc(x.author)}${x.internal ? ' (intern)' : ''}`, esc(fmtDate(x.createdAt))].join(' · '));
+  else if (type === 'wiki') body = line(hl(x.title, q), [esc(x.category), hl(x.preview, q)].join(' · '));
+  else if (type === 'penal') body = line(`<span class="text-gold">§ ${esc(x.para)}</span> · ${hl(x.title, q)}`, esc(x.chapter));
   else if (type === 'messages')
     body = line(hl(x.subject || '(ohne Betreff)', q), [x.box === 'inbox' ? `von ${esc(x.senderName)}` : `an ${esc(x.recipientName)}`, esc(fmtDate(x.createdAt)), hl(x.preview, q)].filter(Boolean).join(' · '));
   return `<button type="button" class="gs-item" data-action="gs-open" data-type="${type}" data-id="${x.id}">${ico}${body}</button>`;
@@ -434,7 +444,7 @@ function renderSearchResults() {
   if (!box) return;
   const q = st.gsQuery.trim();
   if (q.length < 2) {
-    box.innerHTML = `<p class="gs-hint">${isStaff() ? 'Aktenzeichen, Namen, Rechnungsnummern, Termine, Aufgaben oder Nachrichten – auch FiveNet- und Google-Links.' : 'Aktenzeichen, Rechnungsnummern, Termine oder Nachrichten.'}</p>`;
+    box.innerHTML = `<p class="gs-hint">${isStaff() ? 'Aktenzeichen, Namen, Notizen, Rechnungen, Termine, Wiki oder Paragraphen – auch FiveNet- und Google-Links. Kleine Tippfehler sind kein Problem.' : 'Aktenzeichen, Rechnungsnummern, Termine, Nachrichten oder der Chat Ihrer Akten.'}</p>`;
     return;
   }
   const r = st.gsResults || {};
@@ -463,6 +473,7 @@ async function runSearch() {
     const res = await api.get('/api/search?q=' + encodeURIComponent(q));
     if (token !== st.gsToken) return; // inzwischen weitergetippt
     st.gsResults = res.results;
+    st.gsTerms = res.terms || [];
   } finally {
     if (token === st.gsToken) st.gsLoading = false;
   }
@@ -486,6 +497,9 @@ async function openSearchResult(type, id) {
   const x = list.find((r) => r.id === id);
   if (!x) return;
   if (type === 'cases') return modalInstead(() => openCase(id));
+  if (type === 'notes') return modalInstead(() => openCase(x.caseId));
+  if (type === 'wiki') return modalInstead(() => openWikiArticle(id));
+  if (type === 'penal') return modalInstead(() => openLaw(x.para));
   if (type === 'clients') return modalInstead(() => openClient(`u${id}`)); // Mandantenkartei
   if (type === 'invoices') {
     if (x.caseId) return modalInstead(() => openCase(x.caseId));
@@ -637,6 +651,7 @@ function rememberCase(data) {
   st.caseContracts = data.contracts || [];
   st.caseTasks = data.tasks || [];
   st.caseInfo = data.case;
+  st.caseCharges = data.charges || null; // Anklagepunkte (Kanzlei) – auch für den Verhandlungsmodus
 }
 /*
  * Akte vorladen: Fährt man mit der Maus über eine Akte (am Handy: beim Antippen), wird sie schon geladen – der Klick

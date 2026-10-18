@@ -2,10 +2,10 @@
  * Kanzlei-Dashboard (Single-Page): Navigation per #hash, Daten über /api/*.
  * Alle Nutzertexte laufen vor der Ausgabe per innerHTML durch esc().
  *
- * Teil 1 von 12 – Grundlagen: Konstanten, Zustand & Helfer, Daten laden.
+ * Teil 1 von 14 – Grundlagen: Konstanten, Zustand & Helfer, Daten laden.
  * Das Dashboard besteht aus den Dateien unter /js/dashboard/ (01 … 12). dashboard.html lädt sie in dieser
  * Reihenfolge; sie teilen sich Konstanten und Funktionen. Code, der beim Laden sofort läuft, darf nur auf
- * Früheres zugreifen – der eigentliche Start (12-start.js) kommt zuletzt.
+ * Früheres zugreifen – der eigentliche Start (14-start.js) kommt zuletzt.
  */
 'use strict';
 
@@ -123,6 +123,7 @@ const ICONS = {
   more: 'M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z',
   printer: 'M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z',
   restore: 'M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3',
+  refresh: 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15',
   eye: 'M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z',
   bell: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9',
   trash: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16',
@@ -146,6 +147,13 @@ const ICONS = {
   grip: 'M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01',
   table: 'M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z',
   doc: 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z',
+  book: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
+  info: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+  minus: 'M20 12H4',
+  ballot: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4',
+  seal: 'M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z',
+  image: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z',
+  expand: 'M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4',
   idCard: 'M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2',
 };
 const icon = (name, cls = 'ico') =>
@@ -164,11 +172,13 @@ const VIEWS = {
   mail: { label: 'Kanzlei-Post', short: 'Post', icon: 'mail' },
   // Menügruppen (Überschrift „section“): Kanzlei, Board-Eingang und Verwaltung lassen sich auf- und zuklappen
   board: { label: 'Pinnwand', icon: 'pin', staff: true, section: 'Kanzlei' },
+  wiki: { label: 'Kanzlei-Wiki', short: 'Wiki', icon: 'book', staff: true, section: 'Kanzlei' },
   concerns: { label: 'Anliegen ans Board', short: 'Anliegen', icon: 'chat', section: 'Kanzlei', staffSection: true },
   duty: { label: 'Dienstzeiten', icon: 'clock', staff: true, section: 'Kanzlei' },
   personnel: { label: 'Beförderungen & Einstellungen', short: 'Personal', icon: 'star', staff: true, section: 'Kanzlei' },
   // Board: eigene und eingegangene Anliegen sind ein Menüpunkt „Anliegen“ (Reiter „Eingang“ / „Meine Anliegen“)
   'concerns-board': { label: 'Eingegangene Anliegen', navLabel: 'Anliegen', short: 'Anliegen', icon: 'chat', board: true, section: 'Board-Eingang' },
+  resolutions: { label: 'Beschlüsse', icon: 'ballot', board: true, section: 'Board-Eingang' },
   applications: { label: 'Bewerbungen', icon: 'userAdd', board: true, section: 'Board-Eingang' },
   'name-requests': { label: 'Namensänderungen', short: 'Namen', icon: 'edit', board: true, section: 'Board-Eingang' },
   reviews: { label: 'Mandantenstimmen', short: 'Stimmen', icon: 'star', board: true, section: 'Board-Eingang' },
@@ -628,6 +638,10 @@ const load = {
   /** Board: offene Anträge auf Namensänderung */
   async nameCount() {
     if (isBoard()) st.nameOpen = (await api.get('/api/name-requests')).open;
+  },
+  /** Board: offene Beschlüsse, bei denen die eigene Stimme fehlt */
+  async resolutionCount() {
+    if (isBoard()) st.resolutionOpen = (await api.get('/api/resolutions/pending')).pending;
   },
   /** Board: neue Mandantenstimmen (warten auf Freigabe) */
   async reviewCount() {

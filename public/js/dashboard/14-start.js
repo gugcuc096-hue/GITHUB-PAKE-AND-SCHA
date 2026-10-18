@@ -1,5 +1,5 @@
 /*
- * Kanzlei-Dashboard – Teil 12 von 12: Ereignisse und Start.
+ * Kanzlei-Dashboard – Teil 14 von 14: Ereignisse und Start.
  * Wird nach den vorherigen Teilen geladen (Reihenfolge siehe dashboard.html bzw. 01-basis.js).
  */
 'use strict';
@@ -140,6 +140,7 @@ document.addEventListener('submit', (e) => {
       throw err;
     }
     ok = true;
+    document.dispatchEvent(new CustomEvent('ps:form-ok', { detail: f.dataset.form }));
   }).finally(() => {
     draftDone(ok);
     buttons.forEach((b) => b.isConnected && (b.disabled = false));
@@ -611,6 +612,9 @@ const LIVE_VIEWS = {
   clients: ['clients'],
   cooperations: ['cooperations'],
   team: ['team'],
+  wiki: ['wiki'],
+  penal: ['wiki'],
+  resolutions: ['resolutions'],
 };
 const live = { es: null, ok: false, down: false, timers: new Map(), pendingView: false, pendingCase: null };
 function liveLater(key, fn, ms = 300) {
@@ -765,7 +769,7 @@ setInterval(() => {
 
 // Ungelesene Post, neue Bewerbungen und Dienststatus (Badges in der Navigation, Zahl im Tab und auf dem App-Symbol)
 function refreshBadges() {
-  return Promise.all([load.chatUnread().catch(() => {}), load.unread(), load.appCount(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {}), load.paymentReports().catch(() => {})])
+  return Promise.all([load.chatUnread().catch(() => {}), load.unread(), load.appCount(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {}), load.paymentReports().catch(() => {}), load.resolutionCount().catch(() => {})])
     .then(renderNav)
     .catch(() => {});
 }
@@ -783,6 +787,139 @@ setInterval(() => {
     .then(() => renderUser())
     .catch(() => {});
 }, 60000);
+
+/* ================================================================
+   Handy-Gesten: Fenster nach unten wegwischen, Seite herunterziehen zum Aktualisieren, kurzes Vibrieren bei Erfolg
+   ================================================================ */
+const touchUi = () => window.matchMedia('(pointer: coarse)').matches;
+/** Kurzes Vibrieren als Bestätigung (nur Touch-Geräte, die es können). */
+function buzz(pattern = 12) {
+  try {
+    if (touchUi()) navigator.vibrate?.(pattern);
+  } catch {
+    /* kein Vibrieren auf diesem Gerät */
+  }
+}
+// Erfolgreich abgeschickte Formulare kurz bestätigen
+document.addEventListener('ps:form-ok', () => buzz());
+
+// Fenster (am Handy ein Blatt von unten) am Griff oder ganz oben nach unten ziehen → schließen wie mit dem X
+(() => {
+  const card = $('#modalCard');
+  const body = $('#modalBody');
+  if (!card) return;
+  let drag = null; // { y, t, dy }
+  const reset = () => {
+    card.style.transition = 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)';
+    card.style.transform = '';
+    setTimeout(() => (card.style.transition = ''), 260);
+  };
+  card.addEventListener(
+    'touchstart',
+    (e) => {
+      if (window.innerWidth >= 640 || e.touches.length !== 1) return;
+      const t = e.target;
+      const onHandle = !!t.closest('.modal-head');
+      if (!onHandle && (body.scrollTop > 0 || t.closest('input, textarea, select, .chip-row, .tbl-wrap, .pk-list, .law-text, [contenteditable]'))) return;
+      drag = { y: e.touches[0].clientY, x: e.touches[0].clientX, t: Date.now(), dy: 0, on: false };
+    },
+    { passive: true }
+  );
+  card.addEventListener(
+    'touchmove',
+    (e) => {
+      if (!drag) return;
+      const dy = e.touches[0].clientY - drag.y;
+      const dx = Math.abs(e.touches[0].clientX - drag.x);
+      if (!drag.on && (dy < 8 || dx > dy)) {
+        if (dy < -4 || dx > 12) drag = null; // nach oben scrollen oder seitlich wischen: keine Geste
+        return;
+      }
+      drag.on = true;
+      drag.dy = Math.max(0, dy);
+      card.style.transition = 'none';
+      card.style.transform = `translateY(${drag.dy}px)`;
+    },
+    { passive: true }
+  );
+  card.addEventListener('touchend', async () => {
+    if (!drag) return;
+    const { dy, t, on } = drag;
+    drag = null;
+    if (!on) return;
+    const fast = dy > 50 && dy / Math.max(1, Date.now() - t) > 0.6;
+    if (dy > Math.min(140, card.offsetHeight * 0.25) || fast) {
+      buzz(8);
+      await guard(() => modalDismiss());
+    }
+    reset(); // geschlossen (oder ungespeicherte Eingaben behalten): wieder an seinen Platz
+  });
+  card.addEventListener('touchcancel', () => {
+    if (drag) reset();
+    drag = null;
+  });
+})();
+
+// Ganz oben auf der Seite nach unten ziehen → Seite und Zähler neu laden
+(() => {
+  const ind = document.createElement('div');
+  ind.className = 'ptr';
+  ind.setAttribute('aria-hidden', 'true');
+  ind.innerHTML = icon('refresh');
+  document.body.appendChild(ind);
+  const LIMIT = 72;
+  let pull = null;
+  let busy = false;
+  const blocked = () => busy || window.scrollY > 0 || $('#modal').classList.contains('open') || document.body.classList.contains('hearing-open') || document.body.classList.contains('ps-dialog-open');
+  document.addEventListener(
+    'touchstart',
+    (e) => {
+      if (!touchUi() || e.touches.length !== 1 || blocked() || !e.target.closest('#content')) return;
+      pull = { y: e.touches[0].clientY, x: e.touches[0].clientX, d: 0 };
+    },
+    { passive: true }
+  );
+  document.addEventListener(
+    'touchmove',
+    (e) => {
+      if (!pull) return;
+      const dy = e.touches[0].clientY - pull.y;
+      if (window.scrollY > 0 || dy < 0 || Math.abs(e.touches[0].clientX - pull.x) > dy) {
+        if (dy < 0 || window.scrollY > 0) {
+          pull = null;
+          ind.classList.remove('show');
+        }
+        return;
+      }
+      pull.d = Math.min(dy * 0.5, LIMIT + 24);
+      ind.classList.add('show');
+      ind.classList.toggle('ready', pull.d >= LIMIT);
+      ind.style.transform = `translate(-50%, ${pull.d}px) rotate(${pull.d * 4}deg)`;
+    },
+    { passive: true }
+  );
+  document.addEventListener('touchend', async () => {
+    if (!pull) return;
+    const ready = pull.d >= LIMIT;
+    pull = null;
+    if (!ready) {
+      ind.classList.remove('show', 'ready');
+      ind.style.transform = '';
+      return;
+    }
+    busy = true;
+    buzz(10);
+    ind.classList.add('spin');
+    ind.style.transform = `translate(-50%, ${LIMIT}px)`;
+    try {
+      await Promise.all([refreshBehind(), refreshBadges()]);
+    } finally {
+      busy = false;
+      ind.classList.remove('show', 'ready', 'spin');
+      ind.style.transform = '';
+    }
+  });
+})();
 
 /* ================================================================
    Start
@@ -816,7 +953,7 @@ setInterval(() => {
   if (googleState) st.settingsTab = 'integrations'; // Google Docs stehen unter Einstellungen → Integrationen
 
   try {
-    await Promise.all([load.chatUnread().catch(() => {}), load.unread(), load.appCount(), load.duty(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {}), load.paymentReports().catch(() => {})]);
+    await Promise.all([load.chatUnread().catch(() => {}), load.unread(), load.appCount(), load.duty(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {}), load.paymentReports().catch(() => {}), load.resolutionCount().catch(() => {})]);
     renderUser();
   } catch {
     /* Badges und Dienststatus sind nicht kritisch */

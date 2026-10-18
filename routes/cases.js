@@ -454,6 +454,8 @@ function caseDetail(c, u) {
     ticket: tickets.ticketInfo(c, u),
     // Mandant: eigene Bewertung der (abgeschlossenen) Akte
     review: require('./reviews').reviewForCase(c, u),
+    // Kanzlei: Anklagepunkte und Strafmaß (Strafmaß-Rechner)
+    charges: staff ? require('./penal').payload(c) : undefined,
     // Team: passende Mandantenkonten, solange die Akte noch keins hat (z. B. Mandant hat sich später registriert)
     clientSuggestions: staff && !c.client_id ? clientSuggestions(c) : undefined,
   };
@@ -678,6 +680,15 @@ router.patch(
           newStatus === 'geschlossen' && updated.outcome ? { name: 'Ergebnis', value: OUTCOMES[updated.outcome].label } : null,
           { name: 'Geändert von', value: u.display_name },
         ],
+      });
+    }
+    // Sieg-Moment: Erfolg fürs Team in Discord feiern – ohne Mandant, Aktenzeichen oder Sachverhalt
+    if (newStatus === 'geschlossen' && c.status !== 'geschlossen' && OUTCOMES[updated.outcome]?.success) {
+      const AREA = { strafrecht: 'Strafrecht', zivilrecht: 'Zivilrecht', verfassungsrecht: 'Verfassungsrecht', vertragsrecht: 'Vertragsrecht' };
+      discord.notify('case.victory', {
+        title: `🏆 ${OUTCOMES[updated.outcome].label}!`,
+        description: `Ein ${AREA[updated.area] ? `${AREA[updated.area]}s-` : ''}Mandat wurde erfolgreich abgeschlossen. Starke Arbeit, Team!`,
+        fields: [{ name: 'Erreicht von', value: caseLawyers(updated).map((l) => l.name).join(', ') || u.display_name }],
       });
     }
     ticketUpdate(c, updated, u, { history, editFields, d, newStatus, newlyAssigned });

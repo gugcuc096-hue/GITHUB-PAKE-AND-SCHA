@@ -58,7 +58,7 @@
   }
 
   // Platzhalter, deren Absatz ganz entfällt, wenn sie leer sind (freier Text in Schriftsätzen)
-  const OPTIONAL_LINES = new Set(['begruendung']);
+  const OPTIONAL_LINES = new Set(['begruendung', 'anklagepunkte']);
 
   function signatures(values, sig, who = 'both') {
     const clientSigned = sig && sig.clientSignature;

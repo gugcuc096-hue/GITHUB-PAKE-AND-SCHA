@@ -1,7 +1,7 @@
 'use strict';
 /*
  * Prüfungen ohne Server: strenge Content-Security-Policy (keine Inline-Skripte, keine onclick-Attribute),
- * vollständige Skript-Verweise der Seiten, die 12 Teile des Dashboards und keine Zugangsdaten im Code.
+ * vollständige Skript-Verweise der Seiten, die Teile des Dashboards und keine Zugangsdaten im Code.
  */
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');

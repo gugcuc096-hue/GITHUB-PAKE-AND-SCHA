@@ -253,6 +253,21 @@ router.get('/audit', (req, res) => {
 });
 
 /* ---------------------------------------------------------------- Einstellungen */
+/** Anwalt des Monats: Modus, Auswahl und wer es gerade ist (mit Punkten der Automatik als Vorschau). */
+function lotmSettings() {
+  const lotm = require('../lawyerOfMonth');
+  const cur = lotm.current();
+  const name = (id) => (id ? db.prepare('SELECT name FROM team_members WHERE id = ?').get(id)?.name || '' : '');
+  return {
+    lotmMode: getSetting('lotm_mode', 'auto'),
+    lotmMember: Number(getSetting('lotm_member', '')) || null,
+    lotmCandidates: db.prepare('SELECT id, name FROM team_members WHERE visible = 1 ORDER BY name COLLATE NOCASE').all(),
+    lotmCurrent: cur ? { name: name(cur.memberId), label: cur.label, stats: cur.stats } : null,
+    lotmMonth: lotm.monthLabel(lotm.previousMonth()),
+    lotmRanking: lotm.ranking(lotm.previousMonth()).slice(0, 3),
+  };
+}
+
 function settingsPayload() {
   const dbUrl = getSetting('discord_webhook_url', '');
   return {
@@ -277,6 +292,7 @@ function settingsPayload() {
     onboardingTemplate: require('../onboarding').template(),
     showDutyPublic: getSetting('show_duty_public', '1') === '1',
     showSuccessPublic: getSetting('show_success_public', '1') === '1',
+    ...lotmSettings(),
     fivenetUrl: getSetting('fivenet_url', ''),
     fivenetInstance: fivenet.instance(),
     fivenetEnvUrl: process.env.FIVENET_URL || '',
@@ -306,6 +322,8 @@ router.patch(
       onboardingTemplate: z.string().max(4000).optional(),
       showDutyPublic: z.boolean().optional(),
       showSuccessPublic: z.boolean().optional(),
+      lotmMode: z.enum(['auto', 'manual', 'off']).optional(),
+      lotmMember: z.number().int().positive().nullable().optional(),
       fivenetUrl: z.string().trim().max(200).optional(),
     });
     const d = parseBody(schema, req, res);
@@ -349,6 +367,8 @@ router.patch(
     tx(() => {
       if (d.showDutyPublic !== undefined) setSetting('show_duty_public', d.showDutyPublic ? '1' : '0');
       if (d.showSuccessPublic !== undefined) setSetting('show_success_public', d.showSuccessPublic ? '1' : '0');
+      if (d.lotmMode !== undefined) setSetting('lotm_mode', d.lotmMode);
+      if (d.lotmMember !== undefined) setSetting('lotm_member', d.lotmMember ? String(d.lotmMember) : '');
       if (d.discordWebhookUrl !== undefined) setSetting('discord_webhook_url', d.discordWebhookUrl);
       if (d.discordEvents !== undefined) {
         setSetting('discord_events', JSON.stringify(d.discordEvents.filter((e) => discord.EVENTS[e])));

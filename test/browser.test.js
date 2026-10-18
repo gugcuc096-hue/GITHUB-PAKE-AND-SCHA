@@ -2124,10 +2124,14 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       const box = await card.boundingBox();
       await A.page.mouse.move(box.x + 60, box.y + 80);
       await A.page.waitForFunction(() => document.querySelector('#teamGrid .team-card.ps-spot-on'));
+      await A.page.waitForTimeout(300); // Neigung zur Maus abwarten
       const spot = await card.evaluate((el) => [parseFloat(el.style.getPropertyValue('--mx')), parseFloat(el.style.getPropertyValue('--my'))]);
-      assert.ok(Math.abs(spot[0] - 60) <= 2 && Math.abs(spot[1] - 80) <= 2, `Licht an der Maus: ${spot}`);
+      // Die Karte neigt sich zur Maus (3D) – das Licht sitzt trotzdem an der Maus (wenige Pixel Spiel durch die Neigung)
+      assert.ok(Math.abs(spot[0] - 60) <= 8 && Math.abs(spot[1] - 80) <= 8, `Licht an der Maus: ${spot}`);
+      assert.match(await card.evaluate((el) => el.style.transform), /perspective\(900px\).*rotateX\(.*rotateY\(/);
       await A.page.mouse.move(2, 2);
       await A.page.waitForFunction(() => !document.querySelector('.ps-spot-on'));
+      assert.equal(await card.evaluate((el) => el.style.transform), '', 'Karte richtet sich wieder auf');
       // Name auf der Karte → Profilseite → „Mandat anfragen“ öffnet das Formular mit Wunschanwalt
       const name = (await card.locator('.team-name').textContent()).trim();
       await card.locator('.team-name').click();
@@ -2341,4 +2345,144 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       }
     });
   }
+});
+
+describe('Browser: Strafmaß, Verhandlung, Wiki, Beschlüsse, Rechnungszeile, Gesten', { skip: chromium ? false : 'Playwright nicht installiert' }, () => {
+  let srv;
+  let browser;
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  before(async () => {
+    srv = await startServer();
+    browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+  });
+  after(async () => {
+    if (browser) await browser.close();
+    if (srv) await srv.stop();
+  });
+  async function session(device) {
+    const ctx = await browser.newContext({ ...device, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+    const page = await ctx.newPage();
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
+    page.on('console', (m) => /Content Security Policy|Refused to (execute|load|apply)/.test(m.text()) && problems.push(`CSP: ${m.text()}`));
+    await page.goto(srv.base + '/login.html');
+    await page.fill('#email', TEAM.admin);
+    await page.fill('#password', PASSWORD);
+    await page.click('button[type=submit]');
+    await page.waitForURL(/dashboard/);
+    await page.waitForSelector('#nav a.nav-item');
+    return { ctx, page, problems };
+  }
+  // Wischgeste per Touch-Ereignissen (Playwright kennt nur Antippen)
+  const swipe = (page, sel, dy) =>
+    page.evaluate(
+      ({ sel, dy }) => {
+        const el = document.querySelector(sel);
+        const r = el.getBoundingClientRect();
+        const t = (y) => new Touch({ identifier: 1, target: el, clientX: r.left + r.width / 2, clientY: y });
+        const y0 = r.top + 10;
+        el.dispatchEvent(new TouchEvent('touchstart', { touches: [t(y0)], bubbles: true }));
+        for (let i = 1; i <= 10; i++) el.dispatchEvent(new TouchEvent('touchmove', { touches: [t(y0 + (dy * i) / 10)], bubbles: true }));
+        el.dispatchEvent(new TouchEvent('touchend', { touches: [], bubbles: true }));
+      },
+      { sel, dy }
+    );
+
+  it('PC: Anklagepunkte, Verhandlungsmodus mit Protokoll, Wiki/StGB, Beschluss, Rechnungen in einer Zeile', async () => {
+    const admin = client(srv.base);
+    await admin.login(TEAM.admin);
+    const c = (await admin.post('/api/cases', { title: 'Überfall auf die Fleeca Bank', area: 'strafrecht', clientName: 'Marco Bellucci', description: 'Festnahme am Legion Square.' })).json.case;
+    await admin.upload(`/api/cases/${c.id}/attachments`, PNG, 'image/png');
+    for (let i = 0; i < 2; i++) {
+      const inv = (await admin.post('/api/invoices', { caseId: c.id, clientName: 'Marco Bellucci', items: [{ description: 'Verteidigung', quantity: 1, unitPrice: 12500 }] })).json.invoice;
+      if (i) await admin.post(`/api/invoices/${inv.id}/remind`);
+    }
+    const partner = client(srv.base);
+    await partner.login(TEAM.partner);
+    await partner.post('/api/resolutions', { title: 'Notfallhonorar erhöhen', deadlineHours: 72, vote: 'ja' });
+
+    const { ctx, page, problems } = await session(DESKTOP);
+    try {
+      // Anklagepunkt über die Auswahl, zweimal = Anzahl 2
+      await page.evaluate((id) => openCase(id), c.id);
+      await page.click('#secCharges [data-action="charge-pick"]');
+      await page.fill('#pkSearch', '21');
+      await page.click('#pkList .pk-add >> nth=0');
+      await page.click('#pkList .pk-add >> nth=0');
+      await page.waitForFunction(() => /2×/.test(document.querySelector('#pkList .pk-row.added .pk-state')?.textContent || ''));
+      await page.click('#modalCard [data-action="close-modal"]');
+      await page.waitForSelector('#secCharges .chg-row');
+      assert.equal(await page.locator('#secCharges .chg-row').count(), 1, 'gleicher Tatbestand = eine Zeile');
+      // Verhandlungsmodus: Notiz mit Enter, Beenden speichert das Protokoll als interne Notiz
+      await page.click('#secCharges [data-action="hearing-start"]');
+      await page.waitForSelector('#hearing');
+      await page.fill('#hrInput', 'Zeuge: Officer Miller hat den Mandanten nicht gesehen.');
+      await page.keyboard.press('Enter');
+      await page.waitForSelector('#hearing .hr-note');
+      await page.click('[data-action="hr-end"]');
+      await page.click('[data-ps-dialog="ok"]');
+      await page.waitForSelector('#hearing', { state: 'detached' });
+      const notes = (await admin.get(`/api/cases/${c.id}`)).json.notes.filter((n) => /Verhandlungsprotokoll/.test(n.body));
+      assert.equal(notes.length, 1);
+      assert.match(notes[0].body, /Officer Miller/);
+      assert.equal(notes[0].internal, true);
+      await page.click('#modalCard [data-action="close-modal"]');
+      // Wiki und Strafgesetzbuch
+      await page.click('a.nav-item[href="#wiki"]');
+      await page.waitForSelector('.wiki-card');
+      await page.click('.wiki-card >> nth=0');
+      await page.waitForSelector('.wiki-body h3, .wiki-body p');
+      await page.click('#modalCard [data-action="close-modal"]');
+      await page.click('[data-action="wiki-tab"][data-tab="stgb"]');
+      await page.fill('#stgbSearch', 'raub');
+      await page.waitForSelector('.stgb-row');
+      await page.click('.stgb-row >> text=Raub');
+      await page.waitForSelector('.law-text');
+      assert.ok(await page.$('#modalCard [data-action="law-edit"]'), 'Board kann den Text bearbeiten');
+      await page.click('#modalCard [data-action="close-modal"]');
+      // Beschluss: Ja → alle haben abgestimmt → angenommen
+      await page.click('a.nav-item[href="#resolutions"]');
+      await page.click('.res-btn-ja');
+      await page.waitForSelector('.ps-toast >> text=angenommen');
+      // Rechnungen: alle Knöpfe einer Zeile auf einer Höhe, nichts ragt aus der Tabelle
+      await page.click('a.nav-item[href="#invoices"]');
+      await page.waitForSelector('.inv-actions');
+      const rows = await page.$$eval('.inv-actions', (cells) => cells.map((td) => [...td.children].filter((x) => x.offsetParent).map((x) => Math.round(x.getBoundingClientRect().top + x.offsetHeight / 2))));
+      for (const r of rows) assert.ok(Math.max(...r) - Math.min(...r) <= 4, `eine Zeile: ${r}`);
+      assert.equal(await page.locator('.inv-actions >> text=Storno').count(), 0);
+      assert.equal(await page.$eval('.tbl-wrap', (w) => w.scrollWidth - w.clientWidth), 0);
+      // Sieg-Moment
+      await page.evaluate(() => victoryMoment('Freispruch'));
+      await page.waitForSelector('#victory .victory-title >> text=Freispruch');
+      await page.waitForSelector('#victory', { state: 'detached', timeout: 5000 });
+      assert.deepEqual(problems, []);
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  it('Handy: Fenster nach unten wegwischen, Ziehen zum Aktualisieren, nichts ragt über den Rand', async () => {
+    const { ctx, page, problems } = await session(PHONE);
+    try {
+      await page.goto(srv.base + '/dashboard.html#wiki');
+      await page.waitForSelector('.wiki-card');
+      assert.ok((await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 1);
+      await page.click('.wiki-card >> nth=0');
+      await page.waitForSelector('#modal.open .wiki-body');
+      await swipe(page, '#modalCard .modal-head', 260);
+      await page.waitForFunction(() => !document.querySelector('#modal').classList.contains('open'));
+      let loads = 0;
+      page.on('request', (r) => /\/api\/wiki$/.test(r.url()) && loads++);
+      await swipe(page, '#content', 400);
+      await page.waitForFunction(() => !document.querySelector('.ptr.spin'));
+      await page.waitForTimeout(300);
+      assert.ok(loads >= 1, 'Seite neu geladen');
+      await page.goto(srv.base + '/dashboard.html#resolutions');
+      await page.waitForSelector('#content .page-title');
+      assert.ok((await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 1);
+      assert.deepEqual(problems, []);
+    } finally {
+      await ctx.close();
+    }
+  });
 });
