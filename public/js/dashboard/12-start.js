@@ -631,7 +631,23 @@ function liveView() {
   live.pendingView = false;
   refreshBehind();
 }
+// Akte vorladen beim Drüberfahren (kurz verweilen) bzw. sofort beim Antippen
+let prefetchTimer = 0;
+document.addEventListener('pointerover', (e) => {
+  const el = e.target.closest && e.target.closest('[data-action="open-case"][data-id]');
+  if (!el || (e.relatedTarget && el.contains(e.relatedTarget))) return;
+  clearTimeout(prefetchTimer);
+  prefetchTimer = setTimeout(() => prefetchCase(Number(el.dataset.id)), e.pointerType === 'mouse' ? 90 : 0);
+});
+document.addEventListener('pointerout', (e) => {
+  const el = e.target.closest && e.target.closest('[data-action="open-case"][data-id]');
+  if (el && !(e.relatedTarget && el.contains(e.relatedTarget))) clearTimeout(prefetchTimer);
+});
+document.addEventListener('click', () => clearTimeout(prefetchTimer), true);
+document.addEventListener('ps:changed', () => casePrefetch.clear());
+
 function liveCase(ev) {
+  casePrefetch.delete(ev.id);
   const open = $('#modal').classList.contains('open') && st.modalCaseId === ev.id;
   if (open) pollChat(); // neue Nachrichten anhängen – stört auch beim Tippen nicht
   if (open && !ev.chat) {
@@ -770,6 +786,7 @@ setInterval(() => {
   }
   if (st.user.needsName) askInitialName();
   liveConnect();
+  replayUndoDeletes(); // beim letzten Verlassen nicht mehr durchgekommene Löschungen nachholen
 })();
 
 /** Konto per Discord angelegt: einmal nach dem Namen im Spiel fragen (erscheint in Akten, Verträgen, Nachrichten). */

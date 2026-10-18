@@ -26,6 +26,8 @@
       // fields: Hinweise je Feld (Name → Text), damit das Formular sie direkt am Feld zeigen kann
       throw Object.assign(new Error((data && data.error) || `Fehler ${res.status}`), { status: res.status, fields: (data && data.fields) || null });
     }
+    // Erfolgreiche Änderung: Vorgeladenes (z. B. Akten beim Drüberfahren) ist damit veraltet
+    if (method !== 'GET') document.dispatchEvent(new CustomEvent('ps:changed', { detail: { method, url } }));
     return data;
   }
 
@@ -120,7 +122,8 @@
     }
   }
 
-  function toast(message, type = 'ok') {
+  /** Kurze Meldung unten. action: { label, onClick } – Knopf in der Meldung (z. B. „Rückgängig“); duration in ms. */
+  function toast(message, type = 'ok', { action = null, duration = 0 } = {}) {
     let root = document.getElementById('psToastRoot');
     if (!root) {
       root = document.createElement('div');
@@ -133,12 +136,29 @@
     const el = document.createElement('div');
     el.className = 'ps-toast' + (type === 'error' ? ' error' : '');
     el.textContent = message;
-    root.appendChild(el);
     // Kurz ausblenden statt hart verschwinden
-    setTimeout(() => {
+    let timer = 0;
+    const close = () => {
+      clearTimeout(timer);
+      if (el.classList.contains('out')) return;
       el.classList.add('out');
       setTimeout(() => el.remove(), 230);
-    }, type === 'error' ? 6000 : 3500);
+    };
+    if (action) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ps-toast-action';
+      btn.textContent = action.label;
+      btn.addEventListener('click', () => {
+        close();
+        action.onClick();
+      });
+      el.classList.add('has-action');
+      el.appendChild(btn);
+    }
+    root.appendChild(el);
+    timer = setTimeout(close, duration || (type === 'error' ? 6000 : 3500));
+    return { close };
   }
 
   /**
@@ -504,17 +524,117 @@
     },
     true,
   );
-  // Ändern = Hinweis weg (auch für die ganze Gruppe gleichnamiger Auswahlknöpfe)
-  const feOnEdit = (e) => {
+  /*
+   * Live: Nach einer kurzen Tipp-Pause und beim Verlassen eines bearbeiteten Feldes wird geprüft („Mindestens 3 Zeichen
+   * (aktuell 1).“) – nicht erst beim Absenden. Ein leeres Pflichtfeld wird beim Tippen nicht angemahnt, erst beim
+   * Verlassen (wenn man darin etwas getippt hatte) oder beim Absenden. Steht ein Hinweis, zieht er bei jeder Eingabe nach
+   * und verschwindet, sobald der Wert passt. Chat-Eingaben bleiben außen vor.
+   */
+  const FE_PAUSE = 700;
+  const feTimers = new WeakMap();
+  const feLiveOk = (el) => !!(el && el.form && el.willValidate && !el.matches('.chat-input, [data-nolive]'));
+  function feLive(el, { typing = false } = {}) {
+    if (!el || !el.isConnected) return;
+    const marked = el.classList.contains('ps-invalid');
+    const changed = feVals.get(el) !== feValue(el);
+    if (!feLiveOk(el) || el.validity.valid || (typing && el.validity.valueMissing)) {
+      // gültig (oder leer beim Tippen): Hinweis weg – eigene/Server-Hinweise aber nur, wenn sich der Wert geändert hat
+      if (marked && changed) feClear(el);
+      return;
+    }
+    const text = validityText(el);
+    const p = marked && document.getElementById(el.dataset.psErr);
+    if (p) {
+      // Hinweis steht schon: nur den Text nachziehen (kein erneutes Einblenden bei jedem Tastendruck)
+      if (p.textContent !== text) p.textContent = text;
+      feVals.set(el, feValue(el));
+    } else fieldError(el, text, { focus: false });
+  }
+  // Während eine Maustaste/ein Finger unten ist, nichts einblenden: der Hinweis schiebt sonst den Knopf weg, auf den
+  // gerade geklickt wird („Akte anlegen“) – der Klick ginge ins Leere. Geprüft wird direkt nach dem Loslassen.
+  let feDown = false;
+  document.addEventListener('pointerdown', () => (feDown = true), true);
+  const feUp = () => setTimeout(() => (feDown = false), 0);
+  document.addEventListener('pointerup', feUp, true);
+  document.addEventListener('pointercancel', feUp, true);
+  function feLater(el, opts) {
+    if (!feDown) return feLive(el, opts);
+    const run = () => {
+      document.removeEventListener('pointerup', run, true);
+      document.removeEventListener('pointercancel', run, true);
+      setTimeout(() => feLive(el, opts), 0); // erst nach dem Klick (Absenden prüft dann selbst)
+    };
+    document.addEventListener('pointerup', run, true);
+    document.addEventListener('pointercancel', run, true);
+  }
+  document.addEventListener('input', (e) => {
     const el = e.target;
-    if (!el || !el.classList || (el.classList.contains('ps-invalid') && feVals.get(el) === feValue(el))) return;
-    if (!el.form) return feClear(el);
-    if (el.type === 'radio' && el.name) [...el.form.querySelectorAll(`input[type="radio"]`)].filter((r) => r.name === el.name).forEach(feClear);
-    else feClear(el);
-  };
-  document.addEventListener('input', feOnEdit);
-  document.addEventListener('change', feOnEdit);
+    if (!el || !el.classList) return;
+    clearTimeout(feTimers.get(el));
+    if (el.classList.contains('ps-invalid')) feLive(el, { typing: true });
+    else if (e.isTrusted && feLiveOk(el)) {
+      el.dataset.psDirty = '1';
+      feTimers.set(el, setTimeout(() => feLater(el, { typing: true }), FE_PAUSE));
+    }
+  });
+  document.addEventListener('change', (e) => {
+    const el = e.target;
+    if (!el || !el.classList) return;
+    // Auswahlknöpfe: eine Wahl erledigt den Hinweis der ganzen Gruppe
+    if (el.type === 'radio' && el.name && el.form) [...el.form.querySelectorAll('input[type="radio"]')].filter((r) => r.name === el.name).forEach(feClear);
+    else if (el.classList.contains('ps-invalid')) feLive(el);
+  });
+  document.addEventListener('focusout', (e) => {
+    const el = e.target;
+    if (!el || !el.dataset || !el.dataset.psDirty) return;
+    clearTimeout(feTimers.get(el));
+    feLater(el);
+  });
+  document.addEventListener('reset', (e) => e.target.querySelectorAll && e.target.querySelectorAll('[data-ps-dirty]').forEach((el) => delete el.dataset.psDirty));
   document.addEventListener('reset', (e) => clearFieldErrors(e.target));
 
-  window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog, closeToDashboard, drafts, applications, tab, fieldError, fieldErrors, clearFieldErrors };
+  /*
+   * Zahlen zählen hoch: Elemente mit data-count (Schlüssel) zeigen ihre Zahl kurz hochzählend – beim ersten Erscheinen
+   * von 0, danach nur bei einer Änderung vom zuletzt gezeigten Wert (14 → 15). Das Format (Tausenderpunkt, Komma,
+   * „ %“, „ $“, „ ★“) bleibt. whenVisible: erst, wenn die Zahl ins Bild scrollt. Bei „Bewegung reduzieren“ sofort.
+   */
+  const countMemory = new Map();
+  const NUM_RE = /-?\d{1,3}(?:\.\d{3})+(?:,\d+)?|-?\d+(?:,\d+)?/;
+  function countUp(root, { whenVisible = false } = {}) {
+    if (!root || !root.querySelectorAll) return;
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    root.querySelectorAll('[data-count]').forEach((el) => {
+      const text = el.textContent;
+      const m = text.match(NUM_RE);
+      if (!m) return;
+      const decimals = (m[0].split(',')[1] || '').length;
+      const target = Number(m[0].replace(/\./g, '').replace(',', '.'));
+      const key = el.dataset.count;
+      const from = countMemory.has(key) ? countMemory.get(key) : 0;
+      countMemory.set(key, target);
+      if (reduce || from === target || !Number.isFinite(target)) return;
+      const fmt = (n) => text.slice(0, m.index) + n.toLocaleString('de-DE', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + text.slice(m.index + m[0].length);
+      const run = () => {
+        const t0 = performance.now();
+        const step = (now) => {
+          if (!el.isConnected) return;
+          const p = Math.min(1, (now - t0) / 900);
+          el.textContent = p < 1 ? fmt(from + (target - from) * (1 - Math.pow(1 - p, 3))) : text;
+          if (p < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      };
+      el.textContent = fmt(from);
+      if (whenVisible && 'IntersectionObserver' in window) {
+        const io = new IntersectionObserver((entries) => {
+          if (!entries.some((x) => x.isIntersecting)) return;
+          io.disconnect();
+          run();
+        }, { threshold: 0.4 });
+        io.observe(el);
+      } else run();
+    });
+  }
+
+  window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog, closeToDashboard, drafts, applications, tab, fieldError, fieldErrors, clearFieldErrors, countUp };
 })();

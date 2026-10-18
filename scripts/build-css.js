@@ -46,7 +46,11 @@ function refreshOnStart() {
     return;
   }
   buildTailwind()
-    .then((r) => r.changed && console.log(`Tailwind-CSS aktualisiert (${Math.round(r.bytes / 1024)} KB).`))
+    .then((r) => {
+      if (!r.changed) return;
+      console.log(`Tailwind-CSS aktualisiert (${Math.round(r.bytes / 1024)} KB).`);
+      require('../assets').reset(); // neue Versionsnummer für die Seiten
+    })
     .catch((err) => console.warn('Tailwind-CSS konnte nicht neu gebaut werden – die vorhandene Datei bleibt aktiv:', err.message));
 }
 

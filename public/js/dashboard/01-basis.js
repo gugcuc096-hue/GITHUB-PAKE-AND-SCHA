@@ -237,6 +237,7 @@ const st = {
   cal: { month: null, selected: null, types: { gericht: true, frist: true, mandant: true, intern: true } },
   draft: null,
   modalCaseId: null,
+  morphFrom: null, // Rechteck der angeklickten Akten-Zeile: das Fenster wächst daraus hervor (morphOpen)
   returnCase: null,
   // Dialog-Verlauf (siehe openModal/modalBack in 02-geruest.js)
   modalStack: [],

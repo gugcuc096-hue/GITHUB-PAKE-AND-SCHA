@@ -113,6 +113,26 @@ describe('Website & Ränge selbst pflegen', () => {
     for (const p of ['/', '/karriere.html', '/bewerbung']) assert.equal(meta((await client(server.base).get(p)).text, 'theme-color'), '#b8962e', `${p}: Goldstreifen`);
   });
 
+  it('Schneller laden: Versionsnummern, Dashboard als ein Bündel, ein Jahr im Browser – die Seiten selbst immer frisch', async () => {
+    const YEAR = 'public, max-age=31536000, immutable';
+    const page = await fetch(`${server.base}/dashboard.html`);
+    assert.equal(page.headers.get('cache-control'), 'no-cache');
+    const html = await page.text();
+    const v = (html.match(/\/js\/api\.js\?v=([a-f0-9]{12})"/) || [])[1];
+    assert.ok(v, 'Versionsnummer an den Skripten');
+    assert.match(html, new RegExp(`<script src="/js/dashboard\\.bundle\\.js\\?v=${v}"></script>`));
+    assert.doesNotMatch(html, /\/js\/dashboard\/\d\d-/, 'keine zwölf Einzelteile mehr');
+    assert.match(html, new RegExp(`href="/css/app\\.css\\?v=${v}"`));
+    const bundle = await fetch(`${server.base}/js/dashboard.bundle.js?v=${v}`);
+    assert.equal(bundle.headers.get('cache-control'), YEAR);
+    const code = await bundle.text();
+    assert.ok(code.indexOf('---- 01-basis.js ----') >= 0 && code.indexOf('---- 01-basis.js ----') < code.indexOf('---- 12-start.js ----'), 'Teile in fester Reihenfolge');
+    assert.equal((await fetch(`${server.base}/css/app.css?v=${v}`)).headers.get('cache-control'), YEAR);
+    assert.notEqual((await fetch(`${server.base}/css/app.css`)).headers.get('cache-control'), YEAR, 'ohne Nummer: beim Server nachfragen');
+    assert.notEqual((await fetch(`${server.base}/js/api.js?v=alt`)).headers.get('cache-control'), YEAR, 'alte Nummer: nicht ein Jahr behalten');
+    for (const p of ['/', '/karriere.html', '/login', '/vertrag.html']) assert.match((await client(server.base).get(p)).text, new RegExp(`\\?v=${v}"`), p);
+  });
+
   it('404: eigene Seite für Menschen, schlichte Antwort für Programme', async () => {
     const page = await client(server.base).get('/gibt-es-nicht', { Accept: 'text/html' });
     assert.equal(page.status, 404);

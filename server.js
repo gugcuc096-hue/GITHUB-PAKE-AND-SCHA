@@ -169,11 +169,15 @@ const sitePages = require('./sitePages');
 app.get(['/', '/index.html', '/index'], sitePages.handler('index'));
 app.get(['/karriere', '/karriere.html'], sitePages.handler('karriere'));
 for (const page of ['login', 'register', 'bewerbung']) app.get([`/${page}`, `/${page}.html`], sitePages.previewHandler(`${page}.html`));
-app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
+// Übrige Seiten mit Versionsnummern für Skripte/CSS (dauerhaft im Browser), Dashboard-Teile als ein Bündel
+const assets = require('./assets');
+app.get('/js/dashboard.bundle.js', assets.bundle);
+app.use(assets.pages);
+app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'], setHeaders: assets.setHeaders }));
 // Unbekannte Adresse: eigene Seite im Kanzlei-Design (nur für Seitenaufrufe, die ausdrücklich text/html wollen; Bilder, Skripte, API bekommen nur 404)
 app.use((req, res) => {
   res.status(404);
-  if (req.method === 'GET' && /text\/html/.test(req.get('accept') || '')) return res.sendFile(path.join(__dirname, 'public', '404.html'));
+  if (req.method === 'GET' && /text\/html/.test(req.get('accept') || '')) return res.set('Cache-Control', 'no-cache').type('html').send(assets.page('404.html'));
   res.end();
 });
 

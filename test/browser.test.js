@@ -1888,6 +1888,163 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
     }
   });
 
+  it('Paket 3 am PC: Hinweis schon beim Tippen, Zahlen zählen hoch, Akte vorgeladen und aus der Zeile aufgeklappt', async () => {
+    const qsrv = await startServer();
+    const { ctx, page, problems, settle } = await open(DESKTOP);
+    try {
+      const adm = client(qsrv.base);
+      const me = await adm.login(TEAM.admin);
+      const kase = (await adm.post('/api/cases', { title: 'Vorlade-Akte', area: 'zivilrecht', clientName: 'Vera Vorlad', lawyerId: me.id })).json.case;
+      await login(page, TEAM.admin, qsrv.base);
+      // Zahlen zählen hoch: erst 0, dann der echte Wert – Format (Tausenderpunkt, „ $“) bleibt
+      const counted = await page.evaluate(async () => {
+        const box = document.createElement('div');
+        box.innerHTML = '<span data-count="test:betrag">1.234 $</span>';
+        document.body.appendChild(box);
+        window.PS.countUp(box);
+        const first = box.textContent;
+        await new Promise((r) => setTimeout(r, 1100));
+        box.remove();
+        return [first, box.textContent];
+      });
+      assert.deepEqual(counted, ['0 $', '1.234 $']);
+      assert.ok(await page.$('#content .kpi-value[data-count]'), 'Kennzahlen der Übersicht zählen hoch');
+
+      // Hinweis schon beim Tippen (ohne Absenden), weg sobald es passt; leeres Pflichtfeld erst beim Verlassen
+      await page.click('[data-action="new-case"]');
+      await page.waitForSelector('#ncTitle');
+      await page.type('#ncTitle', 'ab');
+      const err = page.locator('form[data-form="new-case"] .ps-field-error');
+      await err.waitFor({ timeout: 3000 });
+      assert.equal(await err.textContent(), 'Mindestens 3 Zeichen (aktuell 2).');
+      await page.type('#ncTitle', 'c');
+      assert.equal(await err.count(), 0, 'passt: Hinweis sofort weg');
+      await page.keyboard.press('Control+A');
+      await page.keyboard.press('Backspace');
+      await page.waitForTimeout(1000);
+      assert.equal(await err.count(), 0, 'leer beim Tippen: noch kein Hinweis');
+      await page.keyboard.press('Tab');
+      await err.waitFor();
+      assert.equal(await err.textContent(), 'Bitte ausfüllen.');
+      await page.click('.modal-close');
+      await page.waitForFunction(() => !document.querySelector('#modal').classList.contains('open'));
+
+      // Akte vorladen beim Drüberfahren, Klick lädt nicht noch einmal; das Fenster wächst aus der Zeile und zieht sich zurück
+      await page.evaluate(() => {
+        window.__morphs = [];
+        const animate = Element.prototype.animate;
+        Element.prototype.animate = function (frames, opts) {
+          if (this.classList.contains('modal-card')) window.__morphs.push(JSON.stringify(frames[0]));
+          return animate.call(this, frames, opts);
+        };
+        location.hash = '#cases';
+      });
+      const row = `#content [data-action="open-case"][data-id="${kase.id}"]`;
+      await page.waitForSelector(row);
+      await settle();
+      const loads = [];
+      page.on('request', (r) => r.method() === 'GET' && r.url().endsWith(`/api/cases/${kase.id}`) && loads.push(r.url()));
+      await page.hover(row);
+      await page.waitForTimeout(500);
+      assert.equal(loads.length, 1, 'beim Drüberfahren vorgeladen');
+      await page.click(row);
+      await page.waitForSelector('#modalBody .case-jump');
+      assert.equal(loads.length, 1, 'der Klick lädt die Akte nicht noch einmal');
+      const opened = await page.evaluate(() => window.__morphs.slice());
+      assert.equal(opened.length, 1, 'Fenster wächst aus der Zeile');
+      assert.match(opened[0], /inset\(/);
+      await page.click('.modal-close');
+      await page.waitForFunction(() => !document.querySelector('#modal').classList.contains('open'));
+      assert.equal(await page.evaluate(() => window.__morphs.length), 2, 'beim Schließen zurück in die Zeile');
+      assert.ok(await page.$('.modal-ghost.morph-out'), 'die ausblendende Kopie zieht sich zusammen');
+      // Bei „Bewegung reduzieren“: ohne Aufklappen
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await page.waitForTimeout(450);
+      await page.click(row);
+      await page.waitForSelector('#modalBody .case-jump');
+      assert.equal(await page.evaluate(() => window.__morphs.length), 2);
+      await page.click('.modal-close');
+      assert.deepEqual(problems, []);
+    } finally {
+      await ctx.close();
+      await qsrv.stop();
+    }
+  });
+
+  it('Rückgängig statt Nachfragen: Aufgabe sofort weg, „Rückgängig“ holt sie zurück, sonst gelöscht – auch beim Verlassen der Seite', async () => {
+    const dsrv = await startServer();
+    const { ctx, page, problems, settle } = await open(DESKTOP);
+    try {
+      const adm = client(dsrv.base);
+      await adm.login(TEAM.admin);
+      const t1 = (await adm.post('/api/tasks', { title: 'Rückgängig-Test eins' })).json.task;
+      const t2 = (await adm.post('/api/tasks', { title: 'Rückgängig-Test zwei' })).json.task;
+      const exists = async (id) => (await adm.get('/api/tasks?scope=all')).json.tasks.some((t) => t.id === id);
+      await login(page, TEAM.admin, dsrv.base);
+      await page.evaluate(() => (location.hash = '#tasks'));
+      const row = (id) => `#content .task-row:has([data-action="task-delete"][data-id="${id}"])`;
+      await page.waitForSelector(row(t1.id));
+      await settle();
+      await page.click(`${row(t1.id)} [data-action="task-delete"]`);
+      assert.equal(await page.isVisible(row(t1.id)), false, 'sofort ausgeblendet');
+      assert.equal(await page.$('.ps-dialog-root'), null, 'keine Nachfrage');
+      const undo = page.locator('.ps-toast-action', { hasText: 'Rückgängig' });
+      await undo.click();
+      assert.equal(await page.isVisible(row(t1.id)), true, 'Rückgängig: wieder da');
+      await page.waitForTimeout(6500);
+      assert.equal(await exists(t1.id), true, 'nicht gelöscht');
+      // Ohne Rückgängig: nach ein paar Sekunden wirklich gelöscht
+      await page.click(`${row(t1.id)} [data-action="task-delete"]`);
+      for (let i = 0; i < 40 && (await exists(t1.id)); i++) await page.waitForTimeout(250);
+      assert.equal(await exists(t1.id), false, 'nach Ablauf gelöscht');
+      // Seite verlassen, bevor die Zeit um ist: wird trotzdem gelöscht – spätestens beim nächsten Öffnen nachgeholt
+      await page.click(`${row(t2.id)} [data-action="task-delete"]`);
+      await page.goto(dsrv.base + '/');
+      await page.goto(dsrv.base + '/dashboard.html');
+      for (let i = 0; i < 20 && (await exists(t2.id)); i++) await new Promise((r) => setTimeout(r, 150));
+      assert.equal(await exists(t2.id), false, 'beim Verlassen gelöscht');
+      await page.waitForFunction(() => localStorage.getItem('ps.undoDeletes') === null); // nachgeholt bzw. erledigt
+      assert.deepEqual(problems, []);
+    } finally {
+      await ctx.close();
+      await dsrv.stop();
+    }
+  });
+
+  it('Vertrag: Unterschriften zeichnen sich beim Erscheinen, eine neue bekommt ein goldenes Siegel', async () => {
+    const vsrv = await startServer();
+    const { ctx, page, problems } = await open(DESKTOP);
+    try {
+      const adm = client(vsrv.base);
+      const me = await adm.login(TEAM.admin);
+      const mandant = client(vsrv.base);
+      assert.equal((await mandant.post('/api/auth/register', { displayName: 'Sina Siegel', email: 'sina.siegel', password: PASSWORD })).status, 201);
+      const kase = (await adm.post('/api/cases', { title: 'Siegel-Akte', area: 'zivilrecht', clientEmail: 'sina.siegel', lawyerId: me.id })).json.case;
+      const { templates } = (await adm.get('/api/contract-templates')).json;
+      const defaults = (await adm.get(`/api/cases/${kase.id}/contracts/defaults`)).json;
+      const k = (await adm.post(`/api/cases/${kase.id}/contracts`, { templateId: templates.find((t) => t.key === 'mandatsvertrag').id, lawyerId: me.id, data: { ...defaults.data, mandant: 'Sina Siegel' } })).json.contract;
+      assert.equal((await adm.post(`/api/contracts/${k.id}/sign`, { as: 'anwalt' })).status, 200);
+      await login(page, 'sina.siegel@pake-scha.ls', vsrv.base);
+      await page.goto(`${vsrv.base}/vertrag.html?id=${k.id}`);
+      await page.waitForSelector('#signClient');
+      const lawyerSig = page.locator('.k-script.lawyer').first();
+      await lawyerSig.scrollIntoViewIfNeeded();
+      await page.waitForFunction(() => document.querySelector('.k-script.lawyer').classList.contains('sig-draw'));
+      await page.fill('#signName', 'Sina Siegel');
+      await page.check('#agree');
+      await page.click('#signClient');
+      await page.waitForSelector('.sig-seal');
+      await page.waitForFunction(() => document.querySelector('.k-script.client').textContent.trim() === 'Sina Siegel');
+      await page.waitForFunction(() => document.querySelector('.k-script.client').classList.contains('sig-draw'));
+      assert.equal(await page.$$eval('.sig-seal', (s) => s.length), 1, 'Siegel nur an der neuen Unterschrift');
+      assert.equal(await page.$eval('.sig-seal', (s) => !!s.closest('.k-sign').querySelector('.k-script.client')), true);
+      assert.deepEqual(problems, []);
+    } finally {
+      await ctx.close();
+      await vsrv.stop();
+    }
+  });
+
   it('404: eigene Seite im Kanzlei-Design, am Handy ohne Überstand', async () => {
     for (const device of [DESKTOP, PHONE]) {
       const { ctx, page, problems } = await open(device);

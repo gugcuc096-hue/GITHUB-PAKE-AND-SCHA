@@ -33,11 +33,14 @@ const actions = {
     st.clientFilter = el.dataset.value;
     renderView();
   },
-  'client-note-delete': async (el) => {
-    if (!(await ask('Die Notiz wird aus der Mandantenkartei gelöscht.', { title: 'Notiz löschen?', confirmText: 'Löschen', danger: true }))) return;
-    await api.del(`/api/clients/notes/${el.dataset.id}`);
-    showClient(await api.get('/api/clients/' + encodeURIComponent(st.clientCard.key)));
-    toast('Notiz gelöscht.');
+  'client-note-delete': (el) => {
+    const key = st.clientCard.key;
+    undoDelete({
+      url: `/api/clients/notes/${el.dataset.id}`,
+      hide: `.client-note:has([data-action="client-note-delete"][data-id="${el.dataset.id}"])`,
+      label: 'Notiz',
+      after: async () => st.clientCard && st.clientCard.key === key && showClient(await api.get('/api/clients/' + encodeURIComponent(key))),
+    });
   },
 
   // Akten
@@ -52,7 +55,7 @@ const actions = {
   'new-case': newCaseModal,
   // Lange Listen: nächste Einträge (passiert beim Scrollen auch von selbst)
   'list-more': (el) => showMoreRows(el.dataset.id),
-  'open-case': (el) => openCase(Number(el.dataset.id)),
+  'open-case': (el) => openCaseFrom(el),
   // „Was ist zu tun?“: Akte öffnen und direkt zu den Nachrichten springen
   'open-case-chat': async (el) => {
     await openCase(Number(el.dataset.id));
@@ -216,11 +219,15 @@ const actions = {
     sec.scrollIntoView({ block: 'start', behavior: 'smooth' });
     $('#secNotes textarea[name="body"]')?.focus({ preventScroll: true });
   },
-  'delete-note': async (el) => {
-    if (!(await askDelete('Notiz löschen?', 'Die Notiz wird aus dem Verlauf der Akte entfernt.'))) return;
+  'delete-note': (el) => {
     const caseId = Number(el.dataset.caseId);
-    await api.del(`/api/cases/${caseId}/notes/${el.dataset.id}`);
-    await reloadCase(caseId);
+    const sel = `[data-action="delete-note"][data-id="${el.dataset.id}"]`;
+    undoDelete({
+      url: `/api/cases/${caseId}/notes/${el.dataset.id}`,
+      hide: `.tl-item:has(${sel}), .chat-msg:has(${sel})`,
+      label: el.closest('.chat-msg') ? 'Nachricht' : 'Notiz',
+      after: () => (st.modalCaseId === caseId ? reloadCase(caseId) : refreshBehind()),
+    });
   },
 
   // Kalender
@@ -242,10 +249,18 @@ const actions = {
     await returnOrClose();
   },
   'event-delete': async (el) => {
-    if (!(await askDelete('Eintrag löschen?', 'Der Termin bzw. die Frist wird endgültig aus dem Kalender gelöscht.'))) return;
-    await api.del('/api/calendar/' + el.dataset.id);
-    st.eventCache.delete(Number(el.dataset.id));
-    toast('Eintrag gelöscht.');
+    const id = Number(el.dataset.id);
+    const ev = st.eventCache.get(id);
+    undoDelete({
+      url: '/api/calendar/' + id,
+      hide: `[data-action="open-event"][data-id="${id}"]:not(.kpi)`,
+      label: ev && ev.type === 'frist' ? 'Frist' : 'Termin',
+      after: async () => {
+        st.eventCache.delete(id);
+        if (st.modalCaseId) await reloadCase(st.modalCaseId);
+        else await refreshBehind();
+      },
+    });
     await returnOrClose();
   },
   'cal-nav': (el) => {
@@ -1441,13 +1456,13 @@ const actions = {
     await Promise.all([load.lawyers(), load.cases()]);
     taskModal(t);
   },
-  'task-delete': async (el) => {
-    const t = findTask(Number(el.dataset.id));
-    if (!(await askDelete('Aufgabe löschen?', t ? `„${t.title}“ wird gelöscht.` : 'Die Aufgabe wird gelöscht.'))) return;
-    await api.del('/api/tasks/' + el.dataset.id);
-    toast('Aufgabe gelöscht.');
-    await afterTaskChange();
-  },
+  'task-delete': (el) =>
+    undoDelete({
+      url: '/api/tasks/' + el.dataset.id,
+      hide: `.task-row:has([data-action="task-delete"][data-id="${el.dataset.id}"])`,
+      label: 'Aufgabe',
+      after: afterTaskChange,
+    }),
   'task-checklist': async (el) => {
     const caseId = Number(el.dataset.caseId);
     const r = await api.post('/api/tasks/checklist', { caseId });

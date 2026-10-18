@@ -84,7 +84,7 @@ function handler(page) {
   return (req, res, next) => {
     try {
       res.set('Cache-Control', 'no-cache');
-      res.type('html').send(render(page, `${req.protocol}://${req.get('host')}`));
+      res.type('html').send(require('./assets').rewrite(render(page, `${req.protocol}://${req.get('host')}`)));
     } catch (err) {
       next(err);
     }
@@ -102,7 +102,7 @@ function previewHandler(file) {
       if (!previewRaw[file] || process.env.NODE_ENV !== 'production') previewRaw[file] = fs.readFileSync(path.join(__dirname, 'public', file), 'utf8');
       const origin = `${req.protocol}://${req.get('host')}`;
       res.set('Cache-Control', 'no-cache');
-      res.type('html').send(previewRaw[file].replace(/(content=")\/img\/og-image\.png"/g, `$1${origin}/img/og-image.png"`));
+      res.type('html').send(require('./assets').rewrite(previewRaw[file].replace(/(content=")\/img\/og-image\.png"/g, `$1${origin}/img/og-image.png"`)));
     } catch (err) {
       next(err);
     }

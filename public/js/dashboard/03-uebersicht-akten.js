@@ -49,7 +49,7 @@ function caseListRow(c, extra = '', cls = '') {
 function kpi(label, value, sub, ico, href) {
   return `<a href="${href}" class="panel kpi block">
       <div class="kpi-label">${icon(ico, 'ico-sm')}${esc(label)}</div>
-      <div class="kpi-value">${esc(value)}</div><div class="kpi-sub">${esc(sub)}</div></a>`;
+      <div class="kpi-value" data-count="kpi:${esc(label)}">${esc(value)}</div><div class="kpi-sub">${esc(sub)}</div></a>`;
 }
 function kpiEvent(label, e) {
   if (!e) {
@@ -638,11 +638,29 @@ function rememberCase(data) {
   st.caseTasks = data.tasks || [];
   st.caseInfo = data.case;
 }
+/*
+ * Akte vorladen: Fährt man mit der Maus über eine Akte (am Handy: beim Antippen), wird sie schon geladen – der Klick
+ * öffnet sie dann ohne Wartezeit. Vorgeladenes gilt 15 s und wird bei jeder Änderung (eigene oder live gemeldete) verworfen.
+ */
+const casePrefetch = new Map(); // id → { at, promise }
+const PREFETCH_MS = 15000;
+function prefetchCase(id) {
+  const hit = casePrefetch.get(id);
+  if (!id || (hit && Date.now() - hit.at < PREFETCH_MS)) return;
+  const promise = api.get('/api/cases/' + id);
+  promise.catch(() => casePrefetch.get(id)?.promise === promise && casePrefetch.delete(id));
+  casePrefetch.set(id, { at: Date.now(), promise });
+}
+function takePrefetchedCase(id) {
+  const hit = casePrefetch.get(id);
+  casePrefetch.delete(id);
+  return hit && Date.now() - hit.at < PREFETCH_MS ? hit.promise : null;
+}
 async function openCase(id) {
   // Dauert das Laden, öffnet sich die Akte sofort mit Platzhaltern
   const data = await withModalPlaceholder({ wide: true }, async () => {
     await load.lawyers();
-    return api.get('/api/cases/' + id);
+    return takePrefetchedCase(id) || api.get('/api/cases/' + id);
   });
   if (!data) return;
   // Erst öffnen (ein vorheriges Fenster wird samt seinem Zustand beiseitegelegt), dann die Akte merken

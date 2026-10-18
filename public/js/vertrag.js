@@ -26,6 +26,42 @@
     const refit = () => { fitSignatures(); if (document.fonts) document.fonts.ready.then(fitSignatures); };
     let resizeTimer;
     window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(fitSignatures, 150); });
+    /*
+     * Unterschriften „schreiben sich“: Beim ersten Erscheinen läuft jede Unterschrift von links nach rechts ins Feld,
+     * als würde sie gerade gezogen; eine eben geleistete Unterschrift bekommt dazu kurz ein goldenes Siegel.
+     * Nur Optik (im Ausdruck/Google Doc steht sie einfach da), nicht bei „Bewegung reduzieren“.
+     */
+    const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const shownSigs = new Set();
+    const sigKey = (el) => `${el.className}|${el.textContent.trim()}`;
+    const sigObserver = !calm && 'IntersectionObserver' in window
+        ? new IntersectionObserver((entries) => entries.forEach((e) => {
+            if (!e.isIntersecting) return;
+            sigObserver.unobserve(e.target);
+            e.target.querySelectorAll('.k-script.sig-wait').forEach((s) => s.classList.replace('sig-wait', 'sig-draw'));
+        }), { threshold: 0.5 })
+        : null;
+    /** before: Unterschriften vor dem Neuzeichnen – was neu dazukam, wurde gerade geleistet (Siegel). */
+    function animateSignatures(before) {
+        document.querySelectorAll('.k-script').forEach((el) => {
+            const key = sigKey(el);
+            if (!el.textContent.trim() || shownSigs.has(key)) return;
+            shownSigs.add(key);
+            if (!sigObserver) return;
+            el.classList.add('sig-wait');
+            // Das Feld selbst ist bis dahin weggeschnitten (clip-path) – beobachtet wird deshalb der Unterschriftsblock
+            sigObserver.observe(el.parentElement);
+            if (!before || before.has(key)) return;
+            el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            const seal = document.createElement('span');
+            seal.className = 'sig-seal';
+            seal.setAttribute('aria-hidden', 'true');
+            seal.textContent = '✓';
+            el.parentElement.appendChild(seal);
+            setTimeout(() => seal.remove(), 2800);
+        });
+    }
+    let drawnOnce = false;
     const dateTime = (v) => { const d = parseDate(v); return d ? d.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''; };
 
     function values(k, c) {
@@ -96,8 +132,11 @@
         document.title = `${k.templateName} ${c.caseNumber} | Pake & Scha`;
         document.getElementById('backLink').href = `/dashboard.html?case=${c.id}#cases`;
         root.className = '';
+        const before = drawnOnce ? new Set([...document.querySelectorAll('.k-script')].map(sigKey)) : null;
         root.innerHTML = sheets(render(k.body, values(k, c), k, { fivenetUrl: state.fivenetUrl }), header(state.header));
         refit();
+        animateSignatures(before);
+        drawnOnce = true;
         renderPanel();
         if (params.get('print') === '1') setTimeout(() => window.print(), 500);
     }
