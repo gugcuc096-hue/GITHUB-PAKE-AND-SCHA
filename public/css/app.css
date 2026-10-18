@@ -65,8 +65,11 @@ h1, h2, h3, .page-title, .panel-title, .modal-title, .section-title { text-wrap:
 .orb-1 { top: -15%; left: -10%; width: 60vw; height: 60vw; background: rgba(212, 175, 55, 0.22); }
 .orb-2 { bottom: -10%; right: -5%; width: 65vw; height: 65vw; background: rgba(30, 58, 138, 0.35); animation-delay: -7s; }
 @keyframes pulse-glow { 0% { transform: scale(1); opacity: 0.25; } 100% { transform: scale(1.12) translate(4%, 6%); opacity: 0.45; } }
+/* „Bewegung reduzieren“ (z. B. Windows: Animationseffekte aus): keine Bewegung, aber weiche Überblendungen bleiben –
+   siehe Ende der Datei. Hier nur, was sich dauerhaft bewegt. */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  html { scroll-behavior: auto !important; }
+  .glow-orb { animation: none !important; }
 }
 
 /* ---------------------------------------------------------------- Flächen */
@@ -1568,3 +1571,25 @@ input.field[aria-expanded="true"] { border-color: var(--gold-500); box-shadow: 0
 .dp-colon { color: var(--gold-500); font-weight: 700; }
 .dp-foot { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
 .dp-foot .btn-gold { margin-left: auto; }
+
+/* ================================================================
+   „Bewegung reduzieren“: Überblenden statt Bewegen
+   Wer im System die Animationseffekte ausgeschaltet hat (Windows tut das z. B. im Energiesparmodus oder bei
+   „Beste Leistung“), sieht trotzdem weiche Übergänge – nur ohne Gleiten, Vergrößern und Pulsieren.
+   Die Keyframes müssen nach den normalen stehen, damit sie diese ersetzen.
+   ================================================================ */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes view-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes modal-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes sheet-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes toast-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes nav-reveal { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes pop-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes dp-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes modal-out { to { opacity: 0; } }
+  @keyframes sheet-out { to { opacity: 0; } }
+  @keyframes toast-out { to { opacity: 0; } }
+  .skeleton, .cd-red { animation: none !important; } /* Schimmern und Pulsieren laufen endlos */
+  .btn-gold:hover, .btn-gold:active, .btn-outline:active, .btn-ghost:active, .btn-danger:active, .icon-btn:active { transform: none !important; }
+  .sidebar { transition: none !important; }
+}

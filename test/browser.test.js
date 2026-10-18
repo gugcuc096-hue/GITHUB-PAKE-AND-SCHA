@@ -989,6 +989,12 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await settle();
         await openMenu();
         assert.equal((await group('Verwaltung')).open, true, 'aktuelle Seite bleibt im Menü sichtbar');
+        // … und lässt sich trotzdem zu- und wieder aufklappen, während man auf der Seite ist
+        await page.click('#nav .nav-toggle[data-group="Verwaltung"]');
+        assert.equal((await group('Verwaltung')).open, false, 'zuklappen auf einer Seite der Gruppe');
+        await page.click('#nav .nav-toggle[data-group="Verwaltung"]');
+        assert.equal((await group('Verwaltung')).open, true, 'wieder aufklappen');
+        await page.click('#nav .nav-toggle[data-group="Verwaltung"]');
         await page.evaluate(() => (location.hash = '#overview'));
         await settle();
         await openMenu();
@@ -1784,7 +1790,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       }
     });
   }
-  it('Übergänge: Seitenblöcke gestaffelt, Fenster blendet weich aus, Menügruppe klappt weich auf, „Bewegung reduzieren“ schaltet ab', async () => {
+  it('Übergänge: Seitenblöcke gestaffelt, Fenster blendet weich aus, Menügruppe klappt weich auf, bei „Bewegung reduzieren“ nur Überblenden', async () => {
     const tsrv = await startServer();
     const { ctx, page, problems } = await open(DESKTOP);
     try {
@@ -1820,12 +1826,33 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.click(`[data-action="nav-group"][aria-expanded="false"]`);
         assert.ok(await page.$('.nav-group.nav-reveal'), 'aufgeklappte Gruppe blendet ein');
       }
-      // „Bewegung reduzieren“: keine Kopie, keine Bewegung
+      // „Bewegung reduzieren“ (z. B. Windows ohne Animationseffekte): weiter weich überblenden, aber ohne Bewegung
       await page.emulateMedia({ reducedMotion: 'reduce' });
+      const moves = (sel) =>
+        page.$$eval(sel, (els) =>
+          els.flatMap((e) => e.getAnimations()).map((a) => ({ name: a.animationName, moves: a.effect.getKeyframes().some((k) => k.transform && k.transform !== 'none'), fades: a.effect.getKeyframes().some((k) => k.opacity !== undefined) }))
+        );
+      await page.evaluate(() => (location.hash = '#tasks'));
+      await page.waitForSelector('#content.view-in .page-title');
+      const view = await moves('#content.view-in > *');
+      assert.ok(view.length && view.every((a) => a.name === 'view-in' && a.fades && !a.moves), `Seitenwechsel blendet nur über: ${JSON.stringify(view)}`);
       await page.evaluate(() => openModal(eventForm(null)));
       await page.waitForSelector('#modal.open #evStart');
+      const card = await moves('#modalCard');
+      assert.ok(card.length && card.every((a) => a.fades && !a.moves), `Fenster blendet nur ein: ${JSON.stringify(card)}`);
+      await page.evaluate(() => {
+        window.__ghostAnim = null;
+        new MutationObserver((list, obs) => {
+          for (const m of list) for (const g of m.addedNodes) if (g.classList && g.classList.contains('modal-ghost')) {
+            const a = g.querySelector('.modal-card').getAnimations()[0];
+            window.__ghostAnim = a ? { name: a.animationName, moves: a.effect.getKeyframes().some((k) => k.transform && k.transform !== 'none') } : 'keine';
+            obs.disconnect();
+          }
+        }).observe(document.body, { childList: true });
+      });
       await page.click('.modal-close');
-      assert.equal(await page.$('.modal-ghost'), null);
+      await page.waitForFunction(() => window.__ghostAnim);
+      assert.deepEqual(await page.evaluate(() => window.__ghostAnim), { name: 'modal-out', moves: false }, 'Schließen blendet nur aus');
       assert.deepEqual(problems, []);
     } finally {
       await ctx.close();
