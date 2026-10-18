@@ -1,7 +1,7 @@
 'use strict';
 /*
  * Öffentliche Anwalts-Profilseiten: /team/<name> – Foto, Rang, Beschreibung, Schwerpunkte, Erfolge,
- * Mandantenstimmen und „Mandat bei … anfragen“. Wird auf dem Server zusammengesetzt (views/anwalt.html), damit
+ * Mandantenstimmen und „Mandat anfragen“. Wird auf dem Server zusammengesetzt (views/anwalt.html), damit
  * Discord & Co. in der Link-Vorschau gleich Name, Rang und Foto zeigen.
  *
  * Zahlen nur, wo sie nichts über einzelne Mandate verraten: erst ab mehreren abgeschlossenen Akten bzw.
@@ -99,6 +99,8 @@ function render(member, facts, { origin, url }) {
     : `<div class="pf-photo pf-initials ${lead ? '' : 'slate'}" aria-hidden="true">${esc(member.initials || '?')}</div>`;
   const duty = member.duty ? `<p class="pf-duty"><span class="duty-dot s-${esc(member.duty)}"></span>${esc(DUTY_STATUS[member.duty] || '')}</p>` : '';
 
+  // Schwerpunkte: vom Board eingetragen, sonst die häufigsten Rechtsgebiete seiner Akten
+  const focus = member.focus.length ? member.focus : facts.focus;
   const tiles = [];
   if (facts.closed) tiles.push(['Abgeschlossene Mandate', num(facts.closed), '']);
   if (facts.successRate !== null) tiles.push(['Erfolgsquote', `${facts.successRate} %`, 'der Verfahren mit Ergebnis']);
@@ -108,8 +110,14 @@ function render(member, facts, { origin, url }) {
     tiles.length
       ? `<div class="pf-stats">${tiles.map(([l, v, s]) => `<div class="panel kpi"><div class="kpi-label">${esc(l)}</div><div class="kpi-value">${esc(v)}</div><div class="kpi-sub">${esc(s)}</div></div>`).join('')}</div>`
       : '',
-    facts.focus.length ? section('Schwerpunkte', `<div class="pf-chips">${facts.focus.map((f) => `<span class="pf-chip">${esc(f)}</span>`).join('')}</div>`) : '',
-    facts.wins.length ? section('Erfolge', `<ul class="pf-wins">${facts.wins.map(([label, n]) => `<li><b>${num(n)}×</b><span>${esc(label)}</span></li>`).join('')}</ul>`) : '',
+    focus.length ? section('Schwerpunkte', `<div class="pf-chips">${focus.map((f) => `<span class="pf-chip">${esc(f)}</span>`).join('')}</div>`) : '',
+    member.highlights.length || facts.wins.length
+      ? section(
+          'Erfolge',
+          (member.highlights.length ? `<ul class="pf-highlights">${member.highlights.map((h) => `<li>${esc(h)}</li>`).join('')}</ul>` : '') +
+            (facts.wins.length ? `<ul class="pf-wins">${facts.wins.map(([label, n]) => `<li><b>${num(n)}×</b><span>${esc(label)}</span></li>`).join('')}</ul>` : '')
+        )
+      : '',
     facts.reviews.length
       ? section(
           'Mandantenstimmen',
@@ -120,9 +128,8 @@ function render(member, facts, { origin, url }) {
       : '',
   ].join('');
 
-  const cta = member.bookable
-    ? `<a href="/?anwalt=${member.id}" class="btn-gold btn-md">Mandat bei mir anfragen</a>`
-    : '<a href="/?mandat=1" class="btn-gold btn-md">Mandat anfragen</a>';
+  // Mit Konto geht die Anfrage direkt an ihn (Wunschanwalt), sonst an die ganze Kanzlei
+  const cta = `<a href="${member.bookable ? `/?anwalt=${member.id}` : '/?mandat=1'}" class="btn-gold btn-md">Mandat anfragen</a>`;
   const summary = member.description || `${member.roleTitle} bei Pake & Scha Legal Consulting. Mandat direkt anfragen.`;
   const values = {
     title: esc(`${member.name} – ${member.roleTitle} | Pake & Scha`),
