@@ -7,7 +7,7 @@ const compression = require('compression');
 const cookieParser = require('cookie-parser');
 
 const { DB_PATH, PUBLIC_MEDIA_DIR } = require('./db');
-const { loadUser } = require('./auth');
+const { loadUser, requireAuth } = require('./auth');
 const { runBootstrap } = require('./bootstrap');
 const calendarRoutes = require('./routes/calendar');
 const dutyRoutes = require('./routes/duty');
@@ -90,6 +90,7 @@ app.use('/api', (req, res, next) => {
   next();
 });
 app.use('/api', live.middleware); // meldet erfolgreiche Änderungen an offene Dashboards
+app.post('/api/events/presence', requireAuth, live.presence); // wer hat die Akte gerade offen, wer tippt
 
 /* ---------------------------------------------------------------- API */
 app.get('/api/health', (req, res) => res.json({ ok: true }));
@@ -169,6 +170,9 @@ const sitePages = require('./sitePages');
 app.get(['/', '/index.html', '/index'], sitePages.handler('index'));
 app.get(['/karriere', '/karriere.html'], sitePages.handler('karriere'));
 for (const page of ['login', 'register', 'bewerbung']) app.get([`/${page}`, `/${page}.html`], sitePages.previewHandler(`${page}.html`));
+// Öffentliche Anwalts-Profile (/team/<name>) mit Link-Vorschau; /team allein führt zum Team auf der Startseite
+app.get('/team', (req, res) => res.redirect(302, '/#team'));
+app.get('/team/:slug', require('./profiles').handler);
 // Übrige Seiten mit Versionsnummern für Skripte/CSS (dauerhaft im Browser), Dashboard-Teile als ein Bündel
 const assets = require('./assets');
 app.get('/js/dashboard.bundle.js', assets.bundle);

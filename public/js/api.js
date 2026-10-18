@@ -675,5 +675,66 @@
     });
   }
 
+  /*
+   * Gold-Spotlight: Über Karten (Startseite, Karriere) und Kacheln (Dashboard) folgt ein weiches Licht der Maus,
+   * der goldene Rand leuchtet in ihrer Nähe auf. Nur mit Maus; Karten mit Formularfeldern bleiben ruhig.
+   * Dazu der einmalige Goldschimmer über großen Überschriften (.gold-shine) – gedämpft ohne Bewegung (calm.css).
+   */
+  const FX_CSS = `.ps-spot-rel{position:relative}.ps-spot{isolation:isolate}
+.ps-spot::after,.ps-spot::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .35s ease}
+.ps-spot::after{z-index:-1;background:radial-gradient(420px circle at var(--mx,50%) var(--my,50%),rgba(212,175,55,.11),transparent 62%)}
+.ps-spot::before{padding:1px;background:radial-gradient(260px circle at var(--mx,50%) var(--my,50%),rgba(240,208,110,.95),rgba(212,175,55,.25) 45%,transparent 72%);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+.ps-spot.ps-spot-on::after,.ps-spot.ps-spot-on::before{opacity:1}
+.gold-shine{background:linear-gradient(110deg,var(--gold-500,#d4af37) 0 41%,#fff7d6 50%,var(--gold-500,#d4af37) 59% 100%) 0 0/250% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;padding:0 .14em;margin:0 -.14em;-webkit-box-decoration-break:clone;box-decoration-break:clone;animation:ps-shine 2.2s ease-in-out .5s both}
+@keyframes ps-shine{from{background-position:100% 0}to{background-position:0 0}}`;
+  const fxStyle = document.createElement('style');
+  fxStyle.id = 'psFxCss';
+  fxStyle.textContent = FX_CSS;
+  document.head.appendChild(fxStyle);
+
+  const SPOT_SEL = '.glass-card, .kpi';
+  const spotOk = new WeakMap();
+  let spotEl = null;
+  let spotXY = null;
+  let spotRaf = 0;
+  function spotTarget(t) {
+    const el = t && t.closest ? t.closest(SPOT_SEL) : null;
+    if (!el) return null;
+    if (!spotOk.has(el)) spotOk.set(el, !el.querySelector('input, textarea, select'));
+    return spotOk.get(el) ? el : null;
+  }
+  function spotOff() {
+    if (spotEl) spotEl.classList.remove('ps-spot-on');
+    spotEl = null;
+  }
+  document.addEventListener(
+    'pointermove',
+    (e) => {
+      if (e.pointerType !== 'mouse') return;
+      const el = spotTarget(e.target);
+      if (el !== spotEl) {
+        spotOff();
+        if (!el) return;
+        if (!el.classList.contains('ps-spot')) {
+          if (getComputedStyle(el).position === 'static') el.classList.add('ps-spot-rel');
+          el.classList.add('ps-spot');
+        }
+        spotEl = el;
+      }
+      spotXY = [e.clientX, e.clientY];
+      if (spotRaf) return;
+      spotRaf = requestAnimationFrame(() => {
+        spotRaf = 0;
+        if (!spotEl || !spotEl.isConnected) return spotOff();
+        const r = spotEl.getBoundingClientRect();
+        spotEl.style.setProperty('--mx', `${Math.round(spotXY[0] - r.left)}px`);
+        spotEl.style.setProperty('--my', `${Math.round(spotXY[1] - r.top)}px`);
+        spotEl.classList.add('ps-spot-on');
+      });
+    },
+    { passive: true }
+  );
+  document.documentElement.addEventListener('mouseleave', spotOff);
+
   window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog, closeToDashboard, drafts, applications, tab, fieldError, fieldErrors, clearFieldErrors, countUp, motion };
 })();

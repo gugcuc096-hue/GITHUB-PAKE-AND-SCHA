@@ -5,13 +5,15 @@
  * Geschickt wird nur, DASS sich etwas geändert hat – nie Inhalte:
  *   { k: 'case', id, chat }  Akte geändert (chat = nur Nachrichten/Gelesen) – nur an Personen, die die Akte sehen dürfen
  *   { k: 'area', a }         Bereich geändert (Aufgaben, Kalender, Post …) – nur an die Kanzlei
+ *   { k: 'presence', id, users }  wer aus der Kanzlei die Akte gerade offen hat – nur an die Kanzlei in dieser Akte
+ *   { k: 'typing', id, name }     jemand schreibt im Akten-Chat – an alle anderen, die die Akte gerade offen haben
  * Das Dashboard lädt daraufhin über die normale API nach; dort gelten die üblichen Rechte.
  * Der Tab, der die Änderung selbst gemacht hat (Kopfzeile X-PS-Tab), bekommt sie nicht noch einmal.
  */
 const { db } = require('./db');
 const { isStaff } = require('./auth');
 
-const clients = new Set(); // { res, userId, tab }
+const clients = new Set(); // { res, userId, tab, caseId }
 const HEARTBEAT_MS = 25000; // hält die Verbindung durch Proxys (Render) offen
 
 function handler(req, res) {
@@ -26,6 +28,7 @@ function handler(req, res) {
   req.on('close', () => {
     clearInterval(beat);
     clients.delete(client);
+    if (client.caseId) presenceChanged(client.caseId);
   });
 }
 
@@ -105,6 +108,69 @@ function middleware(req, res, next) {
   next();
 }
 
+/*
+ * „Wer ist gerade hier?“ – je Tab merkt sich der Server nur im Speicher, welche Akte offen ist (POST /api/events/presence).
+ * Die Angabe hängt an der Live-Verbindung: schließt der Tab, ist sie weg. Gezeigt werden nur Kolleginnen und Kollegen
+ * der Kanzlei (nie Mandanten); „tippt gerade“ sehen alle anderen in derselben Akte – Mandanten nur „Die Kanzlei“.
+ */
+function write(cl, event) {
+  try {
+    cl.res.write(`data: ${JSON.stringify(event)}\n\n`);
+  } catch {
+    clients.delete(cl);
+  }
+}
+
+/** Wer aus der Kanzlei die Akte gerade offen hat (jede Person einmal, auch mit mehreren Tabs). */
+function presentStaff(caseId) {
+  const { userAvatarUrl } = require('./auth');
+  const seen = new Map();
+  for (const cl of clients) {
+    if (cl.caseId !== caseId || seen.has(cl.userId)) continue;
+    const u = userById(cl.userId);
+    if (u && isStaff(u)) seen.set(u.id, { id: u.id, name: u.display_name, avatarUrl: userAvatarUrl(u) || null });
+  }
+  return [...seen.values()];
+}
+
+function presenceChanged(caseId) {
+  const users = presentStaff(caseId);
+  const staff = new Map();
+  for (const cl of clients) {
+    if (cl.caseId !== caseId) continue;
+    if (!staff.has(cl.userId)) staff.set(cl.userId, isStaff(userById(cl.userId)));
+    if (staff.get(cl.userId)) write(cl, { k: 'presence', id: caseId, users });
+  }
+}
+
+function presence(req, res) {
+  const { getCase, caseAccess } = require('./models');
+  const tab = String(req.get('x-ps-tab') || '').slice(0, 40);
+  const caseId = Number(req.body?.caseId) || null;
+  let c = null;
+  if (caseId) {
+    c = getCase(caseId);
+    if (!c || !caseAccess(c, req.user).canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
+  }
+  const mine = [...clients].filter((cl) => cl.userId === req.user.id && cl.tab === tab);
+  // Ohne Live-Verbindung gibt es nichts zu merken (sie meldet sich nach dem Verbinden erneut)
+  if (!mine.length) return res.json({ ok: false, users: [] });
+  const before = new Set(mine.map((cl) => cl.caseId || null));
+  mine.forEach((cl) => (cl.caseId = caseId));
+  for (const id of before) if (id && id !== caseId) presenceChanged(id);
+  if (caseId && !before.has(caseId)) presenceChanged(caseId);
+  if (caseId && req.body?.typing) {
+    const staffTyping = isStaff(req.user);
+    for (const cl of clients) {
+      if (cl.caseId !== caseId || cl.userId === req.user.id) continue;
+      const u = userById(cl.userId);
+      if (!u || !caseAccess(c, u).canView) continue;
+      write(cl, { k: 'typing', id: caseId, name: staffTyping && !isStaff(u) ? 'Die Kanzlei' : req.user.display_name });
+    }
+  }
+  res.json({ ok: true, users: caseId && isStaff(req.user) ? presentStaff(caseId) : [] });
+}
+
 const count = () => clients.size;
 
-module.exports = { handler, middleware, caseChanged, areaChanged, count };
+module.exports = { handler, middleware, presence, caseChanged, areaChanged, count };

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#d4af37">
+    <link rel="icon" href="/favicon.ico?v=4" sizes="48x48">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=4">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=4">
+    <title>{{title}}</title>
+    <meta name="description" content="{{description}}">
+    <link rel="canonical" href="{{url}}">
+    <!-- Link-Vorschau (Discord, WhatsApp …): Name, Rang und Foto des Anwalts; Goldton über theme-color -->
+    <meta property="og:type" content="profile">
+    <meta property="og:site_name" content="Pake & Scha Legal Consulting">
+    <meta property="og:title" content="{{ogTitle}}">
+    <meta property="og:description" content="{{description}}">
+    <meta property="og:url" content="{{url}}">
+    <meta property="og:image" content="{{image}}">
+    <meta property="og:image:alt" content="{{imageAlt}}">
+    <meta name="twitter:card" content="{{card}}">
+    <link rel="preload" href="/fonts/cormorant-garamond-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="/css/fonts.css">
+    <link rel="stylesheet" href="/css/app.css">
+    <link rel="stylesheet" href="/css/tailwind.css">
+    <style>
+        .pf-main { min-height: 100vh; display: flex; justify-content: center; padding: 6.5rem 1rem 3rem; }
+        .pf-card { width: 100%; max-width: 780px; padding: 1.5rem; align-self: flex-start; }
+        @media (min-width: 640px) { .pf-card { padding: 2.75rem; } }
+        .pf-head { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 1.25rem; }
+        @media (min-width: 640px) { .pf-head { flex-direction: row; text-align: left; gap: 2rem; } }
+        .pf-photo { width: 136px; height: 136px; border-radius: 999px; object-fit: cover; flex: none; box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.18), 0 0 44px rgba(212, 175, 55, 0.28); }
+        .pf-initials { display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 3rem; font-weight: 700; background: linear-gradient(135deg, #d4af37, #8f7322); color: #02050e; }
+        .pf-initials.slate { background: linear-gradient(135deg, #475569, #1e293b); color: #fff; }
+        .pf-tier { display: inline-block; font-size: 0.62rem; letter-spacing: 0.22em; text-transform: uppercase; padding: 0.3rem 0.8rem; border-radius: 999px; color: var(--gold-light); border: 1px solid var(--gold-hairline); background: rgba(212, 175, 55, 0.08); }
+        .pf-tier.slate { color: #cbd5e1; border-color: #475569; background: rgba(30, 41, 59, 0.4); }
+        .pf-name { font-family: var(--font-display); font-size: clamp(2.3rem, 7vw, 3.2rem); font-weight: 600; line-height: 1.05; margin: 0.7rem 0 0.35rem; }
+        .pf-rank { font-size: 0.78rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold-500); margin: 0; }
+        .pf-duty { display: inline-flex; align-items: center; gap: 0.45rem; margin: 0.75rem 0 0; font-size: 0.8rem; color: var(--text-muted); }
+        .pf-desc { margin: 1.75rem 0 0; color: var(--text-muted); line-height: 1.75; font-size: 0.97rem; }
+        .pf-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.75rem; margin-top: 2rem; }
+        .pf-section { margin-top: 2rem; }
+        .pf-h { font-family: var(--font-body); font-size: 0.7rem; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-dim); margin: 0 0 0.8rem; }
+        .pf-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+        .pf-chip { padding: 0.45rem 1rem; border-radius: 999px; border: 1px solid var(--gold-hairline); background: rgba(212, 175, 55, 0.06); color: var(--gold-light); font-size: 0.87rem; }
+        .pf-wins { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.6rem; }
+        .pf-wins li { display: flex; align-items: baseline; gap: 0.7rem; padding: 0.7rem 1rem; border-radius: 14px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.025); font-size: 0.92rem; color: var(--text-muted); }
+        .pf-wins b { font-family: var(--font-display); font-size: 1.45rem; font-weight: 600; color: var(--gold-500); min-width: 2.4rem; }
+        .pf-reviews { display: grid; gap: 0.75rem; }
+        .pf-review { margin: 0; padding: 1rem 1.2rem; border-radius: 14px; border: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.03); }
+        .pf-stars { color: var(--gold-500); letter-spacing: 0.12em; font-size: 0.9rem; }
+        .pf-review blockquote { margin: 0.4rem 0; font-family: var(--font-display); font-style: italic; font-size: 1.15rem; line-height: 1.5; color: var(--text-main); }
+        .pf-review figcaption { font-size: 0.78rem; color: var(--text-dim); }
+        .pf-actions { margin-top: 2.5rem; display: flex; flex-wrap: wrap; gap: 0.75rem; }
+        @media (max-width: 479px) { .pf-actions > * { flex: 1 1 100%; } }
+    </style>
+    <link rel="stylesheet" href="/css/calm.css" media="(prefers-reduced-motion: reduce)" data-calm>
+</head>
+<!-- Öffentliches Profil eines Anwalts – Inhalte setzt profiles.js beim Ausliefern ein -->
+<body class="min-h-screen page-in">
+    <div class="ambient-bg"><div class="glow-orb orb-1"></div><div class="glow-orb orb-2"></div></div>
+
+    <nav class="subpage-nav">
+        <a href="/" class="flex items-center gap-3">
+            <img class="brand-logo" src="/img/logo.svg" width="24" height="44" alt="Pake &amp; Scha" decoding="async">
+            <span class="hidden sm:block"><span class="brand-name block">Pake &amp; Scha</span><span class="brand-sub block">Legal Consulting &amp; Advocacy</span></span>
+        </a>
+        <a href="/#team" class="btn-outline btn-md">Unser Team</a>
+    </nav>
+
+    <main class="pf-main">
+        <article class="glass-card card-gold pf-card">
+            <header class="pf-head">
+                {{portrait}}
+                <div>
+                    {{tier}}
+                    <h1 class="pf-name">{{name}}</h1>
+                    <p class="pf-rank">{{rank}}</p>
+                    {{duty}}
+                </div>
+            </header>
+            {{desc}}
+            {{blocks}}
+            <div class="pf-actions">
+                {{cta}}
+            </div>
+        </article>
+    </main>
+    <script src="/js/api.js"></script>
+</body>
+</html>
