@@ -1828,18 +1828,30 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       }
       // „Bewegung reduzieren“ (z. B. Windows ohne Animationseffekte): weiter weich überblenden, aber ohne Bewegung
       await page.emulateMedia({ reducedMotion: 'reduce' });
-      const moves = (sel) =>
-        page.$$eval(sel, (els) =>
-          els.flatMap((e) => e.getAnimations()).map((a) => ({ name: a.animationName, moves: a.effect.getKeyframes().some((k) => k.transform && k.transform !== 'none'), fades: a.effect.getKeyframes().some((k) => k.opacity !== undefined) }))
+      // Animationen beim Start festhalten (auf langsamen Rechnern sind sie beim Nachsehen sonst schon vorbei)
+      await page.evaluate(() => {
+        window.__anims = [];
+        document.addEventListener(
+          'animationstart',
+          (e) => {
+            const a = e.target.getAnimations().find((x) => x.animationName === e.animationName);
+            const kf = a ? a.effect.getKeyframes() : [];
+            window.__anims.push({ name: e.animationName, moves: kf.some((k) => k.transform && k.transform !== 'none'), fades: kf.some((k) => k.opacity !== undefined) });
+          },
+          true
         );
+      });
+      const started = async (name) => {
+        await page.waitForFunction((n) => window.__anims.some((a) => a.name === n), name);
+        return page.evaluate((n) => window.__anims.filter((a) => a.name === n), name);
+      };
       await page.evaluate(() => (location.hash = '#tasks'));
-      await page.waitForSelector('#content.view-in .page-title');
-      const view = await moves('#content.view-in > *');
-      assert.ok(view.length && view.every((a) => a.name === 'view-in' && a.fades && !a.moves), `Seitenwechsel blendet nur über: ${JSON.stringify(view)}`);
+      const view = await started('view-in');
+      assert.ok(view.every((a) => a.fades && !a.moves), `Seitenwechsel blendet nur über: ${JSON.stringify(view)}`);
       await page.evaluate(() => openModal(eventForm(null)));
+      const card = await started('modal-in');
+      assert.ok(card.every((a) => a.fades && !a.moves), `Fenster blendet nur ein: ${JSON.stringify(card)}`);
       await page.waitForSelector('#modal.open #evStart');
-      const card = await moves('#modalCard');
-      assert.ok(card.length && card.every((a) => a.fades && !a.moves), `Fenster blendet nur ein: ${JSON.stringify(card)}`);
       await page.evaluate(() => {
         window.__ghostAnim = null;
         new MutationObserver((list, obs) => {
