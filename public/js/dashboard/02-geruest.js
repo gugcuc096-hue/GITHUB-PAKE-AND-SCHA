@@ -716,12 +716,21 @@ async function go(view) {
       shown = null; // alter Stand passt nicht mehr – normal laden
     }
     if (shown !== null) {
+      // Hat die Person schon geklickt, gescrollt oder getippt, wird nicht mehr unter ihr neu gezeichnet
+      // (die frischen Daten stehen trotzdem bereit und erscheinen beim nächsten Zeichnen)
+      let touched = false;
+      const mark = () => (touched = true);
+      const EVENTS = ['pointerdown', 'keydown', 'wheel', 'touchstart'];
+      EVENTS.forEach((ev) => window.addEventListener(ev, mark, { capture: true, passive: true }));
       try {
         if (views[view].load) await views[view].load();
       } catch {
         return; // offline o. Ä.: der zuletzt geladene Stand bleibt stehen
+      } finally {
+        EVENTS.forEach((ev) => window.removeEventListener(ev, mark, { capture: true }));
       }
-      if (token !== st.navToken || views[view].render() === shown || liveBusy(content)) return;
+      seen.add(view);
+      if (touched || token !== st.navToken || views[view].render() === shown || liveBusy(content)) return;
       const y = window.scrollY;
       renderView();
       window.scrollTo(0, y);
