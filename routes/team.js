@@ -17,7 +17,7 @@ publicRouter.get('/', (req, res) => {
   const showDuty = getSetting('show_duty_public', '1') === '1';
   const rows = db.prepare(`${TEAM_SELECT} WHERE t.visible = 1 ${ORDER}`).all();
   const slugs = require('../profiles').slugMap(); // Adresse der Profilseite /team/<slug>
-  const lotm = require('../lawyerOfMonth').current(); // Anwalt des Monats: Lorbeer an der Karte
+  const lotm = require('../lawyerOfMonth').current(); // Anwalt des Monats: Abzeichen an der Karte
   res.json({
     team: rows.map((t) => {
       const row = teamRow(t);
