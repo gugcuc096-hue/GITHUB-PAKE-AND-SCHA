@@ -58,8 +58,10 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
     page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
     page.on('console', (m) => /Content Security Policy|Refused to (execute|load|apply)/.test(m.text()) && problems.push(`CSP: ${m.text()}`));
     let inflight = 0;
-    page.on('request', (r) => r.url().includes('/api/') && inflight++);
-    const done = (r) => r.url().includes('/api/') && inflight--;
+    // Die Live-Verbindung (/api/events) bleibt offen – sie zählt nicht als laufende Anfrage
+    const counted = (r) => r.url().includes('/api/') && !r.url().includes('/api/events');
+    page.on('request', (r) => counted(r) && inflight++);
+    const done = (r) => counted(r) && inflight--;
     page.on('requestfinished', done);
     page.on('requestfailed', done);
     const settle = async () => {
@@ -1828,52 +1830,58 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
     }
   });
   it('Fehler direkt am Feld: eigene Prüfung, Prüfung des Browsers und Antwort des Servers – PC und Handy', async () => {
-    // Handy: Registrierung – zu kurzes Passwort steht unter dem Passwort, vergebene Adresse unter der E-Mail
-    {
-      const { ctx, page, problems, settle } = await open(PHONE);
-      await page.goto(server.base + '/register.html');
-      await page.fill('#displayName', 'Max Feldtest');
-      await page.fill('#email', 'damat.lex');
-      await page.fill('#password', 'kurz');
-      await page.fill('#password2', 'kurz');
-      await page.click('#registerForm button[type=submit]');
-      const err = page.locator('#registerForm .ps-field-error');
-      await err.waitFor();
-      assert.equal(await err.count(), 1);
-      assert.match(await err.textContent(), /Mindestens 10 Zeichen \(aktuell 4\)/);
-      assert.equal(await page.evaluate(() => document.activeElement.id), 'password', 'Feld wird angesprungen');
-      assert.equal(await page.getAttribute('#password', 'aria-invalid'), 'true');
-      assert.equal(await page.evaluate(() => document.getElementById('password').nextElementSibling?.className.includes('ps-field-error') || document.getElementById('password').closest('div').nextElementSibling?.className.includes('ps-field-error')), true, 'Hinweis direkt am Passwortfeld');
-      assert.equal(await overflow(page), 0);
-      await page.fill('#password', 'langesPasswort1');
-      assert.equal(await err.count(), 0, 'Tippen entfernt den Hinweis');
-      await page.fill('#password2', 'langesPasswort1');
-      await page.click('#registerForm button[type=submit]');
-      await err.waitFor();
-      await settle();
-      assert.match(await err.textContent(), /bereits registriert/);
-      assert.equal(await page.evaluate(() => document.querySelector('.email-group').nextElementSibling.classList.contains('ps-field-error')), true, 'unter der Gruppe mit @pake-scha.ls');
-      assert.equal(await page.textContent('#formError'), '', 'keine doppelte Meldung');
-      assert.deepEqual(problems, []);
-      await ctx.close();
-    }
-    // PC: Dashboard-Formular mit Prüfung des Browsers (Pflichtfeld + Mindestlänge) – keine graue Sprechblase
-    {
-      const { ctx, page, problems, settle } = await open(DESKTOP);
-      await login(page, TEAM.anwalt);
-      await page.click('[data-action="new-case"]');
-      await page.waitForSelector('form[data-form="new-case"]');
-      await page.fill('#ncTitle', 'ab');
-      await page.click('form[data-form="new-case"] button[type=submit]');
-      const err = page.locator('form[data-form="new-case"] .ps-field-error');
-      await err.waitFor();
-      assert.equal(await err.textContent(), 'Mindestens 3 Zeichen (aktuell 2).');
-      assert.equal(await page.evaluate(() => document.activeElement.id), 'ncTitle');
-      await page.fill('#ncTitle', 'Feldtest Akte');
-      assert.equal(await err.count(), 0);
-      await settle();
-      assert.deepEqual(problems, []);
-      await ctx.close();
+    // eigener Server: der gemeinsame erlaubt nur 20 Anmeldungen je 15 Minuten
+    const fsrv = await startServer();
+    try {
+      // Handy: Registrierung – zu kurzes Passwort steht unter dem Passwort, vergebene Adresse unter der E-Mail
+      {
+        const { ctx, page, problems, settle } = await open(PHONE);
+        await page.goto(fsrv.base + '/register.html');
+        await page.fill('#displayName', 'Max Feldtest');
+        await page.fill('#email', 'damat.lex');
+        await page.fill('#password', 'kurz');
+        await page.fill('#password2', 'kurz');
+        await page.click('#registerForm button[type=submit]');
+        const err = page.locator('#registerForm .ps-field-error');
+        await err.waitFor();
+        assert.equal(await err.count(), 1);
+        assert.match(await err.textContent(), /Mindestens 10 Zeichen \(aktuell 4\)/);
+        assert.equal(await page.evaluate(() => document.activeElement.id), 'password', 'Feld wird angesprungen');
+        assert.equal(await page.getAttribute('#password', 'aria-invalid'), 'true');
+        assert.equal(await page.evaluate(() => document.getElementById('password').nextElementSibling?.className.includes('ps-field-error') || document.getElementById('password').closest('div').nextElementSibling?.className.includes('ps-field-error')), true, 'Hinweis direkt am Passwortfeld');
+        assert.equal(await overflow(page), 0);
+        await page.fill('#password', 'langesPasswort1');
+        assert.equal(await err.count(), 0, 'Tippen entfernt den Hinweis');
+        await page.fill('#password2', 'langesPasswort1');
+        await page.click('#registerForm button[type=submit]');
+        await err.waitFor();
+        await settle();
+        assert.match(await err.textContent(), /bereits registriert/);
+        assert.equal(await page.evaluate(() => document.querySelector('.email-group').nextElementSibling.classList.contains('ps-field-error')), true, 'unter der Gruppe mit @pake-scha.ls');
+        assert.equal(await page.textContent('#formError'), '', 'keine doppelte Meldung');
+        assert.deepEqual(problems, []);
+        await ctx.close();
+      }
+      // PC: Dashboard-Formular mit Prüfung des Browsers (Pflichtfeld + Mindestlänge) – keine graue Sprechblase
+      {
+        const { ctx, page, problems, settle } = await open(DESKTOP);
+        await login(page, TEAM.anwalt, fsrv.base);
+        await page.click('[data-action="new-case"]');
+        await page.waitForSelector('form[data-form="new-case"]');
+        await page.fill('#ncTitle', 'ab');
+        await page.click('form[data-form="new-case"] button[type=submit]');
+        const err = page.locator('form[data-form="new-case"] .ps-field-error');
+        await err.waitFor();
+        assert.equal(await err.textContent(), 'Mindestens 3 Zeichen (aktuell 2).');
+        assert.equal(await page.evaluate(() => document.activeElement.id), 'ncTitle');
+        await page.fill('#ncTitle', 'Feldtest Akte');
+        assert.equal(await err.count(), 0);
+        await settle();
+        assert.deepEqual(problems, []);
+        await ctx.close();
+      }
+    } finally {
+      await fsrv.stop();
     }
   });
 
