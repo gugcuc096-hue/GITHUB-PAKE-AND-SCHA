@@ -433,6 +433,10 @@
     }
   }
   let feSeq = 0;
+  // Wert beim Markieren: der Hinweis verschwindet erst, wenn sich der Wert wirklich ändert (manche Browser
+  // melden beim Verlassen des Feldes ein „change“ ohne neue Eingabe – das darf den Hinweis nicht gleich löschen)
+  const feVals = new WeakMap();
+  const feValue = (el) => (el.type === 'checkbox' || el.type === 'radio' ? String(el.checked) : el.value);
   /** Markiert ein Feld mit Hinweis. focus: Feld anspringen (beim ersten Fehler eines Formulars). */
   function fieldError(el, message, { focus = true } = {}) {
     if (!el || !el.isConnected) return;
@@ -447,6 +451,7 @@
     el.setAttribute('aria-invalid', 'true');
     el.setAttribute('aria-describedby', [el.getAttribute('aria-describedby'), p.id].filter(Boolean).join(' '));
     el.dataset.psErr = p.id;
+    feVals.set(el, feValue(el));
     if (focus) {
       el.focus({ preventScroll: true });
       el.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
@@ -502,7 +507,8 @@
   // Ändern = Hinweis weg (auch für die ganze Gruppe gleichnamiger Auswahlknöpfe)
   const feOnEdit = (e) => {
     const el = e.target;
-    if (!el || !el.form) return feClear(el);
+    if (!el || !el.classList || (el.classList.contains('ps-invalid') && feVals.get(el) === feValue(el))) return;
+    if (!el.form) return feClear(el);
     if (el.type === 'radio' && el.name) [...el.form.querySelectorAll(`input[type="radio"]`)].filter((r) => r.name === el.name).forEach(feClear);
     else feClear(el);
   };

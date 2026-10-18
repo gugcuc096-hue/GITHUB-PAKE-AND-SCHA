@@ -1874,6 +1874,9 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await err.waitFor();
         assert.equal(await err.textContent(), 'Mindestens 3 Zeichen (aktuell 2).');
         assert.equal(await page.evaluate(() => document.activeElement.id), 'ncTitle');
+        // „change“ beim Verlassen des Feldes ohne neue Eingabe (z. B. Safari) lässt den Hinweis stehen
+        await page.evaluate(() => document.getElementById('ncTitle').dispatchEvent(new Event('change', { bubbles: true })));
+        assert.equal(await err.count(), 1, 'Hinweis bleibt ohne neue Eingabe');
         await page.fill('#ncTitle', 'Feldtest Akte');
         assert.equal(await err.count(), 0);
         await settle();
