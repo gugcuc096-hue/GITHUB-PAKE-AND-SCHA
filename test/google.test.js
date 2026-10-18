@@ -186,19 +186,22 @@ describe('Google Docs', () => {
 
   it('Unterschrift im Mandatsvertrag erscheint automatisch im Google Doc', async () => {
     const id = data.contractFile;
-    assert.doesNotMatch(docxText(docx(id, 1)), /digital unterschrieben am/);
+    assert.match(docxText(docx(id, 1)), /Unterschrift Anwalt/);
     const sign = await as.admin.post(`/api/contracts/${data.contractId}/sign`, { as: 'anwalt' });
     assert.equal(sign.status, 200, sign.text);
     const f = await waitForVersion(id, 2);
     assert.equal(f.version, 2);
-    assert.match(docxText(docx(id, 2)), /digital unterschrieben am \d\d\.\d\d\.\d{4}, \d\d:\d\d/);
+    // Nur die Unterschrift – keine Zeile „… unterschrieben am …“ darunter
+    const t2 = docxText(docx(id, 2));
+    assert.doesNotMatch(t2, /Unterschrift Anwalt|unterschrieben am/);
     // Mandant unterschreibt im Portal
     const m = await as.mandant.post(`/api/contracts/${data.contractId}/sign`, { as: 'mandant', name: 'Greta Google' });
     assert.equal(m.status, 200, m.text);
     const f3 = await waitForVersion(id, 3);
     assert.equal(f3.version, 3);
     const text = docxText(docx(id, 3));
-    assert.equal((text.match(/digital unterschrieben am/g) || []).length, 2, 'Anwalt und Mandant');
+    assert.doesNotMatch(text, /Unterschrift Mandant|Unterschrift Anwalt|unterschrieben am|im Spiel unterschrieben/, 'Anwalt und Mandant: nur die Unterschriften');
+    assert.match(text, /Greta Google/);
   });
 
   it('neue Rechnungen und Schriftsätze bekommen sofort ein Google Doc', async () => {

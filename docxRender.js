@@ -505,11 +505,6 @@ function fitScript(text, basePt, avgEm, widthPt) {
 function signatureBlock(values, sig, who, W) {
   const v = (key) => String(values[key] ?? '').trim();
   const clientSigned = sig && sig.clientSignature;
-  const clientNote = clientSigned
-    ? sig.clientSignedVia === 'kanzlei'
-      ? `im Spiel unterschrieben · erfasst am ${dateTime(sig.clientSignedAt)}${sig.clientRecordedByName ? ' von ' + sig.clientRecordedByName : ''}`
-      : `digital unterschrieben am ${dateTime(sig.clientSignedAt)}`
-    : '';
   const lawyers = [{ name: v('anwalt'), rank: v('anwalt_rang'), signature: sig && sig.lawyerSignature, signedAt: sig && sig.lawyerSignedAt }, ...coLawyersOf(sig)];
   const gap = mm(16);
   const colW = Math.round((W - gap) / 2);
@@ -527,7 +522,8 @@ function signatureBlock(values, sig, who, W) {
       }),
       para(o.name, { font: 'Roboto Serif', size: 10.5, bold: true, color: K_INK, border: { top: { style: D.BorderStyle.SINGLE, size: 6, color: '333333', space: 6 } }, keepNext: true }),
       para(o.role, { font: 'Roboto Serif', size: 9, color: K_MUTED, keepNext: true }),
-      para(o.note, { font: 'Inter', size: 8, color: '888888', before: 1.5 / 0.3528 }),
+      // Unterschrieben: nur die Unterschrift; leere Felder behalten ihre Beschriftung
+      ...(o.note ? [para(o.note, { font: 'Inter', size: 8, color: '888888', before: 1.5 / 0.3528 })] : []),
     ];
   };
   const lawyerBlocks = lawyers.flatMap((l, i) =>
@@ -537,7 +533,7 @@ function signatureBlock(values, sig, who, W) {
         signature: l.signature,
         name: l.name || 'Anwalt',
         role: `${l.rank ? l.rank + ', ' : ''}Pake & Scha Legal Consulting`,
-        note: l.signature ? `digital unterschrieben am ${dateTime(l.signedAt)}` : 'Unterschrift Anwalt',
+        note: l.signature ? '' : 'Unterschrift Anwalt',
       },
       i === 0
     )
@@ -548,7 +544,7 @@ function signatureBlock(values, sig, who, W) {
       signature: clientSigned ? sig.clientSignature : '',
       name: v('mandant') || 'Mandant',
       role: who === 'client' ? 'Vollmachtgeber / Mandant' : 'Mandant',
-      note: clientNote || 'Unterschrift Mandant',
+      note: clientSigned ? '' : 'Unterschrift Mandant',
     },
     true
   );

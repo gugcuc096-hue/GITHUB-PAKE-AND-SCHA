@@ -62,15 +62,8 @@
 
   function signatures(values, sig, who = 'both') {
     const clientSigned = sig && sig.clientSignature;
-    const when = (v) => {
-      const d = window.PS.parseDate(v);
-      return d ? d.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
-    };
-    const clientNote = clientSigned
-      ? sig.clientSignedVia === 'kanzlei'
-        ? `im Spiel unterschrieben · erfasst am ${esc(when(sig.clientSignedAt))}${sig.clientRecordedByName ? ' von ' + esc(sig.clientRecordedByName) : ''}`
-        : `digital unterschrieben am ${esc(when(sig.clientSignedAt))}`
-      : '';
+    // Unterschrieben: nur die Unterschrift – kein „digital unterschrieben am …“ / „im Spiel unterschrieben …“ darunter.
+    // Leere Felder behalten ihre Beschriftung („Unterschrift Mandant“).
     const v = (k) => String(values[k] ?? '').trim();
     // Alle Anwälte links untereinander (der erste oben), der Mandant rechts
     const lawyers = [
@@ -82,14 +75,14 @@
           <div class="k-line"></div>
           <div class="k-sname">${l.name ? esc(l.name) : 'Anwalt'}</div>
           <div class="k-srole">${l.rank ? esc(l.rank) + ', ' : ''}Pake &amp; Scha Legal Consulting</div>
-          <div class="k-snote">${l.signature ? `digital unterschrieben am ${esc(when(l.signedAt))}` : 'Unterschrift Anwalt'}</div>
+          ${l.signature ? '' : '<div class="k-snote">Unterschrift Anwalt</div>'}
         </div>`;
     const clientBlock = `<div class="k-sign">
           <div class="k-script client">${clientSigned ? esc(sig.clientSignature) : ''}</div>
           <div class="k-line"></div>
           <div class="k-sname">${v('mandant') ? esc(v('mandant')) : 'Mandant'}</div>
           <div class="k-srole">${who === 'client' ? 'Vollmachtgeber / Mandant' : 'Mandant'}</div>
-          <div class="k-snote">${clientNote || 'Unterschrift Mandant'}</div>
+          ${clientSigned ? '' : '<div class="k-snote">Unterschrift Mandant</div>'}
         </div>`;
     const place = `${v('ort') ? esc(v('ort')) : '<span class="k-blank"></span>'}`;
     const date = `${v('datum') ? esc(v('datum')) : '<span class="k-blank"></span>'}`;
