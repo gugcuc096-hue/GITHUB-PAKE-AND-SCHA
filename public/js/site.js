@@ -142,9 +142,6 @@
   })();
 
   /* ---------------------------------------------------------------- Team (live aus dem Dashboard) */
-  // Lorbeerzweig für den „Anwalt des Monats“ (wie auf der Profilseite, profiles.js)
-  const LAUREL =
-    '<svg class="lotm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 20c-2.5-2.5-3.5-6-2.5-10M17 20c2.5-2.5 3.5-6 2.5-10"/><path d="M5.2 15.5c-1.6-.2-2.6-1.2-3-2.6 1.5-.2 2.6.4 3.3 1.4M4.6 11.6c-1.4-.6-2.1-1.8-2.1-3.2 1.4.2 2.4 1 2.8 2.2M18.8 15.5c1.6-.2 2.6-1.2 3-2.6-1.5-.2-2.6.4-3.3 1.4M19.4 11.6c1.4-.6 2.1-1.8 2.1-3.2-1.4.2-2.4 1-2.8 2.2"/><path d="M12 6.5l1.2 2.4 2.6.4-1.9 1.8.5 2.6L12 12.5l-2.4 1.2.5-2.6-1.9-1.8 2.6-.4z" fill="currentColor" stroke="none"/></svg>';
   function renderTeam(team) {
     const grid = document.getElementById('teamGrid');
     if (!grid) return;
@@ -160,7 +157,7 @@
           ? `<img src="${esc(m.photoUrl)}" alt="${esc(m.name)}" loading="lazy" class="w-24 h-24 rounded-full object-cover ring-4 ring-[rgba(212,175,55,0.18)] ${lead ? 'shadow-[0_0_40px_rgba(212,175,55,0.35)]' : ''}">`
           : `<div class="w-24 h-24 rounded-full ${lead ? 'bg-gradient-to-br from-[#d4af37] to-[#8f7322] text-[#02050e] shadow-[0_0_40px_rgba(212,175,55,0.35)]' : 'bg-gradient-to-br from-slate-600 to-slate-800 text-white'} flex items-center justify-center font-serif text-3xl font-bold ring-4 ring-[rgba(212,175,55,0.12)]">${esc(m.initials)}</div>`;
         const lotm = m.lawyerOfMonth
-          ? `<div class="lotm-badge lotm-on-card" title="Für herausragende Arbeit im ${esc(m.lawyerOfMonth)}">${LAUREL}Anwalt des Monats</div>`
+          ? `<div class="lotm-badge lotm-on-card" title="Für herausragende Arbeit im ${esc(m.lawyerOfMonth)}">Anwalt des Monats</div>`
           : '';
         return `
         <article class="glass-card team-card p-7 text-center flex flex-col${m.lawyerOfMonth ? ' is-lotm' : ''}">${lotm}

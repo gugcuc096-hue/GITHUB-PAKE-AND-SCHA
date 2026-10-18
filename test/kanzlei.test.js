@@ -122,7 +122,7 @@ describe('Board-Beschlüsse', () => {
 });
 
 describe('Anwalt des Monats', () => {
-  it('vom Board gewählt: Lorbeer auf der Teamkarte und der Profilseite', async () => {
+  it('vom Board gewählt: Abzeichen auf der Teamkarte und der Profilseite (ohne Symbol)', async () => {
     const team = (await client(server.base).get('/api/team')).json.team;
     const lex = team.find((m) => /Lex/.test(m.name));
     assert.ok(lex);
@@ -134,7 +134,7 @@ describe('Anwalt des Monats', () => {
     assert.match(after.find((m) => m.id === lex.id).lawyerOfMonth, /^\S+ \d{4}$/);
     assert.equal(after.filter((m) => m.lawyerOfMonth).length, 1);
     const page = await client(server.base).get(`/team/${lex.slug}`);
-    assert.match(page.text, /lotm-badge[^>]*>.*Anwalt des Monats/s);
+    assert.match(page.text, /<span class="lotm-badge"[^>]*>Anwalt des Monats<\/span>/, 'nur der Schriftzug, kein Symbol davor');
     await as.admin.patch('/api/admin/settings', { lotmMode: 'off' });
     assert.ok((await client(server.base).get('/api/team')).json.team.every((m) => !m.lawyerOfMonth));
   });

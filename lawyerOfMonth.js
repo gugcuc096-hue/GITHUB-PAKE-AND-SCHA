@@ -1,7 +1,7 @@
 'use strict';
 /*
  * Anwalt des Monats: zeichnet zum Monatswechsel das Teammitglied aus, das im Vormonat am meisten erreicht hat –
- * auf der Startseite (Lorbeer an der Teamkarte), auf der Profilseite und per Discord.
+ * auf der Startseite (goldenes Abzeichen an der Teamkarte), auf der Profilseite und per Discord.
  *
  * Einstellung „lotm_mode“ (Einstellungen → Website & Ränge):
  *   auto    – automatisch: je abgeschlossenem Mandat 2 Punkte, je Erfolg (Freispruch, Einstellung, Vergleich …) 3 weitere,

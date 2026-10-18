@@ -679,7 +679,7 @@
    * Gold-Spotlight: Über Karten (Startseite, Karriere) und Kacheln (Dashboard) folgt ein weiches Licht der Maus,
    * der goldene Rand leuchtet in ihrer Nähe auf. Nur mit Maus; Karten mit Formularfeldern bleiben ruhig.
    * Dazu der einmalige Goldschimmer über großen Überschriften (.gold-shine) – gedämpft ohne Bewegung (calm.css) –
-   * und der Lorbeer „Anwalt des Monats“ (Teamkarte der Startseite, Profilseite).
+   * und das goldene Abzeichen „Anwalt des Monats“ (Teamkarte der Startseite, Profilseite).
    */
   const FX_CSS = `.ps-spot-rel{position:relative}.ps-spot{isolation:isolate}
 .ps-spot::after,.ps-spot::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .35s ease}
@@ -688,9 +688,8 @@
 .ps-spot.ps-spot-on::after,.ps-spot.ps-spot-on::before{opacity:1}
 .gold-shine{background:linear-gradient(110deg,var(--gold-500,#d4af37) 0 41%,#fff7d6 50%,var(--gold-500,#d4af37) 59% 100%) 0 0/250% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;padding:0 .14em;margin:0 -.14em;-webkit-box-decoration-break:clone;box-decoration-break:clone;animation:ps-shine 2.2s ease-in-out .5s both}
 @keyframes ps-shine{from{background-position:100% 0}to{background-position:0 0}}
-.lotm-badge{display:inline-flex;align-items:center;gap:.4rem;padding:.32rem .85rem .32rem .6rem;border-radius:999px;font-size:.62rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;line-height:1.2;color:#1a1405;background:linear-gradient(110deg,#b8902a 0%,#f3d77a 45%,#d4af37 60%,#9c7a20 100%) 0 0/220% 100%;box-shadow:0 6px 22px rgba(212,175,55,.35),inset 0 1px 0 rgba(255,255,255,.45);animation:lotm-shine 3.2s ease-in-out .6s infinite alternate;white-space:nowrap}
+.lotm-badge{display:inline-flex;align-items:center;padding:.32rem .85rem;border-radius:999px;font-size:.62rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;line-height:1.2;color:#1a1405;background:linear-gradient(110deg,#b8902a 0%,#f3d77a 45%,#d4af37 60%,#9c7a20 100%) 0 0/220% 100%;box-shadow:0 6px 22px rgba(212,175,55,.35),inset 0 1px 0 rgba(255,255,255,.45);animation:lotm-shine 3.2s ease-in-out .6s infinite alternate;white-space:nowrap}
 @keyframes lotm-shine{from{background-position:100% 0}to{background-position:0 0}}
-.lotm-ico{width:15px;height:15px;flex:none}
 .pf-head .lotm-badge{margin-left:.5rem;vertical-align:middle}
 @media (max-width:479px){.pf-head .lotm-badge{margin:.5rem 0 0}}
 .lotm-on-card{position:absolute;top:-.85rem;left:50%;transform:translateX(-50%);z-index:2}

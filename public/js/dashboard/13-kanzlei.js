@@ -405,7 +405,7 @@ function lotmPanel(s) {
   return `
       <section class="panel panel-pad">
         <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('star')} Anwalt des Monats</h2>${cur ? badge(cur.name, 'gold') : badge('Niemand', 'slate')}</div>
-        <p class="text-sm text-muted mb-4">Lorbeer an der Teamkarte auf der Startseite und auf der Profilseite, dazu ein Discord-Beitrag zum Monatswechsel. Automatisch zählt der Vormonat (${esc(s.lotmMonth)}): je abgeschlossenem Mandat 2 Punkte, je Erfolg 3 weitere, je 5-Sterne-Bewertung 1 Punkt.</p>
+        <p class="text-sm text-muted mb-4">Goldenes Abzeichen an der Teamkarte auf der Startseite und auf der Profilseite, dazu ein Discord-Beitrag zum Monatswechsel. Automatisch zählt der Vormonat (${esc(s.lotmMonth)}): je abgeschlossenem Mandat 2 Punkte, je Erfolg 3 weitere, je 5-Sterne-Bewertung 1 Punkt.</p>
         <form data-form="settings-lotm" class="form-grid cols-2">
           <div><label class="label" for="lotmMode">Auswahl</label><select id="lotmMode" name="lotmMode" class="field">${[
             ['auto', 'Automatisch aus den Akten'],
