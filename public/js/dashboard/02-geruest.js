@@ -28,6 +28,12 @@ function toggleNavGroup(group) {
   }
   st.navClosed = prefs;
   renderNav();
+  // Aufgeklappte Gruppe kurz einblenden (nur hier, nicht bei jedem Neuzeichnen des Menüs)
+  if (!prefs[group]) {
+    const btn = [...document.querySelectorAll('[data-action="nav-group"]')].find((b) => b.dataset.group === group);
+    const list = btn && document.getElementById(btn.getAttribute('aria-controls'));
+    if (list) playIn(list, 'nav-reveal');
+  }
 }
 /** Board: „Anliegen“ führt in den Eingang; eigene Anliegen sind dort ein Reiter. */
 const concernsMerged = () => isBoard();
@@ -478,6 +484,26 @@ function replaceModal(html) {
   modal.scrollTop = y2;
   tickCountdowns();
 }
+/**
+ * Weiches Schließen: Das echte Fenster ist sofort zu (Zustand und Tests bleiben einfach); eine stumme Kopie ohne ids
+ * an derselben Scrollposition blendet kurz aus und liegt unter einem gleich danach geöffneten Fenster.
+ */
+function fadeOutModal(modal) {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const ghost = modal.cloneNode(true);
+  const body = $('#modalBody');
+  const ghostBody = ghost.querySelector('#modalBody');
+  ghost.removeAttribute('id');
+  ghost.querySelectorAll('[id]').forEach((n) => n.removeAttribute('id'));
+  ghost.classList.remove('open');
+  ghost.classList.add('modal-ghost');
+  ghost.setAttribute('aria-hidden', 'true');
+  ghost.inert = true;
+  document.body.appendChild(ghost);
+  ghost.scrollTop = modal.scrollTop;
+  if (ghostBody && body) ghostBody.scrollTop = body.scrollTop;
+  setTimeout(() => ghost.remove(), 240);
+}
 /** Alles schließen – auch die vorherigen Fenster (Seitenwechsel, Abmelden). */
 function closeModal() {
   st.modalStack = [];
@@ -485,6 +511,7 @@ function closeModal() {
   const modal = $('#modal');
   if (!modal.classList.contains('open')) return;
   scheduleHistory();
+  fadeOutModal(modal);
   modal.classList.remove('open');
   $('#modalBody').innerHTML = '';
   document.body.classList.remove('modal-open');

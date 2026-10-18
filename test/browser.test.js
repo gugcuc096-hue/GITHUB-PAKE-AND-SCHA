@@ -1784,6 +1784,54 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       }
     });
   }
+  it('Übergänge: Seitenblöcke gestaffelt, Fenster blendet weich aus, Menügruppe klappt weich auf, „Bewegung reduzieren“ schaltet ab', async () => {
+    const tsrv = await startServer();
+    const { ctx, page, problems } = await open(DESKTOP);
+    try {
+      await login(page, TEAM.admin, tsrv.base);
+      // Seitenwechsel: die Blöcke der Seite kommen nacheinander (höchstens 0,2 s versetzt)
+      await page.evaluate(() => (location.hash = '#calendar'));
+      await page.waitForSelector('#content.view-in .page-title');
+      const anim = await page.$$eval('#content.view-in > *', (els) => els.map((e) => [getComputedStyle(e).animationName, parseFloat(getComputedStyle(e).animationDelay)]));
+      assert.ok(anim.length >= 2, 'mehrere Blöcke');
+      assert.ok(anim.every(([n]) => n === 'view-in'));
+      assert.ok(anim[1][1] > anim[0][1] && Math.max(...anim.map(([, d]) => d)) <= 0.2, `gestaffelt: ${JSON.stringify(anim)}`);
+      // Fenster schließen: echtes Fenster sofort zu, eine stumme Kopie ohne ids blendet aus und ist danach weg
+      await page.evaluate(() => openModal(eventForm(null)));
+      await page.waitForSelector('#modal.open #evStart');
+      // Kopie beim Einfügen festhalten (sie ist nach 0,24 s wieder weg – auch auf langsamen Rechnern zuverlässig)
+      await page.evaluate(() => {
+        window.__ghost = null;
+        new MutationObserver((list, obs) => {
+          for (const m of list) for (const g of m.addedNodes) if (g.classList && g.classList.contains('modal-ghost')) {
+            window.__ghost = { ids: g.querySelectorAll('[id]').length + (g.id ? 1 : 0), inert: g.inert, open: !!document.querySelector('#modal.open'), anim: getComputedStyle(g).animationName };
+            obs.disconnect();
+          }
+        }).observe(document.body, { childList: true });
+      });
+      await page.click('.modal-close');
+      await page.waitForFunction(() => window.__ghost);
+      assert.deepEqual(await page.evaluate(() => window.__ghost), { ids: 0, inert: true, open: false, anim: 'fade-out' });
+      await page.waitForFunction(() => !document.querySelector('.modal-ghost'), null, { timeout: 2000 });
+      // Menügruppe aufklappen: kurz einblenden
+      const grp = await page.$('[data-action="nav-group"][aria-expanded="true"]');
+      if (grp) {
+        await grp.click(); // zu
+        await page.click(`[data-action="nav-group"][aria-expanded="false"]`);
+        assert.ok(await page.$('.nav-group.nav-reveal'), 'aufgeklappte Gruppe blendet ein');
+      }
+      // „Bewegung reduzieren“: keine Kopie, keine Bewegung
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await page.evaluate(() => openModal(eventForm(null)));
+      await page.waitForSelector('#modal.open #evStart');
+      await page.click('.modal-close');
+      assert.equal(await page.$('.modal-ghost'), null);
+      assert.deepEqual(problems, []);
+    } finally {
+      await ctx.close();
+      await tsrv.stop();
+    }
+  });
   for (const [label, device] of [
     ['PC', DESKTOP],
     ['Handy', PHONE],

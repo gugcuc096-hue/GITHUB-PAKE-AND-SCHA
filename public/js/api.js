@@ -130,7 +130,11 @@
     el.className = 'ps-toast' + (type === 'error' ? ' error' : '');
     el.textContent = message;
     root.appendChild(el);
-    setTimeout(() => el.remove(), type === 'error' ? 6000 : 3500);
+    // Kurz ausblenden statt hart verschwinden
+    setTimeout(() => {
+      el.classList.add('out');
+      setTimeout(() => el.remove(), 230);
+    }, type === 'error' ? 6000 : 3500);
   }
 
   /**
