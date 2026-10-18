@@ -910,6 +910,8 @@ const actions = {
     history.replaceState(history.state, '', `${location.pathname}?tab=${st.settingsTab}#settings`);
     if (st.settingsTab === 'bot' && st.bot && !st.botDiscord) await loadBotDiscord();
     renderView();
+    // Inhalt unter den Reitern weich wechseln
+    for (let n = $('.settings-tabs') && $('.settings-tabs').nextElementSibling; n; n = n.nextElementSibling) playIn(n, 'swap-in');
   },
   'bot-module': async (el) => {
     st.botModule = el.dataset.module;
