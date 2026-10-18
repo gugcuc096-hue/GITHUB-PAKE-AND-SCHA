@@ -1352,6 +1352,19 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
           assert.ok(await page.$(`#modalBody #${id}.sec-empty [data-action="${action}"]`), `${id}: eine Zeile mit „${action}“`);
         }
         assert.ok(await page.$('#modalBody #secEvidence.sec-empty input[type=file][data-upload="evidence"]'), 'Bilder hinzufügen direkt in der Zeile');
+        // Titel und Knöpfe mittig zwischen den Linien – oben und unten gleich viel Luft, nichts sitzt auf der nächsten Linie
+        const gaps = await page.$$eval('#modalBody .sec-empty', (rows) =>
+          rows.map((row) => {
+            const r = row.getBoundingClientRect();
+            const kids = [...row.children].map((k) => k.getBoundingClientRect()).filter((k) => k.height);
+            const top = Math.min(...kids.map((k) => k.top)) - r.top - parseFloat(getComputedStyle(row).borderTopWidth);
+            return { id: row.id, top: Math.round(top), bottom: Math.round(r.bottom - Math.max(...kids.map((k) => k.bottom))) };
+          })
+        );
+        for (const g of gaps) {
+          assert.ok(g.bottom >= 8, `${g.id}: Abstand zur Linie darunter (${g.bottom}px)`);
+          assert.ok(Math.abs(g.top - g.bottom) <= 2, `${g.id}: mittig (oben ${g.top}px, unten ${g.bottom}px)`);
+        }
         // Liegengeblieben: ruhige Leiste ganz oben mit „Wiedervorlage“ und „Notiz“ – nicht mehr gequetscht zwischen den Kennzahlen
         assert.match(await page.textContent('#modalBody .idle-strip'), /Liegt seit 8 Tagen/);
         assert.ok(await page.$('#modalBody .idle-strip [data-action="task-new"]'), 'Wiedervorlage aus der Leiste');

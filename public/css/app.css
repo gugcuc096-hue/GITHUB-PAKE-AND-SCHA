@@ -643,7 +643,8 @@ a:hover > .brand-logo { transform: scale(1.04); }
 .info-grid .v { font-size: 0.9rem; word-break: break-word; }
 .section { margin-top: 1.5rem; }
 /* Leerer Abschnitt: eine Zeile „Titel · noch keine … · Knöpfe“ */
-.sec-empty { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.9rem; margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid var(--glass-border); }
+/* Oben und unten gleich viel Luft: Titel und Knöpfe stehen mittig zwischen den Linien, nicht auf der nächsten Linie */
+.sec-empty { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.9rem; margin-top: 1rem; padding-block: 0.75rem; border-top: 1px solid var(--glass-border); }
 .sec-empty .section-title { font-size: 1.1rem; margin: 0; }
 .sec-empty-note { font-size: 0.82rem; color: var(--text-dim); }
 .sec-empty-note[title] { cursor: help; text-decoration: underline dotted rgba(138, 150, 179, 0.5); text-underline-offset: 3px; }
