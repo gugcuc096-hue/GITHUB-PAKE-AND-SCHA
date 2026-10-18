@@ -73,7 +73,7 @@ function closeTicketModal() {
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeTicketModal(); });
 /** Fenster bleibt offen und „wippt“ kurz – der Klick daneben ist angekommen, schließen geht mit X oder Esc. */
 function nudgeDialog(panel) {
-    if (!panel || typeof panel.animate !== 'function' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (!panel || typeof panel.animate !== 'function' || window.PS.motion.calm()) return;
     panel.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.012)' }, { transform: 'scale(1)' }], { duration: 220, easing: 'ease-out' });
 }
 window.nudgeDialog = nudgeDialog;

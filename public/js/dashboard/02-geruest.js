@@ -506,7 +506,7 @@ function replaceModal(html) {
  * ist sofort, wie ohne Animation. Nur am PC (am Handy kommt das Blatt von unten), nicht bei „Bewegung reduzieren“.
  */
 const MORPH_MS = 380;
-const morphOk = () => window.matchMedia('(min-width: 640px)').matches && !window.matchMedia('(prefers-reduced-motion: reduce)').matches && typeof Element.prototype.animate === 'function';
+const morphOk = () => window.matchMedia('(min-width: 640px)').matches && !window.PS.motion.calm() && typeof Element.prototype.animate === 'function';
 /** Ausschnitt des Fensters, der genau über der Zeile liegt (liegt die Zeile außerhalb: der nächste Rand). */
 function morphClip(card, rect) {
   const r = card.getBoundingClientRect();

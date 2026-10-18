@@ -5,6 +5,19 @@
 'use strict';
 
 /* ---------------------------------------------------------------- Profil */
+/** Animationen je Gerät (api.js: PS.motion) – „Wie System“ folgt „Bewegung reduzieren“ (z. B. Windows). */
+function motionPanel() {
+  const pref = window.PS.motion.get();
+  const opt = (v, label) => `<button type="button" class="chip ${pref === v ? 'active' : ''}" data-action="motion-set" data-value="${v}" aria-pressed="${pref === v}">${label}</button>`;
+  return `<section class="panel panel-pad">
+      <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('eye')} Animationen</h2>${window.PS.motion.calm() ? badge('gedämpft', 'amber') : badge('an', 'emerald')}</div>
+      <p class="text-sm text-muted">Übergänge, hochzählende Zahlen, aufklappende Akten und die Unterschrift, die sich schreibt – auf diesem Gerät für die ganze Website.${
+        window.PS.motion.systemCalm() ? ' Ihr System ist auf <strong>„Bewegung reduzieren“</strong> gestellt (Windows: Einstellungen → Barrierefreiheit → Visuelle Effekte → Animationseffekte) – bei „Wie System“ sind die Animationen deshalb gedämpft.' : ''
+      }</p>
+      <div class="chip-row mt-3">${opt('auto', 'Wie System')}${opt('on', 'Immer an')}${opt('off', 'Aus')}</div>
+    </section>`;
+}
+
 /**
  * Zwei-Faktor-Anmeldung: Beim Login kommt zusätzlich ein Code per Discord-DM. Für das Board Pflicht, sonst wählbar;
  * ohne Bot oder ohne verknüpftes Discord nicht möglich (dann steht hier, was fehlt).
@@ -92,6 +105,7 @@ views.profile = {
           } Fremdes Gerät benutzt oder Handy verloren? Hier melden Sie sich überall sonst ab – dieses Gerät bleibt angemeldet.</p>
             <div class="form-actions mt-3"><button type="button" class="btn-outline btn-md" data-action="logout-others" ${st.otherSessions ? '' : 'disabled'}>${icon('logout', 'ico-sm')}<span>Auf allen anderen Geräten abmelden</span></button></div>
           </section>
+          ${motionPanel()}
           ${twoFactorPanel(st.twoFactor)}
           <section class="panel panel-pad">
             <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${DISCORD_ICON} Discord</h2>${u.discord ? badge('Verbunden', 'emerald') : ''}</div>
