@@ -8,7 +8,8 @@
    Grundgerüst: Navigation, Dialog, Routing
    ================================================================ */
 /* Menügruppen: Kanzlei, Board-Eingang und Verwaltung lassen sich auf- und zuklappen (im Browser gemerkt);
- * Verwaltung ist anfangs zu. Liegt die geöffnete Seite in einer zugeklappten Gruppe, ist sie trotzdem sichtbar. */
+ * Verwaltung ist anfangs zu. Führt ein Seitenwechsel in eine zugeklappte Gruppe, ist sie für diese Seite offen
+ * (nicht gemerkt) – und lässt sich trotzdem zuklappen, auch während man auf einer ihrer Seiten ist. */
 const NAV_FOLDABLE = { Kanzlei: false, 'Board-Eingang': false, Verwaltung: true }; // Gruppe → anfangs zugeklappt?
 function navClosedPrefs() {
   try {
@@ -17,16 +18,22 @@ function navClosedPrefs() {
     return {};
   }
 }
-function toggleNavGroup(group) {
-  const prefs = navClosedPrefs();
-  const closed = group in prefs ? prefs[group] : NAV_FOLDABLE[group];
-  prefs[group] = !closed;
+const navGroupClosed = (prefs, group) => (group in prefs ? prefs[group] : NAV_FOLDABLE[group]);
+function saveNavPrefs(prefs) {
+  st.navClosed = prefs;
   try {
     localStorage.setItem('ps.navClosed', JSON.stringify(prefs));
   } catch {
     /* nur Komfort – ohne Speicher gilt die Auswahl bis zum Neuladen */
   }
-  st.navClosed = prefs;
+}
+function toggleNavGroup(group) {
+  const prefs = st.navClosed || navClosedPrefs();
+  // Was man sieht, zählt: offen → zuklappen, zu → aufklappen (auch wenn die Gruppe nur für die aktuelle Seite offen war)
+  const btn = [...document.querySelectorAll('[data-action="nav-group"]')].find((b) => b.dataset.group === group);
+  prefs[group] = btn ? btn.getAttribute('aria-expanded') === 'true' : !navGroupClosed(prefs, group);
+  if (st.navTemp) delete st.navTemp[group];
+  saveNavPrefs(prefs);
   renderNav();
   // Aufgeklappte Gruppe kurz einblenden (nur hier, nicht bei jedem Neuzeichnen des Menüs)
   if (!prefs[group]) {
@@ -75,13 +82,17 @@ function renderNav() {
       html += `<div class="nav-section">${esc(g.name)}</div>${items}`;
       return;
     }
-    const closed = (g.name in prefs ? prefs[g.name] : NAV_FOLDABLE[g.name]) && !g.items.some(navActive);
+    // Gerade auf eine Seite dieser Gruppe gewechselt, die Gruppe ist aber zu: für diese Seite aufklappen (nicht gemerkt)
+    const temp = st.navTemp || (st.navTemp = {});
+    if (st.navOpenedFor !== st.view && g.items.some(navActive) && navGroupClosed(prefs, g.name)) temp[g.name] = st.view;
+    const closed = navGroupClosed(prefs, g.name) && temp[g.name] !== st.view;
     const total = g.items.reduce((n, k) => n + navCount(k), 0);
     html += `<button type="button" class="nav-section nav-toggle" data-action="nav-group" data-group="${esc(g.name)}" aria-expanded="${!closed}" aria-controls="navGroup${i}">
         <span>${esc(g.name)}</span>${closed && total ? `<span class="nav-count">${total > 99 ? '99+' : total}</span>` : ''}${icon('chevronDown', 'ico-sm nav-chev')}</button>
       <div class="nav-group" id="navGroup${i}" ${closed ? 'hidden' : ''}>${items}</div>`;
   });
   $('#nav').innerHTML = html;
+  st.navOpenedFor = st.view;
 
   // Handy-Leiste: Mitarbeiter haben Aufgaben statt Post (Post steht ohnehin oben als Briefsymbol)
   const bottom = isStaff() ? ['overview', 'cases', 'tasks', 'calendar'] : ['overview', 'cases', 'calendar', 'mail'];
@@ -487,9 +498,9 @@ function replaceModal(html) {
 /**
  * Weiches Schließen: Das echte Fenster ist sofort zu (Zustand und Tests bleiben einfach); eine stumme Kopie ohne ids
  * an derselben Scrollposition blendet kurz aus und liegt unter einem gleich danach geöffneten Fenster.
+ * Bei „Bewegung reduzieren“ blendet sie nur aus, ohne zu gleiten (app.css, Ende).
  */
 function fadeOutModal(modal) {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const ghost = modal.cloneNode(true);
   const body = $('#modalBody');
   const ghostBody = ghost.querySelector('#modalBody');
