@@ -163,6 +163,24 @@ function publicUrl(pathname = '/dashboard.html') {
   return /^https?:\/\//.test(base) ? base + pathname : undefined;
 }
 
+/*
+ * Einheitlicher Look aller Bot-Nachrichten: Kanzlei-Logo klein in der Fußzeile und ein Zeitstempel, den Discord
+ * in der Ortszeit des Lesers zeigt („Heute um 14:03“). Das Logo braucht eine öffentliche Adresse (PUBLIC_URL).
+ */
+const FOOTER_TEXT = 'Pake & Scha Legal Consulting';
+function brandEmbed(e) {
+  const icon = publicUrl('/apple-touch-icon.png');
+  e.footer = { text: (e.footer && e.footer.text) || FOOTER_TEXT, ...(icon ? { icon_url: icon } : {}) };
+  if (!e.timestamp) e.timestamp = new Date().toISOString();
+  return e;
+}
+
+/** Uhrzeit für Discord: <t:…> zeigt jeder Leser in seiner Zeitzone, dazu „vor 5 Minuten“ / „in 2 Stunden“. */
+function discordTime(value, style = 'f') {
+  const ts = Math.floor(new Date(value).getTime() / 1000);
+  return Number.isFinite(ts) ? `<t:${ts}:${style}> (<t:${ts}:R>)` : '—';
+}
+
 function buildPayload({ title, description, fields = [], color = GOLD, mentionIds = [], roleIds = [], link }) {
   const mentions = [...new Set(mentionIds.filter((id) => /^\d{5,25}$/.test(String(id))))].map(String);
   const roles = [...new Set(roleIds.filter((id) => /^\d{15,25}$/.test(String(id))))].map(String);
@@ -173,7 +191,7 @@ function buildPayload({ title, description, fields = [], color = GOLD, mentionId
     // Nur ausdrücklich genannte Nutzer und die eingestellte Rolle pingen -- nie @everyone/@here aus Nutzertexten.
     allowed_mentions: { parse: [], users: mentions, roles },
     embeds: [
-      {
+      brandEmbed({
         title: truncate(title, 256),
         description: description ? truncate(description, 4000) : undefined,
         color,
@@ -182,9 +200,7 @@ function buildPayload({ title, description, fields = [], color = GOLD, mentionId
           .filter((f) => f && f.name)
           .slice(0, 25)
           .map((f) => ({ name: truncate(f.name, 256), value: truncate(f.value || '—', 1024), inline: f.inline !== false })),
-        footer: { text: 'Pake & Scha Legal Consulting' },
-        timestamp: new Date().toISOString(),
-      },
+      }),
     ],
   };
 }
@@ -373,6 +389,8 @@ module.exports = {
   rolesFor,
   notify,
   publicUrl,
+  brandEmbed,
+  discordTime,
   sendTestAll,
   envValue,
   oauthConfigured,

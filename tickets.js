@@ -545,7 +545,7 @@ async function syncArchive(c) {
 }
 
 function embed({ title, description, fields = [], color = COLORS.gold, footer }) {
-  return {
+  return discord.brandEmbed({
     title: truncate(title, 256),
     description: description ? truncate(description, 4000) : undefined,
     color,
@@ -554,8 +554,7 @@ function embed({ title, description, fields = [], color = COLORS.gold, footer })
       .slice(0, 25)
       .map((f) => ({ name: truncate(f.name, 256), value: truncate(f.value || '—', 1024), inline: f.inline !== false })),
     footer: { text: footer || 'Pake & Scha Legal Consulting' },
-    timestamp: new Date().toISOString(),
-  };
+  });
 }
 
 function send(channelId, payload) {

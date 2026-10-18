@@ -676,7 +676,7 @@ function attachmentsSection(c, attachments) {
       `${staff ? 'Fotos, Screenshots und Belege (bis 40 Bilder). Neue Bilder sind zunächst nur für die Kanzlei sichtbar.' : 'Fotos, Screenshots und Belege zu Ihrem Fall (bis 40 Bilder).'} Screenshots auch einfach mit Strg+V einfügen oder ins Fenster ziehen.`
     );
   return `<div class="section" id="secEvidence">
-      <h3 class="section-title">Beweismittel & Anhänge <span class="text-xs text-dim font-normal" style="font-family:Inter,sans-serif">${attachments.length} / 40</span></h3>
+      <h3 class="section-title">Beweismittel & Anhänge <span class="text-xs text-dim font-normal sec-meta">${attachments.length} / 40</span></h3>
       ${canUpload ? `<div class="flex flex-wrap items-center gap-3 mb-3">
           <input id="attCaption" class="field" style="max-width:340px" maxlength="200" placeholder="Beschreibung für neue Bilder (optional)" aria-label="Beschreibung für neue Bilder">
           ${staff ? '<label class="check"><input type="checkbox" id="attInternal" checked> Nur intern (für den Mandanten unsichtbar)</label>' : ''}

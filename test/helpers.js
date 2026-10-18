@@ -116,6 +116,8 @@ function client(base) {
     patch: (url, body = {}) => call('PATCH', url, body),
     put: (url, body = {}) => call('PUT', url, body),
     del: (url) => call('DELETE', url),
+    /** Cookie-Kopfzeile dieser Sitzung (z. B. für die Live-Verbindung /api/events) */
+    cookie: () => Object.entries(jar).map(([k, v]) => `${k}=${v}`).join('; '),
     /** Rohdaten senden, z. B. ein Bild: upload('/api/cases/1/attachments', buffer, 'image/png') */
     upload: (url, buffer, type) => call('POST', url, buffer, { 'Content-Type': type }),
     async login(email, password = PASSWORD) {

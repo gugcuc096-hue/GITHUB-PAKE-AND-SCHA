@@ -151,6 +151,9 @@ describe('Nachrichten-Vorlagen: Rollen und Direktnachrichten', () => {
     const password = access.fields.find((f) => f.name === 'Einmal-Passwort').value.match(/\|\|`([^`]+)`\|\|/)[1];
     assert.equal(email, 'john.doe@pake-scha.ls');
     assert.match(access.description, /Hallo \*\*John Doe\*\*/);
+    // Einheitlicher Look: Kanzlei-Logo klein in der Fußzeile, Zeitstempel (Discord zeigt ihn in der Ortszeit des Lesers)
+    assert.deepEqual(access.footer, { text: 'Pake & Scha Legal Consulting · Nachricht nicht weitergeben', icon_url: 'https://kanzlei.example/apple-touch-icon.png' });
+    assert.ok(!Number.isNaN(Date.parse(access.timestamp)));
     assert.deepEqual(jaywa.components.at(-1).components[0], { type: 2, style: 5, label: 'Zur Anmeldung', url: 'https://kanzlei.example/login.html' });
 
     // Mit den Zugangsdaten aus der Direktnachricht anmelden – neues Passwort ist Pflicht
@@ -193,6 +196,32 @@ describe('Nachrichten-Vorlagen: Rollen und Direktnachrichten', () => {
     assert.ok(sent.every((d) => d.embeds.length === 1 && !d.components.length));
     const bad = await admin.get(`/api/bot/messages/${tid}/dm?roleId=900000000000000999`);
     assert.equal(bad.status, 400);
+  });
+});
+
+describe('Einheitliche Bot-Nachrichten & Bot-Status', () => {
+  it('jedes Embed bekommt Logo und Zeitstempel; Uhrzeiten als Discord-Zeit; Status zählt Dienst und offene Akten', () => {
+    if (!process.env.DB_PATH) process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pake-scha-brand-')), 'b.db');
+    const prev = process.env.PUBLIC_URL;
+    process.env.PUBLIC_URL = 'https://kanzlei.example/';
+    try {
+      const discord = require('../discord');
+      const tickets = require('../tickets');
+      for (const e of [tickets.embed({ title: 'Test' }), discord.brandEmbed({ title: 'x', footer: { text: 'Board of Partners' } })]) {
+        assert.equal(e.footer.icon_url, 'https://kanzlei.example/apple-touch-icon.png');
+        assert.ok(e.footer.text);
+        assert.ok(!Number.isNaN(Date.parse(e.timestamp)));
+      }
+      assert.equal(discord.discordTime('2026-10-18T12:00:00Z'), '<t:1792324800:f> (<t:1792324800:R>)');
+      const { db } = require('../db');
+      const bot = require('../discordBot');
+      const open = db.prepare("SELECT COUNT(*) AS n FROM cases WHERE status != 'geschlossen'").get().n;
+      const duty = db.prepare("SELECT COUNT(*) AS n FROM users WHERE duty_status != 'off' AND active = 1 AND role IN ('anwalt','admin')").get().n;
+      assert.equal(bot.presenceText(), `${duty} im Dienst · ${open} ${open === 1 ? 'offene Akte' : 'offene Akten'}`);
+    } finally {
+      if (prev === undefined) delete process.env.PUBLIC_URL;
+      else process.env.PUBLIC_URL = prev;
+    }
   });
 });
 

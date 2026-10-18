@@ -96,6 +96,45 @@ describe('Website & Ränge selbst pflegen', () => {
     assert.equal(img.status, 200);
   });
 
+  it('Link-Vorschau: eigene Texte je Seite, Goldstreifen auf den öffentlichen Seiten, absolutes Bild auch auf Login & Co.', async () => {
+    const meta = (html, prop) => (html.match(new RegExp(`<meta (?:property|name)="${prop}" content="([^"]*)"`)) || [])[1];
+    const pages = { '/': null, '/karriere.html': null, '/login': 'Mandantenportal – Pake & Scha', '/register.html': 'Konto erstellen – Pake & Scha', '/bewerbung': 'Ihre Bewerbung bei Pake & Scha' };
+    const titles = new Set();
+    for (const [p, title] of Object.entries(pages)) {
+      const html = (await client(server.base).get(p)).text;
+      const t = meta(html, 'og:title');
+      assert.ok(t, `${p}: og:title`);
+      if (title) assert.equal(t, title, p);
+      titles.add(t);
+      assert.ok(meta(html, 'og:description'), `${p}: og:description`);
+      assert.equal(meta(html, 'og:image'), `${server.base}/img/og-image.png`, p);
+    }
+    assert.equal(titles.size, Object.keys(pages).length, 'jede Seite hat ihren eigenen Titel');
+    for (const p of ['/', '/karriere.html', '/bewerbung']) assert.equal(meta((await client(server.base).get(p)).text, 'theme-color'), '#b8962e', `${p}: Goldstreifen`);
+  });
+
+  it('404: eigene Seite für Menschen, schlichte Antwort für Programme', async () => {
+    const page = await client(server.base).get('/gibt-es-nicht', { Accept: 'text/html' });
+    assert.equal(page.status, 404);
+    assert.match(page.text, /Seite nicht gefunden/);
+    assert.match(page.text, /<meta name="robots" content="noindex">/);
+    assert.match(page.text, /href="\/"/);
+    const api = await client(server.base).get('/api/gibt-es-nicht');
+    assert.equal(api.status, 404);
+    assert.doesNotMatch(api.text, /<html/i);
+    const img = await fetch(`${server.base}/img/gibt-es-nicht.png`);
+    assert.equal(img.status, 404);
+    assert.doesNotMatch(await img.text(), /<html/i, 'fehlende Bilder bekommen keine HTML-Seite');
+  });
+
+  it('Ungültige Angaben: der Server nennt je Feld einen kurzen Hinweis', async () => {
+    const r = await client(server.base).post('/api/public/cases', { name: 'P', area: 'zivilrecht', description: 'kurz' });
+    assert.equal(r.status, 400);
+    assert.match(r.json.error, /Bitte prüfen Sie folgende Angaben/);
+    assert.equal(r.json.fields.name, 'Mindestens 2 Zeichen.');
+    assert.match(r.json.fields.description, /^Mindestens \d+ Zeichen\.$/);
+  });
+
   it('Einarbeitung: neuer Anwalt bekommt die Checkliste, Mentor und Person haken ab, fremde nicht', async () => {
     const r = await as.admin.post('/api/admin/users', { displayName: 'Nina Neu', email: 'nina.neu', role: 'anwalt', rank: 'Junior Associate' });
     assert.equal(r.status, 201, r.text);

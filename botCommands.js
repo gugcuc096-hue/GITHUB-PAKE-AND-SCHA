@@ -22,13 +22,13 @@ const FOOTER = 'Pake & Scha Legal Consulting';
 
 /* ---------------------------------------------------------------- Antworten als Embed */
 function card({ title, description, fields, color = COLORS.gold, footer = FOOTER, url } = {}) {
-  const e = { color, footer: { text: footer }, timestamp: new Date().toISOString() };
+  const e = { color, footer: { text: footer } };
   if (title) e.title = truncate(title, 256);
   if (description) e.description = truncate(description, 4000);
   if (url) e.url = url;
   const list = (fields || []).filter((f) => f && f.name);
   if (list.length) e.fields = list.slice(0, 25).map((f) => ({ name: truncate(f.name, 256), value: truncate(f.value || '—', 1024), inline: f.inline !== false }));
-  return e;
+  return require('./discord').brandEmbed(e);
 }
 
 /** Antwort auf einen Befehl/Klick. ephemeral: nur für die Person sichtbar. content nur für Pings. */
@@ -199,6 +199,7 @@ function notizCommand(body, u) {
   db.prepare('INSERT INTO notes (case_id, author_id, author_name, author_role, body, internal) VALUES (?, ?, ?, ?, ?, 1)').run(c.id, u.id, u.display_name, u.role, truncate(text, 4000));
   db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(c.id);
   logActivity(u, 'Interne Notiz (Discord)', 'case', c.id, c.case_number);
+  require('./live').caseChanged(c.id);
   return done(`Interne Notiz zu **${c.case_number}** gespeichert – nur für die Kanzlei sichtbar (nicht für den Mandanten, nicht im Ticket).\n\n>>> ${truncate(text, 1500)}`, 'Notiz gespeichert');
 }
 

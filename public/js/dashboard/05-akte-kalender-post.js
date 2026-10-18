@@ -33,7 +33,7 @@ function caseTasksSection(c, tasks) {
       'Mit Datum wird eine Aufgabe zur Wiedervorlage und erscheint rechtzeitig unter „Handlungsbedarf“.'
     );
   return `<div class="section" id="secTasks">
-      <h3 class="section-title">Aufgaben & Wiedervorlagen <span class="text-xs text-dim font-normal" style="font-family:Inter,sans-serif">${open.length} offen · ${done.length} erledigt</span></h3>
+      <h3 class="section-title">Aufgaben & Wiedervorlagen <span class="text-xs text-dim font-normal sec-meta">${open.length} offen · ${done.length} erledigt</span></h3>
       <div class="task-list">${open.map((t) => taskItem(t, { showCase: false })).join('')}${done.map((t) => taskItem(t, { showCase: false })).join('')}</div>
       <form data-form="task-quick" data-case-id="${c.id}" class="task-quick mt-3">
         <input name="title" class="field" required minlength="2" maxlength="160" placeholder="Neue Aufgabe oder Wiedervorlage …" aria-label="Neue Aufgabe">
@@ -493,7 +493,7 @@ function chatSection(c, chat, ticket) {
         .join(', ')}${duty[present[0].id] === 'dienst' ? ' – Antworten kommen meist schnell.' : '.'}</span></p>`
     : '';
   return `<div class="section" id="secChat">
-      <h3 class="section-title">Nachrichten <span class="text-xs text-dim font-normal" style="font-family:Inter,sans-serif">${staff ? 'mit dem Mandanten' : 'mit Ihrer Kanzlei'}</span></h3>
+      <h3 class="section-title">Nachrichten <span class="text-xs text-dim font-normal sec-meta">${staff ? 'mit dem Mandanten' : 'mit Ihrer Kanzlei'}</span></h3>
       <div class="chat">
         <div class="chat-list" id="chatList" data-case-id="${c.id}" data-last-id="${list.length ? list[list.length - 1].id : 0}" data-other-read="${chat ? chat.read.other : 0}" aria-live="polite">
           ${list.length ? chatBubbles(list, caseBubble) : `<p class="chat-empty">${esc(empty)}</p>`}

@@ -613,7 +613,7 @@ async function testWelcome(kind, discordId) {
 }
 
 /* ================================================================ Gateway */
-const gw = { ws: null, intents: 0, state: 'aus', error: null, since: null, seq: null, sessionId: null, resumeUrl: null, heartbeat: null, jitter: null, acked: true, retry: 0, reconnectTimer: null, lastEvent: null };
+const gw = { ws: null, presence: null, intents: 0, state: 'aus', error: null, since: null, seq: null, sessionId: null, resumeUrl: null, heartbeat: null, jitter: null, acked: true, retry: 0, reconnectTimer: null, lastEvent: null };
 const FATAL = {
   4004: 'Der Bot-Token ist ungültig (DISCORD_BOT_TOKEN prüfen).',
   4010: 'Ungültiger Shard.',
@@ -729,6 +729,30 @@ async function connect(resume = false) {
   ws.addEventListener('error', () => {}); // „close“ folgt
 }
 
+/* ---------------------------------------------------------------- Status unter dem Bot */
+// „3 im Dienst · 14 offene Akten“ – nur Zahlen, keine Namen. Geprüft wird jede Minute, gesendet nur bei Änderung
+// (Discord erlaubt Status-Updates großzügig, aber nicht beliebig oft).
+const PRESENCE_EVERY = 60 * 1000;
+function presenceText() {
+  const duty = db.prepare("SELECT COUNT(*) AS n FROM users WHERE duty_status != 'off' AND active = 1 AND role IN ('anwalt','admin')").get().n;
+  const open = db.prepare("SELECT COUNT(*) AS n FROM cases WHERE status != 'geschlossen'").get().n;
+  return `${duty} im Dienst · ${open} ${open === 1 ? 'offene Akte' : 'offene Akten'}`;
+}
+function presencePayload() {
+  try {
+    gw.presence = presenceText();
+  } catch {
+    gw.presence = null;
+  }
+  return { since: null, status: 'online', afk: false, activities: gw.presence ? [{ name: 'Custom Status', type: 4, state: gw.presence }] : [] };
+}
+function updatePresence() {
+  if (!gw.ws || gw.state !== 'verbunden') return;
+  const before = gw.presence;
+  const payload = presencePayload();
+  if (gw.presence !== before) send(gw.ws, { op: 3, d: payload });
+}
+
 function beat(ws) {
   if (gw.ws !== ws) return;
   if (!gw.acked) return reconnectNow(true); // keine Antwort auf den letzten Herzschlag → Verbindung tot
@@ -757,7 +781,7 @@ function onMessage(ws, raw, resuming) {
       if (resuming && gw.sessionId) send(ws, { op: 6, d: { token, session_id: gw.sessionId, seq: gw.seq } });
       else {
         gw.intents = intents();
-        send(ws, { op: 2, d: { token, intents: gw.intents, properties: { os: 'linux', browser: 'pake-scha', device: 'pake-scha' } } });
+        send(ws, { op: 2, d: { token, intents: gw.intents, properties: { os: 'linux', browser: 'pake-scha', device: 'pake-scha' }, presence: presencePayload() } });
       }
       break;
     }
@@ -887,6 +911,7 @@ function start() {
   botMessages.start(); // Zeitpläne der Nachrichten-Vorlagen
   refresh();
   if (timer) return;
+  setInterval(updatePresence, PRESENCE_EVERY).unref();
   timer = setInterval(() => {
     refresh();
     if (wanted()) scan('automatisch').catch(() => {});
@@ -975,6 +1000,7 @@ async function discordData(fresh = false) {
 
 module.exports = {
   start,
+  presenceText,
   refresh,
   listMembers,
   sendDm,

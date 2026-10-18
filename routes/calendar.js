@@ -32,11 +32,8 @@ function ticketAppointment(a, title, { by, mention = 'client', note } = {}) {
   });
 }
 
-function fmtDiscordTime(iso) {
-  // Discord rendert <t:…> automatisch in der Zeitzone jedes Lesers.
-  const ts = Math.floor(new Date(iso).getTime() / 1000);
-  return `<t:${ts}:F> (<t:${ts}:R>)`;
-}
+// Discord rendert <t:…> automatisch in der Zeitzone jedes Lesers.
+const fmtDiscordTime = (iso) => discord.discordTime(iso, 'F');
 
 router.get('/', (req, res) => {
   const u = req.user;

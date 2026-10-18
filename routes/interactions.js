@@ -58,6 +58,7 @@ function handleCase(action, id, u, channelId) {
     if (c.status === 'geschlossen') return fail('Die Akte ist geschlossen.');
     if (c.lawyer_id) return info(`Die Akte hat bereits einen federführenden Anwalt (${c.lawyer_name || '—'}).`, 'Schon vergeben');
     cases.claimCase(c, u, via);
+    require('../live').caseChanged(c.id); // offene Dashboards sofort aktualisieren
     return done(`Du hast die Akte **${c.case_number}** übernommen.`, 'Akte übernommen');
   }
   if (!access.canEdit) return fail('Schließen und wieder öffnen können nur die zuständigen Anwälte und das Board of Partners.', 'Keine Berechtigung');
@@ -70,11 +71,13 @@ function handleCase(action, id, u, channelId) {
   if (action === 'closeok') {
     if (c.status === 'geschlossen') return replaceWith({ title: 'ℹ️ Schon geschlossen', description: 'Die Akte ist bereits geschlossen.', color: COLORS.slate });
     cases.setCaseStatus(c, u, 'geschlossen', via);
+    require('../live').caseChanged(c.id);
     return replaceWith({ title: '🔒 Akte geschlossen', description: `Akte **${c.case_number}** ist geschlossen, das Ticket wandert ins Archiv.`, color: COLORS.slate });
   }
   if (action === 'reopen') {
     if (c.status !== 'geschlossen') return info('Die Akte ist nicht geschlossen.');
     cases.setCaseStatus(c, u, c.lawyer_id ? 'in_bearbeitung' : 'offen', via);
+    require('../live').caseChanged(c.id);
     return done(`Akte **${c.case_number}** ist wieder offen.`, '🔓 Wieder geöffnet');
   }
   return fail('Unbekannte Aktion.');
@@ -89,6 +92,7 @@ function handleConcern(action, id, u, channelId) {
   const r = concerns.changeConcern(k, u, { status }, ' über Discord');
   if (r.error) return fail(r.error);
   if (!r.changed) return info('Keine Änderung – das Anliegen hat diesen Status bereits.');
+  require('../live').areaChanged('concerns');
   return status === 'erledigt' ? done(`Anliegen **${k.reference}** ist als erledigt markiert.`, 'Anliegen erledigt') : done(`Anliegen **${k.reference}** ist wieder offen.`, '🔓 Wieder geöffnet');
 }
 

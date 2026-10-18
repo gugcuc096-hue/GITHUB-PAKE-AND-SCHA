@@ -308,10 +308,10 @@ function onPopState(e) {
  * oder neu lädt, wird vorher gefragt. Felder, die sofort speichern (Priorität, Rolle, Sortierung …), zählen nicht.
  */
 const AUTO_SAVE_FIELDS = '[data-case-priority], [data-case-status], [data-user-field], [data-ext-sort], [data-upload], [data-no-dirty], #msgRoleInsert, input[type="search"]';
-function formDirty(root, { invoice = false } = {}) {
+function formDirty(root, { invoice = false, skip = '' } = {}) {
   if (!root) return false;
   return $$('form[data-form] input, form[data-form] textarea, form[data-form] select', root).some((el) => {
-    if (el.disabled || el.type === 'hidden' || el.type === 'file' || el.matches(AUTO_SAVE_FIELDS)) return false;
+    if (el.disabled || el.type === 'hidden' || el.type === 'file' || el.matches(AUTO_SAVE_FIELDS) || (skip && el.matches(skip))) return false;
     if (!invoice && el.closest('#invoiceForm')) return false; // Rechnungs-Entwurf bleibt beim Seitenwechsel erhalten
     if (el.type === 'checkbox' || el.type === 'radio') return el.checked !== el.defaultChecked;
     if (el.tagName === 'SELECT') {

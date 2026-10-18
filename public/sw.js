@@ -5,11 +5,11 @@
  * Updates, nichts Vertrauliches im Zwischenspeicher). Nur wenn gar keine Verbindung besteht, zeigt die App
  * statt einer Browser-Fehlerseite eine eigene Offline-Seite.
  */
-const CACHE = 'ps-offline-v1';
+const CACHE = 'ps-offline-v2';
 const OFFLINE_URL = '/offline.html';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([OFFLINE_URL, '/icon-192.png'])));
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([OFFLINE_URL, '/icon-192.png', '/fonts/cormorant-garamond-latin-wght-normal.woff2'])));
   self.skipWaiting();
 });
 
@@ -25,6 +25,11 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   // Nur Seitenaufrufe (GET) abfangen – alles andere (API, Formulare, Downloads) läuft unverändert übers Netz.
+  // Ausnahme: die Überschriften-Schrift der Offline-Seite kommt ohne Verbindung aus dem Zwischenspeicher.
+  if (req.method === 'GET' && req.url.endsWith('/fonts/cormorant-garamond-latin-wght-normal.woff2')) {
+    event.respondWith(fetch(req).catch(() => caches.match(req)));
+    return;
+  }
   if (req.mode !== 'navigate' || req.method !== 'GET') return;
   event.respondWith(fetch(req).catch(() => caches.match(OFFLINE_URL)));
 });

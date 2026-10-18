@@ -28,7 +28,7 @@ function readState() {
 }
 const saveState = (s) => setSetting('system_alerts', JSON.stringify(s));
 
-const fmtTime = (iso) => new Date(iso).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', dateStyle: 'medium', timeStyle: 'short' });
+const fmtTime = (iso) => discord.discordTime(iso); // in der Ortszeit jedes Lesers
 
 /** Fehlertexte ohne Links und lange Zeichenketten (keine Tokens o. Ä. nach Discord). */
 function clean(text) {
