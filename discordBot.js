@@ -54,6 +54,7 @@ function rankSyncConfig() {
     board: c.board || '',
     associates: c.associates || '',
     client: c.client || '',
+    clientOpen: c.clientOpen || '', // Mandant mit offener Akte (auch ohne Website-Konto, über das Akten-Ticket)
     strict: !!c.strict,
   };
 }
@@ -171,6 +172,16 @@ function wantedFor(discordId, rs) {
   return [...out];
 }
 
+/** Hat dieses Discord-Mitglied eine offene Akte (Mandanten-Konto mit diesem Discord oder Discord aus dem Akten-Ticket)? */
+function hasOpenCase(discordId) {
+  return !!db
+    .prepare(
+      `SELECT 1 FROM cases c LEFT JOIN users u ON u.id = c.client_id
+       WHERE c.status != 'geschlossen' AND (u.discord_id = ? OR c.discord_client_id = ?) LIMIT 1`
+    )
+    .get(discordId, discordId);
+}
+
 /** Role Connections anwenden, bis sich nichts mehr ändert (Regeln können aufeinander aufbauen). */
 function evaluate(rules, roles) {
   const set = new Set(roles);
@@ -206,6 +217,11 @@ function desiredRoles(discordId, roles, { forceRemove = false } = {}) {
     if (want || forceRemove || rs.strict) {
       for (const r of managedRoles(rs)) desired.delete(r);
       for (const r of want || []) desired.add(r);
+    }
+    // „Mandant mit offener Akte“: kommt mit der ersten offenen Akte, geht mit der letzten abgeschlossenen
+    if (isId(rs.clientOpen)) {
+      if (hasOpenCase(discordId)) desired.add(rs.clientOpen);
+      else desired.delete(rs.clientOpen);
     }
   }
   // Standardrollen: vor den Role Connections (sie dürfen darauf aufbauen) und danach noch einmal – sie gelten immer
@@ -289,6 +305,20 @@ function syncUser(userId, { previousDiscordId } = {}) {
   if (isId(previousDiscordId) && (!u || u.discord_id !== previousDiscordId)) {
     enqueue(() => applyMember(previousDiscordId, { forceRemove: true }), 'Rang-Sync');
   }
+}
+
+/** Akte geändert (Status, Mandant, neu, gelöscht) → Rolle „Mandant mit offener Akte“ des Mandanten angleichen. */
+function syncCaseClient(caseOrId, extraDiscordIds = []) {
+  const rs = rankSyncConfig();
+  if (!tickets.hasToken() || !isId(guildId()) || !rs.enabled || !isId(rs.clientOpen)) return;
+  const c = typeof caseOrId === 'object' ? caseOrId : db.prepare('SELECT client_id, discord_client_id FROM cases WHERE id = ?').get(caseOrId);
+  const ids = new Set(extraDiscordIds.filter(isId));
+  if (c) {
+    if (isId(c.discord_client_id)) ids.add(c.discord_client_id);
+    const u = c.client_id && db.prepare('SELECT discord_id FROM users WHERE id = ?').get(c.client_id);
+    if (u && isId(u.discord_id)) ids.add(u.discord_id);
+  }
+  for (const d of ids) enqueue(() => applyMember(d), 'Mandanten-Rolle');
 }
 
 /* ================================================================ Vollständiger Abgleich */
@@ -1013,6 +1043,7 @@ module.exports = {
   status,
   scan,
   syncUser,
+  syncCaseClient,
   testWelcome,
   discordData,
   rankSyncConfig,
@@ -1028,5 +1059,5 @@ module.exports = {
   MAX_RULES,
   MAX_CONDITIONS,
   WELCOME_DEFAULT,
-  _test: { handleJoin, catchUpJoins, sameJoin, onClose, dispatch, gw, intents },
+  _test: { handleJoin, catchUpJoins, sameJoin, onClose, dispatch, gw, intents, desiredRoles },
 };

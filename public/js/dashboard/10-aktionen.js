@@ -52,6 +52,44 @@ const actions = {
     st.caseMine = !st.caseMine;
     renderView();
   },
+  // Mehrfachauswahl in der Aktenliste
+  'case-select': () => {
+    st.caseSel = caseSelecting() ? null : new Set();
+    renderView();
+  },
+  'case-pick': (el) => {
+    const id = Number(el.dataset.id);
+    if (st.caseSel.has(id)) st.caseSel.delete(id);
+    else st.caseSel.add(id);
+    const on = st.caseSel.has(id);
+    el.classList.toggle('is-picked', on);
+    el.setAttribute('aria-selected', String(on));
+    $('#bulkBarSlot').innerHTML = bulkBar();
+  },
+  'case-select-all': () => {
+    const rows = filteredCases();
+    const all = rows.length && rows.every((c) => st.caseSel.has(c.id));
+    st.caseSel = new Set(all ? [] : rows.map((c) => c.id));
+    $('#caseList').innerHTML = caseTable();
+    $('#bulkBarSlot').innerHTML = bulkBar();
+  },
+  'bulk-priority': (sel) => sel.value && bulkPatch(() => ({ priority: Number(sel.value) }), `Priorität „${PRIORITY[sel.value][0]}“`),
+  'bulk-lawyer': (sel) => {
+    const l = sel.value && st.lawyers.find((x) => x.id === Number(sel.value));
+    if (l) bulkPatch(() => ({ lawyerId: l.id }), `Federführung: ${l.displayName}`);
+  },
+  'bulk-stage': (sel) => {
+    const v = sel.value;
+    if (!v) return;
+    if (v !== 'geschlossen') return bulkPatch(() => (v.startsWith('step:') ? { status: 'in_bearbeitung', step: Number(v.slice(5)) } : { status: v }), `Stand „${v.startsWith('step:') ? STEPS[Number(v.slice(5))] : 'Offen'}“`);
+    sel.value = '';
+    openModal(`<h2 class="modal-title">${st.caseSel.size} ${st.caseSel.size === 1 ? 'Akte' : 'Akten'} abschließen</h2>
+        <p class="modal-sub">Alle gewählten Akten bekommen dasselbe Ergebnis. Offene Rechnungen, Unterschriften oder Termine werden dabei nicht geprüft – im Zweifel lieber einzeln abschließen.</p>
+        <form data-form="bulk-close" class="form-grid">
+          <div><label class="label" for="bcOutcome">Ergebnis</label><select id="bcOutcome" name="outcome" class="field" required>${outcomeOptions()}</select></div>
+          <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('check', 'ico-sm')}<span>Abschließen</span></button></div>
+        </form>`);
+  },
   'new-case': newCaseModal,
   // Lange Listen: nächste Einträge (passiert beim Scrollen auch von selbst)
   'list-more': (el) => showMoreRows(el.dataset.id),
@@ -569,22 +607,67 @@ const actions = {
     await refreshBehind();
   },
   'att-open': (el) => {
-    const a = st.caseAttachments[Number(el.dataset.index)];
+    // Eigene Beweise (data-index) oder Beweise einer verknüpften Akte (data-linked, nur ansehen)
+    const linked = el.dataset.linked != null;
+    const index = Number(linked ? el.dataset.linked : el.dataset.index);
+    const a = linked ? st.linkedAttachments[index] : st.caseAttachments[index];
     if (!a) return;
     const caseId = st.modalCaseId;
     st.returnCase = caseId;
-    const canDelete = a.uploaderId === st.user.id || isAdmin();
+    const no = linked ? a.no : index + 1;
+    const canDelete = !linked && (a.uploaderId === st.user.id || isAdmin());
     openModal(
-      `<h2 class="modal-title">${esc(a.caption || 'Anhang')}</h2>
-        <p class="modal-sub">${esc(a.uploaderName)} · ${esc(fmtDate(a.createdAt))} ${a.internal ? badge('nur intern', 'amber') : ''}</p>
+      `<p class="text-xs uppercase tracking-[0.2em] text-gold mb-1">Beweismittel B${no}${linked ? ` · Akte ${esc(a.caseNumber)}` : ''}</p>
+        <h2 class="modal-title">${esc(a.caption || 'Anhang')}</h2>
+        <p class="modal-sub flex flex-wrap items-center gap-2">${esc(a.uploaderName)} <span class="stamp-mini is-in" title="Eingang">Eingang ${esc(fmtDate(a.createdAt))}</span>${a.internal ? '<span class="stamp-mini">Vertraulich</span>' : ''}</p>
         <img class="lightbox-img mb-4" src="${esc(a.url)}" alt="${esc(a.caption)}">
         <div class="form-actions">
           <button class="btn-outline btn-md" data-action="back-to-case">${icon('chevronLeft', 'ico-sm')}<span>Zurück zur Akte</span></button>
+          ${linked ? `<button class="btn-ghost btn-md" data-action="open-case" data-id="${a.caseId}">${icon('folder', 'ico-sm')}<span>Akte ${esc(a.caseNumber)} öffnen</span></button>` : ''}
           <a class="btn-ghost btn-md" href="${esc(a.url)}" download>${icon('download', 'ico-sm')}<span>Herunterladen</span></a>
+          ${!linked && isStaff() ? `<button class="btn-ghost btn-md" data-action="redact-open" data-index="${index}">${icon('edit', 'ico-sm')}<span>Schwärzen</span></button>` : ''}
           ${canDelete ? `<button class="btn-danger btn-md" data-action="att-delete" data-id="${a.id}" data-case-id="${caseId}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>` : ''}
         </div>`,
       { wide: true }
     );
+  },
+  'redact-open': (el) => redactOpen(Number(el.dataset.index)),
+  'redact-undo': () => {
+    redact.boxes.pop();
+    redactDraw();
+  },
+  'redact-save': async () => {
+    const r = redact;
+    if (!r.boxes.length) throw new Error('Bitte zuerst mindestens eine Stelle schwärzen (mit der Maus bzw. dem Finger ein Rechteck ziehen).');
+    const blob = await new Promise((res) => r.canvas.toBlob(res, 'image/jpeg', 0.9));
+    const caption = `${r.att.caption || `B${r.index + 1}`} (geschwärzt)`.slice(0, 200);
+    const internal = $('#redactInternal') && $('#redactInternal').checked ? '1' : '0';
+    await api.upload(`/api/cases/${r.caseId}/attachments?caption=${encodeURIComponent(caption)}&internal=${internal}`, blob);
+    toast('Geschwärzte Kopie gespeichert – das Original bleibt unverändert.');
+    st.returnCase = r.caseId;
+    await returnOrClose();
+  },
+  // Akten verknüpfen
+  'case-link': (el) => {
+    const id = Number(el.dataset.id);
+    const c = st.cases.find((x) => x.id === id);
+    const others = st.cases.filter((x) => x.id !== id).sort((a, b) => caseTime(b, 'createdAt') - caseTime(a, 'createdAt'));
+    st.returnCase = id;
+    openModal(`<p class="text-xs uppercase tracking-[0.2em] text-gold mb-1">Akte ${esc(c ? c.caseNumber : '')}</p>
+        <h2 class="modal-title">Akte verknüpfen</h2>
+        <p class="modal-sub">Für zusammenhängende Fälle, z. B. ein Vorfall mit mehreren Festgenommenen. Verknüpfte Akten stehen sich gegenseitig im Aktenkopf, ihre Beweismittel erscheinen als gemeinsame Beweismappe – nur für die Kanzlei, nie für Mandanten.</p>
+        <form data-form="case-link" data-id="${id}" class="form-grid">
+          <div><label class="label" for="clOther">Andere Akte</label><select id="clOther" name="otherId" class="field" required><option value="">Bitte wählen …</option>${others
+            .map((x) => opt(x.id, `${x.caseNumber} · ${x.clientName} · ${x.title}`))
+            .join('')}</select></div>
+          <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('link', 'ico-sm')}<span>Verknüpfen</span></button></div>
+        </form>`);
+  },
+  'case-unlink': async (el) => {
+    if (!(await ask(`Die Verknüpfung mit ${el.dataset.number} wird gelöst – beide Akten bleiben unverändert.`, { title: 'Verknüpfung lösen?', confirmText: 'Lösen' }))) return;
+    await api.del(`/api/cases/${el.dataset.id}/links/${el.dataset.other}`);
+    toast('Verknüpfung gelöst.');
+    await reloadCase(Number(el.dataset.id));
   },
   'att-delete': async (el) => {
     if (!(await askDelete('Anhang löschen?', 'Das Bild wird endgültig aus der Akte gelöscht.'))) return;
@@ -1372,7 +1455,11 @@ const actions = {
     if (!k) return;
     if (!(await ask(`Bitte nur bestätigen, wenn ${k.data.mandant || 'der Mandant'} ${k.kind === 'schriftsatz' ? 'das Dokument' : 'den Vertrag'} im Spiel tatsächlich unterschrieben hat. Die Erfassung wird mit Ihrem Namen im Aktenverlauf vermerkt.`, { title: 'Unterschrift des Mandanten erfassen?', confirmText: 'Erfassen' }))) return;
     const r = await api.post(`/api/contracts/${k.id}/sign`, { as: 'erfassen' });
-    if (r.contract && r.contract.status === 'unterschrieben') window.PS.stamp(el.closest('.contract-row') || $('#modalCard'), 'Unterschrieben');
+    if (r.contract && r.contract.status === 'unterschrieben') {
+      const target = el.closest('.contract-row') || $('#modalCard');
+      window.PS.stamp(target, 'Unterschrieben');
+      window.PS.seal(target); // Gold-Siegel neben dem Stempel
+    }
     toast('Unterschrift des Mandanten erfasst.');
     await reloadCase(Number(el.dataset.caseId));
   },

@@ -17,7 +17,7 @@ fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 const UPLOAD_DIR = path.join(path.dirname(DB_PATH), 'uploads');
 const PUBLIC_MEDIA_DIR = path.join(UPLOAD_DIR, 'public');
 const EVIDENCE_DIR = path.join(UPLOAD_DIR, 'evidence');
-for (const dir of [path.join(PUBLIC_MEDIA_DIR, 'avatars'), path.join(PUBLIC_MEDIA_DIR, 'team'), EVIDENCE_DIR]) {
+for (const dir of [path.join(PUBLIC_MEDIA_DIR, 'avatars'), path.join(PUBLIC_MEDIA_DIR, 'team'), path.join(PUBLIC_MEDIA_DIR, 'items'), EVIDENCE_DIR]) {
   fs.mkdirSync(dir, { recursive: true });
 }
 
@@ -1255,6 +1255,41 @@ db.exec(`
 addColumn('cases', 'sentence_estimate', 'INTEGER');
 addColumn('cases', 'sentence_fine', 'INTEGER');
 addColumn('cases', 'sentence_reduced', 'INTEGER NOT NULL DEFAULT 0');
+// Verknüpfte Akten (z. B. ein Vorfall, mehrere Festgenommene) – je Paar eine Zeile, a_id < b_id
+db.exec(`
+  CREATE TABLE IF NOT EXISTS case_links (
+    a_id            INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    b_id            INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    created_by_name TEXT NOT NULL DEFAULT '',
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (a_id, b_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_case_links_b ON case_links(b_id);
+`);
+// Kanzlei-Lager: Gegenstände (Name + Bild, in den Einstellungen gepflegt) und Buchungen für Gegenstände, Geld und
+// Schwarzgeld (+ einlagern, − entnehmen; der Bestand ist die Summe)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS storage_items (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT NOT NULL,
+    image      TEXT,
+    active     INTEGER NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS storage_entries (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind       TEXT NOT NULL CHECK (kind IN ('item', 'geld', 'schwarzgeld')),
+    item_id    INTEGER REFERENCES storage_items(id) ON DELETE SET NULL,
+    item_name  TEXT NOT NULL DEFAULT '',
+    amount     INTEGER NOT NULL,
+    note       TEXT NOT NULL DEFAULT '',
+    user_id    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    user_name  TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_storage_entries_kind ON storage_entries(kind, item_id);
+`);
 
 function randomPin() {
   return String(crypto.randomInt(0, 1000000)).padStart(6, '0');

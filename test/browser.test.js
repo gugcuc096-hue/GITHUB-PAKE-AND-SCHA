@@ -2704,3 +2704,83 @@ describe('Browser: Tastenkürzel, Mitteilungskarten, Verlaufslinien, Deal-Rechne
     }
   });
 });
+
+describe('Browser: Aktenmappe, verknüpfte Akten, Mehrfachauswahl, Kanzlei-Lager, Schwärzen', { skip: chromium ? false : 'Playwright nicht installiert' }, () => {
+  it('Deckel mit Reiter, Verknüpfung + gemeinsame Beweismappe, Priorität für mehrere Akten, Lager buchen, geschwärzte Kopie', async () => {
+    const srv = await startServer();
+    const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+    const ctx = await browser.newContext({ ...DESKTOP, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+    const page = await ctx.newPage();
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
+    const IMG = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'img', 'logo.png'));
+    try {
+      const a = client(srv.base);
+      await a.login(TEAM.admin);
+      const A = (await a.post('/api/cases', { title: 'Pier – Fahrer', area: 'strafrecht', clientName: 'Tony Vercetti' })).json.case;
+      const B = (await a.post('/api/cases', { title: 'Pier – Beifahrer', area: 'strafrecht', clientName: 'Lance Vance' })).json.case;
+      await a.upload(`/api/cases/${A.id}/attachments?caption=Tatort&internal=1`, IMG, 'image/png');
+      await a.upload(`/api/cases/${B.id}/attachments?caption=Bodycam&internal=1`, IMG, 'image/png');
+      const item = (await a.post('/api/storage/items', { name: 'Schutzweste' })).json.item;
+      await page.goto(srv.base + '/login.html');
+      await page.fill('#email', TEAM.admin);
+      await page.fill('#password', PASSWORD);
+      await page.click('button[type=submit]');
+      await page.waitForURL(/dashboard/);
+      await page.waitForSelector('#nav a.nav-item');
+
+      // Mehrfachauswahl: beide Akten auf „Kritisch“
+      await page.evaluate(() => (location.hash = '#cases'));
+      await page.click('[data-action="case-select"]');
+      await page.click(`#caseList tr[data-id="${A.id}"]`);
+      await page.click(`#caseList tr[data-id="${B.id}"]`);
+      await page.waitForFunction(() => /2 Akten ausgewählt/.test(document.querySelector('.bulk-bar')?.textContent || ''));
+      await page.selectOption('.bulk-sel[data-change="bulk-priority"]', '4');
+      await page.waitForFunction(() => document.querySelectorAll('#caseList tr.tab-p4').length === 2);
+      await page.click('[data-action="case-select"]');
+
+      // Aktendeckel mit Reiter; Akte verknüpfen über „Mehr“
+      await page.click(`#caseList [data-action="open-case"][data-id="${A.id}"]`);
+      await page.waitForSelector('#modalBody .case-cover .cover-tab');
+      await page.click('#modalBody .more-menu summary');
+      await page.click('#modalBody [data-action="case-link"]');
+      await page.selectOption('#clOther', String(B.id));
+      await page.click('#modalBody form[data-form="case-link"] button[type=submit]');
+      await page.waitForSelector('#modalBody .case-link');
+      assert.match(await page.textContent('#modalBody .case-links'), new RegExp(B.caseNumber));
+      assert.equal(await page.locator('#modalBody .linked-ev .att').count(), 1, 'Beweis der anderen Akte');
+      assert.match(await page.textContent('#modalBody #secEvidence .att .ev-no'), /B1/);
+      assert.ok(await page.locator('#modalBody .slip-row').count() >= 1, 'Laufzettel');
+
+      // Schwärzen: Rechteck ziehen → Kopie als B2
+      await page.click('#secEvidence [data-action="att-open"][data-index="0"]');
+      await page.click('#modalBody [data-action="redact-open"]');
+      await page.waitForSelector('#redactCanvas');
+      const box = await page.locator('#redactCanvas').boundingBox();
+      await page.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.2);
+      await page.mouse.down();
+      await page.mouse.move(box.x + box.width * 0.7, box.y + box.height * 0.6, { steps: 4 });
+      await page.mouse.up();
+      await page.click('#modalBody [data-action="redact-save"]');
+      await page.waitForFunction(() => document.querySelectorAll('#secEvidence > .att-grid .att').length === 2);
+      assert.match(await page.textContent('#secEvidence > .att-grid'), /geschwärzt/);
+
+      // Kanzlei-Lager: einlagern über die Kachel
+      await page.evaluate(() => {
+        closeModal();
+        location.hash = '#lager';
+      });
+      await page.waitForSelector('.lager-item');
+      await page.click(`.lager-item[data-item="${item.id}"]`);
+      await page.fill('#sbAmount', '3');
+      await page.click('#modalBody form[data-form="storage-book"] button[type=submit]');
+      await page.waitForFunction(() => /3/.test(document.querySelector('.lager-item .lager-stock')?.textContent || ''));
+      assert.match(await page.textContent('.lager-entry'), /\+3× Schutzweste/);
+      assert.deepEqual(problems, []);
+    } finally {
+      await ctx.close();
+      await browser.close();
+      await srv.stop();
+    }
+  });
+});

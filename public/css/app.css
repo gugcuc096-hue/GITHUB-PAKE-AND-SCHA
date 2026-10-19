@@ -1962,3 +1962,104 @@ kbd { display: inline-block; min-width: 1.6rem; padding: 0.12rem 0.45rem; border
 .prompter-end { text-align: center; color: var(--gold-500); font-size: 0.6em; }
 .prompter-bar { display: flex; justify-content: center; align-items: center; gap: 0.6rem; flex-wrap: wrap; padding: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.08); color: #94a3b8; font-size: 0.85rem; }
 
+
+/* ---------------------------------------------------------------- Aktenmappe: Deckel, Reiter, Laufzettel, Stempel */
+/* Aktendeckel: dunkle Navy-Mappe mit feiner Goldkante, Reiter oben links und geprägtem Aktenzeichen */
+.case-cover { position: relative; margin-top: 1.05rem; padding: 1.15rem 1.1rem 1rem; border: 1px solid var(--gold-hairline); border-radius: 3px 16px 16px 16px; background: linear-gradient(168deg, rgba(22, 32, 62, 0.92), rgba(6, 11, 25, 0.94) 70%); box-shadow: inset 0 1px 0 rgba(243, 229, 171, 0.07), 0 14px 34px -22px rgba(0, 0, 0, 0.9); }
+.case-cover::before { content: ''; position: absolute; inset: 5px; border: 1px solid rgba(212, 175, 55, 0.1); border-radius: 1px 12px 12px 12px; pointer-events: none; }
+@media (min-width: 768px) { .case-cover { padding: 1.3rem 1.4rem 1.1rem; } }
+.cover-tab { position: absolute; left: -1px; bottom: 100%; display: inline-flex; align-items: center; gap: 0.4rem; height: 1.1rem; padding: 0 0.85rem 0 0.75rem; border: 1px solid var(--gold-hairline); border-bottom: 0; border-radius: 8px 10px 0 0; background: rgba(22, 32, 62, 0.95); font-size: 0.58rem; font-weight: 600; letter-spacing: 0.24em; text-transform: uppercase; color: rgba(243, 229, 171, 0.7); }
+.cover-tab-dot { width: 6px; height: 6px; border-radius: 50%; background: #f59e0b; box-shadow: 0 0 8px rgba(245, 158, 11, 0.6); }
+.cover-tab-dot.p4 { background: #ef4444; box-shadow: 0 0 8px rgba(239, 68, 68, 0.6); }
+.case-emboss { letter-spacing: 0.1em; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7), 0 -1px 0 rgba(243, 229, 171, 0.22); }
+.cover-stamp { position: absolute; right: 3.6rem; top: 0.85rem; padding: 0.2rem 0.6rem; border: 2px double rgba(203, 213, 225, 0.45); border-radius: 5px; color: rgba(203, 213, 225, 0.55); font-size: 0.62rem; font-weight: 800; letter-spacing: 0.22em; text-transform: uppercase; transform: rotate(-7deg); pointer-events: none; }
+@media (max-width: 639px) { .cover-stamp { right: 0.9rem; top: auto; bottom: 0.7rem; } }
+/* Kleiner Stempel als Kennzeichnung (Vertraulich, Eingang) statt eines Abzeichens */
+.stamp-mini { display: inline-flex; align-items: center; padding: 0.08rem 0.4rem; border: 1.5px double rgba(252, 165, 165, 0.75); border-radius: 4px; color: #fca5a5; font-size: 0.56rem; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; line-height: 1.4; transform: rotate(-3deg); background: rgba(4, 9, 22, 0.55); white-space: nowrap; }
+.stamp-mini.is-in { border-color: rgba(243, 229, 171, 0.6); color: var(--gold-light); transform: none; letter-spacing: 0.1em; }
+/* Laufzettel: Kürzel + Tag, wer die Akte bearbeitet hat */
+.slip { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.slip-row { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.12rem 0.45rem 0.12rem 0.2rem; border: 1px solid var(--line); border-radius: 6px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.68rem; color: var(--text-dim); }
+.slip-row b { display: inline-grid; place-items: center; min-width: 1.45rem; height: 1.25rem; padding: 0 0.2rem; border-radius: 4px; background: var(--gold-soft); color: var(--gold-light); font-weight: 600; }
+/* Verknüpfte Akten im Aktenkopf */
+.case-links { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.case-link { display: inline-flex; align-items: stretch; border: 1px solid var(--gold-hairline); border-radius: 8px; overflow: hidden; background: rgba(212, 175, 55, 0.05); }
+.case-link.is-closed { opacity: 0.65; }
+.case-link-open { display: inline-flex; align-items: baseline; gap: 0.4rem; padding: 0.18rem 0.5rem; font-size: 0.75rem; color: var(--gold-light); min-width: 0; }
+.case-link-open:hover { background: rgba(212, 175, 55, 0.1); }
+.case-link-who { color: var(--text-muted); max-width: 11rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.case-link-x { display: inline-grid; place-items: center; width: 1.6rem; border-left: 1px solid var(--gold-hairline); color: var(--text-dim); }
+.case-link-x:hover { color: #fca5a5; background: rgba(239, 68, 68, 0.1); }
+/* Beweismittel als nummerierte Anlagen (B1, B2 …) mit schmalem Siegelstreifen */
+.att .ev-no { position: absolute; right: 6px; top: 6px; padding: 0.05rem 0.4rem; border-radius: 5px; background: rgba(4, 9, 22, 0.82); border: 1px solid var(--gold-hairline); color: var(--gold-light); font: 600 0.66rem/1.4 'JetBrains Mono', ui-monospace, monospace; }
+.att::after { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: linear-gradient(90deg, rgba(185, 28, 28, 0.85), rgba(212, 175, 55, 0.85)); opacity: 0.8; }
+.att-grid-sm { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
+.linked-ev { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.9rem; padding-top: 0.9rem; border-top: 1px dashed var(--gold-hairline); }
+.linked-ev-head { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.45rem; font-size: 0.75rem; color: var(--text-dim); }
+/* Prioritäts-Reiter in der Aktenliste: kurze Kante oben links (Hoch/Kritisch) – die volle Kante bleibt „liegengeblieben“ */
+.tbl tr.has-tab td:first-child { position: relative; }
+.tbl tr.has-tab td:first-child::before { content: ''; position: absolute; left: 0; top: 0.55rem; width: 4px; height: 1.15rem; border-radius: 0 3px 3px 0; background: #f59e0b; }
+.tbl tr.tab-p4 td:first-child::before { background: #ef4444; }
+@media (max-width: 767px) { .tbl-cards tr.has-tab { position: relative; } .tbl-cards tr.has-tab td:first-child::before { left: -0.9rem; } }
+/* Textmarker in Gold (Treffer aus der Suche) */
+mark.hl-mark { color: inherit; padding: 0 0.1em; margin: 0 -0.1em; border-radius: 3px; background: linear-gradient(transparent 12%, rgba(212, 175, 55, 0.38) 12%, rgba(212, 175, 55, 0.38) 88%, transparent 88%) no-repeat 0 0 / 100% 100%; animation: hl-draw 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 0.35s both; }
+@keyframes hl-draw { from { background-size: 0 100%; } to { background-size: 100% 100%; } }
+/* Schwärzen */
+.redact-wrap { border: 1px solid var(--glass-border); border-radius: 12px; overflow: hidden; background: #000; }
+.redact-canvas { display: block; width: 100%; height: auto; max-height: 70vh; object-fit: contain; cursor: crosshair; touch-action: none; }
+
+/* ---------------------------------------------------------------- Mehrfachauswahl in der Aktenliste */
+.list-bar .btn-ghost.is-on { color: var(--gold-light); border-color: var(--gold-hairline); background: var(--gold-soft); }
+.list-bar { gap: 0.75rem; }
+.th-check, .td-check { width: 2.4rem; }
+.sel-all { font-size: 0.7rem; color: var(--gold-light); text-transform: uppercase; letter-spacing: 0.08em; }
+.pick-box { display: inline-grid; place-items: center; width: 1.25rem; height: 1.25rem; border-radius: 6px; border: 1.5px solid var(--glass-border); color: transparent; transition: all 0.15s ease; }
+.pick-box .ico-sm { width: 0.85rem; height: 0.85rem; }
+.tbl tr.is-picked td { background: rgba(212, 175, 55, 0.08); }
+.tbl tr.is-picked .pick-box { border-color: var(--gold-500); background: var(--gold-500); color: #1a1405; }
+@media (max-width: 767px) { .tbl-cards td.td-check { display: flex; justify-content: flex-start; padding-bottom: 0; } .tbl-cards td.td-check::before { display: none; } .tbl-cards tr.is-picked { border-color: var(--gold-500); } }
+.bulk-bar { position: sticky; bottom: calc(0.75rem + var(--safe-bottom)); z-index: 30; margin-top: 1rem; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem 1rem; padding: 0.7rem 0.9rem; border: 1px solid var(--gold-hairline); border-radius: 14px; background: rgba(8, 14, 32, 0.96); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55); animation: bulk-in 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+@media (max-width: 1023px) { .bulk-bar { bottom: calc(var(--bottomnav-h) + 0.6rem + var(--safe-bottom)); } }
+.bulk-count { font-size: 0.85rem; color: var(--text-muted); }
+.bulk-count strong { color: var(--gold-light); font-family: var(--font-display); font-size: 1.15rem; margin-right: 0.15rem; }
+.bulk-acts { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.bulk-sel { width: auto; min-width: 9rem; padding-top: 0.4rem; padding-bottom: 0.4rem; font-size: 0.82rem; }
+@media (max-width: 480px) { .bulk-acts { width: 100%; } .bulk-sel { flex: 1 1 calc(50% - 0.5rem); min-width: 0; } }
+@keyframes bulk-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+/* ---------------------------------------------------------------- Kanzlei-Lager */
+.lager-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 1rem; }
+.lager-cash { text-align: left; cursor: pointer; transition: border-color 0.2s ease, transform 0.2s ease; }
+.lager-cash:hover { border-color: var(--gold-hairline); transform: translateY(-1px); }
+.lager-cash.is-black { background: linear-gradient(160deg, rgba(2, 5, 14, 0.95), rgba(17, 17, 24, 0.85)); border-color: rgba(148, 163, 184, 0.18); }
+.lager-cash.is-black .kpi-value { color: #e2e8f0; }
+.lager-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 0.75rem; }
+.lager-item { display: flex; flex-direction: column; align-items: center; gap: 0.45rem; padding: 0.95rem 0.6rem 0.8rem; border: 1px solid var(--glass-border); border-radius: 14px; background: rgba(15, 23, 42, 0.45); text-align: center; transition: border-color 0.2s ease, transform 0.2s ease, background 0.2s ease; min-width: 0; }
+.lager-item:hover { border-color: var(--gold-hairline); transform: translateY(-2px); background: rgba(212, 175, 55, 0.05); }
+.lager-item.is-empty { opacity: 0.5; }
+.item-pic { width: 64px; height: 64px; border-radius: 12px; object-fit: contain; background: rgba(255, 255, 255, 0.04); display: inline-flex; align-items: center; justify-content: center; color: var(--text-dim); flex-shrink: 0; }
+.item-pic.md { width: 44px; height: 44px; border-radius: 10px; }
+.item-pic.sm { width: 36px; height: 36px; border-radius: 9px; }
+.item-ph .ico { width: 45%; height: 45%; }
+.item-pic.is-black { color: #e2e8f0; background: rgba(0, 0, 0, 0.45); }
+.lager-name { font-size: 0.84rem; font-weight: 500; line-height: 1.25; overflow-wrap: anywhere; }
+.lager-stock { display: flex; flex-direction: column; align-items: center; gap: 0.1rem; font-family: var(--font-display); font-size: 1.55rem; font-weight: 600; line-height: 1; color: var(--gold-light); }
+.lager-stock small { font-family: var(--font-body); font-size: 0.66rem; font-weight: 400; color: var(--text-dim); }
+.lager-entry { align-items: center; gap: 0.75rem; }
+.lager-amt { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; }
+.lager-amt.is-in { color: var(--emerald); }
+.lager-amt.is-out { color: var(--red); }
+.lager-search { max-width: 260px; }
+.lager-new { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.lager-new .field { flex: 1 1 220px; }
+.lager-set-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.lager-set-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem; border: 1px solid var(--line); border-radius: 12px; }
+.lager-set-row .field { flex: 1 1 auto; min-width: 0; }
+@media (max-width: 480px) { .lager-set-row { flex-wrap: wrap; } .lager-set-row .field { flex-basis: calc(100% - 60px); } }
+.list-bar > .btn-ghost:first-child { margin-right: auto; }
+/* Beweis-Kachel: Nummer oben links, Stempel/Markierungen darunter (überdecken sich nicht) */
+.att .ev-no { left: 6px; right: auto; }
+.att .tag { top: 1.85rem; }
+.att .stamp-mini { font-size: 0.5rem; letter-spacing: 0.1em; }
+.case-link-open .font-mono { white-space: nowrap; }
+@media (max-width: 639px) { .case-link-who { display: none; } }

@@ -72,6 +72,7 @@ router.put(
         board: idOrEmpty,
         associates: idOrEmpty,
         client: idOrEmpty,
+        clientOpen: idOrEmpty.optional().default(''),
         strict: z.boolean(),
       }),
       req,

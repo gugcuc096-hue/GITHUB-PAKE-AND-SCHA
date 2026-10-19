@@ -101,7 +101,10 @@
                 state.can = r.can;
                 draw();
                 // Vollständig unterschrieben: Stempel auf das Unterschriftsfeld
-                if (r.contract.status === 'unterschrieben') window.PS.stamp(panel, 'Unterschrieben');
+                if (r.contract.status === 'unterschrieben') {
+                    window.PS.stamp(panel, 'Unterschrieben');
+                    window.PS.seal(panel);
+                }
             } catch (e) { btn.disabled = false; err(e); }
         };
         document.getElementById('signClient')?.addEventListener('click', (ev) => {

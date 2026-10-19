@@ -286,6 +286,7 @@ router.post(
     const c = getCase(id);
     notifyCreated(c, u);
     tickets.caseCreated(id);
+    require('../discordBot').syncCaseClient(c);
     if (isStaff(u)) logActivity(u, 'Akte angelegt', 'case', id, `${c.case_number} – ${c.title}`);
     res.status(201).json({ case: caseRow(c, u) });
   })
@@ -412,6 +413,9 @@ router.put(
     });
     logActivity(u, 'Akte geändert', 'case', c.id, `${c.case_number}: ${note}`);
     const updated = getCase(c.id);
+    // Rolle „Mandant mit offener Akte“: beim bisherigen und beim neuen Konto angleichen
+    require('../discordBot').syncCaseClient(c);
+    require('../discordBot').syncCaseClient(updated);
     // Discord-Ticket: Mandant kommt hinein (verknüpftes Discord) bzw. wird entfernt
     if (account) {
       tickets.post(c.id, {
@@ -499,7 +503,55 @@ function caseDetail(c, u) {
     charges: staff ? require('./penal').payload(c) : undefined,
     // Team: passende Mandantenkonten, solange die Akte noch keins hat (z. B. Mandant hat sich später registriert)
     clientSuggestions: staff && !c.client_id ? clientSuggestions(c) : undefined,
+    // Kanzlei: verknüpfte Akten mit ihren Beweismitteln (gemeinsame Beweismappe) und der Laufzettel der Akte
+    links: staff ? linkedCases(c.id) : undefined,
+    linkedEvidence: staff ? linkedEvidence(c.id) : undefined,
+    routing: staff ? routingSlip(c.id) : undefined,
   };
+}
+
+/* ---------------------------------------------------------------- Verknüpfte Akten (nur Kanzlei) */
+const linkPair = (a, b) => (a < b ? [a, b] : [b, a]);
+function linkedIds(caseId) {
+  return db
+    .prepare('SELECT b_id AS id FROM case_links WHERE a_id = ? UNION SELECT a_id AS id FROM case_links WHERE b_id = ?')
+    .all(caseId, caseId)
+    .map((r) => r.id);
+}
+function linkedCases(caseId) {
+  const ids = linkedIds(caseId);
+  if (!ids.length) return [];
+  return db
+    .prepare(
+      `SELECT c.id, c.case_number, c.title, c.status, COALESCE(u.display_name, c.client_name) AS client
+       FROM cases c LEFT JOIN users u ON u.id = c.client_id WHERE c.id IN (${ids.map(() => '?').join(',')}) ORDER BY c.created_at ASC`
+    )
+    .all(...ids)
+    .map((r) => ({ id: r.id, caseNumber: r.case_number, title: r.title, status: r.status, clientName: r.client || '—' }));
+}
+/** Beweismittel der verknüpften Akten – mit ihrer Nummer (B1, B2 …) in der jeweiligen Akte. */
+function linkedEvidence(caseId) {
+  return linkedCases(caseId)
+    .map((k) => ({
+      caseId: k.id,
+      caseNumber: k.caseNumber,
+      clientName: k.clientName,
+      attachments: db
+        .prepare('SELECT * FROM case_attachments WHERE case_id = ? ORDER BY created_at ASC, id ASC')
+        .all(k.id)
+        .map((a, i) => ({ ...attachmentRow(a, k.id), no: i + 1 })),
+    }))
+    .filter((k) => k.attachments.length);
+}
+/** Laufzettel: wer die Akte bearbeitet hat (Einträge im Verlauf), zuletzt zuerst. */
+function routingSlip(caseId) {
+  return db
+    .prepare(
+      `SELECT author_name AS name, MAX(created_at) AS last, COUNT(*) AS n FROM notes
+       WHERE case_id = ? AND author_role IN ('anwalt', 'admin') AND author_name != '' GROUP BY author_name ORDER BY last DESC LIMIT 8`
+    )
+    .all(caseId)
+    .map((r) => ({ name: r.name, lastAt: r.last, count: r.n }));
 }
 
 router.get(
@@ -735,6 +787,7 @@ router.patch(
       });
     }
     ticketUpdate(c, updated, u, { history, editFields, d, newStatus, newlyAssigned });
+    if (newStatus && newStatus !== c.status) require('../discordBot').syncCaseClient(updated); // Rolle „Mandant mit offener Akte“
     // Aktenzeichen, Titel, Gericht und Gegenpartei stehen in den Verträgen → deren Google Docs neu schreiben
     require('../googleDocs').touchCase(c.id);
     res.json({ case: { ...caseRow(updated, u), ...caseAccess(updated, u) } });
@@ -859,6 +912,7 @@ router.delete(
     // Erst in den Papierkorb (30 Tage wiederherstellbar) – Bilddateien bleiben bis zum endgültigen Löschen liegen
     trash.trashCase(c.id, req.user);
     tickets.caseDeleted(c, req.user.display_name);
+    require('../discordBot').syncCaseClient(c);
     logActivity(req.user, 'Akte gelöscht', 'case', c.id, `${c.case_number} – ${c.title} (Papierkorb)`);
     res.json({ success: true, keepDays: trash.KEEP_DAYS });
   })
@@ -1058,6 +1112,61 @@ router.delete('/:id/deals/:did', (req, res) => {
   res.json({ success: true });
 });
 
+/* ---------------------------------------------------------------- Akten verknüpfen (nur Kanzlei) */
+router.post(
+  '/:id/links',
+  wrap(async (req, res) => {
+    const u = req.user;
+    const id = idParam(req);
+    const c = id && getCase(id);
+    if (!c || !isStaff(u) || !caseAccess(c, u).canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
+    if (!caseAccess(c, u).canEdit) return res.status(403).json({ error: 'Verknüpfen dürfen die zuständigen Anwälte und das Board.' });
+    const d = parseBody(z.object({ otherId: z.number().int().positive() }), req, res);
+    if (!d) return;
+    const other = d.otherId !== c.id && getCase(d.otherId);
+    if (!other) return res.status(400).json({ error: 'Bitte eine andere Akte auswählen.' });
+    if (linkedIds(c.id).length >= 20) return res.status(400).json({ error: 'Höchstens 20 verknüpfte Akten.' });
+    const [a, b] = linkPair(c.id, other.id);
+    const added = tx(() => {
+      const r = db.prepare('INSERT OR IGNORE INTO case_links (a_id, b_id, created_by_name) VALUES (?, ?, ?)').run(a, b, u.display_name);
+      if (!r.changes) return false;
+      addSystemNote(c.id, u, `Akte verknüpft mit ${other.case_number}.`, true);
+      addSystemNote(other.id, u, `Akte verknüpft mit ${c.case_number}.`, true);
+      return true;
+    });
+    if (added) {
+      logActivity(u, 'Akten verknüpft', 'case', c.id, `${c.case_number} ↔ ${other.case_number}`);
+      require('../live').caseChanged(other.id);
+    }
+    res.status(added ? 201 : 200).json({ links: linkedCases(c.id) });
+  })
+);
+router.delete(
+  '/:id/links/:otherId',
+  wrap(async (req, res) => {
+    const u = req.user;
+    const id = idParam(req);
+    const c = id && getCase(id);
+    if (!c || !isStaff(u) || !caseAccess(c, u).canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
+    if (!caseAccess(c, u).canEdit) return res.status(403).json({ error: 'Lösen dürfen die zuständigen Anwälte und das Board.' });
+    const other = getCase(idParam(req, 'otherId'));
+    if (!other) return res.status(404).json({ error: 'Akte nicht gefunden.' });
+    const [a, b] = linkPair(c.id, other.id);
+    const removed = tx(() => {
+      const r = db.prepare('DELETE FROM case_links WHERE a_id = ? AND b_id = ?').run(a, b);
+      if (!r.changes) return false;
+      addSystemNote(c.id, u, `Verknüpfung mit ${other.case_number} gelöst.`, true);
+      addSystemNote(other.id, u, `Verknüpfung mit ${c.case_number} gelöst.`, true);
+      return true;
+    });
+    if (removed) {
+      logActivity(u, 'Akten-Verknüpfung gelöst', 'case', c.id, `${c.case_number} ↔ ${other.case_number}`);
+      require('../live').caseChanged(other.id);
+    }
+    res.json({ links: linkedCases(c.id) });
+  })
+);
+
 /* ---------------------------------------------------------------- Gesicherter Ticket-Verlauf (nur Kanzlei) */
 router.get('/:id/transcripts/:tid', (req, res) => {
   const id = idParam(req);
@@ -1146,6 +1255,7 @@ function setCaseStatus(c, u, newStatus, via = '') {
   logActivity(u, 'Akte geändert', 'case', c.id, `${c.case_number}: ${history.join(' · ')}`);
   notifyStatus(updated, u, newStatus);
   ticketUpdate(c, updated, u, { history, editFields: [], d: {}, newStatus, newlyAssigned: [] });
+  require('../discordBot').syncCaseClient(updated);
   return true;
 }
 
