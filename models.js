@@ -179,6 +179,7 @@ function caseRow(c, u) {
     externalDocIds: staff ? String(c.external_doc_ids || '').split(' ').filter(Boolean) : undefined,
     createdAt: c.created_at,
     updatedAt: c.updated_at,
+    closedAt: c.closed_at || null,
     // Nur Kanzlei: seit so vielen Tagen ohne Aktivität (0 = nicht liegengeblieben)
     idleDays: staff ? caseIdleDays(c) : undefined,
     reviewed: !!c.review_id, // Mandantenstimme zu dieser Akte abgegeben
@@ -348,6 +349,7 @@ function apptRow(a, u) {
     createdBy: staff ? a.created_by : undefined,
     creatorName: a.creator_name || null,
     clientVisible: !!a.client_visible,
+    clientResponse: a.client_response || null, // Zusage per Discord-Knopf: zugesagt | passt_nicht
     createdAt: a.created_at,
   };
 }

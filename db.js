@@ -1219,6 +1219,11 @@ db.exec(`
 `);
 // Vorschaubild (WebP, im Browser verkleinert) je Beweismittel – Raster laden schneller, das Original erst beim Öffnen
 addColumn('case_attachments', 'thumb', 'TEXT');
+// Lesebestätigung mit Uhrzeit, einmalige Erinnerung an ungelesene Nachrichten, Zusage des Mandanten zu Terminen
+addColumn('case_chat_reads', 'read_at', 'TEXT');
+addColumn('cases', 'chat_nudged_id', 'INTEGER');
+addColumn('appointments', 'client_response', 'TEXT');
+addColumn('appointments', 'client_response_at', 'TEXT');
 // Strafmaß der Akte: Einschätzung der Kanzlei und verminderte Schuldfähigkeit (§ 8)
 addColumn('cases', 'sentence_estimate', 'INTEGER');
 addColumn('cases', 'sentence_fine', 'INTEGER');

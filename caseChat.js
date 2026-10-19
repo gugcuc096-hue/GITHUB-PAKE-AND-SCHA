@@ -10,6 +10,14 @@
  * Gelesen: case_chat_reads merkt sich je Akte und Person die zuletzt gelesene Nachricht. „Neu“ ist für Anwälte, was
  * der Mandant in ihren Akten (federführend oder mitarbeitend) geschrieben hat, für den Mandanten, was die Kanzlei in
  * seinen Akten geschrieben hat. Nachrichten von vor der Einführung (chat_read_floor) gelten als gelesen.
+ * Unter der eigenen Nachricht steht „gelesen 14:32“ (read_at: wann die Gegenseite zuletzt weitergelesen hat).
+ *
+ * Erinnerung: Hat der Mandant eine Nachricht der Kanzlei zwei Tage nicht gelesen, schickt der Bot ihm einmal eine
+ * kurze Direktnachricht mit Link zur Akte (nur mit Website-Konto und verknüpftem Discord, nicht bei Akten mit
+ * Discord-Ticket – dort steht die Nachricht ohnehin). Der Inhalt der Nachricht steht nicht darin.
+ *
+ * Bilder aus dem Ticket: Discord-Links auf Anhänge laufen nach einiger Zeit ab. Bilder werden deshalb heruntergeladen
+ * und als interne Beweise in der Akte gespeichert; im Chat steht dann ein Verweis statt des Links.
  */
 const { db, getSetting } = require('./db');
 
@@ -47,8 +55,10 @@ function messages(caseId, after = 0) {
 function markRead(caseId, userId, lastId) {
   if (!(lastId > 0)) return;
   db.prepare(
-    `INSERT INTO case_chat_reads (case_id, user_id, last_id) VALUES (?, ?, ?)
-     ON CONFLICT(case_id, user_id) DO UPDATE SET last_id = MAX(last_id, excluded.last_id)`
+    `INSERT INTO case_chat_reads (case_id, user_id, last_id, read_at) VALUES (?, ?, ?, datetime('now'))
+     ON CONFLICT(case_id, user_id) DO UPDATE SET
+       read_at = CASE WHEN excluded.last_id > last_id THEN excluded.read_at ELSE read_at END,
+       last_id = MAX(last_id, excluded.last_id)`
   ).run(caseId, userId, lastId);
 }
 
@@ -61,12 +71,18 @@ function readState(c, u) {
   const staff = u.role === 'anwalt' || u.role === 'admin';
   const other = staff
     ? c.client_id
-      ? db.prepare('SELECT last_id FROM case_chat_reads WHERE case_id = ? AND user_id = ?').get(c.id, c.client_id)
+      ? db.prepare('SELECT last_id, read_at FROM case_chat_reads WHERE case_id = ? AND user_id = ?').get(c.id, c.client_id)
       : null
     : db
-        .prepare("SELECT MAX(r.last_id) AS last_id FROM case_chat_reads r JOIN users u ON u.id = r.user_id WHERE r.case_id = ? AND u.role IN ('anwalt','admin')")
+        .prepare(
+          "SELECT r.last_id, r.read_at FROM case_chat_reads r JOIN users u ON u.id = r.user_id WHERE r.case_id = ? AND u.role IN ('anwalt','admin') ORDER BY r.last_id DESC, r.read_at DESC LIMIT 1"
+        )
         .get(c.id);
-  return { mine: Math.max(mine ? mine.last_id : 0, floor()), other: Math.max(other && other.last_id ? other.last_id : 0, floor()) };
+  return {
+    mine: Math.max(mine ? mine.last_id : 0, floor()),
+    other: Math.max(other && other.last_id ? other.last_id : 0, floor()),
+    otherAt: (other && other.read_at) || null,
+  };
 }
 
 /** Ungelesene Nachrichten der Gegenseite: { total, cases: { [caseId]: Anzahl } }. */
@@ -133,7 +149,91 @@ function importFromDiscord(d) {
   const id = Number(info.lastInsertRowid);
   if (author.id) markRead(c.id, author.id, id); // eigene Nachricht gilt als gelesen
   require('./live').caseChanged(c.id, { chat: true }); // erscheint sofort im offenen Chat auf der Website
+  const images = (d.attachments || []).filter((a) => a && /^image\/(jpeg|png|webp)$/.test(String(a.content_type || '')));
+  if (images.length) keepImages(c, author, id, images).catch((err) => console.warn('Bilder aus dem Ticket nicht gesichert:', err.message));
   return messages(c.id, id - 1)[0] || null;
 }
 
-module.exports = { messages, markRead, readState, unreadFor, importFromDiscord };
+/* ---------------------------------------------------------------- Bilder aus dem Ticket dauerhaft sichern */
+const DISCORD_CDN = /^https:\/\/(cdn\.discordapp\.com|media\.discordapp\.net)\//;
+const MAX_IMAGE = 8 * 1024 * 1024;
+async function fetchImage(url) {
+  if (!DISCORD_CDN.test(url)) return null; // nur Discord selbst – keine beliebigen Adressen abrufen
+  const res = await fetch(url, { signal: AbortSignal.timeout(15000), redirect: 'error' });
+  if (!res.ok || Number(res.headers.get('content-length') || 0) > MAX_IMAGE) return null;
+  const buf = Buffer.from(await res.arrayBuffer());
+  return buf.length <= MAX_IMAGE ? buf : null;
+}
+/** Bilder als interne Beweise speichern (bis zum Limit der Akte) und im Chat die Links durch einen Verweis ersetzen. */
+async function keepImages(c, author, noteId, images) {
+  const { saveImageBuffer } = require('./uploads');
+  const { MAX_ATTACHMENTS_PER_CASE } = require('./helpers');
+  const crypto = require('crypto');
+  let body = db.prepare('SELECT body FROM notes WHERE id = ?').get(noteId)?.body;
+  let kept = 0;
+  for (const a of images) {
+    const count = db.prepare('SELECT COUNT(*) AS n FROM case_attachments WHERE case_id = ?').get(c.id).n;
+    if (count >= MAX_ATTACHMENTS_PER_CASE) break;
+    const buf = await fetchImage(String(a.url || '')).catch(() => null);
+    if (!buf) continue;
+    let saved;
+    try {
+      saved = saveImageBuffer(buf, 'evidence');
+    } catch {
+      continue; // kein echtes JPG/PNG/WebP
+    }
+    const caption = `Aus dem Discord-Ticket (${author.name})`.slice(0, 200);
+    db.prepare(
+      `INSERT INTO case_attachments (case_id, file, mime, size, caption, internal, uploader_id, uploader_name, content_hash)
+       VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`
+    ).run(c.id, saved.file, saved.mime, saved.size, caption, author.id, author.name, crypto.createHash('sha256').update(buf).digest('hex'));
+    if (body) body = body.replace(`📎 ${a.url}`, `📎 Bild „${String(a.filename || 'Bild').slice(0, 80)}“ – gespeichert unter Beweise`);
+    kept++;
+  }
+  if (!kept) return 0;
+  if (body) db.prepare('UPDATE notes SET body = ? WHERE id = ?').run(body, noteId);
+  require('./live').caseChanged(c.id);
+  return kept;
+}
+
+/* ---------------------------------------------------------------- Erinnerung an ungelesene Nachrichten */
+const NUDGE_AFTER_MS = 48 * 60 * 60 * 1000;
+/** Hintergrund (alle paar Minuten): einmal je ungelesener Nachricht der Kanzlei, frühestens nach zwei Tagen. */
+async function nudgeSweep({ now = Date.now() } = {}) {
+  const tickets = ticketsMod();
+  if (!tickets.hasToken()) return 0;
+  const cutoff = new Date(now - NUDGE_AFTER_MS).toISOString().replace('T', ' ').slice(0, 19);
+  const rows = db
+    .prepare(
+      `SELECT c.id, c.case_number, u.discord_id, MAX(n.id) AS last_note
+       FROM cases c
+       JOIN users u ON u.id = c.client_id AND u.role = 'mandant' AND u.active = 1 AND u.discord_id IS NOT NULL
+       JOIN notes n ON n.case_id = c.id AND ${CHAT} AND n.author_role IN ('anwalt','admin')
+       LEFT JOIN case_chat_reads r ON r.case_id = c.id AND r.user_id = c.client_id
+       WHERE c.status != 'geschlossen' AND c.discord_channel_id IS NULL
+         AND n.id > MAX(COALESCE(r.last_id, 0), ?) AND n.id > COALESCE(c.chat_nudged_id, 0)
+       GROUP BY c.id
+       HAVING MIN(n.created_at) <= ?`
+    )
+    .all(floor(), cutoff);
+  let sent = 0;
+  for (const r of rows) {
+    db.prepare('UPDATE cases SET chat_nudged_id = ? WHERE id = ?').run(r.last_note, r.id); // je Nachricht nur einmal
+    if (!tickets.isId(r.discord_id)) continue;
+    const base = tickets.siteBase();
+    try {
+      const ch = await tickets.rest('POST', '/users/@me/channels', { recipient_id: r.discord_id });
+      await tickets.rest('POST', `/channels/${ch.id}/messages`, {
+        embeds: [tickets.embed({ title: '💬 Neue Nachricht Ihrer Kanzlei', description: `In Ihrer Akte **${r.case_number}** wartet eine Nachricht der Kanzlei auf Sie.` })],
+        components: base ? [{ type: 1, components: [{ type: 2, style: 5, label: 'Nachricht lesen', url: `${base}/dashboard.html?case=${r.id}#cases` }] }] : undefined,
+        allowed_mentions: { parse: [] },
+      });
+      sent++;
+    } catch {
+      /* Direktnachrichten gesperrt – die Nachricht steht trotzdem im Portal */
+    }
+  }
+  return sent;
+}
+
+module.exports = { messages, markRead, readState, unreadFor, importFromDiscord, nudgeSweep, keepImages };

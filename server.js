@@ -226,6 +226,10 @@ const reminderTimer = setInterval(() => {
     require('./routes/resolutions').sweep();
     // Anwalt des Monats: zum Monatswechsel in Discord verkünden
     require('./lawyerOfMonth').sweep();
+    // Live-Anzeige „Im Dienst: N“ im Discord-Kanalnamen (z. B. nach automatisch beendeten Schichten)
+    require('./dutyChannel').update();
+    // Ungelesene Nachricht der Kanzlei seit zwei Tagen: einmal per Discord-DM erinnern
+    require('./caseChat').nudgeSweep().catch((err) => console.warn('Erinnerung an ungelesene Nachrichten fehlgeschlagen:', err.message));
   } catch (err) {
     console.warn('Hintergrundaufgabe fehlgeschlagen:', err.message);
   }

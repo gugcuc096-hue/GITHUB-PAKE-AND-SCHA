@@ -259,8 +259,14 @@ router.post('/', express.raw({ type: '*/*', limit: '100kb' }), (req, res) => {
   if (![2, 3, 5].includes(body.type)) return res.json(fail('Diese Aktion wird nicht unterstützt.'));
 
   try {
-    if (String(body.guild_id || '') !== tickets.config().guildId) return res.json(fail('Dieser Server ist nicht für den Kanzlei-Bot eingerichtet.'));
     const discordId = String(body.member?.user?.id || body.user?.id || '');
+    // Termin-Zusage: Knöpfe stehen in der Direktnachricht an den Mandanten (dort gibt es keinen Server)
+    const appt = /^appt:(yes|no):(\d+)$/.exec(String(body.data?.custom_id || ''));
+    if (body.type === 3 && appt) {
+      const r = require('../apptConfirm').answer(appt[1], Number(appt[2]), discordId);
+      return res.json(r.error ? fail(r.error) : done(r.text, appt[1] === 'yes' ? 'Zugesagt' : 'Passt nicht'));
+    }
+    if (String(body.guild_id || '') !== tickets.config().guildId) return res.json(fail('Dieser Server ist nicht für den Kanzlei-Bot eingerichtet.'));
     const u = tickets.isId(discordId) ? db.prepare('SELECT * FROM users WHERE discord_id = ? AND active = 1').get(discordId) : null;
 
     if (body.type === 2) {

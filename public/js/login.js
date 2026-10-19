@@ -40,6 +40,7 @@
             e.target.disabled = true;
             try {
                 const r = await api.post('/api/discord/signup');
+                try { sessionStorage.setItem('ps.freshLogin', '1'); } catch { /* ohne Speicher eben ohne Siegel */ }
                 location.replace(r.redirect || '/dashboard.html');
             } catch (ex) {
                 notice.textContent = ex.message;
@@ -68,6 +69,7 @@
         try {
             const r = await api.post('/api/auth/login', { email, password });
             if (r.twoFactor) return showCodeStep(r.twoFactor);
+            try { sessionStorage.setItem('ps.freshLogin', '1'); } catch { /* ohne Speicher eben ohne Siegel */ }
             location.replace(nextUrl());
         } catch (ex) {
             err.textContent = ex.message;

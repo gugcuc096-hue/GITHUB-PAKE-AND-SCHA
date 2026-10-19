@@ -993,6 +993,11 @@ async function discordData(fresh = false) {
       .filter((c) => c.type === 0 || c.type === 5)
       .sort((a, b) => (a.position || 0) - (b.position || 0))
       .map((c) => ({ id: c.id, name: c.name, category: categories.get(c.parent_id) || '' })),
+    // Sprachkanäle (Live-Anzeige „Im Dienst: N“ im Kanalnamen)
+    voiceChannels: channels
+      .filter((c) => c.type === 2)
+      .sort((a, b) => (a.position || 0) - (b.position || 0))
+      .map((c) => ({ id: c.id, name: c.name, category: categories.get(c.parent_id) || '' })),
   };
   discordCache = { id: g, data, until: Date.now() + 60 * 1000 };
   return data;

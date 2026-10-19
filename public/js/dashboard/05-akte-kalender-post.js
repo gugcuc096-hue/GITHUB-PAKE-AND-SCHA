@@ -415,15 +415,21 @@ function chatBubbles(list, toBubble, prevDay = null) {
     })
     .join('');
 }
-/** „Gesendet“ / „Gelesen“ unter der letzten eigenen Nachricht (otherRead: bis wohin die Gegenseite gelesen hat). */
-function chatReceipts(list, otherRead) {
+/**
+ * „Gesendet“ / „Gelesen 14:32“ unter der letzten eigenen Nachricht (otherRead: bis wohin die Gegenseite gelesen hat,
+ * otherAt: wann sie zuletzt weitergelesen hat).
+ */
+function chatReceipts(list, otherRead, otherAt) {
   if (!list) return;
   if (otherRead !== undefined) list.dataset.otherRead = String(otherRead);
+  if (otherAt !== undefined) list.dataset.otherAt = otherAt || '';
   const read = Number(list.dataset.otherRead) || 0;
+  const at = parseDate(list.dataset.otherAt);
+  const when = at ? ` ${dayKey(at) === dayKey(new Date()) ? '' : `${at.toLocaleDateString('de-DE', { day: 'numeric', month: 'numeric' })}, `}${fmtTime(at)}` : '';
   const outs = $$('.chat-msg.out:not(.pending)', list);
   outs.forEach((el) => (el.querySelector('.chat-receipt').textContent = ''));
   const last = outs[outs.length - 1];
-  if (last) last.querySelector('.chat-receipt').textContent = Number(last.dataset.id) <= read ? '· gelesen' : '· gesendet';
+  if (last) last.querySelector('.chat-receipt').textContent = Number(last.dataset.id) <= read ? `· gelesen${when}` : '· gesendet';
 }
 /** Neue Nachrichten unten anhängen (doppelte werden übersprungen); scrollt mit, wenn man unten war. */
 function chatAppend(list, messages, toBubble) {
@@ -528,7 +534,7 @@ function chatSection(c, chat, ticket) {
   return `<div class="section" id="secChat">
       <h3 class="section-title">Nachrichten <span class="text-xs text-dim font-normal sec-meta">${staff ? 'mit dem Mandanten' : 'mit Ihrer Kanzlei'}</span></h3>
       <div class="chat">
-        <div class="chat-list" id="chatList" data-case-id="${c.id}" data-last-id="${list.length ? list[list.length - 1].id : 0}" data-other-read="${chat ? chat.read.other : 0}" aria-live="polite">
+        <div class="chat-list" id="chatList" data-case-id="${c.id}" data-last-id="${list.length ? list[list.length - 1].id : 0}" data-other-read="${chat ? chat.read.other : 0}" data-other-at="${esc((chat && chat.read.otherAt) || '')}" aria-live="polite">
           ${list.length ? chatBubbles(list, caseBubble) : `<p class="chat-empty">${esc(empty)}</p>`}
         </div>
         ${dutyLine}
@@ -568,7 +574,7 @@ async function pollChat() {
     if (!list.isConnected) return;
     if (r.messages.length) typingHide();
     chatAppend(list, r.messages, caseBubble);
-    chatReceipts(list, r.read.other);
+    chatReceipts(list, r.read.other, r.read.otherAt);
     if (r.messages.length) await markChatRead(caseId, Number(list.dataset.lastId), r.read.mine);
   } catch {
     /* nächster Versuch beim nächsten Takt */
@@ -944,7 +950,7 @@ function calendarStaff() {
     const label = d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }) + (evs.length ? `, ${evs.length} Einträge` : '');
     grid += `<button type="button" class="cal-day ${d.getMonth() !== mo ? 'muted' : ''} ${k === todayKey ? 'today' : ''} ${k === st.cal.selected ? 'selected' : ''}" data-action="cal-select" data-day="${k}" aria-label="${esc(label)}">
         <span class="cal-num">${d.getDate()}</span>
-        ${evs.slice(0, 3).map((e) => `<span class="cal-ev t-${esc(e.type)} ${e.status === 'erledigt' ? 'line-through opacity-60' : ''}">${esc(fmtTime(e.startsAt))} ${esc(e.title)}</span>`).join('')}
+        ${evs.slice(0, 3).map((e) => `<span class="cal-ev t-${esc(e.type)} ${e.status === 'erledigt' ? 'line-through opacity-60' : ''}${e.id === st.cal.landed ? ' cal-landed' : ''}" data-ev="${e.id}" title="Zum Verschieben auf einen anderen Tag ziehen">${esc(fmtTime(e.startsAt))} ${esc(e.title)}</span>`).join('')}
         ${evs.length > 3 ? `<span class="cal-more">+${evs.length - 3} weitere</span>` : ''}
         ${evs.length ? `<span class="cal-dots">${evs.slice(0, 4).map((e) => `<i class="cal-dot" style="background:${EVENT_COLORS[e.type]}"></i>`).join('')}</span>` : ''}
       </button>`;
@@ -987,6 +993,66 @@ function calendarStaff() {
         </aside>
       </div>`;
 }
+
+/*
+ * Kalender (PC): einen Eintrag mit der Maus auf einen anderen Tag ziehen – die Uhrzeit bleibt, der Eintrag rastet am
+ * neuen Tag weich ein. Der Mandant erfährt die Verlegung wie sonst auch (Ticket bzw. Discord-Nachricht).
+ */
+const calDrag = { ev: null, chip: null, ghost: null, over: null, x: 0, y: 0, moved: false };
+document.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0 || e.pointerType !== 'mouse' || st.view !== 'calendar' || !isStaff()) return;
+  const chip = e.target.closest && e.target.closest('#content .cal-ev[data-ev]');
+  if (chip) Object.assign(calDrag, { ev: Number(chip.dataset.ev), chip, x: e.clientX, y: e.clientY, moved: false });
+});
+document.addEventListener('pointermove', (e) => {
+  if (!calDrag.ev) return;
+  if (!calDrag.moved) {
+    if (Math.hypot(e.clientX - calDrag.x, e.clientY - calDrag.y) < 6) return;
+    calDrag.moved = true;
+    calDrag.ghost = calDrag.chip.cloneNode(true);
+    calDrag.ghost.classList.add('cal-ghost');
+    document.body.appendChild(calDrag.ghost);
+    document.body.classList.add('cal-dragging');
+  }
+  calDrag.ghost.style.left = `${e.clientX + 10}px`;
+  calDrag.ghost.style.top = `${e.clientY + 10}px`;
+  const day = document.elementFromPoint(e.clientX, e.clientY)?.closest('#content .cal-day[data-day]') || null;
+  if (day === calDrag.over) return;
+  calDrag.over?.classList.remove('drop-target');
+  calDrag.over = day;
+  day?.classList.add('drop-target');
+});
+document.addEventListener('pointerup', async () => {
+  const { ev, moved, over, ghost } = calDrag;
+  Object.assign(calDrag, { ev: null, chip: null, ghost: null, over: null, moved: false });
+  if (!ev || !moved) return;
+  ghost.remove();
+  over?.classList.remove('drop-target');
+  document.body.classList.remove('cal-dragging');
+  // Der Klick nach dem Loslassen wählt keinen Tag aus
+  const eat = (c) => {
+    c.stopPropagation();
+    c.preventDefault();
+  };
+  window.addEventListener('click', eat, true);
+  setTimeout(() => window.removeEventListener('click', eat, true), 0);
+  const e = st.events.find((x) => x.id === ev);
+  const from = e && parseDate(e.startsAt);
+  if (!over || !from || dayKey(from) === over.dataset.day) return;
+  const [y, m, d] = over.dataset.day.split('-').map(Number);
+  const to = new Date(from);
+  to.setFullYear(y, m - 1, d);
+  const body = { startsAt: to.toISOString() };
+  if (e.endsAt) body.endsAt = new Date(parseDate(e.endsAt).getTime() + (to - from)).toISOString();
+  await guard(async () => {
+    await api.patch(`/api/calendar/${ev}`, body);
+    st.cal.selected = over.dataset.day;
+    st.cal.landed = ev;
+    toast(`„${e.title}“ auf ${to.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })} verschoben.`);
+    await refreshBehind();
+    st.cal.landed = null;
+  });
+});
 
 function calendarClient() {
   const cutoff = Date.now() - 60 * 60 * 1000;

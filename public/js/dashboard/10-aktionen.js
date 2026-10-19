@@ -415,7 +415,9 @@ const actions = {
     updateInvoiceSummary();
   },
   'inv-status': async (el) => {
+    const row = el.closest('tr, .inv-card, .row') || el;
     await api.patch('/api/invoices/' + el.dataset.id, { status: el.dataset.status });
+    if (el.dataset.status === 'bezahlt') window.PS.stamp(row, 'Bezahlt', 'paid');
     toast(
       el.dataset.reported && el.dataset.status === 'bezahlt'
         ? 'Zahlungseingang bestätigt – der Mandant wird informiert.'
@@ -1294,7 +1296,7 @@ const actions = {
     st.returnCase = c.id;
     const [{ templates: all }, defaults] = await Promise.all([api.get('/api/contract-templates'), api.get(`/api/cases/${c.id}/contracts/defaults`), load.lawyers(), load.fees()]);
     const templates = all.filter((t) => t.kind !== 'schriftsatz');
-    if (!templates.length) throw new Error('Es gibt keine aktive Vertragsvorlage. Das Board of Partners kann sie unter Einstellungen → Vertragsvorlagen anlegen.');
+    if (!templates.length) throw new Error('Es gibt keine aktive Vertragsvorlage. Das Board of Partners kann sie im Kanzlei-Wiki unter „Verträge & Schriftsätze“ anlegen.');
     openModal(contractForm(c, { templates, defaults }));
   },
   'brief-new': async () => {
@@ -1303,7 +1305,7 @@ const actions = {
     st.returnCase = c.id;
     const [{ templates: all }, defaults] = await Promise.all([api.get('/api/contract-templates'), api.get(`/api/cases/${c.id}/contracts/defaults`), load.lawyers()]);
     st.briefTemplates = all.filter((t) => t.kind === 'schriftsatz');
-    if (!st.briefTemplates.length) throw new Error('Es gibt keine aktive Schriftsatz-Vorlage. Das Board of Partners kann sie unter Einstellungen → Vertragsvorlagen anlegen (Art „Schriftsatz“).');
+    if (!st.briefTemplates.length) throw new Error('Es gibt keine aktive Schriftsatz-Vorlage. Das Board of Partners kann sie im Kanzlei-Wiki unter „Verträge & Schriftsätze“ anlegen (Art „Schriftsatz“).');
     openModal(briefForm(c, { templates: st.briefTemplates, defaults }));
     syncBriefForm($('form[data-form="brief-new"]'));
   },
@@ -1342,7 +1344,8 @@ const actions = {
     const k = (st.caseContracts || []).find((x) => x.id === Number(el.dataset.id));
     if (!k) return;
     if (!(await ask(`Bitte nur bestätigen, wenn ${k.data.mandant || 'der Mandant'} ${k.kind === 'schriftsatz' ? 'das Dokument' : 'den Vertrag'} im Spiel tatsächlich unterschrieben hat. Die Erfassung wird mit Ihrem Namen im Aktenverlauf vermerkt.`, { title: 'Unterschrift des Mandanten erfassen?', confirmText: 'Erfassen' }))) return;
-    await api.post(`/api/contracts/${k.id}/sign`, { as: 'erfassen' });
+    const r = await api.post(`/api/contracts/${k.id}/sign`, { as: 'erfassen' });
+    if (r.contract && r.contract.status === 'unterschrieben') window.PS.stamp(el.closest('.contract-row') || $('#modalCard'), 'Unterschrieben');
     toast('Unterschrift des Mandanten erfasst.');
     await reloadCase(Number(el.dataset.caseId));
   },

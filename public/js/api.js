@@ -695,7 +695,38 @@
 .lotm-on-card{position:absolute;top:-.85rem;left:50%;transform:translateX(-50%);z-index:2}
 .team-card.is-lotm{position:relative;overflow:visible;border-color:rgba(212,175,55,.55);box-shadow:0 0 0 1px rgba(212,175,55,.25),0 18px 60px rgba(212,175,55,.14)}
 .ps-tilt{will-change:transform;transition:transform .14s ease-out,box-shadow .35s ease,border-color .35s ease!important}
-.ps-tilt:not(.ps-spot-on){transition:transform .7s cubic-bezier(.16,1,.3,1),box-shadow .35s ease,border-color .35s ease!important}`;
+.ps-tilt:not(.ps-spot-on){transition:transform .7s cubic-bezier(.16,1,.3,1),box-shadow .35s ease,border-color .35s ease!important}
+.ps-stamp{position:fixed;z-index:95;pointer-events:none;padding:.3rem .85rem .26rem;border:3px double currentColor;border-radius:6px;font:800 1.05rem/1 'Inter',system-ui,sans-serif;letter-spacing:.22em;text-transform:uppercase;white-space:nowrap;background:rgba(4,9,22,.72);box-shadow:0 10px 30px rgba(0,0,0,.45),inset 0 0 12px rgba(0,0,0,.35);transform:translate(-50%,-50%) rotate(-8deg)}
+.ps-stamp-paid{color:#4ade80;text-shadow:0 0 14px rgba(74,222,128,.45)}
+.ps-stamp-gold{color:#e8c766;text-shadow:0 0 14px rgba(232,199,102,.45)}`;
+  /**
+   * Stempel („BEZAHLT“, „UNTERSCHRIEBEN“): drückt sich kurz mittig auf ein Element und blendet wieder aus. Liegt fest
+   * über der Seite – wird darunter neu gezeichnet, bleibt er trotzdem stehen. Bei „Bewegung reduzieren“ kein Stempel.
+   */
+  function stamp(target, text, tone = 'gold') {
+    if (!target || motion.calm() || typeof Element.prototype.animate !== 'function') return;
+    const r = target.getBoundingClientRect();
+    if (!r.width || r.bottom < 0 || r.top > window.innerHeight) return;
+    const el = document.createElement('div');
+    el.className = `ps-stamp ps-stamp-${tone}`;
+    el.textContent = text;
+    el.setAttribute('aria-hidden', 'true');
+    el.style.left = `${r.left + r.width / 2}px`;
+    el.style.top = `${r.top + r.height / 2}px`;
+    document.body.appendChild(el);
+    const t = (s, deg) => `translate(-50%,-50%) scale(${s}) rotate(${deg}deg)`;
+    el.animate(
+      [
+        { opacity: 0, transform: t(2.4, -16) },
+        { opacity: 1, transform: t(0.94, -8), offset: 0.22 },
+        { opacity: 1, transform: t(1, -8), offset: 0.3 },
+        { opacity: 1, transform: t(1, -8), offset: 0.78 },
+        { opacity: 0, transform: t(1.04, -8) },
+      ],
+      { duration: 1500, easing: 'cubic-bezier(.2,.8,.2,1)' }
+    ).onfinish = () => el.remove();
+  }
+
   const fxStyle = document.createElement('style');
   fxStyle.id = 'psFxCss';
   fxStyle.textContent = FX_CSS;
@@ -757,5 +788,5 @@
   );
   document.documentElement.addEventListener('mouseleave', spotOff);
 
-  window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog, closeToDashboard, drafts, applications, tab, fieldError, fieldErrors, clearFieldErrors, countUp, motion };
+  window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog, closeToDashboard, drafts, applications, tab, fieldError, fieldErrors, clearFieldErrors, countUp, motion, stamp };
 })();
