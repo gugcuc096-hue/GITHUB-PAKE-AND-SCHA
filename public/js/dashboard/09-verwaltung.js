@@ -989,6 +989,11 @@ async function handleUpload(input) {
     if (ctl) ctl.innerHTML = teamPhotoControls(m);
     toast('Foto gespeichert – live auf der Website.');
     await refreshBehind();
+  } else if (kind === 'storage-item') {
+    // Bild eines Lager-Gegenstands (Einstellungen → Lager)
+    await api.upload(`/api/storage/items/${input.dataset.id}/image`, await resizeImage(files[0], { max: 480 }));
+    toast('Bild gespeichert.');
+    await reloadStorageAdmin();
   } else if (kind === 'fn-pending') {
     addPendingImages({ blobs: files });
   } else if (kind === 'fivenet-img') {

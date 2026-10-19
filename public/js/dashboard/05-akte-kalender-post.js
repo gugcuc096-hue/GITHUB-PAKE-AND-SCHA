@@ -628,7 +628,34 @@ function typingHide() {
   $('#chatTyping')?.remove();
 }
 
-function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, transcripts = [], clientSuggestions, review, chat, charges, deals = [] }) {
+/** Kürzel für den Laufzettel: „Dr. Alois Pake“ → „AP“. */
+const slipInitials = (name) =>
+  String(name || '')
+    .replace(/\b(Dr|Prof|Mr|Mrs|Ms)\.?\s+/gi, '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+/** Verknüpfte Akten als Chips (öffnen die Akte; zuständige Anwälte können die Verknüpfung lösen). */
+function linksHtml(c, links) {
+  return `<div class="case-links">${links
+    .map(
+      (k) => `<span class="case-link ${k.status === 'geschlossen' ? 'is-closed' : ''}"><button type="button" class="case-link-open" data-action="open-case" data-id="${k.id}" title="${esc(k.title)}"><span class="font-mono">${esc(k.caseNumber)}</span><span class="case-link-who">${esc(k.clientName)}</span></button>${
+        c.canEdit ? `<button type="button" class="case-link-x" data-action="case-unlink" data-id="${c.id}" data-other="${k.id}" data-number="${esc(k.caseNumber)}" aria-label="Verknüpfung mit ${esc(k.caseNumber)} lösen" title="Verknüpfung lösen">${icon('x', 'ico-sm')}</button>` : ''
+      }</span>`
+    )
+    .join('')}</div>`;
+}
+/** Laufzettel: wer die Akte bearbeitet hat – Kürzel und Tag, voller Name im Tooltip. */
+function routingHtml(routing) {
+  return `<div class="slip">${routing
+    .map((r) => `<span class="slip-row" title="${esc(`${r.name} – ${r.count} ${r.count === 1 ? 'Eintrag' : 'Einträge'}, zuletzt ${fmtDate(r.lastAt)}`)}"><b>${esc(slipInitials(r.name))}</b><span>${esc(shortDate(r.lastAt))}</span></span>`)
+    .join('')}</div>`;
+}
+
+function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, transcripts = [], clientSuggestions, review, chat, charges, deals = [], links = [], linkedEvidence = [], routing = [] }) {
   const staff = isStaff();
   const admin = isAdmin();
   const me = st.user.id;
@@ -668,6 +695,8 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     c.courtRef ? ['Gerichtsaktenzeichen', c.courtRef] : null,
     ['Eröffnet', fmtDate(c.createdAt)],
     staff ? ['Eingang über', SOURCES[c.source] || c.source] : null,
+    staff && links.length ? ['Verknüpfte Akten', null, linksHtml(c, links)] : null,
+    staff && routing.length ? ['Laufzettel', null, routingHtml(routing)] : null,
   ]
     .filter(Boolean)
     .map(([k, v, html]) => `<div><div class="k">${esc(k)}</div><div class="v">${html != null ? html : esc(v)}</div></div>`)
@@ -747,6 +776,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       // Strafsachen haben den Abschnitt „Anklagepunkte“ immer – sonst kommt er von hier
       c.area !== 'strafrecht' && c.canEdit && charges && !charges.charges.length ? `<button type="button" class="more-item" data-action="charge-pick" data-id="${c.id}">${icon('scale', 'ico-sm')}<span>Anklagepunkte</span></button>` : '',
       c.area !== 'strafrecht' && !(charges && charges.charges.length) ? `<button type="button" class="more-item" data-action="hearing-start" data-id="${c.id}">${icon('scale', 'ico-sm')}<span>Verhandlungsmodus</span></button>` : '',
+      c.canEdit ? `<button type="button" class="more-item" data-action="case-link" data-id="${c.id}">${icon('link', 'ico-sm')}<span>Akte verknüpfen</span></button>` : '',
       c.lawyerId === me ? `<button type="button" class="more-item" data-action="release-case" data-id="${c.id}">${icon('logout', 'ico-sm')}<span>Akte abgeben</span></button>` : '',
       c.isCoLawyer ? `<button type="button" class="more-item" data-action="leave-case" data-id="${c.id}">${icon('logout', 'ico-sm')}<span>Mitarbeit beenden</span></button>` : '',
       admin ? `<button type="button" class="more-item danger" data-action="delete-case" data-id="${c.id}" data-number="${esc(c.caseNumber)}">${icon('trash', 'ico-sm')}<span>Akte löschen</span></button>` : '',
@@ -810,7 +840,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
         .map((n) => {
           const canDelete = !n.system && (n.authorId === me || admin);
           return `<div class="tl-item ${n.internal ? 'tl-internal' : ''} ${n.system ? 'tl-system' : ''}">
-              <div class="tl-meta"><span class="text-muted font-medium">${esc(n.author)}</span>${n.authorRole && ROLES[n.authorRole] ? `<span>${esc(ROLES[n.authorRole])}</span>` : ''}<span>${esc(fmtDate(n.createdAt))}</span>${n.internal ? badge('intern', 'amber') : ''}
+              <div class="tl-meta"><span class="text-muted font-medium">${esc(n.author)}</span>${n.authorRole && ROLES[n.authorRole] ? `<span>${esc(ROLES[n.authorRole])}</span>` : ''}<span>${esc(fmtDate(n.createdAt))}</span>${n.internal ? '<span class="stamp-mini" title="Interne Notiz – nur für die Kanzlei">Vertraulich</span>' : ''}
               ${canDelete ? `<button type="button" class="icon-btn sm tl-del" data-action="delete-note" data-case-id="${c.id}" data-id="${n.id}" aria-label="Notiz löschen" title="Notiz löschen">${icon('trash', 'ico-sm')}</button>` : ''}</div>
               <div class="tl-body">${esc(n.body)}</div></div>`;
         })
@@ -826,7 +856,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     contracts: contractsSection(c, contractList),
     briefs: briefsSection(c, briefList),
     external: externalSection(c, externalDocs),
-    evidence: attachmentsSection(c, attachments),
+    evidence: attachmentsSection(c, attachments, linkedEvidence),
     tasks: staff ? caseTasksSection(c, tasks) : '',
     invoices: invoiceList ? `<div class="section" id="secInvoices"><h3 class="section-title">Rechnungen & Honorare</h3>${invoiceList}</div>` : '',
     work: caseWorkSection(c, work),
@@ -839,7 +869,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     ['secContracts', 'Verträge', contractList.length, parts.contracts],
     ['secBriefs', 'Schriftsätze', briefList.length, parts.briefs],
     ['secExternal', 'Dokumente', externalDocs.length, parts.external],
-    ['secEvidence', 'Beweise', attachments.length, parts.evidence],
+    ['secEvidence', 'Beweise', attachments.length + linkedEvidence.reduce((n, k) => n + k.attachments.length, 0), parts.evidence],
     ['secTasks', 'Aufgaben', openTasks, parts.tasks],
     ['secInvoices', 'Rechnungen', invoices.length, parts.invoices],
     ['secWork', 'Zeiten', 0, parts.work],
@@ -850,8 +880,10 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     .join('')}</div></nav>`;
 
   return `
-      <div class="case-head mb-5" data-case-head="${c.id}">
-        <div class="pr-12"><div class="case-num-row"><span class="font-mono text-gold text-sm">${esc(c.caseNumber)}</span>${staff ? hereStrip(c.id) : ''}</div>
+      <div class="case-head case-cover mb-5" data-case-head="${c.id}">
+        <span class="cover-tab" aria-hidden="true">${staff && c.priority >= 3 && !c.closed ? `<i class="cover-tab-dot p${c.priority}"></i>` : ''}Akte</span>
+        ${c.closed ? '<span class="cover-stamp" aria-hidden="true">Abgeschlossen</span>' : ''}
+        <div class="pr-12"><div class="case-num-row"><span class="font-mono text-gold text-sm case-emboss">${esc(c.caseNumber)}</span>${staff ? hereStrip(c.id) : ''}</div>
           <h2 id="modalTitle" class="font-serif text-2xl md:text-3xl font-semibold leading-tight">${esc(c.title)}</h2></div>
         <div class="case-props">${headProps}</div>
       </div>

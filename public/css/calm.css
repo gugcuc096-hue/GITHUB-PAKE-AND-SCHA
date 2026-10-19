@@ -36,3 +36,7 @@ body.site-home *, body.site-home *::before, body.site-home *::after {
 .badge-changed { animation: none; }
 .ps-toast-bar { animation-name: toast-bar; }
 .spark-line { animation: none; stroke-dashoffset: 0; }
+/* Aktenmappe, Mehrfachauswahl: ohne Bewegung */
+mark.hl-mark { animation: none; }
+.bulk-bar { animation: none; }
+.lager-item:hover, .lager-cash:hover { transform: none; }

@@ -283,6 +283,10 @@ document.addEventListener('input', (e) => {
     st.caseQuery = t.value;
     clearTimeout(st.listSearchTimer);
     st.listSearchTimer = setTimeout(() => $('#caseList') && ($('#caseList').innerHTML = caseTable()), 120);
+  } else if (t.id === 'storageSearch') {
+    st.storageQuery = t.value;
+    clearTimeout(st.listSearchTimer);
+    st.listSearchTimer = setTimeout(() => $('#storageGrid') && ($('#storageGrid').innerHTML = storageGrid()), 120);
   } else if (t.id === 'clientSearch') {
     st.clientQuery = t.value;
     clearTimeout(st.listSearchTimer);
@@ -616,6 +620,7 @@ const LIVE_VIEWS = {
   snippets: ['wiki'],
   penal: ['wiki'],
   resolutions: ['resolutions'],
+  storage: ['lager'],
 };
 const live = { es: null, ok: false, down: false, timers: new Map(), pendingView: false, pendingCase: null };
 function liveLater(key, fn, ms = 300) {

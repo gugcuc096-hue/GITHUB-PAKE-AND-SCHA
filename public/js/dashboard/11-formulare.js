@@ -8,6 +8,18 @@
    Formulare
    ================================================================ */
 const forms = {
+  'case-link': async (f) => {
+    const id = Number(f.dataset.id);
+    await api.post(`/api/cases/${id}/links`, { otherId: Number(f.elements.otherId.value) });
+    toast('Akten verknüpft.');
+    st.returnCase = id;
+    await returnOrClose();
+  },
+  'bulk-close': async (f) => {
+    const outcome = val(new FormData(f), 'outcome');
+    closeModal();
+    await bulkPatch(() => ({ status: 'geschlossen', outcome }), 'abgeschlossen', 'Abgeschlossen');
+  },
   'client-note': async (f) => {
     const body = f.elements.body.value.trim();
     if (!body) throw new Error('Bitte einen Text eingeben.');
@@ -24,7 +36,7 @@ const forms = {
     const d = collectForm(f);
     const ranks = {};
     st.bot.ranks.forEach((r) => (ranks[r] = (d.ranks && d.ranks[r]) || ''));
-    st.bot = await api.put('/api/bot/rank-sync', { enabled: !!d.enabled, ranks, staff: d.staff || '', board: d.board || '', associates: d.associates || '', client: d.client || '', strict: !!d.strict });
+    st.bot = await api.put('/api/bot/rank-sync', { enabled: !!d.enabled, ranks, staff: d.staff || '', board: d.board || '', associates: d.associates || '', client: d.client || '', clientOpen: d.clientOpen || '', strict: !!d.strict });
     toast(d.enabled ? 'Rang-Sync gespeichert – alle Mitglieder werden jetzt abgeglichen.' : 'Rang-Sync gespeichert (aus).');
     renderView();
   },
@@ -188,7 +200,10 @@ const forms = {
     await returnOrClose();
     // Sieg-Moment: Erfolg mit goldenem Siegel feiern, sonst nur die Meldung
     if (OUTCOMES[outcome][1] === true) victoryMoment(OUTCOMES[outcome][2]);
-    else toast(`Verfahren abgeschlossen – ${OUTCOMES[outcome][0]}`);
+    else {
+      toast(`Verfahren abgeschlossen – ${OUTCOMES[outcome][0]}`);
+      window.PS.stamp($('#modalCard .case-head') || $('#content'), 'Abgeschlossen', 'slate');
+    }
   },
   'process-ticket': async (f) => {
     const fd = new FormData(f);

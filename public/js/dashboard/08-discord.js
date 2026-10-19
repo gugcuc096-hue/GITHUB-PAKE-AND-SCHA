@@ -170,6 +170,7 @@ function botRanks() {
           ${row('Board of Partners', 'board', c.board, 'Founding Partner, Equity Partner, Partner')}
           ${row('Associate Attorneys', 'associates', c.associates, 'Senior Associate, Associate, Junior Associate')}
           ${row('Mandanten', 'client', c.client, 'alle Mandanten-Konten mit verknüpftem Discord')}
+          ${row('Mandant mit offener Akte', 'clientOpen', c.clientOpen || '', 'solange eine Akte offen ist – auch ohne Konto (Discord aus dem Akten-Ticket); geht mit dem Abschluss')}
         </div>
         <label class="check"><input type="checkbox" data-k="strict" ${c.strict ? 'checked' : ''}> Streng: diese Rollen auch Mitgliedern <em>ohne</em> verknüpftes Website-Konto entfernen (die Website ist die einzige Quelle)</label>
         <p class="form-hint">VIP- und Lifetime-Rollen stellst du bei den Stufen unter „VIP &amp; Lifetime“ ein; Kooperationsrollen werden nur gelesen. Für Rollen wie „| Pake &amp; Scha“ oder Trenner-Rollen eignen sich zusätzlich die Role Connections.</p>

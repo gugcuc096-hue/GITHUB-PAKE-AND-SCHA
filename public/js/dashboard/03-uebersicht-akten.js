@@ -369,27 +369,72 @@ function activityCell(c) {
   return `<span class="act-idle" title="Liegt seit ${dayCount(c.idleDays)} ohne Aktivität (zuletzt ${esc(fmtDate(c.updatedAt))})">${icon('clock', 'ico-sm')}${when}</span>`;
 }
 
+/*
+ * Mehrfachauswahl (nur Kanzlei): „Auswählen“ über der Liste → Zeilen bekommen ein Kästchen, ein Klick wählt statt zu
+ * öffnen. Die Leiste unten setzt Priorität, Stand oder (Admins) die Federführung für alle gewählten Akten auf einmal.
+ */
+const caseSelecting = () => isStaff() && st.caseSel instanceof Set;
+function bulkBar() {
+  if (!caseSelecting()) return '';
+  const n = st.caseSel.size;
+  const sel = (action, label, options) =>
+    `<select class="field bulk-sel" data-change="${action}" data-no-dirty aria-label="${esc(label)}" ${n ? '' : 'disabled'}><option value="">${esc(label)} …</option>${options}</select>`;
+  return `<div class="bulk-bar" role="region" aria-label="Mehrfachauswahl">
+      <span class="bulk-count"><strong>${n}</strong> ${n === 1 ? 'Akte' : 'Akten'} ausgewählt</span>
+      <div class="bulk-acts">
+        ${sel('bulk-priority', 'Priorität', Object.entries(PRIORITY).map(([k, [l]]) => opt(k, l)).join(''))}
+        ${sel('bulk-stage', 'Stand', [opt('offen', 'Offen'), ...STEPS.map((x, i) => opt(`step:${i}`, x)), opt('geschlossen', 'Abschließen …')].join(''))}
+        ${isAdmin() ? sel('bulk-lawyer', 'Federführung', st.lawyers.map((l) => opt(l.id, l.displayName)).join('')) : ''}
+        <button type="button" class="btn-ghost btn-sm" data-action="case-select">Fertig</button>
+      </div></div>`;
+}
+
+/** Dieselbe Änderung für alle gewählten Akten (nacheinander, je Akte mit ihren eigenen Rechten). */
+async function bulkPatch(body, label, stampText = '') {
+  const ids = [...st.caseSel];
+  if (!ids.length) return;
+  $$('.bulk-sel').forEach((x) => (x.disabled = true));
+  let ok = 0;
+  let denied = 0;
+  for (const id of ids) {
+    try {
+      await api.patch('/api/cases/' + id, body(id));
+      ok++;
+    } catch (err) {
+      if (err.status === 403) denied++;
+      else throw err;
+    }
+  }
+  await load.cases();
+  renderView();
+  if (stampText && ok) $$('#caseList tr.is-picked').slice(0, 3).forEach((tr) => window.PS.stamp(tr, stampText, 'slate'));
+  toast(`${label}: ${ok} ${ok === 1 ? 'Akte' : 'Akten'} geändert${denied ? ` · ${denied} ohne Berechtigung übersprungen` : ''}.`, ok ? 'ok' : 'error');
+}
+
 function caseTable() {
   const rows = sortCases(filteredCases());
   const staff = isStaff();
+  const selecting = caseSelecting();
+  // Gewählt bleibt nur, was gerade in der Liste steht (Filter/Suche geändert → nicht mehr sichtbare Akten fallen raus)
+  if (selecting) for (const id of st.caseSel) if (!rows.some((c) => c.id === id)) st.caseSel.delete(id);
   if (!rows.length) {
     return empty(st.cases.length ? 'Keine Akten für diese Auswahl.' : staff ? 'Noch keine Akten angelegt.' : 'Sie haben noch kein Mandat eingereicht.', 'folder');
   }
   // Je Akte zwei Zeilen: „Aktenzeichen · Rechtsgebiet“, darunter der Titel. Liegengebliebene Akten: Streifen am Zeilenanfang
   // und „Letzte Aktivität“ in Bernstein.
   return `<div class="tbl-wrap"><table class="tbl tbl-cards">
-      <thead><tr><th>Akte</th>${staff ? '<th>Mandant</th>' : ''}<th>Zuständig</th>${staff ? '<th>Priorität</th>' : ''}<th>Status</th><th>Letzte Aktivität</th></tr></thead>
+      <thead><tr>${selecting ? `<th class="th-check"><button type="button" class="sel-all" data-action="case-select-all" aria-label="Alle sichtbaren Akten auswählen">${rows.length && rows.every((c) => st.caseSel.has(c.id)) ? 'Keine' : 'Alle'}</button></th>` : ''}<th>Akte</th>${staff ? '<th>Mandant</th>' : ''}<th>Zuständig</th>${staff ? '<th>Priorität</th>' : ''}<th>Status</th><th>Letzte Aktivität</th></tr></thead>
       <tbody>${lazyRows(
         rows,
-        (c) => `<tr class="row${c.idleDays ? ' row-idle' : ''}" data-action="open-case" data-id="${c.id}">
-          <td class="td-main"><div class="case-meta"><span class="font-mono text-gold text-xs">${esc(c.caseNumber)}</span><span class="case-dot" aria-hidden="true">·</span><span>${esc(AREAS[c.area] || c.area)}</span>${staff ? '' : caseLevelBadge(c)}</div>
+        (c) => `<tr class="row${c.idleDays ? ' row-idle' : ''}${staff && c.priority >= 3 && c.status !== 'geschlossen' ? ` has-tab tab-p${c.priority}` : ''}${selecting && st.caseSel.has(c.id) ? ' is-picked' : ''}" data-action="${selecting ? 'case-pick' : 'open-case'}" data-id="${c.id}"${selecting ? ` aria-selected="${st.caseSel.has(c.id)}"` : ''}>
+          ${selecting ? `<td class="td-check"><span class="pick-box" aria-hidden="true">${icon('check', 'ico-sm')}</span></td>` : ''}<td class="td-main"><div class="case-meta"><span class="font-mono text-gold text-xs">${esc(c.caseNumber)}</span><span class="case-dot" aria-hidden="true">·</span><span>${esc(AREAS[c.area] || c.area)}</span>${staff ? '' : caseLevelBadge(c)}</div>
             <div class="font-medium">${esc(c.title)}${c.chatUnread ? ` <span class="chat-new" title="Neue Nachrichten">${icon('chat', 'ico-sm')}${c.chatUnread}</span>` : ''}</div></td>
           ${staff ? `<td data-label="Mandant">${esc(c.clientName)}${c.membership ? `<div class="mt-1">${memberBadge(c.membership)}</div>` : ''}</td>` : ''}
           <td data-label="Zuständig">${c.lawyerName ? `<div class="who"><span class="who-lead">${esc(c.lawyerName)}</span>${(c.coLawyers || []).length ? `<div class="text-xs text-dim">+ ${esc(c.coLawyers.map((l) => l.name).join(', '))}</div>` : ''}</div>` : badge('Unbesetzt', 'amber')}</td>
           ${staff ? `<td data-label="Priorität">${priorityBadge(c, true)}</td>` : ''}
           <td data-label="Status">${stageBadge(c)}</td>
           <td data-label="Letzte Aktivität" class="nowrap">${activityCell(c)}</td></tr>`,
-        staff ? 6 : 4
+        (staff ? 6 : 4) + (selecting ? 1 : 0)
       )}</tbody></table></div>`;
 }
 
@@ -426,6 +471,38 @@ function hl(text, q) {
     i = m.index + m[0].length;
   }
   return out + esc(s.slice(i));
+}
+/** Textmarker: Suchbegriff im offenen Fenster markieren (nur Text, keine Felder/Knöpfe) und zum ersten Treffer scrollen. */
+function markInModal(q) {
+  const body = $('#modalBody');
+  const needles = [...new Set([q, ...q.split(/\s+/)].map((n) => n.trim()).filter((n) => n.length >= 3))].sort((a, b) => b.length - a.length);
+  if (!body || !needles.length) return;
+  const re = new RegExp(needles.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'gi');
+  const hit = new RegExp(re.source, 'i'); // ohne „g“: test() merkt sich sonst die letzte Fundstelle
+  const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, {
+    acceptNode: (n) => (n.parentElement.closest('select, option, textarea, input, button, script, .case-jump, mark') || !hit.test(n.data) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+  });
+  const nodes = [];
+  while (walker.nextNode() && nodes.length < 60) nodes.push(walker.currentNode);
+  for (const n of nodes) {
+    const frag = document.createDocumentFragment();
+    let i = 0;
+    re.lastIndex = 0;
+    for (const m of n.data.matchAll(re)) {
+      frag.append(n.data.slice(i, m.index));
+      const mk = document.createElement('mark');
+      mk.className = 'hl-mark';
+      mk.textContent = m[0];
+      frag.append(mk);
+      i = m.index + m[0].length;
+    }
+    frag.append(n.data.slice(i));
+    n.replaceWith(frag);
+  }
+  // Der erste Treffer unterhalb des Aktenkopfs (dort steht meist nur der Titel) wird sichtbar gescrollt
+  const marks = $$('mark.hl-mark', body);
+  const target = marks.find((m) => !m.closest('.case-head')) || marks[0];
+  if (target && !target.closest('.case-head')) setTimeout(() => target.scrollIntoView({ block: 'center', behavior: window.PS.motion.calm() ? 'auto' : 'smooth' }), 420);
 }
 function gsItem(type, x, q) {
   const line = (title, meta) => `<span class="main"><span class="title">${title}</span>${meta ? `<span class="meta">${meta}</span>` : ''}</span>`;
@@ -506,8 +583,10 @@ async function openSearchResult(type, id) {
   const list = (st.gsResults && st.gsResults[type]) || [];
   const x = list.find((r) => r.id === id);
   if (!x) return;
-  if (type === 'cases') return modalInstead(() => openCase(id));
-  if (type === 'notes') return modalInstead(() => openCase(x.caseId));
+  // Akte aus der Suche: Treffer in der Akte wie mit einem Gold-Textmarker anstreichen
+  const q = st.gsQuery.trim();
+  if (type === 'cases') return modalInstead(() => openCase(id)).then(() => markInModal(q));
+  if (type === 'notes') return modalInstead(() => openCase(x.caseId)).then(() => markInModal(q));
   if (type === 'wiki') return modalInstead(() => openWikiArticle(id));
   if (type === 'penal') return modalInstead(() => openLaw(x.para));
   if (type === 'clients') return modalInstead(() => openClient(`u${id}`)); // Mandantenkartei
@@ -590,11 +669,12 @@ views.cases = {
             ${staff ? `<button class="chip ${st.caseMine ? 'active' : ''}" data-action="case-mine">${icon('user', 'ico-sm')}Nur meine</button>` : ''}
           </div>
         </div>
-        <div class="list-bar"><label class="case-sort"><span>Sortieren</span><select id="caseSort" class="field" aria-label="Akten sortieren">${Object.entries(CASE_SORTS)
+        <div class="list-bar">${staff ? `<button type="button" class="btn-ghost btn-sm ${caseSelecting() ? 'is-on' : ''}" data-action="case-select" aria-pressed="${caseSelecting()}">${icon('check', 'ico-sm')}<span>${caseSelecting() ? 'Auswahl beenden' : 'Auswählen'}</span></button>` : ''}<label class="case-sort"><span>Sortieren</span><select id="caseSort" class="field" aria-label="Akten sortieren">${Object.entries(CASE_SORTS)
         .filter(([k]) => staff || k !== 'prioritaet')
         .map(([k, l]) => opt(k, l, st.caseSort === k))
         .join('')}</select></label></div>
-        <div id="caseList" class="panel p-2 md:p-3">${caseTable()}</div>`;
+        <div id="caseList" class="panel p-2 md:p-3${caseSelecting() ? ' is-selecting' : ''}">${caseTable()}</div>
+        <div id="bulkBarSlot">${bulkBar()}</div>`;
   },
 };
 
@@ -658,6 +738,8 @@ views.tasks = {
 function rememberCase(data) {
   (data.appointments || []).forEach((e) => st.eventCache.set(e.id, e));
   st.caseAttachments = data.attachments || [];
+  // Beweise verknüpfter Akten (nur Kanzlei) – eine Liste für die Bildansicht
+  st.linkedAttachments = (data.linkedEvidence || []).flatMap((k) => k.attachments.map((a) => ({ ...a, caseId: k.caseId, caseNumber: k.caseNumber })));
   st.caseDocs = data.externalDocs || [];
   st.caseContracts = data.contracts || [];
   st.caseTasks = data.tasks || [];
@@ -765,9 +847,30 @@ async function reloadCase(id) {
   refreshBehind();
 }
 
-function attachmentsSection(c, attachments) {
+/** Beweise verknüpfter Akten (gemeinsame Beweismappe): je Akte eine Zeile kleiner Bilder mit Nummer. */
+function linkedEvidenceHtml(linkedEvidence) {
+  if (!linkedEvidence.length) return '';
+  let i = 0;
+  return `<div class="linked-ev">${linkedEvidence
+    .map(
+      (k) => `<div class="linked-ev-case"><div class="linked-ev-head">${icon('link', 'ico-sm')}<span>Aus Akte <button type="button" class="font-mono text-gold hover:underline" data-action="open-case" data-id="${k.caseId}">${esc(k.caseNumber)}</button> · ${esc(k.clientName)}</span></div>
+        <div class="att-grid att-grid-sm">${k.attachments
+          .map(
+            (a) => `<button type="button" class="att" data-action="att-open" data-linked="${i++}" aria-label="${esc(`B${a.no} aus ${k.caseNumber}${a.caption ? ': ' + a.caption : ''}`)}">
+              <img src="${esc(a.thumbUrl || a.url)}" alt="${esc(a.caption)}" loading="lazy" decoding="async"><span class="ev-no">B${a.no}</span></button>`
+          )
+          .join('')}</div></div>`
+    )
+    .join('')}</div>`;
+}
+
+function attachmentsSection(c, attachments, linkedEvidence = []) {
   const staff = isStaff();
   const canUpload = staff || !c.closed;
+  if (!attachments.length && linkedEvidence.length)
+    return `<div class="section" id="secEvidence"><h3 class="section-title">Beweismittel & Anhänge <span class="text-xs text-dim font-normal sec-meta">nur aus verknüpften Akten</span></h3>
+      ${canUpload ? `<label class="btn-outline btn-sm file-btn mb-3">${icon('camera', 'ico-sm')}<span>Bilder hinzufügen</span><input type="file" accept="image/*" multiple data-upload="evidence" data-case-id="${c.id}" aria-label="Bilder hinzufügen"></label>` : ''}
+      ${linkedEvidenceHtml(linkedEvidence)}</div>`;
   if (!attachments.length)
     return emptySection(
       'secEvidence',
@@ -785,9 +888,9 @@ function attachmentsSection(c, attachments) {
       <div class="att-grid">
         ${attachments
         .map(
-          (a, i) => `<button type="button" class="att" data-action="att-open" data-index="${i}" aria-label="${esc(a.caption || 'Anhang ansehen')}">
-              <img src="${esc(a.thumbUrl || a.url)}" alt="${esc(a.caption)}" loading="lazy" decoding="async">
-              <span class="tag">${a.internal ? badge('intern', 'amber') : ''}${a.externalDocId ? badge(extOf(st.caseDocs.find((d) => d.id === a.externalDocId) || {}).name, 'sky') : ''}</span>${a.caption ? `<span class="cap">${esc(a.caption)}</span>` : ''}</button>`
+          (a, i) => `<button type="button" class="att" data-action="att-open" data-index="${i}" aria-label="${esc(`B${i + 1}${a.caption ? ': ' + a.caption : ''}`)}">
+              <img src="${esc(a.thumbUrl || a.url)}" alt="${esc(a.caption)}" loading="lazy" decoding="async"><span class="ev-no">B${i + 1}</span>
+              <span class="tag">${a.internal ? '<span class="stamp-mini">Vertraulich</span>' : ''}${a.externalDocId ? badge(extOf(st.caseDocs.find((d) => d.id === a.externalDocId) || {}).name, 'sky') : ''}</span>${a.caption ? `<span class="cap">${esc(a.caption)}</span>` : ''}</button>`
         )
         .join('')}
         ${canUpload && attachments.length < 40
@@ -795,7 +898,89 @@ function attachmentsSection(c, attachments) {
         : ''}
       </div>
       ${canUpload && attachments.length < 40 ? '<p class="form-hint paste-hint">Tipp: Screenshots einfach mit Strg+V einfügen oder ins Fenster ziehen.</p>' : ''}
+      ${linkedEvidenceHtml(linkedEvidence)}
     </div>`;
+}
+
+/*
+ * Schwärzen (nur Kanzlei): Auf einer Kopie des Beweisbilds Rechtecke ziehen → schwarze Balken. Gespeichert wird eine
+ * neue, geschwärzte Kopie als eigenes Beweismittel; das Original bleibt unverändert in der Akte.
+ */
+const redact = { att: null, index: 0, caseId: 0, img: null, canvas: null, boxes: [], drag: null };
+async function redactOpen(index) {
+  const a = st.caseAttachments[index];
+  if (!a) return;
+  const caseId = st.modalCaseId || st.returnCase;
+  const blob = await fetch(a.url, { credentials: 'same-origin' }).then((r) => {
+    if (!r.ok) throw new Error('Das Bild konnte nicht geladen werden.');
+    return r.blob();
+  });
+  const url = URL.createObjectURL(blob);
+  const img = await new Promise((res, rej) => {
+    const i = new Image();
+    i.onload = () => res(i);
+    i.onerror = () => rej(new Error('Das Bild konnte nicht geöffnet werden.'));
+    i.src = url;
+  });
+  Object.assign(redact, { att: a, index, caseId, img, boxes: [], drag: null });
+  st.returnCase = caseId;
+  replaceModal(
+    `<p class="text-xs uppercase tracking-[0.2em] text-gold mb-1">Beweismittel B${index + 1}</p>
+      <h2 class="modal-title">Schwärzen</h2>
+      <p class="modal-sub">Mit der Maus bzw. dem Finger Rechtecke über Namen, Nummern oder Gesichter ziehen. Gespeichert wird eine Kopie – das Original bleibt unverändert.</p>
+      <div class="redact-wrap"><canvas id="redactCanvas" class="redact-canvas" aria-label="Bild zum Schwärzen"></canvas></div>
+      <div class="form-actions mt-3">
+        <label class="check mr-auto"><input type="checkbox" id="redactInternal" ${a.internal ? 'checked' : ''}> Kopie nur intern (für den Mandanten unsichtbar)</label>
+        <button type="button" class="btn-ghost btn-md" data-action="redact-undo">${icon('restore', 'ico-sm')}<span>Rückgängig</span></button>
+        <button type="button" class="btn-gold btn-md" data-action="redact-save">${icon('check', 'ico-sm')}<span>Geschwärzte Kopie speichern</span></button>
+      </div>`
+  );
+  const cv = $('#redactCanvas');
+  cv.width = img.naturalWidth;
+  cv.height = img.naturalHeight;
+  redact.canvas = cv;
+  redactDraw();
+  URL.revokeObjectURL(url);
+  const pt = (e) => {
+    const r = cv.getBoundingClientRect();
+    return { x: ((e.clientX - r.left) / r.width) * cv.width, y: ((e.clientY - r.top) / r.height) * cv.height };
+  };
+  cv.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    cv.setPointerCapture(e.pointerId);
+    const p = pt(e);
+    redact.drag = { x: p.x, y: p.y, w: 0, h: 0 };
+  });
+  cv.addEventListener('pointermove', (e) => {
+    if (!redact.drag) return;
+    const p = pt(e);
+    redact.drag.w = p.x - redact.drag.x;
+    redact.drag.h = p.y - redact.drag.y;
+    redactDraw();
+  });
+  const end = () => {
+    const d = redact.drag;
+    redact.drag = null;
+    if (d && Math.abs(d.w) > 4 && Math.abs(d.h) > 4) redact.boxes.push(d);
+    redactDraw();
+  };
+  cv.addEventListener('pointerup', end);
+  cv.addEventListener('pointercancel', end);
+}
+function redactDraw() {
+  const { canvas: cv, img, boxes, drag } = redact;
+  if (!cv || !img) return;
+  const ctx = cv.getContext('2d');
+  ctx.drawImage(img, 0, 0);
+  ctx.fillStyle = '#000';
+  for (const b of boxes) ctx.fillRect(b.x, b.y, b.w, b.h);
+  if (drag) {
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(drag.x, drag.y, drag.w, drag.h);
+    ctx.strokeStyle = '#d4af37';
+    ctx.lineWidth = Math.max(2, cv.width / 400);
+    ctx.strokeRect(drag.x, drag.y, drag.w, drag.h);
+  }
 }
 
 /* ---------------------------------------------------------------- Aktenübersicht (Kennzahlen im Aktenkopf) */

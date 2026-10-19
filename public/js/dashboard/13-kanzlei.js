@@ -863,3 +863,184 @@ Object.assign(forms, {
     if (st.view === 'wiki') renderView();
   },
 });
+
+/* ================================================================
+   Kanzlei-Lager: Gegenstände, Geld und Schwarzgeld ein- und auslagern. Die Gegenstände (Name + Bild) pflegen Admins
+   unter Einstellungen → Lager; Schwarzgeld sieht standardmäßig nur das Board of Partners.
+   ================================================================ */
+const STORAGE_KIND = { item: 'Gegenstand', geld: 'Geld', schwarzgeld: 'Schwarzgeld' };
+const itemPic = (i, cls = 'item-pic') =>
+  i && i.imageUrl ? `<img class="${cls}" src="${esc(i.imageUrl)}" alt="" loading="lazy" decoding="async">` : `<span class="${cls} item-ph" aria-hidden="true">${icon('box')}</span>`;
+function storageAmount(e) {
+  const n = Math.abs(e.amount);
+  return `${e.amount > 0 ? '+' : '−'}${e.kind === 'item' ? `${n.toLocaleString('de-DE')}×` : money(n)}`;
+}
+function storageEntry(e) {
+  const item = e.kind === 'item' && st.storage.items.find((i) => i.id === e.itemId);
+  const what = e.kind === 'item' ? e.itemName : STORAGE_KIND[e.kind];
+  return `<div class="list-row lager-entry">
+      ${e.kind === 'item' ? itemPic(item, 'item-pic sm') : `<span class="item-pic sm item-ph ${e.kind === 'schwarzgeld' ? 'is-black' : ''}" aria-hidden="true">${icon('receipt')}</span>`}
+      <div class="main"><div class="title"><span class="lager-amt ${e.amount > 0 ? 'is-in' : 'is-out'}">${storageAmount(e)}</span> ${esc(what)}</div>
+        <div class="meta">${esc(e.userName)} · ${esc(fmtDate(e.createdAt))}${e.note ? ` · ${esc(e.note)}` : ''}</div></div>
+      ${e.canDelete ? `<button type="button" class="icon-btn sm" data-action="storage-undo" data-id="${e.id}" aria-label="Buchung stornieren" title="Buchung stornieren">${icon('restore', 'ico-sm')}</button>` : ''}
+    </div>`;
+}
+
+/** Raster der Gegenstände (die Suche zeichnet nur dieses neu). */
+function storageGrid() {
+  const s = st.storage;
+  const q = (st.storageQuery || '').trim().toLowerCase();
+  const items = s.items.filter((i) => !q || i.name.toLowerCase().includes(q));
+  return items.length
+    ? `<div class="lager-grid">${items
+        .map(
+          (i) => `<button type="button" class="lager-item ${i.stock ? '' : 'is-empty'}" data-action="storage-book" data-kind="item" data-item="${i.id}" aria-label="${esc(i.name)} buchen">
+            ${itemPic(i)}<span class="lager-name">${esc(i.name)}</span><span class="lager-stock">${i.stock.toLocaleString('de-DE')}<small>auf Lager</small></span></button>`
+        )
+        .join('')}</div>`
+    : empty(
+        s.items.length ? 'Kein Gegenstand passt zur Suche.' : s.canManage ? 'Noch keine Gegenstände – lege sie unter Einstellungen → Lager mit Name und Bild an.' : 'Noch keine Gegenstände angelegt (das macht ein Admin in den Einstellungen).',
+        'box'
+      );
+}
+
+views.lager = {
+  async load() {
+    st.storage = await api.get('/api/storage');
+  },
+  render() {
+    const s = st.storage;
+    const cash = (kind, label, value, sub) => `<button type="button" class="panel kpi lager-cash ${kind === 'schwarzgeld' ? 'is-black' : ''}" data-action="storage-book" data-kind="${kind}">
+        <div class="kpi-label">${icon(kind === 'schwarzgeld' ? 'shield' : 'receipt', 'ico-sm')}${esc(label)}</div>
+        <div class="kpi-value">${esc(money(value))}</div><div class="kpi-sub">${esc(sub)}</div></button>`;
+    const stocked = s.items.filter((i) => i.stock > 0);
+    return `
+        <div class="page-head">
+          <div><h1 class="page-title">Kanzlei-Lager</h1><p class="page-sub">Was die Kanzlei an Gegenständen, Geld${s.canBlack ? ' und Schwarzgeld' : ''} hat – jede Ein- und Auslagerung steht mit Name und Uhrzeit in den Buchungen.</p></div>
+          <div class="page-actions">${s.canManage ? `<button class="btn-ghost btn-md" data-action="storage-manage">${icon('cog')}<span>Gegenstände</span></button>` : ''}<button class="btn-gold btn-md" data-action="storage-book">${icon('plus')}<span>Buchen</span></button></div>
+        </div>
+        <div class="kpi-row lager-kpis">
+          ${cash('geld', 'Geld', s.money, 'Kasse der Kanzlei')}
+          ${s.canBlack ? cash('schwarzgeld', 'Schwarzgeld', s.black, s.blackAll ? 'für alle Mitarbeiter sichtbar' : 'nur Board of Partners') : ''}
+          <div class="panel kpi"><div class="kpi-label">${icon('box', 'ico-sm')}Gegenstände</div><div class="kpi-value">${stocked.reduce((n, i) => n + i.stock, 0).toLocaleString('de-DE')}</div><div class="kpi-sub">${stocked.length} von ${s.items.length} Sorten auf Lager</div></div>
+        </div>
+        <section class="panel panel-pad mt-4 lg:mt-5">
+          <div class="panel-head"><h2 class="panel-title">Gegenstände</h2>${s.items.length > 8 ? `<label class="search lager-search">${icon('search')}<input id="storageSearch" class="field" type="search" placeholder="Gegenstand suchen …" value="${esc(st.storageQuery || '')}" aria-label="Gegenstände durchsuchen"></label>` : ''}</div>
+          <div id="storageGrid">${storageGrid()}</div>
+        </section>
+        <section class="panel p-2 md:p-3 mt-4 lg:mt-5">
+          <div class="panel-head px-2 pt-2"><h2 class="panel-title">Buchungen</h2><span class="text-xs text-dim">die letzten ${s.entries.length}</span></div>
+          ${s.entries.length ? lazyRows(s.entries, storageEntry) : empty('Noch keine Buchungen.', 'list')}
+        </section>`;
+  },
+};
+
+/** Buchen: Art oben wählbar (wechselt das Fenster), Gegenstand/Betrag, ein- oder auslagern, Notiz. */
+function storageBookModal(kind = 'item', itemId = null, replace = false) {
+  const s = st.storage;
+  if (kind === 'schwarzgeld' && !s.canBlack) kind = 'geld';
+  if (kind === 'item' && !s.items.length) kind = 'geld';
+  const kinds = Object.entries(STORAGE_KIND).filter(([k]) => (k !== 'schwarzgeld' || s.canBlack) && (k !== 'item' || s.items.length));
+  const items = s.items.filter((i) => i.active || i.stock);
+  const html = `
+      <h2 class="modal-title">Lager buchen</h2>
+      <p class="modal-sub">Einlagern erhöht den Bestand, Entnehmen verringert ihn – mehr als vorhanden geht nicht.</p>
+      <div class="chip-row mb-4" role="tablist">${kinds
+        .map(([k, l]) => `<button type="button" class="chip ${k === kind ? 'active' : ''}" role="tab" aria-selected="${k === kind}" data-action="storage-book" data-kind="${k}" data-swap="1">${esc(l)}</button>`)
+        .join('')}</div>
+      <form data-form="storage-book" data-kind="${kind}" class="form-grid cols-2">
+        ${kind === 'item'
+          ? `<div class="span-2"><label class="label" for="sbItem">Gegenstand</label><select id="sbItem" name="itemId" class="field" required>${items
+              .map((i) => opt(i.id, `${i.name} – ${i.stock.toLocaleString('de-DE')} auf Lager`, i.id === itemId))
+              .join('')}</select></div>`
+          : ''}
+        <div class="span-2 seg" role="radiogroup" aria-label="Richtung">
+          <label class="seg-opt"><input type="radio" name="direction" value="in" checked><span>${icon('plus', 'ico-sm')}Einlagern</span></label>
+          <label class="seg-opt"><input type="radio" name="direction" value="out"><span>${icon('minus', 'ico-sm')}Entnehmen</span></label>
+        </div>
+        <div><label class="label" for="sbAmount">${kind === 'item' ? 'Menge' : 'Betrag ($)'}</label><input id="sbAmount" name="amount" type="number" min="1" max="1000000000" step="1" class="field" required autofocus></div>
+        <div><label class="label" for="sbNote">Notiz <span class="text-dim font-normal normal-case tracking-normal">(optional)</span></label><input id="sbNote" name="note" class="field" maxlength="300" placeholder="${kind === 'item' ? 'z. B. aus Akte PS-2026-0012' : 'z. B. Honorar Mandat Kowalski'}"></div>
+        <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Buchen</span></button></div>
+      </form>`;
+  return replace ? replaceModal(html) : openModal(html);
+}
+
+/** Einstellungen → Lager: Gegenstände mit Name und Bild, Schwarzgeld-Freigabe. */
+function storageSettingsPanel() {
+  const a = st.storageAdmin;
+  if (!a) return `<section class="panel panel-pad">${empty('Lager-Einstellungen konnten nicht geladen werden.', 'box')}</section>`;
+  const row = (i) => `<form data-form="storage-item" data-id="${i.id}" class="lager-set-row">
+      ${itemPic(i, 'item-pic md')}
+      <input name="name" class="field" maxlength="60" value="${esc(i.name)}" required aria-label="Name des Gegenstands">
+      <span class="text-xs text-dim nowrap">${i.stock.toLocaleString('de-DE')} auf Lager</span>
+      <div class="flex gap-1 shrink-0">
+        <button type="submit" class="icon-btn sm" aria-label="Name speichern" title="Name speichern">${icon('check', 'ico-sm')}</button>
+        <label class="icon-btn sm file-btn" title="Bild hochladen">${icon('camera', 'ico-sm')}<input type="file" accept="image/*" data-upload="storage-item" data-id="${i.id}" aria-label="Bild für ${esc(i.name)} hochladen"></label>
+        <button type="button" class="icon-btn sm" data-action="storage-item-del" data-id="${i.id}" data-name="${esc(i.name)}" aria-label="Entfernen" title="Entfernen">${icon('trash', 'ico-sm')}</button>
+      </div></form>`;
+  return `<section class="panel panel-pad">
+      <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('box')} Gegenstände im Kanzlei-Lager</h2><span class="text-xs text-dim">${a.items.length}</span></div>
+      <p class="text-sm text-muted">Alles, was im Lager gebucht werden kann – je Gegenstand ein Name und ein Bild (JPG, PNG oder WebP). Ein entfernter Gegenstand bleibt in den bisherigen Buchungen stehen.</p>
+      <form data-form="storage-item-new" class="lager-new mt-3"><input name="name" class="field" maxlength="60" required placeholder="z. B. Schutzweste, Funkgerät, Dietrich …" aria-label="Neuer Gegenstand"><button type="submit" class="btn-gold btn-md">${icon('plus')}<span>Anlegen</span></button></form>
+      <div class="lager-set-list mt-3">${a.items.length ? a.items.map(row).join('') : '<p class="text-sm text-dim">Noch keine Gegenstände.</p>'}</div>
+    </section>
+    <section class="panel panel-pad mt-4 lg:mt-5">
+      <div class="panel-head"><h2 class="panel-title">Schwarzgeld</h2></div>
+      <form data-form="storage-settings" class="form-grid">
+        <label class="check"><input type="checkbox" name="blackAll" ${a.blackAll ? 'checked' : ''}> Schwarzgeld für alle Mitarbeiter sichtbar und buchbar (sonst nur das Board of Partners)</label>
+        <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button></div>
+      </form>
+    </section>`;
+}
+async function reloadStorageAdmin() {
+  st.storageAdmin = await api.get('/api/storage/items');
+  if (st.view === 'settings') renderView();
+}
+
+Object.assign(actions, {
+  'storage-book': (el) => storageBookModal(el.dataset.kind || 'item', el.dataset.item ? Number(el.dataset.item) : null, !!el.dataset.swap),
+  'storage-undo': async (el) => {
+    if (!(await ask('Die Buchung wird gelöscht, der Bestand entsprechend zurückgesetzt.', { title: 'Buchung stornieren?', confirmText: 'Stornieren' }))) return;
+    st.storage = await api.del('/api/storage/entries/' + el.dataset.id);
+    toast('Buchung storniert.');
+    renderView();
+  },
+  'storage-manage': async () => {
+    st.settingsTab = 'lager';
+    await navigate('settings');
+  },
+  'storage-item-del': async (el) => {
+    if (!(await askDelete(`„${el.dataset.name}“ entfernen?`, 'Der Gegenstand kann danach nicht mehr gebucht werden; bisherige Buchungen bleiben erhalten.'))) return;
+    await api.del('/api/storage/items/' + el.dataset.id);
+    toast('Gegenstand entfernt.');
+    await reloadStorageAdmin();
+  },
+});
+Object.assign(forms, {
+  'storage-book': async (f) => {
+    const fd = new FormData(f);
+    const kind = f.dataset.kind;
+    const body = { kind, direction: val(fd, 'direction') || 'in', amount: Number(val(fd, 'amount')), note: val(fd, 'note') };
+    if (kind === 'item') body.itemId = Number(val(fd, 'itemId'));
+    st.storage = await api.post('/api/storage/entries', body);
+    const item = kind === 'item' && st.storage.items.find((i) => i.id === body.itemId);
+    toast(`${body.direction === 'in' ? 'Eingelagert' : 'Entnommen'}: ${item ? `${body.amount.toLocaleString('de-DE')}× ${item.name}` : `${money(body.amount)} ${STORAGE_KIND[kind]}`}`);
+    closeModal();
+    if (st.view === 'lager') renderView();
+  },
+  'storage-item-new': async (f) => {
+    await api.post('/api/storage/items', { name: val(new FormData(f), 'name') });
+    toast('Gegenstand angelegt – jetzt noch ein Bild hochladen.');
+    await reloadStorageAdmin();
+  },
+  'storage-item': async (f) => {
+    await api.patch('/api/storage/items/' + f.dataset.id, { name: val(new FormData(f), 'name') });
+    toast('Name gespeichert.');
+    await reloadStorageAdmin();
+  },
+  'storage-settings': async (f) => {
+    await api.put('/api/storage/settings', { blackAll: new FormData(f).has('blackAll') });
+    toast('Gespeichert.');
+    await reloadStorageAdmin();
+  },
+});

@@ -615,6 +615,8 @@ video {
   margin-left: auto;
 }.mr-1 {
   margin-right: 0.25rem;
+}.mr-auto {
+  margin-right: auto;
 }.mt-0\.5 {
   margin-top: 0.125rem;
 }.mt-1 {

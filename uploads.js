@@ -22,6 +22,7 @@ function detectImage(buf) {
 const DIRS = {
   avatars: path.join(PUBLIC_MEDIA_DIR, 'avatars'),
   team: path.join(PUBLIC_MEDIA_DIR, 'team'),
+  items: path.join(PUBLIC_MEDIA_DIR, 'items'), // Bilder der Lager-Gegenstände
   evidence: EVIDENCE_DIR,
 };
 
@@ -55,5 +56,6 @@ function evidencePath(file) {
 
 const avatarUrl = (file) => (file ? `/media/avatars/${file}` : null);
 const teamPhotoUrl = (file) => (file ? `/media/team/${file}` : null);
+const itemImageUrl = (file) => (file ? `/media/items/${file}` : null);
 
-module.exports = { imageBody, detectImage, saveImage, saveImageBuffer, removeFile, evidencePath, avatarUrl, teamPhotoUrl, MAX_BYTES };
+module.exports = { imageBody, detectImage, saveImage, saveImageBuffer, removeFile, evidencePath, avatarUrl, teamPhotoUrl, itemImageUrl, MAX_BYTES };

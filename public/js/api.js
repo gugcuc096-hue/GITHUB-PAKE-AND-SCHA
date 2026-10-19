@@ -726,7 +726,12 @@
 .ps-tilt:not(.ps-spot-on){transition:transform .7s cubic-bezier(.16,1,.3,1),box-shadow .35s ease,border-color .35s ease!important}
 .ps-stamp{position:fixed;z-index:95;pointer-events:none;padding:.3rem .85rem .26rem;border:3px double currentColor;border-radius:6px;font:800 1.05rem/1 'Inter',system-ui,sans-serif;letter-spacing:.22em;text-transform:uppercase;white-space:nowrap;background:rgba(4,9,22,.72);box-shadow:0 10px 30px rgba(0,0,0,.45),inset 0 0 12px rgba(0,0,0,.35);transform:translate(-50%,-50%) rotate(-8deg)}
 .ps-stamp-paid{color:#4ade80;text-shadow:0 0 14px rgba(74,222,128,.45)}
-.ps-stamp-gold{color:#e8c766;text-shadow:0 0 14px rgba(232,199,102,.45)}`;
+.ps-stamp-gold{color:#e8c766;text-shadow:0 0 14px rgba(232,199,102,.45)}
+.ps-stamp-slate{color:#cbd5e1;text-shadow:0 0 12px rgba(203,213,225,.3)}
+.ps-seal{position:fixed;z-index:96;pointer-events:none;width:92px;height:92px;border-radius:50%;display:grid;place-items:center;color:#2a1f05;background:radial-gradient(circle at 34% 30%,#fff3c4 0,#f0cf6a 22%,#d4af37 48%,#a8841f 78%,#7a5d12 100%);box-shadow:0 0 0 3px rgba(212,175,55,.35),0 12px 34px rgba(0,0,0,.55),inset 0 -4px 10px rgba(0,0,0,.35),inset 0 3px 6px rgba(255,255,255,.4);transform:translate(-50%,-50%)}
+.ps-seal::before{content:'';position:absolute;inset:7px;border-radius:50%;border:1.5px dashed rgba(42,31,5,.45)}
+.ps-seal svg{width:44px;height:44px}
+.ps-seal span{position:absolute;bottom:13px;font:800 .5rem/1 'Inter',system-ui,sans-serif;letter-spacing:.2em;text-transform:uppercase}`;
   /**
    * Stempel („BEZAHLT“, „UNTERSCHRIEBEN“): drückt sich kurz mittig auf ein Element und blendet wieder aus. Liegt fest
    * über der Seite – wird darunter neu gezeichnet, bleibt er trotzdem stehen. Bei „Bewegung reduzieren“ kein Stempel.
@@ -752,6 +757,31 @@
         { opacity: 0, transform: t(1.04, -8) },
       ],
       { duration: 1500, easing: 'cubic-bezier(.2,.8,.2,1)' }
+    ).onfinish = () => el.remove();
+  }
+
+  /** Gold-Siegel: drückt sich nach einer Unterschrift kurz neben den Stempel (gleiche Regeln wie der Stempel). */
+  function seal(target, label = 'P & S') {
+    if (!target || motion.calm() || typeof Element.prototype.animate !== 'function') return;
+    const r = target.getBoundingClientRect();
+    if (!r.width || r.bottom < 0 || r.top > window.innerHeight) return;
+    const el = document.createElement('div');
+    el.className = 'ps-seal';
+    el.setAttribute('aria-hidden', 'true');
+    el.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"/></svg><span>${esc(label)}</span>`;
+    el.style.left = `${Math.min(window.innerWidth - 60, r.left + r.width / 2 + Math.min(150, r.width / 3))}px`;
+    el.style.top = `${r.top + r.height / 2 + 26}px`;
+    document.body.appendChild(el);
+    const t = (s, deg) => `translate(-50%,-50%) scale(${s}) rotate(${deg}deg)`;
+    el.animate(
+      [
+        { opacity: 0, transform: t(1.9, 24), filter: 'blur(3px)' },
+        { opacity: 1, transform: t(0.92, 6), filter: 'blur(0)', offset: 0.26 },
+        { opacity: 1, transform: t(1, 8), offset: 0.34 },
+        { opacity: 1, transform: t(1, 8), offset: 0.8 },
+        { opacity: 0, transform: t(1.03, 8) },
+      ],
+      { duration: 1900, delay: 260, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' }
     ).onfinish = () => el.remove();
   }
 
@@ -816,5 +846,5 @@
   );
   document.documentElement.addEventListener('mouseleave', spotOff);
 
-  window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog, closeToDashboard, drafts, applications, tab, fieldError, fieldErrors, clearFieldErrors, countUp, motion, stamp };
+  window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog, closeToDashboard, drafts, applications, tab, fieldError, fieldErrors, clearFieldErrors, countUp, motion, stamp, seal };
 })();
