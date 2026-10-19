@@ -370,7 +370,7 @@ function externalDocCard(d, c, sortable = false) {
     : '';
   const gallery = images.length
     ? `<div class="att-grid fn-gallery">${images
-        .map(({ a, i }) => `<button type="button" class="att" data-action="att-open" data-index="${i}" aria-label="${esc(a.caption || 'Bild ansehen')}"><img src="${esc(a.url)}" alt="${esc(a.caption)}" loading="lazy"></button>`)
+        .map(({ a, i }) => `<button type="button" class="att" data-action="att-open" data-index="${i}" aria-label="${esc(a.caption || 'Bild ansehen')}"><img src="${esc(a.thumbUrl || a.url)}" alt="${esc(a.caption)}" loading="lazy" decoding="async"></button>`)
         .join('')}</div>`
     : '';
   const also = staff && d.alsoIn && d.alsoIn.length

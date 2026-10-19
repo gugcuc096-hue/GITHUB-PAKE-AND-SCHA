@@ -86,6 +86,8 @@ function middleware(req, res, next) {
   const tab = String(req.get('x-ps-tab') || '').slice(0, 40);
   res.on('finish', () => {
     if (res.statusCode >= 400 || !clients.size) return;
+    // Vorschaubild eines Anhangs: ändert für andere nichts Sichtbares – niemand muss neu laden
+    if (/^\/cases\/\d+\/attachments\/\d+\/thumb$/.test(path)) return;
     try {
       if (PUBLIC_AREAS[path]) return areaChanged(PUBLIC_AREAS[path]);
       const area = areaOf(path);

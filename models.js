@@ -532,6 +532,9 @@ function attachmentRow(a, caseId) {
     uploaderName: a.uploader_name,
     createdAt: a.created_at,
     url: `/api/cases/${caseId}/attachments/${a.id}/file`,
+    // Vorschaubild (klein, WebP) für Raster – ohne eigenes Vorschaubild das Original; needsThumb: Dashboard legt eins an
+    thumbUrl: a.thumb ? `/api/cases/${caseId}/attachments/${a.id}/thumb` : `/api/cases/${caseId}/attachments/${a.id}/file`,
+    needsThumb: !a.thumb,
   };
 }
 

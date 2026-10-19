@@ -326,7 +326,7 @@ function hearingHtml() {
               ? `<div class="hr-photos">${photos
                   .map(
                     (a, i) => `<button type="button" class="hr-photo" data-action="hr-photo" data-index="${i}" aria-label="${esc(a.caption || `Beweis ${i + 1}`)} groß anzeigen">
-                      <img src="${esc(a.url)}" alt="" loading="lazy"><span>${esc(a.caption || `Beweis ${i + 1}`)}</span></button>`
+                      <img src="${esc(a.thumbUrl || a.url)}" alt="" loading="lazy" decoding="async"><span>${esc(a.caption || `Beweis ${i + 1}`)}</span></button>`
                   )
                   .join('')}</div>`
               : '<p class="text-dim text-sm">Keine Bilder in der Akte.</p>'

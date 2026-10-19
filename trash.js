@@ -71,7 +71,7 @@ function trashCase(caseId, user) {
     const c = snap.rows[0][1][0];
     // Name des Mandanten festhalten – falls sein Konto gelöscht wird, solange die Akte im Papierkorb liegt
     const clientName = c.client_name || (c.client_id && db.prepare('SELECT display_name FROM users WHERE id = ?').get(c.client_id)?.display_name) || '';
-    const files = (snap.rows.find(([t]) => t === 'case_attachments') || [null, []])[1].map((a) => a.file).filter(Boolean);
+    const files = (snap.rows.find(([t]) => t === 'case_attachments') || [null, []])[1].flatMap((a) => [a.file, a.thumb]).filter(Boolean); // samt Vorschaubild
     const info = db
       .prepare(
         `INSERT INTO case_trash (case_id, case_number, title, client_name, deleted_by, deleted_by_name, payload, files)
@@ -174,7 +174,7 @@ function purge(trashId) {
   require('./googleDocs').removeForCase(t.case_id);
   for (const f of JSON.parse(t.files || '[]')) {
     // Datei nur löschen, wenn kein (wiederhergestellter) Anhang sie noch nutzt
-    if (!db.prepare('SELECT 1 FROM case_attachments WHERE file = ?').get(f)) removeFile('evidence', f);
+    if (!db.prepare('SELECT 1 FROM case_attachments WHERE file = ? OR thumb = ?').get(f, f)) removeFile('evidence', f);
   }
   return true;
 }

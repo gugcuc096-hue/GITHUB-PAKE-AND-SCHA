@@ -2486,3 +2486,59 @@ describe('Browser: Strafmaß, Verhandlung, Wiki, Beschlüsse, Rechnungszeile, Ge
     }
   });
 });
+
+describe('Browser: Textbausteine, Vorschaubilder, Menü vorladen', { skip: chromium ? false : 'Playwright nicht installiert' }, () => {
+  it('„/mand“ + Enter fügt den Baustein mit Mandant, Name und Rang ein; Bilder bekommen ein Vorschaubild; Menü lädt beim Drüberfahren', async () => {
+    const srv = await startServer();
+    const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+    const ctx = await browser.newContext({ ...DESKTOP, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+    const page = await ctx.newPage();
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
+    try {
+      const a = client(srv.base);
+      const me = await a.login(TEAM.anwalt);
+      const c = (await a.post('/api/cases', { title: 'Überfall auf die Fleeca Bank', area: 'strafrecht', clientName: 'Marco Bellucci' })).json.case;
+      const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+      await a.upload(`/api/cases/${c.id}/attachments`, PNG, 'image/png');
+      await page.goto(srv.base + '/login.html');
+      await page.fill('#email', TEAM.anwalt);
+      await page.fill('#password', PASSWORD);
+      await page.click('button[type=submit]');
+      await page.waitForURL(/dashboard/);
+      await page.waitForSelector('#nav a.nav-item');
+      // Menüpunkt vorladen: die Anfrage läuft schon vor dem Klick
+      const early = page.waitForRequest((r) => /\/api\/invoices(\?|$)/.test(r.url()), { timeout: 3000 });
+      await page.hover('a.nav-item[href="#invoices"]');
+      await early;
+      // Akte: Vorschaubild entsteht im Hintergrund
+      await page.evaluate((id) => openCase(id), c.id);
+      await page.waitForSelector('#modalBody #secChat .chat-input');
+      for (let i = 0; i < 40 && (await a.get(`/api/cases/${c.id}`)).json.attachments[0].needsThumb; i++) await page.waitForTimeout(150);
+      assert.equal((await a.get(`/api/cases/${c.id}`)).json.attachments[0].needsThumb, false, 'Vorschaubild angelegt');
+      // Textbaustein
+      await page.click('#secChat .chat-input');
+      await page.keyboard.type('/mand');
+      await page.waitForSelector('.snip-menu .snip-item.active >> text=/mandatsübernahme');
+      await page.keyboard.press('Enter');
+      const text = await page.inputValue('#secChat .chat-input');
+      assert.match(text, /^Sehr geehrte\/r Marco Bellucci,/);
+      assert.ok(text.includes(me.displayName) && text.includes(me.rank), 'Name und Rang');
+      assert.match(text, /PS-\d{4}-\d{4}/);
+      assert.equal(await page.locator('.snip-menu').count(), 0, 'Auswahl geschlossen');
+      assert.equal(await page.locator('#secChat .chat-bubble').count(), 0, 'Enter hat nur eingefügt, nicht gesendet');
+      // Esc schließt nur die Auswahl
+      await page.fill('#secChat .chat-input', '');
+      await page.keyboard.type('/');
+      await page.waitForSelector('.snip-menu');
+      await page.keyboard.press('Escape');
+      assert.equal(await page.locator('.snip-menu').count(), 0);
+      assert.equal(await page.locator('#modal.open').count(), 1, 'Akte bleibt offen');
+      assert.deepEqual(problems, []);
+    } finally {
+      await ctx.close();
+      await browser.close();
+      await srv.stop();
+    }
+  });
+});

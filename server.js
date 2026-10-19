@@ -118,6 +118,7 @@ app.use('/api/gsheets', externalRoutes.gsheetsRouter);
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/penal', require('./routes/penal').router); // Strafkatalog (StGB)
 app.use('/api/wiki', require('./routes/wiki').router); // Kanzlei-Wiki
+app.use('/api/snippets', require('./routes/snippets').router); // Textbausteine (Akten-Chat, Notizen)
 app.use('/api/resolutions', require('./routes/resolutions').router); // Board-Beschlüsse
 app.use('/api/search', require('./routes/search'));
 app.use('/api/google', require('./routes/google'));
@@ -204,6 +205,7 @@ runBootstrap();
 require('./ranks').init(); // Ränge aus der Datenbank (beim ersten Start: die bisherigen sechs)
 require('./penal').init(); // Strafgesetzbuch & Strafkatalog (beim ersten Start aus seeds/stgb.json)
 require('./routes/wiki').seed(); // Kanzlei-Wiki: Grundlagen-Artikel beim ersten Start
+require('./routes/snippets').seed(); // Textbausteine: Startbausteine beim ersten Start
 
 // Discord-Erinnerungen an Fristen/Gerichtstermine (24 h vorher).
 const reminderTimer = setInterval(() => {

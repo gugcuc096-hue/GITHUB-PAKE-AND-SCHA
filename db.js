@@ -1204,6 +1204,21 @@ db.exec(`
     PRIMARY KEY (resolution_id, user_id)
   );
 `);
+// Textbausteine für Akten-Chat und Notizen: „/befehl“ fügt den Text ein, {{platzhalter}} werden aus der Akte gefüllt
+db.exec(`
+  CREATE TABLE IF NOT EXISTS text_snippets (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    command         TEXT NOT NULL,
+    title           TEXT NOT NULL,
+    body            TEXT NOT NULL,
+    created_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_by_name TEXT NOT NULL DEFAULT '',
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
+// Vorschaubild (WebP, im Browser verkleinert) je Beweismittel – Raster laden schneller, das Original erst beim Öffnen
+addColumn('case_attachments', 'thumb', 'TEXT');
 // Strafmaß der Akte: Einschätzung der Kanzlei und verminderte Schuldfähigkeit (§ 8)
 addColumn('cases', 'sentence_estimate', 'INTEGER');
 addColumn('cases', 'sentence_fine', 'INTEGER');

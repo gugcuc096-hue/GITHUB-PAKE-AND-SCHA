@@ -180,3 +180,64 @@ describe('Rechnung stornieren', () => {
     assert.equal((await as.anwalt.get(`/api/invoices/${inv.json.invoice.id}`)).json.invoice.status, 'storniert');
   });
 });
+
+describe('Textbausteine', () => {
+  it('Startbausteine mit Platzhaltern wie in den Schriftsätzen; nur für die Kanzlei', async () => {
+    const r = await as.anwalt.get('/api/snippets');
+    assert.equal(r.status, 200);
+    const uebernahme = r.json.snippets.find((s) => s.command === 'mandatsübernahme');
+    assert.ok(uebernahme, 'Startbaustein /mandatsübernahme');
+    assert.match(uebernahme.body, /\{\{mandant\}\}/);
+    assert.match(uebernahme.body, /\{\{anwalt_rang\}\}/);
+    for (const p of ['mandant', 'anwalt', 'anwalt_rang', 'aktenzeichen', 'gerichtsaktenzeichen', 'anklagepunkte', 'datum']) assert.ok(r.json.placeholders[p], p);
+    assert.equal(uebernahme.canEdit, false, 'Startbausteine ändert das Board');
+    assert.equal((await as.mandant.get('/api/snippets')).status, 403);
+  });
+
+  it('eigene Bausteine: Befehl eindeutig (auch ohne Umlaute), nur bekannte Platzhalter, ändern nur Ersteller oder Board', async () => {
+    const body = { command: '/Haftprüfung', title: 'Haftprüfung beantragt', body: 'Sehr geehrte/r {{mandant}},\nich habe Haftprüfung beantragt.\n{{anwalt}}' };
+    const r = await as.anwalt.post('/api/snippets', body);
+    assert.equal(r.status, 201, r.text);
+    assert.equal(r.json.snippet.command, 'haftprüfung');
+    assert.equal(r.json.snippet.canEdit, true);
+    assert.equal((await as.anwalt.post('/api/snippets', { ...body, command: 'haftpruefung' })).status, 409, 'gleicher Befehl ohne Umlaut');
+    const bad = await as.anwalt.post('/api/snippets', { ...body, command: 'test', body: 'Hallo {{vorname}}' });
+    assert.equal(bad.status, 400);
+    assert.match(bad.json.error, /\{\{vorname\}\}/);
+    assert.equal((await as.anwalt.post('/api/snippets', { ...body, command: 'a b' })).status, 400);
+    const id = r.json.snippet.id;
+    assert.equal((await as.anwalt.patch(`/api/snippets/${id}`, { ...body, title: 'Haftprüfung' })).status, 200);
+    const other = client(server.base);
+    const reg = await other.post('/api/auth/register', { displayName: 'Kim Kunde', email: 'kim.kunde', password: 'Mandanten-Passwort-3' });
+    assert.equal(reg.status, 201);
+    assert.equal((await as.partner.patch(`/api/snippets/${id}`, { ...body, title: 'Vom Board' })).status, 200, 'Board darf');
+    const start = (await as.anwalt.get('/api/snippets')).json.snippets.find((s) => s.command === 'vollmacht');
+    assert.equal((await as.anwalt.del(`/api/snippets/${start.id}`)).status, 403, 'fremden Baustein nicht löschen');
+    assert.equal((await as.anwalt.del(`/api/snippets/${id}`)).status, 200);
+  });
+});
+
+describe('Vorschaubilder', () => {
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  it('ohne Vorschaubild zeigt das Raster das Original; einmal anlegen, danach nicht überschreiben', async () => {
+    const up = await as.mandant.upload(`/api/cases/${data.caseId}/attachments`, PNG, 'image/png');
+    assert.equal(up.status, 201, up.text);
+    const a = up.json.attachment;
+    assert.equal(a.needsThumb, true);
+    assert.equal(a.thumbUrl, a.url);
+    assert.equal((await as.mandant.upload(`/api/cases/${data.caseId}/attachments/${a.id}/thumb`, Buffer.from('kein Bild'), 'image/png')).status, 404, 'PUT, nicht POST');
+    const put = (who, buf) => fetch(`${server.base}/api/cases/${data.caseId}/attachments/${a.id}/thumb`, { method: 'PUT', headers: { 'Content-Type': 'image/png', Cookie: who.cookie() }, body: buf });
+    assert.equal((await put(as.mandant, Buffer.from('xxxxxxxxxxxxxxxxxxxx'))).status, 400, 'nur echte Bilder');
+    const ok = await put(as.anwalt, PNG);
+    assert.equal(ok.status, 200);
+    const row = (await ok.json()).attachment;
+    assert.equal(row.needsThumb, false);
+    assert.match(row.thumbUrl, /\/thumb$/);
+    const img = await fetch(server.base + row.thumbUrl, { headers: { Cookie: as.mandant.cookie() } });
+    assert.equal(img.status, 200);
+    assert.match(img.headers.get('content-type'), /^image\/png/);
+    assert.equal((await put(as.anwalt, PNG)).status, 200, 'zweites Mal: bleibt beim ersten');
+    // fremde Akte: kein Zugriff
+    assert.equal((await fetch(server.base + row.thumbUrl, { headers: { Cookie: (await (async () => { const k = client(server.base); await k.login('kim.kunde', 'Mandanten-Passwort-3'); return k; })()).cookie() } })).status, 404);
+  });
+});

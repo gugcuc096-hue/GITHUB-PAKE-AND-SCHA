@@ -264,12 +264,18 @@ function previewStage(stage) {
   if (track && stage.startsWith('step:')) {
     const at = Number(stage.slice(5));
     const nodes = $$('.track-node', track);
+    const fill = track.querySelector('.track-fill');
+    let pop = 0;
     nodes.forEach((n, i) => {
+      const was = n.classList.contains('done');
       n.classList.toggle('done', i < at);
       n.classList.toggle('current', i === at);
       n.textContent = i < at ? '✓' : String(i + 1);
+      // neu erreichte Schritte springen kurz auf, während die goldene Linie hinläuft
+      if (!window.PS.motion.calm() && ((i < at && !was) || i === at)) n.animate(TRACK_POP, { duration: 420, delay: 120 + pop++ * 130, easing: 'ease-out', fill: 'backwards' });
     });
-    track.querySelector('.track-fill').style.width = `${(at / (nodes.length - 1)) * 80}%`;
+    fill.style.width = `${(at / (nodes.length - 1)) * 80}%`;
+    trackGlow(fill, 700);
   }
   return () => {
     if (sel && sel.isConnected) {
@@ -278,6 +284,31 @@ function previewStage(stage) {
     }
     if (track && track.isConnected) track.innerHTML = before.track;
   };
+}
+
+/*
+ * Bearbeitungsstand animiert: Beim Öffnen der Akte läuft die goldene Linie bis zum aktuellen Schritt, die erreichten
+ * Kreise springen nacheinander auf; beim Weiterschalten wandert ein Lichtpunkt mit. Bei „Bewegung reduzieren“ nicht.
+ */
+const TRACK_POP = [
+  { transform: 'scale(0.55)', opacity: 0.35 },
+  { transform: 'scale(1.14)', opacity: 1, offset: 0.7 },
+  { transform: 'none', opacity: 1 },
+];
+function trackGlow(fill, ms) {
+  if (!fill || window.PS.motion.calm()) return;
+  fill.classList.add('moving');
+  clearTimeout(fill._glow);
+  fill._glow = setTimeout(() => fill.classList.remove('moving'), ms);
+}
+function animateTrack(track) {
+  if (!track || window.PS.motion.calm()) return;
+  const fill = track.querySelector('.track-fill');
+  if (fill && parseFloat(fill.style.width) > 0) {
+    fill.animate([{ width: '0%' }, { width: fill.style.width }], { duration: 900, delay: 150, easing: 'cubic-bezier(0.16, 1, 0.3, 1)', fill: 'backwards' });
+    trackGlow(fill, 1100);
+  }
+  $$('.track-node.done, .track-node.current', track).forEach((n, i) => n.animate(TRACK_POP, { duration: 420, delay: 200 + i * 150, easing: 'ease-out', fill: 'backwards' }));
 }
 
 /**
@@ -447,8 +478,10 @@ async function chatSendNow(f, listSel, toBubble, send) {
   }
 }
 function chatForm({ form, attrs, placeholder }) {
+  // Kanzlei im Akten-Chat: „/“ öffnet die Textbausteine (13-kanzlei.js)
+  const snippets = form === 'chat-send' && isStaff();
   return `<form data-form="${form}" ${attrs} class="chat-form">
-          <textarea name="body" rows="1" maxlength="${form === 'chat-send' ? 4000 : 3000}" required class="field chat-input" placeholder="${esc(placeholder)}" aria-label="Nachricht schreiben"></textarea>
+          <textarea name="body" rows="1" maxlength="${form === 'chat-send' ? 4000 : 3000}" required class="field chat-input" placeholder="${esc(snippets ? `${placeholder} ( / für Textbausteine)` : placeholder)}" aria-label="Nachricht schreiben"${snippets ? ' data-snippets' : ''}></textarea>
           <button type="submit" class="btn-gold chat-send" aria-label="Senden" title="Senden">${icon('send')}</button>
         </form>`;
 }
@@ -843,7 +876,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
         ${staff
         ? `<form data-form="add-note" data-id="${c.id}" class="mt-4 space-y-3">
           <input type="hidden" name="internal" value="on">
-          <textarea name="body" rows="3" maxlength="4000" required class="field" placeholder="Notiz, Telefonat, Beweismittel, nächster Schritt …" aria-label="Neue interne Notiz"></textarea>
+          <textarea name="body" rows="3" maxlength="4000" required class="field" placeholder="Notiz, Telefonat, Beweismittel, nächster Schritt … ( / für Textbausteine)" aria-label="Neue interne Notiz" data-snippets></textarea>
           <div class="flex flex-wrap items-center justify-between gap-3">
             <span class="text-xs text-dim">Interne Notizen sieht nur die Kanzlei – Nachrichten an den Mandanten oben unter „Nachrichten“.</span>
             <button type="submit" class="btn-outline btn-md">${icon('send', 'ico-sm')}<span>Notiz speichern</span></button>

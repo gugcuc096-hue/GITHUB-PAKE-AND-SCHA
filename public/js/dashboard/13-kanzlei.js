@@ -1,6 +1,6 @@
 /*
- * Kanzlei-Dashboard – Teil 13 von 14: Kanzlei – Wiki (mit Strafgesetzbuch), Board-Beschlüsse, Sieg-Moment und
- * Anwalt des Monats (Einstellungen → Website & Ränge).
+ * Kanzlei-Dashboard – Teil 13 von 14: Kanzlei – Wiki (mit Strafgesetzbuch und Textbausteinen), Board-Beschlüsse,
+ * Sieg-Moment, Anwalt des Monats (Einstellungen → Website & Ränge) und Textbausteine im Akten-Chat.
  * Wird nach den vorherigen Teilen geladen (Reihenfolge siehe dashboard.html bzw. 01-basis.js).
  */
 'use strict';
@@ -62,20 +62,31 @@ const foldText = (s) =>
 views.wiki = {
   async load() {
     if (st.wikiTab === 'stgb') await loadPenal();
+    if (st.wikiTab === 'bausteine') await loadSnippets(true);
     st.wiki = await api.get('/api/wiki');
   },
   render() {
-    const tab = st.wikiTab === 'stgb' ? 'stgb' : 'artikel';
+    const tab = ['stgb', 'bausteine'].includes(st.wikiTab) ? st.wikiTab : 'artikel';
     const board = st.wiki.canEdit;
     const head = `
         <div class="page-head">
           <div><h1 class="page-title">Kanzlei-Wiki</h1><p class="page-sub">Abläufe, Vorlagen und Gerichtspraxis zum Nachschlagen – und das Strafgesetzbuch mit allen Strafrahmen.</p></div>
-          ${board ? `<div class="page-actions">${tab === 'stgb' ? `<button class="btn-outline btn-md" data-action="offence-new">${icon('plus')}<span>Tatbestand</span></button>` : `<button class="btn-gold btn-md" data-action="wiki-new">${icon('plus')}<span>Neuer Artikel</span></button>`}</div>` : ''}
+          ${
+            tab === 'bausteine'
+              ? `<div class="page-actions"><button class="btn-gold btn-md" data-action="snip-new">${icon('plus')}<span>Neuer Baustein</span></button></div>`
+              : board
+                ? `<div class="page-actions">${tab === 'stgb' ? `<button class="btn-outline btn-md" data-action="offence-new">${icon('plus')}<span>Tatbestand</span></button>` : `<button class="btn-gold btn-md" data-action="wiki-new">${icon('plus')}<span>Neuer Artikel</span></button>`}</div>`
+                : ''
+          }
         </div>
         <div class="chip-row mb-4" role="tablist" aria-label="Bereiche des Wikis">
           <button type="button" class="chip ${tab === 'artikel' ? 'active' : ''}" role="tab" aria-selected="${tab === 'artikel'}" data-action="wiki-tab" data-tab="artikel">${icon('book', 'ico-sm')}<span>Artikel</span><span class="chip-count">${st.wiki.articles.length}</span></button>
           <button type="button" class="chip ${tab === 'stgb' ? 'active' : ''}" role="tab" aria-selected="${tab === 'stgb'}" data-action="wiki-tab" data-tab="stgb">${icon('scale', 'ico-sm')}<span>Strafgesetzbuch</span></button>
+          <button type="button" class="chip ${tab === 'bausteine' ? 'active' : ''}" role="tab" aria-selected="${tab === 'bausteine'}" data-action="wiki-tab" data-tab="bausteine">${icon('chat', 'ico-sm')}<span>Textbausteine</span></button>
         </div>`;
+    if (tab === 'bausteine')
+      return `${head}<p class="text-sm text-muted mb-4">Im Akten-Chat und in internen Notizen <code class="snip-code">/</code> tippen und den Baustein wählen (Pfeiltasten, Enter) – Name des Mandanten, Ihr Name und Rang, Aktenzeichen &amp; Co. setzt das Dashboard automatisch ein. Anlegen kann jeder, ändern wer ihn angelegt hat oder das Board.</p>
+        <div class="panel p-2 md:p-3 snip-list">${snippetRows(st.snippets.snippets)}</div>`;
     return head + (tab === 'stgb' ? stgbPanel() : wikiPanel());
   },
 };
@@ -436,6 +447,7 @@ Object.assign(actions, {
   'wiki-tab': async (el) => {
     st.wikiTab = el.dataset.tab;
     if (st.wikiTab === 'stgb') await loadPenal();
+    if (st.wikiTab === 'bausteine') await loadSnippets(true);
     renderView();
   },
   'wiki-cat': (el) => {
@@ -582,4 +594,262 @@ document.addEventListener('input', (e) => {
     st.stgbQ = e.target.value;
     $('#stgbList').innerHTML = stgbRows();
   }
+});
+
+/* ================================================================
+   Textbausteine (Akten-Chat und interne Notizen): „/“ tippen → Auswahl, Enter oder Tab fügt ein. Platzhalter wie in den
+   Schriftsätzen ({{mandant}}, {{anwalt}}, {{anwalt_rang}}, {{aktenzeichen}} …) kommen aus der offenen Akte und dem eigenen
+   Konto; was fehlt, bleibt als [platzhalter] stehen und fällt so beim Lesen auf.
+   ================================================================ */
+async function loadSnippets(force = false) {
+  if (!isStaff()) return null;
+  if (!st.snippets || force) st.snippets = await api.get('/api/snippets');
+  return st.snippets;
+}
+
+/** Werte der Platzhalter aus der offenen Akte (st.caseInfo) und dem eigenen Konto. */
+function snippetValues() {
+  const c = st.caseInfo || {};
+  const now = new Date();
+  const charges = (st.caseCharges && st.caseCharges.charges) || [];
+  return {
+    mandant: c.clientName && c.clientName !== '—' ? c.clientName : '',
+    anwalt: st.user.displayName,
+    anwalt_rang: st.user.rank || '',
+    anwalt_telefon: st.user.phone || '',
+    zustaendig: c.lawyerName || '',
+    aktenzeichen: c.caseNumber || '',
+    akte: c.title || '',
+    rechtsgebiet: AREAS[c.area] || '',
+    gerichtsaktenzeichen: c.courtRef || '',
+    gegenpartei: c.opponent || '',
+    anklagepunkte: charges.map((x) => `${x.count > 1 ? `${x.count}× ` : ''}${x.citation} – ${x.title}${x.attempted ? ' (Versuch)' : ''}${x.aiding ? ' (Beihilfe)' : ''}`).join('\n'),
+    kanzlei: 'Pake & Scha Legal Consulting',
+    datum: now.toLocaleDateString('de-DE'),
+    uhrzeit: now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+    ort: 'Los Santos, San Andreas',
+  };
+}
+const fillSnippet = (body, values = snippetValues()) => String(body).replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (all, k) => values[k.toLowerCase()] || `[${k.toLowerCase()}]`);
+
+/** „/befehl“ direkt vor dem Cursor (am Zeilenanfang oder nach einem Leerzeichen) – oder null. */
+function snippetToken(t) {
+  const before = t.value.slice(0, t.selectionStart);
+  const m = before.match(/(^|\s)\/([^\s/]{0,32})$/);
+  return m ? { start: before.length - m[2].length - 1, query: m[2] } : null;
+}
+
+const snip = { el: null, input: null, list: [], active: 0, token: null };
+function snippetMatches(query) {
+  const q = foldText(query);
+  const all = (st.snippets && st.snippets.snippets) || [];
+  // Befehle, die mit dem Getippten anfangen, zuerst – dann alphabetisch
+  return all
+    .filter((s) => !q || foldText(s.command).includes(q) || foldText(s.title).includes(q))
+    .sort((a, b) => foldText(b.command).startsWith(q) - foldText(a.command).startsWith(q) || a.command.localeCompare(b.command, 'de'))
+    .slice(0, 8);
+}
+function closeSnippetMenu() {
+  snip.el?.remove();
+  snip.el = null;
+  snip.input = null;
+}
+function renderSnippetMenu() {
+  const t = snip.input;
+  if (!t || !t.isConnected) return closeSnippetMenu();
+  if (!snip.el) {
+    snip.el = document.createElement('div');
+    snip.el.className = 'snip-menu';
+    snip.el.setAttribute('role', 'listbox');
+    snip.el.addEventListener('mousedown', (e) => e.preventDefault()); // Fokus bleibt im Eingabefeld
+    snip.el.addEventListener('click', (e) => {
+      const item = e.target.closest('[data-snip]');
+      if (item) insertSnippet(Number(item.dataset.snip));
+      else if (e.target.closest('[data-snip-manage]')) {
+        closeSnippetMenu();
+        guard(() => snippetManager());
+      }
+    });
+    document.body.appendChild(snip.el);
+  }
+  snip.el.innerHTML = `${
+    snip.list.length
+      ? snip.list
+          .map(
+            (s, i) => `<button type="button" class="snip-item ${i === snip.active ? 'active' : ''}" role="option" aria-selected="${i === snip.active}" data-snip="${s.id}">
+              <span class="snip-cmd">/${esc(s.command)}</span><span class="snip-title">${esc(s.title)}</span></button>`
+          )
+          .join('')
+      : `<p class="snip-empty">Kein Baustein „/${esc(snip.token.query)}“.</p>`
+  }<button type="button" class="snip-manage" data-snip-manage>${icon('edit', 'ico-sm')}<span>Bausteine verwalten</span></button>`;
+  // über dem Eingabefeld, so breit wie das Feld (höchstens 420 px)
+  const r = t.getBoundingClientRect();
+  const w = Math.min(420, Math.max(260, r.width));
+  snip.el.style.width = `${w}px`;
+  snip.el.style.left = `${Math.max(8, Math.min(r.left, innerWidth - w - 8))}px`;
+  const h = snip.el.offsetHeight;
+  snip.el.style.top = `${r.top - h - 8 > 8 ? r.top - h - 8 : r.bottom + 8}px`;
+}
+async function updateSnippetMenu(t) {
+  const tok = snippetToken(t);
+  if (!tok) return closeSnippetMenu();
+  if (!st.snippets) {
+    try {
+      await loadSnippets();
+    } catch {
+      return;
+    }
+  }
+  snip.input = t;
+  snip.token = tok;
+  snip.list = snippetMatches(tok.query);
+  snip.active = Math.min(snip.active, Math.max(0, snip.list.length - 1));
+  renderSnippetMenu();
+}
+function insertSnippet(id) {
+  const t = snip.input;
+  const s = (st.snippets.snippets || []).find((x) => x.id === id);
+  if (!t || !s) return closeSnippetMenu();
+  const tok = snippetToken(t) || snip.token;
+  const text = fillSnippet(s.body);
+  const after = t.value.slice(t.selectionStart);
+  t.value = t.value.slice(0, tok.start) + text + after;
+  const pos = tok.start + text.length;
+  t.setSelectionRange(pos, pos);
+  closeSnippetMenu();
+  t.dispatchEvent(new Event('input', { bubbles: true })); // Höhe, Entwurf, „schreibt gerade“
+  t.focus();
+  // Erste fehlende Angabe markieren, damit man sie gleich überschreiben kann
+  const gap = t.value.slice(tok.start, pos).search(/\[[a-z_]+\]/);
+  if (gap >= 0) {
+    const m = t.value.slice(tok.start + gap).match(/^\[[a-z_]+\]/);
+    t.setSelectionRange(tok.start + gap, tok.start + gap + m[0].length);
+  }
+}
+document.addEventListener('input', (e) => {
+  const t = e.target;
+  if (t.matches && t.matches('textarea[data-snippets]') && isStaff()) updateSnippetMenu(t);
+});
+// Pfeiltasten, Enter/Tab und Esc gehören der Auswahl, solange sie offen ist (vor „Enter sendet“ im Chat)
+window.addEventListener(
+  'keydown',
+  (e) => {
+    if (!snip.el || e.target !== snip.input) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      e.stopPropagation();
+      const n = snip.list.length;
+      if (n) snip.active = (snip.active + (e.key === 'ArrowDown' ? 1 : n - 1)) % n;
+      renderSnippetMenu();
+    } else if ((e.key === 'Enter' || e.key === 'Tab') && !e.shiftKey && snip.list.length) {
+      e.preventDefault();
+      e.stopPropagation();
+      insertSnippet(snip.list[snip.active].id);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      closeSnippetMenu();
+    }
+  },
+  true
+);
+document.addEventListener('focusout', (e) => e.target === snip.input && setTimeout(() => document.activeElement !== snip.input && closeSnippetMenu(), 120));
+window.addEventListener('resize', () => snip.el && renderSnippetMenu());
+document.addEventListener('scroll', () => snip.el && renderSnippetMenu(), true);
+
+/* ---------------------------------------------------------------- Bausteine verwalten (Fenster und Wiki-Reiter) */
+function snippetRows(list) {
+  if (!list.length) return empty('Noch keine Textbausteine.', 'chat');
+  return list
+    .map(
+      (s) => `<div class="snip-row">
+        <div class="min-w-0 flex-1">
+          <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1"><span class="snip-cmd">/${esc(s.command)}</span><span class="font-medium">${esc(s.title)}</span></div>
+          <p class="snip-preview">${esc(s.body.length > 160 ? `${s.body.slice(0, 157)}…` : s.body)}</p>
+        </div>
+        ${
+          s.canEdit
+            ? `<div class="flex gap-1 shrink-0"><button type="button" class="icon-btn sm" data-action="snip-edit" data-id="${s.id}" aria-label="Bearbeiten" title="Bearbeiten">${icon('edit', 'ico-sm')}</button><button type="button" class="icon-btn sm" data-action="snip-delete" data-id="${s.id}" data-command="${esc(s.command)}" aria-label="Löschen" title="Löschen">${icon('trash', 'ico-sm')}</button></div>`
+            : ''
+        }
+      </div>`
+    )
+    .join('');
+}
+async function snippetManager() {
+  const d = await loadSnippets(true);
+  openModal(
+    `
+      <h2 class="modal-title">Textbausteine</h2>
+      <p class="modal-sub">Im Akten-Chat und in Notizen <code>/</code> tippen, Baustein wählen – Name, Aktenzeichen &amp; Co. werden automatisch eingesetzt.</p>
+      <div class="flex justify-end mb-3"><button type="button" class="btn-gold btn-md" data-action="snip-new">${icon('plus')}<span>Neuer Baustein</span></button></div>
+      <div class="snip-list">${snippetRows(d.snippets)}</div>`,
+    { wide: true, key: 'snippets', reopen: () => snippetManager() }
+  );
+}
+function snippetEditor(s) {
+  const p = st.snippets.placeholders;
+  const v = s || { command: '', title: '', body: 'Sehr geehrte/r {{mandant}},\n\n\n\nMit freundlichen Grüßen\n{{anwalt}}' };
+  openModal(
+    `
+      <h2 class="modal-title">${s ? 'Baustein bearbeiten' : 'Neuer Textbaustein'}</h2>
+      <p class="modal-sub">Platzhalter antippen, um sie an der Cursorstelle einzufügen. Beim Einfügen im Chat werden sie aus der Akte gefüllt.</p>
+      <form data-form="snippet" data-id="${s ? s.id : ''}" class="form-grid cols-2">
+        <div><label class="label" for="snCmd">Befehl</label><div class="snip-cmd-field"><span aria-hidden="true">/</span><input id="snCmd" name="command" class="field" required minlength="2" maxlength="32" value="${esc(v.command)}" placeholder="mandatsübernahme" autocomplete="off" spellcheck="false"></div></div>
+        <div><label class="label" for="snTitle">Name</label><input id="snTitle" name="title" class="field" required minlength="2" maxlength="80" value="${esc(v.title)}" placeholder="z. B. Mandat übernommen"></div>
+        <div class="span-2"><label class="label" for="snBody">Text</label><textarea id="snBody" name="body" rows="9" class="field" required maxlength="3000">${esc(v.body)}</textarea>
+          <div class="snip-chips" role="group" aria-label="Platzhalter einfügen">${Object.entries(p)
+            .map(([k, label]) => `<button type="button" class="snip-chip" data-action="snip-ph" data-ph="${k}" title="${esc(label)}">{{${k}}}</button>`)
+            .join('')}</div></div>
+        <div class="span-2"><span class="label">Vorschau${st.caseInfo ? ` (Akte ${esc(st.caseInfo.caseNumber)})` : ''}</span><div id="snPreview" class="snip-preview-box">${esc(fillSnippet(v.body))}</div></div>
+        <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button></div>
+      </form>`,
+    { wide: true }
+  );
+}
+document.addEventListener('input', (e) => {
+  if (e.target.id === 'snBody' && $('#snPreview')) $('#snPreview').textContent = fillSnippet(e.target.value);
+});
+
+Object.assign(actions, {
+  'snip-manage': () => snippetManager(),
+  'snip-new': async () => {
+    await loadSnippets();
+    snippetEditor(null);
+  },
+  'snip-edit': async (el) => {
+    const d = await loadSnippets();
+    const s = d.snippets.find((x) => x.id === Number(el.dataset.id));
+    if (s) snippetEditor(s);
+  },
+  'snip-delete': async (el) => {
+    if (!(await askDelete('Textbaustein löschen?', `/${el.dataset.command} steht danach niemandem mehr zur Verfügung.`))) return;
+    await api.del('/api/snippets/' + el.dataset.id);
+    await loadSnippets(true);
+    toast('Textbaustein gelöscht.');
+    if (st.modalCurrent && st.modalCurrent.key === 'snippets') await snippetManager();
+    else if (st.view === 'wiki') renderView();
+  },
+  'snip-ph': (el) => {
+    const t = $('#snBody');
+    const ins = `{{${el.dataset.ph}}}`;
+    const a = t.selectionStart ?? t.value.length;
+    t.value = t.value.slice(0, a) + ins + t.value.slice(t.selectionEnd ?? a);
+    t.focus();
+    t.setSelectionRange(a + ins.length, a + ins.length);
+    t.dispatchEvent(new Event('input', { bubbles: true }));
+  },
+});
+Object.assign(forms, {
+  snippet: async (f) => {
+    const fd = new FormData(f);
+    const id = f.dataset.id ? Number(f.dataset.id) : null;
+    const body = { command: val(fd, 'command'), title: val(fd, 'title'), body: val(fd, 'body') };
+    if (id) await api.patch('/api/snippets/' + id, body);
+    else await api.post('/api/snippets', body);
+    await loadSnippets(true);
+    toast(`Baustein /${body.command.replace(/^\/+/, '').toLowerCase()} gespeichert.`);
+    await modalBack();
+    if (st.view === 'wiki') renderView();
+  },
 });
