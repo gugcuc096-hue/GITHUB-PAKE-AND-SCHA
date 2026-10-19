@@ -117,6 +117,24 @@ describe('Kanzlei-Lager & verknüpfte Akten', () => {
     assert.equal((await as.anwalt.post('/api/storage/entries', { kind: 'item', itemId: data.item.id, direction: 'out', amount: 5 })).status, 201, 'aber noch entnehmbar');
   });
 
+  it('Geburtsdatum: aus dem Mandatsvertrag in die Kartei – der nächste Vertrag desselben Mandanten ist vorbelegt', async () => {
+    const tpl = (await as.anwalt.get('/api/contract-templates')).json.templates.find((t) => t.kind !== 'schriftsatz');
+    const k = await as.anwalt.post(`/api/cases/${data.b.id}/contracts`, { templateId: tpl.id, lawyerId: as.anwalt.me.id, data: { mandant: 'Bernd Beifahrer', mandant_geburtsdatum: '04.07.1995' } });
+    assert.equal(k.status, 201, k.text);
+    // Neue Akte, gleicher Mandant (ohne Konto): Geburtsdatum steht schon drin
+    const c = (await as.anwalt.post('/api/cases', { title: 'Bernd – zweites Mandat', area: 'strafrecht', clientName: 'Bernd Beifahrer' })).json.case;
+    let def = (await as.anwalt.get(`/api/cases/${c.id}/contracts/defaults`)).json;
+    assert.equal(def.data.mandant_geburtsdatum, '04.07.1995');
+    // Kartei zeigt es und kann es ändern – das gilt dann für den nächsten Vertrag
+    const key = encodeURIComponent('n:bernd beifahrer');
+    assert.equal((await as.anwalt.get(`/api/clients/${key}`)).json.birth, '04.07.1995');
+    const put = await as.anwalt.put(`/api/clients/${key}/birth`, { birth: '05.07.1995' });
+    assert.equal(put.status, 200, put.text);
+    def = (await as.anwalt.get(`/api/cases/${c.id}/contracts/defaults`)).json;
+    assert.equal(def.data.mandant_geburtsdatum, '05.07.1995');
+    assert.equal((await as.mandant.put(`/api/clients/${key}/birth`, { birth: 'x' })).status, 403);
+  });
+
   it('Akten verknüpfen: gegenseitig sichtbar, gemeinsame Beweismappe nur für die Kanzlei, Laufzettel', async () => {
     const up = await as.anwalt.upload(`/api/cases/${data.b.id}/attachments?caption=Bodycam&internal=1`, PNG, 'image/png');
     assert.equal(up.status, 201, up.text);

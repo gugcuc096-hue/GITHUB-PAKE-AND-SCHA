@@ -790,7 +790,7 @@
   fxStyle.textContent = FX_CSS;
   document.head.appendChild(fxStyle);
 
-  const SPOT_SEL = '.glass-card, .kpi';
+  const SPOT_SEL = '.glass-card, .kpi, .lager-item, .cc-stat';
   const spotOk = new WeakMap();
   let spotEl = null;
   let spotXY = null;

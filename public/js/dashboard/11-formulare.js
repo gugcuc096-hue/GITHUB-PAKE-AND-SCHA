@@ -27,6 +27,11 @@ const forms = {
     showClient(await api.post(`/api/clients/${encodeURIComponent(f.dataset.key)}/notes`, { body }));
     toast('Notiz gespeichert.');
   },
+  'client-birth': async (f) => {
+    const birth = f.elements.birth.value.trim();
+    showClient(await api.put(`/api/clients/${encodeURIComponent(f.dataset.key)}/birth`, { birth }));
+    toast(birth ? `Geburtsdatum gespeichert – steht im nächsten Mandatsvertrag schon drin.` : 'Geburtsdatum entfernt.');
+  },
   'client-flag': async (f) => {
     const flag = f.elements.flag.value;
     showClient(await api.put(`/api/clients/${encodeURIComponent(f.dataset.key)}/flag`, { flag, reason: f.elements.reason.value.trim() }));
@@ -131,6 +136,7 @@ const forms = {
     await api.patch('/api/concerns/' + f.dataset.id, { status: val(fd, 'status'), assignedTo: val(fd, 'assignedTo') ? Number(val(fd, 'assignedTo')) : null });
     toast('Anliegen aktualisiert.');
     await openConcern(Number(f.dataset.id));
+    if (val(fd, 'status') === 'erledigt') window.PS.stamp($('#modalCard'), 'Erledigt', 'paid');
     refreshBehind();
     load.concernCount().then(renderNav).catch(() => {});
   },

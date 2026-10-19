@@ -12,7 +12,7 @@ function taskItem(t, { showCase = true } = {}) {
     t.assignedName ? esc(t.assignedName) : '<span class="text-amber-300">niemand zuständig</span>',
     t.done && t.doneByName ? `erledigt von ${esc(t.doneByName)}` : null,
   ].filter(Boolean);
-  return `<div class="task-row ${t.done ? 'is-done' : ''}">
+  return `<div class="task-row ${t.done ? 'is-done' : ''}" data-id="${t.id}">
       <button type="button" class="task-check" data-action="task-toggle" data-id="${t.id}" data-done="${t.done ? 1 : 0}" aria-label="${t.done ? 'Wieder öffnen' : 'Als erledigt markieren'}" title="${t.done ? 'Wieder öffnen' : 'Erledigt'}">${t.done ? icon('check', 'ico-sm') : ''}</button>
       <div class="main"><div class="title">${esc(t.title)}</div>${t.note ? `<div class="note">${esc(t.note)}</div>` : ''}<div class="meta">${meta.join(' · ')}</div></div>
       <div class="side">${due ? `<span class="countdown ${due.cls}">${esc(due.text)}</span>` : ''}

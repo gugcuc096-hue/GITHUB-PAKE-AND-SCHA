@@ -447,6 +447,14 @@ function openModal(html, { wide = false, key = null, reopen = null, child = fals
   st.morphFrom = null;
   // Fensterwechsel (neues Fenster über dem alten, Zurück, Inhalt nach dem Laden): weich statt hart
   if (wasOpen) playIn(body, 'swap-in');
+  // Neu geöffnet: Abschnitte blenden gestaffelt ein (der Aktenkopf fliegt schon aus der Zeile), Zahlen zählen hoch
+  else {
+    playIn(body, 'modal-stagger');
+    // nur dieses eine Mal – späteres Neuzeichnen (Live-Updates) soll nicht erneut einblenden
+    clearTimeout(st.staggerTimer);
+    st.staggerTimer = setTimeout(() => body.classList.remove('modal-stagger'), 650);
+  }
+  window.PS.countUp(body);
   modal.scrollTop = 0;
   body.scrollTop = 0;
   document.body.classList.add('modal-open');
@@ -537,6 +545,7 @@ async function withModalPlaceholder({ wide = false } = {}, loadFn) {
 }
 function replaceModal(html) {
   const body = $('#modalBody');
+  body.classList.remove('modal-stagger');
   const modal = $('#modal');
   const y1 = body.scrollTop;
   const y2 = modal.scrollTop;

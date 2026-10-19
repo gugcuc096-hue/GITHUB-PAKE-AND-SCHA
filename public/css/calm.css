@@ -40,3 +40,5 @@ body.site-home *, body.site-home *::before, body.site-home *::after {
 mark.hl-mark { animation: none; }
 .bulk-bar { animation: none; }
 .lager-item:hover, .lager-cash:hover { transform: none; }
+#modalBody.modal-stagger > *, .lager-stock.bump { animation: none; }
+.cc-mono, .cc-birth[open] .cc-birth-form { animation: none; }

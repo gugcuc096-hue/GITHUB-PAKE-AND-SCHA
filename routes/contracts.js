@@ -423,10 +423,8 @@ caseRouter.get('/defaults', wrap(async (req, res) => {
   const lawyer = db.prepare("SELECT id, display_name, rank FROM users WHERE id = ? AND role IN ('anwalt','admin')").get(wanted);
   const lastOfLawyer = lawyer && db.prepare('SELECT data FROM case_contracts WHERE lawyer_id = ? ORDER BY id DESC LIMIT 1').get(lawyer.id);
   const clientName = c.client_account_name || c.client_name || '';
-  const lastOfClient = c.client_id
-    ? db.prepare('SELECT k.data FROM case_contracts k JOIN cases x ON x.id = k.case_id WHERE x.client_id = ? ORDER BY k.id DESC LIMIT 1').get(c.client_id)
-    : null;
-  const clientBirth = lastOfClient ? parseData(lastOfClient.data).mandant_geburtsdatum || '' : '';
+  // Geburtsdatum des Mandanten: aus der Mandantenkartei bzw. seinem letzten Vertrag (auch ohne Konto, gleicher Name)
+  const clientBirth = require('./clients').birthFor(c, clientName === '—' ? '' : clientName);
   // Geburtsdaten (IC) der Anwälte aus ihren letzten Verträgen – für weitere unterzeichnende Anwälte
   const births = {};
   for (const r of db.prepare("SELECT user_id, birth FROM case_contract_lawyers WHERE user_id IS NOT NULL AND birth != '' ORDER BY id").all()) births[r.user_id] = r.birth;
@@ -559,6 +557,7 @@ caseRouter.post(
       return Number(info.lastInsertRowid);
     });
     logActivity(req.user, kind === 'schriftsatz' ? 'Schriftsatz erstellt' : 'Vertrag erstellt', 'case', c.id, `${c.case_number}: ${t.name}`);
+    if (d.data) require('./clients').rememberBirth(c, d.data.mandant, d.data.mandant_geburtsdatum, req.user); // für den nächsten Vertrag merken
     require('../googleDocs').ensure('contract', id); // Google Doc gleich mit anlegen (wenn verbunden)
     if (kind === 'schriftsatz') {
       // Interne Schriftsätze erscheinen nicht im Ticket; muss der Mandant unterschreiben, wird er einmal erwähnt
@@ -752,6 +751,7 @@ router.patch(
       if (co) saveCoLawyers(k.id, co.list);
     });
     require('../googleDocs').touch('contract', k.id);
+    require('./clients').rememberBirth(c, data.mandant, data.mandant_geburtsdatum, req.user);
     res.json({ contract: contractRow(db.prepare(`${CONTRACT_SELECT} WHERE k.id = ?`).get(k.id)) });
   })
 );
