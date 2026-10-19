@@ -608,6 +608,41 @@ function loadContract(req, res) {
   return { k, c, can: permissions(k, c, req.user) };
 }
 
+/**
+ * Fertigen Schriftsatz ins Prozessticket der Akte schicken (z. B. DOJ-Kanal): Ist der Kanzlei-Bot dort Mitglied, postet
+ * er eine Nachricht mit Dokument-Link (Google Doc, sonst Druckansicht). Sonst liefert die Antwort den Text zum Einfügen
+ * – das Dashboard kopiert ihn und öffnet den Kanal. Nur zuständige Anwälte bzw. Board.
+ */
+router.post(
+  '/:cid/process-ticket',
+  wrap(async (req, res) => {
+    const { k, c } = loadContract(req, res);
+    if (!k) return;
+    const u = req.user;
+    if (!isStaff(u) || !caseAccess(c, u).canEdit) return res.status(403).json({ error: 'Einreichen dürfen die zuständigen Anwälte und das Board of Partners.' });
+    if (statusOf(k) !== 'unterschrieben') return res.status(400).json({ error: 'Bitte zuerst unterschreiben – eingereicht werden nur fertige Schriftsätze.' });
+    const url = String(c.process_ticket_url || '');
+    const m = /^https:\/\/(?:ptb\.|canary\.)?discord(?:app)?\.com\/channels\/(\d{15,22})\/(\d{15,22})/.exec(url);
+    if (!m) return res.status(400).json({ error: 'Für diese Akte ist kein Prozessticket (Discord-Kanal) eingetragen.' });
+    const tickets = require('../tickets');
+    const doc = require('../googleDocs').urls('contract', [k.id]).get(k.id) || `${tickets.siteBase() || ''}/vertrag.html?id=${k.id}`;
+    const title = `📄 ${k.template_name} – ${c.case_number}`;
+    const lines = [`**Akte:** ${c.title}${c.court_ref ? ` · Gerichtsaktenzeichen ${c.court_ref}` : ''}`, `**Eingereicht von:** ${u.display_name}${u.rank ? ` (${u.rank})` : ''} · Pake & Scha Legal Consulting`, `**Dokument:** ${doc}`];
+    let posted = false;
+    if (tickets.hasToken()) {
+      try {
+        await tickets.rest('POST', `/channels/${m[2]}/messages`, { embeds: [tickets.embed({ title, description: lines.join('\n'), url: /^https:/.test(doc) ? doc : undefined })], allowed_mentions: { parse: [] } });
+        posted = true;
+      } catch {
+        posted = false; // Bot ist nicht auf dem Server bzw. darf dort nicht schreiben
+      }
+    }
+    addSystemNote(c.id, u, `${k.template_name} ${posted ? 'ins Prozessticket eingereicht' : 'zum Einreichen im Prozessticket kopiert'}.`, true);
+    logActivity(u, posted ? 'Schriftsatz ins Prozessticket eingereicht' : 'Schriftsatz fürs Prozessticket kopiert', 'case', c.id, `${c.case_number}: ${k.template_name}`);
+    res.json({ posted, channelUrl: url, text: `${title}\n${lines.join('\n')}` });
+  })
+);
+
 /** Für das Google Doc (googleDocs.js): dieselben Daten wie die Druckansicht – ohne Anfrage/Rechteprüfung. */
 function contractDocData(cid) {
   const k = db.prepare(`${CONTRACT_SELECT} WHERE k.id = ?`).get(cid);

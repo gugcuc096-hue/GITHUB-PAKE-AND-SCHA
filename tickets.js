@@ -1364,6 +1364,8 @@ function deleteTicket(kind, id, { by, reason, delayMs = 5000 } = {}) {
   ).run(id);
   const seconds = Math.round(delayMs / 1000);
   enqueue(kind === 'case' ? id : boardKey(kind, id), async () => {
+    // Verlauf vorher in der Akte sichern (nur Akten-Tickets)
+    if (kind === 'case') await require('./transcripts').saveCaseTranscript(id, channelId, rest).catch((err) => console.warn('Ticket-Verlauf nicht gesichert:', err.message));
     await send(channelId, {
       embeds: [
         embed({

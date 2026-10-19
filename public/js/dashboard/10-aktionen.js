@@ -273,6 +273,7 @@ const actions = {
     const m = st.cal.month;
     st.cal.month = new Date(m.getFullYear(), m.getMonth() + Number(el.dataset.dir), 1);
     renderView();
+    calSlide(Number(el.dataset.dir));
   },
   'cal-today': () => {
     st.cal.month = monthStart(new Date());
@@ -1339,6 +1340,32 @@ const actions = {
     st.returnCase = st.caseInfo.id;
     const [defaults] = await Promise.all([api.get(`/api/cases/${st.caseInfo.id}/contracts/defaults`), load.lawyers(), load.fees()]);
     openModal(contractForm(st.caseInfo, { templates: [], defaults, k }));
+  },
+  // Deal-Rechner
+  'deal-new': (el) => {
+    st.returnCase = Number(el.dataset.id);
+    openModal(dealForm(Number(el.dataset.id)));
+  },
+  'deal-answer': async (el) => {
+    const accept = el.dataset.accept === '1';
+    const staff = isStaff();
+    if (!(await ask(staff ? `Hat der Mandant das Angebot im Spiel ${accept ? 'angenommen' : 'abgelehnt'}? Das wird mit Ihrem Namen in der Akte vermerkt.` : `Möchten Sie das Angebot wirklich ${accept ? 'annehmen' : 'ablehnen'}? Ihre Antwort wird in der Akte festgehalten.`, { title: accept ? 'Angebot annehmen' : 'Angebot ablehnen', confirmText: accept ? 'Annehmen' : 'Ablehnen' }))) return;
+    await api.post(`/api/cases/${el.dataset.caseId}/deals/${el.dataset.id}/answer`, { accept });
+    toast(accept ? 'Angebot angenommen – die Kanzlei ist informiert.' : 'Angebot abgelehnt – die Kanzlei ist informiert.');
+    await reloadCase(Number(el.dataset.caseId));
+  },
+  'deal-withdraw': async (el) => {
+    await api.del(`/api/cases/${el.dataset.caseId}/deals/${el.dataset.id}`);
+    toast('Angebot zurückgezogen.');
+    await reloadCase(Number(el.dataset.caseId));
+  },
+  // Fertigen Schriftsatz ins Prozessticket (DOJ-Kanal): Bot postet – oder Text kopieren und Kanal öffnen
+  'brief-to-process': async (el) => {
+    const r = await api.post(`/api/contracts/${el.dataset.id}/process-ticket`);
+    if (r.posted) return toast('Im Prozessticket eingereicht – mit Dokument-Link.');
+    await window.PS.copy(r.text);
+    window.open(r.channelUrl, '_blank', 'noopener');
+    toast('Der Bot ist nicht auf diesem Discord – Text mit Dokument-Link kopiert. Im Prozessticket einfach einfügen (Strg+V).');
   },
   'contract-record': async (el) => {
     const k = (st.caseContracts || []).find((x) => x.id === Number(el.dataset.id));

@@ -29,3 +29,10 @@ html { scroll-behavior: auto !important; }
 body.site-home *, body.site-home *::before, body.site-home *::after {
   animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important;
 }
+/* Leerzustände, Knöpfe, Badges: ohne Bewegung (Ring gleich gezeichnet, kein Funkeln, keine Lichtkante) */
+.empty-art .ea-ring { animation: none; stroke-dashoffset: 0; }
+.empty-art .ea-spark { animation: none; }
+.btn-gold:hover::after { animation: none; }
+.badge-changed { animation: none; }
+.ps-toast-bar { animation-name: toast-bar; }
+.spark-line { animation: none; stroke-dashoffset: 0; }

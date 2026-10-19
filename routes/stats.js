@@ -42,6 +42,12 @@ router.get('/', (req, res) => {
   }
   const byKey = new Map(months.map((m) => [m.key, m]));
 
+  // Verlauf der letzten 8 Wochen (älteste zuerst) für die kleinen Linien unter den Kennzahlen
+  const weeks = Array.from({ length: 8 }, () => ({ revenue: 0, opened: 0, closed: 0 }));
+  const week = (t) => {
+    const i = 7 - Math.floor((now - t) / (7 * DAY));
+    return t != null && i >= 0 && i <= 7 ? weeks[i] : null;
+  };
   // Rechnungen (Honorarvereinbarungen sind kein Umsatz)
   const invoices = db.prepare("SELECT total, status, due_date, created_at, paid_at FROM invoices WHERE kind = 'rechnung'").all();
   let revenue30 = 0;
@@ -59,6 +65,8 @@ router.get('/', (req, res) => {
         m.revenue += i.total;
         m.paid += 1;
       }
+      const w = week(t);
+      if (w) w.revenue += i.total;
       if (t > now - 30 * DAY) revenue30 += i.total;
       else if (t > now - 60 * DAY) revenuePrev30 += i.total;
     } else if (i.status === 'offen') {
@@ -84,11 +92,13 @@ router.get('/', (req, res) => {
     const mo = created != null && byKey.get(monthKey(created));
     if (mo) mo.opened += 1;
     if (created != null && created > now - 30 * DAY) opened30 += 1;
+    if (week(created)) week(created).opened += 1;
     if (c.status !== 'geschlossen') continue;
     const closedAt = ms(c.closed_at);
     if (closedAt != null) {
       const mc = byKey.get(monthKey(closedAt));
       if (mc) mc.closed += 1;
+      if (week(closedAt)) week(closedAt).closed += 1;
       if (closedAt > now - 30 * DAY) closed30 += 1;
       else if (closedAt > now - 60 * DAY) closedPrev30 += 1;
       if (created != null) durations.push(Math.max(0, (closedAt - created) / DAY));
@@ -140,6 +150,7 @@ router.get('/', (req, res) => {
       avgDays: avg(durations),
     },
     months,
+    weeks,
     lawyers,
     unassignedOpen: cases.filter((c) => c.status !== 'geschlossen' && !c.lawyer_id).length,
     outcomes: Object.entries(OUTCOMES)

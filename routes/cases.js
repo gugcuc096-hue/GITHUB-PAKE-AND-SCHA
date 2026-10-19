@@ -489,6 +489,10 @@ function caseDetail(c, u) {
     // Nachrichten mit dem Mandanten und Lesestand
     chat: { messages: caseChat.messages(c.id), read: caseChat.readState(c, u) },
     ticket: tickets.ticketInfo(c, u),
+    // Gesicherte Verläufe gelöschter Tickets (nur Kanzlei)
+    transcripts: staff ? require('../transcripts').listForCase(c.id) : undefined,
+    // Angebote der Staatsanwaltschaft (Deal-Rechner) – Kanzlei und Mandant
+    deals: require('../deals').forCase(c.id),
     // Mandant: eigene Bewertung der (abgeschlossenen) Akte
     review: require('./reviews').reviewForCase(c, u),
     // Kanzlei: Anklagepunkte und Strafmaß (Strafmaß-Rechner)
@@ -998,6 +1002,72 @@ router.delete(
     res.json({ success: true });
   })
 );
+
+/* ---------------------------------------------------------------- Deal-Rechner: Angebote der Staatsanwaltschaft */
+const dealSchema = z
+  .object({
+    he: z.number().int().min(0).max(999).nullable().optional(),
+    fine: z.number().int().min(0).max(100000000).nullable().optional(),
+    note: z.string().trim().max(500).optional(),
+  })
+  .refine((d) => d.he != null || d.fine != null, 'Bitte Hafteinheiten und/oder Geldstrafe des Angebots angeben.');
+router.post(
+  '/:id/deals',
+  wrap(async (req, res) => {
+    const id = idParam(req);
+    const c = id && getCase(id);
+    if (!c || !isStaff(req.user) || !caseAccess(c, req.user).canEdit) return res.status(404).json({ error: 'Akte nicht gefunden.' });
+    const d = parseBody(dealSchema, req, res);
+    if (!d) return;
+    const deals = require('../deals');
+    const dealId = tx(() => {
+      // Ein neues Angebot ersetzt ein noch offenes
+      db.prepare("UPDATE case_deals SET status = 'zurueckgezogen' WHERE case_id = ? AND status = 'offen'").run(c.id);
+      const info = db
+        .prepare('INSERT INTO case_deals (case_id, offer_he, offer_fine, note, created_by, created_by_name) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(c.id, d.he ?? null, d.fine ?? null, d.note || '', req.user.id, req.user.display_name);
+      return Number(info.lastInsertRowid);
+    });
+    addSystemNote(c.id, req.user, `Angebot der Staatsanwaltschaft eingetragen: ${deals.offerText(deals.load(dealId))} – der Mandant kann zustimmen oder ablehnen.`);
+    const sent = await deals.askClient(dealId);
+    res.status(201).json({ deal: deals.row(deals.load(dealId)), discord: sent });
+  })
+);
+router.post('/:id/deals/:did/answer', (req, res) => {
+  const id = idParam(req);
+  const c = id && getCase(id);
+  if (!c || !caseAccess(c, req.user).canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
+  const d = parseBody(z.object({ accept: z.boolean() }), req, res);
+  if (!d) return;
+  const deal = db.prepare('SELECT id FROM case_deals WHERE id = ? AND case_id = ?').get(idParam(req, 'did'), c.id);
+  if (!deal) return res.status(404).json({ error: 'Angebot nicht gefunden.' });
+  // Mandant im Portal – oder die Kanzlei erfasst die Antwort aus dem Spiel
+  const staff = isStaff(req.user);
+  if (staff && !caseAccess(c, req.user).canEdit) return res.status(403).json({ error: 'Nur die zuständigen Anwälte können die Antwort erfassen.' });
+  const r = require('../deals').answer(deal.id, d.accept, { user: req.user, via: staff ? 'kanzlei' : 'portal' });
+  if (r.error) return res.status(400).json({ error: r.error });
+  res.json(r);
+});
+router.delete('/:id/deals/:did', (req, res) => {
+  const id = idParam(req);
+  const c = id && getCase(id);
+  if (!c || !isStaff(req.user) || !caseAccess(c, req.user).canEdit) return res.status(404).json({ error: 'Akte nicht gefunden.' });
+  const r = db.prepare("UPDATE case_deals SET status = 'zurueckgezogen' WHERE id = ? AND case_id = ? AND status = 'offen'").run(idParam(req, 'did'), c.id);
+  if (!r.changes) return res.status(404).json({ error: 'Kein offenes Angebot.' });
+  addSystemNote(c.id, req.user, 'Angebot der Staatsanwaltschaft zurückgezogen.', true);
+  res.json({ success: true });
+});
+
+/* ---------------------------------------------------------------- Gesicherter Ticket-Verlauf (nur Kanzlei) */
+router.get('/:id/transcripts/:tid', (req, res) => {
+  const id = idParam(req);
+  const c = id && getCase(id);
+  if (!c || !isStaff(req.user) || !caseAccess(c, req.user).canView) return res.status(404).json({ error: 'Nicht gefunden.' });
+  const t = db.prepare('SELECT html FROM ticket_transcripts WHERE id = ? AND case_id = ?').get(idParam(req, 'tid'), c.id);
+  if (!t) return res.status(404).json({ error: 'Nicht gefunden.' });
+  res.set({ 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src https:", 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'private, no-store' });
+  res.send(t.html);
+});
 
 /* ---------------------------------------------------------------- Notizen */
 router.post(

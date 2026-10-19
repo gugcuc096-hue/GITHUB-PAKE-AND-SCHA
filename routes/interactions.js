@@ -261,6 +261,12 @@ router.post('/', express.raw({ type: '*/*', limit: '100kb' }), (req, res) => {
   try {
     const discordId = String(body.member?.user?.id || body.user?.id || '');
     // Termin-Zusage: Knöpfe stehen in der Direktnachricht an den Mandanten (dort gibt es keinen Server)
+    // Angebot der Staatsanwaltschaft: Annehmen / Ablehnen in der Direktnachricht
+    const deal = /^deal:(yes|no):(\d+)$/.exec(String(body.data?.custom_id || ''));
+    if (body.type === 3 && deal) {
+      const r = require('../deals').answer(Number(deal[2]), deal[1] === 'yes', { discordId, via: 'discord' });
+      return res.json(r.error ? fail(r.error) : done(deal[1] === 'yes' ? 'Sie haben das Angebot angenommen. Ihre Kanzlei wird informiert.' : 'Sie haben das Angebot abgelehnt. Ihre Kanzlei wird informiert.', deal[1] === 'yes' ? 'Angenommen' : 'Abgelehnt'));
+    }
     const appt = /^appt:(yes|no):(\d+)$/.exec(String(body.data?.custom_id || ''));
     if (body.type === 3 && appt) {
       const r = require('../apptConfirm').answer(appt[1], Number(appt[2]), discordId);

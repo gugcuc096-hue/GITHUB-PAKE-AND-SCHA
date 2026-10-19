@@ -196,8 +196,36 @@
       el.classList.add('has-action');
       el.appendChild(btn);
     }
+    // Karte: Leiste läuft bis zum Ausblenden ab, wegwischen schließt; höchstens drei übereinander
+    const ms = duration || (type === 'error' ? 6000 : 3500);
+    const bar = document.createElement('span');
+    bar.className = 'ps-toast-bar';
+    bar.style.animationDuration = `${ms}ms`;
+    el.appendChild(bar);
+    let dragX = null;
+    el.addEventListener('pointerdown', (e) => {
+      if (!e.target.closest('.ps-toast-action')) dragX = e.clientX;
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (dragX === null) return;
+      const dx = e.clientX - dragX;
+      el.style.transform = `translateX(${dx}px)`;
+      el.style.opacity = String(Math.max(0.2, 1 - Math.abs(dx) / 220));
+    });
+    const drop = (e) => {
+      if (dragX === null) return;
+      const dx = e.clientX - dragX;
+      dragX = null;
+      if (Math.abs(dx) > 70) close();
+      else el.style.transform = el.style.opacity = '';
+    };
+    el.addEventListener('pointerup', drop);
+    el.addEventListener('pointercancel', drop);
     root.appendChild(el);
-    timer = setTimeout(close, duration || (type === 'error' ? 6000 : 3500));
+    const live = [...root.children].filter((t) => !t.classList.contains('out'));
+    live.slice(0, Math.max(0, live.length - 3)).forEach((t) => t.dispatchEvent(new Event('ps:close')));
+    el.addEventListener('ps:close', close);
+    timer = setTimeout(close, ms);
     return { close };
   }
 

@@ -1074,3 +1074,87 @@ function askInitialName() {
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 1300);
 })();
+
+/*
+ * Status-Wechsel mit Übergang: Ändert sich der Status einer Zeile (Akte, Rechnung), blendet das neue Badge weich ein
+ * und glänzt kurz – gemerkt wird je Zeile der letzte Text des Badges.
+ */
+const badgeMemory = new Map();
+const rowKey = (row) => (row.dataset.inv ? `inv:${row.dataset.inv}` : row.dataset.id ? `${row.dataset.action || 'row'}:${row.dataset.id}` : '');
+function markChangedBadges(root) {
+  if (!root) return;
+  root.querySelectorAll('[data-action="open-case"][data-id], tr[data-inv]').forEach((row) => {
+    const key = rowKey(row);
+    const b = row.querySelector('.badge');
+    if (!key || !b) return;
+    const text = b.textContent.trim();
+    const was = badgeMemory.get(key);
+    badgeMemory.set(key, text);
+    if (was !== undefined && was !== text && !window.PS.motion.calm()) b.classList.add('badge-changed');
+  });
+}
+
+/*
+ * Aktenliste und Rechnungen sortieren sich weich um: Nach dem Neuzeichnen gleitet jede Zeile von ihrer alten an die
+ * neue Stelle (FLIP), neue Zeilen blenden ein. Nur wenn höchstens 60 Zeilen sichtbar sind und ohne „Bewegung reduzieren“.
+ */
+const FLIP_SEL = '#caseList [data-action="open-case"][data-id], #content tr[data-inv]';
+function flipSnapshot() {
+  if (window.PS.motion.calm() || typeof Element.prototype.animate !== 'function') return null;
+  const rows = $$(FLIP_SEL);
+  if (!rows.length || rows.length > 60) return null;
+  return new Map(rows.map((r) => [rowKey(r), r.getBoundingClientRect().top]));
+}
+function flipPlay(before) {
+  if (!before) return;
+  for (const row of $$(FLIP_SEL)) {
+    const was = before.get(rowKey(row));
+    if (was === undefined) {
+      row.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: 'ease-out' });
+      continue;
+    }
+    const dy = was - row.getBoundingClientRect().top;
+    if (Math.abs(dy) > 2) row.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: 320, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+  }
+}
+
+
+/*
+ * Tastenkürzel (PC): „?“ zeigt die Übersicht, „n“ neue Akte, „/“ Suche, „g“ und dann ein Buchstabe springt zu einer
+ * Seite. Nie beim Tippen in einem Feld und nie mit Strg/Alt – so stören sie nichts.
+ */
+const GO_KEYS = { u: 'overview', a: 'cases', m: 'clients', t: 'tasks', k: 'calendar', r: 'invoices', p: 'mail', w: 'wiki', e: 'profile' };
+let goPending = 0;
+const typingIn = (el) => !!el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable);
+function shortcutsHelp() {
+  const row = (keys, what) => `<div class="kbd-row"><span>${keys.map((k) => `<kbd>${esc(k)}</kbd>`).join(' ')}</span><span>${esc(what)}</span></div>`;
+  const go = Object.entries(GO_KEYS)
+    .filter(([, v]) => allowed(v))
+    .map(([k, v]) => row(['g', k], viewLabel(v)));
+  openModal(`<h2 id="modalTitle" class="modal-title">Tastenkürzel</h2>
+      <p class="modal-sub">Funktionieren überall im Dashboard, solange kein Eingabefeld aktiv ist.</p>
+      <div class="kbd-list">${row(['?'], 'Diese Übersicht')}${row(['/'], 'Suchen')}${row(['Strg', 'K'], 'Suchen (auch beim Tippen)')}${isStaff() ? row(['n'], 'Neue Akte') : ''}${row(['Esc'], 'Fenster schließen')}${go.join('')}</div>
+      <div class="form-actions mt-4"><button type="button" class="btn-ghost btn-md" data-action="close-modal">Schließen</button></div>`);
+}
+document.addEventListener('keydown', (e) => {
+  if (!st.user || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented || typingIn(e.target) || document.body.classList.contains('ps-dialog-open') || document.body.classList.contains('hearing-open')) return;
+  if (goPending && Date.now() - goPending < 1200 && GO_KEYS[e.key] && allowed(GO_KEYS[e.key])) {
+    goPending = 0;
+    e.preventDefault();
+    closeModal();
+    navigate(GO_KEYS[e.key]);
+    return;
+  }
+  goPending = 0;
+  if ($('#modal').classList.contains('open') && e.key !== '?') return; // im Fenster nur die Hilfe
+  if (e.key === '?') {
+    e.preventDefault();
+    shortcutsHelp();
+  } else if (e.key === '/') {
+    e.preventDefault();
+    guard(() => openSearch());
+  } else if (e.key === 'n' && isStaff()) {
+    e.preventDefault();
+    guard(() => newCaseModal());
+  } else if (e.key === 'g') goPending = Date.now();
+});

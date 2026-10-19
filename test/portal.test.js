@@ -588,4 +588,60 @@ describe('Mandantenportal: Discord-Konto, Zahlung melden, Unterschriften', () =>
       await waitFor(() => (stub().renames || []).find((x) => x.channel === '900000000000000777' && /^🟢 Im Dienst: \d+$/.test(x.name)), 'Kanal umbenannt');
     });
   });
+  describe('Deal-Rechner, Prozessticket, Ticket-Verlauf', () => {
+    it('Angebot der Staatsanwaltschaft: DM mit Annehmen/Ablehnen – nur der Mandant, Antwort steht in der Akte', async () => {
+      assert.equal((await as.anwalt.post(`/api/cases/${state.caseId}/deals`, { note: 'ohne Zahlen' })).status, 400, 'HE oder Geldstrafe nötig');
+      const r = await as.anwalt.post(`/api/cases/${state.caseId}/deals`, { he: 15, fine: 5000, note: 'Geständnis zu § 21' });
+      assert.equal(r.status, 201, r.text);
+      const id = r.json.deal.id;
+      const dm = await waitFor(() => stub().dms.find((x) => x.to === MEMBERS.jaywa && (x.components || []).some((row) => row.components.some((b) => b.custom_id === `deal:yes:${id}`))), 'DM mit dem Angebot');
+      assert.match(dm.embeds[0].description, /15 HE \+ 5\.000 \$/);
+      assert.match(text(await interact({ guild_id: undefined, type: 3, user: { id: MEMBERS.mo, username: 'mo' }, data: { custom_id: `deal:yes:${id}`, component_type: 2 } })), /nur der Mandant/);
+      assert.match(text(await interact({ guild_id: undefined, type: 3, user: { id: MEMBERS.jaywa, username: 'jay' }, data: { custom_id: `deal:yes:${id}`, component_type: 2 } })), /angenommen/);
+      const detail = (await as.mandant.get(`/api/cases/${state.caseId}`)).json;
+      assert.equal(detail.deals[0].status, 'angenommen');
+      assert.equal(detail.deals[0].answeredVia, 'discord');
+      assert.ok(detail.notes.some((n) => /Angebot der Staatsanwaltschaft \(15 HE \+ 5\.000 \$\) vom Mandanten angenommen – per Discord/.test(n.body)));
+      assert.equal((await as.mandant.post(`/api/cases/${state.caseId}/deals/${id}/answer`, { accept: false })).status, 400, 'schon beantwortet');
+      // Neues Angebot: Mandant lehnt im Portal ab
+      const r2 = await as.anwalt.post(`/api/cases/${state.caseId}/deals`, { he: 10 });
+      const no = await as.mandant.post(`/api/cases/${state.caseId}/deals/${r2.json.deal.id}/answer`, { accept: false });
+      assert.equal(no.status, 200, no.text);
+      assert.equal(no.json.deal.answeredVia, 'portal');
+      assert.equal((await as.fremd.post(`/api/cases/${state.caseId}/deals/${r2.json.deal.id}/answer`, { accept: true })).status, 404, 'fremder Mandant');
+    });
+
+    it('Schriftsatz ins Prozessticket: Bot postet mit Dokument-Link (nur fertig unterschriebene)', async () => {
+      const ch = '900000000000000888';
+      assert.equal((await as.anwalt.put(`/api/cases/${state.caseId}/process-ticket`, { url: `https://discord.com/channels/${GUILD}/${ch}`, label: 'DOJ' })).status, 200);
+      const tpl = (await as.anwalt.get('/api/contract-templates')).json.templates.find((t) => t.kind === 'schriftsatz' && /Akteneinsicht/.test(t.name));
+      const k = (await as.anwalt.post(`/api/cases/${state.caseId}/contracts`, { templateId: tpl.id, lawyerId: as.anwalt.me.id, data: { empfaenger: 'District Court' } })).json.contract;
+      assert.equal((await as.anwalt.post(`/api/contracts/${k.id}/process-ticket`)).status, 400, 'erst unterschreiben');
+      assert.equal((await as.anwalt.post(`/api/contracts/${k.id}/sign`, { as: 'anwalt' })).status, 200);
+      assert.equal((await as.mandant.post(`/api/contracts/${k.id}/process-ticket`)).status, 404, 'interner Schriftsatz: für den Mandanten unsichtbar');
+      const r = await as.anwalt.post(`/api/contracts/${k.id}/process-ticket`);
+      assert.equal(r.status, 200, r.text);
+      assert.equal(r.json.posted, true);
+      const msg = stub().channelMessages.find((x) => x.channel === ch);
+      assert.match(msg.embeds[0].title, /Akteneinsicht/);
+      assert.match(msg.embeds[0].description, /vertrag\.html\?id=/);
+    });
+
+    it('Ticket mit /delete gelöscht: der Verlauf liegt vorher gesichert in der Akte (nur Kanzlei)', async () => {
+      await interact({ type: 2, channel_id: state.channel, member: { user: { id: MEMBERS.mo, username: 'mo' } }, data: { name: 'delete', options: [] } });
+      await click(MEMBERS.mo, `tdel:case:${state.caseId}`);
+      const list = await waitFor(() => {
+        return sql((db) => db.prepare('SELECT id, message_count FROM ticket_transcripts WHERE case_id = ?').get(state.caseId));
+      }, 'gesicherter Verlauf', 8000);
+      assert.ok(list.message_count > 0);
+      const detail = (await as.anwalt.get(`/api/cases/${state.caseId}`)).json;
+      assert.equal(detail.transcripts[0].id, list.id);
+      assert.equal((await as.mandant.get(`/api/cases/${state.caseId}`)).json.transcripts, undefined, 'Mandant sieht keine Verläufe');
+      assert.equal((await as.mandant.get(`/api/cases/${state.caseId}/transcripts/${list.id}`)).status, 404);
+      const html = await as.anwalt.get(`/api/cases/${state.caseId}/transcripts/${list.id}`);
+      assert.equal(html.status, 200);
+      assert.match(html.text, /Ticket-Verlauf · PS-/);
+      assert.match(html.headers ? html.headers.get('content-security-policy') || "default-src 'none'" : "default-src 'none'", /default-src 'none'/);
+    });
+  });
 });
