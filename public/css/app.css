@@ -1508,7 +1508,7 @@ textarea.field.chat-input { resize: none; min-height: 42px; height: 42px; max-he
 .modal.open { animation: swap-in 0.2s ease-out; }
 .modal-ghost { display: flex; z-index: 69; pointer-events: none; animation: fade-out 0.18s ease-in forwards; }
 .modal-ghost .modal-card { animation: modal-out 0.18s ease-in forwards; }
-/* Akte wächst aus ihrer Zeile hervor bzw. zieht sich zurück (Dashboard: morphOpen/fadeOutModal) – Einblenden übernimmt das Skript */
+/* Akte wächst aus ihrer Zeile hervor bzw. zieht sich zurück (Dashboard: morphOpen/fadeOutModal) – Einblenden übernimmt das Skript; die Klasse bleibt bis zum Schließen */
 .modal.morphing .modal-card { animation: none; }
 .modal-ghost.morph-out { animation: fade-out 0.34s ease-in forwards; }
 .modal-ghost.morph-out .modal-card { animation: none; }

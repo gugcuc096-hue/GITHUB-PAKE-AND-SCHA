@@ -1944,6 +1944,10 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       await settle();
       const loads = [];
       page.on('request', (r) => r.method() === 'GET' && r.url().endsWith(`/api/cases/${kase.id}`) && loads.push(r.url()));
+      await page.evaluate(() => {
+        window.__cardIn = [];
+        document.querySelector('#modalCard').addEventListener('animationstart', (e) => e.target.id === 'modalCard' && window.__cardIn.push(e.animationName));
+      });
       await page.hover(row);
       await page.waitForTimeout(500);
       assert.equal(loads.length, 1, 'beim Drüberfahren vorgeladen');
@@ -1953,6 +1957,9 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       const opened = await page.evaluate(() => window.__morphs.slice());
       assert.equal(opened.length, 1, 'Fenster wächst aus der Zeile');
       assert.match(opened[0], /inset\(/);
+      // Nach dem Aufziehen spielt das Fenster sein normales Einblenden nicht noch einmal ab (kurzes Flackern)
+      await page.waitForTimeout(700);
+      assert.deepEqual(await page.evaluate(() => window.__cardIn), []);
       await page.click('.modal-close');
       await page.waitForFunction(() => !document.querySelector('#modal').classList.contains('open'));
       assert.equal(await page.evaluate(() => window.__morphs.length), 2, 'beim Schließen zurück in die Zeile');

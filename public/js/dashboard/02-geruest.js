@@ -517,9 +517,10 @@ function morphOpen(rect) {
   const modal = $('#modal');
   const card = $('#modalCard');
   if (!morphOk()) return;
-  modal.classList.add('morphing'); // eigenes Einblenden des Fensters aus (app.css)
-  const anim = card.animate([{ clipPath: morphClip(card, rect), opacity: 0.6 }, { clipPath: 'inset(0px 0px 0px 0px round 20px)', opacity: 1 }], { duration: MORPH_MS, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
-  anim.onfinish = anim.oncancel = () => modal.classList.remove('morphing');
+  // Eigenes Einblenden des Fensters aus (app.css) – bis zum Schließen: Fiele die Klasse am Ende der Animation weg,
+  // spielte das Fenster sein normales Einblenden noch einmal ab (kurzes Flackern)
+  modal.classList.add('morphing');
+  card.animate([{ clipPath: morphClip(card, rect), opacity: 0.6 }, { clipPath: 'inset(0px 0px 0px 0px round 20px)', opacity: 1 }], { duration: MORPH_MS, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
 }
 /** Zeile der offenen Akte in der Liste dahinter – nur, wenn sie zu sehen ist. */
 function morphRow() {
@@ -546,7 +547,7 @@ function fadeOutModal(modal, { morph = false } = {}) {
   const ghostBody = ghost.querySelector('#modalBody');
   ghost.removeAttribute('id');
   ghost.querySelectorAll('[id]').forEach((n) => n.removeAttribute('id'));
-  ghost.classList.remove('open');
+  ghost.classList.remove('open', 'morphing');
   ghost.classList.add('modal-ghost');
   ghost.setAttribute('aria-hidden', 'true');
   ghost.inert = true;
@@ -569,7 +570,7 @@ function closeModal({ morph = false } = {}) {
   if (!modal.classList.contains('open')) return;
   scheduleHistory();
   fadeOutModal(modal, { morph });
-  modal.classList.remove('open');
+  modal.classList.remove('open', 'morphing');
   $('#modalBody').innerHTML = '';
   document.body.classList.remove('modal-open');
   st.modalCaseId = null;
