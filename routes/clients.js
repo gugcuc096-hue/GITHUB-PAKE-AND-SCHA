@@ -120,6 +120,54 @@ function flagField(c) {
   return f ? { name: '⚠️ Mandantenvermerk', value: truncate(`${f.label}${f.reason ? ` – ${f.reason}` : ''}`, 300) } : null;
 }
 
+/* ---------------------------------------------------------------- Geburtsdatum (IC) */
+const BIRTH_MAX = 40;
+/** Schlüssel eines Mandanten zu Akte bzw. Name (Konto, wenn der Name genau einem Konto gehört). */
+function keysFor(c, name) {
+  const { byName } = accounts();
+  const keys = [];
+  if (c && c.client_id) {
+    keys.push(`u${c.client_id}`);
+    const u = db.prepare('SELECT display_name FROM users WHERE id = ?').get(c.client_id);
+    if (u) keys.push(nameKey(u.display_name));
+  }
+  for (const n of [name, c && c.client_name]) if (norm(n)) keys.push(resolve(nameKey(n), byName), nameKey(n));
+  return [...new Set(keys.filter(Boolean))];
+}
+/**
+ * Geburtsdatum eines Mandanten: aus der Kartei – sonst aus dem jüngsten Vertrag mit demselben Mandanten (Konto oder
+ * gleicher Name, auch in einer anderen Akte).
+ */
+function birthFor(c, name) {
+  const keys = keysFor(c, name);
+  if (keys.length) {
+    const p = db.prepare(`SELECT birth FROM client_profiles WHERE client_key IN (${keys.map(() => '?').join(',')}) AND birth != '' ORDER BY updated_at DESC LIMIT 1`).get(...keys);
+    if (p) return p.birth;
+  }
+  const want = new Set([norm(name), norm(c && c.client_name)].filter(Boolean));
+  for (const r of db.prepare("SELECT k.data, x.client_id FROM case_contracts k JOIN cases x ON x.id = k.case_id WHERE k.data LIKE '%mandant_geburtsdatum%' ORDER BY k.id DESC LIMIT 500").all()) {
+    let d = {};
+    try {
+      d = JSON.parse(r.data || '{}');
+    } catch {
+      continue;
+    }
+    if (!d.mandant_geburtsdatum) continue;
+    if ((c && c.client_id && r.client_id === c.client_id) || want.has(norm(d.mandant))) return d.mandant_geburtsdatum;
+  }
+  return '';
+}
+/** Geburtsdatum aus einem Vertrag in der Kartei merken (beim nächsten Vertrag steht es schon drin). */
+function rememberBirth(c, name, birth, user) {
+  const b = String(birth || '').trim().slice(0, BIRTH_MAX);
+  const key = keysFor(c, name)[0];
+  if (!b || !key) return;
+  db.prepare(
+    `INSERT INTO client_profiles (client_key, birth, updated_by_name) VALUES (?, ?, ?)
+     ON CONFLICT(client_key) DO UPDATE SET birth = excluded.birth, updated_by_name = excluded.updated_by_name, updated_at = datetime('now')`
+  ).run(key, b, user ? user.display_name : '');
+}
+
 const membershipOf = (userId) =>
   userId
     ? db
@@ -203,6 +251,7 @@ function card(key, u) {
     since,
     membership: membershipOf(e.userId),
     flag: flagOf(keys),
+    birth: (db.prepare(`SELECT birth FROM client_profiles WHERE client_key IN (${inList(keys)}) AND birth != '' ORDER BY updated_at DESC LIMIT 1`).get(...keys) || {}).birth || birthFor(e.userId ? { client_id: e.userId } : null, (a && a.display_name) || e.name),
     stats: {
       casesOpen: cases.filter((c) => c.status !== 'geschlossen').length,
       casesTotal: cases.length,
@@ -247,6 +296,21 @@ router.delete('/notes/:id', (req, res) => {
 });
 
 router.put(
+  '/:key/birth',
+  wrap(async (req, res) => {
+    const d = parseBody(z.object({ birth: z.string().trim().max(BIRTH_MAX) }), req, res);
+    if (!d) return;
+    const { index, byName } = buildIndex();
+    const k = resolve(req.params.key, byName);
+    const e = k && index.get(k);
+    if (!e) return res.status(404).json({ error: 'Mandant nicht gefunden.' });
+    db.prepare(`DELETE FROM client_profiles WHERE client_key IN (${inList(aliasKeys(e))})`).run(...aliasKeys(e));
+    if (d.birth) db.prepare('INSERT INTO client_profiles (client_key, birth, updated_by_name) VALUES (?, ?, ?)').run(k, d.birth, req.user.display_name);
+    res.json(card(k, req.user));
+  })
+);
+
+router.put(
   '/:key/flag',
   wrap(async (req, res) => {
     if (!isBoard(req.user)) return res.status(403).json({ error: 'Den Vermerk setzt das Board of Partners.' });
@@ -268,4 +332,4 @@ router.put(
   })
 );
 
-module.exports = { router, flagForCase, flagField, clientKeyForCase: (c) => (c.client_id ? `u${c.client_id}` : norm(c.client_name) ? nameKey(c.client_name) : null) };
+module.exports = { router, flagForCase, flagField, birthFor, rememberBirth, clientKeyForCase: (c) => (c.client_id ? `u${c.client_id}` : norm(c.client_name) ? nameKey(c.client_name) : null) };

@@ -282,15 +282,15 @@ document.addEventListener('input', (e) => {
   if (t.id === 'caseSearch') {
     st.caseQuery = t.value;
     clearTimeout(st.listSearchTimer);
-    st.listSearchTimer = setTimeout(() => $('#caseList') && ($('#caseList').innerHTML = caseTable()), 120);
+    st.listSearchTimer = setTimeout(() => flipFill($('#caseList'), caseTable()), 120);
   } else if (t.id === 'storageSearch') {
     st.storageQuery = t.value;
     clearTimeout(st.listSearchTimer);
-    st.listSearchTimer = setTimeout(() => $('#storageGrid') && ($('#storageGrid').innerHTML = storageGrid()), 120);
+    st.listSearchTimer = setTimeout(() => flipFill($('#storageGrid'), storageGrid()), 120);
   } else if (t.id === 'clientSearch') {
     st.clientQuery = t.value;
     clearTimeout(st.listSearchTimer);
-    st.listSearchTimer = setTimeout(() => $('#clientList') && ($('#clientList').innerHTML = clientTable()), 120);
+    st.listSearchTimer = setTimeout(() => flipFill($('#clientList'), clientTable()), 120);
   } else if (t.classList && t.classList.contains('chat-input')) {
     // Eingabefeld wächst mit (bis zu einigen Zeilen)
     t.style.height = 'auto';
@@ -403,7 +403,7 @@ document.addEventListener('change', (e) => {
     } catch {
       /* nur Komfort – ohne Speicher gilt die Auswahl bis zum Neuladen */
     }
-    $('#caseList').innerHTML = caseTable();
+    flipFill($('#caseList'), caseTable()); // Zeilen gleiten an ihren neuen Platz
     return;
   }
   if (t.dataset.casePriority !== undefined) {
@@ -1085,7 +1085,16 @@ function askInitialName() {
  * und glänzt kurz – gemerkt wird je Zeile der letzte Text des Badges.
  */
 const badgeMemory = new Map();
-const rowKey = (row) => (row.dataset.inv ? `inv:${row.dataset.inv}` : row.dataset.id ? `${row.dataset.action || 'row'}:${row.dataset.id}` : '');
+const rowKey = (row) =>
+  row.dataset.inv
+    ? `inv:${row.dataset.inv}`
+    : row.dataset.key
+      ? `key:${row.dataset.key}`
+      : row.dataset.item
+        ? `item:${row.dataset.item}`
+        : row.dataset.id
+          ? `${row.dataset.action === 'case-pick' ? 'open-case' : row.dataset.action || 'row'}:${row.dataset.id}`
+          : '';
 function markChangedBadges(root) {
   if (!root) return;
   root.querySelectorAll('[data-action="open-case"][data-id], tr[data-inv]').forEach((row) => {
@@ -1103,7 +1112,15 @@ function markChangedBadges(root) {
  * Aktenliste und Rechnungen sortieren sich weich um: Nach dem Neuzeichnen gleitet jede Zeile von ihrer alten an die
  * neue Stelle (FLIP), neue Zeilen blenden ein. Nur wenn höchstens 60 Zeilen sichtbar sind und ohne „Bewegung reduzieren“.
  */
-const FLIP_SEL = '#caseList [data-action="open-case"][data-id], #content tr[data-inv]';
+// Aktenliste (auch im Auswahlmodus), Rechnungen, Mandanten, Lager-Gegenstände und Aufgaben
+const FLIP_SEL = '#caseList tr[data-id], #content tr[data-inv], #clientList tr[data-key], #storageGrid .lager-item[data-item], #content .task-row[data-id]';
+/** Liste neu zeichnen und dabei weich umsortieren (Suche beim Tippen). */
+function flipFill(el, html) {
+  if (!el) return;
+  const before = flipSnapshot();
+  el.innerHTML = html;
+  flipPlay(before);
+}
 function flipSnapshot() {
   if (window.PS.motion.calm() || typeof Element.prototype.animate !== 'function') return null;
   const rows = $$(FLIP_SEL);

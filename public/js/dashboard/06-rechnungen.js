@@ -677,13 +677,24 @@ function clientFlagStrip(f, { inCase = false } = {}) {
 
 function clientCard(d) {
   const s = d.stats;
+  // Kontakt als Chips mit Symbol (E-Mail, Telefon, Discord, Mandant seit)
+  const chip = (ico, html, title = '') => `<span class="cc-chip"${title ? ` title="${esc(title)}"` : ''}>${ico}<span>${html}</span></span>`;
   const facts = [
-    d.account ? mailBreakHtml(d.account.email) : '<span class="text-dim">ohne Konto</span>',
-    d.phone ? esc(d.phone) : '',
-    d.account && d.account.discord ? `${DISCORD_ICON.replace('class="ico"', 'class="ico-sm inline-block align-[-2px]"')} ${esc(d.account.discord)}` : '',
-    d.since ? `Mandant seit ${esc(fmtDateOnly(String(d.since).slice(0, 10)))}` : '',
+    d.account ? chip(icon('mail', 'ico-sm'), mailBreakHtml(d.account.email), 'Konto') : chip(icon('user', 'ico-sm'), '<span class="text-dim">ohne Konto</span>'),
+    d.phone ? chip(icon('chat', 'ico-sm'), esc(d.phone), 'Telefon') : '',
+    d.account && d.account.discord ? chip(DISCORD_ICON.replace('class="ico"', 'class="ico-sm"'), esc(d.account.discord), 'Discord') : '',
+    d.since ? chip(icon('calendar', 'ico-sm'), `seit ${esc(fmtDateOnly(String(d.since).slice(0, 10)))}`, 'Mandant seit') : '',
   ].filter(Boolean);
-  const cell = (k, v) => `<div><div class="k">${esc(k)}</div><div class="v">${v}</div></div>`;
+  const initials = String(d.name || '?')
+    .replace(/\b(Dr|Prof)\.?\s+/gi, '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+  const stat = (label, value, count, tone = '') =>
+    `<div class="cc-stat ${tone}"><span class="cc-stat-v"${count ? ` data-count="client:${esc(d.key)}:${count}"` : ''}>${value}</span><span class="cc-stat-k">${esc(label)}</span></div>`;
   const openDoc = (gdoc, href, label) =>
     safeGdoc(gdoc)
       ? `<a class="icon-btn sm" href="${esc(safeGdoc(gdoc))}" target="_blank" rel="noopener noreferrer" aria-label="Google Doc öffnen" title="Google Doc öffnen">${icon('doc', 'ico-sm')}</a>`
@@ -739,14 +750,37 @@ function clientCard(d) {
         </form></div>`
     : '';
 
+  // Geburtsdatum (IC): steht automatisch aus dem letzten Vertrag drin und füllt den nächsten Vertrag vor
+  const birthPart = `<details class="cc-birth"${d.birth ? '' : ' open'}>
+      <summary><span class="cc-birth-k">Geburtsdatum (IC)</span><span class="cc-birth-v">${d.birth ? esc(d.birth) : '<span class="text-dim">noch nicht bekannt</span>'}</span>${icon('edit', 'ico-sm')}</summary>
+      <form data-form="client-birth" data-key="${esc(d.key)}" class="cc-birth-form">
+        <input name="birth" class="field" maxlength="40" value="${esc(d.birth || '')}" placeholder="TT.MM.JJJJ" aria-label="Geburtsdatum (IC)">
+        <button type="submit" class="btn-outline btn-sm">${icon('check', 'ico-sm')}<span>Speichern</span></button>
+      </form>
+      <p class="form-hint">Wird beim nächsten Mandatsvertrag automatisch eingetragen – und aus jedem Vertrag hier übernommen.</p>
+    </details>`;
+
   return `
-      <div class="pr-12 mb-4"><p class="text-xs uppercase tracking-[0.2em] text-gold mb-1">Mandantenkartei</p>
-        <h2 class="modal-title mb-1">${esc(d.name)}</h2>
-        <p class="text-sm text-muted client-facts">${facts.join('<span class="text-dim"> · </span>')}</p>
-        ${d.membership || (d.account && !d.account.active) ? `<div class="flex flex-wrap gap-1.5 mt-2">${memberBadge(d.membership ? { name: d.membership.tier_name, kind: d.membership.kind } : null)}${d.account && !d.account.active ? badge('Konto deaktiviert', 'slate') : ''}</div>` : ''}
+      <div class="client-cover mb-5">
+        <span class="cover-tab" aria-hidden="true">Kartei</span>
+        <div class="cc-top">
+          <div class="cc-mono ${d.membership ? (d.membership.kind === 'perma' ? 'is-life' : 'is-vip') : ''}" aria-hidden="true">${esc(initials || '?')}${d.membership ? `<span class="cc-crown">${icon('crown', 'ico-sm')}</span>` : ''}</div>
+          <div class="cc-id">
+            <p class="cc-kicker">Mandantenkartei</p>
+            <h2 id="modalTitle" class="modal-title cc-name">${esc(d.name)}</h2>
+            ${d.membership || (d.account && !d.account.active) ? `<div class="flex flex-wrap gap-1.5 mt-1">${memberBadge(d.membership ? { name: d.membership.tier_name, kind: d.membership.kind } : null)}${d.account && !d.account.active ? badge('Konto deaktiviert', 'slate') : ''}</div>` : ''}
+          </div>
+        </div>
+        <div class="cc-facts">${facts.join('')}</div>
+        ${birthPart}
       </div>
       ${clientFlagStrip(d.flag)}
-      <div class="info-grid stats-4 mb-5">${cell('Laufende Akten', String(s.casesOpen))}${cell('Akten gesamt', String(s.casesTotal))}${cell('Offene Rechnungen', s.openSum ? `<span class="text-amber-300">${money(s.openSum)}</span>` : '—')}${cell('Bezahlt gesamt', s.paidSum ? money(s.paidSum) : '—')}</div>
+      <div class="cc-stats mb-5">
+        ${stat('Laufende Akten', String(s.casesOpen), 'open')}
+        ${stat('Akten gesamt', String(s.casesTotal), 'total')}
+        ${stat('Offen', s.openSum ? money(s.openSum) : '—', s.openSum ? 'due' : '', s.openSum ? 'is-due' : '')}
+        ${stat('Bezahlt gesamt', s.paidSum ? money(s.paidSum) : '—', s.paidSum ? 'paid' : '', s.paidSum ? 'is-paid' : '')}
+      </div>
       ${casesPart}
       ${invoicesPart}
       ${contractsPart}

@@ -1255,6 +1255,15 @@ db.exec(`
 addColumn('cases', 'sentence_estimate', 'INTEGER');
 addColumn('cases', 'sentence_fine', 'INTEGER');
 addColumn('cases', 'sentence_reduced', 'INTEGER NOT NULL DEFAULT 0');
+// Mandantenkartei: Stammdaten je Mandant (Schlüssel wie bei Notizen) – Geburtsdatum (IC) aus dem letzten Vertrag
+db.exec(`
+  CREATE TABLE IF NOT EXISTS client_profiles (
+    client_key      TEXT PRIMARY KEY,
+    birth           TEXT NOT NULL DEFAULT '',
+    updated_by_name TEXT NOT NULL DEFAULT '',
+    updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
 // Verknüpfte Akten (z. B. ein Vorfall, mehrere Festgenommene) – je Paar eine Zeile, a_id < b_id
 db.exec(`
   CREATE TABLE IF NOT EXISTS case_links (
