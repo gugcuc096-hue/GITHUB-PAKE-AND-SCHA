@@ -2180,6 +2180,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       await M.page.fill('#password', 'Mandanten-Passwort-1');
       await M.page.click('button[type=submit]');
       await M.page.waitForURL(/dashboard/);
+      // erst wenn das Dashboard fertig gestartet ist – sonst kann der Start das Fenster wieder schließen
+      await M.page.waitForSelector('#nav a.nav-item');
       await M.page.evaluate((id) => openCase(id), kase.id);
       await M.page.waitForSelector('#modalBody #secChat .chat-input');
       await M.page.waitForFunction(() => live.ok);
