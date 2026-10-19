@@ -99,12 +99,15 @@ function renderNav() {
     if (!groups.length || groups[groups.length - 1].name !== name) groups.push({ name, items: [] });
     groups[groups.length - 1].items.push(key);
   }
+  // Menüpunkt eines Bündels: aktiv bzw. Zähler über alle seine Seiten
+  const itemActive = (key) => (hubOf(key) ? hubOf(key).members.some(([k]) => hubTabActive(k)) : navActive(key));
+  const itemCount = (key) => (hubOf(key) ? hubOf(key).members.reduce((n, [k]) => n + navCount(k), 0) : navCount(key));
   const item = (key) => {
     const h = hubOf(key);
     if (h) {
       // Bündel: ein Punkt für alle seine Seiten
-      const count = h.members.reduce((n, [k]) => n + navCount(k), 0);
-      const active = h.members.some(([k]) => hubTabActive(k));
+      const count = itemCount(key);
+      const active = itemActive(key);
       const target = (st.hubLast && st.hubLast[h.key]) || h.members[0][0];
       return `<a href="#${target}" class="nav-item ${active ? 'active' : ''}" data-hub="${h.key}" ${active ? 'aria-current="page"' : ''}>${icon(h.hub.icon)}<span>${esc(h.hub.label)}</span>${count ? `<span class="nav-count">${count > 99 ? '99+' : count}</span>` : ''}</a>`;
     }
@@ -127,9 +130,9 @@ function renderNav() {
     }
     // Gerade auf eine Seite dieser Gruppe gewechselt, die Gruppe ist aber zu: für diese Seite aufklappen (nicht gemerkt)
     const temp = st.navTemp || (st.navTemp = {});
-    if (st.navOpenedFor !== st.view && g.items.some(navActive) && navGroupClosed(prefs, g.name)) temp[g.name] = st.view;
+    if (st.navOpenedFor !== st.view && g.items.some(itemActive) && navGroupClosed(prefs, g.name)) temp[g.name] = st.view;
     const closed = navGroupClosed(prefs, g.name) && temp[g.name] !== st.view;
-    const total = g.items.reduce((n, k) => n + navCount(k), 0);
+    const total = g.items.reduce((n, k) => n + itemCount(k), 0);
     html += `<button type="button" class="nav-section nav-toggle" data-action="nav-group" data-group="${esc(g.name)}" aria-expanded="${!closed}" aria-controls="navGroup${i}">
         <span>${esc(g.name)}</span>${closed && total ? `<span class="nav-count">${total > 99 ? '99+' : total}</span>` : ''}${icon('chevronDown', 'ico-sm nav-chev')}</button>
       <div class="nav-group" id="navGroup${i}" ${closed ? 'hidden' : ''}>${items}</div>`;
