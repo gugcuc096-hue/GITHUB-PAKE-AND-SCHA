@@ -103,7 +103,7 @@ function boardTicketLine(kind, id, t) {
 }
 
 /** Discord-Ticket der Akte (nur wenn Discord-Tickets eingerichtet sind). */
-function ticketBanner(c, t) {
+function ticketBanner(c, t, transcripts = []) {
   if (!t) return '';
   if (!isStaff()) {
     if (t.deleted) return ''; // Ticket wurde von der Kanzlei gelöscht
@@ -130,7 +130,8 @@ function ticketBanner(c, t) {
     badges: ticketState(t) + (t.exists ? client : ''),
     hint: esc(hint),
     error: t.error,
-    actions: `${ticketOpen(t.url)}<button class="btn-ghost btn-sm" data-action="ticket-sync" data-id="${c.id}">${t.exists ? 'Abgleichen' : t.deleted ? 'Neu anlegen' : 'Ticket anlegen'}</button>`,
+    // Gesicherter Verlauf des zuletzt gelöschten Tickets (öffnet als eigene Seite)
+    actions: `${ticketOpen(t.url)}${transcripts.length ? `<a class="btn-ghost btn-sm" href="/api/cases/${c.id}/transcripts/${transcripts[0].id}" target="_blank" rel="noopener" title="${esc(`${transcripts[0].count} Nachrichten · gesichert ${fmtDate(transcripts[0].createdAt)}`)}">${icon('doc', 'ico-sm')}<span>Verlauf</span></a>` : ''}<button class="btn-ghost btn-sm" data-action="ticket-sync" data-id="${c.id}">${t.exists ? 'Abgleichen' : t.deleted ? 'Neu anlegen' : 'Ticket anlegen'}</button>`,
   });
 }
 
@@ -627,7 +628,7 @@ function typingHide() {
   $('#chatTyping')?.remove();
 }
 
-function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, clientSuggestions, review, chat, charges }) {
+function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, transcripts = [], clientSuggestions, review, chat, charges, deals = [] }) {
   const staff = isStaff();
   const admin = isAdmin();
   const me = st.user.id;
@@ -820,7 +821,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
   const contractList = contracts.filter((k) => k.kind !== 'schriftsatz');
   const briefList = contracts.filter((k) => k.kind === 'schriftsatz');
   const parts = {
-    charges: chargesSection(c, charges),
+    charges: staff ? chargesSection(c, charges, deals) : dealClientCard(c, deals),
     chat: chatSection(c, chat, ticket),
     contracts: contractsSection(c, contractList),
     briefs: briefsSection(c, briefList),
@@ -861,7 +862,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       ${track}
       <div class="info-grid mb-5">${staff ? caseStats(c, { appointments, tasks }) : ''}${info}</div>
       ${clientLinkBanner(c, clientSuggestions)}
-      ${ticket || c.processTicket || c.canEdit ? `<div class="ticket-strips">${ticketBanner(c, ticket)}${processTicketBanner(c)}</div>` : ''}
+      ${ticket || c.processTicket || c.canEdit ? `<div class="ticket-strips">${ticketBanner(c, ticket, transcripts)}${processTicketBanner(c)}</div>` : ''}
       ${quick.length ? `<div class="form-actions case-quick mb-2">${quick.join('')}</div>` : ''}
       ${editForm}
       ${staff ? '' : reviewSection(c, review)}
@@ -1053,6 +1054,29 @@ document.addEventListener('pointerup', async () => {
     st.cal.landed = null;
   });
 });
+
+/** Monatswechsel: der neue Monat gleitet von der Seite herein, aus der man kommt. */
+function calSlide(dir) {
+  const grid = $('#content .cal-grid');
+  if (!grid || window.PS.motion.calm() || typeof grid.animate !== 'function') return;
+  grid.animate([{ transform: `translateX(${dir * 36}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+}
+// Am Handy: über den Kalender wischen wechselt den Monat
+let calTouch = null;
+document.addEventListener('touchstart', (e) => {
+  const grid = e.target.closest && e.target.closest('#content .cal-grid');
+  calTouch = grid && e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
+}, { passive: true });
+document.addEventListener('touchend', (e) => {
+  if (!calTouch || st.view !== 'calendar') return;
+  const t = e.changedTouches[0];
+  const dx = t.clientX - calTouch.x;
+  const dy = t.clientY - calTouch.y;
+  calTouch = null;
+  if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.7) return;
+  const btn = $(`#content [data-action="cal-nav"][data-dir="${dx < 0 ? 1 : -1}"]`);
+  if (btn) btn.click();
+}, { passive: true });
 
 function calendarClient() {
   const cutoff = Date.now() - 60 * 60 * 1000;

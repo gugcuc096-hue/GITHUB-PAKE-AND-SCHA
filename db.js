@@ -1224,6 +1224,33 @@ addColumn('case_chat_reads', 'read_at', 'TEXT');
 addColumn('cases', 'chat_nudged_id', 'INTEGER');
 addColumn('appointments', 'client_response', 'TEXT');
 addColumn('appointments', 'client_response_at', 'TEXT');
+// Deal-Rechner: Angebote der Staatsanwaltschaft und die Antwort des Mandanten
+db.exec(`
+  CREATE TABLE IF NOT EXISTS case_deals (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id         INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    offer_he        INTEGER,
+    offer_fine      INTEGER,
+    note            TEXT NOT NULL DEFAULT '',
+    status          TEXT NOT NULL DEFAULT 'offen',
+    answered_at     TEXT,
+    answered_via    TEXT,
+    created_by      INTEGER,
+    created_by_name TEXT NOT NULL DEFAULT '',
+    created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
+// Gesicherter Verlauf gelöschter Akten-Tickets (nur Kanzlei)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS ticket_transcripts (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id       INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    channel_name  TEXT NOT NULL DEFAULT '',
+    message_count INTEGER NOT NULL DEFAULT 0,
+    html          TEXT NOT NULL,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
 // Strafmaß der Akte: Einschätzung der Kanzlei und verminderte Schuldfähigkeit (§ 8)
 addColumn('cases', 'sentence_estimate', 'INTEGER');
 addColumn('cases', 'sentence_fine', 'INTEGER');

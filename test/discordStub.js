@@ -97,6 +97,14 @@ globalThis.fetch = async (input, init = {}) => {
     }
     if (method === 'POST' && path === '/users/@me/channels') return json(200, { id: `dm-${body.recipient_id}`, type: 1 });
     m = path.match(/^\/channels\/([^/]+)\/messages$/);
+    // Verlauf eines Kanals (neueste zuerst, eine Seite): was der Bot dort geschrieben hat
+    if (method === 'GET' && m) {
+      if (url.searchParams.get('before')) return json(200, []);
+      const list = state.channelMessages
+        .filter((x) => x.channel === m[1])
+        .map((x, i) => ({ id: String(1000 + i), author: { id: BOT, username: 'kanzlei-bot', bot: true }, timestamp: new Date().toISOString(), content: x.content || '', embeds: x.embeds || [] }));
+      return json(200, list.reverse());
+    }
     if (method === 'POST' && m) {
       if (m[1].startsWith('dm-')) {
         const to = m[1].slice(3);

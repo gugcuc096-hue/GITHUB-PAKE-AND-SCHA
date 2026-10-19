@@ -65,7 +65,7 @@ function invoiceTable(rows) {
       <thead><tr><th>Dokument</th><th>Empfänger</th><th>Akte</th><th style="text-align:right">Betrag</th><th>Status</th><th>Datum</th><th><span class="sr-only">Aktionen</span></th></tr></thead>
       <tbody>${lazyRows(
         rows,
-        (i) => `<tr>
+        (i) => `<tr data-inv="${i.id}">
           <td class="td-main"><div class="font-mono text-gold text-sm nowrap">${docTitleLink(`/invoice.html?id=${i.id}`, esc(i.number))}</div><div class="text-xs text-dim">${esc(INVOICE_KIND[i.kind])}${i.subject ? ' · ' + esc(i.subject) : ''}</div></td>
           <td data-label="Empfänger">${staff && i.clientKey ? clientLink(i.clientKey, i.clientName) : esc(i.clientName)}</td>
           <td data-label="Akte" class="nowrap">${i.caseNumber ? `<button class="text-gold font-mono text-xs hover:underline" data-action="open-case" data-id="${i.caseId}">${esc(i.caseNumber)}</button>` : '—'}</td>

@@ -398,7 +398,13 @@ function lawyerPicker({ leadId = null, coIds = [], withLead = false, extra = [],
   return `${lead}<div class="span-2" data-team><div class="label">Weitere Anwälte <span class="text-dim font-normal normal-case tracking-normal">– arbeiten mit und dürfen die Akte bearbeiten</span></div>
       ${options ? `<div class="lawyer-grid">${options}</div>` : '<p class="text-sm text-dim">Keine weiteren Anwälte im Team.</p>'}</div>`;
 }
-const empty = (text, ico = 'folder') => `<div class="empty">${icon(ico, 'ico-lg')}<p>${esc(text)}</p></div>`;
+/** Leerer Bereich: feine Goldlinien-Zeichnung (Symbol im Doppelring mit Funkeln) und ein kurzer Satz. */
+const emptyArt = (ico) =>
+  `<svg class="empty-art" viewBox="0 0 120 84" aria-hidden="true"><ellipse class="ea-floor" cx="60" cy="76" rx="34" ry="4"/>
+    <circle class="ea-ring" cx="60" cy="38" r="27" pathLength="1"/><circle class="ea-ring ea-ring2" cx="60" cy="38" r="33" pathLength="1"/>
+    <path class="ea-spark" d="M96 14l1.6 4.4L102 20l-4.4 1.6L96 26l-1.6-4.4L90 20l4.4-1.6zM24 52l1.2 3.2 3.2 1.2-3.2 1.2L24 61l-1.2-3.2-3.2-1.2 3.2-1.2z"/>
+    <g class="ea-icon" transform="translate(45 23) scale(1.25)"><path d="${ICONS[ico] || ICONS.folder}"/></g></svg>`;
+const empty = (text, ico = 'folder') => `<div class="empty">${emptyArt(ico)}<p>${esc(text)}</p></div>`;
 /** Leerer Kasten in der Übersicht: nur eine schmale Zeile, damit das Wichtige nach oben rückt. */
 const emptyLine = (text, ico = 'check') => `<p class="empty-line">${icon(ico, 'ico-sm')}<span>${esc(text)}</span></p>`;
 const pad = (n) => String(n).padStart(2, '0');

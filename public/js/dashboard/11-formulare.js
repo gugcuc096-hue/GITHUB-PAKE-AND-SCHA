@@ -155,6 +155,14 @@ const forms = {
     await navigate('cases');
     await openCase(res.case.id);
   },
+  deal: async (f) => {
+    const num = (k) => (f.elements[k].value === '' ? null : Number(f.elements[k].value));
+    const caseId = Number(f.dataset.caseId);
+    const r = await api.post(`/api/cases/${caseId}/deals`, { he: num('he'), fine: num('fine'), note: f.elements.note.value.trim() });
+    toast(r.discord ? 'Angebot eingetragen – der Mandant wurde per Discord gefragt.' : 'Angebot eingetragen – der Mandant sieht es im Portal.');
+    await returnOrClose();
+    await reloadCase(caseId);
+  },
   'case-edit': async (f) => {
     const fd = new FormData(f);
     const id = Number(f.dataset.id);

@@ -567,6 +567,21 @@ function morphOpen(rect) {
   // spielte das Fenster sein normales Einblenden noch einmal ab (kurzes Flackern)
   modal.classList.add('morphing');
   card.animate([{ clipPath: morphClip(card, rect), opacity: 0.6 }, { clipPath: 'inset(0px 0px 0px 0px round 20px)', opacity: 1 }], { duration: MORPH_MS, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+  // Aktenzeichen und Titel fliegen aus der Zeile an ihren Platz im Aktenkopf
+  const parts = st.morphParts || {};
+  [
+    [parts.num, $('#modalBody .case-num-row .font-mono')],
+    [parts.title, $('#modalTitle')],
+  ].forEach(([from, el]) => {
+    if (!from || !el) return;
+    const to = el.getBoundingClientRect();
+    if (!to.height) return;
+    const s = Math.min(1, from.height / to.height);
+    el.animate([{ transformOrigin: '0 0', transform: `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${s})` }, { transformOrigin: '0 0', transform: 'none' }], {
+      duration: MORPH_MS + 60,
+      easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+    });
+  });
 }
 /** Zeile der offenen Akte in der Liste dahinter – nur, wenn sie zu sehen ist. */
 function morphRow() {
@@ -578,7 +593,13 @@ function morphRow() {
 /** Openers: Akten-Zeile merken, aus der das Fenster hervorwachsen soll. */
 function openCaseFrom(el) {
   st.morphFrom = morphOk() && !$('#modal').classList.contains('open') ? el.getBoundingClientRect() : null;
-  return openCase(Number(el.dataset.id)).finally(() => (st.morphFrom = null));
+  // Aktenzeichen und Titel der Zeile (fliegen in den Aktenkopf)
+  const rect = (sel) => {
+    const n = st.morphFrom && el.querySelector(sel);
+    return n ? n.getBoundingClientRect() : null;
+  };
+  st.morphParts = { num: rect('.font-mono'), title: rect('.font-medium, .title') };
+  return openCase(Number(el.dataset.id)).finally(() => (st.morphFrom = st.morphParts = null));
 }
 
 /**
@@ -845,7 +866,10 @@ function playIn(el, cls) {
   el.classList.add(cls);
 }
 function renderView() {
+  const before = flipSnapshot(); // Positionen der Zeilen vor dem Neuzeichnen (weiches Umsortieren)
   $('#content').innerHTML = views[st.view].render();
+  flipPlay(before);
+  markChangedBadges($('#content'));
   // Seite eines Bündels: Reiter unter der Überschrift
   const tabs = hubTabs(st.view);
   if (tabs) ($('#content > .page-head') || $('#content').firstElementChild)?.insertAdjacentHTML($('#content > .page-head') ? 'afterend' : 'beforebegin', tabs);

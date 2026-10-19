@@ -343,7 +343,12 @@ label.prop:hover { border-color: rgba(255, 255, 255, 0.22); }
   background: rgba(6, 11, 25, 0.97); border: 1px solid var(--gold-hairline); border-left: 3px solid var(--gold-500);
   border-radius: 12px; padding: 0.8rem 1.1rem; max-width: 360px; font-size: 0.875rem;
   box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6); animation: toast-in 0.3s ease;
+  position: relative; overflow: hidden; touch-action: pan-y; user-select: none; transition: transform 0.2s ease, opacity 0.2s ease;
 }
+/* Ablaufende Leiste unten in der Karte (api.js toast) */
+.ps-toast-bar { position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; background: var(--gold-500); opacity: 0.55; transform-origin: left; animation: toast-bar linear forwards; }
+.ps-toast.error .ps-toast-bar { background: #ef4444; }
+@keyframes toast-bar { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 .ps-toast.error { border-left-color: #ef4444; }
 /* Meldung mit Knopf („Gelöscht · Rückgängig“) */
 .ps-toast.has-action { display: flex; align-items: center; gap: 1rem; }
@@ -1910,4 +1915,50 @@ body.cal-dragging, body.cal-dragging * { cursor: grabbing !important; user-selec
 .chip-row.hub-tabs .chip:hover { color: #e5e7eb; background: none; }
 .chip-row.hub-tabs .chip.active { color: var(--gold-light); border-bottom-color: var(--gold-500); background: none; }
 .chip-row.hub-tabs .nav-count { margin-left: 0.15rem; }
+/* Goldene Hauptknöpfe: beim Drüberfahren läuft einmal eine feine Lichtkante darüber */
+.btn-gold { position: relative; overflow: hidden; isolation: isolate; }
+.btn-gold::after { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(105deg, transparent 35%, rgba(255, 248, 220, 0.55) 50%, transparent 65%); transform: translateX(-120%); }
+.btn-gold:hover::after { animation: btn-glint 0.75s ease-out; }
+@keyframes btn-glint { to { transform: translateX(120%); } }
+/* Status-Wechsel: neues Badge blendet weich ein und glänzt kurz (14-start.js) */
+.badge-changed { animation: badge-change 1.1s ease-out; }
+@keyframes badge-change { 0% { opacity: 0.2; transform: scale(0.85); box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.6); } 35% { opacity: 1; transform: scale(1.06); box-shadow: 0 0 0 6px rgba(212, 175, 55, 0.18); } 100% { transform: none; box-shadow: 0 0 0 0 rgba(212, 175, 55, 0); } }
+/* Leerzustände: Goldlinien-Zeichnung (01-basis.js emptyArt) */
+.empty-art { display: block; width: 120px; height: 84px; margin: 0 auto 0.5rem; color: var(--gold-500); }
+.empty-art .ea-floor { fill: rgba(212, 175, 55, 0.08); }
+.empty-art .ea-ring { fill: none; stroke: currentColor; stroke-width: 1; opacity: 0.55; stroke-dasharray: 1; stroke-dashoffset: 1; transform: rotate(-90deg); transform-origin: 60px 38px; animation: seal-draw 0.9s cubic-bezier(0.65, 0, 0.35, 1) forwards; }
+.empty-art .ea-ring2 { opacity: 0.25; stroke-dasharray: 0.02 0.03; stroke-dashoffset: 0; animation: none; }
+.empty-art .ea-spark { fill: currentColor; opacity: 0.5; animation: ea-twinkle 3.2s ease-in-out infinite; transform-origin: 60px 38px; }
+.empty-art .ea-icon path { fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; opacity: 0.85; }
+@keyframes ea-twinkle { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.7; } }
+/* Verlaufslinie unter einer Kennzahl (Kanzlei-Statistik) */
+.kpi .spark { display: block; width: 100%; height: 28px; margin-top: 0.6rem; overflow: visible; }
+.spark-fill { fill: rgba(212, 175, 55, 0.1); }
+.spark-line { fill: none; stroke: var(--gold-500); stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; stroke-dasharray: 1; stroke-dashoffset: 1; animation: seal-draw 0.9s ease-out 0.15s forwards; }
+.spark-dot { fill: var(--gold-light); }
+
+/* Tastenkürzel-Übersicht (14-start.js) */
+.kbd-list { display: grid; gap: 0.15rem; }
+.kbd-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.45rem 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); font-size: 0.9rem; }
+.kbd-row > span:first-child { display: inline-flex; gap: 0.3rem; flex: none; }
+kbd { display: inline-block; min-width: 1.6rem; padding: 0.12rem 0.45rem; border: 1px solid rgba(255, 255, 255, 0.18); border-bottom-width: 2px; border-radius: 6px; font: 600 0.75rem/1.4 'JetBrains Mono', monospace; text-align: center; color: var(--gold-light); background: rgba(255, 255, 255, 0.04); }
+/* Deal-Rechner in den Anklagepunkten (12-recht.js) */
+.deal-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin: 0.9rem 0; padding: 0.8rem 1rem; border: 1px solid var(--gold-hairline); border-radius: 12px; background: rgba(212, 175, 55, 0.05); }
+.deal-row.deal-empty { border-style: dashed; background: none; }
+.deal-offer { display: flex; align-items: center; gap: 0.6rem; margin: 0.15rem 0; font-size: 1.05rem; }
+.deal-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.deal-good { color: #6ee7b7; }
+.deal-bad { color: #fca5a5; }
+.deal-card { border: 1px solid var(--gold-hairline); border-radius: 14px; padding: 1rem 1.1rem; background: rgba(212, 175, 55, 0.05); }
+/* Plädoyer-Baukasten und Teleprompter im Verhandlungsmodus (12-recht.js) */
+.plea-panel { position: absolute; inset: 0; z-index: 5; display: grid; place-items: start center; overflow-y: auto; padding: 2rem 1rem; background: rgba(2, 5, 14, 0.82); }
+.plea-card { width: 100%; max-width: 760px; padding: 1.4rem 1.5rem; border-radius: 18px; background: rgba(8, 14, 32, 0.98); border: 1px solid var(--glass-border); border-top: 2px solid var(--gold-500); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6); }
+.plea-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.4rem; }
+.plea-field { margin-bottom: 0.9rem; resize: vertical; line-height: 1.55; }
+.prompter { position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column; background: #02050e; }
+.prompter-text { flex: 1; overflow-y: auto; padding: 38vh max(6vw, 1.25rem) 60vh; font: 500 clamp(1.6rem, 3.6vw, 2.8rem)/1.5 'Cormorant Garamond', Georgia, serif; color: #f8f3e0; scrollbar-width: none; mask-image: linear-gradient(transparent, #000 22%, #000 70%, transparent); }
+.prompter-text::-webkit-scrollbar { display: none; }
+.prompter-text p { margin: 0 0 1.2em; }
+.prompter-end { text-align: center; color: var(--gold-500); font-size: 0.6em; }
+.prompter-bar { display: flex; justify-content: center; align-items: center; gap: 0.6rem; flex-wrap: wrap; padding: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.08); color: #94a3b8; font-size: 0.85rem; }
 

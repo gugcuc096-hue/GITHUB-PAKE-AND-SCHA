@@ -122,6 +122,12 @@ Premium-Webanwendung für die GTA-RP-Kanzlei **Pake & Scha Legal Consulting**: �
 | **Termin-Zusage per Knopf** | Trägt die Kanzlei einen Termin für den Mandanten ein oder verlegt ihn, bekommt der Mandant (verknüpftes Discord oder sein Discord aus dem Ticket) eine DM mit **Passt** / **Passt nicht** · im Kalender steht „Zugesagt“ bzw. „Passt nicht“, bei „Passt nicht“ bekommt der zuständige Anwalt eine DM · Fristen fragen nicht nach, antworten kann nur der Mandant |
 | **Bilder aus Tickets gesichert** | Discord-Links auf Anhänge laufen ab – Bilder (JPG/PNG/WebP, bis 8 MB, nur von Discord selbst) aus dem Akten-Ticket werden heruntergeladen und als **interne Beweise** gespeichert (bis 40 je Akte), im Chat steht ein Verweis statt des Links |
 | **Live-Anzeige im Kanalnamen** | *Einstellungen → Discord → Übersicht:* ein Sprachkanal heißt automatisch z. B. „🟢 Im Dienst: 3“ (Name frei wählbar mit `{anzahl}`) – höchstens alle 5 Minuten aktualisiert, weil Discord Umbenennungen begrenzt |
+| **Deal-Rechner** | In den Anklagepunkten: **Angebot der Staatsanwaltschaft** eintragen (HE, Geldstrafe, Bedingungen) – steht neben dem Strafmaß mit Vergleich („8 HE weniger als erwartet“) · der Mandant stimmt im **Portal** oder per **Discord-DM** („Annehmen“ / „Ablehnen“) zu, oder die Kanzlei erfasst die Antwort aus dem Spiel · Antwort mit Weg und Zeitpunkt im Verlauf und im Ticket · ein neues Angebot ersetzt ein offenes |
+| **Plädoyer & Teleprompter** | Im Verhandlungsmodus „Plädoyer“: vier Bausteine (Eröffnung, Sachverhalt, Beweiswürdigung, Antrag), **Vorschlag** aus Akte, Anklagepunkten, Beweisen, Einschätzung bzw. angenommenem Deal · **Teleprompter**: großer Text läuft langsam durch – Leertaste hält an, Pfeile ändern das Tempo, Esc schließt · gespeichert mit den Notizen der Verhandlung (im Browser) |
+| **Ins Prozessticket** | Fertig unterschriebene Schriftsätze per Knopf ins Prozessticket der Akte: Ist der Kanzlei-Bot auf dem Discord (z. B. DOJ), postet er mit Dokument-Link (Google Doc bzw. Druckansicht) – sonst wird der Text kopiert und der Kanal geöffnet, einfach einfügen · Vermerk im Verlauf (intern) |
+| **Ticket-Verlauf gesichert** | Wird ein Akten-Ticket gelöscht (/delete oder automatisches Aufräumen), sichert der Bot vorher bis zu 1000 Nachrichten als eigene Seite in der Akte – „Verlauf“ in der Ticket-Leiste, nur für die Kanzlei |
+| **Tastenkürzel** (PC) | `?` Übersicht · `/` Suchen · `n` neue Akte · `g` + Buchstabe springt: `u` Übersicht, `a` Akten, `m` Mandanten, `t` Aufgaben, `k` Kalender, `r` Rechnungen, `p` Post, `w` Wiki, `e` Profil – nie beim Tippen, nicht im Verhandlungsmodus |
+| **Feinschliff Optik** | Akte öffnen: Aktenzeichen und Titel fliegen aus der Zeile in den Aktenkopf · Aktenliste und Rechnungen sortieren sich weich um (Filter, Sortierung, neue Einträge) · Status-Wechsel blendet das neue Badge weich ein und glänzt kurz · goldene Knöpfe mit Lichtkante beim Drüberfahren · Kalender gleitet beim Monatswechsel, am Handy wischen · Mitteilungen als Karten mit ablaufender Leiste, wegwischbar, höchstens drei · Leerzustände als Goldlinien-Zeichnung · Kanzlei-Statistik: Verlaufslinie der letzten 8 Wochen unter Umsatz und Abschlüssen – bei „Bewegung reduzieren“ alles ruhig |
 | **Protokoll** (Admin) | Wer hat wann was geändert: Akten, Rechnungen, Konten, Team, Bewerbungen, Einstellungen, Anmeldungen des Teams |
 
 ## Feste Team-Besetzung
@@ -643,7 +649,7 @@ docxRender.js    Word-Dateien im Layout der Druckansichten (Rechnung, Vertrag/Sc
 googleDrive.js   Google Drive über das Kanzlei-Konto: Anmeldung (nur drive.file), verschlüsselter Token, Docs anlegen/teilen/neu schreiben, Sicherungen hochladen (in Stücken)
 googleDocs.js    Google Docs je Dokument: automatisch anlegen, bei Änderungen automatisch neu schreiben, Papierkorb, Nachholen nach Störungen
 scripts/         build-css.js (Tailwind fest bauen: npm run build:css), seed-admin.js
-test/            npm test: api, static, browser, chat, portal, clients, abschluss, komfort, google (mit googleStub.js), discord und zweifaktor (mit discordStub.js), docx, schriftsatz, kanzlei (Strafkatalog, Wiki, Beschlüsse, Anwalt des Monats, Suche, Textbausteine, Vorschaubilder), portal (u. a. Termin-Zusage, Übergabe, Lesebestätigung, Live-Anzeige) – helpers.js startet den Server mit frischer Test-Datenbank
+test/            npm test: api, static, browser, chat, portal, clients, abschluss, komfort, google (mit googleStub.js), discord und zweifaktor (mit discordStub.js), docx, schriftsatz, kanzlei (Strafkatalog, Wiki, Beschlüsse, Anwalt des Monats, Suche, Textbausteine, Vorschaubilder), portal (u. a. Termin-Zusage, Übergabe, Lesebestätigung, Live-Anzeige, Deal-Rechner, Prozessticket, Ticket-Verlauf) – helpers.js startet den Server mit frischer Test-Datenbank
 .github/workflows/test.yml  GitHub-Prüfung: alle Tests bei jedem Pull Request
 auth.js          Sessions, Passwörter, Rollen-Middleware
 bootstrap.js     Team-Seed, Notfall-Admin, Passwort-Reset, Datenmigration
@@ -657,6 +663,8 @@ cooperations.js  Kooperationen: Rabatt-Erkennung über Discord-Rollen bzw. zugeo
 memberships.js   VIP & Lifetime: aktive Mitgliedschaft, Discord-Rolle, Ablauf und Erinnerung
 caseChat.js      Nachrichten in der Akte (Kanzlei ↔ Mandant): Nachrichten, Lesestand mit Uhrzeit, neu-Zähler, Übernahme aus dem Discord-Ticket (Bilder als Beweise), Erinnerung an Ungelesenes
 apptConfirm.js   Termin-Zusage per Discord-DM (Passt / Passt nicht)
+deals.js         Deal-Rechner: Angebote der Staatsanwaltschaft, Zustimmung des Mandanten (Portal, Discord, Kanzlei)
+transcripts.js   Ticket-Verlauf vor dem Löschen sichern (HTML-Seite in der Akte, nur Kanzlei)
 dutyChannel.js   Live-Anzeige „Im Dienst: N“ im Namen eines Discord-Sprachkanals
 contractDiscord.js  Mandatsvertrag in Discord lesen: Vorlage als Discord-Text (Embeds), Namensvergleich für die Unterschrift
 fivenet.js       FiveNet: Schnittstellenprüfung, Link-Erkennung, Instanz-Einstellung

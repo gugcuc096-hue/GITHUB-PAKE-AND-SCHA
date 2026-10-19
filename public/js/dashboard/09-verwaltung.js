@@ -365,8 +365,19 @@ document.addEventListener('keydown', (e) => {
   all[next].focus();
 });
 
-function statKpi(label, value, sub, ico) {
-  return `<div class="panel kpi"><div class="kpi-label">${icon(ico, 'ico-sm')}${esc(label)}</div><div class="kpi-value">${esc(value)}</div><div class="kpi-sub">${esc(sub)}</div></div>`;
+function statKpi(label, value, sub, ico, series = null) {
+  return `<div class="panel kpi"><div class="kpi-label">${icon(ico, 'ico-sm')}${esc(label)}</div><div class="kpi-value">${esc(value)}</div><div class="kpi-sub">${esc(sub)}</div>${series ? sparkline(series, label) : ''}</div>`;
+}
+/** Kleine goldene Verlaufslinie der letzten 8 Wochen unter einer Kennzahl (älteste links). */
+function sparkline(values, label) {
+  const w = 120;
+  const h = 28;
+  const max = Math.max(...values, 1);
+  const pts = values.map((v, i) => [Math.round((i / (values.length - 1)) * w * 10) / 10, Math.round((h - 3 - (v / max) * (h - 6)) * 10) / 10]);
+  const line = pts.map((p) => p.join(',')).join(' ');
+  const last = pts[pts.length - 1];
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="${esc(`${label}: Verlauf der letzten 8 Wochen`)}">
+      <polygon class="spark-fill" points="0,${h} ${line} ${w},${h}"/><polyline class="spark-line" points="${line}" pathLength="1"/><circle class="spark-dot" cx="${last[0]}" cy="${last[1]}" r="2.4"/></svg>`;
 }
 /** „▲ 12 % ggü. Vorzeitraum“ (die 30 Tage davor) – ohne Vergleichswert nur dessen Summe. */
 function trendText(now, before) {
@@ -452,9 +463,9 @@ views.stats = {
           <div><h1 class="page-title">Kanzlei-Statistik</h1><p class="page-sub">Umsatz, Akten und Erfolgsquote auf einen Blick – berechnet aus Rechnungen und Akten. Nur für das Board of Partners sichtbar.</p></div>
         </div>
         <div class="kpi-grid mb-4 lg:mb-5">
-          ${statKpi('Umsatz 30 Tage', money(k.revenue30), trendText(k.revenue30, k.revenuePrev30), 'receipt')}
+          ${statKpi('Umsatz 30 Tage', money(k.revenue30), trendText(k.revenue30, k.revenuePrev30), 'receipt', st.stats.weeks && st.stats.weeks.map((x) => x.revenue))}
           ${statKpi('Offene Forderungen', money(k.openSum), `${k.openCount} offen${k.overdueCount ? ` · ${k.overdueCount} überfällig` : ''}`, 'clock')}
-          ${statKpi('Abgeschlossen', String(k.closed30), `in 30 Tagen · ${k.opened30} neu`, 'check')}
+          ${statKpi('Abgeschlossen', String(k.closed30), `in 30 Tagen · ${k.opened30} neu`, 'check', st.stats.weeks && st.stats.weeks.map((x) => x.closed))}
           ${statKpi('Erfolgsquote', success.pct == null ? '—' : `${success.pct} %`, success.rated ? `${success.won} von ${success.rated} mit Ergebnis` : 'noch kein Ergebnis', 'scale')}
         </div>
         <div class="grid-2 mb-4 lg:mb-5 items-start">

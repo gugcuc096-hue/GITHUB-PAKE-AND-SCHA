@@ -2638,3 +2638,69 @@ describe('Browser: Board-Menü gebündelt, Hover-Karte, Kalender ziehen, Stempel
     }
   });
 });
+
+describe('Browser: Tastenkürzel, Mitteilungskarten, Verlaufslinien, Deal-Rechner, Plädoyer & Teleprompter', { skip: chromium ? false : 'Playwright nicht installiert' }, () => {
+  it('„?“ und „g a“, ablaufende Mitteilung, Linien in der Statistik, Deal in der Akte, Teleprompter im Verhandlungsmodus', async () => {
+    const srv = await startServer();
+    const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+    const ctx = await browser.newContext({ ...DESKTOP, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+    const page = await ctx.newPage();
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
+    try {
+      const a = client(srv.base);
+      await a.login(TEAM.admin);
+      const c = (await a.post('/api/cases', { title: 'Bewaffneter Raubüberfall', area: 'strafrecht', clientName: 'Tony Vercetti', description: 'Festnahme vor der Fleeca Bank.' })).json.case;
+      assert.equal((await a.post(`/api/cases/${c.id}/deals`, { he: 15, note: 'bei Geständnis' })).status, 201);
+      await page.goto(srv.base + '/login.html');
+      await page.fill('#email', TEAM.admin);
+      await page.fill('#password', PASSWORD);
+      await page.click('button[type=submit]');
+      await page.waitForURL(/dashboard/);
+      await page.waitForSelector('#nav a.nav-item');
+      await page.waitForTimeout(1400); // Siegel vorbei
+
+      // Tastenkürzel
+      await page.keyboard.press('?');
+      await page.waitForSelector('#modalBody .kbd-list');
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(() => !document.querySelector('#modal').classList.contains('open'));
+      await page.keyboard.press('g');
+      await page.keyboard.press('a');
+      await page.waitForFunction(() => location.hash === '#cases');
+
+      // Mitteilung als Karte mit ablaufender Leiste
+      await page.evaluate(() => window.PS.toast('Probe'));
+      await page.waitForSelector('.ps-toast .ps-toast-bar');
+
+      // Statistik: Verlaufslinien unter den Kennzahlen
+      await page.evaluate(() => (location.hash = '#stats'));
+      await page.waitForSelector('#content .kpi .spark');
+      assert.equal(await page.locator('#content .kpi .spark').count(), 2);
+
+      // Akte: Deal-Rechner neben dem Strafmaß
+      await page.evaluate(() => (location.hash = '#cases'));
+      await page.click(`#caseList [data-action="open-case"][data-id="${c.id}"]`);
+      await page.waitForSelector('#modalBody .deal-row');
+      assert.match(await page.textContent('#modalBody .deal-row'), /15 HE.*wartet auf Mandant/);
+
+      // Verhandlungsmodus: Plädoyer aus dem Vorschlag, Teleprompter läuft und schließt mit Esc
+      await page.click('#modalBody [data-action="hearing-start"]');
+      await page.waitForSelector('#hearing');
+      await page.click('#hearing [data-action="plea-open"]');
+      await page.click('#pleaPanel [data-action="plea-suggest"]');
+      await page.waitForFunction(() => /Hohes Gericht, ich vertrete heute Tony Vercetti/.test(document.querySelector('#plea_open')?.value || ''));
+      await page.click('#pleaPanel [data-action="plea-prompter"]');
+      await page.waitForSelector('#prompter .prompter-text');
+      assert.match(await page.textContent('#prompterText'), /Festnahme vor der Fleeca Bank/);
+      await page.waitForFunction(() => document.querySelector('#prompterText').scrollTop > 0, null, { timeout: 4000 });
+      await page.keyboard.press('Escape');
+      await page.waitForSelector('#prompter', { state: 'detached' });
+      assert.deepEqual(problems, []);
+    } finally {
+      await ctx.close();
+      await browser.close();
+      await srv.stop();
+    }
+  });
+});

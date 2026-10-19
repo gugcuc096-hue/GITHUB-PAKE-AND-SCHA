@@ -24,7 +24,7 @@ function penaltyText(o) {
 const citeShort = (o) => `§ ${o.para}${o.paragraph ? ` ${o.paragraph.replace('Satz', 'S.')}` : ''}`;
 
 /* ---------------------------------------------------------------- Akte: Anklagepunkte */
-function chargesSection(c, data) {
+function chargesSection(c, data, deals = []) {
   if (!isStaff() || !data) return '';
   const { charges, sentence: s, estimate } = data;
   const edit = c.canEdit;
@@ -32,8 +32,10 @@ function chargesSection(c, data) {
   const addBtn = edit ? `<button type="button" class="btn-outline btn-sm" data-action="charge-pick" data-id="${c.id}">${icon('plus', 'ico-sm')}<span>Anklagepunkt</span></button>` : '';
   if (!charges.length) {
     // Nur Strafsachen zeigen den Abschnitt immer – sonst kommt er über „⋯ Mehr“
-    if (c.area !== 'strafrecht') return '';
-    return emptySection('secCharges', 'Anklagepunkte', 'noch keine', `${addBtn}${hearingBtn}`, 'Tatbestände aus dem Strafgesetzbuch – der Strafmaß-Rechner zeigt sofort, was droht.');
+    if (c.area !== 'strafrecht' && !deals.length) return '';
+    // Ein Angebot der Staatsanwaltschaft bleibt auch ohne Anklagepunkte sichtbar
+    const deal = deals.length ? `<div class="section deal-only">${dealBlock(c, deals, { mitigations: [] }, { he: null })}</div>` : '';
+    return emptySection('secCharges', 'Anklagepunkte', 'noch keine', `${addBtn}${hearingBtn}`, 'Tatbestände aus dem Strafgesetzbuch – der Strafmaß-Rechner zeigt sofort, was droht.') + deal;
   }
   const haft = s.fineOnly ? 'keine' : s.minHe > 0 ? (s.minHe === s.maxHe ? `${s.maxHe} HE` : `${s.minHe}–${s.maxHe} HE`) : `bis ${s.maxHe} HE`;
   const haftSub = s.fineOnly ? 'nur Geldstrafe' : s.open || s.capped ? `Gesamtstrafe höchstens ${s.cap} HE (§ 3 Abs. 2)` : s.severe ? 'besonders schwerer Fall – Rahmen bis 180 HE' : 'Gesamtstrafe nach § 3';
@@ -75,8 +77,65 @@ function chargesSection(c, data) {
           ${edit ? `<label class="check chg-reduced"><input type="checkbox" data-change="sentence-set" data-case-id="${c.id}" data-key="reduced" ${estimate.reduced ? 'checked' : ''}> Verminderte Schuldfähigkeit (§ 8)</label>` : ''}</div>
       </div>
       ${mitig}
+      ${dealBlock(c, deals, s, estimate)}
       <div class="chg-list">${rows}</div>
     </div>`;
+}
+
+/* ---------------------------------------------------------------- Deal-Rechner (Angebot der Staatsanwaltschaft) */
+const DEAL_STATUS = { offen: ['wartet auf Mandant', 'amber'], angenommen: ['angenommen', 'emerald'], abgelehnt: ['abgelehnt', 'red'], zurueckgezogen: ['zurückgezogen', 'slate'] };
+const dealOffer = (d) => [d.he != null ? `${d.he} HE` : '', d.fine != null ? usd(d.fine) : ''].filter(Boolean).join(' + ');
+const DEAL_VIA = { portal: 'im Portal', discord: 'per Discord', kanzlei: 'im Spiel' };
+/** Vergleich mit dem Strafmaß: „8 HE unter der Einschätzung“ bzw. unter/über dem Rahmen. */
+function dealCompare(d, s, estimate) {
+  if (d.he == null) return '';
+  const ref = estimate.he != null ? estimate.he : s.minHe > 0 && s.minHe === s.maxHe ? s.maxHe : null;
+  if (ref != null) {
+    const diff = ref - d.he;
+    return diff > 0 ? `<span class="deal-good">${diff} HE weniger als erwartet (${ref} HE)</span>` : diff < 0 ? `<span class="deal-bad">${-diff} HE mehr als erwartet (${ref} HE)</span>` : `<span>genau wie erwartet (${ref} HE)</span>`;
+  }
+  if (s.maxHe != null) return d.he < s.maxHe ? `<span class="deal-good">unter dem Rahmen (bis ${s.maxHe} HE)</span>` : `<span class="deal-bad">am oberen Rand (bis ${s.maxHe} HE)</span>`;
+  return '';
+}
+function dealBlock(c, deals, s, estimate) {
+  const d = deals[0];
+  const add = c.canEdit ? `<button type="button" class="btn-outline btn-sm" data-action="deal-new" data-id="${c.id}">${icon('plus', 'ico-sm')}<span>${d && d.status === 'offen' ? 'Neues Angebot' : 'Angebot der StA'}</span></button>` : '';
+  if (!d) return c.canEdit ? `<div class="deal-row deal-empty"><span class="text-sm text-dim">Deal der Staatsanwaltschaft? Eintragen, mit dem Strafmaß vergleichen und vom Mandanten bestätigen lassen.</span>${add}</div>` : '';
+  const answer = d.status === 'offen' && c.canEdit
+    ? `<button type="button" class="btn-ghost btn-sm" data-action="deal-answer" data-case-id="${c.id}" data-id="${d.id}" data-accept="1" title="Der Mandant hat im Spiel zugestimmt">Zustimmung erfassen</button>
+       <button type="button" class="btn-ghost btn-sm" data-action="deal-answer" data-case-id="${c.id}" data-id="${d.id}" data-accept="0" title="Der Mandant hat im Spiel abgelehnt">Ablehnung erfassen</button>
+       <button type="button" class="icon-btn sm" data-action="deal-withdraw" data-case-id="${c.id}" data-id="${d.id}" aria-label="Angebot zurückziehen" title="Angebot zurückziehen">${icon('x', 'ico-sm')}</button>`
+    : '';
+  return `<div class="deal-row">
+      <div class="deal-main"><div class="chg-k">Angebot der Staatsanwaltschaft</div>
+        <div class="deal-offer"><strong>${esc(dealOffer(d))}</strong>${statusBadge(DEAL_STATUS, d.status)}</div>
+        <div class="text-xs text-dim">${dealCompare(d, s, estimate)}${d.answeredAt ? ` · ${esc(DEAL_VIA[d.answeredVia] || '')} am ${esc(fmtDate(d.answeredAt))}` : ''}${d.note ? ` · ${esc(d.note)}` : ''}</div></div>
+      <div class="deal-actions">${answer}${add}</div>
+    </div>`;
+}
+/** Mandant: offenes Angebot mit „Annehmen“ / „Ablehnen“, sonst die Antwort. */
+function dealClientCard(c, deals) {
+  const d = deals.find((x) => x.status !== 'zurueckgezogen');
+  if (!d) return '';
+  const open = d.status === 'offen';
+  return `<div class="section deal-card" id="secCharges">
+      <h3 class="section-title">Angebot der Staatsanwaltschaft</h3>
+      <p class="text-sm">Die Staatsanwaltschaft bietet an: <strong>${esc(dealOffer(d))}</strong>${d.note ? ` – ${esc(d.note)}` : ''}.</p>
+      ${open
+        ? `<p class="text-sm text-dim mt-1">Besprechen Sie das Angebot bitte mit Ihrem Anwalt. Ihre Antwort wird mit Datum in der Akte festgehalten.</p>
+           <div class="form-actions mt-3"><button type="button" class="btn-outline btn-md" data-action="deal-answer" data-case-id="${c.id}" data-id="${d.id}" data-accept="0">Ablehnen</button><button type="button" class="btn-gold btn-md" data-action="deal-answer" data-case-id="${c.id}" data-id="${d.id}" data-accept="1">Angebot annehmen</button></div>`
+        : `<p class="mt-2">${statusBadge(DEAL_STATUS, d.status)} <span class="text-xs text-dim">am ${esc(fmtDate(d.answeredAt))}</span></p>`}
+    </div>`;
+}
+function dealForm(caseId) {
+  return `<h2 id="modalTitle" class="modal-title">Angebot der Staatsanwaltschaft</h2>
+      <p class="modal-sub">Der Mandant bekommt das Angebot im Portal und – mit verknüpftem Discord – als Nachricht mit „Annehmen“ / „Ablehnen“.</p>
+      <form data-form="deal" data-case-id="${caseId}" class="form-grid">
+        <div><label class="label" for="dealHe">Hafteinheiten</label><input id="dealHe" name="he" type="number" min="0" max="999" inputmode="numeric" class="field" placeholder="z. B. 15"></div>
+        <div><label class="label" for="dealFine">Geldstrafe ($)</label><input id="dealFine" name="fine" type="number" min="0" step="1000" inputmode="numeric" class="field" placeholder="z. B. 5000"></div>
+        <div class="span-2"><label class="label" for="dealNote">Bedingungen (optional)</label><input id="dealNote" name="note" class="field" maxlength="500" placeholder="z. B. Geständnis zu § 21, Anklage wegen § 30 fällt weg"></div>
+        <div class="span-2 form-actions"><button type="button" class="btn-ghost btn-md" data-action="close-modal">Abbrechen</button><button class="btn-gold btn-md">Eintragen &amp; Mandant fragen</button></div>
+      </form>`;
 }
 
 /** Nach einer Änderung: Akte mit der Antwort neu zeichnen (ohne alles neu zu laden). */
@@ -282,6 +341,7 @@ function hearingHtml() {
       <div class="hr-id"><span class="font-mono text-gold text-sm">${esc(c.caseNumber)}</span><strong>${esc(c.title)}</strong></div>
       <div class="hr-clock" title="Dauer der Verhandlung"><span class="hr-live" aria-hidden="true"></span><span id="hrTimer">0:00</span></div>
       <div class="hr-actions">
+        <button type="button" class="btn-ghost btn-sm" data-action="plea-open">${icon('doc', 'ico-sm')}<span>Plädoyer</span></button>
         <div class="hr-speech-wrap">
           <button type="button" class="btn-ghost btn-sm" data-action="hr-speech-menu" aria-haspopup="true" aria-expanded="false">${icon('clock', 'ico-sm')}<span id="hrSpeechLabel">Redezeit</span></button>
           <div class="hr-pop" id="hrSpeechPop" hidden>${[2, 3, 5, 10].map((m) => `<button type="button" data-action="hr-speech" data-min="${m}">${m} Min.</button>`).join('')}<button type="button" data-action="hr-speech" data-min="0">Aus</button></div>
@@ -449,6 +509,7 @@ window.addEventListener(
   'keydown',
   (e) => {
     if (!document.body.classList.contains('hearing-open')) return;
+    if ($('#prompter')) return promptKey(e); // Teleprompter: Leertaste, Pfeile, Esc
     if (e.target.id === 'hrInput' && e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
       e.stopPropagation();
@@ -538,3 +599,137 @@ Object.assign(actions, {
   },
   'hr-law-close': () => ($('#hrLaw').hidden = true),
 });
+
+/* ---------------------------------------------------------------- Plädoyer-Baukasten mit Teleprompter */
+/*
+ * Im Verhandlungsmodus: Plädoyer aus vier Bausteinen (Eröffnung, Sachverhalt, Beweiswürdigung, Antrag). „Vorschlag“
+ * füllt sie aus Akte, Anklagepunkten, Beweisen und Einschätzung; gespeichert wird mit den Notizen der Verhandlung
+ * (im Browser). Der Teleprompter zeigt den Text groß und lässt ihn langsam durchlaufen – Leertaste hält an,
+ * Pfeile ändern das Tempo, Esc schließt.
+ */
+const PLEA_PARTS = [
+  ['open', 'Eröffnung'],
+  ['facts', 'Sachverhalt'],
+  ['evidence', 'Beweiswürdigung'],
+  ['motion', 'Antrag'],
+];
+function pleaSuggestion() {
+  const { case: c, attachments = [], charges, deals = [] } = hearing.data;
+  const who = c.clientName && c.clientName !== '—' ? c.clientName : 'meinen Mandanten';
+  const list = (charges && charges.charges) || [];
+  const est = charges && charges.estimate;
+  const s = charges && charges.sentence;
+  const deal = deals.find((d) => d.status === 'angenommen');
+  const facts = String(c.description || '').trim();
+  return {
+    open: `Hohes Gericht, ich vertrete heute ${who} in der Sache „${c.title}“ (${c.caseNumber}).`,
+    facts: facts ? `Zum Sachverhalt: ${facts.length > 600 ? `${facts.slice(0, 600)} …` : facts}` : 'Zum Sachverhalt: …',
+    evidence: [
+      list.length ? `Die Anklage stützt sich auf ${list.map((ch) => `${citeShort(ch)} (${ch.title})`).join(', ')}.` : 'Die Anklage stützt sich auf …',
+      attachments.length ? `Es liegen ${attachments.length} Beweismittel vor; keines davon belegt den Vorwurf zweifelsfrei.` : 'Beweismittel, die den Vorwurf zweifelsfrei belegen, liegen nicht vor.',
+      s && s.mitigations && s.mitigations.length ? `Zu berücksichtigen ist: ${s.mitigations.join(', ')}.` : '',
+    ]
+      .filter(Boolean)
+      .join(' '),
+    motion: deal
+      ? `Entsprechend der Absprache mit der Staatsanwaltschaft beantrage ich eine Strafe von ${dealOffer(deal)}.`
+      : est && est.he != null
+        ? `Ich beantrage, ${who} zu einer Strafe von höchstens ${est.he} HE${est.fine != null ? ` und ${usd(est.fine)}` : ''} zu verurteilen – hilfsweise den Freispruch.`
+        : `Ich beantrage, ${who} freizusprechen.`,
+  };
+}
+const pleaState = () => (hearing.state.plea = hearing.state.plea || { open: '', facts: '', evidence: '', motion: '' });
+const pleaText = () =>
+  PLEA_PARTS.map(([k]) => pleaState()[k].trim())
+    .filter(Boolean)
+    .join('\n\n');
+function openPlea() {
+  const p = pleaState();
+  let el = $('#pleaPanel');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'pleaPanel';
+    el.className = 'plea-panel';
+    $('#hearing').appendChild(el);
+  }
+  el.innerHTML = `<div class="plea-card" role="dialog" aria-modal="true" aria-labelledby="pleaTitle">
+      <div class="plea-head"><h2 id="pleaTitle" class="font-serif text-2xl">Plädoyer</h2>
+        <div class="flex gap-2"><button type="button" class="btn-ghost btn-sm" data-action="plea-suggest">${icon('refresh', 'ico-sm')}<span>Vorschlag</span></button>
+        <button type="button" class="btn-gold btn-sm" data-action="plea-prompter" ${pleaText() ? '' : 'disabled'}>${icon('view', 'ico-sm')}<span>Teleprompter</span></button>
+        <button type="button" class="icon-btn" data-action="plea-close" aria-label="Plädoyer schließen">${icon('x')}</button></div></div>
+      <p class="text-sm text-dim mb-3">Bausteine bearbeiten – gespeichert wird automatisch mit den Notizen der Verhandlung.</p>
+      ${PLEA_PARTS.map(([k, l]) => `<label class="label" for="plea_${k}">${esc(l)}</label><textarea id="plea_${k}" class="field plea-field" data-plea="${k}" rows="${k === 'facts' || k === 'evidence' ? 4 : 2}">${esc(p[k])}</textarea>`).join('')}
+    </div>`;
+  $('#plea_open').focus();
+}
+document.addEventListener('input', (e) => {
+  const k = e.target.dataset && e.target.dataset.plea;
+  if (!k || !hearing.state) return;
+  pleaState()[k] = e.target.value;
+  hearingSave();
+  const btn = $('[data-action="plea-prompter"]');
+  if (btn) btn.disabled = !pleaText();
+});
+
+const prompter = { speed: 1, paused: false, raf: 0, last: 0 };
+function openPrompter() {
+  const text = pleaText();
+  if (!text) return;
+  const el = document.createElement('div');
+  el.id = 'prompter';
+  el.className = 'prompter';
+  el.innerHTML = `<div class="prompter-text" id="prompterText">${text.split('\n\n').map((p) => `<p>${esc(p)}</p>`).join('')}<p class="prompter-end">— Ende —</p></div>
+    <div class="prompter-bar"><button type="button" class="btn-ghost btn-sm" data-action="prompter-speed" data-step="-1" aria-label="Langsamer">−</button>
+      <span id="prompterSpeed">Tempo 1</span>
+      <button type="button" class="btn-ghost btn-sm" data-action="prompter-speed" data-step="1" aria-label="Schneller">+</button>
+      <button type="button" class="btn-outline btn-sm" data-action="prompter-pause" id="prompterPause">Pause</button>
+      <button type="button" class="btn-ghost btn-sm" data-action="prompter-close">Schließen</button></div>`;
+  $('#hearing').appendChild(el);
+  Object.assign(prompter, { speed: 1, paused: false, last: performance.now() });
+  cancelAnimationFrame(prompter.raf);
+  const box = $('#prompterText');
+  const step = (t) => {
+    if (!$('#prompter')) return;
+    const dt = t - prompter.last;
+    prompter.last = t;
+    if (!prompter.paused) box.scrollTop += (dt / 1000) * 22 * prompter.speed; // Pixel je Sekunde
+    prompter.raf = requestAnimationFrame(step);
+  };
+  prompter.raf = requestAnimationFrame(step);
+}
+function promptSpeed(step) {
+  prompter.speed = Math.max(0.5, Math.min(4, prompter.speed + step * 0.5));
+  $('#prompterSpeed').textContent = `Tempo ${prompter.speed.toLocaleString('de-DE')}`;
+}
+function promptPause() {
+  prompter.paused = !prompter.paused;
+  $('#prompterPause').textContent = prompter.paused ? 'Weiter' : 'Pause';
+}
+function closePrompter() {
+  cancelAnimationFrame(prompter.raf);
+  $('#prompter')?.remove();
+}
+function promptKey(e) {
+  const key = { ' ': () => promptPause(), ArrowUp: () => promptSpeed(1), ArrowRight: () => promptSpeed(1), ArrowDown: () => promptSpeed(-1), ArrowLeft: () => promptSpeed(-1), Escape: () => closePrompter() }[e.key];
+  if (!key) return;
+  e.preventDefault();
+  e.stopPropagation();
+  key();
+}
+
+Object.assign(actions, {
+  'plea-open': () => openPlea(),
+  'plea-close': () => $('#pleaPanel')?.remove(),
+  'plea-suggest': async () => {
+    const p = pleaState();
+    if (PLEA_PARTS.some(([k]) => p[k].trim()) && !(await ask('Die Bausteine werden durch den Vorschlag ersetzt.', { title: 'Vorschlag einfügen?', confirmText: 'Ersetzen' }))) return;
+    Object.assign(p, pleaSuggestion());
+    hearingSave();
+    openPlea();
+  },
+  'plea-prompter': () => openPrompter(),
+  'prompter-speed': (el) => promptSpeed(Number(el.dataset.step)),
+  'prompter-pause': () => promptPause(),
+  'prompter-close': () => closePrompter(),
+});
+
