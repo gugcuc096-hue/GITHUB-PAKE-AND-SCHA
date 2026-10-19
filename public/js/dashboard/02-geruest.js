@@ -740,7 +740,10 @@ async function go(view) {
   // Platzhalter erst, wenn das Laden dauert – schnelle Seiten erscheinen ohne kurzes Aufblitzen
   const slow = setTimeout(() => token === st.navToken && (content.innerHTML = loadingHtml(view)), 120);
   try {
-    if (views[view].load) await views[view].load();
+    // beim Drüberfahren schon vorgeladen? Dann nur noch auf dieses Laden warten (meist ist es fertig)
+    const pre = viewPrefetch.get(view);
+    viewPrefetch.delete(view);
+    if (views[view].load) await (pre && Date.now() - pre.at < VIEW_PREFETCH_MS ? pre.promise : views[view].load());
   } catch (e) {
     if (token !== st.navToken) return;
     clearTimeout(slow);
@@ -755,6 +758,38 @@ async function go(view) {
   playIn(content, 'view-in');
 }
 const INSTANT_SKIP = new Set(['invoice-new', 'settings', 'profile']);
+
+/*
+ * Menüpunkt vorladen: Fährt die Maus über einen Menüpunkt (am Handy: beim Antippen), lädt die Seite schon – der Klick
+ * zeigt sie dann ohne Wartezeit, auch beim ersten Besuch. Schon besuchte Seiten erscheinen ohnehin sofort.
+ */
+const viewPrefetch = new Map(); // view → { at, promise }
+const VIEW_PREFETCH_MS = 10000;
+function prefetchView(view) {
+  if (!st.user || !views[view] || !views[view].load || view === st.view || !allowed(view) || INSTANT_SKIP.has(view)) return;
+  if (st.seenViews && st.seenViews.has(view)) return;
+  const hit = viewPrefetch.get(view);
+  if (hit && Date.now() - hit.at < VIEW_PREFETCH_MS) return;
+  const promise = Promise.resolve().then(() => views[view].load());
+  promise.catch(() => viewPrefetch.get(view)?.promise === promise && viewPrefetch.delete(view));
+  viewPrefetch.set(view, { at: Date.now(), promise });
+}
+let viewPrefetchTimer = 0;
+const navTarget = (e) => {
+  const a = e.target.closest && e.target.closest('a.nav-item[href^="#"], a.bn-item[href^="#"]');
+  return a ? decodeURIComponent(a.getAttribute('href').slice(1)) : null;
+};
+document.addEventListener('pointerover', (e) => {
+  const view = navTarget(e);
+  if (!view) return;
+  clearTimeout(viewPrefetchTimer);
+  viewPrefetchTimer = setTimeout(() => prefetchView(view), e.pointerType === 'mouse' ? 80 : 0);
+});
+document.addEventListener('pointerout', (e) => navTarget(e) && clearTimeout(viewPrefetchTimer));
+document.addEventListener('pointerdown', (e) => {
+  const view = navTarget(e);
+  if (view) prefetchView(view);
+});
 /** Sanft einblenden (Seitenwechsel, neues Fenster) – nicht bei jedem Neuzeichnen, sonst flackert es. */
 function playIn(el, cls) {
   if (!el) return;

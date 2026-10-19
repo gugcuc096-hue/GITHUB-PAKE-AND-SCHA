@@ -613,6 +613,7 @@ const LIVE_VIEWS = {
   cooperations: ['cooperations'],
   team: ['team'],
   wiki: ['wiki'],
+  snippets: ['wiki'],
   penal: ['wiki'],
   resolutions: ['resolutions'],
 };
@@ -662,6 +663,7 @@ function liveCase(ev) {
   liveLater('badges', refreshBadges, 800);
 }
 function liveArea(area) {
+  if (area === 'snippets') st.snippets = null; // Textbausteine beim nächsten „/“ frisch laden
   if ((LIVE_VIEWS[area] || []).includes(st.view)) liveView();
   if (area === 'duty' && isStaff()) load.duty().then(renderUser).catch(() => {});
   if (area === 'applications' && typeof pollAppChat === 'function') pollAppChat();

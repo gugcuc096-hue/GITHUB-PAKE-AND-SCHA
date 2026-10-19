@@ -899,6 +899,48 @@ router.get(
   })
 );
 
+/*
+ * Vorschaubild: Der Browser verkleinert das Bild (WebP, höchstens ~480 px) und lädt es einmal hoch – beim Hochladen
+ * oder später beim ersten Anzeigen (für ältere bzw. aus FiveNet/Google übernommene Bilder). Kanzlei oder wer das Bild
+ * hochgeladen hat; ein vorhandenes Vorschaubild wird nicht überschrieben.
+ */
+const thumbBody = express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: 300 * 1024 });
+router.put(
+  '/:id/attachments/:attId/thumb',
+  thumbBody,
+  wrap(async (req, res) => {
+    const id = idParam(req);
+    const attId = idParam(req, 'attId');
+    const c = id && getCase(id);
+    if (!c || !caseAccess(c, req.user).canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
+    const a = attId && db.prepare('SELECT * FROM case_attachments WHERE id = ? AND case_id = ?').get(attId, c.id);
+    if (!a || (a.internal && !isStaff(req.user))) return res.status(404).json({ error: 'Anhang nicht gefunden.' });
+    if (!isStaff(req.user) && a.uploader_id !== req.user.id) return res.status(403).json({ error: 'Keine Berechtigung.' });
+    if (a.thumb) return res.json({ attachment: attachmentRow(a, c.id) });
+    const saved = saveImage(req, 'evidence');
+    const done = db.prepare('UPDATE case_attachments SET thumb = ? WHERE id = ? AND thumb IS NULL').run(saved.file, a.id);
+    if (!done.changes) removeFile('evidence', saved.file); // gleichzeitig schon angelegt
+    res.json({ attachment: attachmentRow(db.prepare('SELECT * FROM case_attachments WHERE id = ?').get(a.id), c.id) });
+  })
+);
+
+router.get(
+  '/:id/attachments/:attId/thumb',
+  wrap(async (req, res) => {
+    const id = idParam(req);
+    const attId = idParam(req, 'attId');
+    const c = id && getCase(id);
+    if (!c || !caseAccess(c, req.user).canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
+    const a = attId && db.prepare('SELECT * FROM case_attachments WHERE id = ? AND case_id = ?').get(attId, c.id);
+    if (!a || (a.internal && !isStaff(req.user))) return res.status(404).json({ error: 'Anhang nicht gefunden.' });
+    res.set('Cache-Control', 'private, max-age=604800');
+    if (!a.thumb) res.type(a.mime); // Vorschaubild: Typ aus der Dateiendung (.webp/.jpg/.png)
+    res.sendFile(evidencePath(a.thumb || a.file), (err) => {
+      if (err && !res.headersSent) res.status(404).json({ error: 'Datei nicht gefunden.' });
+    });
+  })
+);
+
 router.delete(
   '/:id/attachments/:attId',
   wrap(async (req, res) => {
@@ -913,6 +955,7 @@ router.delete(
     }
     db.prepare('DELETE FROM case_attachments WHERE id = ?').run(a.id);
     removeFile('evidence', a.file);
+    if (a.thumb) removeFile('evidence', a.thumb);
     res.json({ success: true });
   })
 );

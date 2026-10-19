@@ -652,6 +652,62 @@ function rememberCase(data) {
   st.caseTasks = data.tasks || [];
   st.caseInfo = data.case;
   st.caseCharges = data.charges || null; // Anklagepunkte (Kanzlei) – auch für den Verhandlungsmodus
+  if (data.case) queueThumbs(data.case.id, st.caseAttachments);
+}
+
+/*
+ * Vorschaubilder: Bilder ohne eigenes Vorschaubild (neu hochgeladen, aus FiveNet/Google übernommen, ältere) verkleinert
+ * der Browser einmal auf ~480 px (WebP) und legt sie auf dem Server ab – danach laden Raster und Verhandlungsmodus
+ * nur noch die kleinen Bilder. Läuft im Leerlauf, eins nach dem anderen; wer es nicht darf, bekommt einfach das Original.
+ */
+const thumbTried = new Set();
+const thumbQueue = [];
+let thumbBusy = false;
+function queueThumbs(caseId, attachments) {
+  for (const a of attachments || []) {
+    if (!a.needsThumb || thumbTried.has(a.id) || !/^image\//.test(a.mime || '')) continue;
+    if (!isStaff() && a.uploaderId !== st.user.id) continue;
+    thumbTried.add(a.id);
+    thumbQueue.push({ caseId, a });
+  }
+  if (!thumbBusy && thumbQueue.length) (window.requestIdleCallback || setTimeout)(runThumbs, { timeout: 1500 });
+}
+async function makeThumb(blob, max = 480) {
+  const bmp = await createImageBitmap(blob);
+  const scale = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(bmp.width * scale));
+  canvas.height = Math.max(1, Math.round(bmp.height * scale));
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#0a1228';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+  bmp.close?.();
+  const as = (type, q) => new Promise((r) => canvas.toBlob(r, type, q));
+  const webp = await as('image/webp', 0.8);
+  return webp && webp.type === 'image/webp' ? webp : as('image/jpeg', 0.82); // ältere Safari können kein WebP schreiben
+}
+async function runThumbs() {
+  thumbBusy = true;
+  try {
+    while (thumbQueue.length) {
+      const { caseId, a } = thumbQueue.shift();
+      try {
+        const res = await fetch(a.url, { credentials: 'same-origin' });
+        if (!res.ok) continue;
+        const thumb = await makeThumb(await res.blob());
+        const put = await fetch(`/api/cases/${caseId}/attachments/${a.id}/thumb`, { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': thumb.type, 'X-PS-Tab': window.PS.tab }, body: thumb });
+        if (!put.ok) continue;
+        const { attachment } = await put.json();
+        // ab jetzt das Vorschaubild verwenden (beim nächsten Zeichnen; das sichtbare Bild bleibt ruhig stehen)
+        Object.assign(a, { thumbUrl: attachment.thumbUrl, needsThumb: false });
+      } catch {
+        /* Bild nicht lesbar (z. B. Format) – dann eben das Original */
+      }
+    }
+  } finally {
+    thumbBusy = false;
+  }
 }
 /*
  * Akte vorladen: Fährt man mit der Maus über eine Akte (am Handy: beim Antippen), wird sie schon geladen – der Klick
@@ -683,6 +739,7 @@ async function openCase(id) {
   rememberCase(data);
   st.modalCaseId = id;
   initChat(data);
+  animateTrack($('#modalBody .track'));
 }
 async function reloadCase(id) {
   const data = await api.get('/api/cases/' + id);
@@ -718,7 +775,7 @@ function attachmentsSection(c, attachments) {
         ${attachments
         .map(
           (a, i) => `<button type="button" class="att" data-action="att-open" data-index="${i}" aria-label="${esc(a.caption || 'Anhang ansehen')}">
-              <img src="${esc(a.url)}" alt="${esc(a.caption)}" loading="lazy">
+              <img src="${esc(a.thumbUrl || a.url)}" alt="${esc(a.caption)}" loading="lazy" decoding="async">
               <span class="tag">${a.internal ? badge('intern', 'amber') : ''}${a.externalDocId ? badge(extOf(st.caseDocs.find((d) => d.id === a.externalDocId) || {}).name, 'sky') : ''}</span>${a.caption ? `<span class="cap">${esc(a.caption)}</span>` : ''}</button>`
         )
         .join('')}
