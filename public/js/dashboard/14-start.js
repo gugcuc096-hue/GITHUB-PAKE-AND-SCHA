@@ -651,6 +651,73 @@ document.addEventListener('pointerout', (e) => {
 document.addEventListener('click', () => clearTimeout(prefetchTimer), true);
 document.addEventListener('ps:changed', () => casePrefetch.clear());
 
+// Anderen federführenden Anwalt gewählt: Feld für die Übergabe einblenden
+document.addEventListener('change', (e) => {
+  if (e.target.id !== 'teamLead' || !$('#handoverBox')) return;
+  const changed = !!e.target.value && e.target.value !== e.target.dataset.was;
+  $('#handoverBox').hidden = !changed;
+  if (changed) $('#handover').focus();
+});
+
+/*
+ * Hover-Karte: Fährt man am PC über eine Akte außerhalb der Aktenliste (Übersicht, Aufgaben, Kalender …), zeigt eine
+ * kleine Karte Mandant, Stand, nächsten Termin und Zuständigen – ohne die Akte zu öffnen. Die Daten kommen vom Vorladen.
+ */
+const peek = { timer: 0, el: null, card: null };
+function hidePeek() {
+  clearTimeout(peek.timer);
+  peek.el = null;
+  const card = peek.card;
+  peek.card = null;
+  if (!card) return;
+  card.classList.remove('show');
+  setTimeout(() => card.remove(), 180);
+}
+function peekHtml({ case: c, appointments = [] }) {
+  const cutoff = Date.now() - 60 * 60 * 1000;
+  const next = appointments.filter((e) => (e.status === 'bestaetigt' || e.status === 'angefragt') && (e.type === 'frist' || parseDate(e.startsAt) >= cutoff)).sort(byStart)[0];
+  const row = (k, v) => `<div class="peek-row"><span>${k}</span><strong>${v}</strong></div>`;
+  return `<div class="peek-head"><span class="peek-no">${esc(c.caseNumber)}</span>${statusBadge(CASE_STATUS, c.status)}</div>
+      <div class="peek-title">${esc(c.title)}</div>
+      ${row('Mandant', esc(c.clientName || '–'))}
+      ${row('Stand', esc(c.status === 'geschlossen' ? 'Abgeschlossen' : c.stepLabel || ''))}
+      ${row('Nächster Termin', next ? `${esc(fmtDay(next.startsAt))}, ${esc(fmtTime(next.startsAt))} · ${esc(next.title)}` : '<span class="text-dim">keiner</span>')}
+      ${row('Zuständig', c.lawyerName ? esc(c.lawyerName) : '<span class="text-dim">noch offen</span>')}`;
+}
+async function showPeek(el) {
+  const id = Number(el.dataset.id);
+  prefetchCase(id);
+  const hit = casePrefetch.get(id);
+  const data = hit && (await hit.promise.catch(() => null));
+  if (!data || !data.case || peek.el !== el || !el.isConnected) return;
+  const card = document.createElement('div');
+  card.className = 'peek-card';
+  card.setAttribute('role', 'tooltip');
+  card.innerHTML = peekHtml(data);
+  document.body.appendChild(card);
+  const r = el.getBoundingClientRect();
+  const left = Math.min(Math.max(8, r.left), window.innerWidth - card.offsetWidth - 8);
+  const top = r.bottom + 8 + card.offsetHeight > window.innerHeight ? r.top - card.offsetHeight - 8 : r.bottom + 8;
+  card.style.left = `${left}px`;
+  card.style.top = `${Math.max(8, top)}px`;
+  peek.card = card;
+  requestAnimationFrame(() => card.classList.add('show'));
+}
+document.addEventListener('pointerover', (e) => {
+  if (e.pointerType !== 'mouse' || !window.matchMedia('(hover: hover)').matches) return;
+  const el = e.target.closest && e.target.closest('[data-action="open-case"][data-id]');
+  if (!el || el === peek.el || el.closest('#caseList, #modal')) return; // Aktenliste zeigt alles selbst, im Fenster stört sie
+  hidePeek();
+  peek.el = el;
+  peek.timer = setTimeout(() => showPeek(el), 450);
+});
+document.addEventListener('pointerout', (e) => {
+  if (!peek.el || (e.relatedTarget && peek.el.contains(e.relatedTarget))) return;
+  if (e.target.closest && e.target.closest('[data-action="open-case"][data-id]') === peek.el) hidePeek();
+});
+document.addEventListener('pointerdown', hidePeek, true);
+window.addEventListener('scroll', hidePeek, { capture: true, passive: true });
+
 function liveCase(ev) {
   casePrefetch.delete(ev.id);
   const open = $('#modal').classList.contains('open') && st.modalCaseId === ev.id;
@@ -988,3 +1055,22 @@ function askInitialName() {
         <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('check', 'ico-sm')}<span>Speichern</span></button></div>
       </form>`);
 }
+
+/* Siegel nach dem Anmelden: zeichnet sich kurz in Gold, während das Dashboard lädt (nur direkt aus dem Login) */
+(function loginSeal() {
+  let fresh = false;
+  try {
+    fresh = sessionStorage.getItem('ps.freshLogin') === '1';
+    sessionStorage.removeItem('ps.freshLogin');
+  } catch {
+    /* ohne Speicher kein Siegel */
+  }
+  if (!fresh || window.PS.motion.calm()) return;
+  const el = document.createElement('div');
+  el.className = 'login-seal';
+  el.setAttribute('aria-hidden', 'true');
+  el.innerHTML = `<svg viewBox="0 0 100 100"><circle class="seal-ring" cx="50" cy="50" r="46" pathLength="1"/><circle class="seal-ring seal-ring2" cx="50" cy="50" r="39" pathLength="1"/>
+      <text x="50" y="58" text-anchor="middle">P&amp;S</text></svg>`;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1300);
+})();

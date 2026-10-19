@@ -117,6 +117,43 @@ function notifyAssigned(c, user, newIds) {
   });
 }
 
+/**
+ * Übergabe an einen neuen federführenden Anwalt: Die Übergabe-Notiz steht intern im Verlauf und kommt per Discord-DM
+ * beim neuen Anwalt an (mit Stand und Link). Der Mandant bekommt im Chat (und im Ticket) nur, wer jetzt sein
+ * Ansprechpartner ist.
+ */
+function handover(c, by, leadId, text) {
+  const lead = db.prepare('SELECT id, display_name, rank, discord_id FROM users WHERE id = ?').get(leadId);
+  if (!lead) return;
+  if (text) addSystemNote(c.id, by, `Übergabe an ${lead.display_name}: ${text}`, true);
+  const msg = `Ihr neuer Ansprechpartner in dieser Sache ist ${lead.display_name}${lead.rank ? ` (${lead.rank})` : ''}. Sie erreichen die Kanzlei wie gewohnt hier im Chat.`;
+  const noteId = Number(
+    db.prepare('INSERT INTO notes (case_id, author_id, author_name, author_role, body, internal) VALUES (?, ?, ?, ?, ?, 0)').run(c.id, by.id, by.display_name, by.role, msg).lastInsertRowid
+  );
+  caseChat.markRead(c.id, by.id, noteId);
+  tickets.post(c.id, { event: 'chat', title: `💬 Nachricht von ${by.display_name}`, description: msg, color: tickets.COLORS.gold, mention: 'client', by: by.rank || 'Pake & Scha', byDiscordId: by.discord_id });
+  if (lead.id === by.id || !tickets.hasToken() || !tickets.isId(lead.discord_id)) return;
+  const base = tickets.siteBase();
+  (async () => {
+    const ch = await tickets.rest('POST', '/users/@me/channels', { recipient_id: lead.discord_id });
+    await tickets.rest('POST', `/channels/${ch.id}/messages`, {
+      embeds: [
+        tickets.embed({
+          title: `📁 Akte übergeben: ${c.case_number}`,
+          description: `${by.display_name} hat Ihnen die Akte „${truncate(c.title, 200)}“ übergeben – Sie sind jetzt federführend.`,
+          fields: [
+            { name: 'Übergabe', value: truncate(text || '– (keine Notiz)', 1000), inline: false },
+            { name: 'Mandant', value: c.client_name || '–' },
+            { name: 'Stand', value: c.status === 'geschlossen' ? 'Abgeschlossen' : STEPS[c.step] || STEPS[0] },
+          ],
+        }),
+      ],
+      components: base ? [{ type: 1, components: [{ type: 2, style: 5, label: 'Akte öffnen', url: `${base}/dashboard.html?case=${c.id}#cases` }] }] : undefined,
+      allowed_mentions: { parse: [] },
+    });
+  })().catch(() => {});
+}
+
 /* ---------------------------------------------------------------- Liste */
 router.get('/', (req, res) => {
   const u = req.user;
@@ -491,6 +528,7 @@ const updateSchema = z.object({
   outcome: z.enum(Object.keys(OUTCOMES)).optional(), // Ergebnis beim Abschluss – nur Kanzlei, intern
   publicNote: z.string().trim().max(500).optional(),
   lawyerId: z.number().int().positive().nullable().optional(),
+  handover: z.string().trim().max(1000).optional(), // Übergabe an den neuen federführenden Anwalt (intern)
   // Vollständige Liste der weiteren Anwälte (ersetzt die bisherige)
   coLawyerIds: z.array(z.number().int().positive()).max(MAX_CO_LAWYERS).optional(),
 });
@@ -667,6 +705,7 @@ router.patch(
     });
 
     const updated = getCase(c.id);
+    if (lawyerChanged && leadAfter && c.lawyer_id && leadAfter !== c.lawyer_id) handover(updated, u, leadAfter, d.handover);
     const newlyAssigned = [...(lawyerChanged && leadAfter && leadAfter !== c.lawyer_id && !coBefore.includes(leadAfter) ? [leadAfter] : []), ...coAdded];
     notifyAssigned(updated, u, newlyAssigned);
     if (history.length || internalHistory.length) logActivity(u, 'Akte geändert', 'case', c.id, `${c.case_number}: ${[...history, ...internalHistory].join(' · ')}`);

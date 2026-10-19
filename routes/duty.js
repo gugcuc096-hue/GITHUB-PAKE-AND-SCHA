@@ -39,6 +39,7 @@ function closeStaleSessions() {
 function setDuty(userId, status, note) {
   const now = new Date().toISOString();
   const open = db.prepare('SELECT * FROM duty_sessions WHERE user_id = ? AND ended_at IS NULL ORDER BY id DESC').get(userId);
+  setImmediate(() => require('../dutyChannel').update()); // Live-Anzeige im Discord-Kanalnamen
   return tx(() => {
     if (status === 'off') {
       db.prepare('UPDATE duty_sessions SET ended_at = ? WHERE user_id = ? AND ended_at IS NULL').run(now, userId);

@@ -100,6 +100,8 @@
                 state.contract = r.contract;
                 state.can = r.can;
                 draw();
+                // Vollständig unterschrieben: Stempel auf das Unterschriftsfeld
+                if (r.contract.status === 'unterschrieben') window.PS.stamp(panel, 'Unterschrieben');
             } catch (e) { btn.disabled = false; err(e); }
         };
         document.getElementById('signClient')?.addEventListener('click', (ev) => {
@@ -160,7 +162,7 @@
                     ? { anwalt: 'Dr. Alois Pake', anwalt_rang: 'Founding Partner', anwalt_geburtsdatum: '12.03.1988', mandant: 'John Doe', mandant_geburtsdatum: '04.07.1995', leistungen: '• Vertretung Hauptverhandlung (alle Gerichte) – 100.000 $\n• U-Haft-Vertretung vor Ort – 50.000 $', grundgebuehr: '150.000 $', zusatzgebuehr: '25.000 $ je weiterem Verhandlungstag', datum: new Date().toLocaleDateString('de-DE'), ort: 'Los Santos, San Andreas', aktenzeichen: 'PS-2026-0001', akte: 'Beispielakte', rechtsgebiet: 'Strafrecht', gerichtsaktenzeichen: 'DC-2026-0142', gegenpartei: 'State of San Andreas', empfaenger: 'District Court San Andreas\nStaatsanwaltschaft Los Santos\nMission Row, Los Santos', betreff: 'Ermittlungsverfahren gegen John Doe', fivenet_az: 'DOC - 74412', festnahme: 'Festnahme am 01.10.2026, Mission Row Police Department', begruendung: 'Der Beschuldigte ist nicht vorbestraft und hat sich zu jeder Zeit kooperativ gezeigt.', kanzlei: 'Pake & Scha Legal Consulting' }
                     : { aktenzeichen: '', akte: '', rechtsgebiet: '', gerichtsaktenzeichen: '', gegenpartei: '', kanzlei: 'Pake & Scha Legal Consulting', anwalt: '', anwalt_rang: '', anwalt_geburtsdatum: '', mandant: '', mandant_geburtsdatum: '', leistungen: '', grundgebuehr: '', zusatzgebuehr: '', datum: '', ort: '', empfaenger: '', betreff: '', fivenet_az: '', festnahme: '', begruendung: '' };
                 document.title = `Vorschau: ${t.name} | Pake & Scha`;
-                document.getElementById('backLink').href = '/dashboard.html?tab=contracts#settings';
+                document.getElementById('backLink').href = '/dashboard.html?tab=vorlagen#wiki';
                 document.getElementById('backLink').textContent = '← Einstellungen';
                 panel.innerHTML = `<p class="preview-note">Vorschau der Vorlage „${esc(t.name)}“ – ${params.get('beispiel') === '1' ? 'mit Beispielwerten' : 'leere Felder erscheinen als Linie zum Ausfüllen'}.</p>`;
                 root.className = '';
@@ -169,7 +171,7 @@
                 root.innerHTML = sheets(render(t.body, sample, exampleSig, { fivenetUrl }), header(head));
                 refit();
             })
-            .catch((e) => fail(e, '/dashboard.html?tab=contracts#settings'));
+            .catch((e) => fail(e, '/dashboard.html?tab=vorlagen#wiki'));
     } else if (!Number.isInteger(id) || id <= 0) {
         root.innerHTML = 'Kein Dokument angegeben. <a href="/dashboard.html#cases">Zum Dashboard</a>';
     } else {

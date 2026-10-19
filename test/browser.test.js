@@ -958,7 +958,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
           }
         };
         const group = (name) => page.$eval(`#nav .nav-toggle[data-group="${name}"]`, (b) => ({ open: b.getAttribute('aria-expanded') === 'true', count: (b.querySelector('.nav-count') || {}).textContent || '' }));
-        const usersVisible = () => page.isVisible('#nav a[href="#users"]');
+        const BOARD = 'Board of Partners';
+        const teamVisible = () => page.isVisible('#nav a[data-hub="people"]');
 
         // Übersicht: leere Bereiche als kurze Zeile, Handy-Leiste mit Aufgaben statt Post
         assert.ok(await page.isVisible('#content .empty-line'), 'leere Bereiche kompakt');
@@ -967,44 +968,45 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
           assert.equal(await page.$('#bottomNav a[href="#mail"]'), null, 'Post steht oben als Briefsymbol');
         }
 
-        // Menü: Verwaltung zugeklappt, Kanzlei und Board-Eingang offen – Auswahl bleibt nach dem Neuladen
+        // Menü: Kanzlei und Board of Partners offen; verwandte Seiten sind je ein Punkt (Bündel mit Reitern)
         await openMenu();
-        assert.deepEqual(await group('Verwaltung'), { open: false, count: '' });
         assert.equal((await group('Kanzlei')).open, true);
-        assert.equal((await group('Board-Eingang')).open, true);
-        assert.equal(await usersVisible(), false, 'Benutzer stecken in der zugeklappten Verwaltung');
-        await page.click('#nav .nav-toggle[data-group="Verwaltung"]');
-        assert.equal((await group('Verwaltung')).open, true);
-        assert.equal(await usersVisible(), true);
-        await page.click('#nav .nav-toggle[data-group="Board-Eingang"]');
-        assert.deepEqual(await group('Board-Eingang'), { open: false, count: '1' }, 'zugeklappt: Zähler des neuen Anliegens am Gruppennamen');
+        assert.equal((await group(BOARD)).open, true);
+        assert.equal(await page.$('#nav a.nav-item[href="#users"]'), null, 'Benutzer stecken im Punkt „Team & Personal“');
+        assert.equal(await page.$('#nav a.nav-item[href="#applications"]'), null, 'Bewerbungen stecken im Board-Eingang');
+        assert.equal(await page.textContent('#nav a[data-hub="inbox"] .nav-count'), '1', 'Board-Eingang zählt das neue Anliegen');
+        assert.equal(await teamVisible(), true);
+        await page.click('#nav .nav-toggle[data-group="Board of Partners"]');
+        assert.deepEqual(await group(BOARD), { open: false, count: '1' }, 'zugeklappt: Zähler am Gruppennamen');
         await page.reload();
         await page.waitForSelector('#nav a.nav-item', { state: 'attached' });
         await settle();
         await openMenu();
-        assert.equal((await group('Verwaltung')).open, true, 'aufgeklappt gemerkt');
-        assert.equal((await group('Board-Eingang')).open, false, 'zugeklappt gemerkt');
-        await page.click('#nav .nav-toggle[data-group="Verwaltung"]');
-        assert.equal(await usersVisible(), false);
-        // Liegt die aktuelle Seite in einer zugeklappten Gruppe, ist sie trotzdem offen
+        assert.equal((await group(BOARD)).open, false, 'zugeklappt gemerkt');
+        assert.equal(await teamVisible(), false);
+        // Liegt die aktuelle Seite in einer zugeklappten Gruppe, ist sie trotzdem offen – Reiter oben führen zu den anderen Seiten
         await page.evaluate(() => (location.hash = '#users'));
         await settle();
+        assert.deepEqual(await page.$$eval('#content .hub-tabs a', (as) => as.map((a) => a.getAttribute('href'))), ['#team', '#users', '#personnel']);
+        assert.equal(await page.getAttribute('#content .hub-tabs a.active', 'href'), '#users');
         await openMenu();
-        assert.equal((await group('Verwaltung')).open, true, 'aktuelle Seite bleibt im Menü sichtbar');
+        assert.equal((await group(BOARD)).open, true, 'aktuelle Seite bleibt im Menü sichtbar');
+        assert.equal(await page.getAttribute('#nav a[data-hub="people"]', 'href'), '#users', 'Menüpunkt führt zur zuletzt besuchten Seite');
         // … und lässt sich trotzdem zu- und wieder aufklappen, während man auf der Seite ist
-        await page.click('#nav .nav-toggle[data-group="Verwaltung"]');
-        assert.equal((await group('Verwaltung')).open, false, 'zuklappen auf einer Seite der Gruppe');
-        await page.click('#nav .nav-toggle[data-group="Verwaltung"]');
-        assert.equal((await group('Verwaltung')).open, true, 'wieder aufklappen');
-        await page.click('#nav .nav-toggle[data-group="Verwaltung"]');
+        await page.click('#nav .nav-toggle[data-group="Board of Partners"]');
+        assert.equal((await group(BOARD)).open, false, 'zuklappen auf einer Seite der Gruppe');
+        await page.click('#nav .nav-toggle[data-group="Board of Partners"]');
+        assert.equal((await group(BOARD)).open, true, 'wieder aufklappen');
+        await page.click('#nav .nav-toggle[data-group="Board of Partners"]');
         await page.evaluate(() => (location.hash = '#overview'));
         await settle();
         await openMenu();
-        assert.equal((await group('Verwaltung')).open, false, 'danach wieder wie gewählt zugeklappt');
+        assert.equal((await group(BOARD)).open, false, 'danach wieder wie gewählt zugeklappt');
+        await page.click('#nav .nav-toggle[data-group="Board of Partners"]');
 
-        // Anliegen: ein Menüpunkt für das Board, eigene Anliegen als Reiter
+        // Anliegen: Teil des Board-Eingangs, eigene Anliegen als Reiter
         assert.equal(await page.$('#nav a[href="#concerns"]'), null, 'kein zweiter Menüpunkt');
-        assert.equal((await page.textContent('#nav a[href="#concerns-board"]')).trim().startsWith('Anliegen'), true);
+        assert.equal((await page.textContent('#nav a[data-hub="inbox"]')).trim().startsWith('Board-Eingang'), true);
         await page.evaluate(() => (location.hash = '#concerns-board'));
         await settle();
         assert.ok((await page.textContent('#content')).includes('Rückruf zu meiner Akte'), 'Eingang zeigt das Anliegen');
@@ -1068,7 +1070,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         // Einstellungen: sechs Reiter, Discord mit Webhook und Login als Module, System mit Datensicherung
         await page.evaluate(() => (location.hash = '#settings'));
         await settle();
-        assert.deepEqual(await page.$$eval('#content .settings-tabs .chip', (els) => els.map((e) => e.textContent.trim())), ['Kanzlei & Rechnungen', 'Website & Ränge', 'Discord', 'Integrationen', 'System', 'Vertragsvorlagen']);
+        assert.deepEqual(await page.$$eval('#content .settings-tabs .chip', (els) => els.map((e) => e.textContent.trim())), ['Kanzlei & Rechnungen', 'Website & Ränge', 'Discord', 'Integrationen', 'System']);
         assert.ok(await page.$('#content form[data-form="settings-firm"]'));
         // Website & Ränge: Bearbeiten-Links, Ränge mit Knöpfen, Rang-Dialog
         await page.click('#content .settings-tabs [data-tab="site"]');
@@ -1106,7 +1108,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
           const staff = await open(device);
           await login(staff.page, TEAM.anwalt, usrv.base);
           assert.ok(await staff.page.$('#nav .nav-group a[href="#concerns"]'), 'eigener Punkt „Anliegen ans Board“');
-          assert.equal(await staff.page.$('#nav .nav-toggle[data-group="Board-Eingang"]'), null);
+          assert.equal(await staff.page.$('#nav .nav-toggle[data-group="Board of Partners"]'), null);
           assert.deepEqual(staff.problems, []);
           await staff.ctx.close();
         }
@@ -2448,7 +2450,7 @@ describe('Browser: Strafmaß, Verhandlung, Wiki, Beschlüsse, Rechnungszeile, Ge
       assert.ok(await page.$('#modalCard [data-action="law-edit"]'), 'Board kann den Text bearbeiten');
       await page.click('#modalCard [data-action="close-modal"]');
       // Beschluss: Ja → alle haben abgestimmt → angenommen
-      await page.click('a.nav-item[href="#resolutions"]');
+      await page.evaluate(() => (location.hash = '#resolutions'));
       await page.click('.res-btn-ja');
       await page.waitForSelector('.ps-toast >> text=angenommen');
       // Rechnungen: alle Knöpfe einer Zeile auf einer Höhe, nichts ragt aus der Tabelle
@@ -2541,6 +2543,93 @@ describe('Browser: Textbausteine, Vorschaubilder, Menü vorladen', { skip: chrom
       await page.keyboard.press('Escape');
       assert.equal(await page.locator('.snip-menu').count(), 0);
       assert.equal(await page.locator('#modal.open').count(), 1, 'Akte bleibt offen');
+      assert.deepEqual(problems, []);
+    } finally {
+      await ctx.close();
+      await browser.close();
+      await srv.stop();
+    }
+  });
+});
+
+describe('Browser: Board-Menü gebündelt, Hover-Karte, Kalender ziehen, Stempel, Siegel, Vorlagen im Wiki', { skip: chromium ? false : 'Playwright nicht installiert' }, () => {
+  it('Board-Eingang mit Reitern, Hover-Karte zur Akte, Termin per Ziehen verschoben, „Bezahlt“-Stempel, Archiv', async () => {
+    const srv = await startServer();
+    const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+    const ctx = await browser.newContext({ ...DESKTOP, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+    const page = await ctx.newPage();
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
+    try {
+      const a = client(srv.base);
+      await a.login(TEAM.admin);
+      const c = (await a.post('/api/cases', { title: 'Raub am Juweliergeschäft', area: 'strafrecht', clientName: 'Vito Russo', lawyerId: null })).json.case;
+      const day = new Date();
+      day.setDate(day.getDate() + (day.getDate() > 20 ? -3 : 3)); // im selben Monat bleiben
+      day.setHours(18, 0, 0, 0);
+      const ev = (await a.post('/api/calendar', { type: 'intern', title: 'Akteneinsicht vorbereiten', startsAt: day.toISOString(), caseId: c.id })).json.event;
+      const inv = (await a.post('/api/invoices', { caseId: c.id, items: [{ description: 'Erstberatung', quantity: 1, unitPrice: 15000 }] })).json.invoice;
+
+      // Frisch angemeldet: das Siegel zeichnet sich kurz und verschwindet von selbst
+      await page.goto(srv.base + '/login.html');
+      await page.fill('#email', TEAM.admin);
+      await page.fill('#password', PASSWORD);
+      await page.click('button[type=submit]');
+      await page.waitForURL(/dashboard/);
+      await page.waitForSelector('.login-seal', { state: 'attached' });
+      await page.waitForSelector('.login-seal', { state: 'detached', timeout: 3000 });
+      await page.waitForSelector('#nav a.nav-item');
+
+      // Board-Eingang: ein Menüpunkt, oben Reiter zu den Seiten
+      await page.click('#nav a[data-hub="inbox"]');
+      await page.waitForSelector('#content .hub-tabs');
+      assert.deepEqual(await page.$$eval('#content .hub-tabs a', (as) => as.map((x) => x.getAttribute('href'))), ['#concerns-board', '#applications', '#name-requests', '#reviews', '#resolutions']);
+      await page.click('#content .hub-tabs a[href="#applications"]');
+      await page.waitForFunction(() => location.hash === '#applications' && document.querySelector('#content .hub-tabs a.active')?.getAttribute('href') === '#applications');
+      assert.equal(await page.getAttribute('#nav a[data-hub="inbox"]', 'aria-current'), 'page', 'Menüpunkt bleibt markiert');
+
+      // Hover-Karte: Akte in der Übersicht (ohne Anwalt) – Mandant, Stand, nächster Termin
+      await page.click('#nav a[href="#overview"]');
+      const row = `#content [data-action="open-case"][data-id="${c.id}"]`;
+      await page.waitForSelector(row);
+      await page.hover(row);
+      await page.waitForSelector('.peek-card.show');
+      const peek = await page.textContent('.peek-card');
+      assert.ok(peek.includes(c.caseNumber) && peek.includes('Vito Russo') && peek.includes('Akteneinsicht vorbereiten'), peek);
+      await page.mouse.move(5, 5);
+      await page.waitForSelector('.peek-card', { state: 'detached' });
+
+      // Kalender: Eintrag mit der Maus auf einen anderen Tag ziehen
+      await page.click('#nav a[href="#calendar"]');
+      const chip = page.locator(`#content .cal-ev[data-ev="${ev.id}"]`);
+      await chip.waitFor();
+      const target = new Date(day);
+      target.setDate(day.getDate() + (day.getDate() > 20 ? -1 : 1));
+      const key = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(target.getDate()).padStart(2, '0')}`;
+      const from = await chip.boundingBox();
+      const to = await page.locator(`#content .cal-day[data-day="${key}"]`).boundingBox();
+      await page.mouse.move(from.x + 10, from.y + 5);
+      await page.mouse.down();
+      await page.mouse.move(from.x + 30, from.y + 20, { steps: 4 });
+      await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 8 });
+      assert.ok(await page.$('.cal-day.drop-target'), 'Zieltag hervorgehoben');
+      await page.mouse.up();
+      await page.waitForSelector('.ps-toast >> text=verschoben');
+      const moved = (await a.get('/api/calendar')).json.events.find((e) => e.id === ev.id);
+      assert.equal(new Date(moved.startsAt).getDate(), target.getDate(), 'neuer Tag');
+      assert.equal(new Date(moved.startsAt).getHours(), 18, 'Uhrzeit bleibt');
+
+      // Rechnung als bezahlt: Stempel auf der Zeile
+      await page.click('#nav a[href="#invoices"]');
+      await page.click(`#content [data-action="inv-status"][data-id="${inv.id}"][data-status="bezahlt"]`);
+      await page.waitForSelector('.ps-stamp >> text=Bezahlt');
+      await page.waitForSelector('.ps-stamp', { state: 'detached', timeout: 3000 });
+
+      // Vorlagen im Wiki statt in den Einstellungen; Archiv-Regel
+      await page.click('#nav a[href="#wiki"]');
+      await page.click('#content [data-action="wiki-tab"][data-tab="vorlagen"]');
+      await page.waitForSelector('#content >> text=Vertragsvorlagen');
+      assert.equal(await page.evaluate(() => [isArchived({ status: 'geschlossen', closedAt: '2020-01-01 10:00:00' }), isArchived({ status: 'geschlossen', closedAt: new Date().toISOString() }), isArchived({ status: 'offen' })].join()), 'true,false,false');
       assert.deepEqual(problems, []);
     } finally {
       await ctx.close();

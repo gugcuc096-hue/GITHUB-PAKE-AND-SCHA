@@ -320,7 +320,7 @@ const PING_COOLDOWNS = [
   [-1, 'Keine – nur beim Eröffnen des Tickets'],
 ];
 
-/* ---------------------------------------------------------------- Einstellungen: Vertragsvorlagen */
+/* ---------------------------------------------------------------- Vertrags- und Schriftsatz-Vorlagen (Kanzlei-Wiki → Reiter „Verträge & Schriftsätze“) */
 const TPL_HELP = [
   ['# Titel', 'großer Dokumenttitel'],
   ['## II. Abschnitt', 'goldene Abschnittsüberschrift'],
@@ -447,12 +447,11 @@ views.settings = {
   render() {
     const s = st.settings;
     const tab = SETTINGS_TABS.some(([k]) => k === st.settingsTab) ? st.settingsTab : 'general';
-    const head = `<div class="page-head"><div><h1 class="page-title">Einstellungen</h1><p class="page-sub">Kanzlei &amp; Rechnungen, Discord, Integrationen, System und Vertragsvorlagen.</p></div></div>
+    const head = `<div class="page-head"><div><h1 class="page-title">Einstellungen</h1><p class="page-sub">Kanzlei &amp; Rechnungen, Website, Discord, Integrationen und System. Vertrags- und Schriftsatz-Vorlagen stehen im Kanzlei-Wiki.</p></div></div>
         <div class="chip-row settings-tabs" role="tablist" aria-label="Bereiche der Einstellungen">${SETTINGS_TABS.map(
           ([k, label, ic]) => `<button type="button" class="chip ${tab === k ? 'active' : ''}" role="tab" aria-selected="${tab === k}" data-action="settings-tab" data-tab="${k}">${ic === 'discord' ? DISCORD_ICON : icon(ic, 'ico-sm')}<span>${esc(label)}</span></button>`
         ).join('')}</div>`;
     if (tab === 'bot') return head + botSettings();
-    if (tab === 'contracts') return head + contractTemplatesPanel();
     if (tab === 'integrations') return `${head}${fivenetSettingsPanel(s)}${googleDocsPanel(st.google)}`;
     if (tab === 'system') return `${head}${backupPanel()}<div class="mt-4 lg:mt-5">${emergencyPanel()}</div>`;
     if (tab === 'site') return `${head}${websitePanel(s)}<div class="mt-4 lg:mt-5">${lotmPanel(s)}</div><div class="mt-4 lg:mt-5">${siteTextsPanel()}</div><div class="mt-4 lg:mt-5">${ranksPanel()}</div>`;
@@ -486,7 +485,6 @@ const SETTINGS_TABS = [
   ['bot', 'Discord', 'discord'],
   ['integrations', 'Integrationen', 'link'],
   ['system', 'System', 'shield'],
-  ['contracts', 'Vertragsvorlagen', 'doc'],
 ];
 
 /** Discord → Webhook: Kanzlei-Updates in Kanäle, je Ereignis Kanal und Rolle. */

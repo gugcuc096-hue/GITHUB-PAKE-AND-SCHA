@@ -162,7 +162,7 @@ async function afterAbsenceChange() {
 
 async function refreshSettingsTemplates() {
   st.contractTemplates = await api.get('/api/contract-templates?all=1');
-  if (st.view === 'settings') renderView();
+  if (st.view === 'wiki') renderView();
 }
 
 function contractServices(form) {

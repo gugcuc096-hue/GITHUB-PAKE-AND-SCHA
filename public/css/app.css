@@ -924,7 +924,6 @@ details.edit-box[open] > summary::after { content: '–'; }
 .fn-table tbody tr:nth-child(even) td { background: rgba(255, 255, 255, 0.02); }
 .fn-table tr.gap td { padding: 0.2rem; background: transparent; }
 /* Discord-Tickets */
-.banner-discord { border-color: rgba(88, 101, 242, 0.45); background: rgba(88, 101, 242, 0.1); }
 .btn-discord { display: inline-flex; align-items: center; gap: 0.45rem; border-radius: 999px; background: #5865f2; color: #fff; font-weight: 600; font-size: 0.8rem; padding: 0.45rem 0.95rem; transition: background 0.15s ease; white-space: nowrap; }
 .btn-discord:hover { background: #4752c4; }
 .btn-discord .ico { width: 16px; height: 16px; }
@@ -1879,3 +1878,36 @@ body.hearing-open .ps-toast-root { top: 5rem; bottom: auto; } /* Meldungen nicht
 .snip-chip:hover, .snip-chip:focus-visible { border-color: var(--gold-hairline); color: var(--gold-light); }
 .snip-preview-box { padding: 0.85rem 1rem; border-radius: 12px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.03); font-size: 0.88rem; line-height: 1.6; color: var(--text-muted); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow-y: auto; }
 .snip-code, .snip-row code { font-size: 0.85em; padding: 0.1rem 0.35rem; border-radius: 6px; background: rgba(255, 255, 255, 0.06); color: var(--gold-light); }
+/* Hover-Karte einer Akte (Dashboard, 14-start.js) */
+.peek-card { position: fixed; z-index: 80; width: 300px; max-width: calc(100vw - 16px); padding: 0.85rem 1rem 0.7rem; border-radius: 14px; background: rgba(8, 14, 32, 0.97); border: 1px solid var(--glass-border); border-top: 2px solid var(--gold-500); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55); pointer-events: none; opacity: 0; transform: translateY(4px); transition: opacity 0.16s ease, transform 0.16s ease; }
+.peek-card.show { opacity: 1; transform: none; }
+.peek-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.3rem; }
+.peek-no { font-size: 0.72rem; letter-spacing: 0.12em; color: var(--gold-300, #e8c766); font-weight: 600; }
+.peek-title { font-weight: 600; color: #fff; margin-bottom: 0.5rem; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.peek-row { display: flex; justify-content: space-between; gap: 1rem; font-size: 0.8rem; padding: 0.3rem 0; border-top: 1px solid rgba(255, 255, 255, 0.06); }
+.peek-row span { color: #94a3b8; flex: none; }
+.peek-row strong { font-weight: 500; color: #e5e7eb; text-align: right; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Siegel nach dem Anmelden (14-start.js) */
+.login-seal { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; pointer-events: none; background: radial-gradient(circle at 50% 45%, rgba(10, 18, 40, 0.97), rgba(3, 6, 15, 0.99)); animation: seal-out 0.35s ease 0.85s forwards; }
+.login-seal svg { width: 128px; height: 128px; color: var(--gold-500); filter: drop-shadow(0 0 18px rgba(212, 175, 55, 0.35)); }
+.login-seal .seal-ring { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-dasharray: 1; stroke-dashoffset: 1; transform: rotate(-90deg); transform-origin: 50% 50%; animation: seal-draw 0.7s cubic-bezier(0.65, 0, 0.35, 1) forwards; }
+.login-seal .seal-ring2 { stroke-width: 0.8; animation-delay: 0.1s; }
+.login-seal text { fill: currentColor; font-family: 'Cormorant Garamond', serif; font-size: 27px; font-weight: 600; opacity: 0; animation: seal-fade 0.35s ease 0.4s forwards; }
+@keyframes seal-draw { to { stroke-dashoffset: 0; } }
+@keyframes seal-fade { to { opacity: 1; } }
+@keyframes seal-out { to { opacity: 0; visibility: hidden; } }
+/* Kalender: Eintrag auf einen anderen Tag ziehen (05-akte-kalender-post.js) */
+@media (hover: hover) { #content .cal-ev[data-ev] { cursor: grab; user-select: none; } }
+body.cal-dragging, body.cal-dragging * { cursor: grabbing !important; user-select: none; }
+.cal-ghost { position: fixed; z-index: 90; pointer-events: none; max-width: 180px; background: rgba(8, 14, 32, 0.95); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5); transform: rotate(-2deg); }
+.cal-day.drop-target { outline: 2px dashed var(--gold-500); outline-offset: -3px; background: var(--gold-soft); }
+.cal-landed { animation: cal-land 0.45s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes cal-land { from { transform: scale(0.6); opacity: 0; } to { transform: none; opacity: 1; } }
+/* Reiter eines Menü-Bündels (z. B. Board-Eingang): schlichte Unterstrich-Reiter – Filter darunter bleiben Chips */
+.chip-row.hub-tabs { flex-wrap: nowrap; gap: 0.15rem; margin: -0.35rem 0 1.25rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); overflow-x: auto; scrollbar-width: none; }
+.chip-row.hub-tabs::-webkit-scrollbar { display: none; }
+.chip-row.hub-tabs .chip { flex: none; background: none; border: 0; border-bottom: 2px solid transparent; border-radius: 0; margin-bottom: -1px; padding: 0.6rem 0.85rem; color: #94a3b8; box-shadow: none; }
+.chip-row.hub-tabs .chip:hover { color: #e5e7eb; background: none; }
+.chip-row.hub-tabs .chip.active { color: var(--gold-light); border-bottom-color: var(--gold-500); background: none; }
+.chip-row.hub-tabs .nav-count { margin-left: 0.15rem; }
+

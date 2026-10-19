@@ -20,7 +20,9 @@ function upcomingEvents(limit = 6) {
 
 function eventRow(e, { date = true } = {}) {
   const closed = e.status === 'erledigt' || e.status === 'abgesagt';
-  const side = closed ? statusBadge(EVENT_STATUS, e.status) : `${e.status === 'angefragt' ? badge('Anfrage', 'amber') : ''}${countdownHtml(e)}`;
+  // Zusage des Mandanten per Discord-Knopf (nur Kanzlei sieht sie als Markierung)
+  const reply = isStaff() && !closed && e.clientResponse ? (e.clientResponse === 'zugesagt' ? badge('Zugesagt', 'emerald') : badge('Passt nicht', 'red')) : '';
+  const side = closed ? statusBadge(EVENT_STATUS, e.status) : `${e.status === 'angefragt' ? badge('Anfrage', 'amber') : ''}${reply}${countdownHtml(e)}`;
   const meta = [EVENT_TYPES[e.type], `${date ? fmtDay(e.startsAt) + ', ' : ''}${fmtTime(e.startsAt)} Uhr`, e.caseNumber, isStaff() ? e.assignedName : null]
     .filter(Boolean)
     .map(esc)
@@ -292,7 +294,8 @@ function filteredCases() {
   // Ein eingefügter FiveNet-/Google-Docs-Link oder eine Dokument-ID findet die Akten, mit denen das Dokument verknüpft ist.
   const extId = q ? externalIdFrom(st.caseQuery) : null;
   return st.cases.filter((c) => {
-    const stateOk = caseMatches(c, st.caseFilter);
+    // Archiv (seit über 30 Tagen abgeschlossen) nur im Reiter „Archiv“ – die Suche findet aber alles
+    const stateOk = caseMatches(c, st.caseFilter) && (st.caseFilter === 'archiv' || !!q || !isArchived(c));
     const mineOk = !st.caseMine || onCase(c);
     const textOk =
       !q ||
@@ -302,15 +305,22 @@ function filteredCases() {
     return stateOk && mineOk && textOk;
   });
 }
-/** Filter der Aktenliste: alle, aktiv, ein Status oder „liegt“ (liegengeblieben, nur Kanzlei). */
+const ARCHIVE_DAYS = 30;
+/** Seit über 30 Tagen abgeschlossen: steht nicht mehr in der normalen Liste, sondern im Archiv. */
+function isArchived(c) {
+  const t = c.status === 'geschlossen' && parseDate(c.closedAt || c.updatedAt);
+  return !!t && Date.now() - t > ARCHIVE_DAYS * 86400000;
+}
+/** Filter der Aktenliste: alle, aktiv, ein Status, „liegt“ (liegengeblieben, nur Kanzlei) oder „archiv“. */
 function caseMatches(c, f) {
+  if (f === 'archiv') return isArchived(c);
   if (f === 'alle') return true;
   if (f === 'aktiv') return c.status !== 'geschlossen';
   if (f === 'liegt') return c.idleDays > 0;
   return c.status === f;
 }
 function caseCount(f) {
-  return st.cases.filter((c) => caseMatches(c, f)).length;
+  return st.cases.filter((c) => caseMatches(c, f) && (f === 'archiv' || !isArchived(c))).length;
 }
 /** VIP / Lifetime des Mandanten als Badge. */
 function memberBadge(m) {
@@ -566,6 +576,7 @@ views.cases = {
     const filters = [['aktiv', 'Aktiv'], ['offen', 'Offen'], ['in_bearbeitung', 'In Bearbeitung'], ['geschlossen', 'Abgeschlossen'], ['alle', 'Alle']];
     // „Liegengeblieben“ erscheint nur, wenn es solche Akten gibt (oder der Filter gerade gewählt ist)
     if (staff && (caseCount('liegt') || st.caseFilter === 'liegt')) filters.splice(3, 0, ['liegt', 'Liegengeblieben']);
+    if (caseCount('archiv') || st.caseFilter === 'archiv') filters.push(['archiv', 'Archiv']);
     return `
         <div class="page-head">
           <div><h1 class="page-title">${staff ? 'Aktenverwaltung' : 'Meine Akten'}</h1>

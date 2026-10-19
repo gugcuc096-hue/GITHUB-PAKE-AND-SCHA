@@ -198,7 +198,7 @@ const STARTER = [
 3. Bei Strafsachen fügt {{anklagepunkte}} die Anklagepunkte der Akte automatisch ein
 4. Speichern – das Dokument liegt als Google Doc bereit und kann unterschrieben werden
 
-> Tipp: Vorlagen pflegt das Board unter Einstellungen → Vertragsvorlagen.`,
+> Tipp: Vorlagen pflegt das Board im Kanzlei-Wiki unter „Verträge & Schriftsätze“.`,
   },
 ];
 

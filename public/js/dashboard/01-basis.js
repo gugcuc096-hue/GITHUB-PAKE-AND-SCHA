@@ -170,27 +170,28 @@ const VIEWS = {
   invoices: { label: 'Rechnungen', icon: 'receipt' },
   'vip-angebot': { label: 'VIP & Lifetime', short: 'VIP', icon: 'crown', client: true },
   mail: { label: 'Kanzlei-Post', short: 'Post', icon: 'mail' },
-  // Menügruppen (Überschrift „section“): Kanzlei, Board-Eingang und Verwaltung lassen sich auf- und zuklappen
+  // Menügruppen (Überschrift „section“): Kanzlei und Board of Partners lassen sich auf- und zuklappen; Seiten eines
+  // Bündels (NAV_HUBS) sind ein Menüpunkt mit Reitern oben
   board: { label: 'Pinnwand', icon: 'pin', staff: true, section: 'Kanzlei' },
   wiki: { label: 'Kanzlei-Wiki', short: 'Wiki', icon: 'book', staff: true, section: 'Kanzlei' },
   concerns: { label: 'Anliegen ans Board', short: 'Anliegen', icon: 'chat', section: 'Kanzlei', staffSection: true },
   duty: { label: 'Dienstzeiten', icon: 'clock', staff: true, section: 'Kanzlei' },
   personnel: { label: 'Beförderungen & Einstellungen', short: 'Personal', icon: 'star', staff: true, section: 'Kanzlei' },
   // Board: eigene und eingegangene Anliegen sind ein Menüpunkt „Anliegen“ (Reiter „Eingang“ / „Meine Anliegen“)
-  'concerns-board': { label: 'Eingegangene Anliegen', navLabel: 'Anliegen', short: 'Anliegen', icon: 'chat', board: true, section: 'Board-Eingang' },
-  resolutions: { label: 'Beschlüsse', icon: 'ballot', board: true, section: 'Board-Eingang' },
-  applications: { label: 'Bewerbungen', icon: 'userAdd', board: true, section: 'Board-Eingang' },
-  'name-requests': { label: 'Namensänderungen', short: 'Namen', icon: 'edit', board: true, section: 'Board-Eingang' },
-  reviews: { label: 'Mandantenstimmen', short: 'Stimmen', icon: 'star', board: true, section: 'Board-Eingang' },
-  team: { label: 'Team', icon: 'users', admin: true, section: 'Verwaltung' },
-  users: { label: 'Benutzer', icon: 'key', admin: true, section: 'Verwaltung' },
-  stats: { label: 'Kanzlei-Statistik', short: 'Statistik', icon: 'chart', board: true, section: 'Verwaltung' },
+  'concerns-board': { label: 'Eingegangene Anliegen', navLabel: 'Anliegen', short: 'Anliegen', icon: 'chat', board: true, section: 'Board of Partners' },
+  resolutions: { label: 'Beschlüsse', icon: 'ballot', board: true, section: 'Board of Partners' },
+  applications: { label: 'Bewerbungen', icon: 'userAdd', board: true, section: 'Board of Partners' },
+  'name-requests': { label: 'Namensänderungen', short: 'Namen', icon: 'edit', board: true, section: 'Board of Partners' },
+  reviews: { label: 'Mandantenstimmen', short: 'Stimmen', icon: 'star', board: true, section: 'Board of Partners' },
+  team: { label: 'Team', icon: 'users', admin: true, section: 'Board of Partners' },
+  users: { label: 'Benutzer', icon: 'key', admin: true, section: 'Board of Partners' },
+  stats: { label: 'Kanzlei-Statistik', short: 'Statistik', icon: 'chart', board: true, section: 'Board of Partners' },
   work: { label: 'Kanzlei-Statistik', short: 'Statistik', icon: 'briefcase', board: true, hidden: true }, // Reiter „Aktenbearbeitung“ der Kanzlei-Statistik
-  vip: { label: 'VIP & Lifetime', short: 'VIP', icon: 'crown', board: true, section: 'Verwaltung' },
-  cooperations: { label: 'Kooperationen', icon: 'tag', board: true, section: 'Verwaltung' },
-  fees: { label: 'Honorarordnung', icon: 'scale', admin: true, section: 'Verwaltung' },
-  audit: { label: 'Protokoll', icon: 'list', admin: true, section: 'Verwaltung' },
-  settings: { label: 'Einstellungen', icon: 'cog', admin: true, section: 'Verwaltung' },
+  vip: { label: 'VIP & Lifetime', short: 'VIP', icon: 'crown', board: true, section: 'Board of Partners' },
+  cooperations: { label: 'Kooperationen', icon: 'tag', board: true, section: 'Board of Partners' },
+  fees: { label: 'Honorarordnung', icon: 'scale', admin: true, section: 'Board of Partners' },
+  audit: { label: 'Protokoll', icon: 'list', admin: true, section: 'Board of Partners' },
+  settings: { label: 'Einstellungen', icon: 'cog', admin: true, section: 'Board of Partners' },
   profile: { label: 'Mein Profil', short: 'Profil', icon: 'user', section: 'Konto' },
   'invoice-new': { label: 'Neues Dokument', icon: 'receipt', staff: true, hidden: true },
 };
@@ -381,8 +382,11 @@ function teamHtml(c) {
 function lawyerPicker({ leadId = null, coIds = [], withLead = false, extra = [], leadLabel = 'Federführender Anwalt', emptyLead = 'Nicht zugewiesen' }) {
   const people = [...st.lawyers.map((l) => ({ id: l.id, name: l.displayName, rank: l.rank })), ...extra.filter((x) => !st.lawyers.some((l) => l.id === x.id))];
   const lead = withLead
-    ? `<div class="span-2"><label class="label" for="teamLead">${esc(leadLabel)}</label><select id="teamLead" name="lawyerId" class="field">
-          <option value="">${esc(emptyLead)}</option>${people.map((l) => opt(l.id, l.name + (l.rank ? ' · ' + l.rank : ''), l.id === leadId)).join('')}</select></div>`
+    ? `<div class="span-2"><label class="label" for="teamLead">${esc(leadLabel)}</label><select id="teamLead" name="lawyerId" class="field" data-was="${leadId || ''}">
+          <option value="">${esc(emptyLead)}</option>${people.map((l) => opt(l.id, l.name + (l.rank ? ' · ' + l.rank : ''), l.id === leadId)).join('')}</select></div>
+        ${leadId ? `<div class="span-2" id="handoverBox" hidden><label class="label" for="handover">Übergabe an den neuen Anwalt</label>
+          <textarea id="handover" name="handover" class="field" rows="3" maxlength="1000" placeholder="Was muss der neue Anwalt wissen? Stand, offene Punkte, Absprachen mit dem Mandanten …"></textarea>
+          <p class="form-hint">Steht intern im Verlauf und kommt per Discord-DM beim neuen Anwalt an. Der Mandant erfährt nur, wer jetzt sein Ansprechpartner ist.</p></div>` : ''}`
     : '';
   const options = people
     .filter((l) => withLead || l.id !== leadId)

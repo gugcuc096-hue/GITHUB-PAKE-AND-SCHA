@@ -7,6 +7,7 @@ const { wrap, parseBody, idParam, isoDateTime, EVENT_TYPES, truncate } = require
 const { getCase, caseAccess, APPT_SELECT, getAppointment, apptVisible, apptRow } = require('../models');
 const discord = require('../discord');
 const tickets = require('../tickets');
+const apptConfirm = require('../apptConfirm');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -135,6 +136,7 @@ router.post(
       });
     }
     require('../googleDocs').touchExtract(a.case_id); // Termine stehen im Aktenauszug
+    if (u.role !== 'mandant') apptConfirm.askClient(a.id).catch(() => {}); // „Passt“ / „Passt nicht“ per Discord-DM
     res.status(201).json({ event: apptRow(a, u) });
   })
 );
@@ -212,6 +214,7 @@ router.patch(
       const label = { bestaetigt: '✅ Termin bestätigt', abgesagt: '❌ Termin abgesagt', erledigt: '✔️ Termin erledigt', angefragt: '📅 Termin wieder offen' }[updated.status];
       if (label) ticketAppointment(updated, updated.type === 'frist' && updated.status === 'erledigt' ? '✔️ Frist erledigt' : label, { by: u });
     } else if (moved) ticketAppointment(updated, updated.type === 'frist' ? '⏳ Frist geändert' : '🔁 Termin verlegt', { by: u });
+    if (becameVisible || moved) apptConfirm.askClient(a.id).catch(() => {}); // neu fragen – die alte Zusage gilt nicht mehr
     const gdocs = require('../googleDocs');
     gdocs.touchExtract(updated.case_id);
     if (a.case_id !== updated.case_id) gdocs.touchExtract(a.case_id);

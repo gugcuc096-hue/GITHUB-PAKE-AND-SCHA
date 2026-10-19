@@ -127,6 +127,7 @@ function botOverview() {
           ${(scanStats.errors || []).length ? `<ul class="bot-errors">${scanStats.errors.map((e) => `<li>${esc(e)}</li>`).join('')}</ul>` : ''}</div>`
       : ''}
       ${s.errors && s.errors.length ? `<details class="edit-box mt-4"><summary>Letzte Fehler (${s.errors.length})</summary><ul class="bot-errors">${s.errors.map((e) => `<li><span class="text-dim">${esc(fmtDate(e.at))}</span> ${esc(e.message)}</li>`).join('')}</ul></details>` : ''}
+      ${dutyChannelPanel()}
       <details class="edit-box mt-4"><summary>Einrichtung (einmalig)</summary>
         <ol class="text-sm text-muted list-decimal pl-5 space-y-1 mt-2">
           <li>Discord Developer Portal → deine Anwendung → <strong>Bot</strong> → „Privileged Gateway Intents“ → <strong>SERVER MEMBERS INTENT</strong> einschalten → speichern.</li>
@@ -135,6 +136,22 @@ function botOverview() {
           <li>Render: Der Bot läuft, solange der Server läuft. Schläft der Dienst (kostenloser Tarif), verpasst er in der Zeit Beitritte; Rollen werden beim nächsten Abgleich (alle 10 Minuten) nachgezogen.</li>
         </ol></details>
     </section>`;
+}
+
+/** Live-Anzeige: ein Sprachkanal heißt automatisch „🟢 Im Dienst: 3“. */
+function dutyChannelPanel() {
+  const c = st.bot.dutyChannel || { channelId: '', template: '🟢 Im Dienst: {anzahl}' };
+  const voice = (st.botDiscord && st.botDiscord.voiceChannels) || [];
+  const known = !c.channelId || voice.some((v) => v.id === c.channelId);
+  return `<form data-form="bot-duty-channel" class="edit-box mt-4 form-grid">
+      <div class="span-2"><strong class="text-sm">Live-Anzeige im Kanalnamen</strong>
+        <p class="text-sm text-muted mt-1">Ein Sprachkanal zeigt immer, wie viele im Dienst sind – z. B. „🟢 Im Dienst: 3“. Am besten einen eigenen Kanal anlegen, den niemand betreten darf. Discord erlaubt nur wenige Umbenennungen; die Zahl wird höchstens alle 5 Minuten aktualisiert.</p></div>
+      <div><label class="label" for="dcChannel">Sprachkanal</label><select id="dcChannel" name="channelId" class="field">
+        <option value="">Aus</option>${voice.map((v) => opt(v.id, v.category ? `${v.name} (${v.category})` : v.name, v.id === c.channelId)).join('')}${known ? '' : opt(c.channelId, `Kanal ${c.channelId}`, true)}</select></div>
+      <div><label class="label" for="dcTemplate">Name</label><input id="dcTemplate" name="template" class="field" maxlength="100" value="${esc(c.template)}" required>
+        <p class="form-hint">{anzahl} wird durch die Zahl ersetzt.</p></div>
+      <div class="span-2 form-actions"><button class="btn-gold btn-md">Speichern</button></div>
+    </form>`;
 }
 
 function botRanks() {

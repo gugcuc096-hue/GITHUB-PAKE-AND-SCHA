@@ -531,4 +531,61 @@ describe('Mandantenportal: Discord-Konto, Zahlung melden, Unterschriften', () =>
       await as.admin.patch('/api/tickets/settings', { events: { step: false } });
     });
   });
+  describe('Termin-Zusage per Knopf, Übergabe, Lesebestätigung, Live-Anzeige im Kanalnamen', () => {
+    it('Termin für den Mandanten: DM mit „Passt“ / „Passt nicht“ – nur der Mandant antwortet, Verlegen fragt neu', async () => {
+      const startsAt = new Date(Date.now() + 3 * 86400000).toISOString();
+      const r = await as.anwalt.post('/api/calendar', { type: 'mandant', title: 'Besprechung Zeugenaussage', startsAt, caseId: state.caseId });
+      assert.equal(r.status, 201, r.text);
+      const id = r.json.event.id;
+      const ask = () => stub().dms.filter((x) => x.to === MEMBERS.jaywa && (x.components || []).some((row) => row.components.some((b) => b.custom_id === `appt:yes:${id}`)));
+      const dm = await waitFor(() => ask()[0], 'Direktnachricht mit Zusage-Knöpfen');
+      assert.match(dm.embeds[0].title, /Besprechung Zeugenaussage/);
+      // Ein anderer kann nicht antworten; der Mandant schon – auch ohne Server (Direktnachricht)
+      assert.match(text(await click(MEMBERS.mo, `appt:yes:${id}`)), /nur der Mandant/);
+      const yes = await interact({ guild_id: undefined, type: 3, user: { id: MEMBERS.jaywa, username: 'jay' }, data: { custom_id: `appt:yes:${id}`, component_type: 2 } });
+      assert.match(text(yes), /Zusage ist bei der Kanzlei angekommen/);
+      const ev = (await as.anwalt.get('/api/calendar')).json.events.find((e) => e.id === id);
+      assert.equal(ev.clientResponse, 'zugesagt');
+      // „Passt nicht“ → der zuständige Anwalt bekommt eine Direktnachricht
+      await interact({ guild_id: undefined, type: 3, user: { id: MEMBERS.jaywa, username: 'jay' }, data: { custom_id: `appt:no:${id}`, component_type: 2 } });
+      await waitFor(() => stub().dms.find((x) => x.to === MEMBERS.mo && /passt dem Mandanten nicht/.test(x.embeds[0].title)), 'DM an den Anwalt');
+      // Verlegen: Antwort verfällt, neue Frage
+      const moved = await as.anwalt.patch(`/api/calendar/${id}`, { startsAt: new Date(Date.now() + 4 * 86400000).toISOString() });
+      assert.equal(moved.json.event.clientResponse, null);
+      await waitFor(() => ask().length === 2, 'neue Frage nach dem Verlegen');
+    });
+
+    it('Lesebestätigung mit Uhrzeit: die Kanzlei sieht, wann der Mandant gelesen hat', async () => {
+      const chat = (await as.anwalt.get(`/api/cases/${state.caseId}/chat`)).json;
+      const last = chat.messages[chat.messages.length - 1].id;
+      assert.equal((await as.mandant.post(`/api/cases/${state.caseId}/chat/read`, { lastId: last })).status, 200);
+      const read = (await as.anwalt.get(`/api/cases/${state.caseId}/chat`)).json.read;
+      assert.equal(read.other, last);
+      assert.match(read.otherAt, /^\d{4}-\d\d-\d\d \d\d:\d\d/);
+    });
+
+    it('Übergabe an einen anderen Anwalt: Notiz intern, DM an den neuen, im Chat nur der neue Ansprechpartner', async () => {
+      const r = await as.admin.patch(`/api/cases/${state.caseId}`, { lawyerId: as.admin.me.id, handover: 'Zeuge Miller morgen anrufen, Akteneinsicht läuft.' });
+      assert.equal(r.status, 200, r.text);
+      const detail = (await as.admin.get(`/api/cases/${state.caseId}`)).json;
+      assert.ok(detail.notes.some((n) => n.internal && /Übergabe an .*Zeuge Miller/.test(n.body)), 'Übergabe intern im Verlauf');
+      const chat = (await as.mandant.get(`/api/cases/${state.caseId}/chat`)).json.messages;
+      const hint = chat[chat.length - 1].body;
+      assert.match(hint, /Ihr neuer Ansprechpartner/);
+      assert.doesNotMatch(hint, /Miller/, 'die Übergabe-Notiz sieht der Mandant nicht');
+      // zurück an den Anwalt (verknüpftes Discord) → er bekommt die Übergabe per DM
+      assert.equal((await as.admin.patch(`/api/cases/${state.caseId}`, { lawyerId: as.anwalt.me.id, handover: 'Bitte übernehmen.' })).status, 200);
+      const dm = await waitFor(() => stub().dms.find((x) => x.to === MEMBERS.mo && /Akte übergeben/.test(x.embeds[0].title)), 'DM an den neuen Anwalt');
+      assert.match(JSON.stringify(dm.embeds[0].fields), /Bitte übernehmen/);
+    });
+
+    it('Live-Anzeige: der Sprachkanal heißt „🟢 Im Dienst: N“', async () => {
+      const bad = await as.admin.put('/api/bot/duty-channel', { channelId: '900000000000000777', template: 'Im Dienst' });
+      assert.equal(bad.status, 400, 'ohne {anzahl}');
+      const ok = await as.admin.put('/api/bot/duty-channel', { channelId: '900000000000000777', template: '🟢 Im Dienst: {anzahl}' });
+      assert.equal(ok.status, 200, ok.text);
+      assert.equal(ok.json.dutyChannel.channelId, '900000000000000777');
+      await waitFor(() => (stub().renames || []).find((x) => x.channel === '900000000000000777' && /^🟢 Im Dienst: \d+$/.test(x.name)), 'Kanal umbenannt');
+    });
+  });
 });

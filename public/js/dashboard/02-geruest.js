@@ -7,10 +7,43 @@
 /* ================================================================
    Grundgerüst: Navigation, Dialog, Routing
    ================================================================ */
-/* Menügruppen: Kanzlei, Board-Eingang und Verwaltung lassen sich auf- und zuklappen (im Browser gemerkt);
- * Verwaltung ist anfangs zu. Führt ein Seitenwechsel in eine zugeklappte Gruppe, ist sie für diese Seite offen
- * (nicht gemerkt) – und lässt sich trotzdem zuklappen, auch während man auf einer ihrer Seiten ist. */
-const NAV_FOLDABLE = { Kanzlei: false, 'Board-Eingang': false, Verwaltung: true }; // Gruppe → anfangs zugeklappt?
+/* Menügruppen: Kanzlei und Board of Partners lassen sich auf- und zuklappen (im Browser gemerkt). Führt ein
+ * Seitenwechsel in eine zugeklappte Gruppe, ist sie für diese Seite offen (nicht gemerkt) – und lässt sich trotzdem zuklappen, auch während man auf einer ihrer Seiten ist. */
+const NAV_FOLDABLE = { Kanzlei: false, 'Board of Partners': false }; // Gruppe → anfangs zugeklappt?
+/*
+ * Menü-Bündel: verwandte Seiten sind ein Menüpunkt; die Seite zeigt oben Reiter zu den anderen (nur erlaubte).
+ * Der Menüpunkt steht an der Stelle der ersten Seite, zählt alle zusammen und führt zur zuletzt besuchten.
+ */
+const NAV_HUBS = {
+  inbox: { label: 'Board-Eingang', icon: 'bell', views: [['concerns-board', 'Anliegen'], ['applications', 'Bewerbungen'], ['name-requests', 'Namen'], ['reviews', 'Stimmen'], ['resolutions', 'Beschlüsse']] },
+  people: { label: 'Team & Personal', icon: 'users', views: [['team', 'Team'], ['users', 'Benutzer'], ['personnel', 'Beförderungen']] },
+  numbers: { label: 'Statistik & Protokoll', icon: 'chart', views: [['stats', 'Überblick'], ['work', 'Aktenbearbeitung'], ['audit', 'Protokoll']] },
+  offers: { label: 'Preise & Mitglieder', icon: 'crown', views: [['vip', 'VIP & Lifetime'], ['cooperations', 'Kooperationen'], ['fees', 'Honorarordnung']] },
+};
+/** Bündel einer Seite (nur wenn mindestens zwei seiner Seiten erlaubt sind): { key, hub, members } */
+function hubOf(view) {
+  if (view === 'concerns' && concernsMerged()) view = 'concerns-board';
+  for (const [key, hub] of Object.entries(NAV_HUBS)) {
+    if (!hub.views.some(([k]) => k === view)) continue;
+    const members = hub.views.filter(([k]) => allowed(k));
+    return members.length > 1 ? { key, hub, members } : null;
+  }
+  return null;
+}
+const hubTabActive = (k) => st.view === k || (k === 'concerns-board' && st.view === 'concerns' && concernsMerged());
+/** Reiter oben auf einer Seite eines Bündels. */
+function hubTabs(view) {
+  const h = hubOf(view);
+  if (!h) return '';
+  (st.hubLast || (st.hubLast = {}))[h.key] = view === 'concerns' ? 'concerns-board' : view;
+  return `<div class="chip-row settings-tabs hub-tabs" role="tablist" aria-label="${esc(h.hub.label)}">${h.members
+    .map(([k, l]) => {
+      const n = navCount(k);
+      const on = hubTabActive(k);
+      return `<a href="#${k}" class="chip ${on ? 'active' : ''}" role="tab" aria-selected="${on}">${icon(VIEWS[k].icon, 'ico-sm')}<span>${esc(l)}</span>${n ? `<span class="nav-count">${n > 99 ? '99+' : n}</span>` : ''}</a>`;
+    })
+    .join('')}</div>`;
+}
 function navClosedPrefs() {
   try {
     return JSON.parse(localStorage.getItem('ps.navClosed') || '{}') || {};
@@ -60,11 +93,21 @@ function renderNav() {
   for (const [key, v] of Object.entries(VIEWS)) {
     if (v.hidden || !allowed(key)) continue;
     if (key === 'concerns' && concernsMerged()) continue; // steckt im Board-Punkt „Anliegen“
+    const h = hubOf(key);
+    if (h && h.members[0][0] !== key) continue; // steckt im Menüpunkt des Bündels
     const name = v.section && (!v.staffSection || isStaff()) ? v.section : groups.length ? groups[groups.length - 1].name : null;
     if (!groups.length || groups[groups.length - 1].name !== name) groups.push({ name, items: [] });
     groups[groups.length - 1].items.push(key);
   }
   const item = (key) => {
+    const h = hubOf(key);
+    if (h) {
+      // Bündel: ein Punkt für alle seine Seiten
+      const count = h.members.reduce((n, [k]) => n + navCount(k), 0);
+      const active = h.members.some(([k]) => hubTabActive(k));
+      const target = (st.hubLast && st.hubLast[h.key]) || h.members[0][0];
+      return `<a href="#${target}" class="nav-item ${active ? 'active' : ''}" data-hub="${h.key}" ${active ? 'aria-current="page"' : ''}>${icon(h.hub.icon)}<span>${esc(h.hub.label)}</span>${count ? `<span class="nav-count">${count > 99 ? '99+' : count}</span>` : ''}</a>`;
+    }
     const v = VIEWS[key];
     const count = navCount(key);
     const active = navActive(key);
@@ -800,6 +843,9 @@ function playIn(el, cls) {
 }
 function renderView() {
   $('#content').innerHTML = views[st.view].render();
+  // Seite eines Bündels: Reiter unter der Überschrift
+  const tabs = hubTabs(st.view);
+  if (tabs) ($('#content > .page-head') || $('#content').firstElementChild)?.insertAdjacentHTML($('#content > .page-head') ? 'afterend' : 'beforebegin', tabs);
   renderNav();
   tickCountdowns();
   hidePendingDeletes();

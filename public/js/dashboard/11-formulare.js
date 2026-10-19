@@ -59,6 +59,11 @@ const forms = {
       toast('Vorlage gespeichert.');
     }
   },
+  'bot-duty-channel': async (f) => {
+    st.bot = await api.put('/api/bot/duty-channel', { channelId: f.elements.channelId.value, template: f.elements.template.value });
+    toast(f.elements.channelId.value ? 'Live-Anzeige gespeichert – der Kanalname passt sich gleich an.' : 'Live-Anzeige ausgeschaltet.');
+    renderView();
+  },
   'bot-welcome': async (f) => {
     st.bot = await api.put('/api/bot/welcome', botWelcomeBody(f));
     toast('Willkommensnachrichten gespeichert.');
@@ -161,6 +166,8 @@ const forms = {
     if (f.elements.priority) body.priority = Number(fd.get('priority'));
     if (f.elements.lawyerId) body.lawyerId = fd.get('lawyerId') ? Number(fd.get('lawyerId')) : null;
     if (f.querySelector('[data-team]')) body.coLawyerIds = fd.getAll('coLawyerIds').map(Number);
+    const handover = f.elements.handover && !$('#handoverBox').hidden ? val(fd, 'handover') : '';
+    if (handover) body.handover = handover;
     await api.patch('/api/cases/' + id, body);
     toast('Akte gespeichert.');
     await reloadCase(id);

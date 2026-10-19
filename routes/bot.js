@@ -34,6 +34,7 @@ function overview() {
     placeholders: bot.PLACEHOLDERS,
     limits: { rules: bot.MAX_RULES, conditions: bot.MAX_CONDITIONS, joinRoles: bot.MAX_JOIN_ROLES },
     // Wer bekommt überhaupt Rollen? Nur Konten mit verknüpftem Discord.
+    dutyChannel: require('../dutyChannel').config(),
     linked: db
       .prepare(
         `SELECT SUM(CASE WHEN role IN ('anwalt','admin') THEN 1 ELSE 0 END) AS staff,
@@ -81,6 +82,25 @@ router.put(
     logActivity(req.user, 'Discord-Bot: Rang-Sync gespeichert', 'settings', null, d.enabled ? 'eingeschaltet' : 'ausgeschaltet');
     bot.refresh();
     if (d.enabled) bot.scan('nach Speichern').catch(() => {});
+    res.json(overview());
+  })
+);
+
+/* ---------------------------------------------------------------- Live-Anzeige „Im Dienst: N“ im Kanalnamen */
+router.put(
+  '/duty-channel',
+  wrap(async (req, res) => {
+    const d = parseBody(
+      z.object({
+        channelId: idOrEmpty,
+        template: z.string().trim().min(3).max(100).refine((t) => t.includes('{anzahl}'), 'Der Name braucht {anzahl} – dort steht die Zahl.'),
+      }),
+      req,
+      res
+    );
+    if (!d) return;
+    require('../dutyChannel').save(d);
+    logActivity(req.user, 'Discord-Bot: Live-Anzeige im Kanalnamen gespeichert', 'settings', null, d.channelId ? 'eingeschaltet' : 'ausgeschaltet');
     res.json(overview());
   })
 );

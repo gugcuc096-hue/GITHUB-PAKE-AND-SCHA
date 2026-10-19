@@ -61,12 +61,19 @@ const foldText = (s) =>
 
 views.wiki = {
   async load() {
+    // Link aus der Vertragsvorschau: ?tab=vorlagen#wiki
+    if (new URLSearchParams(location.search).get('tab') === 'vorlagen') {
+      st.wikiTab = 'vorlagen';
+      history.replaceState(history.state, '', `${location.pathname}#wiki`);
+    }
     if (st.wikiTab === 'stgb') await loadPenal();
     if (st.wikiTab === 'bausteine') await loadSnippets(true);
+    if (st.wikiTab === 'vorlagen' && allowed('settings')) st.contractTemplates = await api.get('/api/contract-templates?all=1');
     st.wiki = await api.get('/api/wiki');
   },
   render() {
-    const tab = ['stgb', 'bausteine'].includes(st.wikiTab) ? st.wikiTab : 'artikel';
+    // Vorlagen (Verträge & Schriftsätze) pflegt das Board – für alle anderen gibt es den Reiter nicht
+    const tab = ['stgb', 'bausteine'].includes(st.wikiTab) || (st.wikiTab === 'vorlagen' && allowed('settings')) ? st.wikiTab : 'artikel';
     const board = st.wiki.canEdit;
     const head = `
         <div class="page-head">
@@ -83,7 +90,9 @@ views.wiki = {
           <button type="button" class="chip ${tab === 'artikel' ? 'active' : ''}" role="tab" aria-selected="${tab === 'artikel'}" data-action="wiki-tab" data-tab="artikel">${icon('book', 'ico-sm')}<span>Artikel</span><span class="chip-count">${st.wiki.articles.length}</span></button>
           <button type="button" class="chip ${tab === 'stgb' ? 'active' : ''}" role="tab" aria-selected="${tab === 'stgb'}" data-action="wiki-tab" data-tab="stgb">${icon('scale', 'ico-sm')}<span>Strafgesetzbuch</span></button>
           <button type="button" class="chip ${tab === 'bausteine' ? 'active' : ''}" role="tab" aria-selected="${tab === 'bausteine'}" data-action="wiki-tab" data-tab="bausteine">${icon('chat', 'ico-sm')}<span>Textbausteine</span></button>
+          ${allowed('settings') ? `<button type="button" class="chip ${tab === 'vorlagen' ? 'active' : ''}" role="tab" aria-selected="${tab === 'vorlagen'}" data-action="wiki-tab" data-tab="vorlagen">${icon('doc', 'ico-sm')}<span>Verträge &amp; Schriftsätze</span></button>` : ''}
         </div>`;
+    if (tab === 'vorlagen') return head + contractTemplatesPanel();
     if (tab === 'bausteine')
       return `${head}<p class="text-sm text-muted mb-4">Im Akten-Chat und in internen Notizen <code class="snip-code">/</code> tippen und den Baustein wählen (Pfeiltasten, Enter) – Name des Mandanten, Ihr Name und Rang, Aktenzeichen &amp; Co. setzt das Dashboard automatisch ein. Anlegen kann jeder, ändern wer ihn angelegt hat oder das Board.</p>
         <div class="panel p-2 md:p-3 snip-list">${snippetRows(st.snippets.snippets)}</div>`;
@@ -448,6 +457,7 @@ Object.assign(actions, {
     st.wikiTab = el.dataset.tab;
     if (st.wikiTab === 'stgb') await loadPenal();
     if (st.wikiTab === 'bausteine') await loadSnippets(true);
+    if (st.wikiTab === 'vorlagen') st.contractTemplates = await api.get('/api/contract-templates?all=1');
     renderView();
   },
   'wiki-cat': (el) => {
