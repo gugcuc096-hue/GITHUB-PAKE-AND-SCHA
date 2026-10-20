@@ -2021,7 +2021,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
     }
   });
 
-  it('Vertrag: Unterschriften zeichnen sich beim Erscheinen, eine neue bekommt ein goldenes Siegel', async () => {
+  it('Vertrag: Unterschriften zeichnen sich beim Erscheinen – eine neue ohne Haken oder Siegel', async () => {
     const vsrv = await startServer();
     const { ctx, page, problems } = await open(DESKTOP);
     try {
@@ -2043,11 +2043,10 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       await page.fill('#signName', 'Sina Siegel');
       await page.check('#agree');
       await page.click('#signClient');
-      await page.waitForSelector('.sig-seal');
       await page.waitForFunction(() => document.querySelector('.k-script.client').textContent.trim() === 'Sina Siegel');
       await page.waitForFunction(() => document.querySelector('.k-script.client').classList.contains('sig-draw'));
-      assert.equal(await page.$$eval('.sig-seal', (s) => s.length), 1, 'Siegel nur an der neuen Unterschrift');
-      assert.equal(await page.$eval('.sig-seal', (s) => !!s.closest('.k-sign').querySelector('.k-script.client')), true);
+      assert.equal(await page.$('.sig-seal'), null, 'kein Siegel');
+      assert.ok(!(await page.$$eval('.k-sign', (s) => s.map((x) => x.textContent).join(''))).includes('✓'), 'kein Haken');
       assert.deepEqual(problems, []);
     } finally {
       await ctx.close();

@@ -28,7 +28,7 @@
     window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(fitSignatures, 150); });
     /*
      * Unterschriften „schreiben sich“: Beim ersten Erscheinen läuft jede Unterschrift von links nach rechts ins Feld,
-     * als würde sie gerade gezogen; eine eben geleistete Unterschrift bekommt dazu kurz ein goldenes Siegel.
+     * als würde sie gerade gezogen; zu einer eben geleisteten Unterschrift scrollt die Seite hin.
      * Nur Optik (im Ausdruck/Google Doc steht sie einfach da), nicht bei „Bewegung reduzieren“.
      */
     const calm = window.PS.motion.calm();
@@ -41,7 +41,7 @@
             e.target.querySelectorAll('.k-script.sig-wait').forEach((s) => s.classList.replace('sig-wait', 'sig-draw'));
         }), { threshold: 0.5 })
         : null;
-    /** before: Unterschriften vor dem Neuzeichnen – was neu dazukam, wurde gerade geleistet (Siegel). */
+    /** before: Unterschriften vor dem Neuzeichnen – was neu dazukam, wurde gerade geleistet. */
     function animateSignatures(before) {
         document.querySelectorAll('.k-script').forEach((el) => {
             const key = sigKey(el);
@@ -53,12 +53,6 @@
             sigObserver.observe(el.parentElement);
             if (!before || before.has(key)) return;
             el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-            const seal = document.createElement('span');
-            seal.className = 'sig-seal';
-            seal.setAttribute('aria-hidden', 'true');
-            seal.textContent = '✓';
-            el.parentElement.appendChild(seal);
-            setTimeout(() => seal.remove(), 2800);
         });
     }
     let drawnOnce = false;
