@@ -3,8 +3,8 @@
  * Namensänderung: Jeder Benutzer beantragt im Profil einen neuen Namen, das Board of Partners genehmigt oder
  * lehnt ab. Genehmigt → neuer Name im Konto (und im Team-Profil der Website, falls verknüpft). Niemand entscheidet
  * über seinen eigenen Antrag. Benachrichtigung per Discord-Direktnachricht (falls verknüpft) und Webhook.
- * Ohne Antrag: Das Board ändert den eigenen Namen und Namen von Mandanten (z. B. Groß-/Kleinschreibung) direkt –
- * die Änderung steht trotzdem in der Historie, im Protokoll und wird gemeldet. Mitarbeiter-Namen nur per Antrag.
+ * Ohne Antrag: Das Board ändert Namen jeder Person direkt – den eigenen, von Mandanten und von Mitarbeitern (z. B.
+ * Groß-/Kleinschreibung, neuer Charaktername). Die Änderung steht trotzdem in der Historie, im Protokoll und wird gemeldet.
  */
 const express = require('express');
 const { z } = require('zod');
@@ -160,19 +160,21 @@ router.post(
 );
 
 /* ---------------------------------------------------------------- Direkt ändern (Board of Partners) */
-/** Mandanten-Konten für die direkte Korrektur suchen (Name oder E-Mail). */
+/** Konten für die direkte Änderung suchen (Name oder E-Mail) – Mandanten und Mitarbeiter. */
 router.get('/accounts', (req, res) => {
   if (!isBoard(req.user)) return res.status(403).json({ error: 'Nur für das Board of Partners.' });
   const q = String(req.query.q || '').trim().slice(0, 80);
   const like = `%${q.replace(/[%_\\]/g, (m) => '\\' + m)}%`;
   const rows = db
     .prepare(
-      `SELECT id, display_name, email, created_at FROM users
-       WHERE role = 'mandant' AND (? = '' OR display_name LIKE ? ESCAPE '\\' OR email LIKE ? ESCAPE '\\')
-       ORDER BY display_name COLLATE NOCASE LIMIT 20`
+      `SELECT id, display_name, email, role, rank, created_at FROM users
+       WHERE (? = '' OR display_name LIKE ? ESCAPE '\\' OR email LIKE ? ESCAPE '\\')
+       ORDER BY role = 'mandant', display_name COLLATE NOCASE LIMIT 20`
     )
     .all(q, like, like);
-  res.json({ accounts: rows.map((u) => ({ id: u.id, name: u.display_name, email: u.email, createdAt: u.created_at })) });
+  res.json({
+    accounts: rows.map((u) => ({ id: u.id, name: u.display_name, email: u.email, role: u.role, roleLabel: ROLE_LABEL[u.role] || u.role, rank: u.rank || null, self: u.id === req.user.id, createdAt: u.created_at })),
+  });
 });
 
 router.post(
@@ -189,9 +191,6 @@ router.post(
     const target = db.prepare('SELECT * FROM users WHERE id = ?').get(d.userId);
     if (!target) return res.status(404).json({ error: 'Konto nicht gefunden.' });
     const self = target.id === me.id;
-    if (!self && target.role !== 'mandant') {
-      return res.status(403).json({ error: 'Namen von Mitarbeitern ändern sich nur per Antrag im Profil der Person.' });
-    }
     const newName = d.newName.replace(/\s+/g, ' ');
     if (newName === target.display_name) return res.status(400).json({ error: 'Das ist bereits der aktuelle Name.' });
     const note = self ? 'Eigener Name – direkt geändert (Board of Partners)' : 'Direkt durch das Board of Partners geändert';
@@ -218,7 +217,7 @@ router.post(
     });
     logActivity(me, self ? 'Eigenen Namen geändert' : 'Name geändert', 'user', target.id, `${target.display_name} → ${newName}${d.reason ? ` (${d.reason})` : ''}`);
     discord.notify('name.requested', {
-      title: self ? '✏️ Name geändert (Board of Partners, eigener Name)' : '✏️ Name eines Mandanten korrigiert',
+      title: self ? '✏️ Name geändert (Board of Partners, eigener Name)' : target.role === 'mandant' ? '✏️ Name eines Mandanten korrigiert' : '✏️ Name eines Mitarbeiters geändert',
       fields: [
         { name: 'Bisher', value: target.display_name },
         { name: 'Neu', value: newName },

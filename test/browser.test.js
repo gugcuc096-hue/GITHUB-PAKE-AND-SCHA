@@ -3018,3 +3018,43 @@ describe('Browser: Bewegung, die zeigt, woher etwas kommt – Zahlen, die mitlau
     }
   });
 });
+
+describe('Browser: Namen direkt ändern (Board)', { skip: chromium ? false : 'Playwright nicht installiert' }, () => {
+  it('Stift in „Benutzer“ ändert den Namen eines Anwalts, „Namen direkt ändern“ findet Mitarbeiter mit Rang', async () => {
+    const srv = await startServer();
+    const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+    const ctx = await browser.newContext({ ...DESKTOP, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+    const page = await ctx.newPage();
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
+    try {
+      await page.goto(srv.base + '/login.html');
+      await page.fill('#email', TEAM.admin);
+      await page.fill('#password', PASSWORD);
+      await page.click('button[type=submit]');
+      await page.waitForURL(/dashboard/);
+      await page.waitForSelector('#nav a.nav-item', { state: 'attached' });
+      await page.evaluate(() => (location.hash = '#users'));
+      const pen = '#content [data-action="name-direct"][data-role="anwalt"]';
+      await page.waitForSelector(pen);
+      assert.equal(await page.$$eval('#content .td-actions [data-action="name-direct"]', (b) => b.length), 2, 'bei allen außer dem eigenen Konto');
+      await page.click(pen);
+      await page.waitForSelector('#modalBody form[data-form="name-direct"]');
+      assert.match(await page.textContent('#modalBody .modal-sub'), /Mitarbeiter · Senior Associate .*Team-Profil der Website/);
+      await page.fill('#ndName', 'Damat Lexington');
+      await page.click('#modalBody button[type=submit]');
+      await page.waitForFunction(() => [...document.querySelectorAll('#content .td-main')].some((td) => td.textContent.includes('Damat Lexington')));
+      assert.equal(await page.$('#modalBody form[data-form="name-direct"]'), null);
+
+      await page.evaluate(() => (location.hash = '#name-requests'));
+      await page.waitForSelector('#nameAccSearch');
+      await page.type('#nameAccSearch', 'lexing');
+      await page.waitForSelector('#nameAccList [data-action="name-direct"][data-role="anwalt"]');
+      assert.match(await page.textContent('#nameAccList .list-row'), /Damat Lexington\s*Senior Associate/);
+      assert.deepEqual(problems, []);
+    } finally {
+      await browser.close();
+      await srv.stop();
+    }
+  });
+});

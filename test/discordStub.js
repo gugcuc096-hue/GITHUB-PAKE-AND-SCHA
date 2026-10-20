@@ -1,7 +1,8 @@
 'use strict';
 /*
  * Nachgebaute Discord-Schnittstelle für die Tests – wird mit `node --require test/discordStub.js` vor dem Server
- * geladen (oder im Testprozess selbst) und fängt nur Aufrufe an discord.com ab. Es geht nichts nach außen.
+ * geladen (oder im Testprozess selbst) und fängt nur Aufrufe an discord.com und das Gateway (discord.gg) ab. Es geht
+ * nichts nach außen.
  *
  * Server „Testserver“ (GUILD) mit den Rollen Burgershot (nicht erwähnbar) und Mitarbeiter (erwähnbar), dem Bot und
  * vier Mitgliedern: Jaywa und MO mit Burgershot-Rolle, „Closed Dms“ (Burgershot, nimmt keine Direktnachrichten an),
@@ -119,6 +120,48 @@ globalThis.fetch = async (input, init = {}) => {
   } finally {
     save();
   }
+};
+
+/*
+ * Gateway (gateway.discord.gg): bleibt ebenfalls im Test – sonst hinge das Anlegen eines Ticket-Kanals
+ * (tickets.identifyOnce) an der echten Discord-Verbindung. Wie bei Discord: erst „Hello“, nach dem Identify „READY“.
+ */
+const RealWebSocket = globalThis.WebSocket;
+const emit = (target, type, props) => target.dispatchEvent(Object.assign(new Event(type), props));
+class StubGateway extends EventTarget {
+  constructor(url) {
+    super();
+    this.url = url;
+    this.readyState = 0;
+    setTimeout(() => {
+      if (this.readyState !== 0) return;
+      this.readyState = 1;
+      emit(this, 'open');
+      emit(this, 'message', { data: JSON.stringify({ op: 10, d: { heartbeat_interval: 41250 } }) });
+    }, 0);
+  }
+  send(raw) {
+    const msg = JSON.parse(raw);
+    if (msg.op !== 2) return;
+    setTimeout(() => {
+      if (this.readyState !== 1) return;
+      emit(this, 'message', { data: JSON.stringify({ op: 0, t: 'READY', s: 1, d: { user: { id: BOT, username: 'kanzlei-bot', bot: true }, guilds: [{ id: GUILD }] } }) });
+    }, 0);
+  }
+  close(code = 1000) {
+    if (this.readyState === 3) return;
+    this.readyState = 3;
+    setTimeout(() => emit(this, 'close', { code }), 0);
+  }
+}
+globalThis.WebSocket = function WebSocket(url, protocols) {
+  let host = '';
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    /* ungültige Adresse – wie bisher */
+  }
+  return host === 'discord.gg' || host.endsWith('.discord.gg') ? new StubGateway(String(url)) : new RealWebSocket(url, protocols);
 };
 
 module.exports = { state, GUILD, BOT, ROLES, MEMBERS };
