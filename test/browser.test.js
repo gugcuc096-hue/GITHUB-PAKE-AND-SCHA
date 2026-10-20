@@ -2907,6 +2907,45 @@ describe('Browser: Bewegung, die zeigt, woher etwas kommt – Zahlen, die mitlau
     }
   });
 
+  it('Startseite: Seitenübergang nur von der Teamkarte zur Profilseite – sonst (Login, Discord-Anmeldung …) kein Übergang', async () => {
+    const srv = await startServer();
+    const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+    try {
+      const page = await (await browser.newContext({ ...DESKTOP, locale: 'de-DE' })).newPage();
+      const problems = [];
+      page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
+      const optedIn = () =>
+        page.evaluate(() =>
+          [...document.styleSheets].some((sheet) => {
+            try {
+              return [...sheet.cssRules].some((r) => r.constructor.name === 'CSSViewTransitionRule' && r.navigation === 'auto');
+            } catch {
+              return false;
+            }
+          })
+        );
+      await page.goto(srv.base + '/');
+      await page.waitForSelector('#teamGrid .team-card .team-name');
+      assert.equal(await optedIn(), false, 'ohne Klick auf eine Teamkarte kein Übergang');
+      await page.click('#teamGrid .team-card .team-name');
+      await page.waitForURL(/\/team\//);
+      await page.waitForSelector('.pf-photo');
+      assert.equal(await optedIn(), true, 'Profilseite nimmt den Übergang an');
+      // von der Profilseite zur Anmeldung: Übergang wird übersprungen, kein Fehler
+      await page.evaluate(() => {
+        const a = Object.assign(document.createElement('a'), { href: '/login.html', id: 'toLogin', textContent: 'Login' });
+        document.body.appendChild(a);
+      });
+      await page.click('#toLogin');
+      await page.waitForURL(/login\.html/);
+      await page.waitForTimeout(300);
+      assert.deepEqual(problems, []);
+    } finally {
+      await browser.close();
+      await srv.stop();
+    }
+  });
+
   it('Handy: Beweisbild mit Doppeltippen vergrößern und zurück · „Bewegung reduzieren“: kein Flug, Mandantenkarte neigt sich nicht', async () => {
     const srv = await startServer();
     const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });

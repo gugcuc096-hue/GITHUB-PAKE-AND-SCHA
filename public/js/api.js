@@ -923,5 +923,22 @@
     lightOff();
   });
 
+  /*
+   * Seitenübergang Teamkarte → Profilseite (index.html, views/anwalt.html): nur dorthin. Jeder andere Wechsel überspringt
+   * ihn – sonst bricht der Browser ihn auf einer Seite ohne Übergang (Dashboard, Login …) ab und meldet einen Fehler.
+   */
+  window.addEventListener('pageswap', (e) => {
+    const vt = e.viewTransition;
+    if (!vt) return;
+    [vt.ready, vt.finished, vt.updateCallbackDone].forEach((p) => p && p.catch(() => {}));
+    let to = null;
+    try {
+      to = e.activation && e.activation.entry ? new URL(e.activation.entry.url) : null;
+    } catch {
+      to = null;
+    }
+    if (!to || to.origin !== location.origin || !to.pathname.startsWith('/team/') || motion.calm()) vt.skipTransition();
+  });
+
   window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog, closeToDashboard, drafts, applications, tab, fieldError, fieldErrors, clearFieldErrors, countUp, roll, motion };
 })();

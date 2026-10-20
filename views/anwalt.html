@@ -57,7 +57,8 @@
         .pf-actions { margin-top: 2.5rem; display: flex; justify-content: center; }
         .pf-actions .btn-gold { min-width: 220px; }
         @media (max-width: 479px) { .pf-actions > * { flex: 1 1 100%; } }
-        /* Von der Teamkarte der Startseite: Foto und Name gleiten an ihren Platz (Gegenstück in index.html / site.js) */
+        /* Von der Teamkarte der Startseite: Foto und Name gleiten an ihren Platz (Gegenstück in index.html / site.js);
+           weiter zu anderen Seiten ohne Übergang (api.js, pageswap) */
         @view-transition { navigation: auto; }
         .pf-photo { view-transition-name: pf-photo; }
         .pf-name { view-transition-name: pf-name; }

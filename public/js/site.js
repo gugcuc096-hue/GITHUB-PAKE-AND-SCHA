@@ -178,7 +178,9 @@
     // Zur Profilseite: Foto und Name dieser Karte gleiten an ihren Platz auf der Profilseite (View Transitions,
     // Gegenstück in views/anwalt.html) – ohne Unterstützung im Browser ganz normal
     const link = e.target.closest('a[href^="/team/"]');
-    if (link) {
+    if (link && window.PS && !window.PS.motion.calm()) {
+      // nur dieser Seitenwechsel bekommt den Übergang – andere (Login, Discord-Anmeldung …) laufen ganz normal
+      if (!document.getElementById('vtTeam')) document.head.insertAdjacentHTML('beforeend', '<style id="vtTeam">@view-transition { navigation: auto; }</style>');
       document.querySelectorAll('#teamGrid [style*="view-transition-name"]').forEach((n) => (n.style.viewTransitionName = ''));
       const card = link.closest('.team-card');
       const photo = card && card.querySelector('a[href^="/team/"] > img, a[href^="/team/"] > div');
