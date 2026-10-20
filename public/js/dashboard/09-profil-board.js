@@ -181,14 +181,16 @@ function namePanel(u) {
       ${state}</section>`;
 }
 
-/** Board of Partners: Namen eines Mandanten (oder den eigenen) direkt ändern – ohne Antrag. */
-function nameDirectModal({ userId, name, email, returnCase }) {
+/** Board of Partners: Namen einer Person (Mandant oder Mitarbeiter) direkt ändern – ohne Antrag. */
+function nameDirectModal({ userId, name, email, role = 'mandant', rank = '', returnCase }) {
+  const staff = role !== 'mandant';
+  const who = staff ? `${role === 'admin' ? 'Board of Partners' : 'Mitarbeiter'}${rank ? ` · ${rank}` : ''}` : 'Mandanten-Konto';
   openModal(`
-      <h2 class="modal-title">Name korrigieren</h2>
-      <p class="modal-sub">Mandanten-Konto <strong>${esc(name)}</strong>${email ? ` · ${esc(email)}` : ''}. Der neue Name gilt sofort überall (Konto und Akten); der Mandant bekommt eine Nachricht per Discord (falls verknüpft). Die Änderung steht im Protokoll.</p>
+      <h2 class="modal-title">Name ändern</h2>
+      <p class="modal-sub">${esc(who)} <strong>${esc(name)}</strong>${email ? ` · ${esc(email)}` : ''}. Der neue Name gilt sofort überall (Konto, Akten${staff ? ', Team-Profil der Website' : ''}); die Person bekommt eine Nachricht per Discord (falls verknüpft). Die Änderung steht im Protokoll.</p>
       <form data-form="name-direct" data-user-id="${Number(userId)}" ${returnCase ? `data-return-case="${Number(returnCase)}"` : ''} class="form-grid">
         <div><label class="label" for="ndName">Neuer Name</label><input id="ndName" name="newName" class="field" required minlength="2" maxlength="80" value="${esc(name)}" autofocus></div>
-        <div><label class="label" for="ndReason">Grund <span class="text-dim font-normal normal-case tracking-normal">(optional)</span></label><input id="ndReason" name="reason" class="field" maxlength="500" placeholder="z. B. Groß-/Kleinschreibung"></div>
+        <div><label class="label" for="ndReason">Grund <span class="text-dim font-normal normal-case tracking-normal">(optional)</span></label><input id="ndReason" name="reason" class="field" maxlength="500" placeholder="${staff ? 'z. B. neuer Charaktername, Tippfehler' : 'z. B. Groß-/Kleinschreibung'}"></div>
         <div class="form-actions">${returnCase ? `<button type="button" class="btn-ghost btn-md" data-action="back-to-case">Abbrechen</button>` : '<button type="button" class="btn-ghost btn-md" data-action="close-modal">Abbrechen</button>'}<button type="submit" class="btn-gold btn-md">${icon('check', 'ico-sm')}<span>Speichern</span></button></div>
       </form>`);
 }
@@ -430,9 +432,9 @@ views['name-requests'] = {
         <div class="chip-row mb-4"><button class="chip ${st.namesAll ? '' : 'active'}" data-action="names-filter" data-value="offen">Offen <span class="chip-count">${d.open}</span></button><button class="chip ${st.namesAll ? 'active' : ''}" data-action="names-filter" data-value="alle">Alle</button></div>
         <div class="panel p-2 md:p-3">${rows.length ? rows.map(item).join('') : empty(st.namesAll ? 'Noch keine Anträge.' : 'Keine offenen Anträge.', 'edit')}</div>
         <section class="panel panel-pad mt-4 lg:mt-5">
-          <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('edit')} Name eines Mandanten korrigieren</h2></div>
-          <p class="text-sm text-muted mb-3">Ohne Antrag – z. B. bei Groß-/Kleinschreibung oder Tippfehlern. Der Mandant wird per Discord benachrichtigt (falls verknüpft), die Änderung steht im Protokoll. Mitarbeiter ändern ihren Namen per Antrag im Profil; Ihren eigenen Namen ändern Sie direkt unter „Mein Profil“.</p>
-          <input id="nameAccSearch" class="field" type="search" maxlength="80" placeholder="Mandant suchen (Name oder E-Mail) …" value="${esc(st.nameAccQ || '')}" autocomplete="off" aria-label="Mandanten-Konto suchen">
+          <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('edit')} Namen direkt ändern</h2></div>
+          <p class="text-sm text-muted mb-3">Ohne Antrag – für Mandanten und Mitarbeiter, z. B. bei Groß-/Kleinschreibung, Tippfehlern oder einem neuen Charakternamen. Die Person wird per Discord benachrichtigt (falls verknüpft), die Änderung steht im Protokoll. Ihren eigenen Namen ändern Sie unter „Mein Profil“.</p>
+          <input id="nameAccSearch" class="field" type="search" maxlength="80" placeholder="Person suchen (Name oder E-Mail) …" value="${esc(st.nameAccQ || '')}" autocomplete="off" aria-label="Konto suchen">
           <div id="nameAccList" class="mt-3">${nameAccList()}</div>
         </section>`;
   },
@@ -497,19 +499,26 @@ function reviewSection(c, info) {
       </form></div>`;
 }
 
-/** Suchergebnis „Name eines Mandanten korrigieren“. */
+/** Suchergebnis „Namen direkt ändern“ (Mandanten und Mitarbeiter). */
 function nameAccList() {
   const q = (st.nameAccQ || '').trim();
   if (q.length < 2) return '<p class="text-sm text-dim">Mindestens zwei Zeichen eingeben.</p>';
   const list = st.nameAccounts || [];
-  if (!list.length) return '<p class="text-sm text-dim">Kein Mandanten-Konto gefunden.</p>';
+  if (!list.length) return '<p class="text-sm text-dim">Kein Konto gefunden.</p>';
   return list
     .map(
-      (a) => `<div class="list-row wrap"><div class="main"><div class="title">${esc(a.name)}</div><div class="meta">${esc(a.email)}${a.createdAt ? ` · registriert ${esc(fmtDateOnly(String(a.createdAt).slice(0, 10)))}` : ''}</div></div>
-          <button type="button" class="btn-outline btn-sm shrink-0" data-action="name-direct" data-user-id="${a.id}" data-name="${esc(a.name)}" data-email="${esc(a.email)}">${icon('edit', 'ico-sm')}<span>Name korrigieren</span></button></div>`
+      (a) => `<div class="list-row wrap"><div class="main"><div class="title flex flex-wrap items-center gap-2">${esc(a.name)}${a.role === 'mandant' ? '' : badge(a.rank || a.roleLabel, a.role === 'admin' ? 'gold' : 'sky')}${a.self ? badge('Sie', 'gold') : ''}</div><div class="meta">${esc(a.email)}${a.createdAt ? ` · registriert ${esc(fmtDateOnly(String(a.createdAt).slice(0, 10)))}` : ''}</div></div>
+          ${
+            a.self
+              ? '<a href="#profile" class="btn-ghost btn-sm shrink-0">Unter „Mein Profil“</a>'
+              : `<button type="button" class="btn-outline btn-sm shrink-0" ${nameDirectAttrs(a)}>${icon('edit', 'ico-sm')}<span>Name ändern</span></button>`
+          }</div>`
     )
     .join('');
 }
+/** Daten-Attribute für den Knopf „Name ändern“ (Aktion name-direct). */
+const nameDirectAttrs = (u) =>
+  `data-action="name-direct" data-user-id="${Number(u.id)}" data-name="${esc(u.name)}" data-email="${esc(u.email || '')}" data-role="${esc(u.role || 'mandant')}" data-rank="${esc(u.rank || '')}"`;
 async function searchNameAccounts(input) {
   const q = input.value.trim();
   st.nameAccQ = input.value;

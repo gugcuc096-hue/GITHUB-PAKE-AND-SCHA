@@ -123,7 +123,8 @@ function userTable() {
             <td class="td-actions">${
             self
               ? ''
-              : `<button class="btn-outline btn-sm" data-action="user-reset" data-id="${u.id}" title="Einmal-Passwort erzeugen">${icon('key', 'ico-sm')}<span>Passwort</span></button>
+              : `${isBoard() ? `<button class="icon-btn sm" ${nameDirectAttrs({ id: u.id, name: u.displayName, email: u.email, role: u.role, rank: u.rank })} aria-label="Name ändern" title="Name ohne Antrag ändern">${icon('edit', 'ico-sm')}</button>` : ''}
+                   <button class="btn-outline btn-sm" data-action="user-reset" data-id="${u.id}" title="Einmal-Passwort erzeugen">${icon('key', 'ico-sm')}<span>Passwort</span></button>
                    <button class="btn-ghost btn-sm" data-action="user-toggle" data-id="${u.id}">${u.active ? 'Sperren' : 'Entsperren'}</button>
                    <button class="icon-btn sm" data-action="user-delete" data-id="${u.id}" aria-label="Löschen">${icon('trash', 'ico-sm')}</button>`
           }</td></tr>`;

@@ -847,7 +847,7 @@ const actions = {
   },
   'name-direct': (el) => {
     st.returnCase = el.dataset.returnCase ? Number(el.dataset.returnCase) : null;
-    nameDirectModal({ userId: el.dataset.userId, name: el.dataset.name, email: el.dataset.email, returnCase: st.returnCase });
+    nameDirectModal({ userId: el.dataset.userId, name: el.dataset.name, email: el.dataset.email, role: el.dataset.role || 'mandant', rank: el.dataset.rank || '', returnCase: st.returnCase });
   },
   'names-filter': async (el) => {
     st.namesAll = el.dataset.value === 'alle';
