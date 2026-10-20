@@ -1061,25 +1061,6 @@ function askInitialName() {
       </form>`);
 }
 
-/* Siegel nach dem Anmelden: zeichnet sich kurz in Gold, während das Dashboard lädt (nur direkt aus dem Login) */
-(function loginSeal() {
-  let fresh = false;
-  try {
-    fresh = sessionStorage.getItem('ps.freshLogin') === '1';
-    sessionStorage.removeItem('ps.freshLogin');
-  } catch {
-    /* ohne Speicher kein Siegel */
-  }
-  if (!fresh || window.PS.motion.calm()) return;
-  const el = document.createElement('div');
-  el.className = 'login-seal';
-  el.setAttribute('aria-hidden', 'true');
-  el.innerHTML = `<svg viewBox="0 0 100 100"><circle class="seal-ring" cx="50" cy="50" r="46" pathLength="1"/><circle class="seal-ring seal-ring2" cx="50" cy="50" r="39" pathLength="1"/>
-      <text x="50" y="58" text-anchor="middle">P&amp;S</text></svg>`;
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 1300);
-})();
-
 /*
  * Status-Wechsel mit Übergang: Ändert sich der Status einer Zeile (Akte, Rechnung), blendet das neue Badge weich ein
  * und glänzt kurz – gemerkt wird je Zeile der letzte Text des Badges.

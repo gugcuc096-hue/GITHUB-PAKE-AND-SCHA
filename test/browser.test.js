@@ -2133,14 +2133,12 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       const box = await card.boundingBox();
       await A.page.mouse.move(box.x + 60, box.y + 80);
       await A.page.waitForFunction(() => document.querySelector('#teamGrid .team-card.ps-spot-on'));
-      await A.page.waitForTimeout(300); // Neigung zur Maus abwarten
       const spot = await card.evaluate((el) => [parseFloat(el.style.getPropertyValue('--mx')), parseFloat(el.style.getPropertyValue('--my'))]);
-      // Die Karte neigt sich zur Maus (3D) – das Licht sitzt trotzdem an der Maus (wenige Pixel Spiel durch die Neigung)
+      // Das Licht sitzt an der Maus; die Karte neigt sich nicht (keine 3D-Effekte mehr)
       assert.ok(Math.abs(spot[0] - 60) <= 8 && Math.abs(spot[1] - 80) <= 8, `Licht an der Maus: ${spot}`);
-      assert.match(await card.evaluate((el) => el.style.transform), /perspective\(900px\).*rotateX\(.*rotateY\(/);
+      assert.equal(await card.evaluate((el) => el.style.transform), '');
       await A.page.mouse.move(2, 2);
       await A.page.waitForFunction(() => !document.querySelector('.ps-spot-on'));
-      assert.equal(await card.evaluate((el) => el.style.transform), '', 'Karte richtet sich wieder auf');
       // Name auf der Karte → Profilseite → „Mandat anfragen“ öffnet das Formular mit Wunschanwalt
       const name = (await card.locator('.team-name').textContent()).trim();
       await card.locator('.team-name').click();
@@ -2462,10 +2460,8 @@ describe('Browser: Strafmaß, Verhandlung, Wiki, Beschlüsse, Rechnungszeile, Ge
       for (const r of rows) assert.ok(Math.max(...r) - Math.min(...r) <= 4, `eine Zeile: ${r}`);
       assert.equal(await page.locator('.inv-actions >> text=Storno').count(), 0);
       assert.equal(await page.$eval('.tbl-wrap', (w) => w.scrollWidth - w.clientWidth), 0);
-      // Sieg-Moment
-      await page.evaluate(() => victoryMoment('Freispruch'));
-      await page.waitForSelector('#victory .victory-title >> text=Freispruch');
-      await page.waitForSelector('#victory', { state: 'detached', timeout: 5000 });
+      // Kein Sieg-Overlay mehr (seriöser): Abschluss meldet sich nur noch kurz unten
+      assert.equal(await page.evaluate(() => typeof window.victoryMoment), 'undefined');
       assert.deepEqual(problems, []);
     } finally {
       await ctx.close();
@@ -2554,7 +2550,7 @@ describe('Browser: Textbausteine, Vorschaubilder, Menü vorladen', { skip: chrom
   });
 });
 
-describe('Browser: Board-Menü gebündelt, Hover-Karte, Kalender ziehen, Stempel, Siegel, Vorlagen im Wiki', { skip: chromium ? false : 'Playwright nicht installiert' }, () => {
+describe('Browser: Board-Menü gebündelt, Hover-Karte, Kalender ziehen, Vorlagen im Wiki', { skip: chromium ? false : 'Playwright nicht installiert' }, () => {
   it('Board-Eingang mit Reitern, Hover-Karte zur Akte, Termin per Ziehen verschoben, „Bezahlt“-Stempel, Archiv', async () => {
     const srv = await startServer();
     const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
@@ -2572,15 +2568,14 @@ describe('Browser: Board-Menü gebündelt, Hover-Karte, Kalender ziehen, Stempel
       const ev = (await a.post('/api/calendar', { type: 'intern', title: 'Akteneinsicht vorbereiten', startsAt: day.toISOString(), caseId: c.id })).json.event;
       const inv = (await a.post('/api/invoices', { caseId: c.id, items: [{ description: 'Erstberatung', quantity: 1, unitPrice: 15000 }] })).json.invoice;
 
-      // Frisch angemeldet: das Siegel zeichnet sich kurz und verschwindet von selbst
+      // Frisch angemeldet: direkt ins Dashboard, ohne Siegel-Einblendung
       await page.goto(srv.base + '/login.html');
       await page.fill('#email', TEAM.admin);
       await page.fill('#password', PASSWORD);
       await page.click('button[type=submit]');
       await page.waitForURL(/dashboard/);
-      await page.waitForSelector('.login-seal', { state: 'attached' });
-      await page.waitForSelector('.login-seal', { state: 'detached', timeout: 3000 });
       await page.waitForSelector('#nav a.nav-item');
+      assert.equal(await page.locator('.login-seal').count(), 0);
 
       // Board-Eingang: ein Menüpunkt, oben Reiter zu den Seiten
       await page.click('#nav a[data-hub="inbox"]');
@@ -2621,11 +2616,11 @@ describe('Browser: Board-Menü gebündelt, Hover-Karte, Kalender ziehen, Stempel
       assert.equal(new Date(moved.startsAt).getDate(), target.getDate(), 'neuer Tag');
       assert.equal(new Date(moved.startsAt).getHours(), 18, 'Uhrzeit bleibt');
 
-      // Rechnung als bezahlt: Stempel auf der Zeile
+      // Rechnung als bezahlt: nur die Meldung, kein Stempel über der Seite
       await page.click('#nav a[href="#invoices"]');
       await page.click(`#content [data-action="inv-status"][data-id="${inv.id}"][data-status="bezahlt"]`);
-      await page.waitForSelector('.ps-stamp >> text=Bezahlt');
-      await page.waitForSelector('.ps-stamp', { state: 'detached', timeout: 3000 });
+      await page.waitForSelector('.ps-toast >> text=bezahlt');
+      assert.equal(await page.locator('.ps-stamp').count(), 0);
 
       // Vorlagen im Wiki statt in den Einstellungen; Archiv-Regel
       await page.click('#nav a[href="#wiki"]');
@@ -2660,7 +2655,6 @@ describe('Browser: Tastenkürzel, Mitteilungskarten, Verlaufslinien, Deal-Rechne
       await page.click('button[type=submit]');
       await page.waitForURL(/dashboard/);
       await page.waitForSelector('#nav a.nav-item');
-      await page.waitForTimeout(1400); // Siegel vorbei
 
       // Tastenkürzel
       await page.keyboard.press('?');

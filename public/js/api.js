@@ -716,81 +716,17 @@
 .ps-spot.ps-spot-on::after,.ps-spot.ps-spot-on::before{opacity:1}
 .gold-shine{background:linear-gradient(110deg,var(--gold-500,#d4af37) 0 41%,#fff7d6 50%,var(--gold-500,#d4af37) 59% 100%) 0 0/250% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;padding:0 .14em;margin:0 -.14em;-webkit-box-decoration-break:clone;box-decoration-break:clone;animation:ps-shine 2.2s ease-in-out .5s both}
 @keyframes ps-shine{from{background-position:100% 0}to{background-position:0 0}}
-.lotm-badge{display:inline-flex;align-items:center;padding:.32rem .85rem;border-radius:999px;font-size:.62rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;line-height:1.2;color:#1a1405;background:linear-gradient(110deg,#b8902a 0%,#f3d77a 45%,#d4af37 60%,#9c7a20 100%) 0 0/220% 100%;box-shadow:0 6px 22px rgba(212,175,55,.35),inset 0 1px 0 rgba(255,255,255,.45);animation:lotm-shine 3.2s ease-in-out .6s infinite alternate;white-space:nowrap}
-@keyframes lotm-shine{from{background-position:100% 0}to{background-position:0 0}}
+.lotm-badge{display:inline-flex;align-items:center;padding:.32rem .85rem;border-radius:999px;font-size:.62rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;line-height:1.2;color:#1a1405;background:linear-gradient(110deg,#b8902a 0%,#f3d77a 45%,#d4af37 60%,#9c7a20 100%) 0 0/220% 100%;box-shadow:0 6px 22px rgba(212,175,55,.35),inset 0 1px 0 rgba(255,255,255,.45);white-space:nowrap}
 .pf-head .lotm-badge{margin-left:.5rem;vertical-align:middle}
 @media (max-width:479px){.pf-head .lotm-badge{margin:.5rem 0 0}}
 .lotm-on-card{position:absolute;top:-.85rem;left:50%;transform:translateX(-50%);z-index:2}
-.team-card.is-lotm{position:relative;overflow:visible;border-color:rgba(212,175,55,.55);box-shadow:0 0 0 1px rgba(212,175,55,.25),0 18px 60px rgba(212,175,55,.14)}
-.ps-tilt{will-change:transform;transition:transform .14s ease-out,box-shadow .35s ease,border-color .35s ease!important}
-.ps-tilt:not(.ps-spot-on){transition:transform .7s cubic-bezier(.16,1,.3,1),box-shadow .35s ease,border-color .35s ease!important}
-.ps-stamp{position:fixed;z-index:95;pointer-events:none;padding:.3rem .85rem .26rem;border:3px double currentColor;border-radius:6px;font:800 1.05rem/1 'Inter',system-ui,sans-serif;letter-spacing:.22em;text-transform:uppercase;white-space:nowrap;background:rgba(4,9,22,.72);box-shadow:0 10px 30px rgba(0,0,0,.45),inset 0 0 12px rgba(0,0,0,.35);transform:translate(-50%,-50%) rotate(-8deg)}
-.ps-stamp-paid{color:#4ade80;text-shadow:0 0 14px rgba(74,222,128,.45)}
-.ps-stamp-gold{color:#e8c766;text-shadow:0 0 14px rgba(232,199,102,.45)}
-.ps-stamp-slate{color:#cbd5e1;text-shadow:0 0 12px rgba(203,213,225,.3)}
-.ps-seal{position:fixed;z-index:96;pointer-events:none;width:92px;height:92px;border-radius:50%;display:grid;place-items:center;color:#2a1f05;background:radial-gradient(circle at 34% 30%,#fff3c4 0,#f0cf6a 22%,#d4af37 48%,#a8841f 78%,#7a5d12 100%);box-shadow:0 0 0 3px rgba(212,175,55,.35),0 12px 34px rgba(0,0,0,.55),inset 0 -4px 10px rgba(0,0,0,.35),inset 0 3px 6px rgba(255,255,255,.4);transform:translate(-50%,-50%)}
-.ps-seal::before{content:'';position:absolute;inset:7px;border-radius:50%;border:1.5px dashed rgba(42,31,5,.45)}
-.ps-seal svg{width:44px;height:44px}
-.ps-seal span{position:absolute;bottom:13px;font:800 .5rem/1 'Inter',system-ui,sans-serif;letter-spacing:.2em;text-transform:uppercase}`;
-  /**
-   * Stempel („BEZAHLT“, „UNTERSCHRIEBEN“): drückt sich kurz mittig auf ein Element und blendet wieder aus. Liegt fest
-   * über der Seite – wird darunter neu gezeichnet, bleibt er trotzdem stehen. Bei „Bewegung reduzieren“ kein Stempel.
-   */
-  function stamp(target, text, tone = 'gold') {
-    if (!target || motion.calm() || typeof Element.prototype.animate !== 'function') return;
-    const r = target.getBoundingClientRect();
-    if (!r.width || r.bottom < 0 || r.top > window.innerHeight) return;
-    const el = document.createElement('div');
-    el.className = `ps-stamp ps-stamp-${tone}`;
-    el.textContent = text;
-    el.setAttribute('aria-hidden', 'true');
-    el.style.left = `${r.left + r.width / 2}px`;
-    el.style.top = `${r.top + r.height / 2}px`;
-    document.body.appendChild(el);
-    const t = (s, deg) => `translate(-50%,-50%) scale(${s}) rotate(${deg}deg)`;
-    el.animate(
-      [
-        { opacity: 0, transform: t(2.4, -16) },
-        { opacity: 1, transform: t(0.94, -8), offset: 0.22 },
-        { opacity: 1, transform: t(1, -8), offset: 0.3 },
-        { opacity: 1, transform: t(1, -8), offset: 0.78 },
-        { opacity: 0, transform: t(1.04, -8) },
-      ],
-      { duration: 1500, easing: 'cubic-bezier(.2,.8,.2,1)' }
-    ).onfinish = () => el.remove();
-  }
-
-  /** Gold-Siegel: drückt sich nach einer Unterschrift kurz neben den Stempel (gleiche Regeln wie der Stempel). */
-  function seal(target, label = 'P & S') {
-    if (!target || motion.calm() || typeof Element.prototype.animate !== 'function') return;
-    const r = target.getBoundingClientRect();
-    if (!r.width || r.bottom < 0 || r.top > window.innerHeight) return;
-    const el = document.createElement('div');
-    el.className = 'ps-seal';
-    el.setAttribute('aria-hidden', 'true');
-    el.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"/></svg><span>${esc(label)}</span>`;
-    el.style.left = `${Math.min(window.innerWidth - 60, r.left + r.width / 2 + Math.min(150, r.width / 3))}px`;
-    el.style.top = `${r.top + r.height / 2 + 26}px`;
-    document.body.appendChild(el);
-    const t = (s, deg) => `translate(-50%,-50%) scale(${s}) rotate(${deg}deg)`;
-    el.animate(
-      [
-        { opacity: 0, transform: t(1.9, 24), filter: 'blur(3px)' },
-        { opacity: 1, transform: t(0.92, 6), filter: 'blur(0)', offset: 0.26 },
-        { opacity: 1, transform: t(1, 8), offset: 0.34 },
-        { opacity: 1, transform: t(1, 8), offset: 0.8 },
-        { opacity: 0, transform: t(1.03, 8) },
-      ],
-      { duration: 1900, delay: 260, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' }
-    ).onfinish = () => el.remove();
-  }
-
+.team-card.is-lotm{position:relative;overflow:visible;border-color:rgba(212,175,55,.55);box-shadow:0 0 0 1px rgba(212,175,55,.25),0 18px 60px rgba(212,175,55,.14)}`;
   const fxStyle = document.createElement('style');
   fxStyle.id = 'psFxCss';
   fxStyle.textContent = FX_CSS;
   document.head.appendChild(fxStyle);
 
-  const SPOT_SEL = '.glass-card, .kpi, .lager-item, .cc-stat';
+  const SPOT_SEL = '.glass-card, .kpi';
   const spotOk = new WeakMap();
   let spotEl = null;
   let spotXY = null;
@@ -802,14 +738,9 @@
     return spotOk.get(el) ? el : null;
   }
   function spotOff() {
-    if (spotEl) {
-      spotEl.classList.remove('ps-spot-on');
-      if (spotEl.classList.contains('ps-tilt')) spotEl.style.transform = '';
-    }
+    if (spotEl) spotEl.classList.remove('ps-spot-on');
     spotEl = null;
   }
-  // Teamkarten (Startseite) neigen sich zusätzlich in 3D zur Maus – nicht bei gedämpften Animationen
-  const TILT_SEL = '.team-card';
   document.addEventListener(
     'pointermove',
     (e) => {
@@ -830,21 +761,14 @@
         spotRaf = 0;
         if (!spotEl || !spotEl.isConnected) return spotOff();
         const r = spotEl.getBoundingClientRect();
-        // Lage in der Karte von der Mitte aus – stimmt auch, solange die Karte geneigt ist
         spotEl.style.setProperty('--mx', `${Math.round(spotXY[0] - (r.left + r.width / 2) + spotEl.offsetWidth / 2)}px`);
         spotEl.style.setProperty('--my', `${Math.round(spotXY[1] - (r.top + r.height / 2) + spotEl.offsetHeight / 2)}px`);
         spotEl.classList.add('ps-spot-on');
-        if (spotEl.matches(TILT_SEL) && !motion.calm()) {
-          const px = Math.max(-0.5, Math.min(0.5, (spotXY[0] - r.left) / r.width - 0.5));
-          const py = Math.max(-0.5, Math.min(0.5, (spotXY[1] - r.top) / r.height - 0.5));
-          spotEl.classList.add('ps-tilt');
-          spotEl.style.transform = `perspective(900px) translateY(-6px) rotateX(${(-py * 9).toFixed(2)}deg) rotateY(${(px * 11).toFixed(2)}deg) scale(1.015)`;
-        }
       });
     },
     { passive: true }
   );
   document.documentElement.addEventListener('mouseleave', spotOff);
 
-  window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog, closeToDashboard, drafts, applications, tab, fieldError, fieldErrors, clearFieldErrors, countUp, motion, stamp, seal };
+  window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog, closeToDashboard, drafts, applications, tab, fieldError, fieldErrors, clearFieldErrors, countUp, motion };
 })();
