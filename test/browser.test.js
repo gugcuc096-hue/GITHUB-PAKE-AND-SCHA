@@ -2133,12 +2133,14 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       const box = await card.boundingBox();
       await A.page.mouse.move(box.x + 60, box.y + 80);
       await A.page.waitForFunction(() => document.querySelector('#teamGrid .team-card.ps-spot-on'));
+      await A.page.waitForTimeout(300); // Neigung zur Maus abwarten
       const spot = await card.evaluate((el) => [parseFloat(el.style.getPropertyValue('--mx')), parseFloat(el.style.getPropertyValue('--my'))]);
-      // Das Licht sitzt an der Maus; die Karte neigt sich nicht (keine 3D-Effekte mehr)
+      // Die Karte neigt sich zur Maus (3D) – das Licht sitzt trotzdem an der Maus (wenige Pixel Spiel durch die Neigung)
       assert.ok(Math.abs(spot[0] - 60) <= 8 && Math.abs(spot[1] - 80) <= 8, `Licht an der Maus: ${spot}`);
-      assert.equal(await card.evaluate((el) => el.style.transform), '');
+      assert.match(await card.evaluate((el) => el.style.transform), /perspective\(900px\).*rotateX\(.*rotateY\(/);
       await A.page.mouse.move(2, 2);
       await A.page.waitForFunction(() => !document.querySelector('.ps-spot-on'));
+      assert.equal(await card.evaluate((el) => el.style.transform), '', 'Karte richtet sich wieder auf');
       // Name auf der Karte → Profilseite → „Mandat anfragen“ öffnet das Formular mit Wunschanwalt
       const name = (await card.locator('.team-name').textContent()).trim();
       await card.locator('.team-name').click();

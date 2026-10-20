@@ -720,7 +720,9 @@
 .pf-head .lotm-badge{margin-left:.5rem;vertical-align:middle}
 @media (max-width:479px){.pf-head .lotm-badge{margin:.5rem 0 0}}
 .lotm-on-card{position:absolute;top:-.85rem;left:50%;transform:translateX(-50%);z-index:2}
-.team-card.is-lotm{position:relative;overflow:visible;border-color:rgba(212,175,55,.55);box-shadow:0 0 0 1px rgba(212,175,55,.25),0 18px 60px rgba(212,175,55,.14)}`;
+.team-card.is-lotm{position:relative;overflow:visible;border-color:rgba(212,175,55,.55);box-shadow:0 0 0 1px rgba(212,175,55,.25),0 18px 60px rgba(212,175,55,.14)}
+.ps-tilt{will-change:transform;transition:transform .14s ease-out,box-shadow .35s ease,border-color .35s ease!important}
+.ps-tilt:not(.ps-spot-on){transition:transform .7s cubic-bezier(.16,1,.3,1),box-shadow .35s ease,border-color .35s ease!important}`;
   const fxStyle = document.createElement('style');
   fxStyle.id = 'psFxCss';
   fxStyle.textContent = FX_CSS;
@@ -738,9 +740,14 @@
     return spotOk.get(el) ? el : null;
   }
   function spotOff() {
-    if (spotEl) spotEl.classList.remove('ps-spot-on');
+    if (spotEl) {
+      spotEl.classList.remove('ps-spot-on');
+      if (spotEl.classList.contains('ps-tilt')) spotEl.style.transform = '';
+    }
     spotEl = null;
   }
+  // Teamkarten (Startseite) neigen sich zusätzlich in 3D zur Maus – nicht bei gedämpften Animationen
+  const TILT_SEL = '.team-card';
   document.addEventListener(
     'pointermove',
     (e) => {
@@ -761,9 +768,16 @@
         spotRaf = 0;
         if (!spotEl || !spotEl.isConnected) return spotOff();
         const r = spotEl.getBoundingClientRect();
+        // Lage in der Karte von der Mitte aus – stimmt auch, solange die Karte geneigt ist
         spotEl.style.setProperty('--mx', `${Math.round(spotXY[0] - (r.left + r.width / 2) + spotEl.offsetWidth / 2)}px`);
         spotEl.style.setProperty('--my', `${Math.round(spotXY[1] - (r.top + r.height / 2) + spotEl.offsetHeight / 2)}px`);
         spotEl.classList.add('ps-spot-on');
+        if (spotEl.matches(TILT_SEL) && !motion.calm()) {
+          const px = Math.max(-0.5, Math.min(0.5, (spotXY[0] - r.left) / r.width - 0.5));
+          const py = Math.max(-0.5, Math.min(0.5, (spotXY[1] - r.top) / r.height - 0.5));
+          spotEl.classList.add('ps-tilt');
+          spotEl.style.transform = `perspective(900px) translateY(-6px) rotateX(${(-py * 9).toFixed(2)}deg) rotateY(${(px * 11).toFixed(2)}deg) scale(1.015)`;
+        }
       });
     },
     { passive: true }

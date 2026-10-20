@@ -1897,7 +1897,10 @@ body.cal-dragging, body.cal-dragging * { cursor: grabbing !important; user-selec
 .chip-row.hub-tabs .nav-count { margin-left: 0.15rem; }
 /* Goldene Hauptknöpfe: beim Drüberfahren läuft einmal eine feine Lichtkante darüber */
 .btn-gold { position: relative; overflow: hidden; isolation: isolate; }
-/* Status-Wechsel: neues Badge blendet weich ein und glänzt kurz (14-start.js) */
+.btn-gold::after { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(105deg, transparent 35%, rgba(255, 248, 220, 0.55) 50%, transparent 65%); transform: translateX(-120%); }
+.btn-gold:hover::after { animation: btn-glint 0.75s ease-out; }
+@keyframes btn-glint { to { transform: translateX(120%); } }
+/* Status-Wechsel: neues Badge blendet weich ein (14-start.js) */
 .badge-changed { animation: badge-change 0.5s ease-out; }
 @keyframes badge-change { from { opacity: 0.25; } to { opacity: 1; } }
 @keyframes seal-draw { to { stroke-dashoffset: 0; } }
