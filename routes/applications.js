@@ -29,7 +29,7 @@ const limit = (windowMs, max, message, skipFailedRequests = false) =>
 /* ================================================================
    Nachrichten zwischen Board und Bewerber
    ================================================================
- * Der Bewerber hat kein Konto: Er erreicht seine Bewerbung über einen persönlichen Link (/bewerbung.html#<token>,
+ * Der Bewerber hat kein Konto: Er erreicht seine Bewerbung über einen persönlichen Link (/bewerbung#<token>,
  * nach dem Absenden angezeigt und auf dem Gerät gemerkt). Verbindet er sein Discord, schickt der Bot ihm den Link per
  * Direktnachricht, und „Mit Discord öffnen“ führt auf jedem Gerät hin – Antworten und neue Stände kommen ebenfalls per
  * DM. Bewerbungsnummer + Zugangscode gibt es nur noch als Notlösung, solange Discord-Anmeldung oder Bot fehlen.
@@ -37,7 +37,7 @@ const limit = (windowMs, max, message, skipFailedRequests = false) =>
  * Nachrichten nur als Protokoll fürs Board – der Bewerber ist nicht im Ticket (dort stehen auch interne Notizen).
  */
 const newToken = () => crypto.randomBytes(24).toString('base64url');
-const portalPath = (a) => `/bewerbung.html#${a.access_token}`;
+const portalPath = (a) => `/bewerbung#${a.access_token}`;
 /** Zugang über Discord möglich (Anmeldung + Bot für die Direktnachricht)? Sonst bleibt Nummer + Zugangscode. */
 const discordAccess = () => discord.oauthConfigured() && tickets.hasToken();
 
@@ -138,7 +138,7 @@ publicRouter.post(
     });
     // Zugangscode nur, wenn es den Weg über Discord nicht gibt
     const viaDiscord = discordAccess();
-    res.status(201).json({ number, positionTitle, token, portal: `/bewerbung.html#${token}`, discord: viaDiscord, ...(viaDiscord ? {} : { code }) });
+    res.status(201).json({ number, positionTitle, token, portal: `/bewerbung#${token}`, discord: viaDiscord, ...(viaDiscord ? {} : { code }) });
   })
 );
 

@@ -148,7 +148,7 @@ function handover(c, by, leadId, text) {
           ],
         }),
       ],
-      components: base ? [{ type: 1, components: [{ type: 2, style: 5, label: 'Akte öffnen', url: `${base}/dashboard.html?case=${c.id}#cases` }] }] : undefined,
+      components: base ? [{ type: 1, components: [{ type: 2, style: 5, label: 'Akte öffnen', url: `${base}/dashboard?case=${c.id}#cases` }] }] : undefined,
       allowed_mentions: { parse: [] },
     });
   })().catch(() => {});

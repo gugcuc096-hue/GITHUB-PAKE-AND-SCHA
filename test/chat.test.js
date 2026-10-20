@@ -149,7 +149,7 @@ describe('Nachrichten, Bewerberseite und VIP-Preise', () => {
       });
       assert.equal(r.status, 201, r.text);
       assert.match(r.json.token, /^[\w-]{30,}$/);
-      assert.equal(r.json.portal, `/bewerbung.html#${r.json.token}`);
+      assert.equal(r.json.portal, `/bewerbung#${r.json.token}`);
       Object.assign(state, { app: r.json });
       state.appId = (await as.admin.get('/api/admin/applications')).json.applications.find((a) => a.number === r.json.number).id;
       const access = await client(server.base).post('/api/public/application-access', { number: r.json.number.toLowerCase(), code: r.json.code });
@@ -234,9 +234,9 @@ describe('Nachrichten, Bewerberseite und VIP-Preise', () => {
           body: new URLSearchParams({ token }).toString(),
         });
       assert.equal((await post(state.app.token, 'https://boese.example')).status, 403, 'fremde Seite blockiert');
-      assert.equal((await post('x'.repeat(32))).headers.get('location'), '/bewerbung.html?discord=notfound');
+      assert.equal((await post('x'.repeat(32))).headers.get('location'), '/bewerbung?discord=notfound');
       // gültig, aber Discord-Anmeldung (OAuth) ist im Test nicht eingerichtet
-      assert.equal((await post(state.app.token)).headers.get('location'), '/bewerbung.html?discord=disabled');
+      assert.equal((await post(state.app.token)).headers.get('location'), '/bewerbung?discord=disabled');
     });
 
     it('Kurzübersicht für Start- und Karriereseite: Stand und neue Nachrichten, ohne sie als gelesen zu markieren', async () => {

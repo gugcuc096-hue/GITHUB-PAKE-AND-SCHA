@@ -31,7 +31,7 @@ function dueCases(days) {
 const dayText = (n) => `${n} ${n === 1 ? 'Tag' : 'Tagen'}`;
 
 async function notifyLawyer(lawyerId, list, days) {
-  const link = discord.publicUrl(list.length === 1 ? `/dashboard.html?case=${list[0].id}#cases` : '/dashboard.html#cases');
+  const link = discord.publicUrl(list.length === 1 ? `/dashboard?case=${list[0].id}#cases` : '/dashboard#cases');
   const lines = list.slice(0, MAX_LINES).map((c) => `• **${c.case_number}** – ${c.title} (seit ${dayText(c.quiet)})`);
   if (list.length > MAX_LINES) lines.push(`… und ${list.length - MAX_LINES} weitere`);
   const message = {

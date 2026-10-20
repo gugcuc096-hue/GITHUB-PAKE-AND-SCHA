@@ -154,7 +154,7 @@ describe('Zwei-Faktor-Anmeldung per Discord-DM', () => {
     const dm = toErika()[0];
     assert.match(dm.embeds[0].title, /Wie zufrieden waren Sie mit uns/);
     assert.match(dm.embeds[0].description, new RegExp(kase.caseNumber));
-    assert.equal(dm.components[0].components[0].url, `https://kanzlei.example/dashboard.html?case=${kase.id}&bewerten=1#cases`);
+    assert.equal(dm.components[0].components[0].url, `https://kanzlei.example/dashboard?case=${kase.id}&bewerten=1#cases`);
     assert.ok(!/verloren|Verurteilt/i.test(JSON.stringify(dm)), 'Ergebnis steht nicht in der Nachricht');
     assert.ok(db.prepare('SELECT review_requested_at FROM cases WHERE id = ?').get(kase.id).review_requested_at);
 
@@ -178,7 +178,7 @@ describe('Zwei-Faktor-Anmeldung per Discord-DM', () => {
       ['💰 Umsatz', '📁 Akten', '🧾 Offene Rechnungen', '⏸️ Liegengeblieben', '📅 Nächste 7 Tage', '📥 Board-Eingang']
     );
     assert.match(e.fields[1].value, /1 abgeschlossen/, 'die eben abgeschlossene Akte zählt');
-    assert.match(e.description, /https:\/\/kanzlei\.example\/dashboard\.html#stats/);
+    assert.match(e.description, /https:\/\/kanzlei\.example\/dashboard#stats/);
     // Abschaltbar in den Einstellungen
     const off = await admin.patch('/api/admin/settings', { weeklyReport: false });
     assert.equal(off.json.settings.weeklyReport, false);

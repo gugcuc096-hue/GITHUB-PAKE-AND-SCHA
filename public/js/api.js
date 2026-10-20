@@ -85,7 +85,8 @@
    * Verkleinert ein Bild im Browser (spart Speicher und Upload-Zeit) und liefert ein JPEG.
    * square: mittig quadratisch zuschneiden (Profilbilder).
    */
-  function resizeImage(file, { max = 1600, square = false, quality = 0.86 } = {}) {
+  /** webp: kleiner speichern, wo das Bild nur im Browser erscheint (nicht in Word-Dateien/Link-Vorschauen); ältere Browser bekommen JPEG. */
+  function resizeImage(file, { max = 1600, square = false, quality = 0.86, webp = false } = {}) {
     return new Promise((resolve, reject) => {
       if (!file || !/^image\//.test(file.type)) {
         reject(new Error('Bitte eine Bilddatei (JPG, PNG, WebP) auswählen.'));
@@ -114,7 +115,9 @@
         ctx.fillStyle = '#0a1228'; // Hintergrund für transparente PNGs
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Das Bild konnte nicht verarbeitet werden.'))), 'image/jpeg', quality);
+        const done = (blob) => (blob ? resolve(blob) : reject(new Error('Das Bild konnte nicht verarbeitet werden.')));
+        if (!webp) return canvas.toBlob(done, 'image/jpeg', quality);
+        canvas.toBlob((blob) => (blob && blob.type === 'image/webp' ? resolve(blob) : canvas.toBlob(done, 'image/jpeg', quality)), 'image/webp', 0.82);
       };
       img.onerror = () => {
         URL.revokeObjectURL(url);
@@ -309,7 +312,7 @@
       let fromDashboard = false;
       try {
         const ref = new URL(document.referrer);
-        fromDashboard = ref.origin === location.origin && ref.pathname === '/dashboard.html';
+        fromDashboard = ref.origin === location.origin && ref.pathname === '/dashboard';
       } catch {
         /* kein Verweis – direkt aufgerufen */
       }
@@ -940,5 +943,26 @@
     if (!to || to.origin !== location.origin || !to.pathname.startsWith('/team/') || motion.calm()) vt.skipTransition();
   });
 
-  window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog, closeToDashboard, drafts, applications, tab, fieldError, fieldErrors, clearFieldErrors, countUp, roll, motion };
+  /**
+   * Startseite/Karriere: Daten, die der Server gleich in die Seite geschrieben hat (#psBoot). boot('team', '/api/team')
+   * nimmt sie – einmal – und fragt nur nach, wenn etwas fehlt.
+   */
+  let bootData;
+  function boot(key, url) {
+    if (bootData === undefined) {
+      try {
+        bootData = JSON.parse(document.getElementById('psBoot')?.textContent || 'null');
+      } catch {
+        bootData = null;
+      }
+    }
+    const v = bootData && bootData[key];
+    if (v) {
+      delete bootData[key];
+      return Promise.resolve(v);
+    }
+    return api.get(url);
+  }
+
+  window.PS = { boot, api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog, closeToDashboard, drafts, applications, tab, fieldError, fieldErrors, clearFieldErrors, countUp, roll, motion };
 })();

@@ -361,7 +361,7 @@ router.post(
         { name: 'Preis', value: money(tier.price) },
         ...(current ? [{ name: 'Aktuell', value: `${current.tier_name}${current.expires_at ? ` bis ${ms.fmtDate(current.expires_at)}` : ''}` }] : []),
       ],
-      link: discord.publicUrl('/dashboard.html#vip'),
+      link: discord.publicUrl('/dashboard#vip'),
       color: tier.kind === 'perma' ? discord.GOLD : 0x38bdf8,
     });
     res.status(201).json({ request: requestRow(r) });

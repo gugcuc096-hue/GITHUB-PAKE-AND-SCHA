@@ -69,7 +69,7 @@ views.profile = {
       : st.discordOAuth
         ? `<p class="text-sm text-muted mb-4">Verbinden Sie Ihr Discord-Konto, um sich künftig mit einem Klick anzumelden${isStaff() ? ' und bei Fristen oder neuen Akten im Kanzlei-Discord erwähnt zu werden' : ''}.</p>
              <a class="btn-discord btn-md" href="/api/discord/connect">${DISCORD_ICON}<span>Mit Discord verbinden</span></a>`
-        : `<p class="text-sm text-muted">Das Board of Partners hat die Discord-Anmeldung noch nicht eingerichtet.${isAdmin() ? ' <a href="/dashboard.html?tab=bot&amp;modul=login#settings" class="text-gold underline">Einstellungen → Discord → Discord-Login</a> zeigt, was fehlt.' : ''}</p>`;
+        : `<p class="text-sm text-muted">Das Board of Partners hat die Discord-Anmeldung noch nicht eingerichtet.${isAdmin() ? ' <a href="/dashboard?tab=bot&amp;modul=login#settings" class="text-gold underline">Einstellungen → Discord → Discord-Login</a> zeigt, was fehlt.' : ''}</p>`;
     return `
         ${u.mustChangePassword ? `<div class="banner banner-amber">${icon('alert')}<div><strong>Bitte jetzt ein eigenes Passwort festlegen.</strong> Ihr aktuelles Passwort wurde automatisch erzeugt oder vom Board of Partners zurückgesetzt.</div></div>` : ''}
         <div class="page-head"><div><h1 class="page-title">Mein Profil</h1><p class="page-sub">Kontaktdaten, Passwort, Discord${isStaff() ? ' und FiveNet' : ''}.</p></div></div>
@@ -238,7 +238,7 @@ function vipRequestHtml(r) {
       <div class="main"><div class="title flex flex-wrap items-center gap-2">${esc(r.name)} ${memberBadge({ kind: r.kind, name: r.tierName })}${badge(bl, bc)}</div>
         <div class="meta">${esc(r.email)} · ${money(r.price)} · ${fmtPct(r.discountPct)} % · ${r.durationDays ? `${r.durationDays} Tage` : 'unbefristet'} · angefragt ${esc(fmtDate(r.createdAt))}${r.discordLinked ? '' : ' · kein Discord'}</div>
         ${r.message ? `<div class="meta">Nachricht: ${esc(r.message)}</div>` : ''}
-        ${r.invoice ? `<div class="meta">Rechnung <a class="text-gold underline" href="/invoice.html?id=${r.invoice.id}" target="_blank" rel="noopener">${esc(r.invoice.number)}</a> · ${esc(r.invoice.status)}</div>` : ''}
+        ${r.invoice ? `<div class="meta">Rechnung <a class="text-gold underline" href="/rechnung?id=${r.invoice.id}" target="_blank" rel="noopener">${esc(r.invoice.number)}</a> · ${esc(r.invoice.status)}</div>` : ''}
         ${r.decisionNote ? `<div class="meta">${r.status === 'abgelehnt' ? 'Grund' : 'Hinweis'}: ${esc(r.decisionNote)}</div>` : ''}</div>
       <div class="flex flex-wrap gap-2 shrink-0">
         ${r.status === 'offen' ? `<button class="btn-gold btn-sm" data-action="vipreq-accept" data-id="${r.id}">${icon('check', 'ico-sm')}<span>Annehmen</span></button><button class="btn-ghost btn-sm" data-action="vipreq-decline" data-id="${r.id}">Ablehnen</button>` : ''}
@@ -378,7 +378,7 @@ views['vip-angebot'] = {
     const want = Number(new URLSearchParams(location.search).get('vip'));
     if (want) {
       st.vipAutoTier = want;
-      history.replaceState(history.state, '', '/dashboard.html' + location.hash);
+      history.replaceState(history.state, '', '/dashboard' + location.hash);
     }
   },
   render() {
@@ -394,7 +394,7 @@ views['vip-angebot'] = {
     const status = running
       ? running.status === 'offen'
         ? `<div class="banner banner-amber items-center justify-between flex-wrap"><div><strong>Anfrage gesendet: ${esc(running.tierName)}</strong> (${money(running.price)}) · ${esc(fmtDate(running.createdAt))}<div class="text-xs text-dim">Das Board of Partners meldet sich – danach erhalten Sie die Rechnung.</div></div><button class="btn-ghost btn-sm" data-action="vip-request-withdraw" data-id="${running.id}">Zurückziehen</button></div>`
-        : `<div class="banner banner-gold items-center justify-between flex-wrap"><div><strong>Angenommen: ${esc(running.tierName)}</strong> – bitte die Rechnung ${running.invoice ? `<strong>${esc(running.invoice.number)}</strong> ` : ''}über <strong>${money(running.price)}</strong> im Spiel bezahlen. Danach wird Ihre Mitgliedschaft automatisch freigeschaltet.${running.decisionNote ? `<div class="text-xs mt-1">${esc(running.decisionNote)}</div>` : ''}</div>${running.invoice ? `<a class="btn-outline btn-sm" href="/invoice.html?id=${running.invoice.id}" target="_blank" rel="noopener">${icon('receipt', 'ico-sm')}<span>Rechnung</span></a>` : ''}</div>`
+        : `<div class="banner banner-gold items-center justify-between flex-wrap"><div><strong>Angenommen: ${esc(running.tierName)}</strong> – bitte die Rechnung ${running.invoice ? `<strong>${esc(running.invoice.number)}</strong> ` : ''}über <strong>${money(running.price)}</strong> im Spiel bezahlen. Danach wird Ihre Mitgliedschaft automatisch freigeschaltet.${running.decisionNote ? `<div class="text-xs mt-1">${esc(running.decisionNote)}</div>` : ''}</div>${running.invoice ? `<a class="btn-outline btn-sm" href="/rechnung?id=${running.invoice.id}" target="_blank" rel="noopener">${icon('receipt', 'ico-sm')}<span>Rechnung</span></a>` : ''}</div>`
       : last && last.status === 'abgelehnt'
         ? `<div class="banner banner-red">${icon('alert')}<div>Ihre letzte Anfrage (${esc(last.tierName)}) wurde abgelehnt.${last.decisionNote ? ` Grund: ${esc(last.decisionNote)}` : ''}</div></div>`
         : '';
@@ -844,4 +844,114 @@ function updatePromotePreview() {
     ? `${esc(u.name)}: ${esc(u.rank || 'ohne Rang')} → <strong class="text-gold">${esc(rank)}</strong> ${statusBadge(PERSONNEL_TYPE, kind === 'Rückstufung' ? 'rueckstufung' : 'befoerderung')}`
     : `${esc(u.name)} hat bereits diesen Rang.`;
   $('#prSubmit').textContent = kind === 'Rückstufung' ? 'Rang ändern' : 'Befördern';
+}
+
+/* ---------------------------------------------------------------- Gemeinsam (auch für Mandanten geladen)
+ * Stehen hier statt in 09-verwaltung.js: die Verwaltungsteile lädt das Dashboard nur für die Kanzlei nach. */
+/** Übersicht: kurze Zeile, wer heute abgemeldet ist. */
+function absenceStrip() {
+  const now = (st.absences?.absences || []).filter((a) => a.state === 'aktiv');
+  if (!isStaff() || !now.length) return '';
+  return `<a href="#duty" class="absence-strip mb-4 lg:mb-5">${icon('calendar', 'ico-sm')}<span><strong>Heute abgemeldet:</strong> ${now
+    .map((a) => `${esc(a.name)} <span class="text-dim">(bis ${esc(dayDe(a.endDate))}, ${esc(a.reasonLabel)})</span>`)
+    .join(', ')}</span></a>`;
+}
+
+/** Akte: Bearbeitungszeiten (nur Board of Partners). */
+function caseWorkSection(c, work) {
+  if (!work || !isBoard()) return '';
+  const now = Date.now();
+  const opened = parseDate(c.createdAt);
+  const end = work.closedAt ? parseDate(work.closedAt) : null;
+  const total = opened ? (end ? end.getTime() : now) - opened.getTime() : null;
+  const since = `${end ? 'Bearbeitungsdauer bis zum Abschluss' : 'Offen seit'} ${fmtDur(total)}`;
+  if (!work.rows.length) return emptySection('secWork', 'Bearbeitungszeiten', `noch keine Bearbeitung erfasst · ${since}`, '', 'Nur für das Board of Partners sichtbar.');
+  const rows = work.rows
+        .map(
+          (w) => `<div class="list-row wrap"><div class="main"><div class="title flex flex-wrap items-center gap-2">${esc(w.name)}${statusBadge(ROLE_BADGE, w.role)}</div>
+              <div class="meta">${esc(fmtDate(w.startedAt))} – ${w.running ? 'heute' : esc(fmtDate(w.endedAt))}${w.endReason ? ' · ' + esc(w.endReason) : ''}${w.estimated ? ' · ≈ geschätzt' : ''}</div></div>
+              <span class="font-mono text-sm shrink-0 ${w.running ? 'text-emerald-300' : 'text-gold'}">${w.estimated ? '≈ ' : ''}${esc(fmtDur(w.durationMs))}</span></div>`
+        )
+        .join('');
+  return `<div class="section" id="secWork"><h3 class="section-title">Bearbeitungszeiten <span class="text-xs text-dim font-normal">nur Board of Partners</span></h3>
+      <p class="text-sm text-muted mb-2">${end ? `Bearbeitungsdauer bis zum Abschluss: <strong>${esc(fmtDur(total))}</strong>` : `Offen seit <strong>${esc(fmtDur(total))}</strong>`}</p>
+      ${rows}</div>`;
+}
+
+/* ---------------------------------------------------------------- Bild-Uploads */
+async function handleUpload(input) {
+  const files = [...(input.files || [])];
+  const kind = input.dataset.upload;
+  input.value = '';
+  if (!files.length) return;
+
+  if (kind === 'backup') {
+    // Sicherung (Datenbank oder Bilder-Archiv) unverändert als Binärdaten hochladen
+    toast('Sicherung wird hochgeladen …');
+    const res = await api.upload('/api/admin/backups/upload', new Blob([files[0]], { type: 'application/octet-stream' }));
+    const r = res.result;
+    st.backups = res;
+    toast(
+      r.kind === 'datenbank'
+        ? 'Datenbank-Sicherung vorgemerkt – sie wird beim nächsten Neustart eingespielt.'
+        : `Bilder eingespielt: ${r.added} neu, ${r.existing} schon vorhanden${r.skipped ? `, ${r.skipped} übersprungen` : ''}.`
+    );
+    renderView();
+    return;
+  }
+
+  if (kind === 'avatar') {
+    const blob = await resizeImage(files[0], { max: 512, square: true, webp: true });
+    const res = await api.upload('/api/auth/avatar', blob);
+    st.user = res.user;
+    renderUser();
+    if (st.view === 'profile') renderView();
+    toast('Profilbild aktualisiert.');
+  } else if (kind === 'team') {
+    const id = Number(input.dataset.id);
+    const blob = await resizeImage(files[0], { max: 640, square: true });
+    const res = await api.upload(`/api/admin/team/${id}/photo`, blob);
+    const m = res.member;
+    const photo = $('#tmPhoto');
+    if (photo) photo.innerHTML = avatarImg(m.photoUrl, m.name);
+    const ctl = $('#tmPhotoCtl');
+    if (ctl) ctl.innerHTML = teamPhotoControls(m);
+    toast('Foto gespeichert – live auf der Website.');
+    await refreshBehind();
+  } else if (kind === 'storage-item') {
+    // Bild eines Lager-Gegenstands (Einstellungen → Lager)
+    await api.upload(`/api/storage/items/${input.dataset.id}/image`, await resizeImage(files[0], { max: 480, webp: true }));
+    toast('Bild gespeichert.');
+    await reloadStorageAdmin();
+  } else if (kind === 'fn-pending') {
+    addPendingImages({ blobs: files });
+  } else if (kind === 'fivenet-img') {
+    const caseId = Number(input.dataset.caseId);
+    const d = st.caseDocs.find((x) => x.id === Number(input.dataset.docId));
+    if (!d) return;
+    st.fnPending = { urls: [], blobs: files.slice(0, FN_MAX_IMAGES) };
+    reportImport(await importPendingImages(caseId, d));
+    await reloadCase(caseId);
+  } else if (kind === 'pay-proof') {
+    // Screenshot zur gemeldeten Zahlung nachreichen
+    toast('Screenshot wird hochgeladen …');
+    await api.upload(`/api/invoices/${input.dataset.id}/payment-proof`, await resizeImage(files[0], { max: 1600 }));
+    toast('Screenshot gespeichert – die Kanzlei sieht ihn bei der Zahlungsmeldung.');
+    await afterInvoiceChange(input);
+  } else if (kind === 'evidence') {
+    const caseId = Number(input.dataset.caseId);
+    const caption = ($('#attCaption')?.value || '').trim();
+    // Ohne Kästchen (erster Upload aus der leeren Zeile): bei der Kanzlei wie voreingestellt „nur intern“
+    const box = $('#attInternal');
+    const internal = (box ? box.checked : isStaff()) ? '1' : '0';
+    const batch = files.slice(0, 10);
+    if (files.length > 10) toast('Es werden maximal 10 Bilder auf einmal hochgeladen.', 'error');
+    toast(batch.length === 1 ? 'Bild wird hochgeladen …' : `${batch.length} Bilder werden hochgeladen …`);
+    for (const f of batch) {
+      const blob = await resizeImage(f, { max: 1600 });
+      await api.upload(`/api/cases/${caseId}/attachments?caption=${encodeURIComponent(caption)}&internal=${internal}`, blob);
+    }
+    toast(batch.length === 1 ? 'Anhang gespeichert.' : `${batch.length} Anhänge gespeichert.`);
+    await reloadCase(caseId);
+  }
 }

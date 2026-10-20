@@ -73,7 +73,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
   }
   const overflow = (page) => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   async function login(page, email, base = server.base) {
-    await page.goto(base + '/login.html');
+    await page.goto(base + '/login');
     await page.fill('#email', email);
     await page.fill('#password', PASSWORD);
     await page.click('button[type=submit]');
@@ -117,7 +117,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
 
   it('Registrierung als Mandant führt ins Dashboard', async () => {
     const { ctx, page, problems } = await open(DESKTOP);
-    await page.goto(server.base + '/register.html');
+    await page.goto(server.base + '/registrieren');
     await page.fill('#displayName', 'Rita Registriert');
     await page.fill('#password', 'Mandanten-Passwort-9');
     await page.fill('#password2', 'Mandanten-Passwort-9');
@@ -207,8 +207,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       // Dokumente ohne Druckersymbol: die Nummer öffnet die Ansicht der Website, das Symbol daneben ebenso
       // (ohne verbundenes Google-Konto gibt es kein Google Doc – sonst öffnet das Symbol direkt das Doc)
       assert.equal(await page.$$eval('#modalBody svg path', (ps) => ps.filter((p) => (p.getAttribute('d') || '').startsWith('M17 17h2')).length), 0, 'kein Druckersymbol in der Akte');
-      assert.equal(await page.getAttribute(`#secInvoices a.doc-title[href="/invoice.html?id=${data.invoiceId}"]`, 'target'), '_blank');
-      assert.equal(await page.getAttribute(`#secInvoices a.icon-btn[href="/invoice.html?id=${data.invoiceId}"]`, 'aria-label'), 'Ansehen');
+      assert.equal(await page.getAttribute(`#secInvoices a.doc-title[href="/rechnung?id=${data.invoiceId}"]`, 'target'), '_blank');
+      assert.equal(await page.getAttribute(`#secInvoices a.icon-btn[href="/rechnung?id=${data.invoiceId}"]`, 'aria-label'), 'Ansehen');
 
       // Weit unten in der Akte: das X bleibt oben rechts sichtbar und klickbar
       await page.$eval(scroller, (el) => (el.scrollTop = el.scrollHeight));
@@ -248,7 +248,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       await page.goBack();
       await page.waitForTimeout(500);
       const afterBack = await page.evaluate(() => location.pathname + location.hash);
-      assert.ok(afterBack === '/dashboard.html' || afterBack === '/dashboard.html#overview', `Zurück nach abgebrochener Rechnung: Seite davor (${afterBack})`);
+      assert.ok(afterBack === '/dashboard' || afterBack === '/dashboard#overview', `Zurück nach abgebrochener Rechnung: Seite davor (${afterBack})`);
       // Die Suche (Strg + K) schließt ebenso per Klick daneben
       await page.keyboard.press('Control+k');
       await page.waitForSelector('#gsInput');
@@ -326,7 +326,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       // Board sieht die Antwort im offenen Fenster (Nachladen)
       await page.waitForFunction((t) => [...document.querySelectorAll('#appChatList .chat-text')].some((e) => e.textContent === t), `Antwort des Bewerbers (${label})`, { timeout: 12000 });
       // Karriereseite: Bewerbung ist auf dem Gerät gemerkt – oben mit Stand, „Meine Bewerbung“ führt direkt hin
-      await portal.goto(server.base + '/karriere.html');
+      await portal.goto(server.base + '/karriere');
       await portal.waitForSelector(`#meine a[href="${app.portal}"] .badge`);
       assert.match(await portal.textContent('#meine'), /In Prüfung/);
       for (const href of await portal.$$eval('[data-my-link]', (as) => as.map((a) => a.getAttribute('href')))) assert.equal(href, app.portal);
@@ -431,7 +431,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       await page.selectOption('#bf_tpl', { label: 'Antrag auf Akteneinsicht' });
       await page.click('form[data-form="brief-new"] button[type=submit]');
       await settle();
-      const href = await page.getAttribute('#secBriefs a[href^="/vertrag.html"] >> nth=0', 'href');
+      const href = await page.getAttribute('#secBriefs a[href^="/vertrag"] >> nth=0', 'href');
       await page.goto(server.base + href);
       await page.waitForSelector('.sheet');
       const link = await page.$eval('.sheet a.k-link', (a) => ({ href: a.href, text: a.textContent, target: a.target }));
@@ -452,12 +452,12 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await adm.login(TEAM.admin);
         assert.equal((await adm.patch('/api/tickets/settings', { guildId: GUILD })).status, 200);
         const { ctx, page, problems, settle } = await open(device);
-        await page.goto(dsrv.base + '/login.html');
+        await page.goto(dsrv.base + '/login');
         await page.fill('#email', TEAM.admin);
         await page.fill('#password', PASSWORD);
         await page.click('button[type=submit]');
         await page.waitForURL(/dashboard/);
-        await page.goto(dsrv.base + '/dashboard.html?tab=bot&modul=messages#settings');
+        await page.goto(dsrv.base + '/dashboard?tab=bot&modul=messages#settings');
         await page.waitForSelector('[data-action="msg-new"]');
         await settle();
         await page.click('[data-action="msg-new"]');
@@ -535,7 +535,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await settle();
         const titles = () => page.$$eval('#content section.todo .todo-title', (els) => els.map((e) => e.textContent));
         assert.deepEqual(await titles(), [`${k.templateName} unterschreiben`, `Rechnung ${inv.number} über 9.000 $ begleichen`, 'Neue Nachricht von Ihrer Kanzlei']);
-        assert.equal(await page.getAttribute(`#content section.todo a[href="/vertrag.html?id=${k.id}"]`, 'target'), '_blank', 'Vertrag öffnet sich zum Unterschreiben');
+        assert.equal(await page.getAttribute(`#content section.todo a[href="/vertrag?id=${k.id}"]`, 'target'), '_blank', 'Vertrag öffnet sich zum Unterschreiben');
         const top = await page.$eval('#content section.todo', (el) => el.getBoundingClientRect().top);
         const kpis = await page.$eval('#content .kpi-grid', (el) => el.getBoundingClientRect().top);
         assert.ok(top < kpis, 'Karte steht ganz oben (vor den Kennzahlen)');
@@ -615,7 +615,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Liste passt aufs Handy');
 
         // Der Name in der Akte öffnet die Kartei, X führt zurück in die Akte
-        await page.goto(server.base + `/dashboard.html?case=${data.caseId}#cases`);
+        await page.goto(server.base + `/dashboard?case=${data.caseId}#cases`);
         await page.waitForSelector('#modalBody .case-head');
         await settle();
         await page.click('#modalBody .client-link');
@@ -666,7 +666,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       let site = null;
       try {
         await login(page, TEAM.admin);
-        await page.goto(server.base + `/dashboard.html?case=${kase.id}#cases`);
+        await page.goto(server.base + `/dashboard?case=${kase.id}#cases`);
         await page.waitForSelector('#modalBody .case-head');
         await settle();
         // „Rechnung“ in der Akte: Leistungen aus dem Vertrag stehen schon drin
@@ -742,7 +742,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         assert.equal((await adm.post('/api/duty', { status: 'dienst' })).status, 200);
         await login(page, TEAM.admin, qsrv.base);
         const openKase = async () => {
-          await page.goto(qsrv.base + `/dashboard.html?case=${kase.id}#cases`);
+          await page.goto(qsrv.base + `/dashboard?case=${kase.id}#cases`);
           await page.waitForSelector('#modalBody .case-head');
           await settle();
         };
@@ -853,11 +853,11 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
 
         // 1) Registrieren mit Discord → Dashboard fragt einmal nach dem Namen im Spiel
         discordId = `90000000000000016${suffix}`;
-        await page.goto(dsrv.base + '/register.html');
+        await page.goto(dsrv.base + '/registrieren');
         await page.waitForSelector('#discordBlock:not(.hidden) a[href="/api/discord/register"]');
         if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Registrierung passt aufs Handy');
         await page.click('#discordBlock a[href="/api/discord/register"]');
-        await page.waitForURL(/dashboard\.html/);
+        await page.waitForURL(/dashboard/);
         await page.waitForSelector('#modalBody form[data-form="initial-name"]');
         await page.fill('#inName', 'Tony');
         await page.click('#modalBody form[data-form="initial-name"] button[type=submit]');
@@ -875,15 +875,15 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         // 2) Abmelden, „Mit Discord anmelden“ mit einem neuen Discord → Login-Seite fragt nach, bevor ein Konto entsteht
         await ctx.clearCookies();
         discordId = `90000000000000017${suffix}`;
-        await page.goto(dsrv.base + '/login.html');
+        await page.goto(dsrv.base + '/login');
         await page.waitForSelector('#discordBlock:not(.hidden)');
         await page.click('#discordBlock a[href="/api/discord/login"]');
-        await page.waitForURL(/login\.html\?discord=neu/);
+        await page.waitForURL(/login\?discord=neu/);
         await page.waitForSelector('#discordSignup:not(.hidden)');
         assert.match(await page.textContent('#discordSignupName'), /Neuer Nutzer/);
         if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Login-Seite passt aufs Handy');
         await page.click('#discordSignupBtn');
-        await page.waitForURL(/dashboard\.html/);
+        await page.waitForURL(/dashboard/);
         await page.waitForSelector('#modalBody form[data-form="initial-name"]');
 
         // 3) Mandatsanfrage auf der Startseite → „Konto mit Discord anlegen“ → Akte öffnet sich im Portal
@@ -922,7 +922,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         const caseNumber = (await page.textContent('#ticketSuccess .font-mono')).trim();
         if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Erfolgsanzeige passt aufs Handy');
         await page.click('#ticketAccount');
-        await page.waitForURL(/dashboard\.html/);
+        await page.waitForURL(/dashboard/);
         await page.waitForSelector('#modalBody #chatList', { timeout: 10000 });
         assert.match(await page.textContent('#modalBody'), new RegExp(caseNumber));
         assert.equal(await page.$('#modalBody form[data-form="initial-name"]'), null, 'Name kommt aus der Mandatsanfrage');
@@ -1098,7 +1098,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await settle();
         assert.equal((await adm.get('/api/admin/settings')).json.settings.discordPingRole, '1546979799820537986', 'Webhook-Einstellungen speichern wie zuvor');
         // Alter Link aus Hinweisen (?tab=bot&modul=login) führt weiter zum richtigen Modul
-        await page.goto(`${usrv.base}/dashboard.html?tab=bot&modul=login#settings`);
+        await page.goto(`${usrv.base}/dashboard?tab=bot&modul=login#settings`);
         await page.waitForSelector('#content .bot-nav-item[data-module="login"].active');
         assert.match(await page.textContent('#content'), /Discord-Login/);
         if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Einstellungen passen aufs Handy');
@@ -1142,7 +1142,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         };
 
         // 1) „Im Dashboard öffnen“ aus dem Discord-Ticket bzw. /akte (Link ohne Seite): dahinter liegt die Aktenliste
-        await page.goto(`${rsrv.base}/dashboard.html?case=${kase.id}`);
+        await page.goto(`${rsrv.base}/dashboard?case=${kase.id}`);
         await page.waitForSelector('#modalBody .case-jump');
         await settle();
         await closedTo(page, 'Discord-Link');
@@ -1150,7 +1150,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         // 2) Vertrag, Rechnung und Aktenauszug aus der Akte (neuer Tab): „← Zur Akte“ schließt den Tab – die Akte ist noch offen
         await page.click(`[data-action="open-case"][data-id="${kase.id}"] >> nth=0`);
         await page.waitForSelector('#modalBody .case-jump');
-        for (const href of [`/vertrag.html?id=${k.id}`, `/invoice.html?id=${inv.id}`, `/aktenauszug.html?id=${kase.id}`]) {
+        for (const href of [`/vertrag?id=${k.id}`, `/rechnung?id=${inv.id}`, `/aktenauszug?id=${kase.id}`]) {
           const [tab] = await Promise.all([ctx.waitForEvent('page'), page.$eval(`#modalBody a[href="${href}"]`, (a) => a.click())]);
           await tab.waitForFunction(() => document.getElementById('backLink').href.includes('?case='));
           assert.match(await tab.textContent('#backLink'), /Zur Akte/, `${href}: Knopf „Zur Akte“`);
@@ -1162,10 +1162,10 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
 
         // 3) Druckansicht direkt aufgerufen (z. B. „Lesen & unterschreiben“ aus Discord): „← Zur Akte“ öffnet die Akte, X führt zur Liste
         const direct = await ctx.newPage();
-        await direct.goto(`${rsrv.base}/vertrag.html?id=${k.id}`);
+        await direct.goto(`${rsrv.base}/vertrag?id=${k.id}`);
         await direct.waitForFunction(() => document.getElementById('backLink').href.includes('?case='));
         await direct.click('#backLink');
-        await direct.waitForURL(/dashboard\.html/);
+        await direct.waitForURL(/dashboard/);
         await direct.waitForSelector('#modalBody .case-jump');
         await direct.waitForTimeout(300);
         await closedTo(direct, 'Vertrag direkt');
@@ -1173,12 +1173,12 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         // 4) Direkt vor der Akte liegt im Verlauf die Website (neu geladen, aus Discord, Brave überspringt Einträge):
         //    X bleibt trotzdem im Dashboard – früher führte das „Zurück“ beim Schließen auf die Website
         await direct.goto(`${rsrv.base}/`);
-        await direct.evaluate((id) => history.pushState({ psOverlay: 1 }, '', `/dashboard.html?case=${id}#cases`), kase.id);
+        await direct.evaluate((id) => history.pushState({ psOverlay: 1 }, '', `/dashboard?case=${id}#cases`), kase.id);
         await direct.reload();
         await direct.waitForSelector('#modalBody .case-jump');
         await direct.waitForTimeout(300);
         await closedTo(direct, 'Website davor');
-        assert.equal(new URL(direct.url()).pathname, '/dashboard.html', 'X verlässt das Dashboard nicht');
+        assert.equal(new URL(direct.url()).pathname, '/dashboard', 'X verlässt das Dashboard nicht');
 
         // 5) Normaler Weg: Der Eintrag der Akte verschwindet wieder – „Zurück“ führt danach zur Seite davor
         await direct.evaluate(() => (location.hash = '#overview'));
@@ -1221,7 +1221,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await login(page, TEAM.admin, ksrv.base);
         // Übersicht: liegengebliebene Akte wie in der Aktenliste („🕓 vor 8 Tagen“ + Streifen, kein Etikett), Aufgaben mit
         // Fälligkeit und Knöpfen in einer Zeile, leere Pinnwand als schmale Zeile, Seite so breit wie die Aktenliste
-        await page.goto(`${ksrv.base}/dashboard.html#overview`);
+        await page.goto(`${ksrv.base}/dashboard#overview`);
         await page.waitForSelector('#content .attention .list-row.row-idle');
         await settle();
         const ov = await page.evaluate(() => {
@@ -1243,7 +1243,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         assert.ok(ov.oneLine, 'Fälligkeit und Knöpfe der Aufgabe in einer Zeile');
         assert.deepEqual(ov.quiet, ['Pinnwand'], 'leere Pinnwand als schmale Zeile, offene Anfrage (Lena Berg) als Kasten');
         assert.equal(ov.maxWidth, '1760px', 'alle Seiten gleich breit');
-        await page.goto(`${ksrv.base}/dashboard.html#cases`);
+        await page.goto(`${ksrv.base}/dashboard#cases`);
         await page.waitForSelector('#caseList tr.row');
         await settle();
         // Aktenliste: kein Etikett unter dem Titel – „Aktenzeichen · Rechtsgebiet“ in einer Zeile, liegengeblieben steht in
@@ -1502,7 +1502,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         const kase = (await adm.post('/api/cases', { title: 'Beschlagnahmtes Fahrzeug', area: 'zivilrecht', clientName: 'Sofia Sofort', lawyerId: me.id })).json.case;
         assert.equal((await adm.post('/api/tasks', { title: 'Akteneinsicht beantragen', caseId: kase.id, assignedTo: me.id })).status, 201);
         await login(page, TEAM.admin, osrv.base);
-        await page.goto(osrv.base + `/dashboard.html?case=${kase.id}#cases`);
+        await page.goto(osrv.base + `/dashboard?case=${kase.id}#cases`);
         await page.waitForSelector('#modalBody .case-head');
         await settle();
         // Server antwortet langsam bzw. mit Fehler – die Anzeige wartet nicht darauf
@@ -1600,7 +1600,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         sql.close();
 
         // Board: nach dem Passwort der Code aus der Discord-DM – sechs Ziffern schicken das Formular von selbst ab
-        await page.goto(zsrv.base + '/login.html');
+        await page.goto(zsrv.base + '/login');
         await page.fill('#email', TEAM.admin);
         await page.fill('#password', PASSWORD);
         await page.click('button[type=submit]');
@@ -1624,7 +1624,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.waitForSelector('#nav a.nav-item');
 
         // Kanzlei-Statistik: Kennzahlen, zwei Diagramme mit Tooltip, Werte als Tabelle
-        await page.goto(zsrv.base + '/dashboard.html#stats');
+        await page.goto(zsrv.base + '/dashboard#stats');
         await page.waitForSelector('#content .vchart');
         await settle();
         assert.equal(await page.$$eval('#content .vchart', (c) => c.length), 2);
@@ -1642,7 +1642,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Statistik passt aufs Handy');
 
         // Lange Aktenliste: erst 50, beim Scrollen die nächsten 50, Rest per Knopf
-        await page.goto(zsrv.base + '/dashboard.html#cases');
+        await page.goto(zsrv.base + '/dashboard#cases');
         await page.waitForSelector('#content tr[data-action="open-case"]');
         await settle();
         const rows = () => page.$$eval('#content tr[data-action="open-case"]', (r) => r.length);
@@ -1672,7 +1672,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       });
       const { ctx, page, problems } = await open(device);
       try {
-        await page.goto(bsrv.base + '/karriere.html');
+        await page.goto(bsrv.base + '/karriere');
         await page.waitForSelector('#applyForm');
         await page.evaluate(() => {
           const f = document.getElementById('applyForm');
@@ -1692,12 +1692,12 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         // Anderes Gerät (ohne gespeicherte Bewerbung): Bewerberseite bietet „Mit Discord öffnen“
         const other = await ctx.browser().newContext({ ...device });
         const p2 = await other.newPage();
-        await p2.goto(bsrv.base + '/bewerbung.html');
+        await p2.goto(bsrv.base + '/bewerbung');
         await p2.waitForSelector('#portal a[href="/api/discord/application-open"]');
         assert.equal(await p2.$('#accessForm'), null, 'kein Code-Formular');
         await other.close();
         // Ohne Discord-Anmeldung (gemeinsamer Test-Server): Nummer + Zugangscode als Notlösung
-        await page.goto(server.base + '/karriere.html#status');
+        await page.goto(server.base + '/karriere#status');
         await page.waitForSelector('#statusForm.flex');
         assert.equal(await page.isVisible('#statusDiscord'), false);
         assert.deepEqual(problems, []);
@@ -1711,12 +1711,12 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
   it('Ansichten Rechnung und Aktenauszug ohne Drucken/PDF', async () => {
     const { ctx, page, problems } = await open(DESKTOP);
     await login(page, TEAM.admin);
-    await page.goto(`${server.base}/invoice.html?id=${data.invoiceId}`);
+    await page.goto(`${server.base}/rechnung?id=${data.invoiceId}`);
     await page.waitForSelector('.paper');
     // Kein Drucken/PDF mehr – die Kanzlei arbeitet mit Google Docs
     assert.equal(await page.locator('#printBtn').count(), 0);
     assert.doesNotMatch(await page.textContent('.toolbar'), /Drucken|PDF/);
-    await page.goto(`${server.base}/aktenauszug.html?id=${data.caseId}`);
+    await page.goto(`${server.base}/aktenauszug?id=${data.caseId}`);
     await page.waitForSelector('.paper h1');
     assert.ok((await page.textContent('.paper')).includes(data.caseNumber));
     assert.doesNotMatch(await page.textContent('.toolbar'), /Drucken|PDF|Aktualisieren/);
@@ -1768,7 +1768,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         const me = await adm.login(TEAM.admin);
         const kase = (await adm.post('/api/cases', { title: 'Missbrauch der Amtsgewalt', area: 'strafrecht', clientName: 'Toni Test', lawyerId: me.id })).json.case;
         await login(page, TEAM.admin, csrv.base);
-        await page.goto(`${csrv.base}/dashboard.html?case=${kase.id}#cases`);
+        await page.goto(`${csrv.base}/dashboard?case=${kase.id}#cases`);
         await page.waitForSelector('#modalBody .case-head');
         await page.evaluate(async () => {
           await load.fivenet();
@@ -1804,7 +1804,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       const reg = client(lsrv.base);
       assert.equal((await reg.post('/api/auth/register', { displayName: 'Lia Live', email: 'lia.live', password: 'Mandanten-Passwort-1' })).status, 201);
       const kase = (await anwalt.post('/api/cases', { title: 'Live im Portal', area: 'zivilrecht', clientEmail: 'lia.live' })).json.case;
-      await page.goto(lsrv.base + '/login.html');
+      await page.goto(lsrv.base + '/login');
       await page.fill('#email', 'lia.live');
       await page.fill('#password', 'Mandanten-Passwort-1');
       await page.click('button[type=submit]');
@@ -1839,7 +1839,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       // Handy: Registrierung – zu kurzes Passwort steht unter dem Passwort, vergebene Adresse unter der E-Mail
       {
         const { ctx, page, problems, settle } = await open(PHONE);
-        await page.goto(fsrv.base + '/register.html');
+        await page.goto(fsrv.base + '/registrieren');
         await page.fill('#displayName', 'Max Feldtest');
         await page.fill('#email', 'damat.lex');
         await page.fill('#password', 'kurz');
@@ -2010,7 +2010,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       // Seite verlassen, bevor die Zeit um ist: wird trotzdem gelöscht – spätestens beim nächsten Öffnen nachgeholt
       await page.click(`${row(t2.id)} [data-action="task-delete"]`);
       await page.goto(dsrv.base + '/');
-      await page.goto(dsrv.base + '/dashboard.html');
+      await page.goto(dsrv.base + '/dashboard');
       for (let i = 0; i < 20 && (await exists(t2.id)); i++) await new Promise((r) => setTimeout(r, 150));
       assert.equal(await exists(t2.id), false, 'beim Verlassen gelöscht');
       await page.waitForFunction(() => localStorage.getItem('ps.undoDeletes') === null); // nachgeholt bzw. erledigt
@@ -2035,7 +2035,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       const k = (await adm.post(`/api/cases/${kase.id}/contracts`, { templateId: templates.find((t) => t.key === 'mandatsvertrag').id, lawyerId: me.id, data: { ...defaults.data, mandant: 'Sina Siegel' } })).json.contract;
       assert.equal((await adm.post(`/api/contracts/${k.id}/sign`, { as: 'anwalt' })).status, 200);
       await login(page, 'sina.siegel@pake-scha.ls', vsrv.base);
-      await page.goto(`${vsrv.base}/vertrag.html?id=${k.id}`);
+      await page.goto(`${vsrv.base}/vertrag?id=${k.id}`);
       await page.waitForSelector('#signClient');
       const lawyerSig = page.locator('.k-script.lawyer').first();
       await lawyerSig.scrollIntoViewIfNeeded();
@@ -2091,7 +2091,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       // gilt auf dem ganzen Gerät: auch auf der Startseite und nach dem Neuladen
       await page.goto(msrv.base + '/');
       assert.equal(await calmMedia(), 'not all');
-      await page.goto(msrv.base + '/dashboard.html#profile');
+      await page.goto(msrv.base + '/dashboard#profile');
       await page.waitForSelector('[data-action="motion-set"][data-value="off"]');
       await page.click('[data-action="motion-set"][data-value="off"]');
       assert.equal(await calmMedia(), 'all');
@@ -2175,7 +2175,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       await A.page.waitForFunction((n) => (document.querySelector('#caseHere:not([hidden])')?.textContent || '').includes(`${n} ist auch hier`), first(partnerMe.displayName), { timeout: 6000 });
       await B.page.waitForFunction((n) => (document.querySelector('#caseHere:not([hidden])')?.textContent || '').includes(`${n} ist auch hier`), first(anwaltMe.displayName), { timeout: 6000 });
       // Mandant (Handy) öffnet sie auch: sieht keine Präsenz, taucht selbst nicht auf
-      await M.page.goto(psrv.base + '/login.html');
+      await M.page.goto(psrv.base + '/login');
       await M.page.fill('#email', 'mia.mandant');
       await M.page.fill('#password', 'Mandanten-Passwort-1');
       await M.page.click('button[type=submit]');
@@ -2321,7 +2321,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       const tap = (sel) => (label === 'Handy' ? page.tap(sel) : page.click(sel));
       try {
         await login(page, TEAM.admin, ksrv.base);
-        await page.goto(ksrv.base + '/dashboard.html#calendar');
+        await page.goto(ksrv.base + '/dashboard#calendar');
         await page.waitForSelector('#content .page-title');
         await page.evaluate(() => openModal(eventForm(null)));
         await tap('#evStart');
@@ -2376,7 +2376,7 @@ describe('Browser: Strafmaß, Verhandlung, Wiki, Beschlüsse, Rechnungszeile, Ge
     const problems = [];
     page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
     page.on('console', (m) => /Content Security Policy|Refused to (execute|load|apply)/.test(m.text()) && problems.push(`CSP: ${m.text()}`));
-    await page.goto(srv.base + '/login.html');
+    await page.goto(srv.base + '/login');
     await page.fill('#email', TEAM.admin);
     await page.fill('#password', PASSWORD);
     await page.click('button[type=submit]');
@@ -2473,7 +2473,7 @@ describe('Browser: Strafmaß, Verhandlung, Wiki, Beschlüsse, Rechnungszeile, Ge
   it('Handy: Fenster nach unten wegwischen, Ziehen zum Aktualisieren, nichts ragt über den Rand', async () => {
     const { ctx, page, problems } = await session(PHONE);
     try {
-      await page.goto(srv.base + '/dashboard.html#wiki');
+      await page.goto(srv.base + '/dashboard#wiki');
       await page.waitForSelector('.wiki-card');
       assert.ok((await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 1);
       await page.click('.wiki-card >> nth=0');
@@ -2486,7 +2486,7 @@ describe('Browser: Strafmaß, Verhandlung, Wiki, Beschlüsse, Rechnungszeile, Ge
       await page.waitForFunction(() => !document.querySelector('.ptr.spin'));
       await page.waitForTimeout(300);
       assert.ok(loads >= 1, 'Seite neu geladen');
-      await page.goto(srv.base + '/dashboard.html#resolutions');
+      await page.goto(srv.base + '/dashboard#resolutions');
       await page.waitForSelector('#content .page-title');
       assert.ok((await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 1);
       assert.deepEqual(problems, []);
@@ -2510,7 +2510,7 @@ describe('Browser: Textbausteine, Vorschaubilder, Menü vorladen', { skip: chrom
       const c = (await a.post('/api/cases', { title: 'Überfall auf die Fleeca Bank', area: 'strafrecht', clientName: 'Marco Bellucci' })).json.case;
       const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
       await a.upload(`/api/cases/${c.id}/attachments`, PNG, 'image/png');
-      await page.goto(srv.base + '/login.html');
+      await page.goto(srv.base + '/login');
       await page.fill('#email', TEAM.anwalt);
       await page.fill('#password', PASSWORD);
       await page.click('button[type=submit]');
@@ -2571,7 +2571,7 @@ describe('Browser: Board-Menü gebündelt, Hover-Karte, Kalender ziehen, Vorlage
       const inv = (await a.post('/api/invoices', { caseId: c.id, items: [{ description: 'Erstberatung', quantity: 1, unitPrice: 15000 }] })).json.invoice;
 
       // Frisch angemeldet: direkt ins Dashboard, ohne Siegel-Einblendung
-      await page.goto(srv.base + '/login.html');
+      await page.goto(srv.base + '/login');
       await page.fill('#email', TEAM.admin);
       await page.fill('#password', PASSWORD);
       await page.click('button[type=submit]');
@@ -2651,7 +2651,7 @@ describe('Browser: Tastenkürzel, Mitteilungskarten, Verlaufslinien, Deal-Rechne
       await a.login(TEAM.admin);
       const c = (await a.post('/api/cases', { title: 'Bewaffneter Raubüberfall', area: 'strafrecht', clientName: 'Tony Vercetti', description: 'Festnahme vor der Fleeca Bank.' })).json.case;
       assert.equal((await a.post(`/api/cases/${c.id}/deals`, { he: 15, note: 'bei Geständnis' })).status, 201);
-      await page.goto(srv.base + '/login.html');
+      await page.goto(srv.base + '/login');
       await page.fill('#email', TEAM.admin);
       await page.fill('#password', PASSWORD);
       await page.click('button[type=submit]');
@@ -2720,7 +2720,7 @@ describe('Browser: Aktenmappe, verknüpfte Akten, Mehrfachauswahl, Kanzlei-Lager
       await a.upload(`/api/cases/${A.id}/attachments?caption=Tatort&internal=1`, IMG, 'image/png');
       await a.upload(`/api/cases/${B.id}/attachments?caption=Bodycam&internal=1`, IMG, 'image/png');
       const item = (await a.post('/api/storage/items', { name: 'Schutzweste' })).json.item;
-      await page.goto(srv.base + '/login.html');
+      await page.goto(srv.base + '/login');
       await page.fill('#email', TEAM.admin);
       await page.fill('#password', PASSWORD);
       await page.click('button[type=submit]');
@@ -2799,7 +2799,7 @@ describe('Browser: Bewegung, die zeigt, woher etwas kommt – Zahlen, die mitlau
       await a.upload(`/api/cases/${A.id}/attachments?caption=Tatort`, IMG, 'image/png');
       await a.post('/api/calendar', { type: 'frist', title: 'Berufungsfrist', startsAt: new Date(Date.now() + 2 * 864e5).toISOString(), caseId: A.id });
       await a.post('/api/storage/entries', { kind: 'geld', direction: 'in', amount: 12500, note: 'Startkasse' });
-      await page.goto(srv.base + '/login.html');
+      await page.goto(srv.base + '/login');
       await page.fill('#email', TEAM.admin);
       await page.fill('#password', PASSWORD);
       await page.click('button[type=submit]');
@@ -2932,11 +2932,11 @@ describe('Browser: Bewegung, die zeigt, woher etwas kommt – Zahlen, die mitlau
       assert.equal(await optedIn(), true, 'Profilseite nimmt den Übergang an');
       // von der Profilseite zur Anmeldung: Übergang wird übersprungen, kein Fehler
       await page.evaluate(() => {
-        const a = Object.assign(document.createElement('a'), { href: '/login.html', id: 'toLogin', textContent: 'Login' });
+        const a = Object.assign(document.createElement('a'), { href: '/login', id: 'toLogin', textContent: 'Login' });
         document.body.appendChild(a);
       });
       await page.click('#toLogin');
-      await page.waitForURL(/login\.html/);
+      await page.waitForURL(/login/);
       await page.waitForTimeout(300);
       assert.deepEqual(problems, []);
     } finally {
@@ -2950,7 +2950,7 @@ describe('Browser: Bewegung, die zeigt, woher etwas kommt – Zahlen, die mitlau
     const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
     const IMG = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'icon-512.png'));
     const signIn = async (page) => {
-      await page.goto(srv.base + '/login.html');
+      await page.goto(srv.base + '/login');
       await page.fill('#email', TEAM.admin);
       await page.fill('#password', PASSWORD);
       await page.click('button[type=submit]');
@@ -2969,7 +2969,7 @@ describe('Browser: Bewegung, die zeigt, woher etwas kommt – Zahlen, die mitlau
       const problems = [];
       page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
       await signIn(page);
-      await page.goto(`${srv.base}/dashboard.html?case=${A.id}#cases`);
+      await page.goto(`${srv.base}/dashboard?case=${A.id}#cases`);
       await page.waitForSelector('#modalBody #secEvidence [data-action="att-open"]');
       await page.click('#modalBody #secEvidence [data-action="att-open"][data-index="0"]');
       await page.waitForFunction(() => !document.querySelector('.lb-zoom.is-flying') && document.querySelector('.lb-zoom .lightbox-img').complete);
@@ -2991,7 +2991,7 @@ describe('Browser: Bewegung, die zeigt, woher etwas kommt – Zahlen, die mitlau
       const calm = await browser.newContext({ ...DESKTOP, reducedMotion: 'reduce', locale: 'de-DE', timezoneId: 'Europe/Berlin' });
       const p2 = await calm.newPage();
       await signIn(p2);
-      await p2.goto(`${srv.base}/dashboard.html?case=${A.id}#cases`);
+      await p2.goto(`${srv.base}/dashboard?case=${A.id}#cases`);
       await p2.waitForSelector('#modalBody #secEvidence [data-action="att-open"]');
       await p2.evaluate(() => {
         window.flew = 0;
@@ -3001,7 +3001,7 @@ describe('Browser: Bewegung, die zeigt, woher etwas kommt – Zahlen, die mitlau
       await p2.waitForSelector('#modalBody .lb-zoom:not(.is-flying)');
       await p2.waitForTimeout(400);
       assert.equal(await p2.evaluate(() => window.flew), 0, 'kein Flug bei „Bewegung reduzieren“');
-      await p2.goto(`${srv.base}/dashboard.html#clients`);
+      await p2.goto(`${srv.base}/dashboard#clients`);
       await p2.waitForSelector('#clientList [data-action]');
       await p2.click('#clientList [data-action]');
       await p2.waitForSelector('#modalBody .client-cover');
@@ -3027,7 +3027,7 @@ describe('Browser: Namen direkt ändern (Board)', { skip: chromium ? false : 'Pl
     const problems = [];
     page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
     try {
-      await page.goto(srv.base + '/login.html');
+      await page.goto(srv.base + '/login');
       await page.fill('#email', TEAM.admin);
       await page.fill('#password', PASSWORD);
       await page.click('button[type=submit]');

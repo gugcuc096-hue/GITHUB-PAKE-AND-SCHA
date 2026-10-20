@@ -763,7 +763,7 @@ const errorHtml = (msg) =>
 
 function handleError(e) {
   if (e && e.status === 401) {
-    location.href = '/login.html?next=' + encodeURIComponent('/dashboard.html' + location.search + location.hash);
+    location.href = '/login?next=' + encodeURIComponent('/dashboard' + location.search + location.hash);
     return;
   }
   toast(e?.message || 'Unbekannter Fehler.', 'error');
@@ -1048,7 +1048,7 @@ async function returnOrClose() {
 }
 
 function showCredentials(cred, name) {
-  const text = `Login: ${location.origin}/login.html\nE-Mail: ${cred.email}\nEinmal-Passwort: ${cred.password}`;
+  const text = `Login: ${location.origin}/login\nE-Mail: ${cred.email}\nEinmal-Passwort: ${cred.password}`;
   openModal(`
       <h2 class="modal-title">Zugangsdaten${name ? ' für ' + esc(name) : ''}</h2>
       <p class="modal-sub">Das Einmal-Passwort wird <strong>nur jetzt</strong> angezeigt. Bitte sicher weitergeben (z. B. per Discord-Direktnachricht). Beim ersten Login wird zum Ändern aufgefordert.</p>

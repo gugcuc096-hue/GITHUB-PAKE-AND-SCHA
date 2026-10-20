@@ -591,15 +591,15 @@ function panelFor(kind, r) {
       if (!closed && !r.lawyer_id) buttons.push(button('Akte übernehmen', `case:claim:${r.id}`, 3, { emoji: { name: '🙋' } }));
       buttons.push(closed ? button('Wieder öffnen', `case:reopen:${r.id}`, 1, { emoji: { name: '🔓' } }) : button('Akte schließen', `case:close:${r.id}`, 4, { emoji: { name: '🔒' } }));
     }
-    if (base) buttons.push(linkButton('Im Dashboard öffnen', `${base}/dashboard.html?case=${r.id}#cases`));
+    if (base) buttons.push(linkButton('Im Dashboard öffnen', `${base}/dashboard?case=${r.id}#cases`));
     state = `${closed ? 'closed' : 'open'}|${r.lawyer_id ? 'taken' : 'free'}`;
   } else if (kind === 'concern') {
     const closed = BOARD_KINDS.concern.closed.includes(r.status);
     if (interactive) buttons.push(closed ? button('Wieder öffnen', `concern:reopen:${r.id}`, 1, { emoji: { name: '🔓' } }) : button('Als erledigt markieren', `concern:done:${r.id}`, 3, { emoji: { name: '✅' } }));
-    if (base) buttons.push(linkButton('Im Dashboard öffnen', `${base}/dashboard.html#concerns-board`));
+    if (base) buttons.push(linkButton('Im Dashboard öffnen', `${base}/dashboard#concerns-board`));
     state = closed ? 'closed' : 'open';
   } else {
-    if (base) buttons.push(linkButton('Im Dashboard öffnen', `${base}/dashboard.html#applications`));
+    if (base) buttons.push(linkButton('Im Dashboard öffnen', `${base}/dashboard#applications`));
     state = 'link';
   }
   const components = buttons.length ? [{ type: 1, components: buttons }] : [];

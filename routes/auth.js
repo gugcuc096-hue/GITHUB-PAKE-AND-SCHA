@@ -5,7 +5,9 @@ const { z } = require('zod');
 const { db } = require('../db');
 const {
   hashPassword,
+  hashPasswordAsync,
   verifyPassword,
+  needsRehash,
   createSession,
   destroySession,
   destroyOtherSessions,
@@ -60,7 +62,7 @@ router.post(
     }
     const info = db
       .prepare("INSERT INTO users (email, password_hash, display_name, role, phone) VALUES (?, ?, ?, 'mandant', ?)")
-      .run(email, hashPassword(data.password), data.displayName, data.phone || null);
+      .run(email, await hashPasswordAsync(data.password), data.displayName, data.phone || null);
     createSession(res, Number(info.lastInsertRowid));
     res.status(201).json({ success: true });
   })
@@ -73,9 +75,10 @@ router.post(
     const data = parseBody(z.object({ email: z.string().trim().min(3).max(120), password: z.string().min(1).max(200) }), req, res);
     if (!data) return;
     const user = findUserByLogin(data.email);
-    if (!user || !verifyPassword(data.password, user.password_hash)) {
+    if (!user || !(await verifyPassword(data.password, user.password_hash))) {
       return res.status(401).json({ error: 'E-Mail-Adresse oder Passwort ist falsch.' });
     }
+    if (needsRehash(user.password_hash)) db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(await hashPasswordAsync(data.password), user.id);
     if (!user.active) return res.status(403).json({ error: 'Dieser Zugang wurde gesperrt. Bitte wenden Sie sich an das Board of Partners.' });
     // Zwei-Faktor: erst der Code aus der Discord-DM öffnet die Sitzung (vertraute Geräte überspringen das 30 Tage lang)
     if (twoFactor.required(user) && !twoFactor.isTrusted(req, user.id)) {
@@ -140,7 +143,7 @@ router.patch(
     if (data.enabled && !st.possible) {
       return res.status(400).json({ error: st.hasDiscord ? 'Der Kanzlei-Bot ist gerade nicht eingerichtet – ohne ihn kann kein Code verschickt werden.' : 'Bitte zuerst Discord verbinden – dorthin kommt der Code.' });
     }
-    if (!data.enabled && !verifyPassword(data.password || '', req.user.password_hash)) {
+    if (!data.enabled && !(await verifyPassword(data.password || '', req.user.password_hash))) {
       return res.status(400).json({ error: 'Zum Ausschalten bitte Ihr Passwort eingeben.' });
     }
     db.prepare('UPDATE users SET two_factor = ? WHERE id = ?').run(data.enabled ? 1 : 0, req.user.id);
@@ -253,13 +256,13 @@ router.post(
     const schema = z.object({ currentPassword: z.string().min(1).max(200), newPassword: z.string().min(10).max(200) });
     const data = parseBody(schema, req, res);
     if (!data) return;
-    if (!verifyPassword(data.currentPassword, req.user.password_hash)) {
+    if (!(await verifyPassword(data.currentPassword, req.user.password_hash))) {
       return res.status(400).json({ error: 'Das aktuelle Passwort ist nicht korrekt.' });
     }
     if (data.currentPassword === data.newPassword) {
       return res.status(400).json({ error: 'Das neue Passwort muss sich vom bisherigen unterscheiden.' });
     }
-    db.prepare('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?').run(hashPassword(data.newPassword), req.user.id);
+    db.prepare('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?').run(await hashPasswordAsync(data.newPassword), req.user.id);
     destroyOtherSessions(req, req.user.id);
     twoFactor.forgetDevices(req.user.id, req);
     res.json({ success: true });

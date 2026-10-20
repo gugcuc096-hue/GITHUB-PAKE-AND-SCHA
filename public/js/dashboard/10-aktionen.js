@@ -20,7 +20,7 @@ const actions = {
     window.PS.drafts.clearAll(); // Entwürfe gehören zu diesem Konto – nicht für den Nächsten am selben Gerät
     setAppBadge(0); // Zahl auf dem App-Symbol gehört ebenfalls zu diesem Konto
     await api.post('/api/auth/logout');
-    location.href = '/login.html';
+    location.href = '/login';
   },
   copy: async (el) => {
     const ok = await copy(el.dataset.text || '');

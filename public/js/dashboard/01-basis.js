@@ -466,7 +466,7 @@ function initials(name) {
   return ((words[0]?.[0] || '') + (words.length > 1 ? words[words.length - 1][0] : '')).toUpperCase() || '?';
 }
 function avatarImg(url, name) {
-  return url ? `<img src="${esc(url)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : esc(initials(name));
+  return url ? `<img src="${esc(url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : esc(initials(name));
 }
 function avatarInner(u) {
   return avatarImg(u?.avatarUrl, u?.displayName);
@@ -613,6 +613,18 @@ setInterval(tickCountdowns, 1000);
    Daten laden
    ================================================================ */
 const load = {
+  /**
+   * Konto (beim Start), alle Zähler der Navigation und der Dienststatus in einem Abruf. Was hier schon frisch kam,
+   * holt die erste Ansicht danach nicht noch einmal (primed – gilt genau einmal).
+   */
+  async start({ me = true } = {}) {
+    const r = await api.get(`/api/start?today=${dayKey(new Date())}${me ? '' : '&me=0'}`);
+    for (const [k, v] of Object.entries(r.counts || {})) st[k] = v;
+    if (st.view === 'personnel') st.personnelNew = 0;
+    ['unread', 'duty'].forEach((k) => load.primed.add(k));
+    return r;
+  },
+  primed: new Set(),
   async cases() {
     st.cases = (await api.get('/api/cases')).cases;
   },
@@ -639,12 +651,14 @@ const load = {
     st.fees = (await api.get('/api/fees')).fees;
   },
   async unread() {
+    if (load.primed.delete('unread')) return;
     st.unread = (await api.get('/api/messages/unread-count')).unread;
   },
   async messages() {
     st.messages = (await api.get('/api/messages?box=' + st.mailBox)).messages;
   },
   async duty() {
+    if (load.primed.delete('duty')) return;
     if (isStaff()) {
       st.duty = await api.get('/api/duty');
     } else {

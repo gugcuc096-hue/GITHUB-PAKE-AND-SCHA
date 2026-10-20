@@ -83,7 +83,7 @@ router.post(
         { name: 'Neu', value: newName },
         { name: 'Konto', value: `${ROLE_LABEL[u.role] || u.role}${u.rank ? ` · ${u.rank}` : ''}` },
       ],
-      link: discord.publicUrl('/dashboard.html#name-requests'),
+      link: discord.publicUrl('/dashboard#name-requests'),
     });
     res.status(201).json({ request: row(db.prepare('SELECT * FROM name_requests WHERE id = ?').get(Number(info.lastInsertRowid))) });
   })

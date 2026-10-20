@@ -97,7 +97,7 @@ async function sendNewPassword(body, u, discordId) {
   const password = generateTempPassword();
   const newHash = hashPassword(password);
   db.prepare('UPDATE users SET password_hash = ?, must_change_password = 1 WHERE id = ?').run(newHash, u.id);
-  const login = dashboardLink('/login.html');
+  const login = dashboardLink('/login');
   try {
     const dm = await tickets.rest('POST', '/users/@me/channels', { recipient_id: discordId });
     await tickets.rest('POST', `/channels/${dm.id}/messages`, {
@@ -184,7 +184,7 @@ function akteCommand(body, u) {
         c.public_note ? { name: 'Hinweis der Kanzlei', value: c.public_note, inline: false } : null,
       ],
     },
-    { components: linkRow('Im Dashboard öffnen', dashboardLink(`/dashboard.html?case=${c.id}#cases`)) }
+    { components: linkRow('Im Dashboard öffnen', dashboardLink(`/dashboard?case=${c.id}#cases`)) }
   );
 }
 
@@ -263,7 +263,7 @@ function termineCommand(body, u) {
       description: lines.length ? lines.join('\n') : 'Keine anstehenden Termine oder Fristen.',
       color: lines.length ? COLORS.gold : COLORS.slate,
     },
-    { components: linkRow('Kalender öffnen', dashboardLink('/dashboard.html#calendar')) }
+    { components: linkRow('Kalender öffnen', dashboardLink('/dashboard#calendar')) }
   );
 }
 

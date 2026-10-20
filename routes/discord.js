@@ -22,11 +22,11 @@ function stateCookieOptions() {
  * application-open) wird zusätzlich „guilds.join“ angefragt (nur wenn Discord-Tickets aktiv sind) – damit fügt der Bot
  * den Mandanten dem Server hinzu.
  */
-const FAIL_TARGET = { login: '/login.html', signup: '/register.html', case: '/', application: '/bewerbung.html', 'application-open': '/bewerbung.html' };
+const FAIL_TARGET = { login: '/login', signup: '/registrieren', case: '/', application: '/bewerbung', 'application-open': '/bewerbung' };
 function startFlow(req, res, mode, extra = '') {
   const cfg = discord.oauthConfig(req);
   if (!cfg) {
-    const target = FAIL_TARGET[mode] ? `${FAIL_TARGET[mode]}?${mode === 'case' ? 'ticket' : 'discord'}=disabled` : '/dashboard.html?discord=disabled#profile';
+    const target = FAIL_TARGET[mode] ? `${FAIL_TARGET[mode]}?${mode === 'case' ? 'ticket' : 'discord'}=disabled` : '/dashboard?discord=disabled#profile';
     return res.redirect(target);
   }
   const state = crypto.randomBytes(24).toString('hex');
@@ -123,7 +123,7 @@ router.post(
     if (!user) user = createDiscordAccount(profile, '');
     createSession(res, user.id);
     await afterDiscordLogin(user, profile);
-    res.json({ success: true, redirect: '/dashboard.html' });
+    res.json({ success: true, redirect: '/dashboard' });
   })
 );
 
@@ -133,7 +133,7 @@ router.get('/status', (req, res) => {
 
 // Verknüpfen: nur für angemeldete Nutzer (Navigation, daher Weiterleitung statt JSON-Fehler).
 router.get('/connect', (req, res) => {
-  if (!req.user) return res.redirect('/login.html?next=' + encodeURIComponent('/dashboard.html#profile'));
+  if (!req.user) return res.redirect('/login?next=' + encodeURIComponent('/dashboard#profile'));
   startFlow(req, res, 'link');
 });
 
@@ -181,10 +181,10 @@ router.post('/case-account', express.urlencoded({ extended: false, limit: '2kb' 
  * dann als Direktnachricht. Der Link-Schlüssel kommt per POST (nicht in der Adresszeile).
  */
 router.post('/application-join', express.urlencoded({ extended: false, limit: '2kb' }), joinLimiter, (req, res) => {
-  if (!fromOwnSite(req)) return res.redirect('/bewerbung.html?discord=error');
+  if (!fromOwnSite(req)) return res.redirect('/bewerbung?discord=error');
   const token = String(req.body?.token || '').trim().slice(0, 64);
   const a = token.length >= 20 ? db.prepare('SELECT id FROM applications WHERE access_token = ?').get(token) : null;
-  if (!a) return res.redirect('/bewerbung.html?discord=notfound');
+  if (!a) return res.redirect('/bewerbung?discord=notfound');
   startFlow(req, res, 'application', String(a.id));
 });
 
@@ -203,7 +203,7 @@ router.get(
     const raw = req.cookies?.[STATE_COOKIE] || '';
     res.clearCookie(STATE_COOKIE, stateCookieOptions());
     const [mode, expected, extra] = raw.split('.');
-    const failTarget = FAIL_TARGET[mode] || '/dashboard.html';
+    const failTarget = FAIL_TARGET[mode] || '/dashboard';
     const fail = (code) => res.redirect(`${failTarget}?${mode === 'case' ? 'ticket' : 'discord'}=${code}${FAIL_TARGET[mode] ? '' : '#profile'}`);
 
     if (!expected || req.query.state !== expected) return fail('state');
@@ -224,12 +224,12 @@ router.get(
       if (!user) {
         // Noch kein Konto: auf der Login-Seite nachfragen (neues Mandantenkonto oder mit E-Mail anmelden und verknüpfen)
         rememberPending(res, profile);
-        return res.redirect('/login.html?discord=neu');
+        return res.redirect('/login?discord=neu');
       }
       if (!user.active) return fail('locked');
       db.prepare('UPDATE users SET discord_username = ?, discord_avatar = ? WHERE id = ?').run(profile.username, profile.avatar, user.id);
       createSession(res, user.id);
-      return res.redirect('/dashboard.html');
+      return res.redirect('/dashboard');
     }
 
     // Registrieren mit Discord (ggf. mit der Akte aus der Mandatsanfrage): Konto anlegen oder anmelden
@@ -244,8 +244,8 @@ router.get(
       const attached = c ? attachCase(c.id, user, profile.id) : null;
       createSession(res, user.id);
       await afterDiscordLogin(user, profile);
-      if (c && !attached) return res.redirect('/dashboard.html?discord=fremdeakte');
-      return res.redirect(attached ? `/dashboard.html?case=${attached}#cases` : '/dashboard.html?discord=willkommen');
+      if (c && !attached) return res.redirect('/dashboard?discord=fremdeakte');
+      return res.redirect(attached ? `/dashboard?case=${attached}#cases` : '/dashboard?discord=willkommen');
     }
 
     // Ticket beitreten (ohne Konto): Discord-ID an der Akte merken, dem Server hinzufügen, Ticket abgleichen
@@ -265,7 +265,7 @@ router.get(
     if (mode === 'application-open') {
       const a = db.prepare('SELECT access_token FROM applications WHERE discord_user_id = ? ORDER BY id DESC LIMIT 1').get(profile.id);
       if (!a) return fail('keine');
-      return res.redirect(`/bewerbung.html?discord=geoeffnet#${a.access_token}`);
+      return res.redirect(`/bewerbung?discord=geoeffnet#${a.access_token}`);
     }
 
     // Bewerber: Discord an der Bewerbung merken (für Direktnachrichten), dem Server beitreten, Bestätigung schicken
@@ -285,10 +285,10 @@ router.get(
         ),
         6000
       );
-      return res.redirect(`/bewerbung.html?discord=verbunden#${a.access_token}`);
+      return res.redirect(`/bewerbung?discord=verbunden#${a.access_token}`);
     }
 
-    if (!req.user) return res.redirect('/login.html?discord=session');
+    if (!req.user) return res.redirect('/login?discord=session');
     const other = db.prepare('SELECT id FROM users WHERE discord_id = ? AND id != ?').get(profile.id, req.user.id);
     // Hängt das Discord an einem vom Bot angelegten, nie benutzten Konto, gibt dieses es frei (die Person hat schon ein eigenes)
     if (other && !require('../botDm').releaseUnusedBotAccount(profile.id, req.user.id)) return fail('taken');
@@ -307,7 +307,7 @@ router.get(
     tickets.syncBoardAll(); // Board-Mitglieder kommen in die Board-Tickets
     require('../memberships').syncUser(req.user.id).catch(() => {}); // VIP-/Perma-Rolle vergeben
     require('../discordBot').syncUser(req.user.id, { previousDiscordId }); // Rang-Rollen (Rang-Sync)
-    res.redirect('/dashboard.html?discord=linked#profile');
+    res.redirect('/dashboard?discord=linked#profile');
   })
 );
 

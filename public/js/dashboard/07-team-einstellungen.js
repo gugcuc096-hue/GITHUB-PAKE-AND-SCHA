@@ -349,7 +349,7 @@ function contractTemplatesPanel() {
                 <div class="text-xs text-dim mt-1">Zuletzt geändert ${esc(fmtDate(x.updatedAt))}${x.updatedByName ? ' von ' + esc(x.updatedByName) : ''} · ${x.body.length.toLocaleString('de-DE')} Zeichen</div></div>
               <div class="contract-actions">
                 <button type="button" class="btn-outline btn-sm" data-action="tpl-edit" data-id="${x.id}">${icon('edit', 'ico-sm')}<span>Bearbeiten</span></button>
-                <a class="btn-ghost btn-sm" href="/vertrag.html?vorlage=${x.id}&beispiel=1" target="_blank" rel="noopener">${icon('external', 'ico-sm')}<span>Vorschau</span></a>
+                <a class="btn-ghost btn-sm" href="/vertrag?vorlage=${x.id}&beispiel=1" target="_blank" rel="noopener">${icon('external', 'ico-sm')}<span>Vorschau</span></a>
                 ${x.isDefault ? `<button type="button" class="btn-ghost btn-sm" data-action="tpl-reset" data-id="${x.id}">Original wiederherstellen</button>` : ''}
                 <button type="button" class="btn-ghost btn-sm fn-danger" data-action="tpl-delete" data-id="${x.id}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>
               </div></div>`
@@ -548,7 +548,7 @@ function websitePanel(s) {
         <form data-form="settings-website" class="form-grid">
           <label class="check"><input type="checkbox" name="showDutyPublic" ${s.showDutyPublic ? 'checked' : ''}> Dienststatus öffentlich anzeigen – „Eilnotdienst: 2 Anwälte im Dienst“ in der Kopfzeile und grüne Punkte bei den Teamkarten</label>
           <label class="check"><input type="checkbox" name="showSuccessPublic" ${s.showSuccessPublic ? 'checked' : ''}> Erfolge öffentlich anzeigen – „Abgeschlossene Verfahren“ (ab 10) und „Erfolgsquote“ (ab 5 Akten mit Ergebnis) über den Mandantenstimmen</label>
-          <div class="form-actions"><button type="submit" class="btn-outline btn-md">Speichern</button><a href="/karriere.html" target="_blank" rel="noopener" class="btn-ghost btn-md">${icon('globe', 'ico-sm')}<span>Karriereseite</span></a></div>
+          <div class="form-actions"><button type="submit" class="btn-outline btn-md">Speichern</button><a href="/karriere" target="_blank" rel="noopener" class="btn-ghost btn-md">${icon('globe', 'ico-sm')}<span>Karriereseite</span></a></div>
         </form>
       </section>`;
 }
@@ -562,7 +562,7 @@ function siteTextsPanel() {
         <p class="text-sm text-muted mb-4">Öffnet die Seite im Bearbeitungsmodus: Text anklicken, ändern, Enter oder daneben klicken – gespeichert. Ein leeres Feld stellt das Original wieder her. Gleichlautende Texte (z. B. derselbe Knopf an mehreren Stellen) ändern sich gemeinsam.</p>
         <div class="form-actions mb-4">
           <a class="btn-gold btn-md" href="/?bearbeiten" target="_blank" rel="noopener">${icon('edit')}<span>Startseite bearbeiten</span></a>
-          <a class="btn-outline btn-md" href="/karriere.html?bearbeiten" target="_blank" rel="noopener">${icon('edit')}<span>Karriereseite bearbeiten</span></a>
+          <a class="btn-outline btn-md" href="/karriere?bearbeiten" target="_blank" rel="noopener">${icon('edit')}<span>Karriereseite bearbeiten</span></a>
         </div>
         ${
           list.length

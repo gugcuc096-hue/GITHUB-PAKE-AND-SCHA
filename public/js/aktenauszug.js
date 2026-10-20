@@ -282,7 +282,7 @@
   }
 
   if (!Number.isInteger(id) || id <= 0) {
-    root.innerHTML = 'Keine Akte angegeben. <a href="/dashboard.html#cases">Zum Dashboard</a>';
+    root.innerHTML = 'Keine Akte angegeben. <a href="/dashboard#cases">Zum Dashboard</a>';
     return;
   }
   Promise.all([api.get('/api/auth/me'), api.get('/api/cases/' + id), api.get('/api/invoices/firm').catch(() => ({ firm }))])
@@ -293,7 +293,7 @@
       firm = f.firm || firm;
       opts = loadOpts();
       // Zurück in genau diese Akte (aus dem Dashboard geöffnet: Tab schließen, siehe closeToDashboard)
-      document.getElementById('backLink').href = `/dashboard.html?case=${id}#cases`;
+      document.getElementById('backLink').href = `/dashboard?case=${id}#cases`;
       document.getElementById('backLink').textContent = '← Zur Akte';
       renderPanel();
       render();
@@ -303,9 +303,9 @@
     })
     .catch((err) => {
       if (err.status === 401) {
-        location.href = '/login.html?next=' + encodeURIComponent(location.pathname + location.search);
+        location.href = '/login?next=' + encodeURIComponent(location.pathname + location.search);
         return;
       }
-      root.innerHTML = `${esc(err.message)}<br><br><a href="/dashboard.html#cases">Zum Dashboard</a>`;
+      root.innerHTML = `${esc(err.message)}<br><br><a href="/dashboard#cases">Zum Dashboard</a>`;
     });
 })();

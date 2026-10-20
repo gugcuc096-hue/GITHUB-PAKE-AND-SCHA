@@ -93,7 +93,7 @@ function todoPanel() {
   const caseRef = (number, title) => `Akte <span class="font-mono text-gold">${esc(number)}</span>${title ? ` · ${esc(title)}` : ''}`;
   const items = [];
   for (const k of st.toSign) {
-    items.push(item('edit', `${esc(k.templateName)} unterschreiben`, caseRef(k.caseNumber, k.caseTitle), `<a class="btn-gold btn-sm" href="/vertrag.html?id=${k.id}" target="_blank" rel="noopener">${icon('edit', 'ico-sm')}<span>Lesen &amp; unterschreiben</span></a>`));
+    items.push(item('edit', `${esc(k.templateName)} unterschreiben`, caseRef(k.caseNumber, k.caseTitle), `<a class="btn-gold btn-sm" href="/vertrag?id=${k.id}" target="_blank" rel="noopener">${icon('edit', 'ico-sm')}<span>Lesen &amp; unterschreiben</span></a>`));
   }
   // Überfällige zuerst, dann nach Fälligkeit (ohne Fälligkeit zuletzt)
   const open = st.invoices.filter((x) => x.status === 'offen' && !x.paymentReport).sort((a, b) => b.overdueDays - a.overdueDays || (a.dueDate || '9999').localeCompare(b.dueDate || '9999'));
@@ -104,7 +104,7 @@ function todoPanel() {
         'receipt',
         `${esc(INVOICE_KIND[i.kind])} <span class="font-mono text-gold">${esc(i.number)}</span> über ${esc(money(i.total))} begleichen`,
         [due, i.caseNumber ? caseRef(i.caseNumber) : ''].filter(Boolean).join(' · '),
-        `<button class="btn-gold btn-sm" data-action="inv-pay-report" data-id="${i.id}">${icon('check', 'ico-sm')}<span>Als bezahlt melden</span></button><a class="btn-ghost btn-sm" href="/invoice.html?id=${i.id}" target="_blank" rel="noopener">Ansehen</a>`,
+        `<button class="btn-gold btn-sm" data-action="inv-pay-report" data-id="${i.id}">${icon('check', 'ico-sm')}<span>Als bezahlt melden</span></button><a class="btn-ghost btn-sm" href="/rechnung?id=${i.id}" target="_blank" rel="noopener">Ansehen</a>`,
         i.overdueDays > 0 ? 'urgent' : ''
       )
     );
@@ -592,7 +592,7 @@ async function openSearchResult(type, id) {
   if (type === 'invoices') {
     if (x.caseId) return modalInstead(() => openCase(x.caseId));
     closeModal();
-    window.open(`/invoice.html?id=${x.id}`, '_blank', 'noopener');
+    window.open(`/rechnung?id=${x.id}`, '_blank', 'noopener');
     return;
   }
   if (type === 'tasks') {

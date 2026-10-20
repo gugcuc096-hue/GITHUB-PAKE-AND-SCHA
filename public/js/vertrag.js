@@ -124,7 +124,7 @@
     function draw() {
         const { contract: k, case: c } = state;
         document.title = `${k.templateName} ${c.caseNumber} | Pake & Scha`;
-        document.getElementById('backLink').href = `/dashboard.html?case=${c.id}#cases`;
+        document.getElementById('backLink').href = `/dashboard?case=${c.id}#cases`;
         root.className = '';
         const before = drawnOnce ? new Set([...document.querySelectorAll('.k-script')].map(sigKey)) : null;
         root.innerHTML = sheets(render(k.body, values(k, c), k, { fivenetUrl: state.fivenetUrl }), header(state.header));
@@ -135,9 +135,9 @@
         if (params.get('print') === '1') setTimeout(() => window.print(), 500);
     }
 
-    function fail(err, back = '/dashboard.html#cases') {
+    function fail(err, back = '/dashboard#cases') {
         if (err.status === 401) {
-            location.href = '/login.html?next=' + encodeURIComponent(location.pathname + location.search);
+            location.href = '/login?next=' + encodeURIComponent(location.pathname + location.search);
             return;
         }
         root.className = 'message';
@@ -154,7 +154,7 @@
                     ? { anwalt: 'Dr. Alois Pake', anwalt_rang: 'Founding Partner', anwalt_geburtsdatum: '12.03.1988', mandant: 'John Doe', mandant_geburtsdatum: '04.07.1995', leistungen: '• Vertretung Hauptverhandlung (alle Gerichte) – 100.000 $\n• U-Haft-Vertretung vor Ort – 50.000 $', grundgebuehr: '150.000 $', zusatzgebuehr: '25.000 $ je weiterem Verhandlungstag', datum: new Date().toLocaleDateString('de-DE'), ort: 'Los Santos, San Andreas', aktenzeichen: 'PS-2026-0001', akte: 'Beispielakte', rechtsgebiet: 'Strafrecht', gerichtsaktenzeichen: 'DC-2026-0142', gegenpartei: 'State of San Andreas', empfaenger: 'District Court San Andreas\nStaatsanwaltschaft Los Santos\nMission Row, Los Santos', betreff: 'Ermittlungsverfahren gegen John Doe', fivenet_az: 'DOC - 74412', festnahme: 'Festnahme am 01.10.2026, Mission Row Police Department', begruendung: 'Der Beschuldigte ist nicht vorbestraft und hat sich zu jeder Zeit kooperativ gezeigt.', kanzlei: 'Pake & Scha Legal Consulting' }
                     : { aktenzeichen: '', akte: '', rechtsgebiet: '', gerichtsaktenzeichen: '', gegenpartei: '', kanzlei: 'Pake & Scha Legal Consulting', anwalt: '', anwalt_rang: '', anwalt_geburtsdatum: '', mandant: '', mandant_geburtsdatum: '', leistungen: '', grundgebuehr: '', zusatzgebuehr: '', datum: '', ort: '', empfaenger: '', betreff: '', fivenet_az: '', festnahme: '', begruendung: '' };
                 document.title = `Vorschau: ${t.name} | Pake & Scha`;
-                document.getElementById('backLink').href = '/dashboard.html?tab=vorlagen#wiki';
+                document.getElementById('backLink').href = '/dashboard?tab=vorlagen#wiki';
                 document.getElementById('backLink').textContent = '← Einstellungen';
                 panel.innerHTML = `<p class="preview-note">Vorschau der Vorlage „${esc(t.name)}“ – ${params.get('beispiel') === '1' ? 'mit Beispielwerten' : 'leere Felder erscheinen als Linie zum Ausfüllen'}.</p>`;
                 root.className = '';
@@ -163,9 +163,9 @@
                 root.innerHTML = sheets(render(t.body, sample, exampleSig, { fivenetUrl }), header(head));
                 refit();
             })
-            .catch((e) => fail(e, '/dashboard.html?tab=vorlagen#wiki'));
+            .catch((e) => fail(e, '/dashboard?tab=vorlagen#wiki'));
     } else if (!Number.isInteger(id) || id <= 0) {
-        root.innerHTML = 'Kein Dokument angegeben. <a href="/dashboard.html#cases">Zum Dashboard</a>';
+        root.innerHTML = 'Kein Dokument angegeben. <a href="/dashboard#cases">Zum Dashboard</a>';
     } else {
         api.get('/api/contracts/' + id)
             .then((r) => {

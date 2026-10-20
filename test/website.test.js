@@ -88,7 +88,7 @@ describe('Website & Ränge selbst pflegen', () => {
   });
 
   it('Vorschaubild für Discord-Links: absolute Adresse auf Startseite und Karriere', async () => {
-    for (const p of ['/', '/karriere.html']) {
+    for (const p of ['/', '/karriere']) {
       const html = (await client(server.base).get(p)).text;
       assert.match(html, new RegExp(`<meta property="og:image" content="${server.base.replace(/[.]/g, '\\.')}/img/og-image\\.png">`), p);
     }
@@ -98,7 +98,7 @@ describe('Website & Ränge selbst pflegen', () => {
 
   it('Link-Vorschau: eigene Texte je Seite, Goldstreifen auf den öffentlichen Seiten, absolutes Bild auch auf Login & Co.', async () => {
     const meta = (html, prop) => (html.match(new RegExp(`<meta (?:property|name)="${prop}" content="([^"]*)"`)) || [])[1];
-    const pages = { '/': null, '/karriere.html': null, '/login': 'Mandantenportal – Pake & Scha', '/register.html': 'Konto erstellen – Pake & Scha', '/bewerbung': 'Ihre Bewerbung bei Pake & Scha' };
+    const pages = { '/': null, '/karriere': null, '/login': 'Mandantenportal – Pake & Scha', '/registrieren': 'Konto erstellen – Pake & Scha', '/bewerbung': 'Ihre Bewerbung bei Pake & Scha' };
     const titles = new Set();
     for (const [p, title] of Object.entries(pages)) {
       const html = (await client(server.base).get(p)).text;
@@ -110,27 +110,37 @@ describe('Website & Ränge selbst pflegen', () => {
       assert.equal(meta(html, 'og:image'), `${server.base}/img/og-image.png`, p);
     }
     assert.equal(titles.size, Object.keys(pages).length, 'jede Seite hat ihren eigenen Titel');
-    for (const p of ['/', '/karriere.html', '/bewerbung']) assert.equal(meta((await client(server.base).get(p)).text, 'theme-color'), '#b8962e', `${p}: Goldstreifen`);
+    for (const p of ['/', '/karriere', '/bewerbung']) assert.equal(meta((await client(server.base).get(p)).text, 'theme-color'), '#b8962e', `${p}: Goldstreifen`);
   });
 
-  it('Schneller laden: Versionsnummern, Dashboard als ein Bündel, ein Jahr im Browser – die Seiten selbst immer frisch', async () => {
+  it('Schneller laden: Versionsnummern, Dashboard in zwei Bündeln (Verwaltung nur für die Kanzlei), verkleinert und mit Brotli, ein Jahr im Browser – die Seiten selbst immer frisch', async () => {
     const YEAR = 'public, max-age=31536000, immutable';
-    const page = await fetch(`${server.base}/dashboard.html`);
+    const page = await fetch(`${server.base}/dashboard`);
     assert.equal(page.headers.get('cache-control'), 'no-cache');
     const html = await page.text();
     const v = (html.match(/\/js\/api\.js\?v=([a-f0-9]{12})"/) || [])[1];
     assert.ok(v, 'Versionsnummer an den Skripten');
-    assert.match(html, new RegExp(`<script src="/js/dashboard\\.bundle\\.js\\?v=${v}"></script>`));
+    assert.match(html, new RegExp(`<script src="/js/dashboard\\.bundle\\.js\\?v=${v}" data-staff="/js/dashboard\\.staff\\.js\\?v=${v}"></script>`));
     assert.doesNotMatch(html, /\/js\/dashboard\/\d\d-/, 'keine Einzelteile mehr');
     assert.match(html, new RegExp(`href="/css/app\\.css\\?v=${v}"`));
     const bundle = await fetch(`${server.base}/js/dashboard.bundle.js?v=${v}`);
     assert.equal(bundle.headers.get('cache-control'), YEAR);
     const code = await bundle.text();
-    assert.ok(code.indexOf('---- 01-basis.js ----') >= 0 && code.indexOf('---- 01-basis.js ----') < code.indexOf('---- 14-start.js ----'), 'Teile in fester Reihenfolge');
+    assert.ok(/\bVIEWS ?= ?\{/.test(code) && code.search(/\bVIEWS ?= ?\{/) < code.search(/function loadStaffParts/), 'Teile in fester Reihenfolge (01 … 14)');
+    assert.doesNotMatch(code, /views\.settings ?=/, 'Einstellungen & Co. nicht im allgemeinen Bündel');
+    assert.ok(code.length < 700000 && !code.includes('---- 01-basis.js ----'), 'verkleinert (ohne Kommentare)');
+    const staff = await fetch(`${server.base}/js/dashboard.staff.js?v=${v}`);
+    assert.equal(staff.headers.get('cache-control'), YEAR);
+    assert.match(await staff.text(), /views\.settings ?=/, 'Verwaltungsteile im zweiten Bündel');
+    const br = await fetch(`${server.base}/js/dashboard.bundle.js?v=${v}`, { headers: { 'accept-encoding': 'br' } });
+    assert.equal(br.headers.get('content-encoding'), 'br');
+    assert.equal(br.headers.get('vary'), 'Accept-Encoding');
+    const gz = await fetch(`${server.base}/css/app.css?v=${v}`, { headers: { 'accept-encoding': 'gzip' } });
+    assert.equal(gz.headers.get('content-encoding'), 'gzip');
     assert.equal((await fetch(`${server.base}/css/app.css?v=${v}`)).headers.get('cache-control'), YEAR);
     assert.notEqual((await fetch(`${server.base}/css/app.css`)).headers.get('cache-control'), YEAR, 'ohne Nummer: beim Server nachfragen');
     assert.notEqual((await fetch(`${server.base}/js/api.js?v=alt`)).headers.get('cache-control'), YEAR, 'alte Nummer: nicht ein Jahr behalten');
-    for (const p of ['/', '/karriere.html', '/login', '/vertrag.html']) assert.match((await client(server.base).get(p)).text, new RegExp(`\\?v=${v}"`), p);
+    for (const p of ['/', '/karriere', '/login', '/vertrag']) assert.match((await client(server.base).get(p)).text, new RegExp(`\\?v=${v}"`), p);
   });
 
   it('Anwalts-Profilseiten: eigene Adresse mit Link-Vorschau, Zahlen erst ab mehreren Akten, Schwerpunkte und Erfolge vom Board, „Mandat anfragen“', async () => {

@@ -33,8 +33,8 @@ router.get('/status', requireAuth, boardOnly, (req, res) => {
 });
 
 router.get('/connect', requireAuth, (req, res) => {
-  if (!isBoard(req.user)) return res.redirect('/dashboard.html#settings');
-  if (!drive.configured()) return res.redirect('/dashboard.html?google=config#settings');
+  if (!isBoard(req.user)) return res.redirect('/dashboard#settings');
+  if (!drive.configured()) return res.redirect('/dashboard?google=config#settings');
   const state = crypto.randomBytes(24).toString('hex');
   res.cookie(STATE_COOKIE, state, { ...stateCookie(), maxAge: 10 * 60 * 1000 });
   res.redirect(drive.authorizeUrl(req, state));
@@ -43,10 +43,10 @@ router.get('/connect', requireAuth, (req, res) => {
 router.get(
   '/callback',
   wrap(async (req, res) => {
-    const back = (code) => res.redirect(`/dashboard.html?google=${code}#settings`);
+    const back = (code) => res.redirect(`/dashboard?google=${code}#settings`);
     const expected = req.cookies && req.cookies[STATE_COOKIE];
     res.clearCookie(STATE_COOKIE, stateCookie());
-    if (!req.user) return res.redirect('/login.html?next=' + encodeURIComponent('/dashboard.html#settings'));
+    if (!req.user) return res.redirect('/login?next=' + encodeURIComponent('/dashboard#settings'));
     if (!isBoard(req.user)) return back('rechte');
     if (req.query.error) return back(req.query.error === 'access_denied' ? 'abgebrochen' : 'fehler');
     if (!expected || req.query.state !== expected) return back('sitzung');

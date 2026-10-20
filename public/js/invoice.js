@@ -89,14 +89,14 @@
     }
 
     if (!Number.isInteger(id) || id <= 0) {
-        root.innerHTML = 'Kein Dokument angegeben. <a href="/dashboard.html#invoices">Zum Dashboard</a>';
+        root.innerHTML = 'Kein Dokument angegeben. <a href="/dashboard#invoices">Zum Dashboard</a>';
         return;
     }
     api.get('/api/invoices/' + id)
         .then(({ invoice, firm }) => {
             // Rechnung zu einer Akte: zurück in die Akte, sonst zu den Rechnungen
             if (invoice.caseId) {
-                backLink.href = `/dashboard.html?case=${Number(invoice.caseId)}#cases`;
+                backLink.href = `/dashboard?case=${Number(invoice.caseId)}#cases`;
                 backLink.textContent = '← Zur Akte';
             }
             render(invoice, firm);
@@ -105,9 +105,9 @@
         })
         .catch((err) => {
             if (err.status === 401) {
-                location.href = '/login.html?next=' + encodeURIComponent(location.pathname + location.search);
+                location.href = '/login?next=' + encodeURIComponent(location.pathname + location.search);
                 return;
             }
-            root.innerHTML = `${esc(err.message)}<br><br><a href="/dashboard.html#invoices">Zum Dashboard</a>`;
+            root.innerHTML = `${esc(err.message)}<br><br><a href="/dashboard#invoices">Zum Dashboard</a>`;
         });
 })();

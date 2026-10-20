@@ -66,14 +66,14 @@ function invoiceTable(rows) {
       <tbody>${lazyRows(
         rows,
         (i) => `<tr data-inv="${i.id}">
-          <td class="td-main"><div class="font-mono text-gold text-sm nowrap">${docTitleLink(`/invoice.html?id=${i.id}`, esc(i.number))}</div><div class="text-xs text-dim">${esc(INVOICE_KIND[i.kind])}${i.subject ? ' · ' + esc(i.subject) : ''}</div></td>
+          <td class="td-main"><div class="font-mono text-gold text-sm nowrap">${docTitleLink(`/rechnung?id=${i.id}`, esc(i.number))}</div><div class="text-xs text-dim">${esc(INVOICE_KIND[i.kind])}${i.subject ? ' · ' + esc(i.subject) : ''}</div></td>
           <td data-label="Empfänger">${staff && i.clientKey ? clientLink(i.clientKey, i.clientName) : esc(i.clientName)}</td>
           <td data-label="Akte" class="nowrap">${i.caseNumber ? `<button class="text-gold font-mono text-xs hover:underline" data-action="open-case" data-id="${i.caseId}">${esc(i.caseNumber)}</button>` : '—'}</td>
           <td data-label="Betrag" class="font-mono nowrap" style="text-align:right">${money(i.total)}</td>
           <td data-label="Status">${invoiceBadge(i, true)}${staff && paymentReported(i) && i.paymentReport.note ? `<div class="text-xs text-dim pay-note">„${esc(i.paymentReport.note)}“</div>` : ''}</td>
           <td data-label="Datum" class="text-xs text-dim nowrap"><div><span title="${esc(fmtDate(i.createdAt))}">${esc(parseDate(i.createdAt)?.toLocaleDateString('de-DE') || '—')}</span>${i.dueDate && i.status === 'offen' ? `<div${i.overdueDays > 0 ? ` class="text-red-300" title="${esc(overdueText(i))}"` : ''}>fällig ${esc(fmtDateOnly(i.dueDate))}</div>` : ''}</div></td>
           <td class="td-actions inv-actions">
-            ${(staff && safeGdoc(i.googleDoc) ? gdocBtn(safeGdoc(i.googleDoc)) : docViewBtn(`/invoice.html?id=${i.id}`).replace('<a ', '<a title="Dokument ansehen" ')).replace(/<span>/, '<span class="inv-lbl">')}
+            ${(staff && safeGdoc(i.googleDoc) ? gdocBtn(safeGdoc(i.googleDoc)) : docViewBtn(`/rechnung?id=${i.id}`).replace('<a ', '<a title="Dokument ansehen" ')).replace(/<span>/, '<span class="inv-lbl">')}
             ${
               // Zahlungserinnerung als normaler kleiner Knopf bei den Aktionen (stand früher klein unter dem Datum)
               staff && i.status === 'offen' && !paymentReported(i)
@@ -713,18 +713,18 @@ function clientCard(d) {
   const invoicesPart = d.invoices.length
     ? `<div class="section"><h3 class="section-title">Rechnungen &amp; Honorare <span class="sec-count">${d.invoices.length}</span></h3>${d.invoices
         .map(
-          (i) => `<div class="list-row wrap inv-row"><div class="main"><div class="title">${docTitleLink(`/invoice.html?id=${i.id}`, esc(i.number), 'font-mono text-gold')} · ${esc(INVOICE_KIND[i.kind])}</div>
+          (i) => `<div class="list-row wrap inv-row"><div class="main"><div class="title">${docTitleLink(`/rechnung?id=${i.id}`, esc(i.number), 'font-mono text-gold')} · ${esc(INVOICE_KIND[i.kind])}</div>
               <div class="meta">${esc(fmtDate(i.createdAt))}${i.caseNumber ? ` · Akte ${esc(i.caseNumber)}` : ''}</div></div>
-            <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end"><span class="font-mono nowrap">${money(i.total)}</span>${invoiceBadge(i)}${openDoc(i.googleDoc, `/invoice.html?id=${i.id}`, 'Ansehen')}</div></div>`
+            <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end"><span class="font-mono nowrap">${money(i.total)}</span>${invoiceBadge(i)}${openDoc(i.googleDoc, `/rechnung?id=${i.id}`, 'Ansehen')}</div></div>`
         )
         .join('')}</div>`
     : emptySection('', 'Rechnungen & Honorare', 'keine');
   const contractsPart = d.contracts.length
     ? `<div class="section"><h3 class="section-title">Verträge &amp; Schriftsätze <span class="sec-count">${d.contracts.length}</span></h3>${d.contracts
         .map(
-          (k) => `<div class="list-row wrap"><div class="main"><div class="title">${docTitleLink(`/vertrag.html?id=${k.id}`, esc(k.templateName), 'font-medium')}</div>
+          (k) => `<div class="list-row wrap"><div class="main"><div class="title">${docTitleLink(`/vertrag?id=${k.id}`, esc(k.templateName), 'font-medium')}</div>
               <div class="meta">Akte ${esc(k.caseNumber)} · ${esc(fmtDate(k.createdAt))}</div></div>
-            <div class="flex items-center gap-2 shrink-0">${statusBadge(CONTRACT_STATUS, k.status)}${openDoc(k.status === 'unterschrieben' ? k.googleDoc : null, `/vertrag.html?id=${k.id}`, 'Ansehen')}</div></div>`
+            <div class="flex items-center gap-2 shrink-0">${statusBadge(CONTRACT_STATUS, k.status)}${openDoc(k.status === 'unterschrieben' ? k.googleDoc : null, `/vertrag?id=${k.id}`, 'Ansehen')}</div></div>`
         )
         .join('')}</div>`
     : emptySection('', 'Verträge & Schriftsätze', 'keine');

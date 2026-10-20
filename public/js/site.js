@@ -26,7 +26,7 @@
 
   /* ---------------------------------------------------------------- Login / Dashboard */
   function updateAuthNav() {
-    const href = me ? '/dashboard.html' : '/login.html';
+    const href = me ? '/dashboard' : '/login';
     document.querySelectorAll('[data-auth-link]').forEach((a) => (a.href = href));
     document.querySelectorAll('[data-auth-label]').forEach((el) => {
       el.textContent = me ? el.dataset.authIn || 'Dashboard' : el.dataset.authOut || 'Login';
@@ -54,7 +54,7 @@
       <p class="text-xs text-[var(--text-muted)] text-center mb-5">Bitte geben Sie das Aktenzeichen bei Rückfragen an.${res.linkedToAccount ? '' : ' Mit einem Mandantenkonto sehen Sie den Stand Ihrer Akte jederzeit im Mandantenportal.'}</p>
       <div class="flex flex-col sm:flex-row gap-2">
         <button type="button" id="ticketCopy" class="btn-outline flex-1 py-3 text-xs uppercase tracking-wider">Aktenzeichen kopieren</button>
-        ${res.linkedToAccount && res.caseId ? `<a href="/dashboard.html?case=${Number(res.caseId)}#cases" class="btn-gold flex-1 py-3 text-xs uppercase tracking-wider">Zur Akte</a>` : ''}
+        ${res.linkedToAccount && res.caseId ? `<a href="/dashboard?case=${Number(res.caseId)}#cases" class="btn-gold flex-1 py-3 text-xs uppercase tracking-wider">Zur Akte</a>` : ''}
       </div>
       ${!res.linkedToAccount && res.discordSignup
         ? `<button type="button" id="ticketAccount" class="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-full bg-[#5865F2] hover:bg-[#4752c4] text-white text-xs uppercase tracking-wider font-semibold py-3 transition-colors">Konto mit Discord anlegen</button>
@@ -81,7 +81,7 @@
     const form = e.target;
     if (me && me.role !== 'mandant') {
       showToast('Hinweis', 'Als Kanzleimitglied legen Sie Akten direkt im Dashboard an.');
-      setTimeout(() => (location.href = '/dashboard.html#cases'), 1400);
+      setTimeout(() => (location.href = '/dashboard#cases'), 1400);
       return;
     }
     const data = {
@@ -154,7 +154,7 @@
         const lead = m.tier === 'leitung';
         const duty = m.duty ? DUTY[m.duty] : null;
         const portrait = m.photoUrl
-          ? `<img src="${esc(m.photoUrl)}" alt="${esc(m.name)}" loading="lazy" class="w-24 h-24 rounded-full object-cover ring-4 ring-[rgba(212,175,55,0.18)] ${lead ? 'shadow-[0_0_40px_rgba(212,175,55,0.35)]' : ''}">`
+          ? `<img src="${esc(m.photoUrl)}" alt="${esc(m.name)}" loading="lazy" decoding="async" width="96" height="96" class="w-24 h-24 rounded-full object-cover ring-4 ring-[rgba(212,175,55,0.18)] ${lead ? 'shadow-[0_0_40px_rgba(212,175,55,0.35)]' : ''}">`
           : `<div class="w-24 h-24 rounded-full ${lead ? 'bg-gradient-to-br from-[#d4af37] to-[#8f7322] text-[#02050e] shadow-[0_0_40px_rgba(212,175,55,0.35)]' : 'bg-gradient-to-br from-slate-600 to-slate-800 text-white'} flex items-center justify-center font-serif text-3xl font-bold ring-4 ring-[rgba(212,175,55,0.12)]">${esc(m.initials)}</div>`;
         const lotm = m.lawyerOfMonth
           ? `<div class="lotm-badge lotm-on-card" title="Für herausragende Arbeit im ${esc(m.lawyerOfMonth)}">Anwalt des Monats</div>`
@@ -278,17 +278,17 @@
   document.addEventListener('click', (e) => {
     const btn = e.target.closest && e.target.closest('[data-vip-tier]');
     if (!btn) return;
-    const target = `/dashboard.html?vip=${btn.dataset.vipTier}#vip-angebot`;
-    if (me && me.role !== 'mandant') location.href = '/dashboard.html#vip'; // Team: Verwaltung im Dashboard
+    const target = `/dashboard?vip=${btn.dataset.vipTier}#vip-angebot`;
+    if (me && me.role !== 'mandant') location.href = '/dashboard#vip'; // Team: Verwaltung im Dashboard
     else if (me) location.href = target;
-    else location.href = '/login.html?next=' + encodeURIComponent(target);
+    else location.href = '/login?next=' + encodeURIComponent(target);
   });
 
   /* ---------------------------------------------------------------- Start */
   // Angefangene Texte (Mandat, Anliegen, Antwort) bleiben auf diesem Gerät erhalten
   window.PS.drafts.watch({ scope: 'website' });
 
-  api.get('/api/auth/session')
+  window.PS.boot('session', '/api/auth/session')
     .then((r) => (me = r?.user ?? null))
     .catch(() => (me = null))
     .finally(updateAuthNav);
@@ -298,7 +298,7 @@
   const wishId = Number(wish.get('anwalt')) || 0;
   if (wishId || wish.has('mandat')) history.replaceState(null, '', location.pathname + location.hash);
   if (!wishId && wish.has('mandat') && typeof window.openTicketModal === 'function') window.openTicketModal('profile');
-  api.get('/api/team')
+  window.PS.boot('team', '/api/team')
     .then((r) => {
       renderTeam(r.team || []);
       const m = wishId && (r.team || []).find((x) => x.id === wishId && x.bookable);
@@ -309,11 +309,11 @@
       if (grid) grid.innerHTML = '<p class="w-full text-center text-sm text-[var(--text-muted)] py-8">Team konnte nicht geladen werden.</p>';
     });
 
-  api.get('/api/fees')
+  window.PS.boot('fees', '/api/fees')
     .then((r) => renderFees(r.fees || []))
     .catch(() => {});
 
-  api.get('/api/public/memberships')
+  window.PS.boot('memberships', '/api/public/memberships')
     .then((r) => renderVip(r.tiers || []))
     .catch(() => {
       const grid = document.getElementById('vipTiers');
@@ -340,7 +340,7 @@
       ${firmStats.visible && firmStats.successRate != null ? '<p class="text-[0.7rem] text-center text-[var(--text-dim)] mt-3">Erfolgsquote: Freispruch, Einstellung, Strafmilderung, Vergleich oder gewonnen – reine Beratungen zählen nicht mit.</p>' : ''}`;
     window.PS.countUp(box, { whenVisible: true }); // Zahlen zählen hoch, sobald sie ins Bild scrollen
   }
-  api.get('/api/public/stats')
+  window.PS.boot('stats', '/api/public/stats')
     .then((d) => {
       Object.assign(firmStats, {
         visible: !!d.visible,
@@ -390,7 +390,7 @@
       tIndex = (tIndex + 1) % tCount();
       updateTestimonial();
     }, 6000);
-    api.get('/api/public/reviews')
+    window.PS.boot('reviews', '/api/public/reviews')
       .then(({ reviews }) => {
         if (!reviews || reviews.length < 3) return; // bis dahin bleiben die bisherigen Texte
         track.innerHTML = reviews.slice(0, 8).map(reviewSlide).join('');
@@ -419,13 +419,13 @@
     }
   }
   const loadDuty = () => api.get('/api/public/on-duty').then(renderDuty).catch(() => {});
-  loadDuty();
+  window.PS.boot('duty', '/api/public/on-duty').then(renderDuty).catch(() => {});
   setInterval(() => {
     if (!document.hidden) loadDuty();
   }, 60000);
 
   /* ---------------------------------------------------------------- Karriere */
-  api.get('/api/public/positions')
+  window.PS.boot('positions', '/api/public/positions')
     .then(({ positions }) => {
       const el = document.getElementById('careerCount');
       if (!el || !positions.length) return;
@@ -439,7 +439,7 @@
     const btn = document.getElementById('careerStatus');
     if (btn) {
       btn.textContent = 'Meine Bewerbung';
-      btn.href = mine.length === 1 ? `/bewerbung.html#${encodeURIComponent(mine[0].token)}` : '/karriere.html#meine';
+      btn.href = mine.length === 1 ? `/bewerbung#${encodeURIComponent(mine[0].token)}` : '/karriere#meine';
     }
     window.PS.applications
       .summary()
@@ -599,7 +599,7 @@
       <div class="flex flex-col sm:flex-row gap-2">
         <button type="button" id="concernCopy" class="btn-outline flex-1 py-3 text-xs uppercase tracking-wider">Daten kopieren</button>
         ${res.linkedToAccount
-          ? '<a href="/dashboard.html#concerns" class="btn-gold flex-1 py-3 text-xs uppercase tracking-wider text-center">Im Dashboard ansehen</a>'
+          ? '<a href="/dashboard#concerns" class="btn-gold flex-1 py-3 text-xs uppercase tracking-wider text-center">Im Dashboard ansehen</a>'
           : '<button type="button" id="concernCheck" class="btn-gold flex-1 py-3 text-xs uppercase tracking-wider">Anliegen ansehen</button>'}
       </div>`;
     document.getElementById('concernForm').classList.add('hidden');

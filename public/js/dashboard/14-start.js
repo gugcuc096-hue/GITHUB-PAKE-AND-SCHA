@@ -17,7 +17,7 @@ document.addEventListener('click', (e) => {
   $$('details.more-menu[open]').forEach((d) => {
     if (!d.contains(e.target) || e.target.closest('.more-item')) d.open = false;
   });
-  if (e.target.closest('a[href^="/vertrag.html"]')) st.contractTabAt = Date.now();
+  if (e.target.closest('a[href^="/vertrag"]')) st.contractTabAt = Date.now();
   // Klick neben das Fenster: zurück zum vorherigen Fenster (z. B. zur Akte) bzw. schließen – bei ungespeicherten
   // Eingaben erst mit Rückfrage. Markieren im Fenster und daneben Loslassen zählt nicht.
   if (e.target === $('#modal')) {
@@ -843,8 +843,10 @@ setInterval(() => {
 
 // Ungelesene Post, neue Bewerbungen und Dienststatus (Badges in der Navigation, Zahl im Tab und auf dem App-Symbol)
 function refreshBadges() {
-  return Promise.all([load.chatUnread().catch(() => {}), load.unread(), load.appCount(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {}), load.paymentReports().catch(() => {}), load.resolutionCount().catch(() => {})])
-    .then(renderNav)
+  // ein Abruf für alle Zähler (wie beim Start, ohne das Konto)
+  return load
+    .start({ me: false })
+    .then(() => (load.primed.clear(), renderNav()))
     .catch(() => {});
 }
 // Regelmäßig nachsehen – im Hintergrund seltener; mit Live-Verbindung nur noch alle zwei Minuten zur Sicherheit
@@ -1000,14 +1002,15 @@ document.addEventListener('ps:form-ok', () => buzz());
    ================================================================ */
 (async function start() {
   try {
-    const me = await api.get('/api/auth/me');
+    const { me } = await load.start(); // Konto + Zähler + Dienststatus in einem Abruf
     st.user = me.user;
     st.twoFactor = me.twoFactor;
     setRanks(me.ranks);
   } catch {
-    location.href = '/login.html?next=' + encodeURIComponent('/dashboard.html' + location.search + location.hash);
+    location.href = '/login?next=' + encodeURIComponent('/dashboard' + location.search + location.hash);
     return;
   }
+  if (isStaff()) await loadStaffParts();
   renderUser();
   // Angefangene Texte je Konto im Browser behalten (Rechnungs-Entwurf eigens, siehe 06-rechnungen)
   window.PS.drafts.watch({ scope: `u${st.user.id}`, onRestore: () => toast('Angefangene Eingaben wiederhergestellt.') });
@@ -1026,12 +1029,6 @@ document.addEventListener('ps:form-ok', () => buzz());
   if (googleState && GOOGLE_MSG[googleState]) toast(...GOOGLE_MSG[googleState]);
   if (googleState) st.settingsTab = 'integrations'; // Google Docs stehen unter Einstellungen → Integrationen
 
-  try {
-    await Promise.all([load.chatUnread().catch(() => {}), load.unread(), load.appCount(), load.duty(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {}), load.paymentReports().catch(() => {}), load.resolutionCount().catch(() => {})]);
-    renderUser();
-  } catch {
-    /* Badges und Dienststatus sind nicht kritisch */
-  }
   st.histPaused = true;
   try {
     await go(hashView());
@@ -1048,6 +1045,22 @@ document.addEventListener('ps:form-ok', () => buzz());
   liveConnect();
   replayUndoDeletes(); // beim letzten Verlassen nicht mehr durchgekommene Löschungen nachholen
 })();
+
+/**
+ * Verwaltungsteile (Team, Einstellungen, Discord, Statistik, Wiki, Lager …) gibt es nur für die Kanzlei – Mandanten
+ * laden sie nie. Programmcode, keine Daten; nach dem ersten Mal liegt er ohnehin im Browser.
+ */
+function loadStaffParts() {
+  const src = document.querySelector('script[data-staff]')?.dataset.staff;
+  if (!src || views.settings) return Promise.resolve();
+  return new Promise((resolve) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => (toast('Ein Teil des Dashboards konnte nicht geladen werden – bitte neu laden.', 'error'), resolve());
+    document.head.appendChild(s);
+  });
+}
 
 /** Konto per Discord angelegt: einmal nach dem Namen im Spiel fragen (erscheint in Akten, Verträgen, Nachrichten). */
 function askInitialName() {

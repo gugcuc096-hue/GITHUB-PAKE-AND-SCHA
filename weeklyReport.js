@@ -85,7 +85,7 @@ function report(now = new Date()) {
   if (n.idleDays) fields.splice(3, 0, { name: '⏸️ Liegengeblieben', value: n.idle ? `**${n.idle} Akte${n.idle === 1 ? '' : 'n'}** seit ${n.idleDays}+ Tagen ohne Aktivität` : 'keine' });
   return {
     title: `📊 Wochenbericht – KW ${isoWeek(now)}`,
-    description: `Die letzten 7 Tage in der Kanzlei.${base ? `\n[Kanzlei-Statistik öffnen](${base}/dashboard.html#stats)` : ''}`,
+    description: `Die letzten 7 Tage in der Kanzlei.${base ? `\n[Kanzlei-Statistik öffnen](${base}/dashboard#stats)` : ''}`,
     fields,
     color: tickets.COLORS.gold,
     footer: 'Pake & Scha Legal Consulting · jeden Montag',
