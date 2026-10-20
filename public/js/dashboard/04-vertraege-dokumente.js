@@ -387,7 +387,7 @@ function externalDocCard(d, c, sortable = false) {
       <div class="fn-head">
         ${sortable ? `<button type="button" class="fn-grip" aria-label="Verschieben: gedrückt halten und ziehen – oder mit den Pfeiltasten ↑ ↓" title="Gedrückt halten und nach oben oder unten ziehen">${icon('grip', 'ico-sm')}</button>` : ''}
         <span class="${p.badgeCls}">${esc(p.name)}</span>
-        <div class="fn-main"><div class="fn-title">${esc(d.title || `${p.noun}${gd ? '' : ' ' + d.documentId}`)}</div><div class="fn-meta">${meta}</div></div>
+        <div class="fn-main"><div class="fn-title">${esc(d.title || `${p.noun}${gd ? '' : ' ' + d.documentId}`)}${!gd && d.documentId ? `<button type="button" class="copy-btn" data-action="copy" data-text="DOC - ${esc(d.documentId)}" title="Aktenzeichen „DOC - ${esc(d.documentId)}“ kopieren" aria-label="FiveNet-Aktenzeichen kopieren">${icon('copy', 'ico-xs')}</button>` : ''}</div><div class="fn-meta">${meta}</div></div>
         ${staff && d.internal ? badge('intern', 'amber') : ''}
       </div>
       ${d.summary ? `<p class="fn-summary">${esc(d.summary)}</p>` : ''}

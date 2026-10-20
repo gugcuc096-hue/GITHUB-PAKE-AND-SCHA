@@ -758,6 +758,8 @@ function liveConnect() {
   const es = new EventSource('/api/events?tab=' + encodeURIComponent(window.PS.tab));
   live.es = es;
   es.onopen = () => {
+    clearTimeout(live.downTimer);
+    if (live.bar === 'down') sysBar(null);
     // Nach einem Verbindungsabbruch einmal alles nachholen, was in der Zwischenzeit passiert ist
     if (live.down) {
       refreshBadges();
@@ -771,6 +773,10 @@ function liveConnect() {
   es.onerror = () => {
     live.ok = false;
     live.down = true;
+    // Länger als ein paar Sekunden weg (z. B. Update, Neustart): ruhiger Hinweis statt Fehlermeldungen – die
+    // Verbindung kommt von selbst wieder, angefangene Eingaben bleiben
+    clearTimeout(live.downTimer);
+    live.downTimer = setTimeout(() => live.down && sysBar('down'), 4000);
   };
   es.onmessage = (m) => {
     let ev;
@@ -779,11 +785,79 @@ function liveConnect() {
     } catch {
       return;
     }
+    if (ev.k === 'hello') {
+      if (ev.v && APP_VERSION && ev.v !== APP_VERSION) sysBar('update');
+      return;
+    }
     if (ev.k === 'case') liveLater(`case${ev.id}${ev.chat ? 'c' : ''}`, () => liveCase(ev));
     else if (ev.k === 'area') liveLater(`area:${ev.a}`, () => liveArea(ev.a));
     else if (ev.k === 'presence') hereShow(ev.id, ev.users);
     else if (ev.k === 'typing') typingShow(ev.id, ev.name);
   };
+}
+
+actions['app-reload'] = () => location.reload();
+
+/** Interne Notiz oben in der Akte anpinnen bzw. lösen. */
+actions['note-pin'] = async (el) => {
+  const caseId = Number(el.dataset.caseId);
+  const on = el.dataset.on === '1';
+  await api.put(`/api/cases/${caseId}/notes/${el.dataset.id}/pin`, { on });
+  toast(on ? 'Notiz oben in der Akte angepinnt.' : 'Notiz gelöst.');
+  await reloadCase(caseId);
+};
+
+/** Merkliste: Stern sofort umschalten, gespeichert wird im Hintergrund (bei Fehler zurück). */
+actions['case-star'] = async (el) => {
+  const id = Number(el.dataset.id);
+  const c = st.cases.find((x) => x.id === id);
+  const on = el.getAttribute('aria-pressed') !== 'true';
+  const apply = (v) => {
+    if (c) c.starred = v;
+    $$(`[data-action="case-star"][data-id="${id}"]`).forEach((b) => {
+      b.classList.toggle('on', v);
+      b.setAttribute('aria-pressed', String(v));
+      b.title = v ? 'Aus der Merkliste nehmen' : 'Merken – steht dann oben';
+    });
+  };
+  apply(on);
+  try {
+    await api.put(`/api/cases/${id}/star`, { on });
+    toast(on ? 'Gemerkt – die Akte steht jetzt oben.' : 'Aus der Merkliste genommen.');
+    if (['cases', 'overview'].includes(st.view) && !$('#modal.open')) renderView();
+  } catch (err) {
+    apply(!on);
+    toast(err.message, 'error');
+  }
+};
+
+/** Fassung, mit der dieses Dashboard geladen wurde (Versionsnummer am Skript). */
+const APP_VERSION = (() => {
+  try {
+    return new URL(document.querySelector('script[data-staff]')?.src || '', location.href).searchParams.get('v') || '';
+  } catch {
+    return '';
+  }
+})();
+
+/**
+ * Hinweis oben: 'down' – Verbindung kurz weg (Update/Neustart, verbindet sich selbst neu); 'update' – neue Fassung
+ * eingespielt, „Neu laden“ holt sie (angefangene Texte bleiben dank Entwurfsspeicher erhalten). null blendet aus.
+ */
+function sysBar(kind) {
+  if (live.bar === 'update' && kind === 'down') return; // „Neu laden“ bleibt stehen
+  live.bar = kind;
+  $('#sysBar')?.remove();
+  if (!kind) return;
+  const bar = document.createElement('div');
+  bar.id = 'sysBar';
+  bar.className = 'sys-bar';
+  bar.setAttribute('role', 'status');
+  bar.innerHTML =
+    kind === 'update'
+      ? `${icon('refresh', 'ico-sm')}<span>Eine neue Version des Dashboards ist da.</span><button type="button" class="btn-gold btn-sm" data-action="app-reload">Neu laden</button>`
+      : `<span class="sys-dot" aria-hidden="true"></span><span>Verbindung kurz unterbrochen – das Dashboard verbindet sich gleich neu. Ihre Eingaben bleiben erhalten.</span>`;
+  document.body.appendChild(bar);
 }
 
 /*

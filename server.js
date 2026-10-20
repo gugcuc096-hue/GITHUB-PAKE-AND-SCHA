@@ -100,7 +100,7 @@ app.use('/api/start', require('./routes/start').router); // Dashboard-Start: Kon
 // ohne Knopf. Chat und „gelesen“ stehen nicht im Auszug.
 app.use('/api/cases/:id', (req, res, next) => {
   const id = Number(req.params.id);
-  if (req.method !== 'GET' && id > 0 && !/^\/chat(\/|$)/.test(req.path)) {
+  if (req.method !== 'GET' && id > 0 && !/^\/(chat(\/|$)|star$)/.test(req.path)) {
     res.on('finish', () => {
       if (res.statusCode < 400) require('./googleDocs').touchExtract(id);
     });
@@ -260,6 +260,8 @@ app.listen(PORT, () => {
   require('./backup').start();
   // Papierkorb: Akten nach 30 Tagen endgültig löschen
   require('./trash').start();
+  // Aufräumen: abgelaufene Sitzungen/Codes, Datenbank optimieren und monatlich verdichten
+  require('./maintenance').start();
   require('./googleDocs').start();
   // Systemwarnungen ans Board (Bot offline, Sicherung fehlgeschlagen, Speicher, Absturz)
   require('./systemAlerts').start();

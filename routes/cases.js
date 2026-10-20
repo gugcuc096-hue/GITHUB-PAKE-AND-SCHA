@@ -161,8 +161,9 @@ router.get('/', (req, res) => {
     ? db.prepare(`${CASE_SELECT} ORDER BY c.updated_at DESC`).all()
     : db.prepare(`${CASE_SELECT} WHERE c.client_id = ? ORDER BY c.updated_at DESC`).all(u.id);
   const unread = caseChat.unreadFor(u).cases;
+  const stars = starredIds(u.id);
   // Liste ohne Sachverhalt (steht in der Akte selbst) – bei vielen Akten deutlich weniger zu laden
-  res.json({ cases: rows.map((c) => ({ ...caseRow(c, u), description: undefined, chatUnread: unread[c.id] || 0 })) });
+  res.json({ cases: rows.map((c) => ({ ...caseRow(c, u), description: undefined, chatUnread: unread[c.id] || 0, starred: stars.has(c.id) })) });
 });
 
 /* ---------------------------------------------------------------- Nachrichten (Chat Kanzlei ↔ Mandant) */
@@ -564,9 +565,26 @@ router.get(
     // Fremde Akten liefern 404 statt 403, damit ihre Existenz nicht verraten wird.
     if (!access.canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
 
-    res.json(caseDetail(c, req.user));
+    const detail = caseDetail(c, req.user);
+    detail.case.starred = starredIds(req.user.id).has(c.id);
+    res.json(detail);
   })
 );
+
+/* ---------------------------------------------------------------- Merkliste (Stern, je Person) */
+function starredIds(userId) {
+  return new Set(db.prepare('SELECT case_id FROM case_stars WHERE user_id = ?').all(userId).map((r) => r.case_id));
+}
+router.put('/:id/star', (req, res) => {
+  const id = idParam(req);
+  const c = id && getCase(id);
+  if (!c || !caseAccess(c, req.user).canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
+  const d = parseBody(z.object({ on: z.boolean() }), req, res);
+  if (!d) return;
+  if (d.on) db.prepare('INSERT OR IGNORE INTO case_stars (user_id, case_id) VALUES (?, ?)').run(req.user.id, c.id);
+  else db.prepare('DELETE FROM case_stars WHERE user_id = ? AND case_id = ?').run(req.user.id, c.id);
+  res.json({ starred: d.on });
+});
 
 /* ---------------------------------------------------------------- Bearbeiten */
 const updateSchema = z.object({
@@ -1196,6 +1214,8 @@ router.post(
       return Number(info.lastInsertRowid);
     });
     if (!internal) caseChat.markRead(c.id, req.user.id, noteId); // eigene Nachricht gilt als gelesen
+    // @Erwähnung in internen Notizen: Kollegen per DM (sonst Kanzlei-Post) benachrichtigen
+    const mentioned = internal ? await require('../mentions').notify(c, req.user, d.body) : [];
     // Interne Notizen bleiben intern – ins Ticket kommt nur, was auch der Mandant sieht.
     if (!internal) {
       tickets.post(c.id, {
@@ -1208,7 +1228,7 @@ router.post(
         byDiscordId: req.user.discord_id,
       });
     }
-    res.status(201).json({ success: true, id: noteId, message: internal ? undefined : caseChat.messages(c.id, noteId - 1)[0] });
+    res.status(201).json({ success: true, id: noteId, mentioned, message: internal ? undefined : caseChat.messages(c.id, noteId - 1)[0] });
   })
 );
 
@@ -1226,6 +1246,23 @@ router.delete(
     res.json({ success: true });
   })
 );
+
+/** Interne Notiz oben in der Akte anpinnen bzw. lösen (Kanzlei; z. B. „Mandant nur per DM erreichbar“). */
+router.put('/:id/notes/:noteId/pin', (req, res) => {
+  const caseId = idParam(req);
+  const noteId = idParam(req, 'noteId');
+  const c = caseId && getCase(caseId);
+  if (!c || !caseAccess(c, req.user).canView || !isStaff(req.user)) return res.status(404).json({ error: 'Akte nicht gefunden.' });
+  const n = noteId && db.prepare('SELECT * FROM notes WHERE id = ? AND case_id = ?').get(noteId, caseId);
+  if (!n || n.system || !n.internal) return res.status(404).json({ error: 'Interne Notiz nicht gefunden.' });
+  const d = parseBody(z.object({ on: z.boolean() }), req, res);
+  if (!d) return;
+  if (d.on && !n.pinned && db.prepare('SELECT COUNT(*) AS k FROM notes WHERE case_id = ? AND pinned = 1').get(caseId).k >= 3) {
+    return res.status(400).json({ error: 'Höchstens drei angepinnte Notizen je Akte – bitte zuerst eine lösen.' });
+  }
+  db.prepare('UPDATE notes SET pinned = ? WHERE id = ?').run(d.on ? 1 : 0, n.id);
+  res.json({ pinned: d.on });
+});
 
 /* ---------------------------------------------------------------- Änderungen aus dem Discord-Ticket (Buttons) */
 // Rechte prüft der Aufrufer (routes/interactions.js); hier nur die Änderung samt Verlauf und Meldungen.

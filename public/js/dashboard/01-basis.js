@@ -157,6 +157,9 @@ const ICONS = {
   box: 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4',
   idCard: 'M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2',
 };
+/** Wert mit kleinem Kopier-Knopf daneben (Aktenzeichen, FiveNet-Nummer, Links). */
+const copyable = (text, label = 'Kopieren') =>
+  `<span class="copyable">${esc(text)}<button type="button" class="copy-btn" data-action="copy" data-text="${esc(text)}" title="${esc(label)}" aria-label="${esc(label)}">${icon('copy', 'ico-xs')}</button></span>`;
 const icon = (name, cls = 'ico') =>
   `<svg class="${cls}${name === 'send' ? ' i-send' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[name] || ''}"/></svg>`;
 const DISCORD_ICON =

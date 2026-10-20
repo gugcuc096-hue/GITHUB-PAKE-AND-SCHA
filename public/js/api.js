@@ -55,10 +55,18 @@
       opts.body = JSON.stringify(body ?? {});
     }
     let res;
-    try {
-      res = await fetch(url, opts);
-    } catch {
-      throw Object.assign(new Error('Der Server ist nicht erreichbar. Bitte Verbindung prüfen und erneut versuchen.'), { status: 0 });
+    // Lesen darf es nach kurzer Pause noch einmal versuchen – z. B. während eines Updates, wenn der Server für einen
+    // Moment neu startet (Render: ca. eine Minute). Ändern (POST & Co.) nie automatisch wiederholen.
+    for (let attempt = 0; ; attempt++) {
+      try {
+        res = await fetch(url, opts);
+        if (method !== 'GET' || attempt >= 3 || ![502, 503, 504].includes(res.status)) break;
+      } catch {
+        if (method !== 'GET' || attempt >= 3) {
+          throw Object.assign(new Error('Der Server ist gerade nicht erreichbar (z. B. während eines Updates). Ihre Eingaben bleiben erhalten – bitte gleich erneut versuchen.'), { status: 0 });
+        }
+      }
+      await new Promise((r) => setTimeout(r, 1500 * 2 ** attempt));
     }
     let data = null;
     try { data = await res.json(); } catch { /* leere Antwort */ }

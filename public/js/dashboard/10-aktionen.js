@@ -23,8 +23,9 @@ const actions = {
     location.href = '/login';
   },
   copy: async (el) => {
-    const ok = await copy(el.dataset.text || '');
-    toast(ok ? 'In die Zwischenablage kopiert.' : 'Kopieren nicht möglich – bitte manuell markieren.', ok ? 'ok' : 'error');
+    const text = el.dataset.text || '';
+    const ok = await copy(text);
+    toast(ok ? (text.length <= 40 && !/\s/.test(text) ? `„${text}“ kopiert.` : 'In die Zwischenablage kopiert.') : 'Kopieren nicht möglich – bitte manuell markieren.', ok ? 'ok' : 'error');
   },
 
   // Mandantenkartei

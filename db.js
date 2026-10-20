@@ -1039,6 +1039,7 @@ db.exec(`
 
 // Nachrichten aus dem Discord-Ticket (Übernahme in den Chat der Akte): Discord-Nachrichten-ID gegen Doppelte
 addColumn('notes', 'discord_message_id', 'TEXT');
+addColumn('notes', 'pinned', 'INTEGER NOT NULL DEFAULT 0'); // interne Notiz oben in der Akte angepinnt
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_discord_msg ON notes(discord_message_id) WHERE discord_message_id IS NOT NULL');
 
 // Konto per Discord angelegt: Name im Spiel (IC) wird beim ersten Login einmal abgefragt
@@ -1360,6 +1361,14 @@ if (!getSetting('migrated_application_public_note')) {
 for (const row of db.prepare('SELECT id FROM concerns WHERE reference IS NULL ORDER BY id').all()) {
   db.prepare('UPDATE concerns SET reference = ?, access_pin = ? WHERE id = ?').run(nextConcernNumber(), randomPin(), row.id);
 }
+
+// Merkliste: Akten, die sich eine Person mit Stern gemerkt hat (je Person, für andere unsichtbar)
+db.exec(`CREATE TABLE IF NOT EXISTS case_stars (
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  case_id    INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (user_id, case_id)
+)`);
 
 /*
  * Volltextsuche (SQLite FTS5) über Notizen und Chat der Akten: schnell auch bei vielen tausend Einträgen und nach

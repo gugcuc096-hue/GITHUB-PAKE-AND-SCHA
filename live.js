@@ -21,6 +21,8 @@ function handler(req, res) {
   res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
   res.flushHeaders();
   res.write('retry: 3000\n\n');
+  // Fassung des Programmcodes: weicht sie vom offenen Dashboard ab, bietet es „Neu laden“ an (Update eingespielt)
+  res.write(`data: ${JSON.stringify({ k: 'hello', v: require('./assets').version() })}\n\n`);
   const client = { res, userId: req.user.id, tab: String(req.query.tab || '').slice(0, 40) };
   clients.add(client);
   const beat = setInterval(() => res.write(': ping\n\n'), HEARTBEAT_MS);
@@ -88,6 +90,8 @@ function middleware(req, res, next) {
     if (res.statusCode >= 400 || !clients.size) return;
     // Vorschaubild eines Anhangs: ändert für andere nichts Sichtbares – niemand muss neu laden
     if (/^\/cases\/\d+\/attachments\/\d+\/thumb$/.test(path)) return;
+    // Merkliste (Stern): gilt nur für die eigene Person – andere müssen nichts nachladen
+    if (/^\/cases\/\d+\/star$/.test(path)) return;
     try {
       if (PUBLIC_AREAS[path]) return areaChanged(PUBLIC_AREAS[path]);
       const area = areaOf(path);

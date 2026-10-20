@@ -41,9 +41,15 @@ function caseLevelText(c) {
 /** Badge neben der Akte: Kanzlei sieht nur die Priorität, der Mandant seine Dringlichkeit. */
 const caseLevelBadge = (c) => (isStaff() ? priorityBadge(c) : c.urgency !== 'normal' && URGENCY[c.urgency] ? badge(...URGENCY[c.urgency]) : '');
 
+/** Stern der Merkliste (je Person): gemerkte Akten stehen oben in Aktenliste und Übersicht. */
+function starBtn(c) {
+  const on = !!c.starred;
+  return `<button type="button" class="star-btn${on ? ' on' : ''}" data-action="case-star" data-id="${c.id}" aria-pressed="${on}" title="${on ? 'Aus der Merkliste nehmen' : 'Merken – steht dann oben'}" aria-label="${on ? 'Aus der Merkliste nehmen' : 'Akte merken'}">${icon('star', 'ico-sm')}</button>`;
+}
+
 function caseListRow(c, extra = '', cls = '') {
   return `<div class="list-row${cls ? ` ${cls}` : ''}" data-action="open-case" data-id="${c.id}" role="button" tabindex="0">
-      <div class="main"><div class="title">${esc(c.title)}</div>
+      <div class="main"><div class="title">${c.starred ? starBtn(c) : ''}${esc(c.title)}</div>
         <div class="meta"><span class="font-mono text-gold">${esc(c.caseNumber)}</span> · ${esc(c.clientName)}${caseLevelText(c)}</div></div>
       <div class="flex items-center gap-2 shrink-0">${extra || stageBadge(c)}</div></div>`;
 }
@@ -229,7 +235,9 @@ views.overview = {
           ${upcoming.length ? upcoming.map((e) => eventRow(e)).join('') : emptyLine('Keine anstehenden Termine.', 'calendar')}
         </section>`;
 
-    const recent = st.cases.slice(0, 5);
+    // Gemerkte Akten zuerst, danach die zuletzt bearbeiteten
+    const starred = st.cases.filter((c) => c.starred && c.status !== 'geschlossen');
+    const recent = [...starred, ...st.cases.filter((c) => !starred.includes(c))].slice(0, Math.max(5, starred.length));
     const recentPanel = `
         <section class="panel panel-pad">
           <div class="panel-head"><h2 class="panel-title">${staff ? 'Zuletzt bearbeitet' : 'Meine Akten'}</h2><a href="#cases" class="btn-ghost btn-sm">Alle Akten</a></div>
@@ -356,7 +364,8 @@ function sortCases(list) {
     neueste: (a, b) => caseTime(b, 'createdAt') - caseTime(a, 'createdAt'),
     aelteste: (a, b) => caseTime(a, 'createdAt') - caseTime(b, 'createdAt'),
   };
-  return list.sort(sorters[mode] || sorters.aktualisiert);
+  const by = sorters[mode] || sorters.aktualisiert;
+  return list.sort((a, b) => !!b.starred - !!a.starred || by(a, b)); // Merkliste zuerst
 }
 
 /**
@@ -427,7 +436,7 @@ function caseTable() {
         rows,
         (c) => `<tr class="row${c.idleDays ? ' row-idle' : ''}${staff && c.priority >= 3 && c.status !== 'geschlossen' ? ` has-tab tab-p${c.priority}` : ''}${selecting && st.caseSel.has(c.id) ? ' is-picked' : ''}" data-action="${selecting ? 'case-pick' : 'open-case'}" data-id="${c.id}"${selecting ? ` aria-selected="${st.caseSel.has(c.id)}"` : ''}>
           ${selecting ? `<td class="td-check"><span class="pick-box" aria-hidden="true">${icon('check', 'ico-sm')}</span></td>` : ''}<td class="td-main"><div class="case-meta"><span class="font-mono text-gold text-xs">${esc(c.caseNumber)}</span><span class="case-dot" aria-hidden="true">·</span><span>${esc(AREAS[c.area] || c.area)}</span>${staff ? '' : caseLevelBadge(c)}</div>
-            <div class="font-medium">${esc(c.title)}${c.chatUnread ? ` <span class="chat-new" title="Neue Nachrichten">${icon('chat', 'ico-sm')}${c.chatUnread}</span>` : ''}</div></td>
+            <div class="font-medium case-title-line">${staff ? starBtn(c) : ''}${esc(c.title)}${c.chatUnread ? ` <span class="chat-new" title="Neue Nachrichten">${icon('chat', 'ico-sm')}${c.chatUnread}</span>` : ''}</div></td>
           ${staff ? `<td data-label="Mandant">${esc(c.clientName)}${c.membership ? `<div class="mt-1">${memberBadge(c.membership)}</div>` : ''}</td>` : ''}
           <td data-label="Zuständig">${c.lawyerName ? `<div class="who"><span class="who-lead">${esc(c.lawyerName)}</span>${(c.coLawyers || []).length ? `<div class="text-xs text-dim">+ ${esc(c.coLawyers.map((l) => l.name).join(', '))}</div>` : ''}</div>` : badge('Unbesetzt', 'amber')}</td>
           ${staff ? `<td data-label="Priorität">${priorityBadge(c, true)}</td>` : ''}

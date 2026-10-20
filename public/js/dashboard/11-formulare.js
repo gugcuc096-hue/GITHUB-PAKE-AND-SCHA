@@ -271,8 +271,9 @@ const forms = {
   'add-note': async (f) => {
     const fd = new FormData(f);
     const id = Number(f.dataset.id);
-    await api.post(`/api/cases/${id}/notes`, { body: val(fd, 'body'), internal: fd.get('internal') === 'on' });
-    toast('Eintrag gespeichert.');
+    const r = await api.post(`/api/cases/${id}/notes`, { body: val(fd, 'body'), internal: fd.get('internal') === 'on' });
+    const m = r.mentioned || [];
+    toast(m.length ? `Gespeichert – ${m.map((u) => `${u.name} (${u.via === 'dm' ? 'Discord-DM' : 'Kanzlei-Post'})`).join(', ')} benachrichtigt.` : 'Eintrag gespeichert.');
     await reloadCase(id);
   },
   event: async (f) => {

@@ -679,8 +679,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.click('[data-action="inv-back"]');
         await page.waitForSelector('#modalBody .case-head');
         await settle();
-        // Abschließen über den Status: offene Punkte, Ergebnis ist Pflicht
-        await page.selectOption('#modalBody select[data-case-status]', 'geschlossen');
+        // Abschließen über den fünften Kreis: offene Punkte, Ergebnis ist Pflicht
+        await page.click('#modalBody [data-action="case-close"]');
         await page.waitForSelector('#modalBody form[data-form="case-close"]');
         const check = await page.textContent('#modalBody .close-check');
         assert.match(check, /Noch offen/);
@@ -693,7 +693,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.click('#modalBody form[data-form="case-close"] button[type=submit]');
         await page.waitForSelector('#modalBody select[data-case-outcome]');
         assert.equal(await page.inputValue('#modalBody [data-case-outcome]'), 'freispruch');
-        assert.equal(await page.inputValue('#modalBody [data-case-status]'), 'geschlossen');
+        assert.equal(await page.$$eval('#modalBody .track-node.done', (n) => n.length), 5, 'abgeschlossen');
         if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Aktenkopf mit Ergebnis passt aufs Handy');
 
         assert.deepEqual(problems, []);
@@ -1317,7 +1317,9 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
           ['Offen', 'Eingang', 'Akteneinsicht', 'Strategie', 'Verhandlung', 'Abgeschlossen']
         );
         await page.selectOption('#modalBody [data-case-status]', 'step:1');
-        await page.waitForFunction(() => document.querySelector('#modalBody [data-case-status]')?.dataset.value === 'step:1');
+        await page.waitForFunction(() => document.querySelectorAll('#modalBody .track-node')[1]?.classList.contains('current'));
+        // ab jetzt zeigen nur noch die Kreise den Stand – keine zweite Angabe „Status“ im Kopf
+        await page.waitForFunction(() => !document.querySelector('#modalBody [data-case-status]'));
         assert.match(await page.textContent('#modalBody .timeline'), /Status: Offen → In Bearbeitung · Verfahrensstand: Akteneinsicht|Verfahrensstand: Akteneinsicht · Status: Offen → In Bearbeitung/);
         // Kennzahlen: erste Zeile im Raster der Angaben (Bezeichnung über dem Wert wie alle Angaben)
         assert.equal(await page.$$eval('#modalBody .info-grid .fact', (els) => els.length), 3);
@@ -1419,18 +1421,18 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.click('.modal-close');
         await page.waitForSelector('#modalBody .track');
         await settle();
-        assert.equal(await page.inputValue('#modalBody [data-case-status]'), 'step:0', 'Schließen ohne Abschluss ändert nichts');
+        assert.equal(await page.$eval('#modalBody .track-node.current', (n) => n.textContent.trim()), '1', 'Schließen ohne Abschluss ändert nichts');
         await page.click('#modalBody [data-action="case-close"]');
         await page.waitForSelector('#modalBody form[data-form="case-close"]');
         await page.selectOption('#ccOutcome', 'vergleich');
         await page.click('#modalBody form[data-form="case-close"] button[type=submit]');
         await page.waitForFunction(() => document.querySelectorAll('#modalBody .track-node.done').length === 5);
-        assert.equal(await page.inputValue('#modalBody [data-case-status]'), 'geschlossen');
+        assert.ok(await page.$('#modalBody .cover-stamp'), 'Stempel „Abgeschlossen“');
         assert.equal(await page.inputValue('#modalBody [data-case-outcome]'), 'vergleich', 'Ergebnis im Aktenkopf');
         assert.match(await page.textContent('#modalBody .timeline'), /Status: In Bearbeitung → Abgeschlossen/);
         await page.click('#modalBody [data-action="case-reopen"][data-step="2"]');
         await page.click('.ps-dialog [data-ps-dialog="ok"]');
-        await page.waitForFunction(() => document.querySelector('#modalBody [data-case-status]')?.value === 'step:2');
+        await page.waitForFunction(() => document.querySelector('#modalBody .track-node.current')?.textContent.trim() === '3');
         assert.equal(await page.$$eval('#modalBody .track-node.done', (n) => n.length), 2, 'wieder offen auf „Strategie“');
         // Knopf in der leeren Zeile funktioniert wie zuvor
         await page.click('#modalBody #secBriefs [data-action="brief-new"]');
@@ -1558,7 +1560,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await settle();
         await page.click('#modalBody button.track-step[data-step="2"]');
         assert.deepEqual(await page.$$eval('#modalBody .track-node', (n) => n.map((x) => (x.classList.contains('current') ? 'c' : x.classList.contains('done') ? 'd' : '-'))), ['d', 'd', 'c', '-', '-'], 'Stand sofort');
-        assert.equal(await page.$eval('#modalBody [data-case-status]', (s) => s.value), 'step:2');
+        assert.equal(await page.$('#modalBody [data-case-status]'), null, 'Stand nur über die Kreise');
         await settle();
         await page.unroute(`**/api/cases/${kase.id}`);
         await page.route(`**/api/cases/${kase.id}`, fail('PATCH'));
@@ -1566,7 +1568,6 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.click('#modalBody button.track-step[data-step="3"]');
         await hint('Nicht gespeichert');
         assert.equal(await page.$eval('#modalBody .track-node.current', (n) => n.textContent.trim()), '3', 'Stand springt zurück');
-        assert.equal(await page.$eval('#modalBody [data-case-status]', (s) => s.value), 'step:2');
         const saved = (await adm.get(`/api/cases/${kase.id}`)).json.case;
         assert.equal(saved.step, 2);
         assert.equal(saved.priority, 4);
