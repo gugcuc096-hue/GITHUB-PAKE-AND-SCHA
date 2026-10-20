@@ -456,8 +456,6 @@ const actions = {
   'inv-status': async (el) => {
     const row = el.closest('tr, .inv-card, .row') || el;
     await api.patch('/api/invoices/' + el.dataset.id, { status: el.dataset.status });
-    if (el.dataset.status === 'bezahlt') window.PS.stamp(row, 'Bezahlt', 'paid');
-    if (el.dataset.status === 'storniert') window.PS.stamp(row, 'Storniert', 'slate');
     toast(
       el.dataset.reported && el.dataset.status === 'bezahlt'
         ? 'Zahlungseingang bestätigt – der Mandant wird informiert.'
@@ -855,7 +853,6 @@ const actions = {
     if (!r || !(await ask(`${r.oldName} heißt danach überall „${r.newName}“ – im Konto, in Akten und (falls vorhanden) im Team-Profil der Website.`, { title: 'Namensänderung genehmigen?', confirmText: 'Genehmigen' }))) return;
     await api.post(`/api/name-requests/${r.id}/decide`, { approve: true });
     toast(`Genehmigt – ${r.newName}.`);
-    window.PS.stamp(el.closest('.list-row') || $('#content'), 'Genehmigt');
     st.lawyers = [];
     st.contacts = null;
     await refreshBehind();
@@ -1457,11 +1454,6 @@ const actions = {
     if (!k) return;
     if (!(await ask(`Bitte nur bestätigen, wenn ${k.data.mandant || 'der Mandant'} ${k.kind === 'schriftsatz' ? 'das Dokument' : 'den Vertrag'} im Spiel tatsächlich unterschrieben hat. Die Erfassung wird mit Ihrem Namen im Aktenverlauf vermerkt.`, { title: 'Unterschrift des Mandanten erfassen?', confirmText: 'Erfassen' }))) return;
     const r = await api.post(`/api/contracts/${k.id}/sign`, { as: 'erfassen' });
-    if (r.contract && r.contract.status === 'unterschrieben') {
-      const target = el.closest('.contract-row') || $('#modalCard');
-      window.PS.stamp(target, 'Unterschrieben');
-      window.PS.seal(target); // Gold-Siegel neben dem Stempel
-    }
     toast('Unterschrift des Mandanten erfasst.');
     await reloadCase(Number(el.dataset.caseId));
   },
@@ -1614,9 +1606,6 @@ const actions = {
     const data = await api.patch('/api/admin/applications/' + el.dataset.id, { status: el.dataset.status });
     toast(`Status: ${APP_STATUS[el.dataset.status][0]}`);
     await reloadApplication(data);
-    // Entscheidung mit Stempel auf der Bewerbung
-    if (el.dataset.status === 'angenommen') window.PS.stamp($('#modalCard'), 'Angenommen', 'paid');
-    if (el.dataset.status === 'abgelehnt') window.PS.stamp($('#modalCard'), 'Abgelehnt', 'slate');
   },
   'app-hire': async (el) => {
     const data = await api.get('/api/admin/applications/' + el.dataset.id);

@@ -18,7 +18,7 @@ const forms = {
   'bulk-close': async (f) => {
     const outcome = val(new FormData(f), 'outcome');
     closeModal();
-    await bulkPatch(() => ({ status: 'geschlossen', outcome }), 'abgeschlossen', 'Abgeschlossen');
+    await bulkPatch(() => ({ status: 'geschlossen', outcome }), 'abgeschlossen');
   },
   'client-note': async (f) => {
     const body = f.elements.body.value.trim();
@@ -136,7 +136,6 @@ const forms = {
     await api.patch('/api/concerns/' + f.dataset.id, { status: val(fd, 'status'), assignedTo: val(fd, 'assignedTo') ? Number(val(fd, 'assignedTo')) : null });
     toast('Anliegen aktualisiert.');
     await openConcern(Number(f.dataset.id));
-    if (val(fd, 'status') === 'erledigt') window.PS.stamp($('#modalCard'), 'Erledigt', 'paid');
     refreshBehind();
     load.concernCount().then(renderNav).catch(() => {});
   },
@@ -204,12 +203,7 @@ const forms = {
     if (!outcome) throw new Error('Bitte das Ergebnis wählen.');
     await api.patch('/api/cases/' + id, { status: 'geschlossen', outcome });
     await returnOrClose();
-    // Sieg-Moment: Erfolg mit goldenem Siegel feiern, sonst nur die Meldung
-    if (OUTCOMES[outcome][1] === true) victoryMoment(OUTCOMES[outcome][2]);
-    else {
-      toast(`Verfahren abgeschlossen – ${OUTCOMES[outcome][0]}`);
-      window.PS.stamp($('#modalCard .case-head') || $('#content'), 'Abgeschlossen', 'slate');
-    }
+    toast(`Verfahren abgeschlossen – ${OUTCOMES[outcome][0]}`);
   },
   'process-ticket': async (f) => {
     const fd = new FormData(f);

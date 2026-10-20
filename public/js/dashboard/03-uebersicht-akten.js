@@ -390,7 +390,7 @@ function bulkBar() {
 }
 
 /** Dieselbe Änderung für alle gewählten Akten (nacheinander, je Akte mit ihren eigenen Rechten). */
-async function bulkPatch(body, label, stampText = '') {
+async function bulkPatch(body, label) {
   const ids = [...st.caseSel];
   if (!ids.length) return;
   $$('.bulk-sel').forEach((x) => (x.disabled = true));
@@ -407,7 +407,6 @@ async function bulkPatch(body, label, stampText = '') {
   }
   await load.cases();
   renderView();
-  if (stampText && ok) $$('#caseList tr.is-picked').slice(0, 3).forEach((tr) => window.PS.stamp(tr, stampText, 'slate'));
   toast(`${label}: ${ok} ${ok === 1 ? 'Akte' : 'Akten'} geändert${denied ? ` · ${denied} ohne Berechtigung übersprungen` : ''}.`, ok ? 'ok' : 'error');
 }
 

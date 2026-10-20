@@ -371,52 +371,6 @@ function resolutionModal() {
 }
 
 /* ================================================================
-   Sieg-Moment: goldenes Siegel beim Abschluss mit Erfolg (Discord-Beitrag macht der Server)
-   ================================================================ */
-function victoryMoment(label) {
-  $('#victory')?.remove();
-  const calm = window.PS.motion.calm();
-  const el = document.createElement('div');
-  el.id = 'victory';
-  el.className = `victory${calm ? ' calm' : ''}`;
-  el.setAttribute('role', 'status');
-  // Gezackter Siegelrand: 32 Zacken
-  const pts = Array.from({ length: 64 }, (_, i) => {
-    const a = (i / 64) * Math.PI * 2;
-    const r = i % 2 ? 88 : 98;
-    return `${(100 + r * Math.cos(a)).toFixed(1)},${(100 + r * Math.sin(a)).toFixed(1)}`;
-  }).join(' ');
-  const sparks = calm
-    ? ''
-    : Array.from({ length: 18 }, (_, i) => `<i style="--a:${(i / 18) * 360}deg;--d:${110 + (i % 3) * 38}px;--t:${0.55 + (i % 4) * 0.12}s"></i>`).join('');
-  el.innerHTML = `
-      <div class="victory-inner">
-        <div class="victory-sparks" aria-hidden="true">${sparks}</div>
-        <svg class="victory-seal" viewBox="0 0 200 200" aria-hidden="true">
-          <defs><linearGradient id="vsGold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6e08f"/><stop offset=".45" stop-color="#d4af37"/><stop offset="1" stop-color="#8f7322"/></linearGradient></defs>
-          <polygon points="${pts}" fill="url(#vsGold)"/>
-          <circle cx="100" cy="100" r="74" fill="none" stroke="rgba(26,20,5,.55)" stroke-width="2"/>
-          <circle cx="100" cy="100" r="66" fill="none" stroke="rgba(26,20,5,.35)" stroke-width="1" stroke-dasharray="3 4"/>
-          <path d="M72 102l18 18 38-40" fill="none" stroke="#1a1405" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <p class="victory-kicker">Erfolg für die Kanzlei</p>
-        <p class="victory-title">${esc(label)}</p>
-      </div>`;
-  document.body.appendChild(el);
-  try {
-    navigator.vibrate?.([30, 60, 90]);
-  } catch {
-    /* kein Vibrieren auf diesem Gerät */
-  }
-  const done = () => {
-    el.classList.add('out');
-    setTimeout(() => el.remove(), 400);
-  };
-  el.addEventListener('click', done);
-  setTimeout(done, calm ? 1800 : 2600);
-}
-
-/* ================================================================
    Anwalt des Monats (Einstellungen → Website & Ränge)
    ================================================================ */
 function lotmPanel(s) {
@@ -1026,11 +980,7 @@ Object.assign(forms, {
     const item = kind === 'item' && st.storage.items.find((i) => i.id === body.itemId);
     toast(`${body.direction === 'in' ? 'Eingelagert' : 'Entnommen'}: ${item ? `${body.amount.toLocaleString('de-DE')}× ${item.name}` : `${money(body.amount)} ${STORAGE_KIND[kind]}`}`);
     closeModal();
-    if (st.view === 'lager') {
-      renderView();
-      // Bestand der Kachel springt kurz auf
-      if (item) playIn($(`#storageGrid .lager-item[data-item="${item.id}"] .lager-stock`), 'bump');
-    }
+    if (st.view === 'lager') renderView();
   },
   'storage-item-new': async (f) => {
     await api.post('/api/storage/items', { name: val(new FormData(f), 'name') });
