@@ -1628,7 +1628,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.waitForSelector('#content .vchart');
         await settle();
         assert.equal(await page.$$eval('#content .vchart', (c) => c.length), 2);
-        assert.match(await page.textContent('#content .kpi-grid'), /18\.000 \$/);
+        // Kennzahlen zählen hoch – auf den Endwert warten
+        await page.waitForFunction(() => /18\.000 \$/.test(document.querySelector('#content .kpi-grid').textContent));
         const last = page.locator('#content .vchart-col').nth(11);
         if (device === PHONE) await last.tap();
         else await last.hover();
@@ -2777,6 +2778,202 @@ describe('Browser: Aktenmappe, verknüpfte Akten, Mehrfachauswahl, Kanzlei-Lager
       assert.deepEqual(problems, []);
     } finally {
       await ctx.close();
+      await browser.close();
+      await srv.stop();
+    }
+  });
+});
+
+describe('Browser: Bewegung, die zeigt, woher etwas kommt – Zahlen, die mitlaufen – Anklage einfügen', { skip: chromium ? false : 'Playwright nicht installiert' }, () => {
+  it('PC: Streiflicht, Lupe, Beweisbild fliegt hin und zurück, Kachel → Überschrift, neue Akte landet, Zählwerk, Frist-Leiste, Anklagetext', async () => {
+    const srv = await startServer();
+    const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+    const ctx = await browser.newContext({ ...DESKTOP, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+    const page = await ctx.newPage();
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
+    const IMG = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'icon-512.png'));
+    try {
+      const a = client(srv.base);
+      await a.login(TEAM.admin);
+      const A = (await a.post('/api/cases', { title: 'Juwelier am Vinewood Boulevard', area: 'strafrecht', clientName: 'Tony Vercetti' })).json.case;
+      await a.upload(`/api/cases/${A.id}/attachments?caption=Tatort`, IMG, 'image/png');
+      await a.post('/api/calendar', { type: 'frist', title: 'Berufungsfrist', startsAt: new Date(Date.now() + 2 * 864e5).toISOString(), caseId: A.id });
+      await a.post('/api/storage/entries', { kind: 'geld', direction: 'in', amount: 12500, note: 'Startkasse' });
+      await page.goto(srv.base + '/login.html');
+      await page.fill('#email', TEAM.admin);
+      await page.fill('#password', PASSWORD);
+      await page.click('button[type=submit]');
+      await page.waitForURL(/dashboard/);
+      await page.waitForSelector('#nav a.nav-item');
+
+      // Frist-Leiste: frisch angelegt fast voll, unter 3 Tagen bernsteinfarben
+      await page.waitForSelector('#content .frist-bar.is-amber > i');
+      const width = await page.$eval('#content .frist-bar > i', (i) => parseFloat(i.style.width));
+      assert.ok(width > 90 && width <= 100, `Frist-Leiste: ${width} %`);
+
+      // Kachel → Aktenliste: die Kachel blendet an ihrem Platz aus, die Überschrift fliegt von dort an ihren Platz
+      await page.click('#content a.kpi[href="#cases"]');
+      await page.waitForSelector('#caseList');
+      assert.ok((await page.$$('.hero-ghost')).length <= 1);
+      assert.ok(await page.$eval('#content .page-title', (t) => t.getAnimations().length > 0), 'Überschrift fliegt');
+
+      // Akte: Streiflicht auf dem Aktendeckel folgt der Maus
+      await page.click(`#caseList [data-action="open-case"][data-id="${A.id}"]`);
+      await page.waitForSelector('#modalBody .case-cover');
+      // erst messen, wenn Fenster und Aktenzeichen fertig aus der Zeile geflogen sind
+      await page.waitForFunction(() => !document.querySelector('#modalCard').getAnimations().length && !document.querySelector('#modalBody .case-emboss').getAnimations().length);
+      const emb = await page.locator('#modalBody .case-emboss').boundingBox();
+      await page.mouse.move(emb.x + 10, emb.y + 5);
+      await page.mouse.move(emb.x + 30, emb.y + 6, { steps: 3 });
+      await page.waitForFunction(() => document.querySelector('#modalBody .case-cover').classList.contains('ps-lit'));
+      assert.match(await page.$eval('#modalBody .case-emboss', (e) => e.style.getPropertyValue('--ex')), /^\d+px$/);
+
+      // Beweisbild: fliegt aus dem Vorschaubild, Lupe folgt der Maus, beim Zurück fliegt es wieder hinein
+      await page.click('#secEvidence [data-action="att-open"][data-index="0"]');
+      await page.waitForSelector('.fly-img');
+      await page.waitForFunction(() => !document.querySelector('.fly-img') && !document.querySelector('.lb-zoom.is-flying'));
+      const img = await page.locator('#modalBody .lightbox-img').boundingBox();
+      await page.mouse.move(img.x + img.width * 0.3, img.y + img.height * 0.3);
+      await page.mouse.move(img.x + img.width * 0.4, img.y + img.height * 0.4, { steps: 3 });
+      await page.waitForSelector('#modalBody .lb-zoom.is-lens');
+      assert.match(await page.$eval('#modalBody .lb-lens', (l) => l.style.backgroundSize), /px \d+(\.\d+)?px/);
+      await page.click('#modalBody [data-action="back-to-case"]');
+      await page.waitForSelector('#modalBody #secEvidence');
+      await page.waitForFunction(() => !document.querySelector('.fly-img'));
+
+      // Anklage einfügen: erkannt, einer abgewählt, zwei übernommen – das Strafmaß läuft zum neuen Wert
+      await page.click('#modalBody [data-action="charge-import"]');
+      await page.fill('#ciText', '§ 33 StGB – Diebstahl (2x)\nversuchter Raub\nBeihilfe zum Betrug\n§ 5 StVO');
+      await page.waitForFunction(() => document.querySelectorAll('#ciResult .ci-row').length === 3);
+      assert.match(await page.textContent('#ciResult .ci-unknown'), /§ 5 StVO/);
+      assert.equal(await page.getAttribute('#ciResult .ci-row:nth-child(2) [data-flag="attempted"]', 'aria-pressed'), 'true', 'Versuch erkannt');
+      await page.click('#ciResult .ci-row:nth-child(3) .ci-check input');
+      await page.waitForFunction(() => /2 Anklagepunkte übernehmen/.test(document.querySelector('#ciSave').textContent));
+      await page.click('#ciSave');
+      await page.waitForFunction(() => document.querySelectorAll('#modalBody #secCharges .chg-row').length === 2);
+      assert.match(await page.textContent('#modalBody #secCharges'), /Diebstahl[\s\S]*Raub/);
+      assert.equal(await page.getAttribute('#modalBody #secCharges .chg-big', 'data-count'), `chg:${A.id}:he`);
+
+      // Neue Akte: das Formular fliegt in die Zeile der neuen Akte, die leuchtet kurz – dann öffnet sie sich von dort
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(() => !document.querySelector('#modal').classList.contains('open'));
+      await page.click('#content [data-action="new-case"]');
+      await page.fill('#modalBody form[data-form="new-case"] [name="title"]', 'Flucht am Pier');
+      await page.fill('#modalBody form[data-form="new-case"] [name="clientName"]', 'Rita Reifen');
+      await page.click('#modalBody form[data-form="new-case"] button[type=submit]');
+      await page.waitForSelector('#caseList .row-arrive');
+      await page.waitForFunction(() => /Flucht am Pier/.test(document.querySelector('#modalTitle')?.textContent || ''));
+      assert.equal(await page.locator('.modal-ghost').count(), 0, 'kein stehen gebliebenes Formular');
+      await page.keyboard.press('Escape');
+
+      // Zählwerk: Kasse rollt vom alten zum neuen Stand – im Text steht immer der echte Betrag
+      await page.evaluate(() => (location.hash = '#lager'));
+      await page.waitForSelector('[data-roll="lager:geld"]');
+      await page.waitForFunction(() => !document.querySelector('.ps-rolling'));
+      await page.click('.lager-cash[data-kind="geld"]');
+      await page.fill('#sbAmount', '1750');
+      await page.click('#modalBody form[data-form="storage-book"] button[type=submit]');
+      await page.waitForSelector('[data-roll="lager:geld"].ps-rolling');
+      assert.equal((await page.textContent('[data-roll="lager:geld"]')).trim(), '14.250 $');
+      assert.match(await page.$eval('[data-roll="lager:geld"] .ps-rd', (d) => d.getAttribute('style')), /--a:1;--z:1;--k:4/, 'Zehntausender bleibt');
+      await page.waitForFunction(() => !document.querySelector('.ps-rolling'));
+      assert.equal(await page.$eval('[data-roll="lager:geld"]', (e) => e.children.length), 0, 'danach wieder normaler Text');
+
+      // Zahlen laufen mit (mehrere Zahlen in einem Text), Balken wachsen beim Öffnen der Seite
+      const counted = await page.evaluate(async () => {
+        const box = document.createElement('div');
+        box.innerHTML = '<span data-count="t:range">12–30 HE</span>';
+        document.body.appendChild(box);
+        window.PS.countUp(box);
+        const start = box.textContent;
+        await new Promise((r) => setTimeout(r, 1000));
+        const end = box.textContent;
+        box.firstChild.textContent = '20–45 HE';
+        window.PS.countUp(box, { ms: 300 });
+        const again = box.textContent;
+        box.innerHTML = '<div class="vchart-cols"><div><span class="vchart-bar" style="height:60%"></span></div></div><span class="hbar-fill" style="width:40%"></span>';
+        growBars(box);
+        const bars = box.querySelector('.vchart-bar').getAnimations().length + box.querySelector('.hbar-fill').getAnimations().length;
+        box.remove();
+        return { start, end, again, bars };
+      });
+      assert.deepEqual(counted, { start: '0–0 HE', end: '12–30 HE', again: '12–30 HE', bars: 2 });
+      assert.deepEqual(problems, []);
+    } finally {
+      await ctx.close();
+      await browser.close();
+      await srv.stop();
+    }
+  });
+
+  it('Handy: Beweisbild mit Doppeltippen vergrößern und zurück · „Bewegung reduzieren“: kein Flug, Mandantenkarte neigt sich nicht', async () => {
+    const srv = await startServer();
+    const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+    const IMG = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'icon-512.png'));
+    const signIn = async (page) => {
+      await page.goto(srv.base + '/login.html');
+      await page.fill('#email', TEAM.admin);
+      await page.fill('#password', PASSWORD);
+      await page.click('button[type=submit]');
+      await page.waitForURL(/dashboard/);
+      await page.waitForSelector('#nav a.nav-item', { state: 'attached' });
+    };
+    try {
+      const a = client(srv.base);
+      await a.login(TEAM.admin);
+      const A = (await a.post('/api/cases', { title: 'Pier – Fahrer', area: 'strafrecht', clientName: 'Tony Vercetti' })).json.case;
+      await a.upload(`/api/cases/${A.id}/attachments?caption=Tatort`, IMG, 'image/png');
+
+      // Handy: Doppeltippen vergrößert auf 2,5× an der Stelle, noch einmal zurück
+      const phone = await browser.newContext({ ...PHONE, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+      const page = await phone.newPage();
+      const problems = [];
+      page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
+      await signIn(page);
+      await page.goto(`${srv.base}/dashboard.html?case=${A.id}#cases`);
+      await page.waitForSelector('#modalBody #secEvidence [data-action="att-open"]');
+      await page.click('#modalBody #secEvidence [data-action="att-open"][data-index="0"]');
+      await page.waitForFunction(() => !document.querySelector('.lb-zoom.is-flying') && document.querySelector('.lb-zoom .lightbox-img').complete);
+      const box = await page.locator('#modalBody .lightbox-img').boundingBox();
+      const at = [box.x + box.width / 2, box.y + box.height / 2];
+      await page.touchscreen.tap(...at);
+      await page.touchscreen.tap(...at);
+      await page.waitForSelector('#modalBody .lb-zoom.is-zoomed');
+      assert.match(await page.$eval('#modalBody .lightbox-img', (i) => i.style.transform), /scale\(2\.5\)/);
+      await page.waitForTimeout(350);
+      await page.touchscreen.tap(...at);
+      await page.touchscreen.tap(...at);
+      await page.waitForFunction(() => !document.querySelector('.lb-zoom.is-zoomed'));
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), 0, 'nichts ragt über den Rand');
+      assert.deepEqual(problems, []);
+      await phone.close();
+
+      // „Bewegung reduzieren“: kein Flug, keine Neigung
+      const calm = await browser.newContext({ ...DESKTOP, reducedMotion: 'reduce', locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+      const p2 = await calm.newPage();
+      await signIn(p2);
+      await p2.goto(`${srv.base}/dashboard.html?case=${A.id}#cases`);
+      await p2.waitForSelector('#modalBody #secEvidence [data-action="att-open"]');
+      await p2.evaluate(() => {
+        window.flew = 0;
+        new MutationObserver((m) => m.forEach((x) => x.addedNodes.forEach((n) => n.classList && n.classList.contains('fly-img') && window.flew++))).observe(document.body, { childList: true });
+      });
+      await p2.click('#modalBody #secEvidence [data-action="att-open"][data-index="0"]');
+      await p2.waitForSelector('#modalBody .lb-zoom:not(.is-flying)');
+      await p2.waitForTimeout(400);
+      assert.equal(await p2.evaluate(() => window.flew), 0, 'kein Flug bei „Bewegung reduzieren“');
+      await p2.goto(`${srv.base}/dashboard.html#clients`);
+      await p2.waitForSelector('#clientList [data-action]');
+      await p2.click('#clientList [data-action]');
+      await p2.waitForSelector('#modalBody .client-cover');
+      const card = await p2.locator('#modalBody .client-cover').boundingBox();
+      await p2.mouse.move(card.x + card.width * 0.8, card.y + 20);
+      await p2.mouse.move(card.x + card.width * 0.85, card.y + 25, { steps: 3 });
+      await p2.waitForTimeout(200);
+      assert.equal(await p2.$eval('#modalBody .client-cover', (c) => c.style.transform), '', 'Mandantenkarte neigt sich nicht');
+      await calm.close();
+    } finally {
       await browser.close();
       await srv.stop();
     }

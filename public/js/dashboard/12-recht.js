@@ -29,7 +29,9 @@ function chargesSection(c, data, deals = []) {
   const { charges, sentence: s, estimate } = data;
   const edit = c.canEdit;
   const hearingBtn = `<button type="button" class="btn-ghost btn-sm" data-action="hearing-start" data-id="${c.id}">${icon('scale', 'ico-sm')}<span>Verhandlungsmodus</span></button>`;
-  const addBtn = edit ? `<button type="button" class="btn-outline btn-sm" data-action="charge-pick" data-id="${c.id}">${icon('plus', 'ico-sm')}<span>Anklagepunkt</span></button>` : '';
+  const addBtn = edit
+    ? `<button type="button" class="btn-outline btn-sm" data-action="charge-pick" data-id="${c.id}">${icon('plus', 'ico-sm')}<span>Anklagepunkt</span></button><button type="button" class="btn-ghost btn-sm" data-action="charge-import" data-id="${c.id}">${icon('doc', 'ico-sm')}<span>Anklage einfügen</span></button>`
+    : '';
   if (!charges.length) {
     // Nur Strafsachen zeigen den Abschnitt immer – sonst kommt er über „⋯ Mehr“
     if (c.area !== 'strafrecht' && !deals.length) return '';
@@ -71,8 +73,8 @@ function chargesSection(c, data, deals = []) {
       <div class="section-head"><h3 class="section-title">Anklagepunkte <span class="text-xs text-dim font-normal sec-meta">Strafmaß-Rechner</span></h3>
         <div class="section-actions">${addBtn}${hearingBtn}</div></div>
       <div class="chg-sum">
-        <div><div class="chg-k">Freiheitsstrafe</div><div class="chg-big">${esc(haft)}</div><div class="chg-sub">${esc(haftSub)}</div></div>
-        <div><div class="chg-k">Geldstrafe</div><div class="chg-big">${s.fineMax ? `bis ${esc(usd(s.fineMax))}` : '—'}</div><div class="chg-sub">${s.fineMax ? (s.fineOnly ? 'Summe der Höchstbeträge' : 'statt Haft, wo das Gesetz es zulässt') : 'nicht vorgesehen'}</div></div>
+        <div><div class="chg-k">Freiheitsstrafe</div><div class="chg-big" data-count="chg:${c.id}:he">${esc(haft)}</div><div class="chg-sub">${esc(haftSub)}</div></div>
+        <div><div class="chg-k">Geldstrafe</div><div class="chg-big" data-count="chg:${c.id}:fine">${s.fineMax ? `bis ${esc(usd(s.fineMax))}` : '—'}</div><div class="chg-sub">${s.fineMax ? (s.fineOnly ? 'Summe der Höchstbeträge' : 'statt Haft, wo das Gesetz es zulässt') : 'nicht vorgesehen'}</div></div>
         <div class="chg-est-cell"><div class="chg-k">Einschätzung der Kanzlei</div><div class="chg-est-row">${est}</div>
           ${edit ? `<label class="check chg-reduced"><input type="checkbox" data-change="sentence-set" data-case-id="${c.id}" data-key="reduced" ${estimate.reduced ? 'checked' : ''}> Verminderte Schuldfähigkeit (§ 8)</label>` : ''}</div>
       </div>
@@ -186,6 +188,107 @@ async function chargePicker(caseId) {
   $('#pkSearch').addEventListener('input', (e) => ($('#pkList').innerHTML = pickerRows(e.target.value)));
 }
 
+/* ---------------------------------------------------------------- Anklage einfügen (Text aus FiveNet / DOJ-Ticket) */
+/*
+ * Der Anklagetext wird hineinkopiert, der Server erkennt Paragraphen, Anzahl, Versuch/Beihilfe und Tatbestände am Namen
+ * (POST /api/penal/parse). Vor dem Übernehmen lässt sich jeder Vorschlag abwählen, umstellen (Absatz) und zählen.
+ * Gelesen wird nur der eingefügte Text – die Website greift dafür nicht auf FiveNet zu.
+ */
+const chargeImport = { caseId: null, items: [], unknown: [], over: new Map(), seq: 0, timer: 0, text: '' };
+/** Vorschlag mit den Anpassungen der Person (an/aus, gewählter Tatbestand, Anzahl, Versuch, Beihilfe). */
+function ciState(it) {
+  const o = chargeImport.over.get(it.key) || {};
+  const id = o.id || it.offenceId;
+  const off = (st.penal && st.penal.offences.find((x) => x.id === id)) || it;
+  return { on: o.on !== false, id, off, count: o.count || it.count, attempted: (o.attempted ?? it.attempted) && !!off.attempt, aiding: o.aiding ?? it.aiding };
+}
+function ciOver(key, patch) {
+  chargeImport.over.set(key, { ...(chargeImport.over.get(key) || {}), ...patch });
+  chargeImportRender();
+}
+function chargeImportHtml() {
+  const { items, unknown, text } = chargeImport;
+  if (!items.length && !unknown.length) {
+    return text.trim() ? `<p class="ci-empty">${icon('info', 'ico-sm')}<span>Noch kein Tatbestand erkannt – ein Paragraph (z. B. § 33) oder ein Name aus dem Strafkatalog (z. B. Diebstahl) genügt.</span></p>` : '';
+  }
+  const rows = items
+    .map((it) => {
+      const s = ciState(it);
+      const o = s.off;
+      const alt = it.alternatives.length
+        ? `<select class="field ci-alt" data-change="ci-alt" data-key="${esc(it.key)}" aria-label="Welcher Absatz?">${it.alternatives.map((a) => opt(a.id, `${a.citation} – ${a.title}`, a.id === s.id)).join('')}</select>`
+        : '';
+      return `<div class="chg-row ci-row ${s.on ? '' : 'is-off'}">
+        <div class="chg-main">
+          <label class="ci-check"><input type="checkbox" data-change="ci-toggle" data-key="${esc(it.key)}" ${s.on ? 'checked' : ''} aria-label="${esc(`${citeShort(o)} ${o.title} übernehmen`)}"></label>
+          <span class="pk-cite">${esc(citeShort(o))}</span>
+          <div class="chg-title"><span>${esc(o.title)}</span><span class="chg-range">${esc(penaltyText(o))}</span>${alt}
+            <span class="ci-src" title="${esc(it.lines.join('\n'))}">„${esc(it.lines[0])}“${it.lines.length > 1 ? ` +${it.lines.length - 1}` : ''}</span></div>
+        </div>
+        <div class="chg-side">
+          ${o.attempt ? `<button type="button" class="chg-flag ${s.attempted ? 'on' : ''}" data-action="ci-flag" data-key="${esc(it.key)}" data-flag="attempted" aria-pressed="${s.attempted}">Versuch</button>` : ''}
+          <button type="button" class="chg-flag ${s.aiding ? 'on' : ''}" data-action="ci-flag" data-key="${esc(it.key)}" data-flag="aiding" aria-pressed="${s.aiding}">Beihilfe</button>
+          <span class="stepper" role="group" aria-label="Anzahl">
+            <button type="button" data-action="ci-count" data-key="${esc(it.key)}" data-count="${s.count - 1}" ${s.count <= 1 ? 'disabled' : ''} aria-label="Einmal weniger">−</button>
+            <span>${s.count}×</span>
+            <button type="button" data-action="ci-count" data-key="${esc(it.key)}" data-count="${s.count + 1}" ${s.count >= 20 ? 'disabled' : ''} aria-label="Einmal mehr">+</button>
+          </span>
+        </div></div>`;
+    })
+    .join('');
+  const miss = unknown.length
+    ? `<p class="ci-unknown">${icon('alert', 'ico-sm')}<span>Nicht übernommen: ${unknown.map((u) => `<b>${esc(u.ref)}</b> (${esc(u.reason)})`).join(' · ')}</span></p>`
+    : '';
+  return `${items.length ? `<div class="ci-head"><span>Erkannt</span><span class="sec-count">${items.length}</span></div><div class="chg-list ci-list">${rows}</div>` : ''}${miss}`;
+}
+function chargeImportRender() {
+  const box = $('#ciResult');
+  if (!box) return;
+  box.innerHTML = chargeImportHtml();
+  const n = chargeImport.items.filter((it) => ciState(it).on).length;
+  const btn = $('#ciSave');
+  if (btn) {
+    btn.disabled = !n;
+    btn.querySelector('span').textContent = n ? `${n === 1 ? '1 Anklagepunkt' : `${n} Anklagepunkte`} übernehmen` : 'Übernehmen';
+  }
+}
+async function chargeImportParse() {
+  const ta = $('#ciText');
+  if (!ta) return;
+  const text = ta.value;
+  const seq = ++chargeImport.seq;
+  chargeImport.text = text;
+  if (!text.trim()) {
+    chargeImport.items = [];
+    chargeImport.unknown = [];
+    return chargeImportRender();
+  }
+  const r = await api.post('/api/penal/parse', { text });
+  if (seq !== chargeImport.seq || !$('#ciText')) return; // inzwischen weitergetippt oder geschlossen
+  chargeImport.items = r.items.map((it) => ({ ...it, key: String(it.offenceId) }));
+  chargeImport.unknown = r.unknown;
+  chargeImportRender();
+}
+async function chargeImportModal(caseId) {
+  await loadPenal();
+  Object.assign(chargeImport, { caseId, items: [], unknown: [], over: new Map(), text: '' });
+  st.returnCase = caseId;
+  openModal(`
+      <h2 class="modal-title">Anklage einfügen</h2>
+      <p class="modal-sub">Den Anklagetext aus FiveNet oder dem DOJ-Ticket hier hineinkopieren – die erkannten Tatbestände erscheinen darunter und lassen sich vor dem Übernehmen anpassen. Gelesen wird nur der eingefügte Text.</p>
+      <form data-form="charge-import" data-case-id="${caseId}">
+        <textarea id="ciText" name="text" class="field ci-text" rows="6" maxlength="20000" placeholder="z. B.&#10;§ 33 StGB – Diebstahl (2x)&#10;§ 66 Abs. 1 Widerstand gegen Vollstreckungsbeamte&#10;Gefährliche Körperverletzung" aria-label="Anklagetext" autofocus></textarea>
+        <div id="ciResult" class="ci-result" aria-live="polite"></div>
+        <div class="form-actions mt-4"><button type="button" class="btn-ghost btn-md" data-action="back-to-case">Abbrechen</button><button type="submit" class="btn-gold btn-md" id="ciSave" disabled>${icon('check')}<span>Übernehmen</span></button></div>
+      </form>`);
+  const ta = $('#ciText');
+  ta.addEventListener('input', () => {
+    clearTimeout(chargeImport.timer);
+    chargeImport.timer = setTimeout(() => guard(chargeImportParse), 250);
+  });
+  if (ta.value.trim()) guard(chargeImportParse); // wiederhergestellter Entwurf
+}
+
 /* ---------------------------------------------------------------- Gesetzestext */
 function lawTextHtml(text) {
   return String(text || '')
@@ -262,6 +365,25 @@ Object.assign(actions, {
     await afterCharges(Number(el.dataset.caseId), await api.patch(`/api/cases/${el.dataset.caseId}/charges/sentence`, { [key]: v }));
   },
   'law-open': (el) => openLaw(el.dataset.para),
+  'charge-import': (el) => chargeImportModal(Number(el.dataset.id)),
+  'ci-toggle': (el) => ciOver(el.dataset.key, { on: el.checked }),
+  'ci-alt': (el) => ciOver(el.dataset.key, { id: Number(el.value) }),
+  'ci-count': (el) => ciOver(el.dataset.key, { count: Math.min(20, Math.max(1, Number(el.dataset.count))) }),
+  'ci-flag': (el) => ciOver(el.dataset.key, { [el.dataset.flag]: el.getAttribute('aria-pressed') !== 'true' }),
+});
+Object.assign(forms, {
+  'charge-import': async (f) => {
+    const caseId = Number(f.dataset.caseId);
+    const items = chargeImport.items
+      .map(ciState)
+      .filter((x) => x.on)
+      .map((x) => ({ offenceId: x.id, count: x.count, attempted: x.attempted, aiding: x.aiding }));
+    if (!items.length) throw new Error('Bitte mindestens einen erkannten Tatbestand auswählen.');
+    await api.post(`/api/cases/${caseId}/charges/bulk`, { items });
+    toast(items.length === 1 ? '1 Anklagepunkt übernommen.' : `${items.length} Anklagepunkte übernommen.`);
+    await returnOrClose();
+    await reloadCase(caseId);
+  },
 });
 
 /* ================================================================

@@ -453,6 +453,7 @@ async function chatSendNow(f, listSel, toBubble, send) {
   const input = f.elements.body;
   const body = input.value.trim();
   if (!body) return null;
+  const fromRect = input.getBoundingClientRect(); // die Nachricht gleitet von hier an ihren Platz (13-bewegung.js)
   input.value = '';
   input.style.height = '';
   input.focus();
@@ -468,10 +469,14 @@ async function chatSendNow(f, listSel, toBubble, send) {
     pending.querySelector('.chat-receipt').textContent = '· wird gesendet …';
     list.scrollTop = list.scrollHeight;
   }
+  const flight = chatFly(pending, fromRect);
   try {
     const msg = await send(body);
     pending?.remove();
-    if (msg) chatAppend($(listSel), [msg], toBubble);
+    if (msg) {
+      chatAppend($(listSel), [msg], toBubble);
+      chatFlyContinue(flight, $(`${listSel} .chat-msg[data-id="${msg.id}"]`));
+    }
     return msg;
   } catch (err) {
     pending?.remove();
@@ -1162,7 +1167,7 @@ function eventForm(e, preset = {}) {
   return `
       <h2 id="modalTitle" class="modal-title">${isNew ? 'Neuer Kalendereintrag' : esc(v.title)}</h2>
       <p class="modal-sub">${isNew ? 'Gerichtstermine, Fristen, Mandantengespräche und interne Termine – mit Countdown im Dashboard und Discord-Erinnerung 24 h vorher.' : `${esc(EVENT_TYPES[v.type] || v.type)} · ${statusBadge(EVENT_STATUS, v.status)}${v.creatorName ? ' · angelegt von ' + esc(v.creatorName) : ''}${v.clientName ? ' · Mandant: ' + esc(v.clientName) : ''}`}</p>
-      ${!isNew && !['abgesagt', 'erledigt'].includes(v.status) ? `<div class="mb-4">${countdownHtml(v)}</div>` : ''}
+      ${!isNew && !['abgesagt', 'erledigt'].includes(v.status) ? `<div class="mb-4">${countdownHtml(v)}${fristBar(v)}</div>` : ''}
       <form data-form="event" data-id="${isNew ? '' : v.id}" class="form-grid cols-2">
         <div class="span-2"><span class="label">Art</span><div class="seg">${Object.entries(EVENT_TYPES)
         .map(([k, l]) => `<label class="seg-opt"><input type="radio" name="type" value="${k}" ${type === k ? 'checked' : ''}><span><i class="cal-dot" style="background:${EVENT_COLORS[k]}"></i>${esc(l)}</span></label>`)
@@ -1205,7 +1210,7 @@ function eventDetailClient(e) {
       <h2 id="modalTitle" class="modal-title">${esc(e.title)}</h2>
       <p class="modal-sub">${esc(EVENT_TYPES[e.type] || e.type)} · ${statusBadge(EVENT_STATUS, e.status)}</p>
       <div class="info-grid mb-4">${cell('Datum', fmtDay(e.startsAt))}${cell('Uhrzeit', fmtTime(e.startsAt) + ' Uhr')}${cell('Ort', e.location || '—')}${e.caseNumber ? cell('Akte', e.caseNumber) : ''}${e.assignedName ? cell('Ansprechpartner', e.assignedName) : ''}</div>
-      ${!['abgesagt', 'erledigt'].includes(e.status) ? `<div class="mb-4">${countdownHtml(e)}</div>` : ''}
+      ${!['abgesagt', 'erledigt'].includes(e.status) ? `<div class="mb-4">${countdownHtml(e)}${fristBar(e)}</div>` : ''}
       ${e.note ? `<div class="tl-item mb-4"><div class="tl-body">${esc(e.note)}</div></div>` : ''}
       ${canCancel ? `<button class="btn-danger btn-md" data-action="event-status" data-id="${e.id}" data-status="abgesagt">Termin absagen</button>` : ''}`;
 }

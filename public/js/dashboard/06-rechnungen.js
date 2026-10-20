@@ -216,7 +216,7 @@ function itemRowHtml(it, i) {
       <input class="field item-desc" data-item="description" data-index="${i}" value="${esc(it.description)}" placeholder="Leistung / Beschreibung" maxlength="200" aria-label="Leistung">
       <input class="field item-qty" data-item="quantity" data-index="${i}" type="number" inputmode="numeric" min="1" max="999" step="1" value="${esc(it.quantity)}" aria-label="Menge">
       <input class="field item-price" data-item="unitPrice" data-index="${i}" type="number" inputmode="numeric" min="0" step="1" value="${esc(it.unitPrice)}" aria-label="Einzelpreis in Dollar">
-      <div class="item-total" data-item-total="${i}">${money((Number(it.quantity) || 0) * (Number(it.unitPrice) || 0))}</div>
+      <div class="item-total" data-item-total="${i}" data-count="inv:item:${i}">${money((Number(it.quantity) || 0) * (Number(it.unitPrice) || 0))}</div>
       <button type="button" class="icon-btn sm item-remove" data-action="inv-remove-item" data-index="${i}" aria-label="Position entfernen">${icon('x', 'ico-sm')}</button></div>`;
 }
 function invoiceItemsHtml(d) {
@@ -339,12 +339,12 @@ function summaryFiguresHtml() {
   return `
       <h2 class="panel-title mb-3">${esc(INVOICE_KIND[d.kind])}</h2>
       <div class="sum-row"><span class="text-muted">Positionen</span><span class="v">${d.items.length}</span></div>
-      <div class="sum-row"><span class="text-muted">Zwischensumme</span><span class="v">${money(t.subtotal)}</span></div>
-      ${t.mp ? `<div class="sum-row" style="color:#fcd34d"><span>${esc(t.memberName)} (${fmtPct(t.mp)} %)</span><span class="v">− ${money(t.member)}</span></div>` : ''}
-      ${t.cp ? `<div class="sum-row" style="color:#6ee7b7"><span>Kooperation ${esc(t.coopName)} (${fmtPct(t.cp)} %)</span><span class="v">− ${money(t.coop)}</span></div>` : ''}
-      ${t.dp ? `<div class="sum-row" style="color:#6ee7b7"><span>Rabatt (${fmtPct(t.dp)} %)</span><span class="v">− ${money(t.discount)}</span></div>` : ''}
-      ${t.sp ? `<div class="sum-row" style="color:#fcd34d"><span>Zuschlag (${fmtPct(t.sp)} %)</span><span class="v">+ ${money(t.surcharge)}</span></div>` : ''}
-      <div class="sum-row sum-total"><span class="font-semibold">Gesamtbetrag</span><span class="v">${money(t.total)}</span></div>
+      <div class="sum-row"><span class="text-muted">Zwischensumme</span><span class="v" data-count="inv:sub">${money(t.subtotal)}</span></div>
+      ${t.mp ? `<div class="sum-row" style="color:#fcd34d"><span>${esc(t.memberName)} (${fmtPct(t.mp)} %)</span><span class="v" data-count="inv:member">− ${money(t.member)}</span></div>` : ''}
+      ${t.cp ? `<div class="sum-row" style="color:#6ee7b7"><span>Kooperation ${esc(t.coopName)} (${fmtPct(t.cp)} %)</span><span class="v" data-count="inv:coop">− ${money(t.coop)}</span></div>` : ''}
+      ${t.dp ? `<div class="sum-row" style="color:#6ee7b7"><span>Rabatt (${fmtPct(t.dp)} %)</span><span class="v" data-count="inv:discount">− ${money(t.discount)}</span></div>` : ''}
+      ${t.sp ? `<div class="sum-row" style="color:#fcd34d"><span>Zuschlag (${fmtPct(t.sp)} %)</span><span class="v" data-count="inv:surcharge">+ ${money(t.surcharge)}</span></div>` : ''}
+      <div class="sum-row sum-total"><span class="font-semibold">Gesamtbetrag</span><span class="v" data-count="inv:total">${money(t.total)}</span></div>
       ${t.mp && !t.total ? `<p class="form-hint">Vollständig abgedeckt – die Rechnung dokumentiert den Wert der Arbeit (${money(t.subtotal)}) und gilt sofort als bezahlt.</p>` : ''}
       ${t.coopDropped ? '<p class="form-hint">Kooperationsrabatt entfällt – der VIP-/Lifetime-Rabatt ist höher (Rabatte werden nicht addiert).</p>' : ''}
       ${contractCompareHtml(d, t)}`;
@@ -365,6 +365,8 @@ function updateInvoiceSummary() {
     const el = $(`[data-item-total="${i}"]`);
     if (el) el.textContent = money((Number(it.quantity) || 0) * (Number(it.unitPrice) || 0));
   });
+  // Summen und Positionsbeträge laufen weich zum neuen Betrag
+  window.PS.countUp($('#content'), { ms: 450 });
 }
 
 /** Kooperation im Rechnungsformular: Auswahl + Ergebnis der Erkennung (Discord-Rolle / zugeordnetes Konto). */

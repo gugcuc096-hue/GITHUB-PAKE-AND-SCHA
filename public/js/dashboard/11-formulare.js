@@ -169,8 +169,15 @@ const forms = {
     const res = await api.post('/api/cases', body);
     toast(`Akte ${res.case.caseNumber} angelegt.`);
     st.caseFilter = 'aktiv';
-    await navigate('cases');
-    await openCase(res.case.id);
+    // Das Formular fliegt in die Zeile der neuen Akte, die sich dann von dort aus öffnet (am PC, 13-bewegung.js)
+    holdModalGhost();
+    try {
+      await navigate('cases');
+    } finally {
+      st.ghostHold = false;
+    }
+    const row = await landInRow(res.case.id);
+    await (row ? openCaseFrom(row) : openCase(res.case.id));
   },
   deal: async (f) => {
     const num = (k) => (f.elements[k].value === '' ? null : Number(f.elements[k].value));

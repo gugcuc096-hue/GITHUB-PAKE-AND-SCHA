@@ -302,6 +302,10 @@
             /* Platz unter dem Footer, damit der feste Knopf nichts verdeckt */
             body > footer.py-10 { padding-bottom: 5.5rem; }
         }
+        /* Teamkarte → Profilseite: Foto und Name gleiten hinüber (site.js benennt die angeklickte Karte, Gegenstück in views/anwalt.html) */
+        @view-transition { navigation: auto; }
+        ::view-transition-group(pf-photo), ::view-transition-group(pf-name) { animation-duration: 0.5s; animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1); }
+        ::view-transition-old(pf-name), ::view-transition-new(pf-name) { height: 100%; object-fit: contain; object-position: left center; }
     </style>
     <!-- Tailwind fest gebaut (npm run build:css) – zuletzt eingebunden wie zuvor beim Play-CDN -->
     <link rel="stylesheet" href="/css/tailwind.css">

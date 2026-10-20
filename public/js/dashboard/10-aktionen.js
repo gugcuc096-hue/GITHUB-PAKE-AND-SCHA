@@ -615,11 +615,15 @@ const actions = {
     st.returnCase = caseId;
     const no = linked ? a.no : index + 1;
     const canDelete = !linked && (a.uploaderId === st.user.id || isAdmin());
+    // Großansicht wächst aus dem Vorschaubild hervor und kehrt beim Schließen dorthin zurück (13-bewegung.js)
+    const from = flyOk() && el.classList.contains('att') ? el.getBoundingClientRect() : null;
+    st.lightboxBack = { attr: linked ? 'data-linked' : 'data-index', value: linked ? el.dataset.linked : el.dataset.index };
     openModal(
       `<p class="text-xs uppercase tracking-[0.2em] text-gold mb-1">Beweismittel B${no}${linked ? ` · Akte ${esc(a.caseNumber)}` : ''}</p>
         <h2 class="modal-title">${esc(a.caption || 'Anhang')}</h2>
         <p class="modal-sub flex flex-wrap items-center gap-2">${esc(a.uploaderName)} <span class="stamp-mini is-in" title="Eingang">Eingang ${esc(fmtDate(a.createdAt))}</span>${a.internal ? '<span class="stamp-mini">Vertraulich</span>' : ''}</p>
-        <img class="lightbox-img mb-4" src="${esc(a.url)}" alt="${esc(a.caption)}">
+        <div class="lb-zoom${from ? ' is-flying' : ''}"><img class="lightbox-img" src="${esc(a.url)}" alt="${esc(a.caption)}"><div class="lb-lens" aria-hidden="true"></div></div>
+        <p class="lb-hint">Zum Vergrößern mit der Maus über das Bild fahren – am Handy mit zwei Fingern oder doppelt tippen.</p>
         <div class="form-actions">
           <button class="btn-outline btn-md" data-action="back-to-case">${icon('chevronLeft', 'ico-sm')}<span>Zurück zur Akte</span></button>
           ${linked ? `<button class="btn-ghost btn-md" data-action="open-case" data-id="${a.caseId}">${icon('folder', 'ico-sm')}<span>Akte ${esc(a.caseNumber)} öffnen</span></button>` : ''}
@@ -629,6 +633,7 @@ const actions = {
         </div>`,
       { wide: true }
     );
+    lightboxEnter(from);
   },
   'redact-open': (el) => redactOpen(Number(el.dataset.index)),
   'redact-undo': () => {
