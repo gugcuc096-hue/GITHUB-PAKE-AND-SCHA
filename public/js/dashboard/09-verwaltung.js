@@ -366,7 +366,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 function statKpi(label, value, sub, ico, series = null) {
-  return `<div class="panel kpi"><div class="kpi-label">${icon(ico, 'ico-sm')}${esc(label)}</div><div class="kpi-value">${esc(value)}</div><div class="kpi-sub">${esc(sub)}</div>${series ? sparkline(series, label) : ''}</div>`;
+  return `<div class="panel kpi"><div class="kpi-label">${icon(ico, 'ico-sm')}${esc(label)}</div><div class="kpi-value" data-count="stat:${esc(label)}">${esc(value)}</div><div class="kpi-sub">${esc(sub)}</div>${series ? sparkline(series, label) : ''}</div>`;
 }
 /** Kleine goldene Verlaufslinie der letzten 8 Wochen unter einer Kennzahl (älteste links). */
 function sparkline(values, label) {

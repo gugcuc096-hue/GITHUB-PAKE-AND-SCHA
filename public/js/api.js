@@ -661,32 +661,56 @@
   document.addEventListener('reset', (e) => clearFieldErrors(e.target));
 
   /*
-   * Zahlen zählen hoch: Elemente mit data-count (Schlüssel) zeigen ihre Zahl kurz hochzählend – beim ersten Erscheinen
-   * von 0, danach nur bei einer Änderung vom zuletzt gezeigten Wert (14 → 15). Das Format (Tausenderpunkt, Komma,
-   * „ %“, „ $“, „ ★“) bleibt. whenVisible: erst, wenn die Zahl ins Bild scrollt. Bei „Bewegung reduzieren“ sofort.
+   * Zahlen zählen hoch: Elemente mit data-count (Schlüssel) zeigen ihre Zahlen kurz hochzählend – beim ersten Erscheinen
+   * von 0, danach nur bei einer Änderung vom zuletzt gezeigten Wert (14 → 15). Mehrere Zahlen in einem Text („12–30 HE“)
+   * laufen gemeinsam; das Format (Tausenderpunkt, Komma, „ %“, „ $“, „ ★“) bleibt. whenVisible: erst, wenn die Zahl ins
+   * Bild scrollt; ms: Dauer (Summen in Formularen laufen kürzer). Ändert sich der Wert mitten im Zählen, geht es von der
+   * gerade gezeigten Zahl aus weiter. Bei „Bewegung reduzieren“ sofort.
    */
-  const countMemory = new Map();
-  const NUM_RE = /-?\d{1,3}(?:\.\d{3})+(?:,\d+)?|-?\d+(?:,\d+)?/;
-  function countUp(root, { whenVisible = false } = {}) {
+  const countMemory = new Map(); // Schlüssel → { to: Zielwerte, shown: gerade gezeigte Werte, run: Kennung des Laufs }
+  const NUM_RE = /-?\d{1,3}(?:\.\d{3})+(?:,\d+)?|-?\d+(?:,\d+)?/g;
+  const parseNum = (s) => Number(s.replace(/\./g, '').replace(',', '.'));
+  function countUp(root, { whenVisible = false, ms = 900 } = {}) {
     if (!root || !root.querySelectorAll) return;
     const reduce = motion.calm();
     root.querySelectorAll('[data-count]').forEach((el) => {
       const text = el.textContent;
-      const m = text.match(NUM_RE);
-      if (!m) return;
-      const decimals = (m[0].split(',')[1] || '').length;
-      const target = Number(m[0].replace(/\./g, '').replace(',', '.'));
+      const parts = [...text.matchAll(NUM_RE)];
+      if (!parts.length) return;
+      const target = parts.map((m) => parseNum(m[0]));
+      if (!target.every(Number.isFinite)) return;
       const key = el.dataset.count;
-      const from = countMemory.has(key) ? countMemory.get(key) : 0;
-      countMemory.set(key, target);
-      if (reduce || from === target || !Number.isFinite(target)) return;
-      const fmt = (n) => text.slice(0, m.index) + n.toLocaleString('de-DE', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + text.slice(m.index + m[0].length);
-      const run = () => {
+      const mem = countMemory.get(key);
+      const from = target.map((_, i) => (mem ? (mem.shown[i] ?? mem.to[i] ?? 0) : 0));
+      const entry = { to: target, shown: from, run: {} };
+      countMemory.set(key, entry);
+      if (reduce || from.every((v, i) => v === target[i])) {
+        entry.shown = target;
+        return;
+      }
+      const decimals = parts.map((m) => (m[0].split(',')[1] || '').length);
+      const fmt = (vals) => {
+        let out = '';
+        let pos = 0;
+        parts.forEach((m, i) => {
+          out += text.slice(pos, m.index) + vals[i].toLocaleString('de-DE', { minimumFractionDigits: decimals[i], maximumFractionDigits: decimals[i] });
+          pos = m.index + m[0].length;
+        });
+        return out + text.slice(pos);
+      };
+      const { run } = entry;
+      const start = () => {
         const t0 = performance.now();
         const step = (now) => {
-          if (!el.isConnected) return;
-          const p = Math.min(1, (now - t0) / 900);
-          el.textContent = p < 1 ? fmt(from + (target - from) * (1 - Math.pow(1 - p, 3))) : text;
+          if (entry.run !== run) return; // inzwischen neu gezeichnet – der neue Lauf übernimmt
+          if (!el.isConnected) {
+            entry.shown = target;
+            return;
+          }
+          const p = Math.min(1, (now - t0) / ms);
+          const e = 1 - Math.pow(1 - p, 3);
+          entry.shown = p < 1 ? from.map((f, i) => f + (target[i] - f) * e) : target;
+          el.textContent = p < 1 ? fmt(entry.shown) : text;
           if (p < 1) requestAnimationFrame(step);
         };
         requestAnimationFrame(step);
@@ -696,10 +720,50 @@
         const io = new IntersectionObserver((entries) => {
           if (!entries.some((x) => x.isIntersecting)) return;
           io.disconnect();
-          run();
+          start();
         }, { threshold: 0.4 });
         io.observe(el);
-      } else run();
+      } else start();
+    });
+  }
+
+  /*
+   * Zählwerk (Kanzlei-Lager): Elemente mit data-roll (Schlüssel) rollen ihre Ziffern bei einer Änderung wie bei einer
+   * alten Kasse vom alten zum neuen Stand – beim ersten Erscheinen von Null aus. Im Text steht dabei immer der echte
+   * Wert (die rollenden Ziffern sind nur Bild per CSS), danach ist es wieder ganz normaler Text.
+   */
+  const rollMemory = new Map();
+  function roll(root) {
+    if (!root || !root.querySelectorAll) return;
+    const calm = motion.calm();
+    root.querySelectorAll('[data-roll]').forEach((el) => {
+      const text = el.textContent;
+      const key = el.dataset.roll;
+      const prev = rollMemory.has(key) ? rollMemory.get(key) : null;
+      rollMemory.set(key, text);
+      const now = text.replace(/\D/g, '');
+      if (calm || prev === text || !now) return;
+      const old = prev == null ? '' : prev.replace(/\D/g, '');
+      const up = (Number(now) || 0) >= (Number(old) || 0);
+      let left = now.length;
+      el.innerHTML = [...text]
+        .map((ch) => {
+          if (!/\d/.test(ch)) return esc(ch);
+          const k = --left; // Stelle von rechts (0 = Einer)
+          const f = Number(old[old.length - 1 - k] || 0);
+          const t = Number(ch);
+          // Streifen 0–9 zweimal: aufwärts rollt jede Ziffer vorwärts (9 → 0 über die Zehn), abwärts rückwärts
+          const [a, z] = up ? [f, t >= f ? t : t + 10] : [f + 10, t <= f ? t + 10 : t];
+          return `<span class="ps-rd" style="--a:${a};--z:${z};--k:${k}"><span class="ps-rd-t">${ch}</span></span>`;
+        })
+        .join('');
+      el.classList.add('ps-rolling');
+      requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('ps-roll-go')));
+      setTimeout(() => {
+        if (!el.isConnected || !el.classList.contains('ps-rolling')) return;
+        el.textContent = text;
+        el.classList.remove('ps-rolling', 'ps-roll-go');
+      }, 1150);
     });
   }
 
@@ -722,7 +786,12 @@
 .lotm-on-card{position:absolute;top:-.85rem;left:50%;transform:translateX(-50%);z-index:2}
 .team-card.is-lotm{position:relative;overflow:visible;border-color:rgba(212,175,55,.55);box-shadow:0 0 0 1px rgba(212,175,55,.25),0 18px 60px rgba(212,175,55,.14)}
 .ps-tilt{will-change:transform;transition:transform .14s ease-out,box-shadow .35s ease,border-color .35s ease!important}
-.ps-tilt:not(.ps-spot-on){transition:transform .7s cubic-bezier(.16,1,.3,1),box-shadow .35s ease,border-color .35s ease!important}`;
+.ps-tilt:not(.ps-tilt-on){transition:transform .7s cubic-bezier(.16,1,.3,1),box-shadow .35s ease,border-color .35s ease!important}
+[data-roll]{font-variant-numeric:lining-nums tabular-nums}
+.ps-rolling .ps-rd{--rh:1.15em;position:relative;display:inline-block;height:var(--rh);line-height:var(--rh);overflow:hidden;vertical-align:top}
+.ps-rolling .ps-rd-t{visibility:hidden}
+.ps-rolling .ps-rd::after{content:'0\\A 1\\A 2\\A 3\\A 4\\A 5\\A 6\\A 7\\A 8\\A 9\\A 0\\A 1\\A 2\\A 3\\A 4\\A 5\\A 6\\A 7\\A 8\\A 9';white-space:pre;position:absolute;left:0;right:0;top:0;text-align:center;transform:translateY(calc(var(--a) * var(--rh) * -1))}
+.ps-roll-go .ps-rd::after{transform:translateY(calc(var(--z) * var(--rh) * -1));transition:transform .85s cubic-bezier(.2,.75,.2,1) calc(var(--k) * 45ms)}`;
   const fxStyle = document.createElement('style');
   fxStyle.id = 'psFxCss';
   fxStyle.textContent = FX_CSS;
@@ -740,14 +809,69 @@
     return spotOk.get(el) ? el : null;
   }
   function spotOff() {
-    if (spotEl) {
-      spotEl.classList.remove('ps-spot-on');
-      if (spotEl.classList.contains('ps-tilt')) spotEl.style.transform = '';
-    }
+    if (spotEl) spotEl.classList.remove('ps-spot-on');
     spotEl = null;
   }
-  // Teamkarten (Startseite) neigen sich zusätzlich in 3D zur Maus – nicht bei gedämpften Animationen
-  const TILT_SEL = '.team-card';
+  /*
+   * In 3D zur Maus neigen sich die Teamkarten der Startseite, die Profilkarte eines Anwalts und die Karteikarte eines
+   * Mandanten – große Karten weniger stark. Nicht bei gedämpften Animationen und nicht, solange in der Karte ein Feld
+   * bearbeitet wird.
+   */
+  const TILT_SEL = '.team-card, .pf-card, .client-cover';
+  let tiltEl = null;
+  function tiltOff() {
+    if (tiltEl) {
+      tiltEl.classList.remove('ps-tilt-on');
+      tiltEl.style.transform = '';
+    }
+    tiltEl = null;
+  }
+  const editing = (el) => {
+    const a = document.activeElement;
+    return !!a && el.contains(a) && a.matches('input, textarea, select');
+  };
+  function tilt(el, x, y) {
+    if (motion.calm() || editing(el)) {
+      if (el.classList.contains('ps-tilt-on')) {
+        el.classList.remove('ps-tilt-on');
+        el.style.transform = '';
+      }
+      return;
+    }
+    const r = el.getBoundingClientRect();
+    const size = Math.max(r.width, r.height);
+    const k = Math.min(1, Math.pow(640 / size, 1.5));
+    const px = Math.max(-0.5, Math.min(0.5, (x - r.left) / r.width - 0.5));
+    const py = Math.max(-0.5, Math.min(0.5, (y - r.top) / r.height - 0.5));
+    el.classList.add('ps-tilt', 'ps-tilt-on');
+    el.style.transform = `perspective(${k >= 1 ? 900 : Math.round(900 / k)}px) translateY(${(-6 * k).toFixed(1)}px) rotateX(${(-py * 9 * k).toFixed(2)}deg) rotateY(${(px * 11 * k).toFixed(2)}deg) scale(${(1 + 0.015 * k).toFixed(4)})`;
+  }
+  /*
+   * Streiflicht: Auf dem Aktendeckel und der Karteikarte liegt ein weiches Licht dort, wo die Maus ist (app.css), und das
+   * geprägte Aktenzeichen glänzt in seiner Nähe – wie Licht, das über eine Prägung streift.
+   */
+  const LIGHT_SEL = '.case-cover, .client-cover';
+  let lightEl = null;
+  function lightOff() {
+    if (lightEl) {
+      lightEl.classList.remove('ps-lit');
+      lightEl.querySelectorAll('.case-emboss').forEach((n) => n.style.removeProperty('--ex'));
+    }
+    lightEl = null;
+  }
+  function light(el, x, y) {
+    const r = el.getBoundingClientRect();
+    el.style.setProperty('--lx', `${Math.round(x - r.left)}px`);
+    el.style.setProperty('--ly', `${Math.round(y - r.top)}px`);
+    el.classList.add('ps-lit');
+    const emb = el.querySelector('.case-emboss');
+    if (emb) {
+      const b = emb.getBoundingClientRect();
+      emb.style.setProperty('--ex', `${Math.round(x - b.left)}px`);
+      emb.style.setProperty('--ey', `${Math.round(y - b.top)}px`);
+    }
+  }
+  const closestOf = (t, sel) => (t && t.closest ? t.closest(sel) : null);
   document.addEventListener(
     'pointermove',
     (e) => {
@@ -755,34 +879,66 @@
       const el = spotTarget(e.target);
       if (el !== spotEl) {
         spotOff();
-        if (!el) return;
-        if (!el.classList.contains('ps-spot')) {
+        if (el && !el.classList.contains('ps-spot')) {
           if (getComputedStyle(el).position === 'static') el.classList.add('ps-spot-rel');
           el.classList.add('ps-spot');
         }
         spotEl = el;
       }
+      const tl = closestOf(e.target, TILT_SEL);
+      if (tl !== tiltEl) {
+        tiltOff();
+        tiltEl = tl;
+      }
+      const li = closestOf(e.target, LIGHT_SEL);
+      if (li !== lightEl) {
+        lightOff();
+        lightEl = li;
+      }
+      if (!spotEl && !tiltEl && !lightEl) return;
       spotXY = [e.clientX, e.clientY];
       if (spotRaf) return;
       spotRaf = requestAnimationFrame(() => {
         spotRaf = 0;
-        if (!spotEl || !spotEl.isConnected) return spotOff();
-        const r = spotEl.getBoundingClientRect();
-        // Lage in der Karte von der Mitte aus – stimmt auch, solange die Karte geneigt ist
-        spotEl.style.setProperty('--mx', `${Math.round(spotXY[0] - (r.left + r.width / 2) + spotEl.offsetWidth / 2)}px`);
-        spotEl.style.setProperty('--my', `${Math.round(spotXY[1] - (r.top + r.height / 2) + spotEl.offsetHeight / 2)}px`);
-        spotEl.classList.add('ps-spot-on');
-        if (spotEl.matches(TILT_SEL) && !motion.calm()) {
-          const px = Math.max(-0.5, Math.min(0.5, (spotXY[0] - r.left) / r.width - 0.5));
-          const py = Math.max(-0.5, Math.min(0.5, (spotXY[1] - r.top) / r.height - 0.5));
-          spotEl.classList.add('ps-tilt');
-          spotEl.style.transform = `perspective(900px) translateY(-6px) rotateX(${(-py * 9).toFixed(2)}deg) rotateY(${(px * 11).toFixed(2)}deg) scale(1.015)`;
+        const [x, y] = spotXY;
+        if (spotEl && !spotEl.isConnected) spotOff();
+        if (spotEl) {
+          const r = spotEl.getBoundingClientRect();
+          // Lage in der Karte von der Mitte aus – stimmt auch, solange die Karte geneigt ist
+          spotEl.style.setProperty('--mx', `${Math.round(x - (r.left + r.width / 2) + spotEl.offsetWidth / 2)}px`);
+          spotEl.style.setProperty('--my', `${Math.round(y - (r.top + r.height / 2) + spotEl.offsetHeight / 2)}px`);
+          spotEl.classList.add('ps-spot-on');
         }
+        if (tiltEl && !tiltEl.isConnected) tiltOff();
+        if (tiltEl) tilt(tiltEl, x, y);
+        if (lightEl && !lightEl.isConnected) lightOff();
+        if (lightEl) light(lightEl, x, y);
       });
     },
     { passive: true }
   );
-  document.documentElement.addEventListener('mouseleave', spotOff);
+  document.documentElement.addEventListener('mouseleave', () => {
+    spotOff();
+    tiltOff();
+    lightOff();
+  });
 
-  window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog, closeToDashboard, drafts, applications, tab, fieldError, fieldErrors, clearFieldErrors, countUp, motion };
+  /*
+   * Seitenübergang Teamkarte → Profilseite (index.html, views/anwalt.html): nur dorthin. Jeder andere Wechsel überspringt
+   * ihn – sonst bricht der Browser ihn auf einer Seite ohne Übergang (Dashboard, Login …) ab und meldet einen Fehler.
+   */
+  window.addEventListener('pageswap', (e) => {
+    const vt = e.viewTransition;
+    if (!vt) return;
+    [vt.ready, vt.finished, vt.updateCallbackDone].forEach((p) => p && p.catch(() => {}));
+    let to = null;
+    try {
+      to = e.activation && e.activation.entry ? new URL(e.activation.entry.url) : null;
+    } catch {
+      to = null;
+    }
+    if (!to || to.origin !== location.origin || !to.pathname.startsWith('/team/') || motion.calm()) vt.skipTransition();
+  });
+
+  window.PS = { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog, closeToDashboard, drafts, applications, tab, fieldError, fieldErrors, clearFieldErrors, countUp, roll, motion };
 })();

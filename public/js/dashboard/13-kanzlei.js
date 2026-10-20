@@ -849,7 +849,7 @@ function storageGrid() {
     ? `<div class="lager-grid">${items
         .map(
           (i) => `<button type="button" class="lager-item ${i.stock ? '' : 'is-empty'}" data-action="storage-book" data-kind="item" data-item="${i.id}" aria-label="${esc(i.name)} buchen">
-            ${itemPic(i)}<span class="lager-name">${esc(i.name)}</span><span class="lager-stock">${i.stock.toLocaleString('de-DE')}<small>auf Lager</small></span></button>`
+            ${itemPic(i)}<span class="lager-name">${esc(i.name)}</span><span class="lager-stock"><b data-roll="lager:item:${i.id}">${i.stock.toLocaleString('de-DE')}</b><small>auf Lager</small></span></button>`
         )
         .join('')}</div>`
     : empty(
@@ -866,7 +866,7 @@ views.lager = {
     const s = st.storage;
     const cash = (kind, label, value, sub) => `<button type="button" class="panel kpi lager-cash ${kind === 'schwarzgeld' ? 'is-black' : ''}" data-action="storage-book" data-kind="${kind}">
         <div class="kpi-label">${icon(kind === 'schwarzgeld' ? 'shield' : 'receipt', 'ico-sm')}${esc(label)}</div>
-        <div class="kpi-value" data-count="lager:${kind}">${esc(money(value))}</div><div class="kpi-sub">${esc(sub)}</div></button>`;
+        <div class="kpi-value" data-roll="lager:${kind}">${esc(money(value))}</div><div class="kpi-sub">${esc(sub)}</div></button>`;
     const stocked = s.items.filter((i) => i.stock > 0);
     return `
         <div class="page-head">
@@ -876,7 +876,7 @@ views.lager = {
         <div class="kpi-row lager-kpis">
           ${cash('geld', 'Geld', s.money, 'Kasse der Kanzlei')}
           ${s.canBlack ? cash('schwarzgeld', 'Schwarzgeld', s.black, s.blackAll ? 'für alle Mitarbeiter sichtbar' : 'nur Board of Partners') : ''}
-          <div class="panel kpi"><div class="kpi-label">${icon('box', 'ico-sm')}Gegenstände</div><div class="kpi-value" data-count="lager:items">${stocked.reduce((n, i) => n + i.stock, 0).toLocaleString('de-DE')}</div><div class="kpi-sub">${stocked.length} von ${s.items.length} Sorten auf Lager</div></div>
+          <div class="panel kpi"><div class="kpi-label">${icon('box', 'ico-sm')}Gegenstände</div><div class="kpi-value" data-roll="lager:items">${stocked.reduce((n, i) => n + i.stock, 0).toLocaleString('de-DE')}</div><div class="kpi-sub">${stocked.length} von ${s.items.length} Sorten auf Lager</div></div>
         </div>
         <section class="panel panel-pad mt-4 lg:mt-5">
           <div class="panel-head"><h2 class="panel-title">Gegenstände</h2>${s.items.length > 8 ? `<label class="search lager-search">${icon('search')}<input id="storageSearch" class="field" type="search" placeholder="Gegenstand suchen …" value="${esc(st.storageQuery || '')}" aria-label="Gegenstände durchsuchen"></label>` : ''}</div>

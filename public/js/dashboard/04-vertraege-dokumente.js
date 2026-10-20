@@ -140,7 +140,7 @@ function contractForm(c, { templates, defaults, k = null }) {
         ${svcList ? `<div class="span-2"><div class="label">Leistungen aus der Honorarordnung <span class="text-dim font-normal normal-case tracking-normal">– mehrere wählbar, die Summe wird zur Grundgebühr</span></div>
           ${disc ? `<div class="svc-discount">${icon(disc.kind === 'coop' ? 'tag' : 'crown', 'ico-sm')}<span><strong>${esc(disc.label)}</strong>: −${disc.pct} % auf die Honorarordnung – die Preise unten sind bereits ermäßigt (wie in Rechnungen).</span></div>` : ''}
           <div class="svc-list" id="svcList">${svcList}</div>
-          <div class="svc-sum"><span>Summe der Leistungen</span><strong id="svcSum">${esc(money(saved.reduce((sum, x) => sum + x.price * x.qty, 0)))}</strong></div></div>` : ''}
+          <div class="svc-sum"><span>Summe der Leistungen</span><strong id="svcSum" data-count="svc:sum">${esc(money(saved.reduce((sum, x) => sum + x.price * x.qty, 0)))}</strong></div></div>` : ''}
         <div><label class="label" for="kf_grundgebuehr">Grundgebühr</label><input id="kf_grundgebuehr" name="grundgebuehr" class="field" maxlength="200" value="${esc(v.grundgebuehr || '')}" placeholder="z. B. 100.000 $">
           <p class="form-hint">${svcList ? 'Wird aus den gewählten Leistungen berechnet – bei Bedarf anpassbar (z. B. Rabatt).' : 'Betrag in $.'}</p></div>
         ${field('zusatzgebuehr', 'Zusatzgebühr', 'placeholder="z. B. 25.000 $ je weiterem Verhandlungstag"')}
@@ -179,7 +179,10 @@ function updateServiceSum(form) {
   const list = contractServices(form);
   const sum = list.reduce((s, x) => s + x.price * x.qty, 0);
   const out = form.querySelector('#svcSum');
-  if (out) out.textContent = money(sum);
+  if (out) {
+    out.textContent = money(sum);
+    window.PS.countUp(out.parentElement, { ms: 450 }); // Summe läuft weich zum neuen Betrag
+  }
   if (list.length && form.elements.grundgebuehr) form.elements.grundgebuehr.value = money(sum);
 }
 

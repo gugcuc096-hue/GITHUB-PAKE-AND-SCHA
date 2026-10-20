@@ -29,7 +29,7 @@ function eventRow(e, { date = true } = {}) {
     .join(' · ');
   return `<button type="button" class="ev-row ${closed ? 'ev-done' : ''}" data-action="open-event" data-id="${e.id}">
       <span class="ev-bar ev-bg-${esc(e.type)}"></span>
-      <span class="ev-main"><span class="ev-title">${esc(e.title)}</span><span class="ev-meta">${meta}</span></span>
+      <span class="ev-main"><span class="ev-title">${esc(e.title)}</span><span class="ev-meta">${meta}</span>${fristBar(e)}</span>
       <span class="ev-side">${side}</span></button>`;
 }
 
@@ -61,7 +61,7 @@ function kpiEvent(label, e) {
   return `<button type="button" class="panel kpi block w-full text-left" data-action="open-event" data-id="${e.id}">
       <div class="kpi-label">${icon('clock', 'ico-sm')}${esc(label)}</div>
       <div class="kpi-value" style="font-size:clamp(1.15rem,3.4vw,1.55rem)">${esc(e.title)}</div>
-      <div class="kpi-sub">${esc(fmtDay(e.startsAt))}, ${esc(fmtTime(e.startsAt))} Uhr</div>${countdownHtml(e)}</button>`;
+      <div class="kpi-sub">${esc(fmtDay(e.startsAt))}, ${esc(fmtTime(e.startsAt))} Uhr</div>${countdownHtml(e)}${fristBar(e)}</button>`;
 }
 
 function dutyStrip() {

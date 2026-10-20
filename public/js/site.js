@@ -175,6 +175,19 @@
   }
   // „Direkt anfragen“: Mandatsformular mit diesem Anwalt als Wunschanwalt (die Karten werden nachgeladen)
   document.getElementById('teamGrid')?.addEventListener('click', (e) => {
+    // Zur Profilseite: Foto und Name dieser Karte gleiten an ihren Platz auf der Profilseite (View Transitions,
+    // Gegenstück in views/anwalt.html) – ohne Unterstützung im Browser ganz normal
+    const link = e.target.closest('a[href^="/team/"]');
+    if (link && window.PS && !window.PS.motion.calm()) {
+      // nur dieser Seitenwechsel bekommt den Übergang – andere (Login, Discord-Anmeldung …) laufen ganz normal
+      if (!document.getElementById('vtTeam')) document.head.insertAdjacentHTML('beforeend', '<style id="vtTeam">@view-transition { navigation: auto; }</style>');
+      document.querySelectorAll('#teamGrid [style*="view-transition-name"]').forEach((n) => (n.style.viewTransitionName = ''));
+      const card = link.closest('.team-card');
+      const photo = card && card.querySelector('a[href^="/team/"] > img, a[href^="/team/"] > div');
+      const name = card && card.querySelector('.team-name');
+      if (photo) photo.style.viewTransitionName = 'pf-photo';
+      if (name) name.style.viewTransitionName = 'pf-name';
+    }
     const btn = e.target.closest('[data-wish]');
     if (btn && typeof window.openTicketModal === 'function') window.openTicketModal('team', { id: Number(btn.dataset.wish), name: btn.dataset.name });
   });

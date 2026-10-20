@@ -39,3 +39,6 @@ body.site-home *, body.site-home *::before, body.site-home *::after {
 .lager-item:hover, .lager-cash:hover { transform: none; }
 #modalBody.modal-stagger > * { animation: none; }
 .cc-birth[open] .cc-birth-form { animation: none; }
+/* Übergänge zwischen Seiten (Teamkarte → Profil) und in die Überschrift: ohne Gleiten */
+@view-transition { navigation: none; }
+::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }

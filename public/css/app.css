@@ -2084,3 +2084,60 @@ mark.hl-mark { color: inherit; padding: 0 0.1em; margin: 0 -0.1em; border-radius
 .cc-stat-k { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-dim); }
 .cc-stat.is-due .cc-stat-v { color: #fcd34d; }
 .cc-stat.is-paid .cc-stat-v { color: var(--gold-light); }
+
+/* ---------------------------------------------------------------- Bewegung, die auf die Maus antwortet */
+/* Streiflicht (api.js setzt --lx/--ly): weiches Licht auf Aktendeckel und Karteikarte, wo die Maus ist */
+.case-cover::after, .client-cover::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity 0.45s ease; background: radial-gradient(380px circle at var(--lx, 50%) var(--ly, 50%), rgba(243, 229, 171, 0.075), transparent 65%); }
+.case-cover.ps-lit::after, .client-cover.ps-lit::after { opacity: 1; }
+/* Geprägtes Aktenzeichen: glänzt dort, wo das Licht ist (--ex/--ey), sonst ruhig gold – die Prägung bleibt als Schatten */
+.case-emboss { background: radial-gradient(64px circle at var(--ex, -999px) var(--ey, -999px), #fff7da, var(--gold-500) 78%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; text-shadow: none; filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.7)) drop-shadow(0 -1px 0 rgba(243, 229, 171, 0.2)); }
+/* Zählwerk im Lager: die Bestandszahl ist kleiner gesetzt */
+.lager-stock b { font-weight: inherit; }
+.lager-stock .ps-rolling .ps-rd { --rh: 1em; }
+
+/* Lupe für Beweisbilder: Großansicht ohne schwarze Ränder, darüber eine runde Lupe (PC) bzw. Zoom mit zwei Fingern (Handy) */
+.lb-zoom { position: relative; display: flex; justify-content: center; border-radius: 12px; background: #000; overflow: hidden; touch-action: pan-y; }
+.lb-zoom.is-zoomed { touch-action: none; }
+.lb-zoom .lightbox-img { width: auto; max-width: 100%; height: auto; border-radius: 0; transform-origin: 0 0; cursor: zoom-in; }
+.lb-zoom.is-zoomed .lightbox-img { cursor: grab; }
+.lb-lens { position: absolute; left: 0; top: 0; width: 190px; height: 190px; border-radius: 50%; border: 2px solid rgba(243, 229, 171, 0.75); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 14px 40px rgba(0, 0, 0, 0.6), inset 0 0 18px rgba(0, 0, 0, 0.35); background-color: #000; background-repeat: no-repeat; pointer-events: none; opacity: 0; transition: opacity 0.18s ease; }
+.lb-zoom.is-lens .lb-lens { opacity: 1; }
+.lb-zoom.is-lens .lightbox-img { cursor: none; }
+.lb-hint { margin: 0.45rem 0 1rem; font-size: 0.74rem; color: var(--text-dim); text-align: center; }
+/* Beweisbild fliegt aus dem Vorschaubild in die Großansicht und zurück (13-bewegung.js) */
+.fly-img { position: fixed; z-index: 90; margin: 0; object-fit: cover; pointer-events: none; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55); }
+.lb-zoom.is-flying .lightbox-img, .att.is-landing img { visibility: hidden; }
+/* Neue Akte: das Formular bleibt beim Seitenwechsel stehen, bis es in die Zeile fliegt */
+.modal-ghost.ghost-hold, .modal-ghost.ghost-hold .modal-card { animation: none; }
+
+/* Neue Akte: die Zeile, in der sie gelandet ist, leuchtet kurz golden nach */
+@keyframes row-arrive { from { background-color: rgba(212, 175, 55, 0.18); box-shadow: inset 3px 0 0 var(--gold-500); } to { background-color: transparent; box-shadow: inset 3px 0 0 transparent; } }
+.row-arrive, .row-arrive > td { animation: row-arrive 1.6s ease-out both; }
+
+/* Frist-Leiste: läuft bis zur Frist leer, Farbe von Gold über Bernstein zu Rot (01-basis.js) */
+.frist-bar { display: block; height: 3px; margin-top: 0.4rem; border-radius: 3px; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
+.frist-bar > i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, rgba(212, 175, 55, 0.55), var(--gold-500)); transition: width 1s linear, background 0.6s ease; }
+.frist-bar.is-amber > i { background: linear-gradient(90deg, rgba(245, 158, 11, 0.55), #f59e0b); }
+.frist-bar.is-red > i { background: linear-gradient(90deg, rgba(239, 68, 68, 0.55), #ef4444); }
+.frist-bar.is-over > i { width: 0 !important; }
+.kpi .frist-bar { margin-top: 0.6rem; }
+.modal-body .frist-bar { max-width: 22rem; margin-top: 0.55rem; }
+@media (forced-colors: active) { .frist-bar > i { forced-color-adjust: none; background: CanvasText; } }
+
+/* Anklage einfügen: erkannte Tatbestände zum Übernehmen (12-recht.js) */
+.ci-text { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.82rem; line-height: 1.55; resize: vertical; }
+.ci-result:not(:empty) { margin-top: 1rem; }
+.ci-head { display: flex; align-items: center; gap: 0.5rem; font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); }
+.ci-list { margin-top: 0.5rem; }
+.ci-row { align-items: flex-start; transition: opacity 0.2s ease; }
+.ci-row.is-off { opacity: 0.45; }
+.ci-row .chg-main { align-items: flex-start; }
+.ci-row .pk-cite { min-width: 4.4rem; padding-top: 0.15rem; }
+.ci-check { flex: none; padding-top: 0.15rem; }
+.ci-check input { width: 1.05rem; height: 1.05rem; accent-color: var(--gold-500); }
+.ci-alt { margin-top: 0.45rem; padding: 0.35rem 0.55rem; font-size: 0.8rem; max-width: 26rem; }
+.ci-src { margin-top: 0.3rem; font-size: 0.72rem; color: var(--text-dim); font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 34rem; }
+.ci-empty, .ci-unknown { display: flex; align-items: flex-start; gap: 0.45rem; margin: 0.6rem 0 0; font-size: 0.8rem; color: var(--text-muted); }
+.ci-unknown { color: #fcd34d; }
+.ci-unknown b { font-weight: 600; }
+@media (max-width: 639px) { .ci-row .chg-side { width: 100%; justify-content: flex-start; padding-left: 1.85rem; } }

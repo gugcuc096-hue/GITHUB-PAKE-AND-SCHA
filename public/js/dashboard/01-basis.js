@@ -565,12 +565,42 @@ function countdownHtml(e) {
   const c = countdown(e.startsAt, over);
   return `<span class="countdown ${c.cls}" data-countdown="${esc(e.startsAt)}" data-over="${over}">${esc(c.text)}</span>`;
 }
+/**
+ * Frist-Leiste: läuft von der Anlage der Frist bis zu ihr leer (ohne Anlagedatum: über eine Woche) und wird mit der
+ * Zeit von Gold über Bernstein (unter 3 Tagen) zu Rot (unter 24 Stunden). Beim ersten Anzeigen einer Frist läuft sie
+ * einmal von voll auf ihren Stand.
+ */
+function fristBar(e) {
+  if (!e || e.type !== 'frist' || ['erledigt', 'abgesagt'].includes(e.status)) return '';
+  return `<span class="frist-bar" data-frist="${esc(e.startsAt)}" data-from="${esc(e.createdAt || '')}" data-key="${esc(String(e.id))}" aria-hidden="true"><i></i></span>`;
+}
+const fristSeen = new Set();
+function fristTick(el) {
+  const due = parseDate(el.dataset.frist);
+  const bar = el.firstElementChild;
+  if (!due || !bar) return;
+  const from = parseDate(el.dataset.from);
+  const left = due.getTime() - Date.now();
+  const total = from ? Math.max(36e5, due.getTime() - from.getTime()) : 7 * 864e5;
+  const width = `${Math.max(0, Math.min(100, (left / total) * 100)).toFixed(2)}%`;
+  el.classList.toggle('is-over', left <= 0);
+  el.classList.toggle('is-red', left > 0 && left < 864e5);
+  el.classList.toggle('is-amber', left >= 864e5 && left < 3 * 864e5);
+  const first = !el.dataset.shown;
+  el.dataset.shown = '1';
+  bar.style.width = width;
+  if (first && !fristSeen.has(el.dataset.key)) {
+    fristSeen.add(el.dataset.key);
+    if (!window.PS.motion.calm() && bar.animate) bar.animate([{ width: '100%' }, { width }], { duration: 900, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+  }
+}
 function tickCountdowns() {
   $$('[data-countdown]').forEach((el) => {
     const c = countdown(el.dataset.countdown, el.dataset.over);
     if (el.textContent !== c.text) el.textContent = c.text;
     el.className = `countdown ${c.cls}`;
   });
+  $$('.frist-bar[data-frist]').forEach(fristTick);
   // Laufende Dienstzeit (Stempeluhr)
   $$('[data-countup]').forEach((el) => {
     const since = parseDate(el.dataset.countup);

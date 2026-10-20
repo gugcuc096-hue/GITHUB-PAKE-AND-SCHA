@@ -10,7 +10,7 @@
  */
 const express = require('express');
 const { z } = require('zod');
-const { db } = require('../db');
+const { db, tx } = require('../db');
 const { requireAuth, requireStaff, isStaff } = require('../auth');
 const { wrap, parseBody, idParam, isBoard } = require('../helpers');
 const { getCase, caseAccess, addSystemNote, logActivity } = require('../models');
@@ -23,6 +23,13 @@ const requireBoard = (req, res, next) => (isBoard(req.user) ? next() : res.statu
 
 router.get('/', (req, res) => {
   res.json({ offences: penal.offences(), laws: penal.laws(), cap: penal.CAP, capSevere: penal.CAP_SEVERE, finePerHe: penal.FINE_PER_HE, canEdit: isBoard(req.user) });
+});
+
+/** Anklagetext lesen (eingefügt aus FiveNet/DOJ-Ticket – hier wird nichts abgerufen): Vorschläge aus dem Strafkatalog. */
+router.post('/parse', (req, res) => {
+  const d = parseBody(z.object({ text: z.string().max(20000) }), req, res);
+  if (!d) return;
+  res.json(penal.parseCharges(d.text));
 });
 
 router.get('/laws/:para', (req, res) => {
@@ -177,6 +184,47 @@ caseRouter.post(
     ).run(c.id, o.id, o.para, o.paragraph, o.title, o.min_he, o.max_he, o.fine_mode, o.fine_max, o.attempt, o.severe, d.count, req.user.id);
     addSystemNote(c.id, req.user, `Anklagepunkt: ${penal.citation(o)} – ${o.title}`, true);
     db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(c.id);
+    res.status(201).json(payload(c));
+  })
+);
+
+/** Mehrere Anklagepunkte auf einmal (aus einem eingefügten Anklagetext) – gleiche Tatbestände zählen hoch. */
+caseRouter.post(
+  '/bulk',
+  wrap(async (req, res) => {
+    const c = loadCase(req, res, { edit: true });
+    if (!c) return;
+    const item = z.object({ offenceId: z.number().int().positive(), count: z.number().int().min(1).max(20).default(1), attempted: z.boolean().optional(), aiding: z.boolean().optional() });
+    const d = parseBody(z.object({ items: z.array(item).min(1).max(40) }), req, res);
+    if (!d) return;
+    const offences = d.items.map((x) => db.prepare('SELECT * FROM penal_offences WHERE id = ?').get(x.offenceId));
+    if (offences.some((o) => !o)) return res.status(400).json({ error: 'Ein Tatbestand steht nicht (mehr) im Strafkatalog – bitte die Vorschläge neu laden.' });
+    // alles oder nichts: passt ein Punkt nicht mehr hinein, bleibt die Akte unverändert
+    let added;
+    try {
+      added = tx(() => {
+        const list = [];
+        d.items.forEach((x, i) => {
+          const o = offences[i];
+          const same = db.prepare('SELECT id, count FROM case_charges WHERE case_id = ? AND offence_id = ? ORDER BY id LIMIT 1').get(c.id, o.id);
+          if (same) db.prepare('UPDATE case_charges SET count = ? WHERE id = ?').run(Math.min(20, same.count + x.count), same.id);
+          else {
+            if (db.prepare('SELECT COUNT(*) AS n FROM case_charges WHERE case_id = ?').get(c.id).n >= 40) throw Object.assign(new Error('Höchstens 40 Anklagepunkte je Akte.'), { status: 400 });
+            db.prepare(
+              `INSERT INTO case_charges (case_id, offence_id, para, paragraph, title, min_he, max_he, fine_mode, fine_max, attempt, severe, count, attempted, aiding, created_by)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            ).run(c.id, o.id, o.para, o.paragraph, o.title, o.min_he, o.max_he, o.fine_mode, o.fine_max, o.attempt, o.severe, x.count, x.attempted && o.attempt ? 1 : 0, x.aiding ? 1 : 0, req.user.id);
+          }
+          list.push(`${x.count > 1 ? `${x.count}× ` : ''}${penal.citation(o)} – ${o.title}`);
+        });
+        db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(c.id);
+        return list;
+      });
+    } catch (e) {
+      if (e.status === 400) return res.status(400).json({ error: e.message });
+      throw e;
+    }
+    addSystemNote(c.id, req.user, `Anklage übernommen: ${added.join(', ')}`, true);
     res.status(201).json(payload(c));
   })
 );

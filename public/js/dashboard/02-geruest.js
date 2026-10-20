@@ -554,6 +554,7 @@ function replaceModal(html) {
   modal.scrollTop = y2;
   tickCountdowns();
   hidePendingDeletes();
+  window.PS.countUp(body, { ms: 600 }); // geänderte Zahlen (Strafmaß, Summen) laufen zum neuen Wert
 }
 /*
  * Akte „fliegt auf“: Aus einer Liste geöffnet, wächst das Fenster aus der angeklickten Zeile hervor; beim Schließen
@@ -630,6 +631,14 @@ function fadeOutModal(modal, { morph = false } = {}) {
   document.body.appendChild(ghost);
   ghost.scrollTop = modal.scrollTop;
   if (ghostBody && body) ghostBody.scrollTop = body.scrollTop;
+  // Neue Akte: das Formular bleibt stehen, bis es in seine Zeile fliegt (landInRow, 13-bewegung.js) – spätestens 3 s
+  if (st.ghostHold) {
+    st.ghostHold = false;
+    ghost.classList.add('ghost-hold');
+    st.heldGhost = ghost;
+    setTimeout(() => ghost.remove(), 3000);
+    return;
+  }
   const card = rowRect && ghost.querySelector('.modal-card');
   if (card) {
     // Zurück in die Zeile: die Kopie zieht sich auf die Zeile zusammen und blendet aus
@@ -666,6 +675,7 @@ async function modalInstead(fn) {
 /** Zurück zum vorherigen Fenster – oder schließen, wenn es keins gibt. */
 async function modalBack() {
   if (st.modalRestoring) return; // vorheriges Fenster lädt gerade (z. B. Doppelklick auf X)
+  const flyBack = lightboxLeave(); // Großansicht eines Beweisbilds: fliegt zurück in ihr Vorschaubild
   const prev = st.modalStack.pop();
   if (!prev) return closeModal({ morph: true });
   const modal = $('#modal');
@@ -694,6 +704,7 @@ async function modalBack() {
     scheduleHistory();
   }
   restoreModalScroll(prev.scroll);
+  if (flyBack) flyBack();
 }
 /** Vom Nutzer geschlossen (X, Esc, daneben, Abbrechen, Zurück-Taste): bei ungespeicherten Eingaben erst nachfragen. */
 async function modalDismiss(back = modalBack) {
@@ -769,7 +780,12 @@ async function guard(fn) {
 
 const hashView = () => decodeURIComponent(location.hash.slice(1)) || 'overview';
 
-async function go(view) {
+/** Seite wechseln – aus einer Kachel bzw. einem Menüpunkt mit Übergang in die Überschrift (13-bewegung.js). */
+function go(view) {
+  const hero = takeHero(view);
+  return hero ? heroGo(hero, () => goNow(view)) : goNow(view);
+}
+async function goNow(view) {
   if (!allowed(view)) view = 'overview';
   if (view !== 'invoice-new') st.invoiceFrom = null; // Rechnung aus einer Akte: Rückweg gilt nur bis zum Verlassen der Seite
   st.view = view;
@@ -789,6 +805,7 @@ async function go(view) {
       shown = views[view].render();
       renderView();
       playIn(content, 'view-in');
+      growBars(content);
     } catch {
       shown = null; // alter Stand passt nicht mehr – normal laden
     }
@@ -833,6 +850,7 @@ async function go(view) {
   seen.add(view);
   renderView();
   playIn(content, 'view-in');
+  growBars(content);
 }
 const INSTANT_SKIP = new Set(['invoice-new', 'settings', 'profile']);
 
@@ -877,6 +895,7 @@ function playIn(el, cls) {
 function renderView() {
   const before = flipSnapshot(); // Positionen der Zeilen vor dem Neuzeichnen (weiches Umsortieren)
   $('#content').innerHTML = views[st.view].render();
+  heroLand(); // aus einer Kachel bzw. einem Menüpunkt: die neue Überschrift fliegt von dort an ihren Platz
   flipPlay(before);
   markChangedBadges($('#content'));
   // Seite eines Bündels: Reiter unter der Überschrift
@@ -886,6 +905,7 @@ function renderView() {
   tickCountdowns();
   hidePendingDeletes();
   window.PS.countUp($('#content')); // Kennzahlen zählen hoch (erstes Erscheinen bzw. bei Änderung)
+  window.PS.roll($('#content')); // Zählwerk (Lager): Ziffern rollen zum neuen Stand
 }
 function navigate(view) {
   // Aus einem offenen Fenster heraus: dessen Verlaufseintrag durch die neue Seite ersetzen (Zurück führt nicht ins Leere)

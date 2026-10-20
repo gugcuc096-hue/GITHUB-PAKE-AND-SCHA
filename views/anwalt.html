@@ -57,6 +57,13 @@
         .pf-actions { margin-top: 2.5rem; display: flex; justify-content: center; }
         .pf-actions .btn-gold { min-width: 220px; }
         @media (max-width: 479px) { .pf-actions > * { flex: 1 1 100%; } }
+        /* Von der Teamkarte der Startseite: Foto und Name gleiten an ihren Platz (Gegenstück in index.html / site.js);
+           weiter zu anderen Seiten ohne Übergang (api.js, pageswap) */
+        @view-transition { navigation: auto; }
+        .pf-photo { view-transition-name: pf-photo; }
+        .pf-name { view-transition-name: pf-name; }
+        ::view-transition-group(pf-photo), ::view-transition-group(pf-name) { animation-duration: 0.5s; animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1); }
+        ::view-transition-old(pf-name), ::view-transition-new(pf-name) { height: 100%; object-fit: contain; object-position: left center; }
     </style>
     <link rel="stylesheet" href="/css/calm.css" media="(prefers-reduced-motion: reduce)" data-calm>
 </head>
