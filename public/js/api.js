@@ -828,7 +828,7 @@
    * Mandanten – große Karten weniger stark. Nicht bei gedämpften Animationen und nicht, solange in der Karte ein Feld
    * bearbeitet wird.
    */
-  const TILT_SEL = '.team-card, .pf-card, .client-cover';
+  const TILT_SEL = '.team-card, .pf-card, .client-cover, .kpi'; // Kacheln der Übersicht nur ganz leicht (siehe tilt)
   let tiltEl = null;
   function tiltOff() {
     if (tiltEl) {
@@ -851,7 +851,7 @@
     }
     const r = el.getBoundingClientRect();
     const size = Math.max(r.width, r.height);
-    const k = Math.min(1, Math.pow(640 / size, 1.5));
+    const k = Math.min(1, Math.pow(640 / size, 1.5)) * (el.classList.contains('kpi') ? 0.4 : 1);
     const px = Math.max(-0.5, Math.min(0.5, (x - r.left) / r.width - 0.5));
     const py = Math.max(-0.5, Math.min(0.5, (y - r.top) / r.height - 0.5));
     el.classList.add('ps-tilt', 'ps-tilt-on');
@@ -972,5 +972,31 @@
     return api.get(url);
   }
 
-  window.PS = { boot, api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog, closeToDashboard, drafts, applications, tab, fieldError, fieldErrors, clearFieldErrors, countUp, roll, motion };
+  /*
+   * Lesefortschritt: In langen Akten, Verträgen, Aktenauszügen und Wiki-Artikeln läuft oben eine dünne goldene Linie mit.
+   * Gilt für Bereiche mit data-readbar (bzw. die Seite selbst, wenn <body data-readbar> gesetzt ist) – erst ab einer
+   * Länge von knapp zwei Bildschirmen.
+   */
+  let readBar = null;
+  function readProgress(e) {
+    const t = e.target;
+    const el = t === document || t === document.documentElement ? document.scrollingElement : t;
+    if (!el || !el.matches) return;
+    const page = el === document.scrollingElement;
+    if (page ? !document.body.hasAttribute('data-readbar') : !el.matches('[data-readbar]')) return;
+    const max = el.scrollHeight - el.clientHeight;
+    if (!readBar) {
+      readBar = document.createElement('div');
+      readBar.className = 'read-bar';
+      readBar.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(readBar);
+    }
+    const long = el.scrollHeight > el.clientHeight * 1.8 && (page || el.closest('.modal.open, #modal.open, [data-readbar]'));
+    readBar.style.opacity = long && max > 0 ? '1' : '0';
+    readBar.style.transform = `scaleX(${long && max > 0 ? Math.min(1, el.scrollTop / max).toFixed(4) : 0})`;
+  }
+  document.addEventListener('scroll', readProgress, { capture: true, passive: true });
+  const readBarOff = () => readBar && (readBar.style.opacity = '0');
+
+  window.PS = { readBarOff, boot, api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog, closeToDashboard, drafts, applications, tab, fieldError, fieldErrors, clearFieldErrors, countUp, roll, motion };
 })();

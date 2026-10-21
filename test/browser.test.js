@@ -962,7 +962,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         const teamVisible = () => page.isVisible('#nav a[data-hub="people"]');
 
         // Übersicht: leere Bereiche als kurze Zeile, Handy-Leiste mit Aufgaben statt Post
-        assert.ok(await page.isVisible('#content .empty-line'), 'leere Bereiche kompakt');
+        assert.ok(await page.isVisible('#content .empty-line, #content .quiet-row'), 'leere Bereiche kompakt');
         if (device === PHONE) {
           assert.ok(await page.$('#bottomNav a[href="#tasks"]'), 'Aufgaben unten in der Leiste');
           assert.equal(await page.$('#bottomNav a[href="#mail"]'), null, 'Post steht oben als Briefsymbol');
@@ -1241,7 +1241,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         assert.equal(ov.tag, false, 'kein Etikett „liegt seit …“ in der Übersicht');
         assert.match(ov.stripe, /rgb\(245, 158, 11\)/, 'Streifen wie in der Aktenliste');
         assert.ok(ov.oneLine, 'Fälligkeit und Knöpfe der Aufgabe in einer Zeile');
-        assert.deepEqual(ov.quiet, ['Pinnwand'], 'leere Pinnwand als schmale Zeile, offene Anfrage (Lena Berg) als Kasten');
+        assert.deepEqual(ov.quiet, ['Pinnwand', 'Fristen & Termine'], 'leere Pinnwand und leere Fristen als schmale Zeile, offene Anfrage (Lena Berg) als Kasten');
         assert.equal(ov.maxWidth, '1760px', 'alle Seiten gleich breit');
         await page.goto(`${ksrv.base}/dashboard#cases`);
         await page.waitForSelector('#caseList tr.row');
@@ -2566,8 +2566,11 @@ describe('Browser: Board-Menü gebündelt, Hover-Karte, Kalender ziehen, Vorlage
       await a.login(TEAM.admin);
       const c = (await a.post('/api/cases', { title: 'Raub am Juweliergeschäft', area: 'strafrecht', clientName: 'Vito Russo', lawyerId: null })).json.case;
       const day = new Date();
-      day.setDate(day.getDate() + (day.getDate() > 20 ? -3 : 3)); // im selben Monat bleiben
-      day.setHours(18, 0, 0, 0);
+      // in der Zukunft, aber im selben Monat (am Monatsende bleiben nur wenige Tage; am letzten Tag spät am Abend)
+      const lastDay = new Date(day.getFullYear(), day.getMonth() + 1, 0).getDate();
+      const ahead = Math.min(3, lastDay - day.getDate());
+      day.setDate(day.getDate() + ahead);
+      day.setHours(ahead ? 18 : 23, ahead ? 0 : 30, 0, 0);
       const ev = (await a.post('/api/calendar', { type: 'intern', title: 'Akteneinsicht vorbereiten', startsAt: day.toISOString(), caseId: c.id })).json.event;
       const inv = (await a.post('/api/invoices', { caseId: c.id, items: [{ description: 'Erstberatung', quantity: 1, unitPrice: 15000 }] })).json.invoice;
 
@@ -3052,6 +3055,125 @@ describe('Browser: Namen direkt ändern (Board)', { skip: chromium ? false : 'Pl
       await page.waitForSelector('#nameAccList [data-action="name-direct"][data-role="anwalt"]');
       assert.match(await page.textContent('#nameAccList .list-row'), /Damat Lexington\s*Senior Associate/);
       assert.deepEqual(problems, []);
+    } finally {
+      await browser.close();
+      await srv.stop();
+    }
+  });
+});
+
+describe('Browser: Update-Hinweis, Merkliste, Kopieren, Anpinnen, Lesefortschritt, Leerzustände, Handy', { skip: chromium ? false : 'Playwright nicht installiert' }, () => {
+  it('PC: neue Version → „Neu laden“, Stern sortiert nach oben, Aktenzeichen kopieren, Notiz anpinnen, Summen, goldene Linie, „Filter zurücksetzen“', async () => {
+    const srv = await startServer();
+    const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+    try {
+      const admin = client(srv.base);
+      await admin.login(TEAM.admin);
+      const ids = [];
+      for (const name of ['Anna Erst', 'Bert Zweit', 'Carla Dritt']) ids.push((await admin.post('/api/cases', { title: `Akte von ${name}`, area: 'zivilrecht', clientName: name })).json.case.id);
+      const long = ids[0];
+      for (let i = 1; i <= 24; i++) await admin.post(`/api/cases/${long}/notes`, { body: `Interner Vermerk Nummer ${i}: ${'Zeugenaussage und Beweislage geprüft. '.repeat(4)}`, internal: true });
+      const inv = async (price) => (await admin.post('/api/invoices', { caseId: long, items: [{ description: 'Beratung', quantity: 1, unitPrice: price }] })).json.invoice.id;
+      await inv(1000);
+      await admin.patch(`/api/invoices/${await inv(2500)}`, { status: 'bezahlt' });
+      const caseNumber = (await admin.get(`/api/cases/${long}`)).json.case.caseNumber;
+
+      const ctx = await browser.newContext({ ...DESKTOP, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+      await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: srv.base });
+      const page = await ctx.newPage();
+      const problems = [];
+      page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
+      // Der Server meldet beim Verbinden eine andere Fassung als die geladene → Hinweis „Neu laden“
+      await page.route('**/api/events**', (route) => route.fulfill({ status: 200, contentType: 'text/event-stream', body: 'data: {"k":"hello","v":"eine-andere-fassung"}\n\n' }));
+      await page.goto(srv.base + '/login');
+      await page.fill('#email', TEAM.admin);
+      await page.fill('#password', PASSWORD);
+      await page.click('button[type=submit]');
+      await page.waitForURL(/\/dashboard/);
+      await page.waitForSelector('#sysBar [data-action="app-reload"]');
+      assert.match(await page.textContent('#sysBar'), /neue Version/);
+      assert.ok(new URL(page.url()).pathname === '/dashboard', 'saubere Adresse ohne .html');
+
+      // Merkliste: Stern an der letzten Akte → steht oben
+      await page.evaluate(() => (location.hash = '#cases'));
+      await page.waitForSelector('#caseList tr[data-id]');
+      const firstId = () => page.$eval('#caseList tr[data-id]', (tr) => Number(tr.dataset.id));
+      const last = await page.$eval('#caseList tbody tr[data-id]:last-child', (tr) => Number(tr.dataset.id));
+      assert.notEqual(await firstId(), last);
+      await page.click(`#caseList [data-action="case-star"][data-id="${last}"]`);
+      await page.waitForFunction((id) => Number(document.querySelector('#caseList tr[data-id]').dataset.id) === id, last);
+      assert.equal(await page.getAttribute(`#caseList [data-action="case-star"][data-id="${last}"]`, 'aria-pressed'), 'true');
+      assert.equal((await admin.get('/api/cases')).json.cases.find((c) => c.id === last).starred, true, 'gespeichert');
+
+      // Leerzustand mit nächstem Schritt
+      await page.fill('#caseSearch', 'gibt-es-nicht');
+      await page.waitForSelector('#caseList .empty [data-action="cases-filter-reset"]');
+      await page.click('#caseList [data-action="cases-filter-reset"]');
+      await page.waitForFunction(() => document.querySelectorAll('#caseList tr[data-id]').length === 3);
+      assert.equal(await page.inputValue('#caseSearch'), '');
+
+      // Akte: Aktenzeichen kopieren, Summen, Notiz anpinnen, goldene Linie beim Lesen
+      await page.click(`#caseList tr[data-id="${long}"]`);
+      await page.waitForSelector('#modalBody .copy-az');
+      assert.notEqual(await page.$eval('#modalBody .copy-az', (b) => getComputedStyle(b).backgroundImage), 'none', 'Aktenzeichen bleibt sichtbar (Goldfüllung des Schriftzugs)');
+      await page.click('#modalBody .copy-az');
+      await page.waitForFunction((n) => document.body.textContent.includes(`„${n}“ kopiert.`), caseNumber);
+      assert.equal(await page.evaluate(() => navigator.clipboard.readText()), caseNumber);
+      await page.waitForFunction(() => /Offen\s*1\.000 \$\s*Bezahlt\s*2\.500 \$/.test(document.querySelector('#modalBody .inv-sums')?.textContent || ''), null, { timeout: 5000 }); // zählt hoch
+      assert.equal(await page.$('#modalBody .pin-notes'), null);
+      await page.click('#modalBody .tl-pin >> nth=0');
+      await page.waitForSelector('#modalBody .pin-notes .pin-note');
+      assert.equal(await page.$$eval('#modalBody .pin-notes .pin-note', (n) => n.length), 1);
+      const scrolled = await page.evaluate(() => {
+        const el = [...document.querySelectorAll('#modal[data-readbar], #modalBody[data-readbar]')].find((e) => e.scrollHeight > e.clientHeight * 1.8);
+        if (!el) return null;
+        el.scrollTop = (el.scrollHeight - el.clientHeight) / 2;
+        return true;
+      });
+      assert.ok(scrolled, 'Akte ist lang genug');
+      await page.waitForFunction(() => document.querySelector('.read-bar')?.style.opacity === '1');
+      const scale = await page.$eval('.read-bar', (b) => Number(b.style.transform.match(/scaleX\(([\d.]+)\)/)[1]));
+      assert.ok(scale > 0.3 && scale < 0.7, `Linie etwa halb: ${scale}`);
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(() => !document.querySelector('#modal.open'));
+      assert.equal(await page.$eval('.read-bar', (b) => b.style.opacity), '0', 'nach dem Schließen weg');
+
+      assert.deepEqual(problems, []);
+      await ctx.close();
+    } finally {
+      await browser.close();
+      await srv.stop();
+    }
+  });
+
+  it('Handy und Mandant: Knöpfe oben nicht abgeschnitten, leere Kennzahlen als schmale Zeile, keine „Dokument(e)“', async () => {
+    const srv = await startServer();
+    const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+    try {
+      assert.equal((await client(srv.base).post('/api/auth/register', { displayName: 'Nina Neu', email: 'nina.neu', password: 'Mandanten-Passwort-3' })).status, 201);
+      const ctx = await browser.newContext({ ...PHONE, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+      const page = await ctx.newPage();
+      const problems = [];
+      page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
+      await page.goto(srv.base + '/login');
+      await page.fill('#email', 'nina.neu');
+      await page.fill('#password', 'Mandanten-Passwort-3');
+      await page.click('button[type=submit]');
+      await page.waitForURL(/\/dashboard/);
+      await page.waitForSelector('#content .kpi');
+      const clipped = await page.$$eval('#content .page-actions > *', (els) => els.filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent.trim()));
+      assert.deepEqual(clipped, [], 'kein Knopf abgeschnitten');
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth <= 1), 'nichts ragt über den Rand');
+      assert.equal(await page.$$eval('#content .kpi-quiet', (k) => k.length), 4, 'neues Konto: vier schmale Zeilen statt Kacheln mit „0“');
+      assert.match(await page.textContent('#content .kpi-quiet-grid'), /Keine offenen Rechnungen/);
+      assert.doesNotMatch(await page.textContent('#content'), /\(e\)|\(en\)|\(n\)/);
+      // Leere Liste: Satz + nächster Schritt
+      await page.evaluate(() => (location.hash = '#cases'));
+      await page.waitForSelector('#content .empty [data-action="new-case"]');
+      await page.evaluate(() => (location.hash = '#mail'));
+      await page.waitForSelector('#content .empty [data-action="compose"]');
+      assert.deepEqual(problems, []);
+      await ctx.close();
     } finally {
       await browser.close();
       await srv.stop();

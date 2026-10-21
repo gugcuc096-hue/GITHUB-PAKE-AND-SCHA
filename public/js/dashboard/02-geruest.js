@@ -623,6 +623,9 @@ function fadeOutModal(modal, { morph = false } = {}) {
   const body = $('#modalBody');
   const ghostBody = ghost.querySelector('#modalBody');
   ghost.removeAttribute('id');
+  ghost.removeAttribute('data-readbar');
+  ghost.querySelectorAll('[data-readbar]').forEach((n) => n.removeAttribute('data-readbar')); // die Hülle, die ausblendet, zeigt keine Lesefortschritts-Linie
+  window.PS.readBarOff();
   ghost.querySelectorAll('[id]').forEach((n) => n.removeAttribute('id'));
   ghost.classList.remove('open', 'morphing');
   ghost.classList.add('modal-ghost');
@@ -653,6 +656,7 @@ function closeModal({ morph = false } = {}) {
   st.modalCurrent = null;
   const modal = $('#modal');
   if (!modal.classList.contains('open')) return;
+  window.PS.readBarOff();
   scheduleHistory();
   fadeOutModal(modal, { morph });
   modal.classList.remove('open', 'morphing');
@@ -759,7 +763,7 @@ function loadingHtml(view = st.view) {
     </div>`;
 }
 const errorHtml = (msg) =>
-  `<div class="panel">${empty(msg || 'Daten konnten nicht geladen werden.', 'alert')}<div class="text-center pb-6"><button class="btn-outline btn-md" data-action="reload-view">Erneut versuchen</button></div></div>`;
+  `<div class="panel">${empty(msg || 'Daten konnten nicht geladen werden.', 'alert', nextStep('Erneut versuchen', 'reload-view', {}, 'refresh'))}</div>`;
 
 function handleError(e) {
   if (e && e.status === 401) {
@@ -894,6 +898,8 @@ function playIn(el, cls) {
 }
 function renderView() {
   const before = flipSnapshot(); // Positionen der Zeilen vor dem Neuzeichnen (weiches Umsortieren)
+  document.body.toggleAttribute('data-readbar', st.view === 'wiki'); // Lesefortschritt in langen Wiki-Artikeln
+  window.PS.readBarOff();
   $('#content').innerHTML = views[st.view].render();
   heroLand(); // aus einer Kachel bzw. einem Menüpunkt: die neue Überschrift fliegt von dort an ihren Platz
   flipPlay(before);

@@ -179,7 +179,7 @@ router.get('/sessions', requireAuth, (req, res) => {
 router.post('/logout-others', requireAuth, (req, res) => {
   const ended = destroyOtherSessions(req, req.user.id);
   twoFactor.forgetDevices(req.user.id, req); // andere Geräte brauchen beim nächsten Mal wieder den Code
-  logActivity(req.user, 'Auf anderen Geräten abgemeldet', 'user', req.user.id, `${ended} Anmeldung(en) beendet`);
+  logActivity(req.user, 'Auf anderen Geräten abgemeldet', 'user', req.user.id, `${ended} ${ended === 1 ? 'Anmeldung' : 'Anmeldungen'} beendet`);
   res.json({ ended, others: 0 });
 });
 

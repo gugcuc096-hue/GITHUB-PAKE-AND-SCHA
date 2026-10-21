@@ -43,7 +43,7 @@ function start() {
     try {
       const r = run();
       if (r.sessions || r.challenges || r.devices || r.vacuumed) {
-        console.log(`Aufgeräumt: ${r.sessions} Sitzung(en), ${r.challenges} Code(s), ${r.devices} Gerät(e)${r.vacuumed ? ', Datenbank verdichtet' : ''}.`);
+        console.log(`Aufgeräumt: abgelaufene Sitzungen ${r.sessions}, Zwei-Faktor-Codes ${r.challenges}, vertraute Geräte ${r.devices}${r.vacuumed ? ' · Datenbank verdichtet' : ''}.`);
       }
     } catch (err) {
       console.warn('Aufräumen fehlgeschlagen:', err.message);

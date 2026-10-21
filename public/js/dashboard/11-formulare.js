@@ -51,7 +51,7 @@ const forms = {
     const bad = rules.findIndex((r) => !r.roleId || !r.conditions.length);
     if (bad >= 0) throw new Error(`Regel ${bad + 1}: bitte eine Hauptrolle und mindestens eine Bedingung wählen.`);
     st.bot = await api.put('/api/bot/connections', { enabled: !!d.enabled, rules });
-    toast(d.enabled ? `${rules.length} Regel(n) gespeichert – alle Mitglieder werden jetzt abgeglichen.` : 'Role Connections gespeichert (aus).');
+    toast(d.enabled ? `${nWord(rules.length, 'Regel', 'Regeln')} gespeichert – alle Mitglieder werden jetzt abgeglichen.` : 'Role Connections gespeichert (aus).');
     renderView();
   },
   'bot-joinroles': async (f) => {

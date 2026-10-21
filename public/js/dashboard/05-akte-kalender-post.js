@@ -81,6 +81,14 @@ async function afterTaskChange() {
  * Erklärungen nur, wenn etwas zu tun ist (sonst im Tooltip).
  */
 const ticketState = (t) => (t.exists ? (t.archived ? badge('archiviert', 'slate') : badge('aktiv', 'emerald')) : t.deleted ? badge('per /delete gelöscht', 'slate') : badge('noch nicht angelegt', 'amber'));
+/** Rechnungen der Akte: offen und bezahlt als Summen – zählen beim Öffnen hoch und bei einer Zahlung mit. */
+function invoiceSums(c, list) {
+  const live = list.filter((i) => i.status !== 'storniert');
+  if (live.length < 2) return '';
+  const sum = (s) => live.filter((i) => i.status === s).reduce((n, i) => n + (i.total || 0), 0);
+  return `<div class="inv-sums"><span>Offen <b data-count="case${c.id}:open">${esc(money(sum('offen')))}</b></span><span>Bezahlt <b data-count="case${c.id}:paid">${esc(money(sum('bezahlt')))}</b></span></div>`;
+}
+
 /** Interne Notiz: @Namen hervorheben (nur Darstellung – Benachrichtigt wird auf dem Server). */
 const mentionHtml = (text) => esc(text).replace(/(^|[^\p{L}\p{N}@])(@[\p{L}][\p{L}'-]*(?: [\p{Lu}][\p{L}'-]*)?)/gu, '$1<span class="mention">$2</span>');
 
@@ -885,7 +893,9 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     external: externalSection(c, externalDocs),
     evidence: attachmentsSection(c, attachments, linkedEvidence),
     tasks: staff ? caseTasksSection(c, tasks) : '',
-    invoices: invoiceList ? `<div class="section" id="secInvoices"><h3 class="section-title">Rechnungen & Honorare</h3>${invoiceList}</div>` : '',
+    invoices: invoiceList
+      ? `<div class="section" id="secInvoices"><h3 class="section-title">Rechnungen & Honorare</h3>${invoiceSums(c, invoices)}${invoiceList}</div>`
+      : '',
     work: caseWorkSection(c, work),
   };
   const openTasks = tasks.filter((t) => !t.done).length;
@@ -1046,7 +1056,7 @@ function calendarStaff() {
           <section id="dayAgenda" class="panel panel-pad">
             <div class="panel-head"><h2 class="panel-title">${esc(selDate.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }))}</h2>
               <button class="btn-outline btn-sm" data-action="new-event" data-day="${st.cal.selected}">${icon('plus', 'ico-sm')}<span>Eintrag</span></button></div>
-            ${selected.length ? selected.map((e) => eventRow(e, { date: false })).join('') : empty('Keine Einträge an diesem Tag.', 'calendar')}
+            ${selected.length ? selected.map((e) => eventRow(e, { date: false })).join('') : empty('Keine Einträge an diesem Tag.', 'calendar', nextStep('Eintrag anlegen', 'new-event', { day: st.cal.selected }))}
           </section>
           <section class="panel panel-pad">
             <div class="panel-head"><h2 class="panel-title">Offene Fristen</h2></div>
@@ -1149,7 +1159,7 @@ function calendarClient() {
         <div class="page-actions"><button class="btn-gold btn-md" data-action="new-event">${icon('plus')}<span>Termin anfragen</span></button></div>
       </div>
       <section class="panel panel-pad mb-4"><div class="panel-head"><h2 class="panel-title">Anstehend</h2></div>
-        ${upcoming.length ? upcoming.map((e) => eventRow(e)).join('') : empty('Keine anstehenden Termine.', 'calendar')}</section>
+        ${upcoming.length ? upcoming.map((e) => eventRow(e)).join('') : empty('Keine anstehenden Termine.', 'calendar', nextStep('Termin anfragen', 'new-event'))}</section>
       ${past.length ? `<details class="edit-box"><summary>Vergangene & abgesagte Termine (${past.length})</summary>${past.map((e) => eventRow(e)).join('')}</details>` : ''}`;
 }
 
@@ -1308,8 +1318,8 @@ views.mail = {
           <button class="chip ${!inbox ? 'active' : ''}" data-action="mail-box" data-value="sent">Gesendet</button>
         </div>
         <div class="mail-layout ${sel ? 'has-sel' : ''}">
-          <div class="panel mail-list">${st.messages.length ? st.messages.map(mailItem).join('') : empty(inbox ? 'Ihr Posteingang ist leer.' : 'Noch keine gesendeten Nachrichten.', 'mail')}</div>
-          <div class="panel mail-read">${sel ? mailReader(sel) : `<div class="empty">${icon('mail', 'ico-lg')}<p>Wählen Sie eine Nachricht aus.</p></div>`}</div>
+          <div class="panel mail-list">${st.messages.length ? st.messages.map(mailItem).join('') : empty(inbox ? 'Ihr Posteingang ist leer.' : 'Noch keine gesendeten Nachrichten.', 'mail', nextStep('Nachricht schreiben', 'compose', {}, 'edit'))}</div>
+          <div class="panel mail-read">${sel ? mailReader(sel) : empty('Wählen Sie links eine Nachricht aus.', 'mail')}</div>
         </div>`;
   },
 };
@@ -1387,6 +1397,6 @@ views.board = {
           <div><h1 class="page-title">Team-Pinnwand</h1><p class="page-sub">Interne Notizen, Übergaben und Hinweise für die ganze Kanzlei.</p></div>
           <div class="page-actions"><button class="btn-gold btn-md" data-action="board-new">${icon('plus')}<span>Neue Notiz</span></button></div>
         </div>
-        ${st.board.length ? `<div class="board-grid">${st.board.map(noteCard).join('')}</div>` : `<div class="panel">${empty('Noch keine Notizen. Heften Sie die erste an!', 'pin')}</div>`}`;
+        ${st.board.length ? `<div class="board-grid">${st.board.map(noteCard).join('')}</div>` : `<div class="panel">${empty('Noch keine Notizen an der Pinnwand.', 'pin', nextStep('Notiz anheften', 'board-new'))}</div>`}`;
   },
 };

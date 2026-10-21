@@ -214,7 +214,7 @@ function memberCardHtml(m) {
   return `<div class="list-row wrap">
       <div class="main"><div class="title flex flex-wrap items-center gap-2">${esc(m.name)} ${memberBadge({ kind: m.kind, name: m.tierName })}${badge(sl, sc)}</div>
         <div class="meta">${esc(m.email)} · ${fmtPct(m.discountPct)} % · ${m.expiresAt ? `bis ${esc(fmtDateOnly(String(m.expiresAt).slice(0, 10)))}` : 'unbefristet'} · seit ${esc(fmtDateOnly(String(m.startsAt).slice(0, 10)))}${m.discordLinked ? '' : ' · <span title="Ohne verknüpftes Discord keine Rolle und keine Erinnerung">kein Discord</span>'}</div>
-        <div class="meta">Gezahlt ${money(m.pricePaid)} · ${m.usage.invoices} Rechnung(en) · Wert der Leistungen ${money(m.usage.workValue)} · abgedeckt ${money(m.usage.covered)}${over ? ` ${badge('Arbeit übersteigt Preis', 'amber')}` : ''}</div>
+        <div class="meta">Gezahlt ${money(m.pricePaid)} · ${nWord(m.usage.invoices, 'Rechnung', 'Rechnungen')} · Wert der Leistungen ${money(m.usage.workValue)} · abgedeckt ${money(m.usage.covered)}${over ? ` ${badge('Arbeit übersteigt Preis', 'amber')}` : ''}</div>
         ${m.status !== 'aktiv' && m.endReason ? `<div class="meta">Grund: ${esc(m.endReason)}${m.endedBy ? ` (${esc(m.endedBy)})` : ''}</div>` : ''}
         ${m.note ? `<div class="meta">Notiz: ${esc(m.note)}</div>` : ''}</div>
       <div class="flex flex-wrap gap-2 shrink-0">
@@ -554,7 +554,7 @@ function concernList(d) {
   const all = d.scope === 'all';
   const rows = d.concerns.filter((k) => concernMatches(k) && (!all || st.concernGroup === 'alle' || k.authorGroup === st.concernGroup));
   if (!rows.length) {
-    return empty(d.concerns.length ? 'Keine Anliegen für diese Auswahl.' : all ? 'Noch keine Anliegen eingegangen.' : 'Sie haben noch kein Anliegen eingereicht.', 'chat');
+    return empty(d.concerns.length ? 'Keine Anliegen für diese Auswahl.' : all ? 'Noch keine Anliegen eingegangen.' : 'Sie haben noch kein Anliegen eingereicht.', 'chat', d.concerns.length || all ? '' : nextStep('Anliegen einreichen', 'concern-new'));
   }
   return rows
     .map((k) => {

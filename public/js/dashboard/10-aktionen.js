@@ -53,6 +53,10 @@ const actions = {
     st.caseMine = !st.caseMine;
     renderView();
   },
+  'cases-filter-reset': () => {
+    Object.assign(st, { caseFilter: 'aktiv', caseQuery: '', caseMine: false });
+    renderView();
+  },
   // Mehrfachauswahl in der Aktenliste
   'case-select': () => {
     st.caseSel = caseSelecting() ? null : new Set();
@@ -781,7 +785,7 @@ const actions = {
   },
   'tier-delete': async (el) => {
     const t = st.vip.tiers.find((x) => x.id === Number(el.dataset.id));
-    if (!t || !(await askDelete(`Stufe „${t.name}“ löschen?`, t.activeMembers ? `${t.activeMembers} aktive Mitgliedschaft(en) behalten Name und Rabatt, lassen sich aber nicht mehr verlängern. Tipp: stattdessen „Aktiv“ abwählen.` : 'Die Stufe kann danach nicht mehr vergeben werden.'))) return;
+    if (!t || !(await askDelete(`Stufe „${t.name}“ löschen?`, t.activeMembers ? `${t.activeMembers === 1 ? '1 aktive Mitgliedschaft behält' : `${t.activeMembers} aktive Mitgliedschaften behalten`} Name und Rabatt, lassen sich aber nicht mehr verlängern. Tipp: stattdessen „Aktiv“ abwählen.` : 'Die Stufe kann danach nicht mehr vergeben werden.'))) return;
     await api.del(`/api/memberships/tiers/${t.id}`);
     toast('Stufe gelöscht.');
     await refreshBehind();
@@ -1091,7 +1095,7 @@ const actions = {
     st.bot = r;
     renderView();
     const x = r.stats;
-    toast(`${x.added} Rolle(n) an ${x.changed} ${bots ? 'Bot(s)' : 'Mitglied(er)'} vergeben${x.skipped ? ` · ${x.skipped} warten noch auf die Regel-Bestätigung` : ''}${x.errors.length ? ` · ${x.errors.length} Fehler (siehe Übersicht)` : ''}.`, x.errors.length ? 'error' : 'ok');
+    toast(`${nWord(x.added, 'Rolle', 'Rollen')} an ${bots ? nWord(x.changed, 'Bot', 'Bots') : nWord(x.changed, 'Mitglied', 'Mitglieder')} vergeben${x.skipped ? ` · ${x.skipped} warten noch auf die Regel-Bestätigung` : ''}${x.errors.length ? ` · ${x.errors.length} Fehler (siehe Übersicht)` : ''}.`, x.errors.length ? 'error' : 'ok');
   },
   'msg-new': () => {
     st.msgId = null;
@@ -1153,7 +1157,7 @@ const actions = {
     const created = withLogin ? picked.filter((m) => m.account === 'keins').length : 0;
     const existing = withLogin ? picked.filter((m) => m.account === 'vorhanden').length : 0;
     const extra = withLogin ? ` Dazu bekommt jeder seinen Website-Zugang: ${existing} vorhandene Konten (Passwort bleibt), ${created} neue Mandantenkonten mit Einmal-Passwort.` : '';
-    if (!(await ask(`„${t.name}“ geht als Direktnachricht an ${picked.length} Mitglied${picked.length === 1 ? '' : 'er'} mit der Rolle @${p.role.name} – nacheinander, etwa ${Math.max(1, Math.ceil((picked.length * 1.5) / 60))} Minute(n).${extra}`, { title: 'Direktnachrichten senden?', confirmText: 'Senden' }))) return;
+    if (!(await ask(`„${t.name}“ geht als Direktnachricht an ${picked.length} Mitglied${picked.length === 1 ? '' : 'er'} mit der Rolle @${p.role.name} – nacheinander, etwa ${nWord(Math.max(1, Math.ceil((picked.length * 1.5) / 60)), 'Minute', 'Minuten')}.${extra}`, { title: 'Direktnachrichten senden?', confirmText: 'Senden' }))) return;
     el.disabled = true;
     try {
       const r = await api.post(`/api/bot/messages/${t.id}/dm`, { roleId: p.role.id, withLogin, recipients });
@@ -1178,7 +1182,7 @@ const actions = {
   'msg-delete': async (el) => {
     const t = st.botMessages.templates.find((x) => x.id === Number(el.dataset.id));
     if (!t) return;
-    if (!(await askDelete(`„${t.name}“ löschen?`, `${t.jobs.length ? `Auch die ${t.jobs.length} Automatik(en) dieser Vorlage enden. ` : ''}Bereits gesendete Nachrichten bleiben in Discord.`, 'Löschen'))) return;
+    if (!(await askDelete(`„${t.name}“ löschen?`, `${t.jobs.length ? `${t.jobs.length === 1 ? 'Auch die Automatik dieser Vorlage endet. ' : `Auch die ${t.jobs.length} Automatiken dieser Vorlage enden. `}` : ''}Bereits gesendete Nachrichten bleiben in Discord.`, 'Löschen'))) return;
     msgRefresh(await api.del(`/api/bot/messages/${t.id}`));
     renderView();
     toast('Vorlage gelöscht.');

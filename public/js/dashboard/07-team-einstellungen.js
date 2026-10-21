@@ -93,7 +93,7 @@ views.team = {
           <div><h1 class="page-title">Team-Verwaltung</h1><p class="page-sub">Teammitglieder hinzufügen, umbenennen, Ränge ändern oder entfernen – live auf der Website.</p></div>
           <div class="page-actions"><a href="/#team" target="_blank" rel="noopener" class="btn-outline btn-md">${icon('globe', 'ico-sm')}<span>Website ansehen</span></a><button class="btn-gold btn-md" data-action="team-new">${icon('plus')}<span>Mitglied hinzufügen</span></button></div>
         </div>
-        ${st.team.length ? `<div class="stack">${st.team.map((m, i) => memberCard(m, i, st.team.length)).join('')}</div>` : `<div class="panel">${empty('Noch keine Teammitglieder.', 'users')}</div>`}`;
+        ${st.team.length ? `<div class="stack">${st.team.map((m, i) => memberCard(m, i, st.team.length)).join('')}</div>` : `<div class="panel">${empty('Noch keine Teammitglieder.', 'users', nextStep('Mitglied hinzufügen', 'team-new'))}</div>`}`;
   },
 };
 

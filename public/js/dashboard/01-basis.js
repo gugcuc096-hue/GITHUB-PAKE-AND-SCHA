@@ -409,9 +409,15 @@ const emptyArt = (ico) =>
     <circle class="ea-ring" cx="60" cy="38" r="27" pathLength="1"/><circle class="ea-ring ea-ring2" cx="60" cy="38" r="33" pathLength="1"/>
     <path class="ea-spark" d="M96 14l1.6 4.4L102 20l-4.4 1.6L96 26l-1.6-4.4L90 20l4.4-1.6zM24 52l1.2 3.2 3.2 1.2-3.2 1.2L24 61l-1.2-3.2-3.2-1.2 3.2-1.2z"/>
     <g class="ea-icon" transform="translate(45 23) scale(1.25)"><path d="${ICONS[ico] || ICONS.folder}"/></g></svg>`;
-const empty = (text, ico = 'folder') => `<div class="empty">${emptyArt(ico)}<p>${esc(text)}</p></div>`;
+/** Alle Leerzustände gleich gebaut: Zeichnung, ein kurzer Satz und – wo es einen gibt – der nächste Schritt als Knopf. */
+const empty = (text, ico = 'folder', next = '') => `<div class="empty">${emptyArt(ico)}<p>${esc(text)}</p>${next ? `<div class="empty-next">${next}</div>` : ''}</div>`;
 /** Leerer Kasten in der Übersicht: nur eine schmale Zeile, damit das Wichtige nach oben rückt. */
-const emptyLine = (text, ico = 'check') => `<p class="empty-line">${icon(ico, 'ico-sm')}<span>${esc(text)}</span></p>`;
+const emptyLine = (text, ico = 'check', next = '') => `<p class="empty-line">${icon(ico, 'ico-sm')}<span>${esc(text)}</span>${next ? `<span class="empty-next">${next}</span>` : ''}</p>`;
+/** Anzahl mit passendem Wort: nWord(1, 'Rechnung', 'Rechnungen') → „1 Rechnung“, nWord(3, …) → „3 Rechnungen“ (statt „Rechnung(en)“). */
+const nWord = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+/** Knopf „nächster Schritt“ für Leerzustände, z. B. nextStep('Neue Akte', 'new-case'). */
+const nextStep = (label, action, data = {}, ico = 'plus') =>
+  `<button class="btn-outline btn-sm" data-action="${action}"${Object.entries(data).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('')}>${icon(ico, 'ico-sm')}<span>${esc(label)}</span></button>`;
 const pad = (n) => String(n).padStart(2, '0');
 const dayKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const byStart = (a, b) => parseDate(a.startsAt) - parseDate(b.startsAt);

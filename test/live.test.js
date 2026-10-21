@@ -33,7 +33,10 @@ describe('Live-Aktualisierung', () => {
             const block = buf.slice(0, i);
             buf = buf.slice(i + 2);
             const line = block.split('\n').find((l) => l.startsWith('data: '));
-            if (line) s.events.push(JSON.parse(line.slice(6)));
+            if (!line) continue;
+            const ev = JSON.parse(line.slice(6));
+            if (ev.k === 'hello') s.hello = ev; // Fassung des Servers (für den Update-Hinweis) – keine Änderungsmeldung
+            else s.events.push(ev);
           }
         }
       } catch {
@@ -70,6 +73,14 @@ describe('Live-Aktualisierung', () => {
   it('ohne Anmeldung keine Live-Verbindung', async () => {
     const res = await fetch(`${server.base}/api/events`);
     assert.equal(res.status, 401);
+  });
+
+  it('beim Verbinden meldet der Server seine Fassung (Grundlage des Hinweises „Neue Version“)', async () => {
+    const s = await listen(as.anwalt, 'h1');
+    await settle();
+    assert.match(s.hello?.v || '', /^[0-9a-f]{8,}$/);
+    assert.equal(s.events.length, 0, 'die Fassung ist keine Änderungsmeldung');
+    s.close();
   });
 
   it('Mandant: nur eigene Akten; Kanzlei: Akte und Bereich; der ändernde Tab nicht', async () => {

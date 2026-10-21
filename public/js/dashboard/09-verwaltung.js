@@ -59,7 +59,7 @@ views.cooperations = {
           Erstellt jemand eine Rechnung zu einer Akte, liest der Bot die Discord-Rollen des Mandanten (verknüpftes Discord bzw. „Discord-Ticket beitreten“) und setzt den Kooperationsrabatt automatisch ein.
           Ohne Discord: Mandantenkonten von Hand zuordnen – oder die Kooperation in der Rechnung selbst auswählen.
         </div>
-        ${d.cooperations.length ? `<div class="stack">${d.cooperations.map(coopCard).join('')}</div>` : `<div class="panel">${empty('Noch keine Kooperationen. „Neue Kooperation“ legt die erste an.', 'tag')}</div>`}`;
+        ${d.cooperations.length ? `<div class="stack">${d.cooperations.map(coopCard).join('')}</div>` : `<div class="panel">${empty('Noch keine Kooperationen.', 'tag', nextStep('Neue Kooperation', 'coop-new'))}</div>`}`;
   },
 };
 
@@ -95,7 +95,7 @@ async function loadCoopRoles(selected) {
     const { roles } = await api.get(`/api/cooperations/roles?fresh=1${guildId ? `&guildId=${encodeURIComponent(guildId)}` : ''}`);
     const unknown = [...chosen].filter((id) => !roles.some((r) => r.id === id));
     box.innerHTML = roles.length || unknown.length
-      ? `<div class="label">Rolle(n) auswählen – wer eine davon hat, bekommt den Rabatt</div><div class="chip-row" style="flex-wrap:wrap">${[
+      ? `<div class="label">Rollen auswählen – wer eine davon hat, bekommt den Rabatt</div><div class="chip-row" style="flex-wrap:wrap">${[
           ...roles.map((r) => `<label class="check chip"><input type="checkbox" name="role" value="${esc(r.id)}" ${chosen.has(r.id) ? 'checked' : ''}> @${esc(r.name)}</label>`),
           ...unknown.map((id) => `<label class="check chip"><input type="checkbox" name="role" value="${esc(id)}" checked> ${esc(id)} <span class="text-red-300">(nicht gefunden)</span></label>`),
         ].join('')}</div>`
@@ -681,7 +681,7 @@ function positionsPanel() {
               <div class="flex gap-1 shrink-0"><button class="icon-btn sm" data-action="position-edit" data-id="${p.id}" aria-label="Bearbeiten">${icon('edit', 'ico-sm')}</button><button class="icon-btn sm" data-action="position-delete" data-id="${p.id}" aria-label="Löschen">${icon('trash', 'ico-sm')}</button></div></div>`
           )
           .join('')
-      : empty('Keine Stellen ausgeschrieben. Initiativbewerbungen sind trotzdem möglich.', 'briefcase')}
+      : empty('Keine Stellen ausgeschrieben – Initiativbewerbungen sind trotzdem möglich.', 'briefcase', nextStep('Stelle ausschreiben', 'position-new'))}
     </div>`;
 }
 

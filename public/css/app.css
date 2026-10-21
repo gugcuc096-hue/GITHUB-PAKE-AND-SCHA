@@ -486,7 +486,8 @@ a:hover > .brand-logo { transform: scale(1.04); }
 .action-grid > * { justify-content: center; }
 @media (max-width: 639px) {
   .page-actions { width: 100%; }
-  .page-actions > * { flex: 1; }
+  /* gleich breit, solange die Beschriftung passt – sonst untereinander statt abgeschnitten */
+  .page-actions > * { flex: 1 1 auto; justify-content: center; white-space: nowrap; }
 }
 .toolbar { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1rem; }
 @media (min-width: 900px) { .toolbar { flex-direction: row; align-items: center; } .toolbar .search { width: 320px; flex-shrink: 0; } }
@@ -2154,7 +2155,7 @@ mark.hl-mark { color: inherit; padding: 0 0.1em; margin: 0 -0.1em; border-radius
 .sys-dot { width: 8px; height: 8px; border-radius: 999px; background: #f59e0b; flex-shrink: 0; animation: hr-pulse 1.4s ease-in-out infinite; }
 
 /* Kopieren mit einem Klick: Aktenzeichen im Aktenkopf, Gerichts-/FiveNet-Aktenzeichen, Links */
-button.copy-az { background: none; border: 0; padding: 0; cursor: copy; border-radius: 4px; }
+button.copy-az { background-color: transparent; border: 0; padding: 0; cursor: copy; border-radius: 4px; }
 button.copy-az:hover { text-decoration: underline dotted rgba(212, 175, 55, 0.6); text-underline-offset: 3px; }
 .copyable { display: inline-flex; align-items: center; gap: 0.3rem; }
 .copy-btn { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; border: 0; background: transparent; color: var(--text-dim); cursor: pointer; flex-shrink: 0; }
@@ -2182,3 +2183,30 @@ tr:not(:hover) .star-btn:not(.on) { opacity: 0.25; }
 
 /* @Erwähnung in internen Notizen */
 .mention { color: var(--gold-light); background: rgba(212, 175, 55, 0.12); border-radius: 4px; padding: 0 0.2em; font-weight: 500; }
+
+/* Lesefortschritt (lange Akten, Verträge, Wiki): dünne goldene Linie oben */
+.read-bar { position: fixed; top: 0; left: 0; right: 0; height: 2px; z-index: 95; pointer-events: none; transform-origin: left center; transform: scaleX(0); opacity: 0;
+  background: linear-gradient(90deg, rgba(212, 175, 55, 0.55), #f3dc8c); box-shadow: 0 0 8px rgba(212, 175, 55, 0.45); transition: opacity 0.3s ease; }
+
+.inv-sums { display: flex; flex-wrap: wrap; gap: 0.4rem 1.4rem; margin: -0.2rem 0 0.6rem; font-size: 0.8rem; color: var(--text-muted); }
+.inv-sums b { font-family: var(--font-mono, 'JetBrains Mono', monospace); font-weight: 600; color: var(--gold-light); margin-left: 0.35rem; font-variant-numeric: lining-nums tabular-nums; }
+
+/* C5: Übersicht – ein kurzer Kasten neben einem langen wird so hoch wie sein Inhalt und schmaler */
+@media (min-width: 1024px) {
+  .grid-2.ov-row.ov-fit-l { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-items: start; }
+  .grid-2.ov-row.ov-fit-r { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; }
+}
+/* C6: Mandantenportal – Kennzahlen ohne Inhalt als schmale Zeile, Kacheln mit Inhalt passend breit */
+.kpi-grid.kpi-grid-1 { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 640px) { .kpi-grid.kpi-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 640px) { .kpi-grid.kpi-grid-1 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.kpi-quiet-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.5rem; margin: 0 0 1.25rem; }
+@media (min-width: 1100px) { .kpi-quiet-grid { gap: 0.75rem; } }
+.kpi.kpi-quiet { display: flex; flex-wrap: wrap; align-items: center; gap: 0.15rem 0.5rem; padding: 0.55rem 0.9rem; min-height: 0; }
+.kpi-quiet > .ico-sm { color: var(--text-dim); flex: none; }
+.kpi-quiet .kpi-label { display: inline; }
+.kpi-quiet .kpi-sub { margin: 0 0 0 auto; min-height: 0; color: var(--text-dim); }
+.kpi-grid + .kpi-quiet-grid { margin-top: -0.5rem; }
+/* C8: Leerzustände – der nächste Schritt direkt darunter */
+.empty .empty-next { margin-top: 0.85rem; display: flex; justify-content: center; flex-wrap: wrap; gap: 0.5rem; }
+.empty-line .empty-next { margin-left: auto; }

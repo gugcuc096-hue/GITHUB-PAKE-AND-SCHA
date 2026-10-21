@@ -60,7 +60,7 @@ function paymentRejectModal(id, number) {
 
 function invoiceTable(rows) {
   const staff = isStaff();
-  if (!rows.length) return empty(st.invoices.length ? 'Keine Dokumente für diese Auswahl.' : staff ? 'Noch keine Rechnungen erstellt.' : 'Es liegen keine Rechnungen vor.', 'receipt');
+  if (!rows.length) return empty(st.invoices.length ? 'Keine Dokumente für diese Auswahl.' : staff ? 'Noch keine Rechnungen erstellt.' : 'Es liegen keine Rechnungen vor.', 'receipt', staff && !st.invoices.length ? nextStep('Neue Rechnung', 'new-invoice') : '');
   return `<div class="tbl-wrap"><table class="tbl tbl-cards inv-tbl">
       <thead><tr><th>Dokument</th><th>Empfänger</th><th>Akte</th><th style="text-align:right">Betrag</th><th>Status</th><th>Datum</th><th><span class="sr-only">Aktionen</span></th></tr></thead>
       <tbody>${lazyRows(
@@ -116,7 +116,7 @@ views.invoices = {
         ${staff ? `<div class="kpi-grid kpi-grid-3">
           <div class="panel kpi"><div class="kpi-label">${icon('clock', 'ico-sm')}Offene Forderungen</div><div class="kpi-value">${money(sum('offen'))}</div><div class="kpi-sub">${count('offen')} offen</div></div>
           <div class="panel kpi"><div class="kpi-label">${icon('alert', 'ico-sm')}Überfällig</div><div class="kpi-value">${money(sum('ueberfaellig'))}</div><div class="kpi-sub">${count('ueberfaellig')} überfällig</div></div>
-          <div class="panel kpi"><div class="kpi-label">${icon('check', 'ico-sm')}Bezahlt</div><div class="kpi-value">${money(sum('bezahlt'))}</div><div class="kpi-sub">${count('bezahlt')} Dokument(e)</div></div>
+          <div class="panel kpi"><div class="kpi-label">${icon('check', 'ico-sm')}Bezahlt</div><div class="kpi-value">${money(sum('bezahlt'))}</div><div class="kpi-sub">${nWord(count('bezahlt'), 'Dokument', 'Dokumente')}</div></div>
         </div>` : ''}
         <div class="chip-row mb-4">${[['alle', 'Alle'], ['offen', 'Offen'], ...(count('gemeldet') ? [['gemeldet', staff ? 'Zahlung gemeldet' : 'Gemeldet']] : []), ...(count('ueberfaellig') ? [['ueberfaellig', 'Überfällig']] : []), ['bezahlt', 'Bezahlt'], ['storniert', 'Storniert']]
         .map(([k, l]) => `<button class="chip ${f === k ? 'active' : ''}" data-action="inv-filter" data-value="${k}">${l} <span class="chip-count">${count(k)}</span></button>`)

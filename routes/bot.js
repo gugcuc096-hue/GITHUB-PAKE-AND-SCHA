@@ -140,7 +140,7 @@ router.put(
       r.id = r.id || crypto.randomUUID().slice(0, 8);
     }
     bot.saveJson('bot_role_connections', d);
-    logActivity(req.user, 'Discord-Bot: Role Connections gespeichert', 'settings', null, `${d.rules.length} Regel(n), ${d.enabled ? 'eingeschaltet' : 'ausgeschaltet'}`);
+    logActivity(req.user, 'Discord-Bot: Role Connections gespeichert', 'settings', null, `${d.rules.length} ${d.rules.length === 1 ? 'Regel' : 'Regeln'}, ${d.enabled ? 'eingeschaltet' : 'ausgeschaltet'}`);
     bot.refresh();
     if (d.enabled) bot.scan('nach Speichern').catch(() => {});
     res.json(overview());
@@ -253,7 +253,7 @@ router.post(
     const stats = await bot.joinRolesToAll(d.target);
     if (!stats) return res.status(502).json({ error: 'Discord war nicht erreichbar – bitte später erneut versuchen.' });
     if (stats.error) return res.status(502).json({ error: stats.error });
-    logActivity(req.user, 'Discord-Bot: Join Roles an alle vergeben', 'settings', null, `${d.target === 'bots' ? 'Bots' : 'Mitglieder'}: ${stats.added} Rolle(n) an ${stats.changed} vergeben`);
+    logActivity(req.user, 'Discord-Bot: Join Roles an alle vergeben', 'settings', null, `${d.target === 'bots' ? 'Bots' : 'Mitglieder'}: ${stats.added} ${stats.added === 1 ? 'Rolle' : 'Rollen'} an ${stats.changed} vergeben`);
     res.json({ stats, ...overview() });
   })
 );
