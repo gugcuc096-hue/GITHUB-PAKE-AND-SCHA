@@ -1219,7 +1219,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
 
         const { ctx, page, problems, settle } = await open(device);
         await login(page, TEAM.admin, ksrv.base);
-        // Übersicht: liegengebliebene Akte wie in der Aktenliste („🕓 vor 8 Tagen“ + Streifen, kein Etikett), Aufgaben mit
+        // Übersicht: liegengebliebene Akte wie in der Aktenliste („🕓 vor 8 Tagen“, kein Etikett, kein Streifen), Aufgaben mit
         // Fälligkeit und Knöpfen in einer Zeile, leere Pinnwand als schmale Zeile, Seite so breit wie die Aktenliste
         await page.goto(`${ksrv.base}/dashboard#overview`);
         await page.waitForSelector('#content .attention .list-row.row-idle');
@@ -1239,7 +1239,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         });
         assert.equal(ov.idle, 'vor 8 Tagen');
         assert.equal(ov.tag, false, 'kein Etikett „liegt seit …“ in der Übersicht');
-        assert.match(ov.stripe, /rgb\(245, 158, 11\)/, 'Streifen wie in der Aktenliste');
+        assert.equal(ov.stripe, 'none', 'kein farbiger Streifen am Rand');
         assert.ok(ov.oneLine, 'Fälligkeit und Knöpfe der Aufgabe in einer Zeile');
         assert.deepEqual(ov.quiet, ['Pinnwand', 'Fristen & Termine'], 'leere Pinnwand und leere Fristen als schmale Zeile, offene Anfrage (Lena Berg) als Kasten');
         assert.equal(ov.maxWidth, '1760px', 'alle Seiten gleich breit');
@@ -1247,7 +1247,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.waitForSelector('#caseList tr.row');
         await settle();
         // Aktenliste: kein Etikett unter dem Titel – „Aktenzeichen · Rechtsgebiet“ in einer Zeile, liegengeblieben steht in
-        // „Letzte Aktivität“ (Bernstein, Uhr) und als Streifen am Zeilenanfang; eigener Filter
+        // „Letzte Aktivität“ (Bernstein, Uhr), ohne Streifen am Zeilenanfang; eigener Filter
         const qRow = `#caseList tr.row[data-id="${quiet.id}"]`;
         assert.doesNotMatch(await page.textContent(`${qRow} .td-main`), /liegt seit/);
         assert.match((await page.textContent(`${qRow} .case-meta`)).trim(), /^PS-\d{4}-\d{4}\s*·\s*Strafrecht$/);
@@ -1263,17 +1263,14 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         const list = await page.evaluate((sel) => {
           const row = document.querySelector(sel);
           const lead = row.querySelector('.who-lead');
-          const card = getComputedStyle(row).display === 'block'; // Handy: Zeilen als Karten, Streifen am Kartenrand
           return {
-            stripe: getComputedStyle(card ? row : row.cells[0]).boxShadow,
-            otherStripe: [...document.querySelectorAll('#caseList tr.row:not(.row-idle)')].map((r) => getComputedStyle(r).boxShadow + getComputedStyle(r.cells[0]).boxShadow).join(''),
+            stripes: [...document.querySelectorAll('#caseList tr.row')].map((r) => getComputedStyle(r).boxShadow + getComputedStyle(r.cells[0]).boxShadow + getComputedStyle(r.cells[0], '::before').content).join(''),
             leadLines: lead.getClientRects().length,
             coBelow: lead.parentElement.lastElementChild.getBoundingClientRect().top >= lead.getBoundingClientRect().bottom - 1,
             maxWidth: getComputedStyle(document.querySelector('#content')).maxWidth,
           };
         }, qRow);
-        assert.match(list.stripe, /rgb\(245, 158, 11\)/, `Streifen am Zeilenanfang (${list.stripe})`);
-        assert.doesNotMatch(list.otherStripe, /rgb\(245, 158, 11\)/, 'kein Streifen bei aktiven Akten');
+        assert.doesNotMatch(list.stripes, /rgb\((245, 158, 11|239, 68, 68)\)/, 'weder volle Kante noch Reiter am Zeilenanfang');
         // Handy-Karte: Haupt- und Mitanwälte als ein Block rechts – früher zerriss der Name mitten in der Karte
         if (device === PHONE) assert.equal(list.leadLines, 1, 'federführender Anwalt in einer Zeile');
         assert.ok(list.coBelow, 'Mitanwälte unter dem federführenden Anwalt');
@@ -2738,7 +2735,7 @@ describe('Browser: Aktenmappe, verknüpfte Akten, Mehrfachauswahl, Kanzlei-Lager
       await page.click(`#caseList tr[data-id="${B.id}"]`);
       await page.waitForFunction(() => /2 Akten ausgewählt/.test(document.querySelector('.bulk-bar')?.textContent || ''));
       await page.selectOption('.bulk-sel[data-change="bulk-priority"]', '4');
-      await page.waitForFunction(() => document.querySelectorAll('#caseList tr.tab-p4').length === 2);
+      await page.waitForFunction(() => [...document.querySelectorAll('#caseList tr[data-id] td[data-label="Priorität"]')].filter((td) => /Kritisch/.test(td.textContent)).length === 2);
       await page.click('[data-action="case-select"]');
 
       // Aktendeckel mit Reiter; Akte verknüpfen über „Mehr“
