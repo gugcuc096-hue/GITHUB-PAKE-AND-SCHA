@@ -216,7 +216,6 @@ input[type="datetime-local"].field, input[type="date"].field { color-scheme: dar
 .tbl tr.row { cursor: pointer; transition: background 0.15s ease; }
 .tbl tr.row:hover td { background: rgba(212, 175, 55, 0.05); }
 /* Liegengebliebene Akte: dünner Streifen in Bernstein am Zeilenanfang (am Handy am Kartenrand) */
-.tbl tr.row-idle td:first-child { box-shadow: inset 3px 0 0 #f59e0b; }
 .tbl tr.is-selected td { background: rgba(212, 175, 55, 0.09); }
 .tbl tr.is-selected td:first-child { box-shadow: inset 3px 0 0 var(--gold-500); }
 .td-actions { text-align: right; white-space: nowrap; }
@@ -237,8 +236,6 @@ input[type="datetime-local"].field, input[type="date"].field { color-scheme: dar
   .tbl-cards tr.is-selected { border-color: var(--gold-500); }
   .tbl-cards tr.is-selected td { background: transparent; }
   .tbl-cards tr.is-selected td:first-child { box-shadow: none; }
-  .tbl-cards tr.row-idle td:first-child { box-shadow: none; }
-  .tbl-cards tr.row-idle { box-shadow: inset 3px 0 0 #f59e0b; }
 }
 
 /* ---------------------------------------------------------------- Aktenfortschritt */
@@ -523,7 +520,6 @@ a:hover > .brand-logo { transform: scale(1.04); }
 }
 .list-row:last-child { border-bottom: 0; }
 /* Liegengebliebene Akte (Übersicht → Handlungsbedarf): Streifen wie in der Aktenliste */
-.list-row.row-idle { box-shadow: inset 3px 0 0 #f59e0b; padding-left: 0.9rem; }
 /* Übersicht: leerer Bereich als schmale Zeile statt großem leerem Kasten; ein einzelner Kasten über die volle Breite */
 .quiet-rows { display: grid; gap: 0.6rem; margin-top: 1rem; }
 @media (min-width: 1024px) { .quiet-rows { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1.25rem; } }
@@ -1977,11 +1973,6 @@ kbd { display: inline-block; min-width: 1.6rem; padding: 0.12rem 0.45rem; border
 .att-grid-sm { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
 .linked-ev { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.9rem; padding-top: 0.9rem; border-top: 1px dashed var(--gold-hairline); }
 .linked-ev-head { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.45rem; font-size: 0.75rem; color: var(--text-dim); }
-/* Prioritäts-Reiter in der Aktenliste: kurze Kante oben links (Hoch/Kritisch) – die volle Kante bleibt „liegengeblieben“ */
-.tbl tr.has-tab td:first-child { position: relative; }
-.tbl tr.has-tab td:first-child::before { content: ''; position: absolute; left: 0; top: 0.55rem; width: 4px; height: 1.15rem; border-radius: 0 3px 3px 0; background: #f59e0b; }
-.tbl tr.tab-p4 td:first-child::before { background: #ef4444; }
-@media (max-width: 767px) { .tbl-cards tr.has-tab { position: relative; } .tbl-cards tr.has-tab td:first-child::before { left: -0.9rem; } }
 /* Textmarker in Gold (Treffer aus der Suche) */
 mark.hl-mark { color: inherit; padding: 0 0.1em; margin: 0 -0.1em; border-radius: 3px; background: linear-gradient(transparent 12%, rgba(212, 175, 55, 0.38) 12%, rgba(212, 175, 55, 0.38) 88%, transparent 88%) no-repeat 0 0 / 100% 100%; }
 /* Schwärzen */

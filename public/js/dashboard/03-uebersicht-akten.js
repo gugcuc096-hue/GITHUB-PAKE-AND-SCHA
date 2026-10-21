@@ -468,13 +468,13 @@ function caseTable() {
         : empty('Keine Akten für diese Auswahl.', 'folder', nextStep('Filter zurücksetzen', 'cases-filter-reset', {}, 'refresh'))
       :empty(staff ? 'Noch keine Akten angelegt.' : 'Sie haben noch kein Mandat eingereicht.', 'folder', nextStep(staff ? 'Neue Akte' : 'Mandat einreichen', 'new-case'));
   }
-  // Je Akte zwei Zeilen: „Aktenzeichen · Rechtsgebiet“, darunter der Titel. Liegengebliebene Akten: Streifen am Zeilenanfang
-  // und „Letzte Aktivität“ in Bernstein.
+  // Je Akte zwei Zeilen: „Aktenzeichen · Rechtsgebiet“, darunter der Titel. Liegengebliebene Akten:
+  // „Letzte Aktivität“ in Bernstein (kein Streifen am Rand).
   return `<div class="tbl-wrap"><table class="tbl tbl-cards">
       <thead><tr>${selecting ? `<th class="th-check"><button type="button" class="sel-all" data-action="case-select-all" aria-label="Alle sichtbaren Akten auswählen">${rows.length && rows.every((c) => st.caseSel.has(c.id)) ? 'Keine' : 'Alle'}</button></th>` : ''}<th>Akte</th>${staff ? '<th>Mandant</th>' : ''}<th>Zuständig</th>${staff ? '<th>Priorität</th>' : ''}<th>Status</th><th>Letzte Aktivität</th></tr></thead>
       <tbody>${lazyRows(
         rows,
-        (c) => `<tr class="row${c.idleDays ? ' row-idle' : ''}${staff && c.priority >= 3 && c.status !== 'geschlossen' ? ` has-tab tab-p${c.priority}` : ''}${selecting && st.caseSel.has(c.id) ? ' is-picked' : ''}" data-action="${selecting ? 'case-pick' : 'open-case'}" data-id="${c.id}"${selecting ? ` aria-selected="${st.caseSel.has(c.id)}"` : ''}>
+        (c) => `<tr class="row${c.idleDays ? ' row-idle' : ''}${selecting && st.caseSel.has(c.id) ? ' is-picked' : ''}" data-action="${selecting ? 'case-pick' : 'open-case'}" data-id="${c.id}"${selecting ? ` aria-selected="${st.caseSel.has(c.id)}"` : ''}>
           ${selecting ? `<td class="td-check"><span class="pick-box" aria-hidden="true">${icon('check', 'ico-sm')}</span></td>` : ''}<td class="td-main"><div class="case-meta"><span class="font-mono text-gold text-xs">${esc(c.caseNumber)}</span><span class="case-dot" aria-hidden="true">·</span><span>${esc(AREAS[c.area] || c.area)}</span>${staff ? '' : caseLevelBadge(c)}</div>
             <div class="font-medium case-title-line">${staff ? starBtn(c) : ''}${esc(c.title)}${c.chatUnread ? ` <span class="chat-new" title="Neue Nachrichten">${icon('chat', 'ico-sm')}${c.chatUnread}</span>` : ''}</div></td>
           ${staff ? `<td data-label="Mandant">${esc(c.clientName)}${c.membership ? `<div class="mt-1">${memberBadge(c.membership)}</div>` : ''}</td>` : ''}
