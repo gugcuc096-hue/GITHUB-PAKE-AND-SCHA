@@ -350,6 +350,52 @@ document.addEventListener('input', (e) => {
   }
 });
 
+/*
+ * Zahlenfelder bekommen eigene Tasten − / + im Stil der Kanzlei (die Systempfeile sind ausgeblendet). Die Tasten lösen
+ * dasselbe change-Ereignis aus wie Tippen, also laufen gespeicherte Aktionen unverändert weiter.
+ */
+function enhanceNumbers(scope) {
+  if (!scope.querySelectorAll) return;
+  const fields = [...scope.querySelectorAll('input[type="number"]:not([data-stepper])')];
+  if (scope.matches?.('input[type="number"]:not([data-stepper])')) fields.push(scope);
+  for (const input of fields) {
+    input.dataset.stepper = '1';
+    const wrap = document.createElement('span');
+    wrap.className = `num-step${input.closest('.chg-est, .svc, .inv-fee-row') || input.classList.contains('svc-qty') ? ' is-compact' : ''}`;
+    const btn = (label, dir) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'num-btn';
+      b.tabIndex = -1;
+      b.dataset.dir = String(dir);
+      b.setAttribute('aria-label', dir < 0 ? 'Einmal weniger' : 'Einmal mehr');
+      b.textContent = label;
+      return b;
+    };
+    input.replaceWith(wrap);
+    wrap.append(btn('−', -1), input, btn('+', 1));
+  }
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest && e.target.closest('.num-btn');
+  if (!b) return;
+  e.preventDefault(); // innerhalb eines Auswahl-Kastens: nicht zusätzlich das Kästchen anhaken
+  const input = b.parentElement.querySelector('input[type="number"]');
+  if (!input || input.disabled) return;
+  const step = Number(input.step) > 0 ? Number(input.step) : 1;
+  const min = input.min !== '' ? Number(input.min) : -Infinity;
+  const max = input.max !== '' ? Number(input.max) : Infinity;
+  const base = input.value === '' ? 0 : Number(input.value);
+  const next = Math.min(max, Math.max(min, base + Number(b.dataset.dir) * step));
+  if (next === base && input.value !== '') return;
+  input.value = String(next);
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+});
+new MutationObserver((records) => {
+  for (const r of records) for (const node of r.addedNodes) if (node.nodeType === 1) enhanceNumbers(node);
+}).observe(document.body, { childList: true, subtree: true });
+enhanceNumbers(document);
+
 document.addEventListener('change', (e) => {
   if (e.target.id === 'prUser' || e.target.id === 'prRank') updatePromotePreview();
   const t = e.target;

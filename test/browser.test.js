@@ -3177,3 +3177,51 @@ describe('Browser: Update-Hinweis, Merkliste, Kopieren, Anpinnen, Lesefortschrit
     }
   });
 });
+
+describe('Browser: Zahlenfelder mit eigenen Tasten, Kästchen im Kanzlei-Stil, Einschätzung ohne Neuladen', { skip: chromium ? false : 'Playwright nicht installiert' }, () => {
+  it('Strafmaß: − / + ändern die Einschätzung, die Akte lädt dabei nicht neu; Startseite: Auswahlkarten mit goldenen Kästchen', async () => {
+    const srv = await startServer();
+    const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+    try {
+      const a = client(srv.base);
+      await a.login(TEAM.admin);
+      const c = (await a.post('/api/cases', { title: 'Raubüberfall Vinewood', area: 'strafrecht', clientName: 'Vito Russo' })).json.case;
+      const parsed = (await a.post('/api/penal/parse', { text: '§ 33 StGB (2x)\nversuchter Raub' })).json.items;
+      await a.post(`/api/cases/${c.id}/charges/bulk`, { items: parsed.map((i) => ({ offenceId: i.offenceId, count: i.count, attempted: i.attempted, aiding: i.aiding })) });
+      const ctx = await browser.newContext({ ...DESKTOP, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+      const page = await ctx.newPage();
+      const problems = [];
+      page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
+      const caseReads = [];
+      page.on('request', (r) => r.method() === 'GET' && new RegExp(`/api/cases/${c.id}$`).test(r.url()) && caseReads.push(r.url()));
+      await page.goto(srv.base + '/login');
+      await page.fill('#email', TEAM.admin);
+      await page.fill('#password', PASSWORD);
+      await page.click('button[type=submit]');
+      await page.waitForURL(/dashboard/);
+      await page.waitForSelector('#nav a.nav-item', { state: 'attached' });
+      await page.evaluate((id) => openCase(id), c.id);
+      await page.waitForSelector('#secCharges .chg-est .num-btn');
+      const reads = caseReads.length;
+      await page.click('#secCharges .chg-est .num-btn[data-dir="1"] >> nth=0');
+      await page.click('#secCharges .chg-est .num-btn[data-dir="1"] >> nth=0');
+      await page.waitForTimeout(600);
+      assert.equal(await page.inputValue('#secCharges .chg-est input >> nth=0'), '2');
+      assert.equal(caseReads.length, reads, 'die Akte wird beim Ändern der Einschätzung nicht neu geladen');
+      assert.equal((await a.get(`/api/cases/${c.id}`)).json.case ? true : false, true);
+      assert.deepEqual(problems, []);
+      await ctx.close();
+
+      const home = await browser.newContext(DESKTOP);
+      const hp = await home.newPage();
+      await hp.goto(srv.base + '/');
+      await hp.waitForSelector('#calcOptions .calc-opt');
+      const box = await hp.$eval('#calcOptions .calc-check', (i) => getComputedStyle(i).backgroundColor);
+      assert.notEqual(box, 'rgb(255, 255, 255)', 'Kästchen nicht weiß');
+      await home.close();
+    } finally {
+      await browser.close();
+      await srv.stop();
+    }
+  });
+});

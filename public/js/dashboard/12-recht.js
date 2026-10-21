@@ -362,7 +362,14 @@ Object.assign(actions, {
     const key = el.dataset.key;
     const v = key === 'reduced' ? el.checked : el.value === '' ? null : Math.max(0, Math.round(Number(el.value)));
     if (key !== 'reduced' && v !== null && !Number.isFinite(v)) return;
-    await afterCharges(Number(el.dataset.caseId), await api.patch(`/api/cases/${el.dataset.caseId}/charges/sentence`, { [key]: v }));
+    const r = await api.patch(`/api/cases/${el.dataset.caseId}/charges/sentence`, { [key]: v });
+    // Nur die Einschätzung ändert sich: die übrige Akte bleibt stehen (kein Neuladen im Hintergrund, Eingabe bleibt fokussiert)
+    const line = $('#modalBody .chg-mitig');
+    const list = (r.sentence && r.sentence.mitigations) || [];
+    if (line) {
+      if (list.length) line.querySelector('span').textContent = `Milderung möglich: ${list.map(esc).join(' · ')}`;
+      else line.remove();
+    }
   },
   'law-open': (el) => openLaw(el.dataset.para),
   'charge-import': (el) => chargeImportModal(Number(el.dataset.id)),

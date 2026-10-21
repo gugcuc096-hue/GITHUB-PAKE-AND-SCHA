@@ -467,6 +467,13 @@ Seiten haben keine Endung mehr: `/login`, `/registrieren`, `/dashboard`, `/karri
 - **Lesefortschritt:** eine dünne Goldlinie oben in langen Akten, Verträgen, Aktenauszügen und Wiki-Artikeln; **Summen** offen/bezahlt zählen in der Akte hoch; KPI-Kacheln neigen sich leicht.
 - **Einheitliche Leerzustände:** immer ein Satz und – wo es einen gibt – der nächste Schritt als Knopf; leere Kennzahlen im Portal („Keine offenen Rechnungen“) werden schmale Zeilen unter den gefüllten Kacheln.
 
+## Bedienelemente
+
+- **Kästchen** sind überall im Kanzlei-Stil (goldene Füllung statt Browser-Weiß), auch im Tarifrechner der Startseite; die Auswahl ist eine Karte mit Goldrand.
+- **Zahlenfelder** (z. B. die Einschätzung der Hafteinheiten im Strafmaß) haben eigene Tasten **− / +** statt der Systempfeile.
+- **Einschätzung ohne Neuladen:** Ändern der Einschätzung speichert nur diesen Wert. Die Akte wird nicht mehr im Hintergrund neu geladen, das Feld bleibt fokussiert.
+- Gemeinsame Styles in `public/css/controls.css` (Startseite und Dashboard).
+
 ## Update einer bestehenden Installation
 
 Beim ersten Start der neuen Version passiert automatisch:
