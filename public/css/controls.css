@@ -1,0 +1,45 @@
+/*
+ * Bedienelemente im Stil der Kanzlei – gemeinsam für Startseite und Dashboard: goldene Kästchen (kein Browser-Weiß),
+ * Zahlenfelder ohne Systempfeile mit eigenen Tasten (− / +) und Auswahlkarten für den Tarifrechner.
+ */
+:root { --ctl-gold: var(--gold-500, #d4af37); --ctl-line: var(--glass-border, rgba(148, 163, 184, 0.18)); }
+
+input[type="checkbox"] {
+  appearance: none; -webkit-appearance: none; flex: none;
+  width: 1.05rem; height: 1.05rem; margin: 0;
+  border: 1px solid rgba(212, 175, 55, 0.55); border-radius: 5px;
+  background: rgba(3, 7, 18, 0.7); cursor: pointer; transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+input[type="checkbox"]:hover { border-color: var(--ctl-gold); }
+input[type="checkbox"]:checked { background: var(--ctl-gold); border-color: var(--ctl-gold); box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.14); }
+input[type="checkbox"]:focus-visible { outline: 2px solid var(--ctl-gold); outline-offset: 2px; }
+input[type="checkbox"]:disabled { opacity: 0.4; cursor: default; }
+
+/* Zahlenfelder: Systempfeile aus, eigene Tasten über .num-step (siehe Dashboard) */
+input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.num-step { display: flex; align-items: stretch; width: 100%; min-width: 0; border: 1px solid var(--ctl-line); border-radius: 12px; overflow: hidden; background: rgba(3, 7, 18, 0.7); transition: border-color 0.15s, box-shadow 0.15s; }
+.num-step:focus-within { border-color: var(--ctl-gold); box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.14); }
+.num-step > input { flex: 1; min-width: 0; border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; text-align: center; font-family: 'JetBrains Mono', ui-monospace, monospace; }
+.num-step > input:focus { outline: none; }
+.num-btn { flex: none; width: 2.1rem; border: 0; background: rgba(212, 175, 55, 0.06); color: var(--ctl-gold); font-size: 1.05rem; line-height: 1; cursor: pointer; transition: background 0.15s; }
+.num-btn:hover:not(:disabled) { background: rgba(212, 175, 55, 0.16); }
+.num-btn:disabled { opacity: 0.35; cursor: default; }
+.num-step.is-compact .num-btn { width: 1.7rem; font-size: 0.95rem; }
+
+/* Auswahlkarten (Tarifrechner auf der Startseite) */
+.calc-opt {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+  padding: 0.85rem 1rem; border-radius: 14px; border: 1px solid var(--ctl-line);
+  background: rgba(15, 23, 42, 0.45); cursor: pointer; transition: border-color 0.2s, background 0.2s;
+}
+.calc-opt:hover { border-color: rgba(212, 175, 55, 0.4); background: rgba(15, 23, 42, 0.75); }
+.calc-opt:has(input:checked) { border-color: var(--ctl-gold); background: rgba(212, 175, 55, 0.07); }
+.calc-opt:has(input:focus-visible) { box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.2); }
+.calc-opt-main { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
+.calc-opt-name { font-size: 0.9rem; font-weight: 500; color: #fff; }
+.calc-opt-sub { display: block; margin-top: 0.15rem; font-size: 0.72rem; color: rgba(252, 211, 77, 0.8); }
+.calc-opt-price { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.78rem; color: var(--ctl-gold); white-space: nowrap; }
+.calc-opt.is-priority { border-color: rgba(245, 158, 11, 0.25); background: rgba(245, 158, 11, 0.05); }
+.calc-opt.is-priority:has(input:checked) { border-color: #f59e0b; background: rgba(245, 158, 11, 0.1); }

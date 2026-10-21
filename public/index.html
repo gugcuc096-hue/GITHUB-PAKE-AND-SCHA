@@ -310,6 +310,7 @@
     <!-- Tailwind fest gebaut (npm run build:css) – zuletzt eingebunden wie zuvor beim Play-CDN -->
     <link rel="stylesheet" href="/css/tailwind.css">
     <link rel="stylesheet" href="/css/select.css">
+    <link rel="stylesheet" href="/css/controls.css">
     <link rel="stylesheet" href="/css/calm.css" media="(prefers-reduced-motion: reduce)" data-calm>
 </head>
 <body class="min-h-screen flex flex-col justify-between page-in site-home">
@@ -502,72 +503,30 @@
 
                     <!-- Wird von site.js live aus der Honorarordnung befüllt; statischer Inhalt dient als Rückfall. -->
                     <div id="calcOptions" class="space-y-3">
-                    <label class="flex items-center justify-between p-3.5 rounded-xl border border-[var(--glass-border)] bg-slate-900/40 hover:bg-slate-900/70 cursor-pointer transition-all">
-                        <div class="flex items-center gap-3">
-                            <input type="checkbox" class="calc-check accent-[var(--gold-500)] w-4 h-4" value="15000" data-name="Rechtliche Beratung per Ticket">
-                            <span class="text-sm font-medium text-white">Rechtliche Beratung per Ticket</span>
-                        </div>
-                        <span class="font-mono text-xs text-[var(--gold-500)]">15.000 $</span>
-                    </label>
+                    <label class="calc-opt"><span class="calc-opt-main"><input type="checkbox" class="calc-check" value="15000" data-name="Rechtliche Beratung per Ticket"><span class="calc-opt-name">Rechtliche Beratung per Ticket</span></span><span class="calc-opt-price">15.000 $</span></label>
 
-                    <label class="flex items-center justify-between p-3.5 rounded-xl border border-[var(--glass-border)] bg-slate-900/40 hover:bg-slate-900/70 cursor-pointer transition-all">
-                        <div class="flex items-center gap-3">
-                            <input type="checkbox" class="calc-check accent-[var(--gold-500)] w-4 h-4" value="25000" data-name="Persönliche Rechtsberatung">
-                            <span class="text-sm font-medium text-white">Persönliche Rechtsberatung</span>
-                        </div>
-                        <span class="font-mono text-xs text-[var(--gold-500)]">25.000 $</span>
-                    </label>
+                    <label class="calc-opt"><span class="calc-opt-main"><input type="checkbox" class="calc-check" value="25000" data-name="Persönliche Rechtsberatung"><span class="calc-opt-name">Persönliche Rechtsberatung</span></span><span class="calc-opt-price">25.000 $</span></label>
 
-                    <label class="flex items-center justify-between p-3.5 rounded-xl border border-[var(--glass-border)] bg-slate-900/40 hover:bg-slate-900/70 cursor-pointer transition-all">
-                        <div class="flex items-center gap-3">
-                            <input type="checkbox" class="calc-check accent-[var(--gold-500)] w-4 h-4" value="50000" data-name="U-Haft-Vertretung vor Ort">
-                            <span class="text-sm font-medium text-white">U-Haft-Vertretung vor Ort</span>
-                        </div>
-                        <span class="font-mono text-xs text-[var(--gold-500)]">50.000 $</span>
-                    </label>
+                    <label class="calc-opt"><span class="calc-opt-main"><input type="checkbox" class="calc-check" value="50000" data-name="U-Haft-Vertretung vor Ort"><span class="calc-opt-name">U-Haft-Vertretung vor Ort</span></span><span class="calc-opt-price">50.000 $</span></label>
 
-                    <label class="flex items-center justify-between p-3.5 rounded-xl border border-[var(--glass-border)] bg-slate-900/40 hover:bg-slate-900/70 cursor-pointer transition-all">
-                        <div class="flex items-center gap-3">
-                            <input type="checkbox" class="calc-check accent-[var(--gold-500)] w-4 h-4" value="60000" data-name="Strafrechtliche Vertretung">
-                            <span class="text-sm font-medium text-white">Strafrechtliche Vertretung</span>
-                        </div>
-                        <span class="font-mono text-xs text-[var(--gold-500)]">60.000 $</span>
-                    </label>
+                    <label class="calc-opt"><span class="calc-opt-main"><input type="checkbox" class="calc-check" value="60000" data-name="Strafrechtliche Vertretung"><span class="calc-opt-name">Strafrechtliche Vertretung</span></span><span class="calc-opt-price">60.000 $</span></label>
 
-                    <label class="flex items-center justify-between p-3.5 rounded-xl border border-[var(--glass-border)] bg-slate-900/40 hover:bg-slate-900/70 cursor-pointer transition-all">
-                        <div class="flex items-center gap-3">
-                            <input type="checkbox" class="calc-check accent-[var(--gold-500)] w-4 h-4" value="100000" data-name="Vertretung Hauptverhandlung">
-                            <span class="text-sm font-medium text-white">Vertretung Hauptverhandlung (alle Gerichte)</span>
-                        </div>
-                        <span class="font-mono text-xs text-[var(--gold-500)]">100.000 $</span>
-                    </label>
+                    <label class="calc-opt"><span class="calc-opt-main"><input type="checkbox" class="calc-check" value="100000" data-name="Vertretung Hauptverhandlung"><span class="calc-opt-name">Vertretung Hauptverhandlung (alle Gerichte)</span></span><span class="calc-opt-price">100.000 $</span></label>
 
-                    <label class="flex items-center justify-between p-3.5 rounded-xl border border-[var(--glass-border)] bg-slate-900/40 hover:bg-slate-900/70 cursor-pointer transition-all">
-                        <div class="flex items-center gap-3">
-                            <input type="checkbox" class="calc-check accent-[var(--gold-500)] w-4 h-4" value="35000" data-name="Vertragsentwurf (Standard)">
-                            <span class="text-sm font-medium text-white">Vertragsentwurf (Standard)</span>
-                        </div>
-                        <span class="font-mono text-xs text-[var(--gold-500)]">35.000 $</span>
-                    </label>
+                    <label class="calc-opt"><span class="calc-opt-main"><input type="checkbox" class="calc-check" value="35000" data-name="Vertragsentwurf (Standard)"><span class="calc-opt-name">Vertragsentwurf (Standard)</span></span><span class="calc-opt-price">35.000 $</span></label>
 
-                    <label class="flex items-center justify-between p-3.5 rounded-xl border border-[var(--glass-border)] bg-slate-900/40 hover:bg-slate-900/70 cursor-pointer transition-all">
-                        <div class="flex items-center gap-3">
-                            <input type="checkbox" class="calc-check accent-[var(--gold-500)] w-4 h-4" value="75000" data-name="24/7 Eilnotdiensteinsatz">
-                            <span class="text-sm font-medium text-white">24/7 Eilnotdiensteinsatz</span>
-                        </div>
-                        <span class="font-mono text-xs text-[var(--gold-500)]">75.000 $</span>
-                    </label>
+                    <label class="calc-opt"><span class="calc-opt-main"><input type="checkbox" class="calc-check" value="75000" data-name="24/7 Eilnotdiensteinsatz"><span class="calc-opt-name">24/7 Eilnotdiensteinsatz</span></span><span class="calc-opt-price">75.000 $</span></label>
 
                     </div>
 
-                    <label class="flex items-center justify-between p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10 cursor-pointer transition-all mt-2">
-                        <div class="flex items-center gap-3">
-                            <input type="checkbox" id="priorityAddon" class="calc-check accent-amber-400 w-4 h-4">
-                            <div>
-                                <span class="text-sm font-medium text-white block">Priorisierte Bearbeitung (+15 %)</span>
-                                <span class="text-[0.65rem] text-amber-300/80">Vorrangige Terminierung innerhalb von 2 Stunden</span>
-                            </div>
-                        </div>
+                    <label class="calc-opt is-priority mt-2">
+                        <span class="calc-opt-main">
+                            <input type="checkbox" id="priorityAddon" class="calc-check">
+                            <span>
+                                <span class="calc-opt-name block">Priorisierte Bearbeitung (+15 %)</span>
+                                <span class="calc-opt-sub">Vorrangige Terminierung innerhalb von 2 Stunden</span>
+                            </span>
+                        </span>
                     </label>
                 </div>
 
