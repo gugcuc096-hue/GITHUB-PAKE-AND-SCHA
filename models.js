@@ -39,7 +39,7 @@ const parseJson = (v) => {
 
 const CASE_SELECT = `
   SELECT c.*,
-         cu.display_name AS client_account_name, cu.email AS client_email, cu.phone AS client_account_phone,
+         cu.display_name AS client_account_name, cu.email AS client_email, cu.phone AS client_account_phone, cu.discord_username AS client_discord,
          lu.display_name AS lawyer_name, lu.discord_id AS lawyer_discord_id,
          (SELECT group_concat(e.external_id, ' ') FROM case_external_docs e WHERE e.case_id = c.id) AS external_doc_ids,
          (SELECT json_group_array(json_object('id', x.id, 'name', x.display_name, 'discordId', x.discord_id))
@@ -156,6 +156,7 @@ function caseRow(c, u) {
     clientName: c.client_account_name || c.client_name || '—',
     clientEmail: staff ? c.client_email || null : undefined,
     clientPhone: staff ? c.client_phone || c.client_account_phone || '' : undefined,
+    clientDiscord: staff ? c.client_discord || null : undefined,
     hasClientAccount: !!c.client_id,
     membership: parseJson(c.membership_json), // VIP / Perma-Mandat des Mandanten
     opponent: c.opponent,
@@ -195,6 +196,7 @@ function noteRow(n) {
     body: n.body,
     internal: !!n.internal,
     system: !!n.system,
+    pinned: !!n.pinned,
     createdAt: n.created_at,
   };
 }

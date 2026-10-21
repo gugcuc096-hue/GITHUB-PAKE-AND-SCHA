@@ -131,7 +131,7 @@ function handleContract(action, id, body, discordId, channelId) {
   }
   if (action !== 'read') return fail('Unbekannter Button.');
   const view = contractRoutes.discordReadView(r.k, r.c, r.data);
-  const portal = tickets.siteBase() && (r.viewer === 'kanzlei' || r.c.client_id) ? `${tickets.siteBase()}/vertrag.html?id=${r.k.id}` : null;
+  const portal = tickets.siteBase() && (r.viewer === 'kanzlei' || r.c.client_id) ? `${tickets.siteBase()}/vertrag?id=${r.k.id}` : null;
   const buttons = [
     ...(r.canSign ? [{ type: 2, style: 3, label: 'Jetzt unterschreiben', emoji: { name: '✍️' }, custom_id: `ksign:sign:${r.k.id}` }] : []),
     ...(portal ? [{ type: 2, style: 5, label: 'Druckansicht im Portal', url: portal }] : []),

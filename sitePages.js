@@ -12,6 +12,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { db } = require('./db');
 const ranks = require('./ranks');
+const { collect, jsonForHtml } = require('./collect');
 
 const PAGES = { index: 'index.html', karriere: 'karriere.html' };
 const raw = {};
@@ -80,11 +81,34 @@ function render(page, origin) {
   return html.replace(/(content=")\/img\/og-image\.png"/g, `$1${origin}/img/og-image.png"`);
 }
 
+/*
+ * Startseite und Karriere bringen ihre Daten gleich mit (Team, Honorare, Erfolge, Stimmen, Dienststatus, Stellen,
+ * Anmeldestatus) – als JSON in der Seite statt bis zu neun Abrufen danach. Fehlt ein Teil, holt die Seite ihn wie
+ * bisher selbst.
+ */
+const BOOT = {
+  index: {
+    session: '/api/auth/session',
+    team: '/api/team',
+    fees: '/api/fees',
+    memberships: '/api/public/memberships',
+    stats: '/api/public/stats',
+    reviews: '/api/public/reviews',
+    duty: '/api/public/on-duty',
+    positions: '/api/public/positions',
+  },
+  karriere: { session: '/api/auth/session', positions: '/api/public/positions' },
+};
 function handler(page) {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     try {
-      res.set('Cache-Control', 'no-cache');
-      res.type('html').send(require('./assets').rewrite(render(page, `${req.protocol}://${req.get('host')}`)));
+      let html = require('./assets').rewrite(render(page, `${req.protocol}://${req.get('host')}`));
+      if (BOOT[page]) {
+        const data = await collect(req, BOOT[page]);
+        html = html.replace(/<body[^>]*>/, (tag) => `${tag}\n<script type="application/json" id="psBoot">${jsonForHtml(data)}</script>`);
+      }
+      res.set('Cache-Control', 'private, no-cache'); // enthält den Anmeldestatus der Person
+      res.type('html').send(html);
     } catch (err) {
       next(err);
     }

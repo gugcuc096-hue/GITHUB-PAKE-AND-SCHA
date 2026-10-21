@@ -68,6 +68,21 @@ function fuzzyMatch(text, terms) {
   return hits;
 }
 
+/**
+ * Suchausdruck für den Volltext-Index: jedes Wort als Wortanfang, alle Wörter müssen vorkommen. Ausgeschriebene
+ * Umlaute zählen auch als Umlaut („mueller“ findet „Müller“ – der Index speichert ihn als „muller“).
+ */
+function ftsMatch(terms) {
+  const parts = terms
+    .map((t) => t.replace(/[^\p{L}\p{N}]/gu, ''))
+    .filter((t) => t.length >= 2)
+    .map((t) => {
+      const alt = t.replace(/ae/g, 'a').replace(/oe/g, 'o').replace(/ue/g, 'u');
+      return alt !== t ? `("${t}"* OR "${alt}"*)` : `"${t}"*`;
+    });
+  return parts.join(' AND ');
+}
+
 /** Ausschnitt rund um den ersten Treffer. */
 function snippet(text, terms) {
   const s = String(text || '').replace(/\s+/g, ' ');
@@ -190,18 +205,31 @@ router.get('/', (req, res) => {
     }
   }
 
-  // Notizen & Chat der Akten: Kanzlei alles außer Systemeinträgen, Mandanten nur den Chat der eigenen Akten
-  const variants = [...new Set([q, q.replace(/ae/gi, 'ä').replace(/oe/gi, 'ö').replace(/ue/gi, 'ü')])];
-  const noteLike = variants.map(() => L('n.body')).join(' OR ');
-  const notes = db
-    .prepare(
-      `SELECT n.id, n.case_id, n.author_name, n.body, n.internal, n.created_at, c.case_number, c.title AS case_title
-       FROM notes n JOIN cases c ON c.id = n.case_id
-       WHERE n.system = 0 AND (${noteLike}) ${staff ? '' : 'AND n.internal = 0 AND c.client_id = ?'}
-       ORDER BY n.created_at DESC LIMIT ${LIMIT}`
-    )
-    .all(...variants.map((v) => `%${v.replace(/[\\%_]/g, (m) => `\\${m}`)}%`), ...(staff ? [] : [u.id]))
-    .map((n) => ({ id: n.id, caseId: n.case_id, caseNumber: n.case_number, caseTitle: n.case_title, author: n.author_name, internal: !!n.internal, createdAt: n.created_at, preview: snippet(n.body, terms) }));
+  // Notizen & Chat der Akten: Kanzlei alles außer Systemeinträgen, Mandanten nur den Chat der eigenen Akten.
+  // Zuerst über den Volltext-Index (Wortanfänge, nach Relevanz), dann wie bisher per Teilwort ergänzt.
+  const noteCols = 'n.id, n.case_id, n.author_name, n.body, n.internal, n.created_at, c.case_number, c.title AS case_title';
+  const noteScope = `n.system = 0 ${staff ? '' : 'AND n.internal = 0 AND c.client_id = ?'}`;
+  const scopeArgs = staff ? [] : [u.id];
+  let noteRows = [];
+  const ftsQuery = ftsMatch(terms);
+  if (ftsQuery) {
+    try {
+      noteRows = db
+        .prepare(`SELECT ${noteCols} FROM notes_fts f JOIN notes n ON n.id = f.rowid JOIN cases c ON c.id = n.case_id WHERE notes_fts MATCH ? AND ${noteScope} ORDER BY bm25(notes_fts) LIMIT ${LIMIT}`)
+        .all(ftsQuery, ...scopeArgs);
+    } catch {
+      noteRows = []; // ohne Index (oder ungültige Eingabe): nur die Teilwort-Suche
+    }
+  }
+  if (noteRows.length < LIMIT) {
+    const variants = [...new Set([q, q.replace(/ae/gi, 'ä').replace(/oe/gi, 'ö').replace(/ue/gi, 'ü')])];
+    const have = new Set(noteRows.map((n) => n.id));
+    const more = db
+      .prepare(`SELECT ${noteCols} FROM notes n JOIN cases c ON c.id = n.case_id WHERE ${noteScope} AND (${variants.map(() => L('n.body')).join(' OR ')}) ORDER BY n.created_at DESC LIMIT ${LIMIT * 2}`)
+      .all(...scopeArgs, ...variants.map((v) => `%${v.replace(/[\\%_]/g, (m) => `\\${m}`)}%`));
+    for (const n of more) if (noteRows.length < LIMIT && !have.has(n.id)) noteRows.push(n);
+  }
+  const notes = noteRows.map((n) => ({ id: n.id, caseId: n.case_id, caseNumber: n.case_number, caseTitle: n.case_title, author: n.author_name, internal: !!n.internal, createdAt: n.created_at, preview: snippet(n.body, terms) }));
 
   // Kanzlei-Wiki und Strafgesetzbuch (nur Kanzlei)
   let wiki = [];

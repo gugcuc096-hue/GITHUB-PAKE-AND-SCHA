@@ -6,9 +6,9 @@
 
     function nextUrl() {
         const n = params.get('next');
-        return n && /^\/[^/\\]/.test(n) ? n : '/dashboard.html';
+        return n && /^\/[^/\\]/.test(n) ? n : '/dashboard';
     }
-    document.getElementById('loginLink').href = '/login.html' + (params.get('next') ? '?next=' + encodeURIComponent(params.get('next')) : '');
+    document.getElementById('loginLink').href = '/login' + (params.get('next') ? '?next=' + encodeURIComponent(params.get('next')) : '');
 
     // Mit Discord registrieren (nur wenn die Discord-Anmeldung eingerichtet ist)
     api.get('/api/discord/status').then((s) => { if (s.oauth) document.getElementById('discordBlock').classList.remove('hidden'); }).catch(() => {});

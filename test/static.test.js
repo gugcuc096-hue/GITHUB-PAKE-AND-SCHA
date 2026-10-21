@@ -53,7 +53,8 @@ describe('Strenge Content-Security-Policy', () => {
   it('alle eingebundenen Skripte und Stylesheets existieren', () => {
     for (const page of htmlPages) {
       const refs = [...read(page).matchAll(/<(?:script[^>]+src|link[^>]+href)\s*=\s*["'](\/[^"'?#]+)/gi)].map((m) => m[1]);
-      for (const ref of refs) assert.ok(fs.existsSync(path.join(PUBLIC, ref)), `${rel(page)} verweist auf ${ref}, die Datei fehlt`);
+      // die Dashboard-Bündel setzt der Server aus public/js/dashboard/ zusammen (assets.js)
+      for (const ref of refs.filter((r) => !/^\/js\/dashboard\.(bundle|staff)\.js$/.test(r))) assert.ok(fs.existsSync(path.join(PUBLIC, ref)), `${rel(page)} verweist auf ${ref}, die Datei fehlt`);
     }
   });
 

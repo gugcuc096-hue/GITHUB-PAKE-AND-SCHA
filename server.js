@@ -95,11 +95,12 @@ app.post('/api/events/presence', requireAuth, live.presence); // wer hat die Akt
 /* ---------------------------------------------------------------- API */
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/start', require('./routes/start').router); // Dashboard-Start: Konto + alle Zähler in einem Abruf
 // Jede Änderung an einer Akte (Notizen, Anhänge, Status, Verträge …) schreibt das Google Doc ihres Aktenauszugs neu –
 // ohne Knopf. Chat und „gelesen“ stehen nicht im Auszug.
 app.use('/api/cases/:id', (req, res, next) => {
   const id = Number(req.params.id);
-  if (req.method !== 'GET' && id > 0 && !/^\/chat(\/|$)/.test(req.path)) {
+  if (req.method !== 'GET' && id > 0 && !/^\/(chat(\/|$)|star$)/.test(req.path)) {
     res.on('finish', () => {
       if (res.statusCode < 400) require('./googleDocs').touchExtract(id);
     });
@@ -173,15 +174,28 @@ app.use(
 app.use('/fonts', express.static(path.join(__dirname, 'public', 'fonts'), { maxAge: '30d' }));
 // Startseite und Karriere: Rang-Karten, vom Board geänderte Texte und Vorschaubild werden beim Ausliefern eingesetzt
 const sitePages = require('./sitePages');
-app.get(['/', '/index.html', '/index'], sitePages.handler('index'));
-app.get(['/karriere', '/karriere.html'], sitePages.handler('karriere'));
-for (const page of ['login', 'register', 'bewerbung']) app.get([`/${page}`, `/${page}.html`], sitePages.previewHandler(`${page}.html`));
+// Saubere Adressen ohne „.html“ (/login, /dashboard, /rechnung …). Alte Links – Lesezeichen, ältere Discord-Nachrichten,
+// die installierte App – leiten dauerhaft weiter; Suchparameter bleiben, den #Teil hängt der Browser selbst wieder an.
+const CLEAN = { index: '/', dashboard: '/dashboard', login: '/login', register: '/registrieren', karriere: '/karriere', bewerbung: '/bewerbung', vertrag: '/vertrag', invoice: '/rechnung', aktenauszug: '/aktenauszug', offline: '/offline' };
+const RENAMED = { index: '/', register: '/registrieren', invoice: '/rechnung' }; // auch ohne „.html“ nur noch unter dem neuen Namen
+app.get(/^\/([a-z0-9-]+)(\.html)?$/i, (req, res, next) => {
+  const [, name, ext] = req.path.match(/^\/([a-z0-9-]+)(\.html)?$/i);
+  const to = ext ? CLEAN[name.toLowerCase()] : RENAMED[name.toLowerCase()];
+  if (!to) return next();
+  const q = req.originalUrl.indexOf('?');
+  res.redirect(301, to + (q >= 0 ? req.originalUrl.slice(q) : ''));
+});
+app.get('/', sitePages.handler('index'));
+app.get('/karriere', sitePages.handler('karriere'));
+for (const [route, file] of [['login', 'login.html'], ['registrieren', 'register.html'], ['bewerbung', 'bewerbung.html']]) app.get(`/${route}`, sitePages.previewHandler(file));
 // Öffentliche Anwalts-Profile (/team/<name>) mit Link-Vorschau; /team allein führt zum Team auf der Startseite
 app.get('/team', (req, res) => res.redirect(302, '/#team'));
 app.get('/team/:slug', require('./profiles').handler);
 // Übrige Seiten mit Versionsnummern für Skripte/CSS (dauerhaft im Browser), Dashboard-Teile als ein Bündel
 const assets = require('./assets');
 app.get('/js/dashboard.bundle.js', assets.bundle);
+app.get('/js/dashboard.staff.js', assets.staffBundle);
+app.use(assets.staticAsset); // übrige Skripte und CSS: verkleinert, Brotli/gzip
 app.use(assets.pages);
 app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'], setHeaders: assets.setHeaders }));
 // Unbekannte Adresse: eigene Seite im Kanzlei-Design (nur für Seitenaufrufe, die ausdrücklich text/html wollen; Bilder, Skripte, API bekommen nur 404)
@@ -240,10 +254,14 @@ reminderTimer.unref();
 app.listen(PORT, () => {
   // Tailwind-CSS auffrischen, falls die Build-Werkzeuge installiert sind (sonst gilt die fertige Datei)
   require('./scripts/build-css').refreshOnStart();
+  // Skripte und CSS einmal verkleinern und komprimieren, damit schon der erste Besucher nicht wartet
+  if (process.env.NODE_ENV === 'production') require('./assets').warm();
   // Tägliche Datensicherung (backups/ neben der Datenbank)
   require('./backup').start();
   // Papierkorb: Akten nach 30 Tagen endgültig löschen
   require('./trash').start();
+  // Aufräumen: abgelaufene Sitzungen/Codes, Datenbank optimieren und monatlich verdichten
+  require('./maintenance').start();
   require('./googleDocs').start();
   // Systemwarnungen ans Board (Bot offline, Sicherung fehlgeschlagen, Speicher, Absturz)
   require('./systemAlerts').start();

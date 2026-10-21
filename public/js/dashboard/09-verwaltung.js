@@ -46,7 +46,7 @@ views.cooperations = {
     const warn = !d.discord.bot
       ? `<div class="banner banner-amber">${icon('alert')}<div>Es ist kein Discord-Bot eingerichtet (<code>DISCORD_BOT_TOKEN</code>). Discord-Rollen werden dann nicht erkannt – es gelten nur von Hand zugeordnete Konten.</div></div>`
       : !d.discord.defaultGuild
-        ? `<div class="banner banner-amber">${icon('alert')}<div>Kein Discord-Server hinterlegt: unter <a href="/dashboard.html?tab=bot&amp;modul=tickets#settings" class="text-gold underline">Einstellungen → Discord → Tickets</a> die Server-ID eintragen oder bei jeder Kooperation den Server angeben.</div></div>`
+        ? `<div class="banner banner-amber">${icon('alert')}<div>Kein Discord-Server hinterlegt: unter <a href="/dashboard?tab=bot&amp;modul=tickets#settings" class="text-gold underline">Einstellungen → Discord → Tickets</a> die Server-ID eintragen oder bei jeder Kooperation den Server angeben.</div></div>`
         : '';
     return `
         <div class="page-head">
@@ -59,7 +59,7 @@ views.cooperations = {
           Erstellt jemand eine Rechnung zu einer Akte, liest der Bot die Discord-Rollen des Mandanten (verknüpftes Discord bzw. „Discord-Ticket beitreten“) und setzt den Kooperationsrabatt automatisch ein.
           Ohne Discord: Mandantenkonten von Hand zuordnen – oder die Kooperation in der Rechnung selbst auswählen.
         </div>
-        ${d.cooperations.length ? `<div class="stack">${d.cooperations.map(coopCard).join('')}</div>` : `<div class="panel">${empty('Noch keine Kooperationen. „Neue Kooperation“ legt die erste an.', 'tag')}</div>`}`;
+        ${d.cooperations.length ? `<div class="stack">${d.cooperations.map(coopCard).join('')}</div>` : `<div class="panel">${empty('Noch keine Kooperationen.', 'tag', nextStep('Neue Kooperation', 'coop-new'))}</div>`}`;
   },
 };
 
@@ -95,7 +95,7 @@ async function loadCoopRoles(selected) {
     const { roles } = await api.get(`/api/cooperations/roles?fresh=1${guildId ? `&guildId=${encodeURIComponent(guildId)}` : ''}`);
     const unknown = [...chosen].filter((id) => !roles.some((r) => r.id === id));
     box.innerHTML = roles.length || unknown.length
-      ? `<div class="label">Rolle(n) auswählen – wer eine davon hat, bekommt den Rabatt</div><div class="chip-row" style="flex-wrap:wrap">${[
+      ? `<div class="label">Rollen auswählen – wer eine davon hat, bekommt den Rabatt</div><div class="chip-row" style="flex-wrap:wrap">${[
           ...roles.map((r) => `<label class="check chip"><input type="checkbox" name="role" value="${esc(r.id)}" ${chosen.has(r.id) ? 'checked' : ''}> @${esc(r.name)}</label>`),
           ...unknown.map((id) => `<label class="check chip"><input type="checkbox" name="role" value="${esc(id)}" checked> ${esc(id)} <span class="text-red-300">(nicht gefunden)</span></label>`),
         ].join('')}</div>`
@@ -222,26 +222,6 @@ views.work = {
   },
 };
 
-/** Akte: Bearbeitungszeiten (nur Board of Partners). */
-function caseWorkSection(c, work) {
-  if (!work || !isBoard()) return '';
-  const now = Date.now();
-  const opened = parseDate(c.createdAt);
-  const end = work.closedAt ? parseDate(work.closedAt) : null;
-  const total = opened ? (end ? end.getTime() : now) - opened.getTime() : null;
-  const since = `${end ? 'Bearbeitungsdauer bis zum Abschluss' : 'Offen seit'} ${fmtDur(total)}`;
-  if (!work.rows.length) return emptySection('secWork', 'Bearbeitungszeiten', `noch keine Bearbeitung erfasst · ${since}`, '', 'Nur für das Board of Partners sichtbar.');
-  const rows = work.rows
-        .map(
-          (w) => `<div class="list-row wrap"><div class="main"><div class="title flex flex-wrap items-center gap-2">${esc(w.name)}${statusBadge(ROLE_BADGE, w.role)}</div>
-              <div class="meta">${esc(fmtDate(w.startedAt))} – ${w.running ? 'heute' : esc(fmtDate(w.endedAt))}${w.endReason ? ' · ' + esc(w.endReason) : ''}${w.estimated ? ' · ≈ geschätzt' : ''}</div></div>
-              <span class="font-mono text-sm shrink-0 ${w.running ? 'text-emerald-300' : 'text-gold'}">${w.estimated ? '≈ ' : ''}${esc(fmtDur(w.durationMs))}</span></div>`
-        )
-        .join('');
-  return `<div class="section" id="secWork"><h3 class="section-title">Bearbeitungszeiten <span class="text-xs text-dim font-normal">nur Board of Partners</span></h3>
-      <p class="text-sm text-muted mb-2">${end ? `Bearbeitungsdauer bis zum Abschluss: <strong>${esc(fmtDur(total))}</strong>` : `Offen seit <strong>${esc(fmtDur(total))}</strong>`}</p>
-      ${rows}</div>`;
-}
 
 /* ---------------------------------------------------------------- Kanzlei-Statistik (Board of Partners) */
 /*
@@ -482,14 +462,6 @@ const ABSENCE_BADGE = { aktiv: ['abgemeldet', 'amber'], geplant: ['geplant', 'sk
 const dayDe = (d) => new Date(`${d}T12:00:00`).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
 const absenceDays = (a) => Math.round((new Date(`${a.endDate}T12:00:00`) - new Date(`${a.startDate}T12:00:00`)) / 864e5) + 1;
 
-/** Übersicht: kurze Zeile, wer heute abgemeldet ist. */
-function absenceStrip() {
-  const now = (st.absences?.absences || []).filter((a) => a.state === 'aktiv');
-  if (!isStaff() || !now.length) return '';
-  return `<a href="#duty" class="absence-strip mb-4 lg:mb-5">${icon('calendar', 'ico-sm')}<span><strong>Heute abgemeldet:</strong> ${now
-    .map((a) => `${esc(a.name)} <span class="text-dim">(bis ${esc(dayDe(a.endDate))}, ${esc(a.reasonLabel)})</span>`)
-    .join(', ')}</span></a>`;
-}
 
 function absencePanel() {
   const data = st.absences;
@@ -709,7 +681,7 @@ function positionsPanel() {
               <div class="flex gap-1 shrink-0"><button class="icon-btn sm" data-action="position-edit" data-id="${p.id}" aria-label="Bearbeiten">${icon('edit', 'ico-sm')}</button><button class="icon-btn sm" data-action="position-delete" data-id="${p.id}" aria-label="Löschen">${icon('trash', 'ico-sm')}</button></div></div>`
           )
           .join('')
-      : empty('Keine Stellen ausgeschrieben. Initiativbewerbungen sind trotzdem möglich.', 'briefcase')}
+      : empty('Keine Stellen ausgeschrieben – Initiativbewerbungen sind trotzdem möglich.', 'briefcase', nextStep('Stelle ausschreiben', 'position-new'))}
     </div>`;
 }
 
@@ -728,7 +700,7 @@ views.applications = {
         <div class="page-head">
           <div><h1 class="page-title">Bewerbungen</h1><p class="page-sub">Bewerbungen prüfen, bewerten, zum Gespräch einladen und mit einem Klick einstellen.</p></div>
           <div class="page-actions">
-            <a href="/karriere.html" target="_blank" rel="noopener" class="btn-outline btn-md">${icon('globe', 'ico-sm')}<span>Karriereseite</span></a>
+            <a href="/karriere" target="_blank" rel="noopener" class="btn-outline btn-md">${icon('globe', 'ico-sm')}<span>Karriereseite</span></a>
             ${tabBewerbungen ? '' : `<button class="btn-gold btn-md" data-action="position-new">${icon('plus')}<span>Neue Stelle</span></button>`}
           </div>
         </div>
@@ -949,80 +921,3 @@ views.audit = {
   },
 };
 
-/* ---------------------------------------------------------------- Bild-Uploads */
-async function handleUpload(input) {
-  const files = [...(input.files || [])];
-  const kind = input.dataset.upload;
-  input.value = '';
-  if (!files.length) return;
-
-  if (kind === 'backup') {
-    // Sicherung (Datenbank oder Bilder-Archiv) unverändert als Binärdaten hochladen
-    toast('Sicherung wird hochgeladen …');
-    const res = await api.upload('/api/admin/backups/upload', new Blob([files[0]], { type: 'application/octet-stream' }));
-    const r = res.result;
-    st.backups = res;
-    toast(
-      r.kind === 'datenbank'
-        ? 'Datenbank-Sicherung vorgemerkt – sie wird beim nächsten Neustart eingespielt.'
-        : `Bilder eingespielt: ${r.added} neu, ${r.existing} schon vorhanden${r.skipped ? `, ${r.skipped} übersprungen` : ''}.`
-    );
-    renderView();
-    return;
-  }
-
-  if (kind === 'avatar') {
-    const blob = await resizeImage(files[0], { max: 512, square: true });
-    const res = await api.upload('/api/auth/avatar', blob);
-    st.user = res.user;
-    renderUser();
-    if (st.view === 'profile') renderView();
-    toast('Profilbild aktualisiert.');
-  } else if (kind === 'team') {
-    const id = Number(input.dataset.id);
-    const blob = await resizeImage(files[0], { max: 640, square: true });
-    const res = await api.upload(`/api/admin/team/${id}/photo`, blob);
-    const m = res.member;
-    const photo = $('#tmPhoto');
-    if (photo) photo.innerHTML = avatarImg(m.photoUrl, m.name);
-    const ctl = $('#tmPhotoCtl');
-    if (ctl) ctl.innerHTML = teamPhotoControls(m);
-    toast('Foto gespeichert – live auf der Website.');
-    await refreshBehind();
-  } else if (kind === 'storage-item') {
-    // Bild eines Lager-Gegenstands (Einstellungen → Lager)
-    await api.upload(`/api/storage/items/${input.dataset.id}/image`, await resizeImage(files[0], { max: 480 }));
-    toast('Bild gespeichert.');
-    await reloadStorageAdmin();
-  } else if (kind === 'fn-pending') {
-    addPendingImages({ blobs: files });
-  } else if (kind === 'fivenet-img') {
-    const caseId = Number(input.dataset.caseId);
-    const d = st.caseDocs.find((x) => x.id === Number(input.dataset.docId));
-    if (!d) return;
-    st.fnPending = { urls: [], blobs: files.slice(0, FN_MAX_IMAGES) };
-    reportImport(await importPendingImages(caseId, d));
-    await reloadCase(caseId);
-  } else if (kind === 'pay-proof') {
-    // Screenshot zur gemeldeten Zahlung nachreichen
-    toast('Screenshot wird hochgeladen …');
-    await api.upload(`/api/invoices/${input.dataset.id}/payment-proof`, await resizeImage(files[0], { max: 1600 }));
-    toast('Screenshot gespeichert – die Kanzlei sieht ihn bei der Zahlungsmeldung.');
-    await afterInvoiceChange(input);
-  } else if (kind === 'evidence') {
-    const caseId = Number(input.dataset.caseId);
-    const caption = ($('#attCaption')?.value || '').trim();
-    // Ohne Kästchen (erster Upload aus der leeren Zeile): bei der Kanzlei wie voreingestellt „nur intern“
-    const box = $('#attInternal');
-    const internal = (box ? box.checked : isStaff()) ? '1' : '0';
-    const batch = files.slice(0, 10);
-    if (files.length > 10) toast('Es werden maximal 10 Bilder auf einmal hochgeladen.', 'error');
-    toast(batch.length === 1 ? 'Bild wird hochgeladen …' : `${batch.length} Bilder werden hochgeladen …`);
-    for (const f of batch) {
-      const blob = await resizeImage(f, { max: 1600 });
-      await api.upload(`/api/cases/${caseId}/attachments?caption=${encodeURIComponent(caption)}&internal=${internal}`, blob);
-    }
-    toast(batch.length === 1 ? 'Anhang gespeichert.' : `${batch.length} Anhänge gespeichert.`);
-    await reloadCase(caseId);
-  }
-}

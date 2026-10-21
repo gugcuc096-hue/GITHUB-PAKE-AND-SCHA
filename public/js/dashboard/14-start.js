@@ -17,7 +17,7 @@ document.addEventListener('click', (e) => {
   $$('details.more-menu[open]').forEach((d) => {
     if (!d.contains(e.target) || e.target.closest('.more-item')) d.open = false;
   });
-  if (e.target.closest('a[href^="/vertrag.html"]')) st.contractTabAt = Date.now();
+  if (e.target.closest('a[href^="/vertrag"]')) st.contractTabAt = Date.now();
   // Klick neben das Fenster: zurück zum vorherigen Fenster (z. B. zur Akte) bzw. schließen – bei ungespeicherten
   // Eingaben erst mit Rückfrage. Markieren im Fenster und daneben Loslassen zählt nicht.
   if (e.target === $('#modal')) {
@@ -758,6 +758,8 @@ function liveConnect() {
   const es = new EventSource('/api/events?tab=' + encodeURIComponent(window.PS.tab));
   live.es = es;
   es.onopen = () => {
+    clearTimeout(live.downTimer);
+    if (live.bar === 'down') sysBar(null);
     // Nach einem Verbindungsabbruch einmal alles nachholen, was in der Zwischenzeit passiert ist
     if (live.down) {
       refreshBadges();
@@ -771,6 +773,10 @@ function liveConnect() {
   es.onerror = () => {
     live.ok = false;
     live.down = true;
+    // Länger als ein paar Sekunden weg (z. B. Update, Neustart): ruhiger Hinweis statt Fehlermeldungen – die
+    // Verbindung kommt von selbst wieder, angefangene Eingaben bleiben
+    clearTimeout(live.downTimer);
+    live.downTimer = setTimeout(() => live.down && sysBar('down'), 4000);
   };
   es.onmessage = (m) => {
     let ev;
@@ -779,11 +785,79 @@ function liveConnect() {
     } catch {
       return;
     }
+    if (ev.k === 'hello') {
+      if (ev.v && APP_VERSION && ev.v !== APP_VERSION) sysBar('update');
+      return;
+    }
     if (ev.k === 'case') liveLater(`case${ev.id}${ev.chat ? 'c' : ''}`, () => liveCase(ev));
     else if (ev.k === 'area') liveLater(`area:${ev.a}`, () => liveArea(ev.a));
     else if (ev.k === 'presence') hereShow(ev.id, ev.users);
     else if (ev.k === 'typing') typingShow(ev.id, ev.name);
   };
+}
+
+actions['app-reload'] = () => location.reload();
+
+/** Interne Notiz oben in der Akte anpinnen bzw. lösen. */
+actions['note-pin'] = async (el) => {
+  const caseId = Number(el.dataset.caseId);
+  const on = el.dataset.on === '1';
+  await api.put(`/api/cases/${caseId}/notes/${el.dataset.id}/pin`, { on });
+  toast(on ? 'Notiz oben in der Akte angepinnt.' : 'Notiz gelöst.');
+  await reloadCase(caseId);
+};
+
+/** Merkliste: Stern sofort umschalten, gespeichert wird im Hintergrund (bei Fehler zurück). */
+actions['case-star'] = async (el) => {
+  const id = Number(el.dataset.id);
+  const c = st.cases.find((x) => x.id === id);
+  const on = el.getAttribute('aria-pressed') !== 'true';
+  const apply = (v) => {
+    if (c) c.starred = v;
+    $$(`[data-action="case-star"][data-id="${id}"]`).forEach((b) => {
+      b.classList.toggle('on', v);
+      b.setAttribute('aria-pressed', String(v));
+      b.title = v ? 'Aus der Merkliste nehmen' : 'Merken – steht dann oben';
+    });
+  };
+  apply(on);
+  try {
+    await api.put(`/api/cases/${id}/star`, { on });
+    toast(on ? 'Gemerkt – die Akte steht jetzt oben.' : 'Aus der Merkliste genommen.');
+    if (['cases', 'overview'].includes(st.view) && !$('#modal.open')) renderView();
+  } catch (err) {
+    apply(!on);
+    toast(err.message, 'error');
+  }
+};
+
+/** Fassung, mit der dieses Dashboard geladen wurde (Versionsnummer am Skript). */
+const APP_VERSION = (() => {
+  try {
+    return new URL(document.querySelector('script[data-staff]')?.src || '', location.href).searchParams.get('v') || '';
+  } catch {
+    return '';
+  }
+})();
+
+/**
+ * Hinweis oben: 'down' – Verbindung kurz weg (Update/Neustart, verbindet sich selbst neu); 'update' – neue Fassung
+ * eingespielt, „Neu laden“ holt sie (angefangene Texte bleiben dank Entwurfsspeicher erhalten). null blendet aus.
+ */
+function sysBar(kind) {
+  if (live.bar === 'update' && kind === 'down') return; // „Neu laden“ bleibt stehen
+  live.bar = kind;
+  $('#sysBar')?.remove();
+  if (!kind) return;
+  const bar = document.createElement('div');
+  bar.id = 'sysBar';
+  bar.className = 'sys-bar';
+  bar.setAttribute('role', 'status');
+  bar.innerHTML =
+    kind === 'update'
+      ? `${icon('refresh', 'ico-sm')}<span>Eine neue Version des Dashboards ist da.</span><button type="button" class="btn-gold btn-sm" data-action="app-reload">Neu laden</button>`
+      : `<span class="sys-dot" aria-hidden="true"></span><span>Verbindung kurz unterbrochen – das Dashboard verbindet sich gleich neu. Ihre Eingaben bleiben erhalten.</span>`;
+  document.body.appendChild(bar);
 }
 
 /*
@@ -843,8 +917,10 @@ setInterval(() => {
 
 // Ungelesene Post, neue Bewerbungen und Dienststatus (Badges in der Navigation, Zahl im Tab und auf dem App-Symbol)
 function refreshBadges() {
-  return Promise.all([load.chatUnread().catch(() => {}), load.unread(), load.appCount(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {}), load.paymentReports().catch(() => {}), load.resolutionCount().catch(() => {})])
-    .then(renderNav)
+  // ein Abruf für alle Zähler (wie beim Start, ohne das Konto)
+  return load
+    .start({ me: false })
+    .then(() => (load.primed.clear(), renderNav()))
     .catch(() => {});
 }
 // Regelmäßig nachsehen – im Hintergrund seltener; mit Live-Verbindung nur noch alle zwei Minuten zur Sicherheit
@@ -1000,14 +1076,15 @@ document.addEventListener('ps:form-ok', () => buzz());
    ================================================================ */
 (async function start() {
   try {
-    const me = await api.get('/api/auth/me');
+    const { me } = await load.start(); // Konto + Zähler + Dienststatus in einem Abruf
     st.user = me.user;
     st.twoFactor = me.twoFactor;
     setRanks(me.ranks);
   } catch {
-    location.href = '/login.html?next=' + encodeURIComponent('/dashboard.html' + location.search + location.hash);
+    location.href = '/login?next=' + encodeURIComponent('/dashboard' + location.search + location.hash);
     return;
   }
+  if (isStaff()) await loadStaffParts();
   renderUser();
   // Angefangene Texte je Konto im Browser behalten (Rechnungs-Entwurf eigens, siehe 06-rechnungen)
   window.PS.drafts.watch({ scope: `u${st.user.id}`, onRestore: () => toast('Angefangene Eingaben wiederhergestellt.') });
@@ -1026,12 +1103,6 @@ document.addEventListener('ps:form-ok', () => buzz());
   if (googleState && GOOGLE_MSG[googleState]) toast(...GOOGLE_MSG[googleState]);
   if (googleState) st.settingsTab = 'integrations'; // Google Docs stehen unter Einstellungen → Integrationen
 
-  try {
-    await Promise.all([load.chatUnread().catch(() => {}), load.unread(), load.appCount(), load.duty(), load.dueTasks(), load.concernCount().catch(() => {}), load.personnelCount().catch(() => {}), load.nameCount().catch(() => {}), load.vipCount().catch(() => {}), load.reviewCount().catch(() => {}), load.paymentReports().catch(() => {}), load.resolutionCount().catch(() => {})]);
-    renderUser();
-  } catch {
-    /* Badges und Dienststatus sind nicht kritisch */
-  }
   st.histPaused = true;
   try {
     await go(hashView());
@@ -1048,6 +1119,22 @@ document.addEventListener('ps:form-ok', () => buzz());
   liveConnect();
   replayUndoDeletes(); // beim letzten Verlassen nicht mehr durchgekommene Löschungen nachholen
 })();
+
+/**
+ * Verwaltungsteile (Team, Einstellungen, Discord, Statistik, Wiki, Lager …) gibt es nur für die Kanzlei – Mandanten
+ * laden sie nie. Programmcode, keine Daten; nach dem ersten Mal liegt er ohnehin im Browser.
+ */
+function loadStaffParts() {
+  const src = document.querySelector('script[data-staff]')?.dataset.staff;
+  if (!src || views.settings) return Promise.resolve();
+  return new Promise((resolve) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => (toast('Ein Teil des Dashboards konnte nicht geladen werden – bitte neu laden.', 'error'), resolve());
+    document.head.appendChild(s);
+  });
+}
 
 /** Konto per Discord angelegt: einmal nach dem Namen im Spiel fragen (erscheint in Akten, Verträgen, Nachrichten). */
 function askInitialName() {

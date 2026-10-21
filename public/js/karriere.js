@@ -49,7 +49,7 @@
             .map((a) => {
                 const status = a.statusLabel ? `<span class="badge badge-${STATUS_COLOR[a.status] || 'slate'}">${esc(a.statusLabel)}</span>` : '';
                 const unread = a.unread ? `<span class="badge badge-gold">${a.unread === 1 ? '1 neue Nachricht' : `${a.unread} neue Nachrichten`}</span>` : '';
-                return `<a class="glass-card my-app" href="/bewerbung.html#${encodeURIComponent(a.token)}">
+                return `<a class="glass-card my-app" href="/bewerbung#${encodeURIComponent(a.token)}">
                     <span class="min-w-0"><span class="block font-mono text-[var(--gold-light)]">${esc(a.number || 'Bewerbung')}</span><span class="block text-sm text-muted truncate">${esc(a.positionTitle || a.position || '')}</span></span>
                     <span class="right flex items-center gap-2 shrink-0">${status}${unread}${status || unread ? '' : '<span class="text-sm text-muted">Stand ansehen</span>'}${ARROW}</span>
                 </a>`;
@@ -65,7 +65,7 @@
         box.innerHTML = myApplicationsHtml(list);
         box.classList.remove('hidden');
         // „Meine Bewerbung“ oben im Menü: eine Bewerbung → direkt zur Bewerberseite, mehrere → zur Liste oben
-        document.querySelectorAll('[data-my-link]').forEach((a) => (a.href = list.length === 1 ? `/bewerbung.html#${encodeURIComponent(list[0].token)}` : '#meine'));
+        document.querySelectorAll('[data-my-link]').forEach((a) => (a.href = list.length === 1 ? `/bewerbung#${encodeURIComponent(list[0].token)}` : '#meine'));
     }
     const mine = window.PS.applications.list();
     if (mine.length) {
@@ -77,9 +77,9 @@
     document.getElementById('year').textContent = new Date().getFullYear();
 
     // Login / Dashboard
-    api.get('/api/auth/session').then((r) => {
+    window.PS.boot('session', '/api/auth/session').then((r) => {
         if (!r || !r.user) return;
-        document.querySelectorAll('[data-auth-link]').forEach((a) => (a.href = '/dashboard.html'));
+        document.querySelectorAll('[data-auth-link]').forEach((a) => (a.href = '/dashboard'));
         document.querySelectorAll('[data-auth-label]').forEach((el) => (el.textContent = 'Dashboard'));
     }).catch(() => {});
 
@@ -96,7 +96,7 @@
     });
 
     // Offene Stellen – drei nebeneinander, wenn es aufgeht (sonst zwei bzw. eine mittig), damit keine Lücke bleibt
-    api.get('/api/public/positions').then(({ positions }) => {
+    window.PS.boot('positions', '/api/public/positions').then(({ positions }) => {
         const root = document.getElementById('positions');
         select.innerHTML = positions.map((p) => `<option value="${p.id}">${esc(p.title)}</option>`).join('') + '<option value="">Initiativbewerbung</option>';
         const wanted = Number(new URLSearchParams(location.search).get('stelle'));

@@ -1,7 +1,7 @@
 'use strict';
 /**
  * Legt einmalig ein Kanzleileitung-Konto (role: admin) an, da die Registrierung
- * über /register.html nur mandant/anwalt/richter erlaubt.
+ * über /registrieren nur mandant/anwalt/richter erlaubt.
  *
  * Aufruf: npm run seed:admin -- "Name Nachname" mail@example.com einPasswort123
  */

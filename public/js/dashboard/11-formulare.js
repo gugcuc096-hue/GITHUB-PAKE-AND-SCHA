@@ -51,7 +51,7 @@ const forms = {
     const bad = rules.findIndex((r) => !r.roleId || !r.conditions.length);
     if (bad >= 0) throw new Error(`Regel ${bad + 1}: bitte eine Hauptrolle und mindestens eine Bedingung wählen.`);
     st.bot = await api.put('/api/bot/connections', { enabled: !!d.enabled, rules });
-    toast(d.enabled ? `${rules.length} Regel(n) gespeichert – alle Mitglieder werden jetzt abgeglichen.` : 'Role Connections gespeichert (aus).');
+    toast(d.enabled ? `${nWord(rules.length, 'Regel', 'Regeln')} gespeichert – alle Mitglieder werden jetzt abgeglichen.` : 'Role Connections gespeichert (aus).');
     renderView();
   },
   'bot-joinroles': async (f) => {
@@ -271,8 +271,9 @@ const forms = {
   'add-note': async (f) => {
     const fd = new FormData(f);
     const id = Number(f.dataset.id);
-    await api.post(`/api/cases/${id}/notes`, { body: val(fd, 'body'), internal: fd.get('internal') === 'on' });
-    toast('Eintrag gespeichert.');
+    const r = await api.post(`/api/cases/${id}/notes`, { body: val(fd, 'body'), internal: fd.get('internal') === 'on' });
+    const m = r.mentioned || [];
+    toast(m.length ? `Gespeichert – ${m.map((u) => `${u.name} (${u.via === 'dm' ? 'Discord-DM' : 'Kanzlei-Post'})`).join(', ')} benachrichtigt.` : 'Eintrag gespeichert.');
     await reloadCase(id);
   },
   event: async (f) => {
@@ -364,7 +365,7 @@ const forms = {
         <h2 class="modal-title">${esc(INVOICE_KIND[inv.kind])} erstellt</h2>
         <p class="modal-sub">Nummer <span class="font-mono text-gold">${esc(inv.number)}</span> über <strong>${money(inv.total)}</strong> an ${esc(inv.clientName)}.</p>
         <div class="form-actions">
-          <a class="btn-gold btn-md" href="/invoice.html?id=${inv.id}" target="_blank" rel="noopener">${icon('eye', 'ico-sm')}<span>Ansehen</span></a>
+          <a class="btn-gold btn-md" href="/rechnung?id=${inv.id}" target="_blank" rel="noopener">${icon('eye', 'ico-sm')}<span>Ansehen</span></a>
           <button class="btn-ghost btn-md" data-action="close-modal">Schließen</button>
         </div>`, { child: !!from });
   },
@@ -699,7 +700,7 @@ const forms = {
     const res = await api.post(`/api/cases/${caseId}/contracts`, { templateId: Number(new FormData(f).get('templateId')), ...contractBody(f) });
     toast('Vertrag erstellt – jetzt ansehen und unterschreiben.');
     st.contractTabAt = Date.now();
-    window.open(`/vertrag.html?id=${res.contract.id}`, '_blank', 'noopener');
+    window.open(`/vertrag?id=${res.contract.id}`, '_blank', 'noopener');
     await returnOrClose();
   },
   'contract-edit': async (f) => {
@@ -723,7 +724,7 @@ const forms = {
     const res = await api.post(`/api/cases/${caseId}/contracts`, { templateId: Number(new FormData(f).get('templateId')), ...briefBody(f), internal: vis ? !vis.checked : true });
     toast(res.contract.needsClient ? 'Erstellt – der Mandant kann jetzt im Portal unterschreiben.' : 'Schriftsatz erstellt – jetzt ansehen und unterschreiben.');
     st.contractTabAt = Date.now();
-    window.open(`/vertrag.html?id=${res.contract.id}`, '_blank', 'noopener');
+    window.open(`/vertrag?id=${res.contract.id}`, '_blank', 'noopener');
     await returnOrClose();
   },
   'brief-edit': async (f) => {

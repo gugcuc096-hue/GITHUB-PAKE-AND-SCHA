@@ -12,7 +12,7 @@ const tickets = require('./tickets');
 
 function reviewUrl(caseId) {
   const base = tickets.siteBase();
-  return base ? `${base}/dashboard.html?case=${caseId}&bewerten=1#cases` : null;
+  return base ? `${base}/dashboard?case=${caseId}&bewerten=1#cases` : null;
 }
 
 /** Nach dem Schließen aufrufen. Liefert true, wenn eine Direktnachricht verschickt wurde. */

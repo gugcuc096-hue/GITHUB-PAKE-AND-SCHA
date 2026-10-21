@@ -117,7 +117,7 @@
     }
 
     function render(d) {
-        const link = `${location.origin}/bewerbung.html#${token}`;
+        const link = `${location.origin}/bewerbung#${token}`;
         const discord = !d.discord.available
             ? ''
             : d.discord.connected
@@ -243,7 +243,7 @@
                 <h2 class="font-serif text-2xl font-semibold mb-2">Mit Discord öffnen</h2>
                 <p class="text-sm text-muted mb-4">Melden Sie sich mit dem Discord an, das Sie mit Ihrer Bewerbung verbunden haben – oder öffnen Sie die Nachricht des Kanzlei-Bots („Zur Bewerbung“).</p>
                 <a href="/api/discord/application-open" class="btn-discord btn-md">${DISCORD_ICON}<span>Mit Discord öffnen</span></a>
-                <p class="text-xs text-dim mt-4">Discord nicht verbunden? Das Board of Partners schickt Ihnen den Link zu Ihrer Bewerberseite.<br>Noch nicht beworben? <a href="/karriere.html" class="text-gold hover:underline">Zu den offenen Stellen</a></p>
+                <p class="text-xs text-dim mt-4">Discord nicht verbunden? Das Board of Partners schickt Ihnen den Link zu Ihrer Bewerberseite.<br>Noch nicht beworben? <a href="/karriere" class="text-gold hover:underline">Zu den offenen Stellen</a></p>
             </div>`
                 : `<div class="glass-card bw-card">
                 <h2 class="font-serif text-2xl font-semibold mb-2">Mit Bewerbungsnummer öffnen</h2>
@@ -254,7 +254,7 @@
                     <button type="submit" class="btn-gold btn-md">Öffnen</button>
                 </form>
                 <p id="accessError" class="form-error mt-3" role="alert"></p>
-                <p class="text-xs text-dim mt-4">Noch nicht beworben? <a href="/karriere.html" class="text-gold hover:underline">Zu den offenen Stellen</a></p>
+                <p class="text-xs text-dim mt-4">Noch nicht beworben? <a href="/karriere" class="text-gold hover:underline">Zu den offenen Stellen</a></p>
             </div>`}`;
         if (!viaDiscord) document.getElementById('accessForm').addEventListener('submit', async (e) => {
             e.preventDefault();

@@ -624,7 +624,7 @@ router.post(
     const m = /^https:\/\/(?:ptb\.|canary\.)?discord(?:app)?\.com\/channels\/(\d{15,22})\/(\d{15,22})/.exec(url);
     if (!m) return res.status(400).json({ error: 'Für diese Akte ist kein Prozessticket (Discord-Kanal) eingetragen.' });
     const tickets = require('../tickets');
-    const doc = require('../googleDocs').urls('contract', [k.id]).get(k.id) || `${tickets.siteBase() || ''}/vertrag.html?id=${k.id}`;
+    const doc = require('../googleDocs').urls('contract', [k.id]).get(k.id) || `${tickets.siteBase() || ''}/vertrag?id=${k.id}`;
     const title = `📄 ${k.template_name} – ${c.case_number}`;
     const lines = [`**Akte:** ${c.title}${c.court_ref ? ` · Gerichtsaktenzeichen ${c.court_ref}` : ''}`, `**Eingereicht von:** ${u.display_name}${u.rank ? ` (${u.rank})` : ''} · Pake & Scha Legal Consulting`, `**Dokument:** ${doc}`];
     let posted = false;

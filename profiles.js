@@ -96,7 +96,7 @@ function render(member, facts, { origin, url }) {
   const lead = member.tier === 'leitung';
   const photo = member.photoUrl ? `${origin}${member.photoUrl}` : `${origin}/img/og-image.png`;
   const portrait = member.photoUrl
-    ? `<img class="pf-photo" src="${esc(member.photoUrl)}" alt="${esc(member.name)}" width="136" height="136">`
+    ? `<img class="pf-photo" src="${esc(member.photoUrl)}" alt="${esc(member.name)}" width="136" height="136" decoding="async">`
     : `<div class="pf-photo pf-initials ${lead ? '' : 'slate'}" aria-hidden="true">${esc(member.initials || '?')}</div>`;
   const duty = member.duty ? `<p class="pf-duty"><span class="duty-dot s-${esc(member.duty)}"></span>${esc(DUTY_STATUS[member.duty] || '')}</p>` : '';
 

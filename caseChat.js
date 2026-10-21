@@ -225,7 +225,7 @@ async function nudgeSweep({ now = Date.now() } = {}) {
       const ch = await tickets.rest('POST', '/users/@me/channels', { recipient_id: r.discord_id });
       await tickets.rest('POST', `/channels/${ch.id}/messages`, {
         embeds: [tickets.embed({ title: '💬 Neue Nachricht Ihrer Kanzlei', description: `In Ihrer Akte **${r.case_number}** wartet eine Nachricht der Kanzlei auf Sie.` })],
-        components: base ? [{ type: 1, components: [{ type: 2, style: 5, label: 'Nachricht lesen', url: `${base}/dashboard.html?case=${r.id}#cases` }] }] : undefined,
+        components: base ? [{ type: 1, components: [{ type: 2, style: 5, label: 'Nachricht lesen', url: `${base}/dashboard?case=${r.id}#cases` }] }] : undefined,
         allowed_mentions: { parse: [] },
       });
       sent++;

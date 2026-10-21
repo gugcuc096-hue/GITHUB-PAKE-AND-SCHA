@@ -213,7 +213,7 @@ describe('Mandantenportal: Discord-Konto, Zahlung melden, Unterschriften', () =>
       const { authorize, cb } = await oauth(c, '/api/discord/register', id);
       assert.equal(authorize.searchParams.get('prompt'), 'consent');
       assert.equal(authorize.searchParams.get('scope'), 'identify guilds.join', 'Server beitreten (Tickets aktiv)');
-      assert.equal(cb.location, '/dashboard.html?discord=willkommen');
+      assert.equal(cb.location, '/dashboard?discord=willkommen');
       const me = (await c.get('/api/auth/me')).json.user;
       assert.equal(me.role, 'mandant');
       assert.equal(me.displayName, 'Neuer Nutzer');
@@ -236,14 +236,14 @@ describe('Mandantenportal: Discord-Konto, Zahlung melden, Unterschriften', () =>
       const id = '900000000000000152';
       const { authorize, cb } = await oauth(c, '/api/discord/login', id);
       assert.equal(authorize.searchParams.get('scope'), 'identify');
-      assert.equal(cb.location, '/login.html?discord=neu');
+      assert.equal(cb.location, '/login?discord=neu');
       assert.equal((await c.get('/api/auth/me')).status, 401, 'noch nicht angemeldet');
       assert.deepEqual((await c.get('/api/discord/pending')).json, { pending: { name: 'Neuer Nutzer' } });
       assert.deepEqual((await client(server.base).get('/api/discord/pending')).json, { pending: null }, 'nur im selben Browser');
 
       const s = await c.post('/api/discord/signup');
       assert.equal(s.status, 200, s.text);
-      assert.equal(s.json.redirect, '/dashboard.html');
+      assert.equal(s.json.redirect, '/dashboard');
       const me = (await c.get('/api/auth/me')).json.user;
       assert.equal(me.role, 'mandant');
       assert.equal(me.needsName, true);
@@ -251,7 +251,7 @@ describe('Mandantenportal: Discord-Konto, Zahlung melden, Unterschriften', () =>
 
       // Beim nächsten Mal meldet „Mit Discord anmelden“ direkt an
       const again = client(server.base);
-      assert.equal((await oauth(again, '/api/discord/login', id)).cb.location, '/dashboard.html');
+      assert.equal((await oauth(again, '/api/discord/login', id)).cb.location, '/dashboard');
       assert.equal((await again.get('/api/auth/me')).json.user.id, me.id);
     });
 
@@ -267,7 +267,7 @@ describe('Mandantenportal: Discord-Konto, Zahlung melden, Unterschriften', () =>
 
       const { authorize, cb } = await oauth(web, '/api/discord/case-account', '900000000000000153', { method: 'POST', form });
       assert.equal(authorize.searchParams.get('prompt'), 'consent');
-      const caseId = Number((cb.location.match(/^\/dashboard\.html\?case=(\d+)#cases$/) || [])[1]);
+      const caseId = Number((cb.location.match(/^\/dashboard\?case=(\d+)#cases$/) || [])[1]);
       assert.ok(caseId > 0, cb.location);
       const me = (await web.get('/api/auth/me')).json.user;
       assert.equal(me.displayName, 'Lena Berg', 'Name aus der Mandatsanfrage');
@@ -280,7 +280,7 @@ describe('Mandantenportal: Discord-Konto, Zahlung melden, Unterschriften', () =>
 
       // Wer Aktenzeichen und Pin ebenfalls kennt, bekommt die Akte nicht (und nicht deren Namen)
       const other = client(server.base);
-      assert.equal((await oauth(other, '/api/discord/case-account', '900000000000000154', { method: 'POST', form })).cb.location, '/dashboard.html?discord=fremdeakte');
+      assert.equal((await oauth(other, '/api/discord/case-account', '900000000000000154', { method: 'POST', form })).cb.location, '/dashboard?discord=fremdeakte');
       const otherMe = (await other.get('/api/auth/me')).json.user;
       assert.notEqual(otherMe.displayName, 'Lena Berg');
       assert.equal(otherMe.needsName, true);
@@ -414,7 +414,7 @@ describe('Mandantenportal: Discord-Konto, Zahlung melden, Unterschriften', () =>
       const buttons = r.json.data.components[0].components;
       assert.deepEqual(
         buttons.map((b) => b.custom_id || b.url),
-        [`ksign:sign:${state.contract.id}`, `https://kanzlei.example/vertrag.html?id=${state.contract.id}`]
+        [`ksign:sign:${state.contract.id}`, `https://kanzlei.example/vertrag?id=${state.contract.id}`]
       );
 
       const staff = await click(MEMBERS.mo, `ksign:read:${state.contract.id}`);
@@ -492,18 +492,18 @@ describe('Mandantenportal: Discord-Konto, Zahlung melden, Unterschriften', () =>
       state.bw = r.json;
       const { authorize, cb } = await oauth(web, '/api/discord/application-join', applicant, { method: 'POST', form: { token: r.json.token } });
       assert.equal(authorize.searchParams.get('prompt'), 'consent');
-      assert.equal(cb.location, `/bewerbung.html?discord=verbunden#${r.json.token}`);
+      assert.equal(cb.location, `/bewerbung?discord=verbunden#${r.json.token}`);
       const dm = await waitFor(() => stub().dms.find((x) => x.to === applicant), 'Direktnachricht an den Bewerber');
       assert.match(dm.embeds[0].title, /Ihre Bewerberseite/);
       assert.match(dm.embeds[0].description, new RegExp(r.json.number));
-      assert.equal(dm.components[0].components[0].url, `https://kanzlei.example/bewerbung.html#${r.json.token}`);
+      assert.equal(dm.components[0].components[0].url, `https://kanzlei.example/bewerbung#${r.json.token}`);
     });
 
     it('„Mit Discord öffnen“ führt auf einem anderen Gerät zur eigenen Bewerbung – ohne verbundene Bewerbung nicht', async () => {
       const { authorize, cb } = await oauth(client(server.base), '/api/discord/application-open', applicant);
       assert.equal(authorize.searchParams.get('scope'), 'identify', 'nur anmelden, kein Server-Beitritt');
-      assert.equal(cb.location, `/bewerbung.html?discord=geoeffnet#${state.bw.token}`);
-      assert.equal((await oauth(client(server.base), '/api/discord/application-open', '900000000000000162')).cb.location, '/bewerbung.html?discord=keine');
+      assert.equal(cb.location, `/bewerbung?discord=geoeffnet#${state.bw.token}`);
+      assert.equal((await oauth(client(server.base), '/api/discord/application-open', '900000000000000162')).cb.location, '/bewerbung?discord=keine');
       // Die Bewerberseite meldet Discord als verfügbar und verbunden
       const portal = (await client(server.base).post('/api/public/application-portal', { token: state.bw.token })).json;
       assert.deepEqual(portal.discord, { connected: true, available: true });
@@ -624,7 +624,7 @@ describe('Mandantenportal: Discord-Konto, Zahlung melden, Unterschriften', () =>
       assert.equal(r.json.posted, true);
       const msg = stub().channelMessages.find((x) => x.channel === ch);
       assert.match(msg.embeds[0].title, /Akteneinsicht/);
-      assert.match(msg.embeds[0].description, /vertrag\.html\?id=/);
+      assert.match(msg.embeds[0].description, /vertrag\?id=/);
     });
 
     it('Ticket mit /delete gelöscht: der Verlauf liegt vorher gesichert in der Akte (nur Kanzlei)', async () => {

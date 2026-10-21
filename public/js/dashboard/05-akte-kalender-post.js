@@ -81,7 +81,21 @@ async function afterTaskChange() {
  * Erklärungen nur, wenn etwas zu tun ist (sonst im Tooltip).
  */
 const ticketState = (t) => (t.exists ? (t.archived ? badge('archiviert', 'slate') : badge('aktiv', 'emerald')) : t.deleted ? badge('per /delete gelöscht', 'slate') : badge('noch nicht angelegt', 'amber'));
-const ticketOpen = (url, label = 'Öffnen') => (url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="btn-discord btn-sm">${DISCORD_ICON}<span>${esc(label)}</span></a>` : '');
+/** Rechnungen der Akte: offen und bezahlt als Summen – zählen beim Öffnen hoch und bei einer Zahlung mit. */
+function invoiceSums(c, list) {
+  const live = list.filter((i) => i.status !== 'storniert');
+  if (live.length < 2) return '';
+  const sum = (s) => live.filter((i) => i.status === s).reduce((n, i) => n + (i.total || 0), 0);
+  return `<div class="inv-sums"><span>Offen <b data-count="case${c.id}:open">${esc(money(sum('offen')))}</b></span><span>Bezahlt <b data-count="case${c.id}:paid">${esc(money(sum('bezahlt')))}</b></span></div>`;
+}
+
+/** Interne Notiz: @Namen hervorheben (nur Darstellung – Benachrichtigt wird auf dem Server). */
+const mentionHtml = (text) => esc(text).replace(/(^|[^\p{L}\p{N}@])(@[\p{L}][\p{L}'-]*(?: [\p{Lu}][\p{L}'-]*)?)/gu, '$1<span class="mention">$2</span>');
+
+const ticketOpen = (url, label = 'Öffnen') =>
+  url
+    ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="btn-discord btn-sm">${DISCORD_ICON}<span>${esc(label)}</span></a><button type="button" class="icon-btn sm" data-action="copy" data-text="${esc(url)}" title="Link zum Ticket kopieren" aria-label="Link zum Ticket kopieren">${icon('link', 'ico-sm')}</button>`
+    : '';
 function ticketStrip({ title, tip = '', badges = '', hint = '', error = '', actions = '', extra = '', ico = DISCORD_ICON, tone = '' }) {
   return `<div class="ticket-strip${tone ? ` strip-${tone}` : ''}">
       <div class="ts-main"><span class="ts-title" ${tip ? `title="${esc(tip)}"` : ''}>${ico}<strong>${esc(title)}</strong></span>${badges}</div>
@@ -693,13 +707,14 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       ? ['Mandant', null, `${clientLink(c.clientKey, c.clientName)}${c.hasClientAccount ? '' : ' <span class="text-dim">(ohne Konto)</span>'}`]
       : ['Mandant', c.clientName + (staff && !c.hasClientAccount ? ' (ohne Konto)' : '')],
     // E-Mail darf nur nach dem @ umbrechen, nicht am Bindestrich der Domain („…@pake-“ / „scha.ls“)
-    staff ? ['Kontakt', null, [c.clientPhone ? esc(c.clientPhone) : '', c.clientEmail ? mailBreakHtml(c.clientEmail) : ''].filter(Boolean).join(' · ') || '—'] : null,
+    // Erreichbar über Telefon und Discord – die Login-Adresse nur, wenn es sonst nichts gibt
+    staff
+      ? ['Kontakt', null, [c.clientPhone ? esc(c.clientPhone) : '', c.clientDiscord ? `${DISCORD_ICON.replace('class="ico"', 'class="ico-sm inline-ico"')} ${esc(c.clientDiscord)}` : ''].filter(Boolean).join(' · ') || (c.clientEmail ? mailBreakHtml(c.clientEmail) : '—')]
+      : null,
     [caseTeam(c).length > 1 ? 'Zuständige Anwälte' : 'Zuständig', null, teamHtml(c)],
     ['Rechtsgebiet', AREAS[c.area] || c.area],
     c.opponent ? ['Gegenpartei', c.opponent] : null,
-    c.courtRef ? ['Gerichtsaktenzeichen', c.courtRef] : null,
-    ['Eröffnet', fmtDate(c.createdAt)],
-    staff ? ['Eingang über', SOURCES[c.source] || c.source] : null,
+    c.courtRef ? ['Gerichtsaktenzeichen', null, copyable(c.courtRef, 'Gerichtsaktenzeichen kopieren')] : null,
     staff && links.length ? ['Verknüpfte Akten', null, linksHtml(c, links)] : null,
     staff && routing.length ? ['Laufzettel', null, routingHtml(routing)] : null,
   ]
@@ -740,7 +755,8 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
         : `<span>${esc(c.outcome && OUTCOMES[c.outcome] ? OUTCOMES[c.outcome][2] : 'Nicht erfasst')}</span>`
       : '';
   const headProps = [
-    prop(`prop-status st-${esc(c.status)}`, 'Status', statusValue),
+    // Der Stand steht in den fünf Kreisen darunter – die Auswahl nur, solange die Akte noch „Offen“ ist (Start)
+    c.status === 'offen' ? prop(`prop-status st-${esc(c.status)}`, 'Status', statusValue) : '',
     staff ? prop(`prop-prio prio-${prio}`, 'Priorität', prioValue) : '',
     outcomeValue ? prop(`prop-outcome ${outcomeTone(c.outcome)}`, 'Ergebnis', outcomeValue, 'Nur für die Kanzlei – Grundlage der Erfolgsquote auf der Startseite') : '',
     // Kanzlei: Angabe des Mandanten nur als Hinweis neben der Priorität (wenn mehr als „Normal“);
@@ -772,7 +788,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
   if (staff) {
     quick.push(`<button class="btn-outline btn-sm" data-action="new-event" data-case-id="${c.id}" data-return-case="${c.id}">${icon('calendar', 'ico-sm')}<span>Frist / Termin</span></button>`);
     quick.push(`<button class="btn-outline btn-sm" data-action="new-invoice" data-case-id="${c.id}">${icon('receipt', 'ico-sm')}<span>Rechnung</span></button>`);
-    quick.push(`<a class="btn-outline btn-sm" href="/aktenauszug.html?id=${c.id}" target="_blank" rel="noopener">${icon('doc', 'ico-sm')}<span>Aktenauszug</span></a>`);
+    quick.push(`<a class="btn-outline btn-sm" href="/aktenauszug?id=${c.id}" target="_blank" rel="noopener">${icon('doc', 'ico-sm')}<span>Aktenauszug</span></a>`);
     quick.push(`<button class="btn-outline btn-sm" data-action="chat-focus">${icon('chat', 'ico-sm')}<span>Mandant anschreiben</span></button>`);
     if (!c.hasClientAccount && canLinkClient(c)) quick.push(`<button class="btn-outline btn-sm" data-action="case-client-search" data-id="${c.id}">${icon('user', 'ico-sm')}<span>Mandanten-Konto verknüpfen</span></button>`);
     if (!c.processTicket && c.canEdit) quick.push(`<button class="btn-outline btn-sm" data-action="pt-toggle">${icon('plus', 'ico-sm')}<span>Prozessticket (DOJ)</span></button>`);
@@ -790,7 +806,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
   } else {
     if (!c.closed) quick.push(`<button class="btn-outline btn-sm" data-action="new-event" data-case-id="${c.id}" data-return-case="${c.id}">${icon('calendar', 'ico-sm')}<span>Termin anfragen</span></button>`);
     quick.push(`<button class="btn-outline btn-sm" data-action="chat-focus">${icon('chat', 'ico-sm')}<span>Nachricht zur Akte</span></button>`);
-    quick.push(`<a class="btn-outline btn-sm" href="/aktenauszug.html?id=${c.id}" target="_blank" rel="noopener">${icon('doc', 'ico-sm')}<span>Aktenauszug</span></a>`);
+    quick.push(`<a class="btn-outline btn-sm" href="/aktenauszug?id=${c.id}" target="_blank" rel="noopener">${icon('doc', 'ico-sm')}<span>Aktenauszug</span></a>`);
   }
 
   const editForm = c.canEdit
@@ -828,8 +844,8 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
             const gd = staff ? safeGdoc(i.googleDoc) : null;
             const open = gd
               ? `<a class="icon-btn sm" href="${esc(gd)}" target="_blank" rel="noopener noreferrer" aria-label="Google Doc öffnen" title="Google Doc öffnen">${icon('doc', 'ico-sm')}</a>`
-              : `<a class="icon-btn sm" href="/invoice.html?id=${i.id}" target="_blank" rel="noopener" aria-label="Ansehen" title="Ansehen">${icon('eye', 'ico-sm')}</a>`;
-            return `<div class="list-row wrap inv-row"><div class="main"><div class="title">${docTitleLink(`/invoice.html?id=${i.id}`, esc(i.number), 'font-mono text-gold')} · ${esc(INVOICE_KIND[i.kind])}</div><div class="meta">${esc(fmtDate(i.createdAt))} · ${esc(i.issuerName)}</div></div>
+              : `<a class="icon-btn sm" href="/rechnung?id=${i.id}" target="_blank" rel="noopener" aria-label="Ansehen" title="Ansehen">${icon('eye', 'ico-sm')}</a>`;
+            return `<div class="list-row wrap inv-row"><div class="main"><div class="title">${docTitleLink(`/rechnung?id=${i.id}`, esc(i.number), 'font-mono text-gold')} · ${esc(INVOICE_KIND[i.kind])}</div><div class="meta">${esc(fmtDate(i.createdAt))} · ${esc(i.issuerName)}</div></div>
             <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end"><span class="font-mono nowrap">${money(i.total)}</span>${invoiceBadge(i)}${open}</div>${
               paymentButtons(i) ? `<div class="inv-pay-row">${paymentButtons(i)}</div>` : ''
             }</div>`;
@@ -844,13 +860,27 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     ? `<div class="timeline">${log
         .map((n) => {
           const canDelete = !n.system && (n.authorId === me || admin);
+          const pinBtn = staff && n.internal && !n.system
+            ? `<button type="button" class="icon-btn sm tl-pin${n.pinned ? ' on' : ''}" data-action="note-pin" data-case-id="${c.id}" data-id="${n.id}" data-on="${n.pinned ? '0' : '1'}" aria-label="${n.pinned ? 'Notiz lösen' : 'Notiz oben anpinnen'}" title="${n.pinned ? 'Lösen' : 'Oben in der Akte anpinnen'}">${icon('pin', 'ico-sm')}</button>`
+            : '';
           return `<div class="tl-item ${n.internal ? 'tl-internal' : ''} ${n.system ? 'tl-system' : ''}">
               <div class="tl-meta"><span class="text-muted font-medium">${esc(n.author)}</span>${n.authorRole && ROLES[n.authorRole] ? `<span>${esc(ROLES[n.authorRole])}</span>` : ''}<span>${esc(fmtDate(n.createdAt))}</span>${n.internal ? '<span class="stamp-mini" title="Interne Notiz – nur für die Kanzlei">Vertraulich</span>' : ''}
-              ${canDelete ? `<button type="button" class="icon-btn sm tl-del" data-action="delete-note" data-case-id="${c.id}" data-id="${n.id}" aria-label="Notiz löschen" title="Notiz löschen">${icon('trash', 'ico-sm')}</button>` : ''}</div>
-              <div class="tl-body">${esc(n.body)}</div></div>`;
+              ${pinBtn}${canDelete ? `<button type="button" class="icon-btn sm tl-del" data-action="delete-note" data-case-id="${c.id}" data-id="${n.id}" aria-label="Notiz löschen" title="Notiz löschen">${icon('trash', 'ico-sm')}</button>` : ''}</div>
+              <div class="tl-body">${n.internal ? mentionHtml(n.body) : esc(n.body)}</div></div>`;
         })
         .join('')}</div>`
     : '<p class="text-sm text-dim">Noch keine Einträge.</p>';
+
+  // Angepinnte interne Notizen: ganz oben in der Akte, damit sie niemand übersieht (nur Kanzlei)
+  const pinned = staff ? notes.filter((n) => n.pinned && n.internal && !n.system) : [];
+  const pinnedStrip = pinned.length
+    ? `<div class="pin-notes">${pinned
+        .map(
+          (n) => `<div class="pin-note">${icon('pin', 'ico-sm')}<div class="pin-body"><div class="pin-text">${esc(n.body)}</div><div class="pin-meta">${esc(n.author)} · ${esc(fmtDate(n.createdAt))}</div></div>
+            <button type="button" class="icon-btn sm" data-action="note-pin" data-case-id="${c.id}" data-id="${n.id}" data-on="0" aria-label="Notiz lösen" title="Lösen">${icon('x', 'ico-sm')}</button></div>`
+        )
+        .join('')}</div>`
+    : '';
 
   // Abschnitte der Akte (in dieser Reihenfolge) – die Sprungleiste zeigt nur, was es in der Akte gibt
   const contractList = contracts.filter((k) => k.kind !== 'schriftsatz');
@@ -863,7 +893,9 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     external: externalSection(c, externalDocs),
     evidence: attachmentsSection(c, attachments, linkedEvidence),
     tasks: staff ? caseTasksSection(c, tasks) : '',
-    invoices: invoiceList ? `<div class="section" id="secInvoices"><h3 class="section-title">Rechnungen & Honorare</h3>${invoiceList}</div>` : '',
+    invoices: invoiceList
+      ? `<div class="section" id="secInvoices"><h3 class="section-title">Rechnungen & Honorare</h3>${invoiceSums(c, invoices)}${invoiceList}</div>`
+      : '',
     work: caseWorkSection(c, work),
   };
   const openTasks = tasks.filter((t) => !t.done).length;
@@ -888,13 +920,14 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       <div class="case-head case-cover mb-5" data-case-head="${c.id}">
         <span class="cover-tab" aria-hidden="true">${staff && c.priority >= 3 && !c.closed ? `<i class="cover-tab-dot p${c.priority}"></i>` : ''}Akte</span>
         ${c.closed ? '<span class="cover-stamp" aria-hidden="true">Abgeschlossen</span>' : ''}
-        <div class="pr-12"><div class="case-num-row"><span class="font-mono text-gold text-sm case-emboss">${esc(c.caseNumber)}</span>${staff ? hereStrip(c.id) : ''}</div>
+        <div class="pr-12"><div class="case-num-row"><button type="button" class="font-mono text-gold text-sm case-emboss copy-az" data-action="copy" data-text="${esc(c.caseNumber)}" title="Aktenzeichen kopieren" aria-label="Aktenzeichen ${esc(c.caseNumber)} kopieren">${esc(c.caseNumber)}</button>${staff ? starBtn(c) : ''}${staff ? hereStrip(c.id) : ''}</div>
           <h2 id="modalTitle" class="font-serif text-2xl md:text-3xl font-semibold leading-tight">${esc(c.title)}</h2></div>
         <div class="case-props">${headProps}</div>
       </div>
       ${jumpBar}
       ${staff ? clientFlagStrip(c.clientFlag, { inCase: true }) : ''}
       ${idleStrip}
+      ${pinnedStrip}
       ${claim}
       ${track}
       <div class="info-grid mb-5">${staff ? caseStats(c, { appointments, tasks }) : ''}${info}</div>
@@ -916,11 +949,12 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       ${parts.invoices}
       ${parts.work}
       <div class="section" id="secNotes"><h3 class="section-title">${staff ? 'Verlauf & interne Notizen' : 'Verlauf'}</h3>
+        <p class="case-origin">Eröffnet ${esc(fmtDate(c.createdAt))}${staff ? ` · Eingang über ${esc(SOURCES[c.source] || c.source)}` : ''}</p>
         ${noteList}
         ${staff
         ? `<form data-form="add-note" data-id="${c.id}" class="mt-4 space-y-3">
           <input type="hidden" name="internal" value="on">
-          <textarea name="body" rows="3" maxlength="4000" required class="field" placeholder="Notiz, Telefonat, Beweismittel, nächster Schritt … ( / für Textbausteine)" aria-label="Neue interne Notiz" data-snippets></textarea>
+          <textarea name="body" rows="3" maxlength="4000" required class="field" placeholder="Notiz, Telefonat, Beweismittel, nächster Schritt … ( / für Textbausteine, @Name benachrichtigt Kollegen)" aria-label="Neue interne Notiz" data-snippets></textarea>
           <div class="flex flex-wrap items-center justify-between gap-3">
             <span class="text-xs text-dim">Interne Notizen sieht nur die Kanzlei – Nachrichten an den Mandanten oben unter „Nachrichten“.</span>
             <button type="submit" class="btn-outline btn-md">${icon('send', 'ico-sm')}<span>Notiz speichern</span></button>
@@ -1022,7 +1056,7 @@ function calendarStaff() {
           <section id="dayAgenda" class="panel panel-pad">
             <div class="panel-head"><h2 class="panel-title">${esc(selDate.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }))}</h2>
               <button class="btn-outline btn-sm" data-action="new-event" data-day="${st.cal.selected}">${icon('plus', 'ico-sm')}<span>Eintrag</span></button></div>
-            ${selected.length ? selected.map((e) => eventRow(e, { date: false })).join('') : empty('Keine Einträge an diesem Tag.', 'calendar')}
+            ${selected.length ? selected.map((e) => eventRow(e, { date: false })).join('') : empty('Keine Einträge an diesem Tag.', 'calendar', nextStep('Eintrag anlegen', 'new-event', { day: st.cal.selected }))}
           </section>
           <section class="panel panel-pad">
             <div class="panel-head"><h2 class="panel-title">Offene Fristen</h2></div>
@@ -1125,7 +1159,7 @@ function calendarClient() {
         <div class="page-actions"><button class="btn-gold btn-md" data-action="new-event">${icon('plus')}<span>Termin anfragen</span></button></div>
       </div>
       <section class="panel panel-pad mb-4"><div class="panel-head"><h2 class="panel-title">Anstehend</h2></div>
-        ${upcoming.length ? upcoming.map((e) => eventRow(e)).join('') : empty('Keine anstehenden Termine.', 'calendar')}</section>
+        ${upcoming.length ? upcoming.map((e) => eventRow(e)).join('') : empty('Keine anstehenden Termine.', 'calendar', nextStep('Termin anfragen', 'new-event'))}</section>
       ${past.length ? `<details class="edit-box"><summary>Vergangene & abgesagte Termine (${past.length})</summary>${past.map((e) => eventRow(e)).join('')}</details>` : ''}`;
 }
 
@@ -1284,8 +1318,8 @@ views.mail = {
           <button class="chip ${!inbox ? 'active' : ''}" data-action="mail-box" data-value="sent">Gesendet</button>
         </div>
         <div class="mail-layout ${sel ? 'has-sel' : ''}">
-          <div class="panel mail-list">${st.messages.length ? st.messages.map(mailItem).join('') : empty(inbox ? 'Ihr Posteingang ist leer.' : 'Noch keine gesendeten Nachrichten.', 'mail')}</div>
-          <div class="panel mail-read">${sel ? mailReader(sel) : `<div class="empty">${icon('mail', 'ico-lg')}<p>Wählen Sie eine Nachricht aus.</p></div>`}</div>
+          <div class="panel mail-list">${st.messages.length ? st.messages.map(mailItem).join('') : empty(inbox ? 'Ihr Posteingang ist leer.' : 'Noch keine gesendeten Nachrichten.', 'mail', nextStep('Nachricht schreiben', 'compose', {}, 'edit'))}</div>
+          <div class="panel mail-read">${sel ? mailReader(sel) : empty('Wählen Sie links eine Nachricht aus.', 'mail')}</div>
         </div>`;
   },
 };
@@ -1363,6 +1397,6 @@ views.board = {
           <div><h1 class="page-title">Team-Pinnwand</h1><p class="page-sub">Interne Notizen, Übergaben und Hinweise für die ganze Kanzlei.</p></div>
           <div class="page-actions"><button class="btn-gold btn-md" data-action="board-new">${icon('plus')}<span>Neue Notiz</span></button></div>
         </div>
-        ${st.board.length ? `<div class="board-grid">${st.board.map(noteCard).join('')}</div>` : `<div class="panel">${empty('Noch keine Notizen. Heften Sie die erste an!', 'pin')}</div>`}`;
+        ${st.board.length ? `<div class="board-grid">${st.board.map(noteCard).join('')}</div>` : `<div class="panel">${empty('Noch keine Notizen an der Pinnwand.', 'pin', nextStep('Notiz anheften', 'board-new'))}</div>`}`;
   },
 };

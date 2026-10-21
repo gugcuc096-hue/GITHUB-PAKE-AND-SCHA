@@ -15,9 +15,9 @@
     // Nur interne Pfade zulassen (verhindert Open-Redirect über ?next=…)
     function nextUrl() {
         const n = params.get('next');
-        return n && /^\/[^/\\]/.test(n) ? n : '/dashboard.html';
+        return n && /^\/[^/\\]/.test(n) ? n : '/dashboard';
     }
-    document.getElementById('registerLink').href = '/register.html' + (params.get('next') ? '?next=' + encodeURIComponent(params.get('next')) : '');
+    document.getElementById('registerLink').href = '/registrieren' + (params.get('next') ? '?next=' + encodeURIComponent(params.get('next')) : '');
 
     const notice = document.getElementById('notice');
     if (params.get('discord') && DISCORD[params.get('discord')]) {
@@ -40,7 +40,7 @@
             e.target.disabled = true;
             try {
                 const r = await api.post('/api/discord/signup');
-                location.replace(r.redirect || '/dashboard.html');
+                location.replace(r.redirect || '/dashboard');
             } catch (ex) {
                 notice.textContent = ex.message;
                 notice.classList.remove('hidden');

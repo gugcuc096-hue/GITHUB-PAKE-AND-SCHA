@@ -41,9 +41,15 @@ function caseLevelText(c) {
 /** Badge neben der Akte: Kanzlei sieht nur die Priorität, der Mandant seine Dringlichkeit. */
 const caseLevelBadge = (c) => (isStaff() ? priorityBadge(c) : c.urgency !== 'normal' && URGENCY[c.urgency] ? badge(...URGENCY[c.urgency]) : '');
 
+/** Stern der Merkliste (je Person): gemerkte Akten stehen oben in Aktenliste und Übersicht. */
+function starBtn(c) {
+  const on = !!c.starred;
+  return `<button type="button" class="star-btn${on ? ' on' : ''}" data-action="case-star" data-id="${c.id}" aria-pressed="${on}" title="${on ? 'Aus der Merkliste nehmen' : 'Merken – steht dann oben'}" aria-label="${on ? 'Aus der Merkliste nehmen' : 'Akte merken'}">${icon('star', 'ico-sm')}</button>`;
+}
+
 function caseListRow(c, extra = '', cls = '') {
   return `<div class="list-row${cls ? ` ${cls}` : ''}" data-action="open-case" data-id="${c.id}" role="button" tabindex="0">
-      <div class="main"><div class="title">${esc(c.title)}</div>
+      <div class="main"><div class="title">${c.starred ? starBtn(c) : ''}${esc(c.title)}</div>
         <div class="meta"><span class="font-mono text-gold">${esc(c.caseNumber)}</span> · ${esc(c.clientName)}${caseLevelText(c)}</div></div>
       <div class="flex items-center gap-2 shrink-0">${extra || stageBadge(c)}</div></div>`;
 }
@@ -52,6 +58,10 @@ function kpi(label, value, sub, ico, href) {
   return `<a href="${href}" class="panel kpi block">
       <div class="kpi-label">${icon(ico, 'ico-sm')}${esc(label)}</div>
       <div class="kpi-value" data-count="kpi:${esc(label)}">${esc(value)}</div><div class="kpi-sub">${esc(sub)}</div></a>`;
+}
+/** Kennzahl ohne Inhalt (Mandantenportal): kleine Zeile statt großer Kachel mit „0“ – Wichtiges rückt nach oben. */
+function kpiQuiet(label, note, ico, href) {
+  return `<a href="${href}" class="panel kpi kpi-quiet">${icon(ico, 'ico-sm')}<span class="kpi-label">${esc(label)}</span><span class="kpi-sub">${esc(note)}</span></a>`;
 }
 function kpiEvent(label, e) {
   if (!e) {
@@ -93,7 +103,7 @@ function todoPanel() {
   const caseRef = (number, title) => `Akte <span class="font-mono text-gold">${esc(number)}</span>${title ? ` · ${esc(title)}` : ''}`;
   const items = [];
   for (const k of st.toSign) {
-    items.push(item('edit', `${esc(k.templateName)} unterschreiben`, caseRef(k.caseNumber, k.caseTitle), `<a class="btn-gold btn-sm" href="/vertrag.html?id=${k.id}" target="_blank" rel="noopener">${icon('edit', 'ico-sm')}<span>Lesen &amp; unterschreiben</span></a>`));
+    items.push(item('edit', `${esc(k.templateName)} unterschreiben`, caseRef(k.caseNumber, k.caseTitle), `<a class="btn-gold btn-sm" href="/vertrag?id=${k.id}" target="_blank" rel="noopener">${icon('edit', 'ico-sm')}<span>Lesen &amp; unterschreiben</span></a>`));
   }
   // Überfällige zuerst, dann nach Fälligkeit (ohne Fälligkeit zuletzt)
   const open = st.invoices.filter((x) => x.status === 'offen' && !x.paymentReport).sort((a, b) => b.overdueDays - a.overdueDays || (a.dueDate || '9999').localeCompare(b.dueDate || '9999'));
@@ -104,7 +114,7 @@ function todoPanel() {
         'receipt',
         `${esc(INVOICE_KIND[i.kind])} <span class="font-mono text-gold">${esc(i.number)}</span> über ${esc(money(i.total))} begleichen`,
         [due, i.caseNumber ? caseRef(i.caseNumber) : ''].filter(Boolean).join(' · '),
-        `<button class="btn-gold btn-sm" data-action="inv-pay-report" data-id="${i.id}">${icon('check', 'ico-sm')}<span>Als bezahlt melden</span></button><a class="btn-ghost btn-sm" href="/invoice.html?id=${i.id}" target="_blank" rel="noopener">Ansehen</a>`,
+        `<button class="btn-gold btn-sm" data-action="inv-pay-report" data-id="${i.id}">${icon('check', 'ico-sm')}<span>Als bezahlt melden</span></button><a class="btn-ghost btn-sm" href="/rechnung?id=${i.id}" target="_blank" rel="noopener">Ansehen</a>`,
         i.overdueDays > 0 ? 'urgent' : ''
       )
     );
@@ -211,17 +221,28 @@ views.overview = {
 
     const kpis = staff
       ? [
-          kpi('Neue Anfragen', active.filter((c) => c.status === 'offen').length, `${active.filter((c) => !c.lawyerId).length} ohne Anwalt`, 'folder', '#cases'),
+          (() => {
+            const free = active.filter((c) => !c.lawyerId).length;
+            return kpi('Neue Anfragen', active.filter((c) => c.status === 'offen').length, free ? `${free} ${free === 1 ? 'Akte wartet' : 'Akten warten'} auf einen Anwalt` : 'jede Akte hat einen Anwalt', 'folder', '#cases');
+          })(),
           kpi('In Bearbeitung', active.filter((c) => c.status === 'in_bearbeitung').length, `${active.filter((c) => onCase(c, u.id)).length} davon bei Ihnen`, 'briefcase', '#cases'),
           kpiEvent('Nächste Frist / Termin', nextDeadline),
           kpi('Kanzlei-Post', st.unread, st.unread === 1 ? 'ungelesene Nachricht' : 'ungelesene Nachrichten', 'mail', '#mail'),
         ]
       : [
-          kpi('Meine Akten', active.length, 'laufende Mandate', 'folder', '#cases'),
-          kpiEvent('Nächster Termin', upcoming[0]),
-          kpi('Kanzlei-Post', st.unread, 'ungelesen', 'mail', '#mail'),
-          kpi('Offene Rechnungen', money(openSum), `${openInvoices.length} Dokument(e)`, 'receipt', '#invoices'),
+          active.length ? kpi('Meine Akten', active.length, active.length === 1 ? 'laufendes Mandat' : 'laufende Mandate', 'folder', '#cases') : kpiQuiet('Meine Akten', 'kein laufendes Mandat', 'folder', '#cases'),
+          upcoming[0] ? kpiEvent('Nächster Termin', upcoming[0]) : kpiQuiet('Nächster Termin', 'kein Termin geplant', 'clock', '#calendar'),
+          st.unread ? kpi('Kanzlei-Post', st.unread, 'ungelesen', 'mail', '#mail') : kpiQuiet('Kanzlei-Post', 'nichts Ungelesenes', 'mail', '#mail'),
+          openInvoices.length
+            ? kpi('Offene Rechnungen', money(openSum), openInvoices.length === 1 ? '1 Rechnung' : `${openInvoices.length} Rechnungen`, 'receipt', '#invoices')
+            : kpiQuiet('Offene Rechnungen', 'Keine offenen Rechnungen', 'receipt', '#invoices'),
         ];
+    // Mandant: Kacheln mit Inhalt zuerst und groß, leere als schmale Zeilen darunter
+    const fullKpis = kpis.filter((k) => !k.includes('kpi-quiet'));
+    const quietKpis = kpis.filter((k) => k.includes('kpi-quiet'));
+    const kpiHtml = staff
+      ? `<div class="kpi-grid">${kpis.join('')}</div>`
+      : `${fullKpis.length ? `<div class="kpi-grid${fullKpis.length < 4 ? ` kpi-grid-${fullKpis.length}` : ''}">${fullKpis.join('')}</div>` : ''}${quietKpis.length ? `<div class="kpi-quiet-grid">${quietKpis.join('')}</div>` : ''}`;
 
     const eventsPanel = `
         <section class="panel panel-pad">
@@ -229,7 +250,9 @@ views.overview = {
           ${upcoming.length ? upcoming.map((e) => eventRow(e)).join('') : emptyLine('Keine anstehenden Termine.', 'calendar')}
         </section>`;
 
-    const recent = st.cases.slice(0, 5);
+    // Gemerkte Akten zuerst, danach die zuletzt bearbeiteten
+    const starred = st.cases.filter((c) => c.starred && c.status !== 'geschlossen');
+    const recent = [...starred, ...st.cases.filter((c) => !starred.includes(c))].slice(0, Math.max(5, starred.length));
     const recentPanel = `
         <section class="panel panel-pad">
           <div class="panel-head"><h2 class="panel-title">${staff ? 'Zuletzt bearbeitet' : 'Meine Akten'}</h2><a href="#cases" class="btn-ghost btn-sm">Alle Akten</a></div>
@@ -253,9 +276,18 @@ views.overview = {
         ${staff ? '' : todoPanel()}
         ${dutyStrip()}
         ${absenceStrip()}
-        <div class="kpi-grid">${kpis.join('')}</div>`;
+        ${kpiHtml}`;
 
-    if (!staff) return `${head}<div class="grid-2">${eventsPanel}${recentPanel}</div>`;
+    // Zwei Kästen nebeneinander, einer kurz (≤ 2 Einträge), einer deutlich länger: der kurze wird so hoch wie sein Inhalt
+    // und schmaler, der lange bekommt die Breite – kein leerer Raum im kurzen Kasten.
+    const fit = (a, b) => (b && Math.abs(a - b) >= 3 && Math.min(a, b) <= 2 ? (a < b ? ' ov-fit-l' : ' ov-fit-r') : '');
+    if (!staff) {
+      return `${head}${
+        upcoming.length
+          ? `<div class="grid-2 ov-row${fit(upcoming.length, recent.length + 1)}">${eventsPanel}${recentPanel}</div>`
+          : `<div class="grid-2 ov-row">${recentPanel}</div>`
+      }`;
+    }
 
     const unassigned = active.filter((c) => !c.lawyerId).slice(0, 5);
     const pinned = st.board.filter((n) => n.pinned).slice(0, 3);
@@ -277,10 +309,20 @@ views.overview = {
     const quiet = [
       unassigned.length ? '' : quietRow('check', 'Neue Mandatsanfragen', 'alle Anfragen sind vergeben'),
       pinned.length ? '' : quietRow('pin', 'Pinnwand', 'keine angehefteten Notizen', '<a href="#board" class="btn-ghost btn-sm">Zur Pinnwand</a>'),
+      upcoming.length ? '' : quietRow('calendar', 'Fristen & Termine', 'nichts geplant', `<button class="btn-ghost btn-sm" data-action="new-event">${icon('plus', 'ico-sm')}<span>Frist / Termin</span></button>`),
     ].join('');
-    const panels = [unassigned.length ? requestsPanel : '', eventsPanel, recentPanel, pinned.length ? boardPanel : ''].filter(Boolean);
+    // Je Kasten die Zahl der Einträge: ein Paar aus kurzem und langem Kasten teilt die Breite nach Inhalt auf
+    const panels = [
+      unassigned.length ? [requestsPanel, unassigned.length] : null,
+      upcoming.length ? [eventsPanel, upcoming.length] : null,
+      [recentPanel, Math.max(recent.length, 1)],
+      pinned.length ? [boardPanel, pinned.length] : null,
+    ].filter(Boolean);
     const rows = [];
-    for (let i = 0; i < panels.length; i += 2) rows.push(`<div class="grid-2 ov-row${i ? ' mt-4 lg:mt-5' : ''}">${panels.slice(i, i + 2).join('')}</div>`);
+    for (let i = 0; i < panels.length; i += 2) {
+      const [a, b] = panels.slice(i, i + 2);
+      rows.push(`<div class="grid-2 ov-row${b ? fit(a[1], b[1]) : ''}${i ? ' mt-4 lg:mt-5' : ''}">${a[0]}${b ? b[0] : ''}</div>`);
+    }
     return `${head}
         ${attentionPanel()}
         ${rows.join('')}
@@ -356,7 +398,8 @@ function sortCases(list) {
     neueste: (a, b) => caseTime(b, 'createdAt') - caseTime(a, 'createdAt'),
     aelteste: (a, b) => caseTime(a, 'createdAt') - caseTime(b, 'createdAt'),
   };
-  return list.sort(sorters[mode] || sorters.aktualisiert);
+  const by = sorters[mode] || sorters.aktualisiert;
+  return list.sort((a, b) => !!b.starred - !!a.starred || by(a, b)); // Merkliste zuerst
 }
 
 /**
@@ -417,7 +460,13 @@ function caseTable() {
   // Gewählt bleibt nur, was gerade in der Liste steht (Filter/Suche geändert → nicht mehr sichtbare Akten fallen raus)
   if (selecting) for (const id of st.caseSel) if (!rows.some((c) => c.id === id)) st.caseSel.delete(id);
   if (!rows.length) {
-    return empty(st.cases.length ? 'Keine Akten für diese Auswahl.' : staff ? 'Noch keine Akten angelegt.' : 'Sie haben noch kein Mandat eingereicht.', 'folder');
+    // Nächster Schritt: eingeschränkte Auswahl → zurücksetzen; nur abgeschlossene Akten → ins Archiv bzw. alle zeigen
+    const plain = st.caseFilter === 'aktiv' && !st.caseQuery.trim() && !st.caseMine;
+    return st.cases.length
+      ? plain
+        ? empty('Keine laufenden Akten.', 'folder', nextStep('Alle Akten zeigen', 'case-filter', { value: caseCount('alle') ? 'alle' : 'archiv' }, 'folder'))
+        : empty('Keine Akten für diese Auswahl.', 'folder', nextStep('Filter zurücksetzen', 'cases-filter-reset', {}, 'refresh'))
+      :empty(staff ? 'Noch keine Akten angelegt.' : 'Sie haben noch kein Mandat eingereicht.', 'folder', nextStep(staff ? 'Neue Akte' : 'Mandat einreichen', 'new-case'));
   }
   // Je Akte zwei Zeilen: „Aktenzeichen · Rechtsgebiet“, darunter der Titel. Liegengebliebene Akten: Streifen am Zeilenanfang
   // und „Letzte Aktivität“ in Bernstein.
@@ -427,7 +476,7 @@ function caseTable() {
         rows,
         (c) => `<tr class="row${c.idleDays ? ' row-idle' : ''}${staff && c.priority >= 3 && c.status !== 'geschlossen' ? ` has-tab tab-p${c.priority}` : ''}${selecting && st.caseSel.has(c.id) ? ' is-picked' : ''}" data-action="${selecting ? 'case-pick' : 'open-case'}" data-id="${c.id}"${selecting ? ` aria-selected="${st.caseSel.has(c.id)}"` : ''}>
           ${selecting ? `<td class="td-check"><span class="pick-box" aria-hidden="true">${icon('check', 'ico-sm')}</span></td>` : ''}<td class="td-main"><div class="case-meta"><span class="font-mono text-gold text-xs">${esc(c.caseNumber)}</span><span class="case-dot" aria-hidden="true">·</span><span>${esc(AREAS[c.area] || c.area)}</span>${staff ? '' : caseLevelBadge(c)}</div>
-            <div class="font-medium">${esc(c.title)}${c.chatUnread ? ` <span class="chat-new" title="Neue Nachrichten">${icon('chat', 'ico-sm')}${c.chatUnread}</span>` : ''}</div></td>
+            <div class="font-medium case-title-line">${staff ? starBtn(c) : ''}${esc(c.title)}${c.chatUnread ? ` <span class="chat-new" title="Neue Nachrichten">${icon('chat', 'ico-sm')}${c.chatUnread}</span>` : ''}</div></td>
           ${staff ? `<td data-label="Mandant">${esc(c.clientName)}${c.membership ? `<div class="mt-1">${memberBadge(c.membership)}</div>` : ''}</td>` : ''}
           <td data-label="Zuständig">${c.lawyerName ? `<div class="who"><span class="who-lead">${esc(c.lawyerName)}</span>${(c.coLawyers || []).length ? `<div class="text-xs text-dim">+ ${esc(c.coLawyers.map((l) => l.name).join(', '))}</div>` : ''}</div>` : badge('Unbesetzt', 'amber')}</td>
           ${staff ? `<td data-label="Priorität">${priorityBadge(c, true)}</td>` : ''}
@@ -592,7 +641,7 @@ async function openSearchResult(type, id) {
   if (type === 'invoices') {
     if (x.caseId) return modalInstead(() => openCase(x.caseId));
     closeModal();
-    window.open(`/invoice.html?id=${x.id}`, '_blank', 'noopener');
+    window.open(`/rechnung?id=${x.id}`, '_blank', 'noopener');
     return;
   }
   if (type === 'tasks') {
@@ -692,7 +741,7 @@ function taskList() {
         : st.taskScope === 'mine'
           ? 'Keine offenen Aufgaben – alles erledigt.'
           : 'Keine offenen Aufgaben im Team.';
-    return empty(msg, 'tasks');
+    return empty(msg, 'tasks', st.tasks.length || st.taskState === 'done' ? '' : nextStep('Neue Aufgabe', 'task-new'));
   }
   if (st.taskState === 'done') return `<div class="task-list">${lazyRows(list, (t) => taskItem(t))}</div>`;
   const bucket = (t) => {

@@ -161,7 +161,7 @@ function rolesFor(event) {
   return role ? [role] : [];
 }
 
-function publicUrl(pathname = '/dashboard.html') {
+function publicUrl(pathname = '/dashboard') {
   const base = envValue('PUBLIC_URL').replace(/\/+$/, '');
   return /^https?:\/\//.test(base) ? base + pathname : undefined;
 }

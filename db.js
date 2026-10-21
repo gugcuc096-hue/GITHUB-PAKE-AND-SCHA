@@ -44,6 +44,24 @@ if (fs.existsSync(RESTORE_PATH)) {
 
 const db = new DatabaseSync(DB_PATH);
 db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
+// Schneller ohne Risiko: mit WAL genügt „NORMAL“ (nach einem Absturz fehlt höchstens der letzte Schreibvorgang, die
+// Datei bleibt heil), 16 MB Zwischenspeicher im Arbeitsspeicher, Hilfstabellen im Speicher statt auf der Disk.
+db.exec('PRAGMA synchronous = NORMAL; PRAGMA cache_size = -16000; PRAGMA temp_store = MEMORY;');
+// Vorbereitete Abfragen wiederverwenden statt jedes Mal neu zu übersetzen (gleicher SQL-Text → gleiche Abfrage).
+// Begrenzt, damit Abfragen mit eingesetzten Werten den Speicher nicht füllen.
+{
+  const prepare = db.prepare.bind(db);
+  const statements = new Map();
+  db.prepare = (sql) => {
+    let stmt = statements.get(sql);
+    if (!stmt) {
+      stmt = prepare(sql);
+      if (statements.size >= 1000) statements.clear();
+      statements.set(sql, stmt);
+    }
+    return stmt;
+  };
+}
 
 /* ================================================================
    Tabellen-Definitionen
@@ -1021,6 +1039,7 @@ db.exec(`
 
 // Nachrichten aus dem Discord-Ticket (Übernahme in den Chat der Akte): Discord-Nachrichten-ID gegen Doppelte
 addColumn('notes', 'discord_message_id', 'TEXT');
+addColumn('notes', 'pinned', 'INTEGER NOT NULL DEFAULT 0'); // interne Notiz oben in der Akte angepinnt
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_discord_msg ON notes(discord_message_id) WHERE discord_message_id IS NOT NULL');
 
 // Konto per Discord angelegt: Name im Spiel (IC) wird beim ersten Login einmal abgefragt
@@ -1034,7 +1053,7 @@ addColumn('invoices', 'payment_reported_by', 'INTEGER');
 
 /*
  * Bewerbungen: Nachrichten zwischen Board und Bewerber (Bewerberseite mit persönlichem Link statt Statusabfrage).
- * access_token: geheimer Link /bewerbung.html#<token> · discord_user_id: per Discord-Anmeldung verbunden (Antworten
+ * access_token: geheimer Link /bewerbung#<token> · discord_user_id: per Discord-Anmeldung verbunden (Antworten
  * kommen dann als Discord-Direktnachricht) · *_read_id: bis wohin Bewerber bzw. Board gelesen haben.
  */
 db.exec(`
@@ -1341,6 +1360,32 @@ if (!getSetting('migrated_application_public_note')) {
 // Ältere Anliegen (vor Einführung der Vorgangsnummer) nachträglich nummerieren.
 for (const row of db.prepare('SELECT id FROM concerns WHERE reference IS NULL ORDER BY id').all()) {
   db.prepare('UPDATE concerns SET reference = ?, access_pin = ? WHERE id = ?').run(nextConcernNumber(), randomPin(), row.id);
+}
+
+// Merkliste: Akten, die sich eine Person mit Stern gemerkt hat (je Person, für andere unsichtbar)
+db.exec(`CREATE TABLE IF NOT EXISTS case_stars (
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  case_id    INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (user_id, case_id)
+)`);
+
+/*
+ * Volltextsuche (SQLite FTS5) über Notizen und Chat der Akten: schnell auch bei vielen tausend Einträgen und nach
+ * Relevanz sortiert. Der Index folgt den Notizen über Trigger von selbst; beim Start wird er neu aufgebaut (dauert nur
+ * Bruchteile einer Sekunde und fängt alles auf, was z. B. eine eingespielte Sicherung mitbringt).
+ */
+try {
+  db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(body, content='notes', content_rowid='id', tokenize='unicode61 remove_diacritics 2');
+    CREATE TRIGGER IF NOT EXISTS notes_fts_ai AFTER INSERT ON notes BEGIN INSERT INTO notes_fts(rowid, body) VALUES (new.id, new.body); END;
+    CREATE TRIGGER IF NOT EXISTS notes_fts_ad AFTER DELETE ON notes BEGIN INSERT INTO notes_fts(notes_fts, rowid, body) VALUES ('delete', old.id, old.body); END;
+    CREATE TRIGGER IF NOT EXISTS notes_fts_au AFTER UPDATE OF body ON notes BEGIN
+      INSERT INTO notes_fts(notes_fts, rowid, body) VALUES ('delete', old.id, old.body);
+      INSERT INTO notes_fts(rowid, body) VALUES (new.id, new.body);
+    END;
+    INSERT INTO notes_fts(notes_fts) VALUES ('rebuild');`);
+} catch (err) {
+  console.warn('Volltextsuche nicht verfügbar – die Suche arbeitet ohne Index:', err.message);
 }
 
 module.exports = {

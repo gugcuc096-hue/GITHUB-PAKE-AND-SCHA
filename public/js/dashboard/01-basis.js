@@ -157,6 +157,9 @@ const ICONS = {
   box: 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4',
   idCard: 'M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2',
 };
+/** Wert mit kleinem Kopier-Knopf daneben (Aktenzeichen, FiveNet-Nummer, Links). */
+const copyable = (text, label = 'Kopieren') =>
+  `<span class="copyable">${esc(text)}<button type="button" class="copy-btn" data-action="copy" data-text="${esc(text)}" title="${esc(label)}" aria-label="${esc(label)}">${icon('copy', 'ico-xs')}</button></span>`;
 const icon = (name, cls = 'ico') =>
   `<svg class="${cls}${name === 'send' ? ' i-send' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[name] || ''}"/></svg>`;
 const DISCORD_ICON =
@@ -406,9 +409,15 @@ const emptyArt = (ico) =>
     <circle class="ea-ring" cx="60" cy="38" r="27" pathLength="1"/><circle class="ea-ring ea-ring2" cx="60" cy="38" r="33" pathLength="1"/>
     <path class="ea-spark" d="M96 14l1.6 4.4L102 20l-4.4 1.6L96 26l-1.6-4.4L90 20l4.4-1.6zM24 52l1.2 3.2 3.2 1.2-3.2 1.2L24 61l-1.2-3.2-3.2-1.2 3.2-1.2z"/>
     <g class="ea-icon" transform="translate(45 23) scale(1.25)"><path d="${ICONS[ico] || ICONS.folder}"/></g></svg>`;
-const empty = (text, ico = 'folder') => `<div class="empty">${emptyArt(ico)}<p>${esc(text)}</p></div>`;
+/** Alle Leerzustände gleich gebaut: Zeichnung, ein kurzer Satz und – wo es einen gibt – der nächste Schritt als Knopf. */
+const empty = (text, ico = 'folder', next = '') => `<div class="empty">${emptyArt(ico)}<p>${esc(text)}</p>${next ? `<div class="empty-next">${next}</div>` : ''}</div>`;
 /** Leerer Kasten in der Übersicht: nur eine schmale Zeile, damit das Wichtige nach oben rückt. */
-const emptyLine = (text, ico = 'check') => `<p class="empty-line">${icon(ico, 'ico-sm')}<span>${esc(text)}</span></p>`;
+const emptyLine = (text, ico = 'check', next = '') => `<p class="empty-line">${icon(ico, 'ico-sm')}<span>${esc(text)}</span>${next ? `<span class="empty-next">${next}</span>` : ''}</p>`;
+/** Anzahl mit passendem Wort: nWord(1, 'Rechnung', 'Rechnungen') → „1 Rechnung“, nWord(3, …) → „3 Rechnungen“ (statt „Rechnung(en)“). */
+const nWord = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+/** Knopf „nächster Schritt“ für Leerzustände, z. B. nextStep('Neue Akte', 'new-case'). */
+const nextStep = (label, action, data = {}, ico = 'plus') =>
+  `<button class="btn-outline btn-sm" data-action="${action}"${Object.entries(data).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('')}>${icon(ico, 'ico-sm')}<span>${esc(label)}</span></button>`;
 const pad = (n) => String(n).padStart(2, '0');
 const dayKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const byStart = (a, b) => parseDate(a.startsAt) - parseDate(b.startsAt);
@@ -466,7 +475,7 @@ function initials(name) {
   return ((words[0]?.[0] || '') + (words.length > 1 ? words[words.length - 1][0] : '')).toUpperCase() || '?';
 }
 function avatarImg(url, name) {
-  return url ? `<img src="${esc(url)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : esc(initials(name));
+  return url ? `<img src="${esc(url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : esc(initials(name));
 }
 function avatarInner(u) {
   return avatarImg(u?.avatarUrl, u?.displayName);
@@ -613,6 +622,18 @@ setInterval(tickCountdowns, 1000);
    Daten laden
    ================================================================ */
 const load = {
+  /**
+   * Konto (beim Start), alle Zähler der Navigation und der Dienststatus in einem Abruf. Was hier schon frisch kam,
+   * holt die erste Ansicht danach nicht noch einmal (primed – gilt genau einmal).
+   */
+  async start({ me = true } = {}) {
+    const r = await api.get(`/api/start?today=${dayKey(new Date())}${me ? '' : '&me=0'}`);
+    for (const [k, v] of Object.entries(r.counts || {})) st[k] = v;
+    if (st.view === 'personnel') st.personnelNew = 0;
+    ['unread', 'duty'].forEach((k) => load.primed.add(k));
+    return r;
+  },
+  primed: new Set(),
   async cases() {
     st.cases = (await api.get('/api/cases')).cases;
   },
@@ -639,12 +660,14 @@ const load = {
     st.fees = (await api.get('/api/fees')).fees;
   },
   async unread() {
+    if (load.primed.delete('unread')) return;
     st.unread = (await api.get('/api/messages/unread-count')).unread;
   },
   async messages() {
     st.messages = (await api.get('/api/messages?box=' + st.mailBox)).messages;
   },
   async duty() {
+    if (load.primed.delete('duty')) return;
     if (isStaff()) {
       st.duty = await api.get('/api/duty');
     } else {

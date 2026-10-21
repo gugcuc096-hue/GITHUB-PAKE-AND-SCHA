@@ -35,11 +35,11 @@ function contractCard(k, c) {
   const gdoc = staff && !mine && k.status === 'unterschrieben' ? safeGdoc(k.googleDoc) : null;
   return `<div class="contract-row">
       <div class="contract-main">
-        <div class="flex flex-wrap items-center gap-2">${docTitleLink(`/vertrag.html?id=${k.id}`, esc(k.templateName), 'font-medium')}${statusBadge(CONTRACT_STATUS, k.status)}</div>
+        <div class="flex flex-wrap items-center gap-2">${docTitleLink(`/vertrag?id=${k.id}`, esc(k.templateName), 'font-medium')}${statusBadge(CONTRACT_STATUS, k.status)}</div>
         <div class="text-xs text-dim mt-1">${signs} · erstellt ${esc(fmtDate(k.createdAt))}${k.createdByName ? ' von ' + esc(k.createdByName) : ''}</div>
       </div>
       <div class="contract-actions">
-        ${clientCanSign || mine ? `<a class="btn-gold btn-sm" href="/vertrag.html?id=${k.id}" target="_blank" rel="noopener">${icon('edit', 'ico-sm')}<span>Ansehen & unterschreiben</span></a>` : gdoc ? gdocBtn(gdoc) : docViewBtn(`/vertrag.html?id=${k.id}`)}
+        ${clientCanSign || mine ? `<a class="btn-gold btn-sm" href="/vertrag?id=${k.id}" target="_blank" rel="noopener">${icon('edit', 'ico-sm')}<span>Ansehen & unterschreiben</span></a>` : gdoc ? gdocBtn(gdoc) : docViewBtn(`/vertrag?id=${k.id}`)}
         ${staff && c.canEdit && !k.locked ? `<button type="button" class="btn-ghost btn-sm" data-action="contract-edit" data-id="${k.id}">${icon('edit', 'ico-sm')}<span>Bearbeiten</span></button>` : ''}
         ${staff && c.canEdit && !k.clientSignedAt ? `<button type="button" class="btn-ghost btn-sm" data-action="contract-record" data-id="${k.id}" data-case-id="${c.id}">${icon('check', 'ico-sm')}<span>Unterschrift Mandant erfassen</span></button>` : ''}
         ${staff && (isAdmin() || (c.canEdit && !k.locked)) ? `<button type="button" class="btn-ghost btn-sm fn-danger" data-action="contract-delete" data-id="${k.id}" data-case-id="${c.id}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>` : ''}
@@ -234,11 +234,11 @@ function briefCard(k, c) {
   const gdoc = staff && !mine && k.status === 'unterschrieben' ? safeGdoc(k.googleDoc) : null;
   return `<div class="contract-row">
       <div class="contract-main">
-        <div class="flex flex-wrap items-center gap-2">${docTitleLink(`/vertrag.html?id=${k.id}`, esc(k.templateName), 'font-medium')}${statusBadge(CONTRACT_STATUS, k.status)}${staff ? (k.internal ? badge('nur intern', 'amber') : badge('für Mandant sichtbar', 'sky')) : ''}</div>
+        <div class="flex flex-wrap items-center gap-2">${docTitleLink(`/vertrag?id=${k.id}`, esc(k.templateName), 'font-medium')}${statusBadge(CONTRACT_STATUS, k.status)}${staff ? (k.internal ? badge('nur intern', 'amber') : badge('für Mandant sichtbar', 'sky')) : ''}</div>
         <div class="text-xs text-dim mt-1">${signs ? signs + ' · ' : ''}erstellt ${esc(fmtDate(k.createdAt))}${k.createdByName ? ' von ' + esc(k.createdByName) : ''}</div>
       </div>
       <div class="contract-actions">
-        ${clientCanSign || mine ? `<a class="btn-gold btn-sm" href="/vertrag.html?id=${k.id}" target="_blank" rel="noopener">${icon('edit', 'ico-sm')}<span>Ansehen & unterschreiben</span></a>` : gdoc ? gdocBtn(gdoc) : docViewBtn(`/vertrag.html?id=${k.id}`)}
+        ${clientCanSign || mine ? `<a class="btn-gold btn-sm" href="/vertrag?id=${k.id}" target="_blank" rel="noopener">${icon('edit', 'ico-sm')}<span>Ansehen & unterschreiben</span></a>` : gdoc ? gdocBtn(gdoc) : docViewBtn(`/vertrag?id=${k.id}`)}
         ${staff && c.canEdit && !k.locked ? `<button type="button" class="btn-ghost btn-sm" data-action="brief-edit" data-id="${k.id}">${icon('edit', 'ico-sm')}<span>Bearbeiten</span></button>` : ''}
         ${staff && c.canEdit && c.processTicket && k.status === 'unterschrieben' ? `<button type="button" class="btn-ghost btn-sm" data-action="brief-to-process" data-id="${k.id}" title="Mit Dokument-Link ins Prozessticket der Akte">${icon('send', 'ico-sm')}<span>Ins Prozessticket</span></button>` : ''}
         ${staff && c.canEdit && !k.needsClient ? `<button type="button" class="btn-ghost btn-sm" data-action="brief-visibility" data-id="${k.id}" data-case-id="${c.id}">${icon(k.internal ? 'eye' : 'shield', 'ico-sm')}<span>${k.internal ? 'Für Mandant freigeben' : 'Nur intern'}</span></button>` : ''}
@@ -387,7 +387,7 @@ function externalDocCard(d, c, sortable = false) {
       <div class="fn-head">
         ${sortable ? `<button type="button" class="fn-grip" aria-label="Verschieben: gedrückt halten und ziehen – oder mit den Pfeiltasten ↑ ↓" title="Gedrückt halten und nach oben oder unten ziehen">${icon('grip', 'ico-sm')}</button>` : ''}
         <span class="${p.badgeCls}">${esc(p.name)}</span>
-        <div class="fn-main"><div class="fn-title">${esc(d.title || `${p.noun}${gd ? '' : ' ' + d.documentId}`)}</div><div class="fn-meta">${meta}</div></div>
+        <div class="fn-main"><div class="fn-title">${esc(d.title || `${p.noun}${gd ? '' : ' ' + d.documentId}`)}${!gd && d.documentId ? `<button type="button" class="copy-btn" data-action="copy" data-text="DOC - ${esc(d.documentId)}" title="Aktenzeichen „DOC - ${esc(d.documentId)}“ kopieren" aria-label="FiveNet-Aktenzeichen kopieren">${icon('copy', 'ico-xs')}</button>` : ''}</div><div class="fn-meta">${meta}</div></div>
         ${staff && d.internal ? badge('intern', 'amber') : ''}
       </div>
       ${d.summary ? `<p class="fn-summary">${esc(d.summary)}</p>` : ''}

@@ -10,12 +10,36 @@ const SESSION_DAYS = 7;
 const SESSION_MS = SESSION_DAYS * 24 * 60 * 60 * 1000;
 const RENEW_AFTER_MS = 24 * 60 * 60 * 1000;
 
+/*
+ * Passwörter: scrypt (in Node eingebaut). Das Prüfen bei der Anmeldung läuft in einem Hintergrund-Thread – eine
+ * Anmeldung hält den Server nicht mehr für alle anderen an. Ältere bcrypt-Hashes gelten weiter und werden bei der
+ * nächsten erfolgreichen Anmeldung unbemerkt umgestellt.
+ */
+const SCRYPT = { N: 16384, r: 8, p: 1 };
+const scryptAsync = (plain, salt, len, opts) => new Promise((ok, fail) => crypto.scrypt(plain, salt, len, opts, (err, key) => (err ? fail(err) : ok(key))));
+const encodeHash = (salt, key) => `scrypt$${SCRYPT.N}$${SCRYPT.r}$${SCRYPT.p}$${salt.toString('base64')}$${key.toString('base64')}`;
 function hashPassword(plain) {
-  return bcrypt.hashSync(plain, 10);
+  const salt = crypto.randomBytes(16);
+  return encodeHash(salt, crypto.scryptSync(String(plain), salt, 32, SCRYPT));
 }
-function verifyPassword(plain, hash) {
-  return bcrypt.compareSync(plain, hash);
+async function hashPasswordAsync(plain) {
+  const salt = crypto.randomBytes(16);
+  return encodeHash(salt, await scryptAsync(String(plain), salt, 32, SCRYPT));
 }
+/** true, wenn das Passwort passt (scrypt oder älteres bcrypt). */
+async function verifyPassword(plain, hash) {
+  if (typeof hash !== 'string' || !hash) return false;
+  if (hash.startsWith('scrypt$')) {
+    const [, N, r, p, salt, key] = hash.split('$');
+    const want = Buffer.from(key || '', 'base64');
+    if (!want.length) return false;
+    const got = await scryptAsync(String(plain), Buffer.from(salt, 'base64'), want.length, { N: Number(N), r: Number(r), p: Number(p) });
+    return crypto.timingSafeEqual(got, want);
+  }
+  return bcrypt.compare(String(plain), hash); // bcryptjs arbeitet asynchron in kleinen Häppchen
+}
+/** Älterer Hash (bcrypt) – nach erfolgreicher Anmeldung auf scrypt umstellen. */
+const needsRehash = (hash) => !String(hash || '').startsWith('scrypt$');
 
 /** 22 Zeichen, URL-sicher -- für automatisch erzeugte Start-Passwörter. */
 function generateStrongPassword() {
@@ -163,7 +187,9 @@ module.exports = {
   SESSION_COOKIE,
   findUserByLogin,
   hashPassword,
+  hashPasswordAsync,
   verifyPassword,
+  needsRehash,
   generateStrongPassword,
   generateTempPassword,
   createSession,

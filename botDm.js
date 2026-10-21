@@ -112,7 +112,7 @@ function createAccount(m, chosenName) {
   return { id: Number(info.lastInsertRowid), email, displayName, password };
 }
 
-const loginUrl = () => (tickets.siteBase() ? `${tickets.siteBase()}/login.html` : '');
+const loginUrl = () => (tickets.siteBase() ? `${tickets.siteBase()}/login` : '');
 
 function accessEmbed(kind, acc) {
   const login = loginUrl();

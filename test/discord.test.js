@@ -154,7 +154,7 @@ describe('Nachrichten-Vorlagen: Rollen und Direktnachrichten', () => {
     // Einheitlicher Look: Kanzlei-Logo klein in der Fußzeile, Zeitstempel (Discord zeigt ihn in der Ortszeit des Lesers)
     assert.deepEqual(access.footer, { text: 'Pake & Scha Legal Consulting · Nachricht nicht weitergeben', icon_url: 'https://kanzlei.example/apple-touch-icon.png' });
     assert.ok(!Number.isNaN(Date.parse(access.timestamp)));
-    assert.deepEqual(jaywa.components.at(-1).components[0], { type: 2, style: 5, label: 'Zur Anmeldung', url: 'https://kanzlei.example/login.html' });
+    assert.deepEqual(jaywa.components.at(-1).components[0], { type: 2, style: 5, label: 'Zur Anmeldung', url: 'https://kanzlei.example/login' });
 
     // Mit den Zugangsdaten aus der Direktnachricht anmelden – neues Passwort ist Pflicht
     const john = client(server.base);
