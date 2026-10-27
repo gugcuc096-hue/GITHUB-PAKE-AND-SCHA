@@ -105,6 +105,19 @@ function todoPanel() {
   for (const k of st.toSign) {
     items.push(item('edit', `${esc(k.templateName)} unterschreiben`, caseRef(k.caseNumber, k.caseTitle), `<a class="btn-gold btn-sm" href="/vertrag?id=${k.id}" target="_blank" rel="noopener">${icon('edit', 'ico-sm')}<span>Lesen &amp; unterschreiben</span></a>`));
   }
+  for (const e of st.events.filter((x) => x.proposal && x.clientId === st.user.id)) {
+    items.push(item('calendar', `Terminvorschlag: ${esc(e.title)}`, [`${e.slots.length} Zeiten zur Auswahl`, e.caseNumber ? caseRef(e.caseNumber) : ''].filter(Boolean).join(' · '), `<button class="btn-gold btn-sm" data-action="open-event" data-id="${e.id}">${icon('calendar', 'ico-sm')}<span>Zeit wählen</span></button>`, 'urgent'));
+  }
+  for (const r of st.openRequests) {
+    items.push(
+      item(
+        'doc',
+        `Unterlage nachreichen: ${esc(r.title)}`,
+        [r.note ? esc(r.note) : '', caseRef(r.caseNumber, r.caseTitle)].filter(Boolean).join(' · '),
+        `<button class="btn-gold btn-sm" data-action="open-case-chat" data-id="${r.caseId}">${icon('chat', 'ico-sm')}<span>An die Kanzlei senden</span></button><button class="btn-ghost btn-sm" data-action="req-toggle" data-case-id="${r.caseId}" data-id="${r.id}" data-done="1">Erledigt</button>`
+      )
+    );
+  }
   // Überfällige zuerst, dann nach Fälligkeit (ohne Fälligkeit zuletzt)
   const open = st.invoices.filter((x) => x.status === 'offen' && !x.paymentReport).sort((a, b) => b.overdueDays - a.overdueDays || (a.dueDate || '9999').localeCompare(b.dueDate || '9999'));
   for (const i of open) {
@@ -176,6 +189,7 @@ views.overview = {
       isStaff() ? api.get('/api/absences').then((r) => (st.absences = r)) : null,
       isStaff() ? api.get('/api/onboarding').then((r) => (st.onboarding = r), () => (st.onboarding = null)) : null,
       isAdmin() ? api.get('/api/admin/alerts').then((r) => (st.alerts = r.alerts), () => (st.alerts = [])) : null,
+      !isStaff() ? load.requests().catch(() => (st.openRequests = [])) : null,
       !isStaff() ? api.get('/api/contracts/to-sign').then((r) => (st.toSign = r.contracts), () => (st.toSign = [])) : null,
     ]);
   },

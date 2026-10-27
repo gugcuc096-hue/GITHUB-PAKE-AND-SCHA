@@ -397,6 +397,7 @@ module.exports = {
   sendTestAll,
   envValue,
   oauthConfigured,
+  publicBase,
   oauthDiagnostics,
   oauthConfig,
   authorizeUrl,

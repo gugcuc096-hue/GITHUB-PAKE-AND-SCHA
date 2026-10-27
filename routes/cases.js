@@ -509,6 +509,12 @@ function caseDetail(c, u) {
     linkedEvidence: staff ? linkedEvidence(c.id) : undefined,
     routing: staff ? routingSlip(c.id) : undefined,
     // Kanzlei: Beteiligte (Gegenpartei, Zeugen …) und Überschneidungen mit anderen Akten (Interessenkonflikt prüfen)
+    // Fehlende Unterlagen: Kanzlei und Mandant sehen dieselbe Liste
+    requests: require('../docRequests').listForCase(c.id),
+    // Kanzlei: Einschätzung (Strafmaß-Rechner) und tatsächliches Strafmaß – Grundlage des Vergleichs in der Statistik
+    sentence: staff
+      ? { estimateHe: c.sentence_estimate ?? null, estimateFine: c.sentence_fine ?? null, actualHe: c.sentence_actual_he ?? null, actualFine: c.sentence_actual_fine ?? null }
+      : undefined,
     parties: staff ? require('../parties').listForCase(c.id) : undefined,
     overlaps: staff
       ? (() => {
@@ -608,6 +614,8 @@ const updateSchema = z.object({
   step: z.number().int().min(0).max(3).optional(),
   priority: z.number().int().min(1).max(4).optional(), // nur Kanzlei, intern
   outcome: z.enum(Object.keys(OUTCOMES)).optional(), // Ergebnis beim Abschluss – nur Kanzlei, intern
+  actualHe: z.number().int().min(0).max(100000).nullable().optional(), // tatsächliches Strafmaß (HE) – nur Kanzlei, intern
+  actualFine: z.number().int().min(0).max(100000000).nullable().optional(),
   publicNote: z.string().trim().max(500).optional(),
   lawyerId: z.number().int().positive().nullable().optional(),
   handover: z.string().trim().max(1000).optional(), // Übergabe an den neuen federführenden Anwalt (intern)
@@ -729,9 +737,10 @@ router.patch(
     }
 
     const editFields = Object.keys(FIELD_COLUMNS).filter((k) => d[k] !== undefined);
-    const wantsEdit = editFields.length > 0 || d.status !== undefined || d.priority !== undefined || d.outcome !== undefined;
+    const wantsEdit = editFields.length > 0 || d.status !== undefined || d.priority !== undefined || d.outcome !== undefined || d.actualHe !== undefined || d.actualFine !== undefined;
     if (d.priority !== undefined && !isStaff(u)) return res.status(403).json({ error: 'Die Priorität legen nur die Anwälte fest.' });
     if (d.outcome !== undefined && !isStaff(u)) return res.status(403).json({ error: 'Das Ergebnis hält die Kanzlei fest.' });
+    if ((d.actualHe !== undefined || d.actualFine !== undefined) && !isStaff(u)) return res.status(403).json({ error: 'Das Strafmaß hält die Kanzlei fest.' });
     // Ergebnis: beim Abschließen oder an einer bereits abgeschlossenen Akte (Korrektur)
     if (d.outcome !== undefined && (newStatus || c.status) !== 'geschlossen') {
       return res.status(400).json({ error: 'Das Ergebnis wird beim Abschließen der Akte festgehalten.' });
@@ -759,6 +768,15 @@ router.patch(
       sets.push('outcome = ?');
       values.push(d.outcome);
       internalHistory.push(`Ergebnis: ${OUTCOMES[d.outcome].label}`);
+    }
+    // Tatsächliches Strafmaß: nur intern, stiller Vergleich mit der Einschätzung (Statistik)
+    if (d.actualHe !== undefined && d.actualHe !== c.sentence_actual_he) {
+      sets.push('sentence_actual_he = ?');
+      values.push(d.actualHe);
+    }
+    if (d.actualFine !== undefined && d.actualFine !== c.sentence_actual_fine) {
+      sets.push('sentence_actual_fine = ?');
+      values.push(d.actualFine);
     }
     if (newStatus && newStatus !== c.status) {
       sets.push('status = ?');
@@ -1044,6 +1062,25 @@ router.put(
     const done = db.prepare('UPDATE case_attachments SET thumb = ? WHERE id = ? AND thumb IS NULL').run(saved.file, a.id);
     if (!done.changes) removeFile('evidence', saved.file); // gleichzeitig schon angelegt
     res.json({ attachment: attachmentRow(db.prepare('SELECT * FROM case_attachments WHERE id = ?').get(a.id), c.id) });
+  })
+);
+
+/*
+ * Beitrittslink für den Mandanten (nur Kanzlei): ein Klick auf den Link startet die Discord-Anmeldung und nimmt den
+ * Mandanten ins Ticket der Akte auf. Der Link enthält Aktenzeichen und Pin der Akte – wie die Angaben für den Beitritt
+ * auf der Startseite; er wird nur der Kanzlei angezeigt.
+ */
+router.get(
+  '/:id/join-link',
+  wrap(async (req, res) => {
+    const id = idParam(req);
+    const c = id && getCase(id);
+    if (!c || !isStaff(req.user) || !caseAccess(c, req.user).canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
+    if (!tickets.active() || !discord.oauthConfigured()) {
+      return res.status(400).json({ error: 'Der Discord-Beitritt ist nicht eingerichtet (Tickets und Discord-Anmeldung in den Einstellungen).' });
+    }
+    const url = `${discord.publicBase(req)}/api/discord/case-join?c=${encodeURIComponent(c.case_number)}&p=${encodeURIComponent(c.access_pin)}`;
+    res.json({ url, text: `Hier kommen Sie in den Discord-Kanal Ihrer Akte ${c.case_number}: ${url}` });
   })
 );
 

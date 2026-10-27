@@ -29,7 +29,7 @@ function caseTasksSection(c, tasks) {
       'secTasks',
       'Aufgaben & Wiedervorlagen',
       'noch keine',
-      `<button type="button" class="btn-outline btn-sm" data-action="task-new" data-case-id="${c.id}">${icon('plus', 'ico-sm')}<span>Aufgabe</span></button><button type="button" class="btn-ghost btn-sm" data-action="task-checklist" data-case-id="${c.id}">${icon('tasks', 'ico-sm')}<span>Checkliste ${esc(AREAS[c.area] || '')} übernehmen</span></button>`,
+      `<button type="button" class="btn-outline btn-sm" data-action="task-new" data-case-id="${c.id}">${icon('plus', 'ico-sm')}<span>Aufgabe</span></button><button type="button" class="btn-ghost btn-sm" data-action="task-checklist" data-case-id="${c.id}">${icon('tasks', 'ico-sm')}<span>Checkliste ${esc(AREAS[c.area] || '')} übernehmen</span></button>${c.canEdit ? `<button type="button" class="btn-ghost btn-sm" data-action="task-package" data-case-id="${c.id}">${icon('tasks', 'ico-sm')}<span>Aufgaben-Paket …</span></button>` : ''}`,
       'Mit Datum wird eine Aufgabe zur Wiedervorlage und erscheint rechtzeitig unter „Handlungsbedarf“.'
     );
   return `<div class="section" id="secTasks">
@@ -43,6 +43,7 @@ function caseTasksSection(c, tasks) {
       <div class="task-extra">
         <button type="button" class="btn-ghost btn-sm" data-action="task-checklist" data-case-id="${c.id}">${icon('tasks', 'ico-sm')}<span>Checkliste ${esc(AREAS[c.area] || '')} übernehmen</span></button>
         <button type="button" class="btn-ghost btn-sm" data-action="task-new" data-case-id="${c.id}">${icon('calendar', 'ico-sm')}<span>Mit Zuständigkeit & Notiz …</span></button>
+        ${c.canEdit ? `<button type="button" class="btn-ghost btn-sm" data-action="task-package" data-case-id="${c.id}">${icon('tasks', 'ico-sm')}<span>Aufgaben-Paket …</span></button>` : ''}
       </div>
     </div>`;
 }
@@ -67,6 +68,58 @@ function taskModal(t, preset = {}) {
         <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button>
           <button type="button" class="btn-ghost btn-md" data-action="back-to-case">Abbrechen</button></div>
       </form>`);
+}
+
+/** Aufgaben-Pakete je Anlass („Festnahme“ → Vollmacht, Akteneinsicht, Haftprüfung …) – Auswahl für eine Akte. */
+function taskPackagesHtml(caseId, packages, area) {
+  const sorted = [...packages].sort((a, b) => (b.area === area) - (a.area === area));
+  const cards = sorted
+    .map(
+      (p) => `<div class="pack${p.area === area ? ' is-fit' : ''}">
+        <div class="pack-head"><strong>${esc(p.name)}</strong>${p.area ? badge(AREAS[p.area] || p.area, 'slate') : ''}</div>
+        <ul class="pack-items">${p.items.map((i) => `<li>${esc(i.title)}${i.days != null ? ` <span class="text-dim">· in ${i.days} ${i.days === 1 ? 'Tag' : 'Tagen'}</span>` : ''}</li>`).join('')}</ul>
+        <button type="button" class="btn-outline btn-sm" data-action="task-package-apply" data-id="${p.id}" data-case-id="${caseId}">${icon('plus', 'ico-sm')}<span>${p.items.length} Aufgaben übernehmen</span></button>
+      </div>`
+    )
+    .join('');
+  return `<h2 id="modalTitle" class="modal-title">Aufgaben-Paket</h2>
+    <p class="modal-sub">Legt alle Aufgaben eines Anlasses auf einmal an – mit Fristen ab heute. Schon vorhandene Aufgaben bleiben unberührt.</p>
+    <div class="pack-list">${cards || '<p class="text-sm text-dim">Noch keine Pakete.</p>'}</div>
+    <div class="form-actions mt-4">${isBoard() ? `<button type="button" class="btn-ghost btn-sm" data-action="task-package-edit" data-case-id="${caseId}">${icon('edit', 'ico-sm')}<span>Pakete pflegen</span></button>` : ''}<button type="button" class="btn-ghost btn-md" data-action="back-to-case">Schließen</button></div>`;
+}
+/** Pakete pflegen (Board): ein Formular je Paket, eine Aufgabe pro Zeile, „| Tage“ für die Frist. */
+function taskPackagesEditHtml(caseId, packages) {
+  const form = (p) => `<form data-form="task-package" ${p ? `data-id="${p.id}"` : ''} data-case-id="${caseId}" class="pack-form form-grid cols-2">
+      <div><label class="label">Name</label><input name="name" class="field" required minlength="2" maxlength="60" value="${esc(p ? p.name : '')}" placeholder="z. B. Festnahme"></div>
+      <div><label class="label">Rechtsgebiet</label><select name="area" class="field"><option value="">Alle</option>${Object.entries(AREAS).map(([k, l]) => opt(k, l, p && p.area === k)).join('')}</select></div>
+      <div class="span-2"><label class="label">Aufgaben <span class="text-dim font-normal normal-case tracking-normal">– eine je Zeile, optional „| Tage“ bis zur Frist</span></label><textarea name="items" class="field" rows="5" maxlength="3000" required placeholder="Vollmacht einholen | 1&#10;Akteneinsicht beantragen | 2">${esc(p ? p.itemsText : '')}</textarea></div>
+      <div class="span-2 form-actions"><button type="submit" class="btn-outline btn-sm">${icon('check', 'ico-sm')}<span>${p ? 'Speichern' : 'Paket anlegen'}</span></button>${p ? `<button type="button" class="btn-ghost btn-sm danger" data-action="task-package-del" data-id="${p.id}" data-case-id="${caseId}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>` : ''}</div>
+    </form>`;
+  return `<h2 id="modalTitle" class="modal-title">Aufgaben-Pakete pflegen</h2>
+    <p class="modal-sub">Nur das Board of Partners. Änderungen gelten für künftige Übernahmen – bestehende Aufgaben bleiben.</p>
+    ${packages.map(form).join('<hr class="pack-sep">')}<hr class="pack-sep">
+    <h3 class="section-title">Neues Paket</h3>${form(null)}
+    <div class="form-actions mt-4"><button type="button" class="btn-ghost btn-md" data-action="task-package" data-case-id="${caseId}">Zurück</button></div>`;
+}
+
+/** Fehlende Unterlagen: die Kanzlei fordert an, der Mandant sieht ein To-do (auch im Portal unter „Was ist zu tun?“). */
+function requestsSection(c, list) {
+  const staff = isStaff();
+  const add = c.canEdit && !c.closed ? `<button type="button" class="btn-outline btn-sm" data-action="req-new" data-case-id="${c.id}">${icon('plus', 'ico-sm')}<span>Unterlage anfordern</span></button>` : '';
+  if (!list.length) return staff ? emptySection('secRequests', 'Fehlende Unterlagen', 'keine', add, 'Der Mandant sieht die Anforderung im Portal, im Ticket und wird nach 3 Tagen erinnert.') : '';
+  const open = list.filter((r) => !r.done);
+  const rows = list
+    .map(
+      (r) => `<div class="req-row${r.done ? ' is-done' : ''}" data-id="${r.id}">
+        <button type="button" class="req-check" data-action="req-toggle" data-case-id="${c.id}" data-id="${r.id}" data-done="${r.done ? '' : '1'}" aria-label="${r.done ? 'Wieder offen' : 'Als erledigt markieren'}" title="${r.done ? 'Wieder offen' : staff ? 'Als erledigt markieren' : 'Ich habe es nachgereicht'}">${r.done ? icon('check', 'ico-sm') : ''}</button>
+        <div class="req-main"><div class="req-title">${esc(r.title)}</div>${r.note ? `<div class="req-note">${esc(r.note)}</div>` : ''}<div class="req-meta">angefordert ${esc(fmtDate(r.createdAt))}${r.done ? ` · erledigt${r.doneBy ? ` (${esc(r.doneBy)})` : ''}` : ''}</div></div>
+        ${staff && c.canEdit ? `<button type="button" class="icon-btn sm" data-action="req-del" data-case-id="${c.id}" data-id="${r.id}" aria-label="Anforderung löschen">${icon('trash', 'ico-sm')}</button>` : ''}
+      </div>`
+    )
+    .join('');
+  return `<div class="section" id="secRequests"><h3 class="section-title">Fehlende Unterlagen <span class="text-xs text-dim font-normal sec-meta">${open.length} offen</span></h3>
+      <div class="req-list">${rows}</div>${add ? `<div class="mt-3">${add}</div>` : ''}
+      ${staff ? '' : '<p class="form-hint">Bitte reichen Sie die Unterlagen per Nachricht an die Kanzlei nach und haken Sie sie danach ab.</p>'}</div>`;
 }
 
 async function afterTaskChange() {
@@ -204,7 +257,7 @@ function ticketChips(c, t, transcripts = []) {
         label,
         tone,
         body: `<div class="chip-pop-head">${ticketState(t)}${t.exists ? client : ''}</div><p class="chip-pop-hint">${esc(hint)}</p>${t.error ? `<p class="chip-pop-hint text-red-300">${icon('alert', 'ico-sm')} ${esc(t.error)}</p>` : ''}
-          <div class="chip-pop-actions">${ticketOpen(t.url)}${verlauf}<button class="btn-ghost btn-sm" data-action="ticket-sync" data-id="${c.id}">${t.exists ? 'Abgleichen' : t.deleted ? 'Neu anlegen' : 'Ticket anlegen'}</button></div>`,
+          <div class="chip-pop-actions">${ticketOpen(t.url)}${verlauf}<button class="btn-ghost btn-sm" data-action="ticket-sync" data-id="${c.id}">${t.exists ? 'Abgleichen' : t.deleted ? 'Neu anlegen' : 'Ticket anlegen'}</button>${t.exists && !t.clientInTicket && c.canEdit ? `<button class="btn-outline btn-sm" data-action="client-join-link" data-id="${c.id}" title="Beitrittslink erzeugen: kopieren oder als Nachricht senden">${icon('link', 'ico-sm')}<span>Mandanten-Link</span></button>` : ''}</div>`,
       })
     );
   }
@@ -497,15 +550,32 @@ function closeCaseHtml(data) {
         <p class="form-hint">Abschließen geht trotzdem – die Liste ist nur zur Kontrolle.</p>
       </div>`
     : `<div class="close-check is-done">${icon('check', 'ico-sm')}<span>Nichts mehr offen: keine unbezahlten Rechnungen, alle Unterschriften da, keine offenen Aufgaben oder Termine.</span></div>`;
+  // Noch keine (nicht stornierte) Rechnung: gleich vorschlagen – aus dem Mandatsvertrag und den erfassten Zeiten
+  const sent = data.sentence;
+  const noInvoice = !(data.invoices || []).some((i) => i.status !== 'storniert');
+  const invoiceHint = noInvoice
+    ? `<div class="close-check is-open close-invoice">
+        <div class="close-check-head">${icon('receipt', 'ico-sm')}<span>Noch keine Rechnung</span></div>
+        <p class="form-hint">Aus Vertrag und Zeiten erstellen? Du kommst danach hierher zurück.</p>
+        <button type="button" class="btn-outline btn-sm" data-action="new-invoice" data-case-id="${c.id}">${icon('plus', 'ico-sm')}<span>Rechnung erstellen</span></button>
+      </div>`
+    : '';
   return `
       <p class="text-xs uppercase tracking-[0.2em] text-gold mb-1">Akte ${esc(c.caseNumber)}</p>
       <h2 id="modalTitle" class="modal-title">Verfahren abschließen</h2>
       <p class="modal-sub">${esc(c.title)}</p>
-      ${check}
-      <form data-form="case-close" data-id="${c.id}" class="form-grid mt-5">
+      ${check}${invoiceHint}
+      <form data-form="case-close" data-id="${c.id}" data-no-invoice="${noInvoice ? '1' : ''}" class="form-grid mt-5">
         <div><label class="label" for="ccOutcome">Ergebnis</label>
           <select id="ccOutcome" name="outcome" class="field" required>${outcomeOptions(c.outcome || '')}</select>
           <p class="form-hint">Nur für die Kanzlei – daraus entsteht die Erfolgsquote auf der Startseite. Beratung ohne Verfahren und vorzeitig beendete Mandate zählen dort nicht mit.</p></div>
+        ${
+          sent && sent.estimateHe != null
+            ? `<div><div class="label">Tatsächliches Strafmaß <span class="text-dim font-normal normal-case tracking-normal">– optional, für den Vergleich mit eurer Einschätzung (${esc(String(sent.estimateHe))} HE${sent.estimateFine ? ` · ${esc(money(sent.estimateFine))}` : ''})</span></div>
+          <div class="chg-est"><span class="num-step"><input type="number" name="actualHe" min="0" max="100000" class="field" placeholder="HE" value="${sent.actualHe ?? ''}" aria-label="Tatsächliche Haftstrafe in Hafteinheiten"></span><span>HE</span><span class="num-step"><input type="number" name="actualFine" min="0" max="100000000" class="field" placeholder="$" value="${sent.actualFine ?? ''}" aria-label="Tatsächliche Geldstrafe"></span><span>$</span></div>
+          <p class="form-hint">Nur intern – die Statistik zeigt, wie gut die Einschätzung getroffen hat.</p></div>`
+            : ''
+        }
         <p class="text-sm text-muted">Der Mandant sieht den Abschluss im Portal, ein Discord-Ticket wird archiviert. Wieder öffnen geht jederzeit über den Bearbeitungsstand.</p>
         <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('check', 'ico-sm')}<span>Abschließen</span></button></div>
       </form>`;
@@ -805,7 +875,7 @@ function routingHtml(routing) {
     .join('')}</div>`;
 }
 
-function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, transcripts = [], clientSuggestions, review, chat, charges, deals = [], links = [], linkedEvidence = [], routing = [], parties = [], overlaps = {} }) {
+function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, transcripts = [], clientSuggestions, review, chat, charges, deals = [], links = [], linkedEvidence = [], routing = [], parties = [], overlaps = {}, requests = [] }) {
   const staff = isStaff();
   const admin = isAdmin();
   const me = st.user.id;
@@ -1034,6 +1104,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     briefs: briefsSection(c, briefList),
     external: externalSection(c, externalDocs),
     evidence: attachmentsSection(c, attachments, linkedEvidence),
+    requests: requestsSection(c, requests),
     tasks: staff ? caseTasksSection(c, tasks) : '',
     invoices: invoiceList
       ? `<div class="section" id="secInvoices"><h3 class="section-title">Rechnungen & Honorare</h3>${invoiceSums(c, invoices)}${invoiceList}</div>`
@@ -1049,6 +1120,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     ['secBriefs', 'Schriftsätze', briefList.length, parts.briefs],
     ['secExternal', 'Dokumente', externalDocs.length, parts.external],
     ['secEvidence', 'Beweise', attachments.length + linkedEvidence.reduce((n, k) => n + k.attachments.length, 0), parts.evidence],
+    ['secRequests', 'Unterlagen', requests.filter((r) => !r.done).length, parts.requests],
     ['secTasks', 'Aufgaben', openTasks, parts.tasks],
     ['secInvoices', 'Rechnungen', invoices.length, parts.invoices],
     ['secWork', 'Zeiten', 0, parts.work],
@@ -1098,6 +1170,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       ${parts.briefs}
       ${parts.external}
       ${parts.evidence}
+      ${parts.requests}
       ${parts.tasks}
       ${parts.invoices}
       ${parts.work}
@@ -1367,6 +1440,11 @@ function eventForm(e, preset = {}) {
         <div class="span-2"><label class="label">Ort</label><input name="location" class="field" maxlength="120" value="${esc(v.location ?? (type === 'frist' ? '' : 'Kanzlei Würfelpark'))}" placeholder="z. B. District Court, Saal 2"></div>
         <div class="span-2"><label class="label">Notiz</label><textarea name="note" rows="3" class="field" maxlength="1000" placeholder="Vorbereitung, Unterlagen, Hinweise …">${esc(v.note || '')}</textarea></div>
         <label class="check span-2"><input type="checkbox" name="clientVisible" ${visible ? 'checked' : ''}> Für den Mandanten im Portal sichtbar</label>
+        ${isNew ? `<details class="span-2 slot-box"><summary>Terminvorschlag: Mandant wählt die Zeit</summary>
+          <p class="form-hint">Nur für Mandantengespräche in einer Akte mit Mandanten-Konto. Oben steht die erste Zeit, hier bis zu zwei weitere – der Mandant tippt im Portal eine an, danach ist der Termin bestätigt.</p>
+          <div class="form-grid cols-2"><div><label class="label" for="evSlot2">Zweite Zeit</label><input id="evSlot2" name="slot2" type="datetime-local" class="field"></div>
+          <div><label class="label" for="evSlot3">Dritte Zeit</label><input id="evSlot3" name="slot3" type="datetime-local" class="field"></div></div></details>`
+          : v.proposal ? `<div class="span-2 banner banner-gold"><div>${icon('calendar')} <strong>Mandant wählt aus:</strong> ${v.slots.map((x) => esc(fmtDate(x))).join(' · ')}</div></div>` : ''}
         <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>${isNew ? 'Eintrag anlegen' : 'Speichern'}</span></button>
           <button type="button" class="btn-ghost btn-md" data-action="close-modal">Abbrechen</button></div>
       </form>
@@ -1398,6 +1476,7 @@ function eventDetailClient(e) {
       <p class="modal-sub">${esc(EVENT_TYPES[e.type] || e.type)} · ${statusBadge(EVENT_STATUS, e.status)}</p>
       <div class="info-grid mb-4">${cell('Datum', fmtDay(e.startsAt))}${cell('Uhrzeit', fmtTime(e.startsAt) + ' Uhr')}${cell('Ort', e.location || '—')}${e.caseNumber ? cell('Akte', e.caseNumber) : ''}${e.assignedName ? cell('Ansprechpartner', e.assignedName) : ''}</div>
       ${!['abgesagt', 'erledigt'].includes(e.status) ? `<div class="mb-4">${countdownHtml(e)}${fristBar(e)}</div>` : ''}
+      ${e.proposal && e.clientId === st.user.id ? `<div class="slot-pick mb-4"><div class="k mb-2">Bitte eine Zeit wählen</div><div class="flex flex-wrap gap-2">${e.slots.map((x) => `<button type="button" class="btn-gold btn-md" data-action="event-choose" data-id="${e.id}" data-at="${esc(x)}">${esc(fmtDay(x))}, ${esc(fmtTime(x))} Uhr</button>`).join('')}</div><p class="form-hint">Mit einem Klick bestätigt. Passt keine Zeit? Schreiben Sie der Kanzlei unter „Nachrichten“ in der Akte.</p></div>` : ''}
       ${e.note ? `<div class="tl-item mb-4"><div class="tl-body">${esc(e.note)}</div></div>` : ''}
       ${canCancel ? `<button class="btn-danger btn-md" data-action="event-status" data-id="${e.id}" data-status="abgesagt">Termin absagen</button>` : ''}`;
 }

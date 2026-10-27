@@ -81,7 +81,7 @@ router.get('/', (req, res) => {
   }
 
   // Akten
-  const cases = db.prepare('SELECT id, status, outcome, lawyer_id, created_at, closed_at FROM cases').all();
+  const cases = db.prepare('SELECT id, status, outcome, lawyer_id, created_at, closed_at, sentence_estimate, sentence_fine, sentence_actual_he, sentence_actual_fine FROM cases').all();
   let closed30 = 0;
   let closedPrev30 = 0;
   let opened30 = 0;
@@ -132,6 +132,18 @@ router.get('/', (req, res) => {
     .filter((l) => l.active || l.open || l.closed)
     .sort((a, b) => b.open + b.closed - (a.open + a.closed) || a.name.localeCompare(b.name, 'de'));
 
+  // Einschätzung der Kanzlei (Strafmaß-Rechner) gegen das tatsächliche Strafmaß abgeschlossener Akten
+  const compared = cases.filter((c) => c.status === 'geschlossen' && c.sentence_estimate != null && c.sentence_actual_he != null);
+  const diffs = compared.map((c) => c.sentence_actual_he - c.sentence_estimate);
+  const forecast = {
+    count: compared.length,
+    avgDiff: avg(diffs), // > 0: härter als eingeschätzt
+    avgAbs: avg(diffs.map(Math.abs)),
+    hit: compared.filter((c) => Math.abs(c.sentence_actual_he - c.sentence_estimate) <= Math.max(5, Math.round(c.sentence_estimate * 0.1))).length,
+    better: diffs.filter((d) => d < 0).length,
+    worse: diffs.filter((d) => d > 0).length,
+  };
+
   res.json({
     generatedAt: new Date(now).toISOString(),
     kpis: {
@@ -152,6 +164,7 @@ router.get('/', (req, res) => {
     months,
     weeks,
     lawyers,
+    forecast,
     unassignedOpen: cases.filter((c) => c.status !== 'geschlossen' && !c.lawyer_id).length,
     outcomes: Object.entries(OUTCOMES)
       .map(([key, o]) => ({ key, label: o.label, success: o.success, count: outcomeCount[key] || 0 }))

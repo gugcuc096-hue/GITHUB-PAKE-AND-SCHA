@@ -308,6 +308,15 @@ function taskRow(t) {
 /* ================================================================
    Kalender (Termine, Gerichtstermine, Fristen)
    ================================================================ */
+function parseSlots(json) {
+  try {
+    const list = JSON.parse(json || '[]');
+    return Array.isArray(list) ? list.filter((x) => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
 const APPT_SELECT = `
   SELECT a.*,
          c.case_number, c.title AS case_title, c.client_id AS case_client_id, c.client_name AS case_client_name,
@@ -351,6 +360,9 @@ function apptRow(a, u) {
     createdBy: staff ? a.created_by : undefined,
     creatorName: a.creator_name || null,
     clientVisible: !!a.client_visible,
+    // Terminvorschlag der Kanzlei: der Mandant wählt eine der Zeiten (bis dahin „angefragt“)
+    slots: a.status === 'angefragt' ? parseSlots(a.slots) : [],
+    proposal: a.status === 'angefragt' && parseSlots(a.slots).length > 1,
     clientResponse: a.client_response || null, // Zusage per Discord-Knopf: zugesagt | passt_nicht
     createdAt: a.created_at,
   };
