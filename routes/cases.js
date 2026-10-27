@@ -177,6 +177,12 @@ router.get('/:id/chat', (req, res) => {
   const id = idParam(req);
   const c = id && getCase(id);
   if (!c || !caseAccess(c, req.user).canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
+  // ?before=ID&limit=N: ältere Nachrichten („Ältere laden“); sonst alle neueren nach ?after=
+  if (req.query.before !== undefined) {
+    const before = Math.max(0, Number(req.query.before) || 0);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 40));
+    return res.json({ ...caseChat.page(c.id, { before, limit }), read: caseChat.readState(c, req.user) });
+  }
   const after = Math.max(0, Number(req.query.after) || 0);
   res.json({ messages: caseChat.messages(c.id, after), read: caseChat.readState(c, req.user) });
 });
@@ -435,13 +441,27 @@ router.put(
 
 /* ---------------------------------------------------------------- Detail */
 /** Akte mit allem, was die Person sehen darf (Dashboard, Aktenauszug, Google Doc des Aktenauszugs). */
-function caseDetail(c, u) {
+const LEAN_CHAT = 40; // Nachrichten, die die offene Akte zuerst lädt
+const LEAN_LOG = 60; // Einträge im Verlauf, die die offene Akte zuerst lädt
+/**
+ * lean: das Dashboard lädt nur die jüngsten Nachrichten und Verlaufseinträge (ältere auf Wunsch) – Aktenauszug und
+ * Google Doc bekommen weiterhin alles. all: im Dashboard den ganzen Verlauf laden.
+ */
+function caseDetail(c, u, { lean = false, all = false } = {}) {
   const access = caseAccess(c, u);
   const staff = isStaff(u);
-  const notes = db
+  let notes = db
     .prepare('SELECT * FROM notes WHERE case_id = ? ORDER BY created_at ASC, id ASC')
     .all(c.id)
     .filter((n) => staff || !n.internal);
+  // Dashboard: Nachrichten stehen im Chat (eigene Seite), im Verlauf nur die jüngsten Einträge plus angepinnte Notizen
+  let logMore = 0;
+  if (lean) {
+    const log = notes.filter((n) => n.system || n.internal);
+    const keep = new Set(log.slice(all ? 0 : -LEAN_LOG).map((n) => n.id));
+    logMore = log.length - keep.size;
+    notes = log.filter((n) => keep.has(n.id) || n.pinned);
+  }
   const appointments = db
     .prepare(`${APPT_SELECT} WHERE a.case_id = ? ORDER BY a.starts_at ASC`)
     .all(c.id)
@@ -492,7 +512,8 @@ function caseDetail(c, u) {
     work: isBoard(u) ? { rows: workForCase(c.id), closedAt: c.closed_at || null } : undefined,
     tasks: staff ? tasks.map(taskRow) : undefined,
     // Nachrichten mit dem Mandanten und Lesestand
-    chat: { messages: caseChat.messages(c.id), read: caseChat.readState(c, u) },
+    chat: lean ? { ...caseChat.page(c.id, { limit: all ? 100000 : LEAN_CHAT }), read: caseChat.readState(c, u) } : { messages: caseChat.messages(c.id), read: caseChat.readState(c, u) },
+    logMore: lean && logMore > 0 ? logMore : undefined,
     ticket: tickets.ticketInfo(c, u),
     // Gesicherte Verläufe gelöschter Tickets (nur Kanzlei)
     transcripts: staff ? require('../transcripts').listForCase(c.id) : undefined,
@@ -579,7 +600,7 @@ router.get(
     // Fremde Akten liefern 404 statt 403, damit ihre Existenz nicht verraten wird.
     if (!access.canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
 
-    const detail = caseDetail(c, req.user);
+    const detail = caseDetail(c, req.user, { lean: req.query.lean === '1', all: req.query.all === '1' });
     detail.case.starred = starredIds(req.user.id).has(c.id);
     res.json(detail);
   })

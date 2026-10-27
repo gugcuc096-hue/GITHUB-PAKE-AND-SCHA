@@ -51,6 +51,18 @@ function messages(caseId, after = 0) {
     .map(row);
 }
 
+/**
+ * Eine Seite Nachrichten: die letzten `limit` (vor `before`, falls angegeben), aufsteigend – plus „gibt es ältere?“.
+ * Die Akte lädt nur die jüngsten Nachrichten; ältere kommen auf Wunsch („Ältere laden“).
+ */
+function page(caseId, { before = 0, limit = 40 } = {}) {
+  const rows = db
+    .prepare(`SELECT n.*, u.rank AS author_rank FROM notes n LEFT JOIN users u ON u.id = n.author_id WHERE n.case_id = ? AND ${CHAT} AND (? = 0 OR n.id < ?) ORDER BY n.id DESC LIMIT ?`)
+    .all(caseId, before, before, limit + 1);
+  const more = rows.length > limit;
+  return { messages: rows.slice(0, limit).reverse().map(row), more };
+}
+
 /** Gelesen bis lastId (nie zurück). */
 function markRead(caseId, userId, lastId) {
   if (!(lastId > 0)) return;
@@ -236,4 +248,4 @@ async function nudgeSweep({ now = Date.now() } = {}) {
   return sent;
 }
 
-module.exports = { messages, markRead, readState, unreadFor, importFromDiscord, nudgeSweep, keepImages };
+module.exports = { page, messages, markRead, readState, unreadFor, importFromDiscord, nudgeSweep, keepImages };

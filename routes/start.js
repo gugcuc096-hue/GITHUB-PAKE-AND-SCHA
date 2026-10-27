@@ -12,6 +12,22 @@ const { collect } = require('../collect');
 
 const router = express.Router();
 
+/*
+ * Zwischenspeicher für die Zähler: Das regelmäßige Nachsehen (alle 30 s je offenem Tab, ?me=0) beantwortet der Server
+ * je Person 15 Sekunden lang aus dem Speicher. Jede Änderung über die API (POST/PATCH/PUT/DELETE) leert ihn sofort
+ * (live.js ruft invalidate()) – Zähler hinken also höchstens bei Änderungen nach, die nicht über die Website kommen
+ * (Discord, Zeitpläne), und das nur für wenige Sekunden. Der erste Abruf beim Laden (mit Konto) kommt immer frisch.
+ */
+const TTL_MS = 15000;
+const MAX_ENTRIES = 500;
+const cache = new Map(); // "Nutzer-ID|today|Rolle|Rang" → { at, body }
+const stats = { hits: 0, misses: 0 };
+let invalidatedAt = 0;
+function invalidate() {
+  invalidatedAt = Date.now();
+  cache.clear();
+}
+
 router.get(
   '/',
   requireAuth,
@@ -31,6 +47,15 @@ router.get(
     if (board) Object.assign(jobs, { applications: '/api/admin/applications', names: '/api/name-requests', resolutions: '/api/resolutions/pending', reviews: '/api/reviews?status=neu', vip: '/api/memberships/requests' });
     if (req.query.me === '0') delete jobs.me; // regelmäßiges Nachsehen: nur die Zähler
 
+    // Nur das regelmäßige Nachsehen (ohne Konto) kommt aus dem Zwischenspeicher; Rolle/Rang stehen im Schlüssel
+    const key = `${u.id}|${today}|${u.role}|${u.rank || ''}`;
+    const hit = req.query.me === '0' ? cache.get(key) : null;
+    if (hit && Date.now() - hit.at < TTL_MS) {
+      stats.hits += 1;
+      return res.json(hit.body);
+    }
+    stats.misses += 1;
+    const startedAt = Date.now();
     const r = await collect(req, jobs);
     if (jobs.me && !r.me) return res.status(401).json({ error: 'Bitte melden Sie sich an.' });
 
@@ -48,8 +73,14 @@ router.get(
       });
     }
     for (const k of Object.keys(counts)) if (counts[k] === undefined || counts[k] === null) delete counts[k];
-    res.json({ ...(r.me ? { me: r.me } : {}), counts });
+    const body = { ...(r.me ? { me: r.me } : {}), counts };
+    // Nur speichern, wenn zwischendurch nichts geändert wurde (invalidate() setzt die Marke)
+    if (req.query.me === '0' && invalidatedAt < startedAt) {
+      if (cache.size >= MAX_ENTRIES) cache.clear();
+      cache.set(key, { at: Date.now(), body });
+    }
+    res.json(body);
   })
 );
 
-module.exports = { router };
+module.exports = { router, invalidate, stats };

@@ -260,3 +260,72 @@ describe('Terminvorschläge', () => {
     assert.equal(moved.json.event.proposal, false, 'feste neue Zeit beendet den Vorschlag');
   });
 });
+
+describe('Verlauf und Chat nachladen', () => {
+  let cid;
+  before(async () => {
+    cid = (await as.admin.post('/api/cases', { title: 'Lange Akte', area: 'zivilrecht', clientName: 'Lena Lang' })).json.case.id;
+    for (let i = 1; i <= 55; i++) await as.admin.post(`/api/cases/${cid}/notes`, { body: `Nachricht ${i}`, internal: false });
+    for (let i = 1; i <= 70; i++) await as.admin.post(`/api/cases/${cid}/notes`, { body: `Interne Notiz ${i}`, internal: true });
+  });
+
+  it('?lean=1 liefert nur die jüngsten Nachrichten und Einträge, der Rest kommt auf Wunsch', async () => {
+    const full = (await as.admin.get(`/api/cases/${cid}`)).json;
+    assert.equal(full.chat.messages.length, 55, 'ohne lean: alles (Aktenauszug)');
+    assert.ok(full.notes.some((n) => !n.internal && !n.system), 'ohne lean: auch die Nachrichten in den Einträgen');
+
+    const lean = (await as.admin.get(`/api/cases/${cid}?lean=1`)).json;
+    assert.equal(lean.chat.messages.length, 40);
+    assert.equal(lean.chat.more, true);
+    assert.equal(lean.chat.messages[39].body, 'Nachricht 55', 'die jüngsten, aufsteigend');
+    assert.equal(lean.notes.length, 60);
+    assert.ok(lean.notes.every((n) => n.internal || n.system), 'Nachrichten stehen nur im Chat');
+    assert.ok(lean.logMore >= 10, `älterer Verlauf: ${lean.logMore}`);
+
+    const older = (await as.admin.get(`/api/cases/${cid}/chat?before=${lean.chat.messages[0].id}&limit=40`)).json;
+    assert.equal(older.messages.length, 15);
+    assert.equal(older.more, false);
+    assert.equal(older.messages[0].body, 'Nachricht 1');
+
+    const all = (await as.admin.get(`/api/cases/${cid}?lean=1&all=1`)).json;
+    assert.equal(all.chat.messages.length, 55);
+    assert.equal(all.logMore, undefined);
+    assert.ok(all.notes.length > lean.notes.length);
+  });
+
+  it('der Mandant bekommt weiterhin keine internen Einträge', async () => {
+    const m = client(server.base);
+    await m.post('/api/auth/register', { displayName: 'Lena Lang', email: 'lena.lang', password: 'Mandanten-Passwort-5' });
+    await m.login('lena.lang', 'Mandanten-Passwort-5');
+    await as.admin.patch(`/api/cases/${cid}`, { clientEmail: 'lena.lang' }).catch(() => {});
+    const r = await m.get(`/api/cases/${cid}?lean=1`);
+    assert.equal(r.status, 404, 'fremde Akte bleibt unsichtbar');
+  });
+});
+
+describe('Dateien aus der Akte werden im Browser zwischengespeichert', () => {
+  it('Vorschaubild und Datei: privat, mit ETag – ein zweiter Abruf kommt als 304', async () => {
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+    const up = await as.admin.upload(`/api/cases/${id.a}/attachments?caption=Test`, png, 'image/png');
+    assert.equal(up.status, 201, up.text);
+    const att = up.json.attachment;
+    for (const url of [att.url, att.thumbUrl].filter(Boolean)) {
+      const first = await as.admin.get(url);
+      assert.equal(first.status, 200, url);
+      assert.match(first.headers.get('cache-control'), /private/);
+      const etag = first.headers.get('etag');
+      assert.ok(etag, `ETag für ${url}`);
+      // fetch hängt bei eigenen If-None-Match-Kopfzeilen „no-cache“ an – ein Browser tut das beim normalen Laden nicht
+      const status = await new Promise((resolve, reject) => {
+        const u = new URL(server.base + url);
+        require('node:http')
+          .get({ host: u.hostname, port: u.port, path: u.pathname, headers: { Cookie: as.admin.cookie(), 'If-None-Match': etag } }, (res) => {
+            res.resume();
+            resolve(res.statusCode);
+          })
+          .on('error', reject);
+      });
+      assert.equal(status, 304, url);
+    }
+  });
+});

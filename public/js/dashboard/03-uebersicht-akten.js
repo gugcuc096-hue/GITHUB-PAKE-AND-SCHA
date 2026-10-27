@@ -870,10 +870,13 @@ async function runThumbs() {
  */
 const casePrefetch = new Map(); // id → { at, promise }
 const PREFETCH_MS = 15000;
+// Die Akte lädt zuerst nur die jüngsten Nachrichten und Verlaufseinträge; wer „Ältere laden“ gewählt hat, behält sie beim Neuzeichnen
+const caseFull = new Set();
+const caseUrl = (id) => `/api/cases/${id}?lean=1${caseFull.has(id) ? '&all=1' : ''}`;
 function prefetchCase(id) {
   const hit = casePrefetch.get(id);
   if (!id || (hit && Date.now() - hit.at < PREFETCH_MS)) return;
-  const promise = api.get('/api/cases/' + id);
+  const promise = api.get(caseUrl(id));
   promise.catch(() => casePrefetch.get(id)?.promise === promise && casePrefetch.delete(id));
   casePrefetch.set(id, { at: Date.now(), promise });
 }
@@ -886,18 +889,19 @@ async function openCase(id) {
   // Dauert das Laden, öffnet sich die Akte sofort mit Platzhaltern
   const data = await withModalPlaceholder({ wide: true }, async () => {
     await load.lawyers();
-    return takePrefetchedCase(id) || api.get('/api/cases/' + id);
+    return takePrefetchedCase(id) || api.get(caseUrl(id));
   });
   if (!data) return;
   // Erst öffnen (ein vorheriges Fenster wird samt seinem Zustand beiseitegelegt), dann die Akte merken
   openModal(caseDetail(data), { wide: true, key: `case:${id}`, reopen: () => openCase(id) });
   rememberCase(data);
   st.modalCaseId = id;
+  if (typeof liveSync === 'function') liveSync(); // Mandanten verbinden sich erst, wenn eine Akte offen ist
   initChat(data);
   animateTrack($('#modalBody .track'));
 }
 async function reloadCase(id) {
-  const data = await api.get('/api/cases/' + id);
+  const data = await api.get(caseUrl(id));
   rememberCase(data);
   if (st.modalCaseId === id) {
     // Angefangene Nachricht und Chat-Position bleiben beim Neuzeichnen erhalten

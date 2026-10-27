@@ -483,18 +483,35 @@ function lazyRows(rows, render, cols = 0) {
   if (rows.length <= LIST_PAGE) return rows.map(render).join('');
   for (const id of moreLists.keys()) if (!document.querySelector(`[data-more="${id}"]`)) moreLists.delete(id); // alte Listen vergessen
   const id = `l${++moreSeq}`;
-  moreLists.set(id, { rows, render, pos: LIST_PAGE, cols });
+  const list = { rows, render, pos: LIST_PAGE, cols };
+  moreLists.set(id, list);
+  virtualLists.set(id, list);
   queueMicrotask(watchMoreRows);
   return rows.slice(0, LIST_PAGE).map(render).join('') + moreRowHtml(id, rows.length - LIST_PAGE, cols);
+}
+/**
+ * Zeichnet die Einträge [k * LIST_PAGE, …) als Elemente der Liste id, jedes mit der Nummer k seines Abschnitts
+ * (für das Zusammenklappen weit entfernter Abschnitte, siehe unten).
+ */
+function chunkNodes(list, id, k) {
+  const tpl = document.createElement('template');
+  tpl.innerHTML = list.rows.slice(k * LIST_PAGE, (k + 1) * LIST_PAGE).map(list.render).join('');
+  const nodes = [...tpl.content.children];
+  nodes.forEach((n) => {
+    n.dataset.vl = id;
+    n.dataset.vk = String(k);
+  });
+  return nodes;
 }
 /** Nächste Einträge einer Liste anhängen. */
 function showMoreRows(id) {
   const list = moreLists.get(id);
   const marker = document.querySelector(`[data-more="${id}"]`);
   if (!list || !marker) return;
-  const next = list.rows.slice(list.pos, list.pos + LIST_PAGE);
-  list.pos += next.length;
-  marker.insertAdjacentHTML('beforebegin', next.map(list.render).join(''));
+  const k = Math.floor(list.pos / LIST_PAGE);
+  list.pos = Math.min(list.rows.length, list.pos + LIST_PAGE);
+  marker.before(...chunkNodes(list, id, k));
+  virtualLists.set(id, list);
   const left = list.rows.length - list.pos;
   if (left > 0) marker.outerHTML = moreRowHtml(id, left, list.cols);
   else {
@@ -502,7 +519,60 @@ function showMoreRows(id) {
     moreLists.delete(id);
   }
   watchMoreRows();
+  virtualTick();
 }
+
+/*
+ * Listen virtuell zeichnen: Ist eine lange Liste weit heruntergescrollt, werden Abschnitte (je LIST_PAGE Einträge)
+ * weit außerhalb des Sichtbereichs durch einen leeren Platzhalter gleicher Höhe ersetzt – die Seite behält ihre Länge
+ * und Scrollposition, hat aber nur noch wenige hundert statt tausender Elemente. Kommt man zurück, werden sie wieder
+ * gezeichnet. Der erste Abschnitt bleibt immer stehen.
+ */
+const VIRTUAL_FAR = 2400; // Abstand zum Sichtbereich in Pixeln, ab dem ein Abschnitt zusammengeklappt wird
+const virtualLists = new Map(); // Kennung → Liste (auch, wenn sie vollständig gezeichnet ist)
+function virtualGap(list, id, k, height) {
+  const gap = document.createElement(list.cols ? 'tr' : 'div');
+  gap.className = 'v-gap';
+  gap.dataset.vl = id;
+  gap.dataset.vgap = String(k);
+  gap.setAttribute('aria-hidden', 'true');
+  if (list.cols) gap.innerHTML = `<td colspan="${list.cols}"></td>`;
+  gap.style.height = `${Math.max(0, Math.round(height))}px`;
+  return gap;
+}
+let virtualFrame = 0;
+function virtualTick() {
+  if (virtualFrame) return;
+  virtualFrame = requestAnimationFrame(() => {
+    virtualFrame = 0;
+    const vh = window.innerHeight;
+    for (const [id, list] of virtualLists) {
+      if (!document.querySelector(`[data-vl="${id}"]`)) {
+        virtualLists.delete(id); // Liste ist nicht mehr auf der Seite
+        continue;
+      }
+      if (list.pos <= LIST_PAGE * 3) continue;
+      for (let k = 1; k * LIST_PAGE < list.pos; k++) {
+        const gap = document.querySelector(`[data-vgap="${k}"][data-vl="${id}"]`);
+        if (gap) {
+          const r = gap.getBoundingClientRect();
+          if (r.bottom > -VIRTUAL_FAR && r.top < vh + VIRTUAL_FAR) gap.replaceWith(...chunkNodes(list, id, k)); // wieder in Reichweite
+          continue;
+        }
+        const els = document.querySelectorAll(`[data-vk="${k}"][data-vl="${id}"]`);
+        if (!els.length) continue;
+        const top = els[0].getBoundingClientRect().top;
+        const bottom = els[els.length - 1].getBoundingClientRect().bottom;
+        if (bottom < -VIRTUAL_FAR || top > vh + VIRTUAL_FAR) {
+          els[0].replaceWith(virtualGap(list, id, k, bottom - top));
+          for (let i = 1; i < els.length; i++) els[i].remove();
+        }
+      }
+    }
+  });
+}
+window.addEventListener('scroll', virtualTick, { capture: true, passive: true });
+window.addEventListener('resize', virtualTick, { passive: true });
 // Rechtzeitig nachladen, bevor man unten ankommt (auch im Fenster mit eigenem Scrollbereich)
 const moreObserver = 'IntersectionObserver' in window ? new IntersectionObserver((entries) => entries.forEach((e) => e.isIntersecting && showMoreRows(e.target.dataset.more)), { rootMargin: '600px 0px' }) : null;
 function watchMoreRows() {

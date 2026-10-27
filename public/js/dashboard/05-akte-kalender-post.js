@@ -756,6 +756,7 @@ function chatSection(c, chat, ticket) {
       <h3 class="section-title">Nachrichten <span class="text-xs text-dim font-normal sec-meta">${staff ? 'mit dem Mandanten' : 'mit Ihrer Kanzlei'}</span></h3>
       <div class="chat">
         <div class="chat-list" id="chatList" data-case-id="${c.id}" data-last-id="${list.length ? list[list.length - 1].id : 0}" data-other-read="${chat ? chat.read.other : 0}" data-other-at="${esc((chat && chat.read.otherAt) || '')}" aria-live="polite">
+          ${chat && chat.more ? `<div class="chat-more"><button type="button" class="btn-ghost btn-sm" data-action="chat-older" data-case-id="${c.id}">${icon('chevronUp', 'ico-sm')}<span>Ältere Nachrichten laden</span></button></div>` : ''}
           ${list.length ? chatBubbles(list, caseBubble) : `<p class="chat-empty">${esc(empty)}</p>`}
         </div>
         ${dutyLine}
@@ -875,7 +876,7 @@ function routingHtml(routing) {
     .join('')}</div>`;
 }
 
-function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, transcripts = [], clientSuggestions, review, chat, charges, deals = [], links = [], linkedEvidence = [], routing = [], parties = [], overlaps = {}, requests = [] }) {
+function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, transcripts = [], clientSuggestions, review, chat, charges, deals = [], links = [], linkedEvidence = [], routing = [], parties = [], overlaps = {}, requests = [], logMore = 0 }) {
   const staff = isStaff();
   const admin = isAdmin();
   const me = st.user.id;
@@ -1176,6 +1177,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       ${parts.work}
       <div class="section" id="secNotes"><h3 class="section-title">${staff ? 'Verlauf & interne Notizen' : 'Verlauf'}</h3>
         <p class="case-origin">Eröffnet ${esc(fmtDate(c.createdAt))}${staff ? ` · Eingang über ${esc(SOURCES[c.source] || c.source)}` : ''}</p>
+        ${logMore ? `<div class="log-more"><button type="button" class="btn-ghost btn-sm" data-action="log-older" data-case-id="${c.id}">${icon('chevronDown', 'ico-sm')}<span>${logMore} ältere ${logMore === 1 ? 'Eintrag' : 'Einträge'} laden</span></button></div>` : ''}
         ${noteList}
         ${staff
         ? `<form data-form="add-note" data-id="${c.id}" class="mt-4 space-y-3">
