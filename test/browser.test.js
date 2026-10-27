@@ -3849,6 +3849,8 @@ describe('Browser: Startseite ↔ Dashboard – Anmelden im Dialog, „Willkomme
         const page = await ctx.newPage();
         const problems = [];
         page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
+        const loginCalls = [];
+        page.on('request', (r) => r.url().includes('/api/auth/login') && loginCalls.push(r.postData()));
         await page.goto(srv.base + '/');
         await page.waitForSelector('#ticketForm', { state: 'attached' });
 
@@ -3868,7 +3870,10 @@ describe('Browser: Startseite ↔ Dashboard – Anmelden im Dialog, „Willkomme
         await page.waitForFunction(() => document.querySelector('#ldError').textContent.length > 3);
         await page.fill('#ldPassword', 'Mandanten-Passwort-5');
         await page.click('#ldSubmit');
-        await page.waitForSelector('#welcomeStrip');
+        await page.waitForSelector('#welcomeStrip', { timeout: 15000 }).catch(async (e) => {
+          const state = await page.evaluate(() => JSON.stringify({ error: document.querySelector('#ldError').textContent, dialogOpen: !document.querySelector('#loginDialog').className.includes('pointer-events-none'), path: location.pathname, strips: document.querySelectorAll('#welcomeStrip').length, switchNode: !!document.querySelector('.site-switch') }));
+          throw new Error(`${e.message} – Zustand: ${state} – Anmeldungen: ${JSON.stringify(loginCalls)}`);
+        });
         assert.equal(new URL(page.url()).pathname, '/', 'nach dem Anmelden bleibt man auf der Seite');
         assert.ok(await page.$('#loginDialog.pointer-events-none'), 'Dialog zu');
 

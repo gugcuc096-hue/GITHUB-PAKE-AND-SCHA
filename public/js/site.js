@@ -376,7 +376,8 @@
     dlg.classList.remove('opacity-0', 'pointer-events-none');
     document.body.style.overflow = 'hidden';
     api.get('/api/discord/status').then((s) => s.oauth && document.getElementById('ldDiscord').classList.remove('hidden')).catch(() => {});
-    setTimeout(() => document.getElementById('ldEmail').focus(), 60);
+    // Cursor ins erste Feld – aber nie, wenn jemand schon schneller war und ein Feld im Dialog gewählt hat
+    setTimeout(() => !dlg.contains(document.activeElement) && document.getElementById('ldEmail').focus(), 60);
   }
   function closeLogin() {
     if (!dlg) return;
