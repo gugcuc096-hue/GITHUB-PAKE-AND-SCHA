@@ -95,6 +95,7 @@ app.post('/api/events/presence', requireAuth, live.presence); // wer hat die Akt
 /* ---------------------------------------------------------------- API */
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/summary', require('./routes/summary').router); // Startseite: „Willkommen zurück“ mit dem, was ansteht
 app.use('/api/start', require('./routes/start').router); // Dashboard-Start: Konto + alle Zähler in einem Abruf
 // Jede Änderung an einer Akte (Notizen, Anhänge, Status, Verträge …) schreibt das Google Doc ihres Aktenauszugs neu –
 // ohne Knopf. Chat und „gelesen“ stehen nicht im Auszug.

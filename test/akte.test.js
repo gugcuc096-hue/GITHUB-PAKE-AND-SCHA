@@ -329,3 +329,39 @@ describe('Dateien aus der Akte werden im Browser zwischengespeichert', () => {
     }
   });
 });
+
+describe('Startseite und Dashboard: Zusammenfassung, Kanzleisitz', () => {
+  it('„Willkommen zurück“: Mandant sieht Unterlagen und Terminvorschläge, Kanzlei ihre Fristen – nur mit Anmeldung', async () => {
+    assert.equal((await client(server.base).get('/api/summary')).status, 401);
+    const m = client(server.base);
+    await m.post('/api/auth/register', { displayName: 'Greta Gast', email: 'greta.gast', password: 'Mandanten-Passwort-5' });
+    await m.login('greta.gast', 'Mandanten-Passwort-5');
+    const c = (await as.admin.post('/api/cases', { title: 'Mietstreit Rockford', area: 'zivilrecht', clientEmail: 'greta.gast' })).json.case;
+    await as.admin.post(`/api/cases/${c.id}/requests`, { title: 'Mietvertrag als Foto' });
+    const day = (n, h) => new Date(Date.now() + n * 864e5 + h * 36e5).toISOString();
+    await as.admin.post('/api/calendar', { type: 'mandant', title: 'Erstgespräch', startsAt: day(4, 2), caseId: c.id, slots: [day(3, 1), day(5, 3)] });
+    const s = (await m.get('/api/summary')).json;
+    assert.equal(s.name, 'Greta');
+    assert.equal(s.role, 'mandant');
+    assert.ok(s.items.some((i) => /Unterlage nachreichen: Mietvertrag als Foto/.test(i.text)), JSON.stringify(s.items));
+    const prop = s.items.find((i) => i.kind === 'proposal');
+    assert.ok(prop && /^\/dashboard\?event=\d+$/.test(prop.href));
+    assert.equal(s.cases[0].href, `/dashboard?case=${c.id}`);
+    assert.ok(s.items.every((i) => i.href.startsWith('/dashboard')), 'nur Direktlinks ins Dashboard');
+    const staff = (await as.admin.get('/api/summary')).json;
+    assert.equal(staff.role, 'admin');
+    assert.ok(!staff.items.some((i) => i.kind === 'requests'));
+  });
+
+  it('Kanzleisitz: eine Einstellung für Website, Rechnungen und den Ort neuer Termine', async () => {
+    assert.deepEqual((await client(server.base).get('/api/public/firm')).json, { seat: 'Würfelpark, Los Santos', place: 'Würfelpark' });
+    assert.equal((await as.anwalt.patch('/api/admin/settings', { firmSeat: 'Vinewood Hills, Los Santos' })).status, 403, 'nur Board');
+    const set = await as.admin.patch('/api/admin/settings', { firmSeat: 'Vinewood Hills, Los Santos' });
+    assert.equal(set.status, 200, set.text);
+    assert.deepEqual((await client(server.base).get('/api/public/firm')).json, { seat: 'Vinewood Hills, Los Santos', place: 'Vinewood Hills' });
+    assert.equal((await as.admin.get('/api/invoices/firm')).json.firm.seat, 'Vinewood Hills, Los Santos');
+    const ev = (await as.admin.post('/api/calendar', { type: 'mandant', title: 'Ort-Test', startsAt: new Date(Date.now() + 864e5).toISOString() })).json.event;
+    assert.equal(ev.location, 'Kanzlei Vinewood Hills');
+    await as.admin.patch('/api/admin/settings', { firmSeat: 'Würfelpark, Los Santos' });
+  });
+});

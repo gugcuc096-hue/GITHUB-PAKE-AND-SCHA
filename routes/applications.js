@@ -6,7 +6,7 @@ const { z } = require('zod');
 const { db, tx, nextApplicationNumber, randomPin } = require('../db');
 const { requireAuth, requireAdmin, hashPassword, generateTempPassword } = require('../auth');
 const { wrap, parseBody, idParam, isoDateTime, deriveInitials, truncate, APPLICATION_STATUS, rankField, BOARD_RANKS, RANKS, isBoard, firmEmail, EMAIL_HINT } = require('../helpers');
-const { applicationRow, positionRow, logActivity } = require('../models');
+const { applicationRow, positionRow, logActivity, firmPlace } = require('../models');
 const discord = require('../discord');
 const personnel = require('./personnel');
 const tickets = require('../tickets');
@@ -408,7 +408,7 @@ adminRouter.post(
     const d = parseBody(z.object({ startsAt: isoDateTime, location: z.string().trim().max(120).optional(), publicNote: z.string().trim().max(1000).optional() }), req, res);
     if (!d) return;
     const startsAt = new Date(d.startsAt).toISOString();
-    const location = d.location || 'Kanzlei Würfelpark';
+    const location = d.location || `Kanzlei ${firmPlace()}`;
     const when = new Date(startsAt).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', dateStyle: 'full', timeStyle: 'short' });
     const invite = d.publicNote || `Wir laden Sie zum Bewerbungsgespräch ein: ${when} Uhr · Ort: ${location}. Bitte geben Sie uns hier kurz Bescheid, ob der Termin passt.`;
     tx(() => {

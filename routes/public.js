@@ -25,6 +25,12 @@ const limit = (windowMs, max, message, skipFailedRequests = false) =>
 const requestLimiter = limit(60 * 60 * 1000, 5, 'Sie haben bereits mehrere Anfragen gesendet. Bitte versuchen Sie es später erneut.', true);
 
 /* Eilnotdienst: Wer ist gerade im Dienst? (abschaltbar unter Einstellungen) */
+/** Kanzleisitz für die Website (eine Einstellung – dieselbe wie Rechnungen und Termin-Orte). */
+router.get('/firm', (req, res) => {
+  const { firmSeat, firmPlace } = require('../models');
+  res.json({ seat: firmSeat(), place: firmPlace() });
+});
+
 router.get('/on-duty', (req, res) => {
   if (getSetting('show_duty_public', '1') !== '1') return res.json({ visible: false, count: null, members: [] });
   const members = onDutyMembers().map((m) => ({ name: m.name, rank: m.rank, status: m.status, statusLabel: m.statusLabel }));

@@ -283,6 +283,7 @@ function settingsPayload() {
     discordOAuthConfigured: discord.oauthConfigured(),
     discordOAuth: discord.oauthDiagnostics(),
     firmAddress: getSetting('firm_address', 'Pake & Scha Legal Consulting\nWürfelpark\nLos Santos, San Andreas'),
+    firmSeat: require('../models').firmSeat(),
     firmPaymentInfo: getSetting('firm_payment_info', 'Zahlbar per Überweisung an Pake & Scha Legal Consulting (Maze Bank).'),
     firmContact: getSetting('firm_contact', 'kontakt@pake-scha.ls'),
     invoiceReminderDays: require('../paymentReminders').reminderDays(),
@@ -313,6 +314,7 @@ router.patch(
       discordEventWebhooks: z.record(z.string().trim().max(300)).optional(),
       discordEventRoles: z.record(z.string().trim().max(40)).optional(),
       firmAddress: z.string().trim().max(300).optional(),
+      firmSeat: z.string().trim().min(2).max(80).optional(),
       firmPaymentInfo: z.string().trim().max(300).optional(),
       firmContact: z.string().trim().max(120).optional(),
       invoiceReminderDays: z.number().int().min(0).max(60).optional(),
@@ -379,6 +381,7 @@ router.patch(
       if (d.discordEventRoles !== undefined) setSetting('discord_event_roles', JSON.stringify(d.discordEventRoles));
       if (d.discordPingEvents !== undefined) setSetting('discord_ping_events', JSON.stringify(d.discordPingEvents.filter((e) => discord.EVENTS[e])));
       if (d.firmAddress !== undefined) setSetting('firm_address', d.firmAddress);
+      if (d.firmSeat !== undefined) setSetting('firm_seat', d.firmSeat);
       if (d.firmPaymentInfo !== undefined) setSetting('firm_payment_info', d.firmPaymentInfo);
       if (d.firmContact !== undefined) setSetting('firm_contact', d.firmContact);
       if (d.invoiceReminderDays !== undefined) require('../paymentReminders').setReminderDays(d.invoiceReminderDays);
@@ -389,7 +392,7 @@ router.patch(
       if (d.fivenetUrl !== undefined) setSetting('fivenet_url', d.fivenetUrl);
     });
     // Anschrift/Zahlungshinweis stehen auf den Rechnungen → deren Google Docs neu schreiben
-    if (d.firmAddress !== undefined || d.firmPaymentInfo !== undefined || d.firmContact !== undefined) require('../googleDocs').touchKind('invoice');
+    if (d.firmAddress !== undefined || d.firmSeat !== undefined || d.firmPaymentInfo !== undefined || d.firmContact !== undefined) require('../googleDocs').touchKind('invoice');
     // Links „DOC - Nummer“ in Schriftsätzen zeigen auf die FiveNet-Instanz → bei neuer Adresse deren Google Docs neu schreiben
     if (d.fivenetUrl !== undefined && d.fivenetUrl !== fivenetBefore) require('../googleDocs').touchKind('contract');
     res.json({ settings: settingsPayload() });

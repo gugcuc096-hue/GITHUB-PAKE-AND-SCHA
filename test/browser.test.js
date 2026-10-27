@@ -3826,3 +3826,121 @@ describe('Browser: Bewegungs-System – Tokens, Knöpfe, Felder, Menüs, Fenster
     }
   });
 });
+
+describe('Browser: Startseite ↔ Dashboard – Anmelden im Dialog, „Willkommen zurück“, Umschalter, Direktlinks', { skip: chromium ? false : 'Playwright nicht installiert' }, () => {
+  const inDays = (n, h = 10) => {
+    const d = new Date(Date.now() + n * 864e5);
+    d.setUTCHours(h, 0, 0, 0);
+    return d.toISOString();
+  };
+  for (const [label, device] of [['PC', DESKTOP], ['Handy', PHONE]]) {
+    it(`${label}: im Dialog anmelden (bleibt auf der Seite), Willkommen zurück mit Direktlinks, Umschalter, Mandat im Dashboard`, async () => {
+      const srv = await startServer();
+      const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+      try {
+        const a = client(srv.base);
+        await a.login(TEAM.admin);
+        const m = client(srv.base);
+        assert.equal((await m.post('/api/auth/register', { displayName: 'Tina Termin', email: 'tina.termin', password: 'Mandanten-Passwort-5' })).status, 201);
+        const c = (await a.post('/api/cases', { title: 'Beratung Mietrecht', area: 'zivilrecht', clientEmail: 'tina.termin' })).json.case;
+        await a.post(`/api/cases/${c.id}/requests`, { title: 'Mietvertrag als Foto' });
+        const ev = (await a.post('/api/calendar', { type: 'mandant', title: 'Erstgespräch', startsAt: inDays(5, 14), caseId: c.id, slots: [inDays(3, 10), inDays(4, 16)] })).json.event;
+        const ctx = await browser.newContext({ ...device, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+        const page = await ctx.newPage();
+        const problems = [];
+        page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
+        await page.goto(srv.base + '/');
+        await page.waitForSelector('#ticketForm', { state: 'attached' });
+
+        // Besucher: Kanzleisitz kommt aus den Einstellungen, „Login“ öffnet den Dialog statt einer neuen Seite
+        await page.waitForFunction(() => document.querySelector('[data-firm-seat]')?.textContent === 'Würfelpark, Los Santos');
+        assert.equal(await page.$('#welcomeStrip'), null);
+        const loginBtn = device === PHONE ? '#menuToggle' : 'header [data-auth-link]';
+        if (device === PHONE) {
+          await page.click('#menuToggle');
+          await page.click('#mobileMenu [data-auth-link]');
+        } else await page.click(loginBtn);
+        await page.waitForSelector('#loginDialog:not(.pointer-events-none)');
+        assert.equal(new URL(page.url()).pathname, '/', 'der Dialog öffnet sich auf der Startseite');
+        await page.fill('#ldEmail', 'tina.termin');
+        await page.fill('#ldPassword', 'falsch');
+        await page.click('#ldSubmit');
+        await page.waitForFunction(() => document.querySelector('#ldError').textContent.length > 3);
+        await page.fill('#ldPassword', 'Mandanten-Passwort-5');
+        await page.click('#ldSubmit');
+        await page.waitForSelector('#welcomeStrip');
+        assert.equal(new URL(page.url()).pathname, '/', 'nach dem Anmelden bleibt man auf der Seite');
+        assert.ok(await page.$('#loginDialog.pointer-events-none'), 'Dialog zu');
+
+        // Willkommen zurück: was ansteht, mit Direktlinks, und die zuletzt bearbeitete Akte
+        const strip = await page.textContent('#welcomeStrip');
+        assert.match(strip, /Willkommen zurück, Tina/);
+        assert.match(strip, /Unterlage nachreichen: Mietvertrag als Foto/);
+        assert.match(strip, /Terminvorschlag/);
+        assert.match(strip, /Beratung Mietrecht/);
+        if (device === PHONE) assert.ok((await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 1, 'Startseite passt aufs Handy');
+        // Umschalter statt „Login“ (am Handy steht er nicht in der Kopfleiste: dort gibt es das Menü)
+        if (device === DESKTOP) {
+          assert.equal(await page.isVisible('header .site-switch'), true);
+          assert.equal(await page.$eval('header .site-switch a.is-active', (e) => e.textContent), 'Website');
+          assert.equal(await page.isVisible('header .btn-outline[data-auth-link]'), false, 'kein „Login“ mehr');
+        }
+
+        // Direktlink: der Terminvorschlag öffnet sich im Dashboard mit den Zeiten zur Auswahl
+        await page.click(`#welcomeStrip a[href="/dashboard?event=${ev.id}"]`);
+        await page.waitForURL(/\/dashboard/);
+        await page.waitForSelector('.slot-pick [data-action="event-choose"]');
+        assert.equal((await page.$$('.slot-pick [data-action="event-choose"]')).length, 3);
+        if (device === DESKTOP) {
+          assert.equal(await page.$eval('.site-switch-top a.is-active', (e) => e.textContent), 'Dashboard');
+          await page.click('.modal-close');
+          await page.click('.site-switch-top a[href="/"]'); // zurück zur Website – mit sanftem Übergang
+          await page.waitForURL((u) => u.pathname === '/');
+          await page.waitForSelector('#welcomeStrip');
+        } else await page.goto(srv.base + '/');
+        await page.waitForSelector('#welcomeStrip');
+
+        // „Mandat einreichen“: als angemeldeter Mandant im Dashboard (eine Quelle), nicht im Formular der Startseite
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await page.evaluate(() => window.openTicketModal('hero'));
+        await page.waitForURL(/\/dashboard/);
+        await page.waitForSelector('form[data-form="new-case"]');
+        assert.deepEqual(problems, []);
+        await ctx.close();
+      } finally {
+        await browser.close();
+        await srv.stop();
+      }
+    });
+  }
+
+  it('Kanzlei meldet sich im Dialog an und landet im Dashboard; Zwei-Faktor und Mandat mit Tarifrechner bleiben auf der Startseite', async () => {
+    const srv = await startServer();
+    const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+    try {
+      const ctx = await browser.newContext({ ...DESKTOP, locale: 'de-DE' });
+      const page = await ctx.newPage();
+      await page.goto(srv.base + '/');
+      await page.click('header [data-auth-link]');
+      await page.waitForSelector('#loginDialog:not(.pointer-events-none)');
+      await page.fill('#ldEmail', TEAM.admin);
+      await page.fill('#ldPassword', PASSWORD);
+      await page.click('#ldSubmit');
+      await page.waitForURL(/\/dashboard/, { waitUntil: 'commit' });
+      await page.waitForSelector('#nav a.nav-item', { state: 'attached', timeout: 60000 });
+      await ctx.close();
+
+      // Besucher: das Formular der Startseite bleibt (Konto ist keine Pflicht)
+      const g = await browser.newContext({ ...DESKTOP, locale: 'de-DE' });
+      const gp = await g.newPage();
+      await gp.goto(srv.base + '/');
+      await gp.evaluate(() => window.openTicketModal('hero'));
+      await gp.waitForSelector('#ticketModal:not(.pointer-events-none)');
+      assert.equal(new URL(gp.url()).pathname, '/');
+      await g.close();
+    } finally {
+      await browser.close();
+      await srv.stop();
+    }
+  });
+});

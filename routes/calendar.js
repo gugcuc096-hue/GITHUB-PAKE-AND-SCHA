@@ -4,7 +4,7 @@ const { z } = require('zod');
 const { db } = require('../db');
 const { requireAuth, isStaff } = require('../auth');
 const { wrap, parseBody, idParam, isoDateTime, EVENT_TYPES, truncate } = require('../helpers');
-const { getCase, caseAccess, APPT_SELECT, getAppointment, apptVisible, apptRow } = require('../models');
+const { getCase, caseAccess, APPT_SELECT, getAppointment, apptVisible, apptRow, firmPlace } = require('../models');
 const discord = require('../discord');
 const tickets = require('../tickets');
 const apptConfirm = require('../apptConfirm');
@@ -85,7 +85,7 @@ router.post(
         clientId: u.id,
         assignedTo: c ? c.lawyer_id : null,
         clientVisible: 1,
-        location: d.location || 'Kanzlei Würfelpark',
+        location: d.location || `Kanzlei ${firmPlace()}`,
       };
     } else {
       let assignedTo = d.assignedTo === undefined ? u.id : d.assignedTo;
@@ -106,7 +106,7 @@ router.post(
         clientId: c ? c.client_id : null,
         assignedTo,
         clientVisible: (d.clientVisible ?? ['mandant', 'gericht'].includes(d.type)) ? 1 : 0,
-        location: d.location ?? (d.type === 'frist' ? '' : 'Kanzlei Würfelpark'),
+        location: d.location ?? (d.type === 'frist' ? '' : `Kanzlei ${firmPlace()}`),
       };
     }
 

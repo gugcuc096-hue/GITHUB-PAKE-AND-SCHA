@@ -339,7 +339,7 @@ async function invoiceDocx(inv, firm) {
 
   // Fußzeile am Ende des Dokuments (wie im Browser)
   body.push(
-    para([...runs('Pake & Scha Legal Consulting · Würfelpark, Los Santos', { font: 'Inter', size: rem(0.7), color: MUTED }), new D.TextRun({ text: '\t' }), ...runs(inv.number, { font: 'Inter', size: rem(0.7), color: MUTED })], {
+    para([...runs(`Pake & Scha Legal Consulting · ${require('./models').firmSeat()}`, { font: 'Inter', size: rem(0.7), color: MUTED }), new D.TextRun({ text: '\t' }), ...runs(inv.number, { font: 'Inter', size: rem(0.7), color: MUTED })], {
       before: rem(2.5),
       border: { top: { style: D.BorderStyle.SINGLE, size: eighths(0.75), color: HAIR, space: 9 } },
       tabStops: [{ type: D.TabStopType.RIGHT, position: W }],
