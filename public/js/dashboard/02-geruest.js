@@ -657,6 +657,7 @@ function closeModal({ morph = false } = {}) {
   const modal = $('#modal');
   if (!modal.classList.contains('open')) return;
   window.PS.readBarOff();
+  docPeekClose();
   scheduleHistory();
   fadeOutModal(modal, { morph });
   modal.classList.remove('open', 'morphing');

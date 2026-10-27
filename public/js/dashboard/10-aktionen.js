@@ -116,6 +116,7 @@ const actions = {
     const steps = $$('button.track-step');
     steps.forEach((b) => (b.disabled = true)); // kein Doppelklick während des Speicherns
     const undo = previewStage(`step:${step}`); // Kreise springen sofort um
+    const was = st.caseInfo && st.caseInfo.id === id ? st.caseInfo.step : null;
     try {
       await api.patch('/api/cases/' + id, { step });
     } catch (err) {
@@ -124,7 +125,7 @@ const actions = {
     } finally {
       steps.forEach((b) => b.isConnected && (b.disabled = false));
     }
-    toast(`Bearbeitungsstand: ${STEPS[step]}`);
+    toast(`Bearbeitungsstand: ${STEPS[step]}`, 'ok', { duration: 6000, ...(was !== null && was !== step ? { action: undoPatch(id, { step: was }) } : {}) });
     await reloadCase(id);
   },
   // Fünfter Kreis „Abgeschlossen“ im Bearbeitungsstand
@@ -610,10 +611,17 @@ const actions = {
     toast('Foto entfernt.');
     await refreshBehind();
   },
+  'peek-close': () => docPeekClose(),
+  'peek-step': (el) => {
+    const box = $('#docPeek');
+    const dir = Number(el.dataset.dir || 0);
+    if (box && dir) docPeekOpen(Number(box.dataset.index) + dir, box.dataset.linked === '1');
+  },
   'att-open': (el) => {
     // Eigene Beweise (data-index) oder Beweise einer verknüpften Akte (data-linked, nur ansehen)
     const linked = el.dataset.linked != null;
     const index = Number(linked ? el.dataset.linked : el.dataset.index);
+    if (peekOk() && el.classList.contains('att')) return docPeekOpen(index, linked);
     const a = linked ? st.linkedAttachments[index] : st.caseAttachments[index];
     if (!a) return;
     const caseId = st.modalCaseId;

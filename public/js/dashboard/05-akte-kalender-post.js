@@ -172,6 +172,123 @@ function processTicketBanner(c) {
   });
 }
 
+/*
+ * Tickets als kleine Chips im Aktenkopf (Kanzlei): „Ticket · aktiv“ und „Prozess · Palermo-03“. Details und Knöpfe
+ * (Öffnen, Abgleichen, Ändern, Entfernen) stehen im kleinen Menü am Chip – statt zweier voller Leisten.
+ */
+function chipMenu({ ico, label, tone = '', body }) {
+  return `<details class="more-menu case-chipmenu"><summary class="case-chip${tone ? ` tone-${tone}` : ''}">${ico}<span>${esc(label)}</span><i class="chip-state" aria-hidden="true"></i></summary><div class="more-pop chip-pop">${body}</div></details>`;
+}
+function ticketChips(c, t, transcripts = []) {
+  if (!isStaff()) return '';
+  const out = [];
+  if (t) {
+    const tone = t.error ? 'red' : t.exists ? 'ok' : 'amber';
+    const label = t.exists ? (t.archived ? 'Ticket · archiviert' : 'Ticket · aktiv') : t.deleted ? 'Ticket · gelöscht' : 'Ticket · fehlt';
+    const client = t.clientInTicket
+      ? badge('Mandant im Ticket', 'emerald')
+      : t.clientLinked
+        ? badge('Mandant nicht auf dem Server', 'amber')
+        : badge(c.hasClientAccount ? 'Mandant: Discord nicht verknüpft' : 'Mandant noch nicht beigetreten', 'slate');
+    const hint = t.exists
+      ? 'Status, Zuständigkeit, Nachrichten, Termine, Verträge und Rechnungen erscheinen automatisch im Kanal – interne Notizen nie.'
+      : t.deleted
+        ? 'Das Ticket wurde im Discord gelöscht und wird nicht automatisch neu angelegt. „Neu anlegen“ erstellt einen frischen Kanal.'
+        : 'Wird automatisch angelegt; hier von Hand anlegen, falls es fehlt.';
+    const verlauf = transcripts.length
+      ? `<a class="btn-ghost btn-sm" href="/api/cases/${c.id}/transcripts/${transcripts[0].id}" target="_blank" rel="noopener" title="${esc(`${transcripts[0].count} Nachrichten · gesichert ${fmtDate(transcripts[0].createdAt)}`)}">${icon('doc', 'ico-sm')}<span>Verlauf</span></a>`
+      : '';
+    out.push(
+      chipMenu({
+        ico: DISCORD_ICON,
+        label,
+        tone,
+        body: `<div class="chip-pop-head">${ticketState(t)}${t.exists ? client : ''}</div><p class="chip-pop-hint">${esc(hint)}</p>${t.error ? `<p class="chip-pop-hint text-red-300">${icon('alert', 'ico-sm')} ${esc(t.error)}</p>` : ''}
+          <div class="chip-pop-actions">${ticketOpen(t.url)}${verlauf}<button class="btn-ghost btn-sm" data-action="ticket-sync" data-id="${c.id}">${t.exists ? 'Abgleichen' : t.deleted ? 'Neu anlegen' : 'Ticket anlegen'}</button></div>`,
+      })
+    );
+  }
+  const pt = c.processTicket;
+  if (pt) {
+    out.push(
+      chipMenu({
+        ico: DISCORD_ICON,
+        label: `Prozess${pt.label ? ` · ${pt.label}` : ''}`,
+        tone: 'sky',
+        body: `<div class="chip-pop-head">${badge('DOJ-Discord', 'sky')}</div><p class="chip-pop-hint">Kanal auf einem anderen Discord-Server · nur für die Kanzlei sichtbar.</p>
+          <div class="chip-pop-actions">${ticketOpen(pt.url)}${c.canEdit ? `<button class="btn-ghost btn-sm" data-action="pt-toggle">Ändern</button><button class="btn-ghost btn-sm" data-action="pt-remove" data-id="${c.id}">Entfernen</button>` : ''}</div>`,
+      })
+    );
+  }
+  return out.length ? `<div class="case-chips">${out.join('')}</div>` : '';
+}
+/** „Details“ in der Akte: zugeklappt, wenn man sie einmal zugeklappt hat (gilt für alle Akten dieses Geräts). */
+function detailsClosed() {
+  try {
+    return localStorage.getItem('ps.caseDetailsClosed') === '1';
+  } catch {
+    return false;
+  }
+}
+/** Eingabe für das Prozessticket (öffnet über „Prozessticket (DOJ)“ bzw. „Ändern“). */
+function processTicketForm(c) {
+  if (!isStaff() || !c.canEdit) return '';
+  const pt = c.processTicket;
+  return `<div id="ptBox" class="pt-box" hidden>
+          <form data-form="process-ticket" data-id="${c.id}" class="form-grid cols-2">
+            <div class="span-2"><label class="label" for="ptUrl">Link zum Kanal des Prozesstickets</label><input id="ptUrl" name="url" class="field" required maxlength="300" inputmode="url" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://discord.com/channels/…/…" value="${esc(pt ? pt.url : '')}"></div>
+            <div class="span-2"><label class="label" for="ptLabel">Bezeichnung (optional)</label><input id="ptLabel" name="label" class="field" maxlength="80" placeholder="z. B. DOJ – Hauptverhandlung" value="${esc(pt ? pt.label : '')}"></div>
+            <p class="span-2 text-xs text-dim">Im Discord des DOJ: Rechtsklick auf den Kanal (am Handy lange drücken) → „Link kopieren“ und hier einfügen. Nur für die Kanzlei sichtbar – der Mandant sieht das Prozessticket nicht.</p>
+            <div class="span-2 form-actions"><button type="button" class="btn-ghost btn-sm" data-action="pt-toggle">Abbrechen</button><button type="submit" class="btn-discord btn-sm">${DISCORD_ICON}<span>${pt ? 'Speichern' : 'Prozessticket hinzufügen'}</span></button></div>
+          </form></div>`;
+}
+
+/*
+ * Felder direkt in der Akte ändern: Klick auf den Wert → Eingabe, Enter oder Verlassen speichert (Esc verwirft), danach
+ * „Rückgängig“. Die Akte wird dabei nicht neu geladen. Nur für zuständige Anwälte und das Board (c.canEdit).
+ */
+const IE_LABEL = { title: 'Titel', clientName: 'Mandant', clientPhone: 'Telefon', opponent: 'Gegenpartei', courtRef: 'Gerichtsaktenzeichen', area: 'Rechtsgebiet', description: 'Sachverhalt', publicNote: 'Statushinweis' };
+function ie(c, key, value, { type = 'text', placeholder = '', cls = '' } = {}) {
+  const v = String(value ?? '');
+  const shown = key === 'area' ? AREAS[v] || v : v;
+  if (!c.canEdit) return shown ? esc(shown) : '';
+  return `<span class="ie ${cls}" role="button" tabindex="0" data-ie="${key}" data-type="${type}" data-id="${c.id}" data-value="${esc(v)}" data-placeholder="${esc(placeholder)}" title="Zum Ändern anklicken">${shown ? esc(shown) : `<span class="ie-empty">${esc(placeholder)}</span>`}</span>`;
+}
+
+/** Beteiligte (Gegenpartei, Zeugen …) mit Hinweis auf Überschneidungen mit anderen Akten. */
+function partiesHtml(c, parties = [], overlaps = {}) {
+  const hit = (list) => list.map((o) => `<button type="button" class="ov-link" data-action="open-case" data-id="${o.caseId}">${esc(o.caseNumber)}</button>`).join(', ');
+  const warn = [];
+  if ((overlaps.client || []).length) warn.push(`Der Mandant ist in ${hit(overlaps.client)} <strong>Gegenpartei</strong>.`);
+  if ((overlaps.opponent || []).length) warn.push(`Die Gegenpartei ist in ${hit(overlaps.opponent)} <strong>Mandant</strong>.`);
+  for (const p of parties) if ((p.overlaps || []).length) warn.push(`${esc(p.name)} (${esc(p.roleLabel)}) ist in ${hit(p.overlaps)} <strong>Mandant</strong>.`);
+  const rows = parties
+    .map(
+      (p) => `<div class="party-row"><span class="party-role">${esc(p.roleLabel)}</span><span class="party-name">${esc(p.name)}</span><span class="party-contact">${esc(p.contact || '')}</span>
+        ${c.canEdit ? `<button type="button" class="icon-btn sm" data-action="party-del" data-case-id="${c.id}" data-id="${p.id}" aria-label="Beteiligten entfernen" title="Entfernen">${icon('trash', 'ico-sm')}</button>` : ''}</div>`
+    )
+    .join('');
+  const add = c.canEdit
+    ? `<form data-form="party-add" data-id="${c.id}" class="party-add"><select name="role" class="field" aria-label="Rolle">${Object.entries({ gegenpartei: 'Gegenpartei', zeuge: 'Zeuge', gericht: 'Gericht', staatsanwalt: 'Staatsanwaltschaft', sonstige: 'Sonstige' }).map(([k, l]) => opt(k, l)).join('')}</select>
+        <input name="name" class="field" required minlength="2" maxlength="120" placeholder="Name" aria-label="Name"><input name="contact" class="field" maxlength="160" placeholder="Kontakt (optional)" aria-label="Kontakt">
+        <button type="submit" class="btn-outline btn-sm">${icon('plus', 'ico-sm')}<span>Hinzufügen</span></button></form>`
+    : '';
+  return `<div class="parties" id="partiesBox"><div class="k">Beteiligte</div>
+      ${warn.length ? `<div class="party-warn">${icon('alert', 'ico-sm')}<div>${warn.join('<br>')}<span class="party-warn-note">Bitte auf einen möglichen Interessenkonflikt prüfen.</span></div></div>` : ''}
+      ${rows || '<p class="text-sm text-dim">Noch niemand erfasst.</p>'}${add}</div>`;
+}
+
+/** Verlauf nach Phasen: frühere Schritte des Verfahrens sind eingeklappt, der aktuelle steht offen. */
+function phaseGroups(log) {
+  const phases = [{ label: 'Eingang', items: [] }];
+  for (const n of log) {
+    const m = n.system && /^Verfahrensstand: (.+?)(?: ·|$)/.exec(n.body || '');
+    if (m) phases.push({ label: m[1], items: [] });
+    phases[phases.length - 1].items.push(n);
+  }
+  return phases;
+}
+
 /** Darf das Mandanten-Konto der Akte verknüpfen/lösen: zuständige Anwälte und Board of Partners. */
 const canLinkClient = (c) => isStaff() && (c.canEdit || isBoard());
 
@@ -219,9 +336,20 @@ async function searchClientAccounts(input) {
 }
 
 /** Priorität direkt in der Akte ändern (Auswahl neben dem Status). */
+/** „Rückgängig“ für eine Änderung am Aktenkopf: stellt den alten Wert wieder her. */
+const undoPatch = (id, body) => ({
+  label: 'Rückgängig',
+  onClick: () =>
+    guard(async () => {
+      await api.patch('/api/cases/' + id, body);
+      await reloadCase(id);
+    }),
+});
+
 async function setCasePriority(sel) {
   const id = Number(sel.dataset.id);
   const priority = Number(sel.value);
+  const was = Number(sel.dataset.value);
   // Balken und Farbe springen sofort um – scheitert das Speichern, zurück auf den alten Stand
   const box = sel.closest('.prop');
   const show = (p) => {
@@ -236,7 +364,7 @@ async function setCasePriority(sel) {
     if (box.isConnected) show(Number(sel.dataset.value));
     throw notSaved(err);
   }
-  toast(`Priorität: ${PRIORITY[priority][0]}`);
+  toast(`Priorität: ${PRIORITY[priority][0]}`, 'ok', { duration: 6000, action: undoPatch(id, { priority: was }) });
   await reloadCase(id);
 }
 
@@ -252,13 +380,15 @@ async function setCaseStatus(sel) {
     return closeCase(id);
   }
   const undo = previewStage(v);
+  const was = sel.dataset.value;
   try {
     await api.patch('/api/cases/' + id, v.startsWith('step:') ? { status: 'in_bearbeitung', step: Number(v.slice(5)) } : { status: v });
   } catch (err) {
     undo();
     throw notSaved(err);
   }
-  toast(`Stand: ${v.startsWith('step:') ? STEPS[Number(v.slice(5))] : CASE_STATUS[v][0]}`);
+  const back = was.startsWith('step:') ? { status: 'in_bearbeitung', step: Number(was.slice(5)) } : { status: was };
+  toast(`Stand: ${v.startsWith('step:') ? STEPS[Number(v.slice(5))] : CASE_STATUS[v][0]}`, 'ok', { duration: 6000, action: undoPatch(id, back) });
   await reloadCase(id);
 }
 
@@ -385,13 +515,14 @@ function closeCaseHtml(data) {
 async function setCaseOutcome(sel) {
   const id = Number(sel.dataset.id);
   if (!sel.value) return void (sel.value = sel.dataset.value);
+  const was = sel.dataset.value;
   try {
     await api.patch('/api/cases/' + id, { outcome: sel.value });
   } catch (err) {
     sel.value = sel.dataset.value;
     throw err;
   }
-  toast(`Ergebnis: ${OUTCOMES[sel.value][0]}`);
+  toast(`Ergebnis: ${OUTCOMES[sel.value][0]}`, 'ok', { duration: 6000, ...(was ? { action: undoPatch(id, { outcome: was }) } : {}) });
   await reloadCase(id);
 }
 
@@ -674,7 +805,7 @@ function routingHtml(routing) {
     .join('')}</div>`;
 }
 
-function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, transcripts = [], clientSuggestions, review, chat, charges, deals = [], links = [], linkedEvidence = [], routing = [] }) {
+function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, transcripts = [], clientSuggestions, review, chat, charges, deals = [], links = [], linkedEvidence = [], routing = [], parties = [], overlaps = {} }) {
   const staff = isStaff();
   const admin = isAdmin();
   const me = st.user.id;
@@ -701,26 +832,45 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
           })
           .join('')}</div></div></div>`;
 
+  const phoneHtml = staff && c.canEdit ? ie(c, 'clientPhone', c.clientPhone, { placeholder: 'Telefon eintragen' }) : esc(c.clientPhone || '');
+  const contactHtml = [
+    staff ? phoneHtml : c.clientPhone ? esc(c.clientPhone) : '',
+    c.clientDiscord ? `${DISCORD_ICON.replace('class="ico"', 'class="ico-sm inline-ico"')} ${esc(c.clientDiscord)}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const info = [
-    // Kanzlei: der Name öffnet die Mandantenkartei
+    // Kanzlei: der Name öffnet die Mandantenkartei; Mandanten ohne Konto lassen sich hier umbenennen
     staff && c.clientKey
-      ? ['Mandant', null, `${clientLink(c.clientKey, c.clientName)}${c.hasClientAccount ? '' : ' <span class="text-dim">(ohne Konto)</span>'}`]
+      ? [
+          'Mandant',
+          null,
+          `${clientLink(c.clientKey, c.clientName)}${c.hasClientAccount ? '' : ' <span class="text-dim">(ohne Konto)</span>'}`,
+        ]
       : ['Mandant', c.clientName + (staff && !c.hasClientAccount ? ' (ohne Konto)' : '')],
-    // E-Mail darf nur nach dem @ umbrechen, nicht am Bindestrich der Domain („…@pake-“ / „scha.ls“)
     // Erreichbar über Telefon und Discord – die Login-Adresse nur, wenn es sonst nichts gibt
     staff
-      ? ['Kontakt', null, [c.clientPhone ? esc(c.clientPhone) : '', c.clientDiscord ? `${DISCORD_ICON.replace('class="ico"', 'class="ico-sm inline-ico"')} ${esc(c.clientDiscord)}` : ''].filter(Boolean).join(' · ') || (c.clientEmail ? mailBreakHtml(c.clientEmail) : '—')]
+      ? ['Kontakt', null, contactHtml || (c.clientEmail ? mailBreakHtml(c.clientEmail) : '<span class="text-dim">—</span>')]
       : null,
-    [caseTeam(c).length > 1 ? 'Zuständige Anwälte' : 'Zuständig', null, teamHtml(c)],
-    ['Rechtsgebiet', AREAS[c.area] || c.area],
-    c.opponent ? ['Gegenpartei', c.opponent] : null,
-    c.courtRef ? ['Gerichtsaktenzeichen', null, copyable(c.courtRef, 'Gerichtsaktenzeichen kopieren')] : null,
+    staff ? null : [caseTeam(c).length > 1 ? 'Zuständige Anwälte' : 'Zuständig', null, teamHtml(c)],
+    ['Rechtsgebiet', null, c.canEdit ? ie(c, 'area', c.area, { type: 'select' }) : esc(AREAS[c.area] || c.area)],
+    c.opponent || c.canEdit ? ['Gegenpartei', null, c.canEdit ? ie(c, 'opponent', c.opponent, { placeholder: 'Gegenpartei eintragen' }) : esc(c.opponent)] : null,
+    c.courtRef || c.canEdit
+      ? ['Gerichtsaktenzeichen', null, c.canEdit ? `${ie(c, 'courtRef', c.courtRef, { placeholder: 'Aktenzeichen des Gerichts' })}${c.courtRef ? ` <button type="button" class="copy-btn" data-action="copy" data-text="${esc(c.courtRef)}" title="Gerichtsaktenzeichen kopieren" aria-label="Gerichtsaktenzeichen kopieren">${icon('copy', 'ico-xs')}</button>` : ''}` : copyable(c.courtRef, 'Gerichtsaktenzeichen kopieren')]
+      : null,
     staff && links.length ? ['Verknüpfte Akten', null, linksHtml(c, links)] : null,
     staff && routing.length ? ['Laufzettel', null, routingHtml(routing)] : null,
   ]
     .filter(Boolean)
     .map(([k, v, html]) => `<div><div class="k">${esc(k)}</div><div class="v">${html != null ? html : esc(v)}</div></div>`)
     .join('');
+
+  const accountRow =
+    staff && c.hasClientAccount && canLinkClient(c)
+      ? `<div class="account-row"><div><span class="k inline">Mandanten-Konto</span> <strong>${esc(c.clientName)}</strong>${c.clientEmail ? ` <span class="text-dim">· ${esc(c.clientEmail)}</span>` : ''}</div><div class="flex flex-wrap gap-2">${isBoard() && c.clientId ? `<button type="button" class="btn-outline btn-sm" data-action="name-direct" data-user-id="${c.clientId}" data-name="${esc(c.clientName)}" data-email="${esc(c.clientEmail || '')}" data-return-case="${c.id}">Name korrigieren</button>` : ''}<button type="button" class="btn-outline btn-sm" data-action="case-client-search" data-id="${c.id}">Anderes Konto</button><button type="button" class="btn-ghost btn-sm" data-action="case-unlink-client" data-id="${c.id}">Verknüpfung lösen</button></div></div>`
+      : staff && c.canEdit && !c.hasClientAccount
+        ? `<div class="account-row"><div><span class="k inline">Name des Mandanten</span> ${ie(c, 'clientName', c.clientName === '—' ? '' : c.clientName, { placeholder: 'Name eintragen' })}</div></div>`
+        : '';
 
   // Aktenkopf: eine Leiste unter dem Titel – je Angabe ein Feld „STATUS | ● In Bearbeitung“. Zuständige Anwälte
   // wählen Status und Priorität direkt aus; alle anderen sehen dieselben Felder nur zum Lesen.
@@ -809,25 +959,6 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     quick.push(`<a class="btn-outline btn-sm" href="/aktenauszug?id=${c.id}" target="_blank" rel="noopener">${icon('doc', 'ico-sm')}<span>Aktenauszug</span></a>`);
   }
 
-  const editForm = c.canEdit
-    ? `<details class="edit-box section">
-          <summary>Akte bearbeiten</summary>
-          <form data-form="case-edit" data-id="${c.id}" class="form-grid cols-2">
-            <div class="span-2"><label class="label">Titel</label><input name="title" class="field" required minlength="3" maxlength="120" value="${esc(c.title)}"></div>
-            <div><label class="label">Rechtsgebiet</label><select name="area" class="field">${Object.entries(AREAS).map(([k, l]) => opt(k, l, c.area === k)).join('')}</select></div>
-            <div><label class="label">Verfahrensstand</label><select name="step" class="field">${STEPS.map((s, i) => opt(i, s, c.step === i)).join('')}</select></div>
-            ${c.hasClientAccount && canLinkClient(c) ? `<div class="span-2 flex flex-wrap items-center justify-between gap-2 text-sm"><div><span class="text-xs uppercase tracking-widest text-dim mr-1">Mandanten-Konto</span> <strong>${esc(c.clientName)}</strong>${c.clientEmail ? ` <span class="text-dim">· ${esc(c.clientEmail)}</span>` : ''}</div><div class="flex flex-wrap gap-2">${isBoard() && c.clientId ? `<button type="button" class="btn-outline btn-sm" data-action="name-direct" data-user-id="${c.clientId}" data-name="${esc(c.clientName)}" data-email="${esc(c.clientEmail || '')}" data-return-case="${c.id}">Name korrigieren</button>` : ''}<button type="button" class="btn-outline btn-sm" data-action="case-client-search" data-id="${c.id}">Anderes Konto</button><button type="button" class="btn-ghost btn-sm" data-action="case-unlink-client" data-id="${c.id}">Verknüpfung lösen</button></div></div>` : ''}
-            ${!c.hasClientAccount ? `<div><label class="label">Mandant</label><input name="clientName" class="field" maxlength="80" value="${esc(c.clientName === '—' ? '' : c.clientName)}"></div>` : ''}
-            <div><label class="label">Telefon Mandant</label><input name="clientPhone" class="field" maxlength="40" value="${esc(c.clientPhone || '')}"></div>
-            <div><label class="label">Gegenpartei</label><input name="opponent" class="field" maxlength="120" value="${esc(c.opponent)}"></div>
-            <div><label class="label">Gerichtsaktenzeichen</label><input name="courtRef" class="field" maxlength="60" value="${esc(c.courtRef)}"></div>
-            ${c.canManageLawyers ? lawyerPicker({ leadId: c.lawyerId, coIds: (c.coLawyers || []).map((l) => l.id), withLead: admin, extra: caseTeam(c) }) : ''}
-            <div class="span-2"><label class="label">Sachverhalt</label><textarea name="description" rows="5" maxlength="4000" class="field">${esc(c.description)}</textarea></div>
-            <div class="span-2"><label class="label">Statushinweis (sichtbar für den Mandanten und in der öffentlichen Abfrage)</label><textarea name="publicNote" rows="2" maxlength="500" class="field">${esc(c.publicNote)}</textarea></div>
-            <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Änderungen speichern</span></button></div>
-          </form></details>`
-    : '';
-
   const newEventBtn =
     staff || !c.closed
       ? `<button type="button" class="btn-outline btn-sm" data-action="new-event" data-case-id="${c.id}" data-return-case="${c.id}">${icon('plus', 'ico-sm')}<span>${staff ? 'Frist / Termin' : 'Termin anfragen'}</span></button>`
@@ -856,19 +987,30 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
 
   // Verlauf: automatische Einträge und (nur Kanzlei) interne Notizen – Nachrichten stehen im Chat
   const log = notes.filter((n) => n.system || n.internal);
-  const noteList = log.length
-    ? `<div class="timeline">${log
-        .map((n) => {
-          const canDelete = !n.system && (n.authorId === me || admin);
-          const pinBtn = staff && n.internal && !n.system
-            ? `<button type="button" class="icon-btn sm tl-pin${n.pinned ? ' on' : ''}" data-action="note-pin" data-case-id="${c.id}" data-id="${n.id}" data-on="${n.pinned ? '0' : '1'}" aria-label="${n.pinned ? 'Notiz lösen' : 'Notiz oben anpinnen'}" title="${n.pinned ? 'Lösen' : 'Oben in der Akte anpinnen'}">${icon('pin', 'ico-sm')}</button>`
-            : '';
-          return `<div class="tl-item ${n.internal ? 'tl-internal' : ''} ${n.system ? 'tl-system' : ''}">
+  const noteItem = (n) => {
+    const canDelete = !n.system && (n.authorId === me || admin);
+    const pinBtn = staff && n.internal && !n.system
+      ? `<button type="button" class="icon-btn sm tl-pin${n.pinned ? ' on' : ''}" data-action="note-pin" data-case-id="${c.id}" data-id="${n.id}" data-on="${n.pinned ? '0' : '1'}" aria-label="${n.pinned ? 'Notiz lösen' : 'Notiz oben anpinnen'}" title="${n.pinned ? 'Lösen' : 'Oben in der Akte anpinnen'}">${icon('pin', 'ico-sm')}</button>`
+      : '';
+    return `<div class="tl-item ${n.internal ? 'tl-internal' : ''} ${n.system ? 'tl-system' : ''}">
               <div class="tl-meta"><span class="text-muted font-medium">${esc(n.author)}</span>${n.authorRole && ROLES[n.authorRole] ? `<span>${esc(ROLES[n.authorRole])}</span>` : ''}<span>${esc(fmtDate(n.createdAt))}</span>${n.internal ? '<span class="stamp-mini" title="Interne Notiz – nur für die Kanzlei">Vertraulich</span>' : ''}
               ${pinBtn}${canDelete ? `<button type="button" class="icon-btn sm tl-del" data-action="delete-note" data-case-id="${c.id}" data-id="${n.id}" aria-label="Notiz löschen" title="Notiz löschen">${icon('trash', 'ico-sm')}</button>` : ''}</div>
               <div class="tl-body">${n.internal ? mentionHtml(n.body) : esc(n.body)}</div></div>`;
-        })
-        .join('')}</div>`
+  };
+  // Mit Phasen: frühere Schritte des Verfahrens klappen zu einer Zeile zusammen, der aktuelle bleibt offen
+  const phases = staff ? phaseGroups(log) : [{ items: log }];
+  const noteList = log.length
+    ? phases.length > 1
+      ? `<div class="timeline phases">${phases
+          .map((ph, i) => {
+            const last = i === phases.length - 1;
+            if (!ph.items.length) return '';
+            const from = fmtDateOnly(String(ph.items[0].createdAt).slice(0, 10));
+            const to = fmtDateOnly(String(ph.items[ph.items.length - 1].createdAt).slice(0, 10));
+            return `<details class="phase" ${last ? 'open' : ''}><summary><span class="phase-name">${esc(ph.label)}</span><span class="phase-meta">${ph.items.length} ${ph.items.length === 1 ? 'Eintrag' : 'Einträge'} · ${esc(from === to ? from : `${from} – ${to}`)}</span></summary>${ph.items.map(noteItem).join('')}</details>`;
+          })
+          .join('')}</div>`
+      : `<div class="timeline">${log.map(noteItem).join('')}</div>`
     : '<p class="text-sm text-dim">Noch keine Einträge.</p>';
 
   // Angepinnte interne Notizen: ganz oben in der Akte, damit sie niemand übersieht (nur Kanzlei)
@@ -920,8 +1062,9 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       <div class="case-head case-cover mb-5" data-case-head="${c.id}">
         <span class="cover-tab" aria-hidden="true">${staff && c.priority >= 3 && !c.closed ? `<i class="cover-tab-dot p${c.priority}"></i>` : ''}Akte</span>
         ${c.closed ? '<span class="cover-stamp" aria-hidden="true">Abgeschlossen</span>' : ''}
-        <div class="pr-12"><div class="case-num-row"><button type="button" class="font-mono text-gold text-sm case-emboss copy-az" data-action="copy" data-text="${esc(c.caseNumber)}" title="Aktenzeichen kopieren" aria-label="Aktenzeichen ${esc(c.caseNumber)} kopieren">${esc(c.caseNumber)}</button>${staff ? starBtn(c) : ''}${staff ? hereStrip(c.id) : ''}</div>
-          <h2 id="modalTitle" class="font-serif text-2xl md:text-3xl font-semibold leading-tight">${esc(c.title)}</h2></div>
+        <div class="pr-12"><div class="case-num-row"><button type="button" class="font-mono text-gold text-sm case-emboss copy-az" data-action="copy" data-text="${esc(c.caseNumber)}" title="Aktenzeichen kopieren" aria-label="Aktenzeichen ${esc(c.caseNumber)} kopieren">${esc(c.caseNumber)}</button>${staff ? starBtn(c) : ''}<span class="case-area">${esc(AREAS[c.area] || c.area)}</span>${staff ? hereStrip(c.id) : ''}</div>
+          <h2 id="modalTitle" class="case-title" title="${esc(c.title)}">${c.canEdit ? ie(c, 'title', c.title, { placeholder: 'Titel eintragen', cls: 'ie-title' }) : esc(c.title)}</h2>
+          ${staff ? ticketChips(c, ticket, transcripts) : ''}</div>
         <div class="case-props">${headProps}</div>
       </div>
       ${jumpBar}
@@ -930,14 +1073,24 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       ${pinnedStrip}
       ${claim}
       ${track}
-      <div class="info-grid mb-5">${staff ? caseStats(c, { appointments, tasks }) : ''}${info}</div>
+      ${
+        staff
+          ? `<div class="info-grid stats-4 mb-4">${caseStats(c, { appointments, tasks })}</div>
+      <details class="case-details mb-5" ${detailsClosed() ? '' : 'open'}><summary>Details</summary>
+        <div class="info-grid">${info}</div>${accountRow}${partiesHtml(c, parties, overlaps)}</details>`
+          : `<div class="info-grid mb-5">${info}</div>`
+      }
       ${clientLinkBanner(c, clientSuggestions)}
-      ${ticket || c.processTicket || c.canEdit ? `<div class="ticket-strips">${ticketBanner(c, ticket, transcripts)}${processTicketBanner(c)}</div>` : ''}
+      ${staff ? processTicketForm(c) : ticket ? `<div class="ticket-strips">${ticketBanner(c, ticket, transcripts)}</div>` : ''}
       ${quick.length ? `<div class="form-actions case-quick mb-2">${quick.join('')}</div>` : ''}
-      ${editForm}
       ${staff ? '' : reviewSection(c, review)}
-      ${c.description ? `<div class="section"><h3 class="section-title">Sachverhalt</h3><p class="text-sm whitespace-pre-wrap text-muted">${esc(c.description)}</p></div>` : emptySection('', 'Sachverhalt', 'noch nicht beschrieben', '', c.canEdit ? 'Unter „Akte bearbeiten“ ergänzen.' : '')}
-      ${c.publicNote ? `<div class="section"><h3 class="section-title">Statushinweis</h3><div class="banner banner-gold mb-0"><p class="text-sm whitespace-pre-wrap">${esc(c.publicNote)}</p></div></div>` : ''}
+      ${
+        c.canEdit
+          ? `<div class="section"><h3 class="section-title">Sachverhalt</h3><div class="ie-block">${ie(c, 'description', c.description, { type: 'textarea', placeholder: 'Sachverhalt beschreiben …', cls: 'ie-text' })}</div></div>
+      <div class="section"><h3 class="section-title">Statushinweis <span class="text-xs text-dim font-normal">sichtbar für den Mandanten</span></h3><div class="ie-block">${ie(c, 'publicNote', c.publicNote, { type: 'textarea', placeholder: 'Statushinweis für den Mandanten …', cls: 'ie-text' })}</div></div>`
+          : `${c.description ? `<div class="section"><h3 class="section-title">Sachverhalt</h3><p class="text-sm whitespace-pre-wrap text-muted">${esc(c.description)}</p></div>` : emptySection('', 'Sachverhalt', 'noch nicht beschrieben')}
+      ${c.publicNote ? `<div class="section"><h3 class="section-title">Statushinweis</h3><div class="banner banner-gold mb-0"><p class="text-sm whitespace-pre-wrap">${esc(c.publicNote)}</p></div></div>` : ''}`
+      }
       ${parts.charges}
       ${parts.chat}
       ${eventsSection}

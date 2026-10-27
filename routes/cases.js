@@ -508,6 +508,14 @@ function caseDetail(c, u) {
     links: staff ? linkedCases(c.id) : undefined,
     linkedEvidence: staff ? linkedEvidence(c.id) : undefined,
     routing: staff ? routingSlip(c.id) : undefined,
+    // Kanzlei: Beteiligte (Gegenpartei, Zeugen …) und Überschneidungen mit anderen Akten (Interessenkonflikt prüfen)
+    parties: staff ? require('../parties').listForCase(c.id) : undefined,
+    overlaps: staff
+      ? (() => {
+          const p = require('../parties');
+          return { opponent: p.opponentOverlaps(c), client: p.clientOverlaps(c, c.client_account_name || c.client_name) };
+        })()
+      : undefined,
   };
 }
 

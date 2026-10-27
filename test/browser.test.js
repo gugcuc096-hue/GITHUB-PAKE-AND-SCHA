@@ -1262,18 +1262,23 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         assert.equal(await page.$(`#caseList tr.row[data-id="${webCase.id}"] .act-idle`), null);
         const list = await page.evaluate((sel) => {
           const row = document.querySelector(sel);
-          const lead = row.querySelector('.who-lead');
+          const who = row.querySelector('.who2');
           return {
             stripes: [...document.querySelectorAll('#caseList tr.row')].map((r) => getComputedStyle(r).boxShadow + getComputedStyle(r.cells[0]).boxShadow + getComputedStyle(r.cells[0], '::before').content).join(''),
-            leadLines: lead.getClientRects().length,
-            coBelow: lead.parentElement.lastElementChild.getBoundingClientRect().top >= lead.getBoundingClientRect().bottom - 1,
+            leadLines: who.querySelector('.who2-name').getClientRects().length,
+            more: who.querySelector('.who2-more')?.textContent,
+            tip: who.title,
+            avatar: who.querySelector('.who2-av').textContent.length,
             maxWidth: getComputedStyle(document.querySelector('#content')).maxWidth,
           };
         }, qRow);
         assert.doesNotMatch(list.stripes, /rgb\((245, 158, 11|239, 68, 68)\)/, 'weder volle Kante noch Reiter am Zeilenanfang');
         // Handy-Karte: Haupt- und Mitanwälte als ein Block rechts – früher zerriss der Name mitten in der Karte
-        if (device === PHONE) assert.equal(list.leadLines, 1, 'federführender Anwalt in einer Zeile');
-        assert.ok(list.coBelow, 'Mitanwälte unter dem federführenden Anwalt');
+        // Zuständig kompakt: Kürzel-Kreis, Rufname des federführenden Anwalts, „+1“ für den Mitanwalt, alle Namen im Tooltip
+        assert.equal(list.leadLines, 1, 'federführender Anwalt in einer Zeile');
+        assert.equal(list.more, '+1');
+        assert.ok(list.avatar >= 1 && list.avatar <= 3, 'Kürzel im Kreis');
+        assert.ok(list.tip.includes(','), 'alle Namen im Tooltip');
         assert.equal(list.maxWidth, '1760px', 'Aktenliste darf breiter werden');
         // Einheitlich: alle Markierungen (Status, Priorität, „liegt seit …“) im selben Stil – flaches Etikett, kein Knopf-Rand
         const tags = await page.$$eval('#caseList .badge', (els) => {
@@ -1302,9 +1307,9 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         const [titleBox, propsBox] = await page.$$eval('#modalBody .case-head > *', (els) => els.map((e) => e.getBoundingClientRect().toJSON()));
         assert.ok(propsBox.top >= titleBox.bottom - 1, 'Felder unter dem Titel');
         assert.doesNotMatch(await page.textContent('#modalBody .info-grid'), /Dringlichkeit/);
-        await page.click('#modalBody details.edit-box summary');
-        assert.equal(await page.$('#modalBody form[data-form="case-edit"] [name="urgency"]'), null, 'nur Priorität bearbeiten');
-        await page.click('#modalBody details.edit-box summary');
+        // kein Aufklapp-Formular mehr: Felder werden direkt in der Akte per Klick geändert
+        assert.equal(await page.$('#modalBody details.edit-box'), null);
+        assert.equal(await page.$('#modalBody [data-ie="urgency"]'), null, 'nur Priorität bearbeiten');
         // Status als Auswahl neben der Priorität (keine Status-Knöpfe mehr)
         assert.equal(await page.inputValue('#modalBody [data-case-status]'), 'offen');
         assert.equal(await page.$('#modalBody [data-action="case-status"]'), null);
@@ -1319,7 +1324,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.waitForFunction(() => !document.querySelector('#modalBody [data-case-status]'));
         assert.match(await page.textContent('#modalBody .timeline'), /Status: Offen → In Bearbeitung · Verfahrensstand: Akteneinsicht|Verfahrensstand: Akteneinsicht · Status: Offen → In Bearbeitung/);
         // Kennzahlen: erste Zeile im Raster der Angaben (Bezeichnung über dem Wert wie alle Angaben)
-        assert.equal(await page.$$eval('#modalBody .info-grid .fact', (els) => els.length), 3);
+        assert.equal(await page.$$eval('#modalBody .info-grid .fact', (els) => els.length), 4);
         if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Aktenkopf passt aufs Handy');
 
         // Akte schließen und sofort auf einen Menüpunkt tippen, während der Sprung zurück im Verlauf noch läuft
@@ -3225,6 +3230,149 @@ describe('Browser: Zahlenfelder mit eigenen Tasten, Kästchen im Kanzlei-Stil, E
       const box = await hp.$eval('#calcOptions .calc-check', (i) => getComputedStyle(i).backgroundColor);
       assert.notEqual(box, 'rgb(255, 255, 255)', 'Kästchen nicht weiß');
       await home.close();
+    } finally {
+      await browser.close();
+      await srv.stop();
+    }
+  });
+});
+
+describe('Browser: Aufgeräumte Akte – Direktbearbeitung, Chips, Beteiligte, Phasen, Vorschau-Seitenleiste', { skip: chromium ? false : 'Playwright nicht installiert' }, () => {
+  for (const [label, device] of [['PC', DESKTOP], ['Handy', PHONE]]) {
+    it(`Akte am ${label}: Felder per Klick ändern mit „Rückgängig“, Details einklappen, Beteiligte, Phasen`, async () => {
+      const srv = await startServer();
+      const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+      try {
+        const a = client(srv.base);
+        const me = await a.login(TEAM.admin);
+        const other = (await a.post('/api/cases', { title: 'Mietstreit Vespucci', area: 'zivilrecht', clientName: 'Paul Weber' })).json.case;
+        const c = (await a.post('/api/cases', { title: 'Raubüberfall Vinewood', area: 'strafrecht', clientName: 'Vito Russo', opponent: 'Paul Weber', lawyerId: me.id })).json.case;
+        await a.patch(`/api/cases/${c.id}`, { step: 1 });
+        await a.patch(`/api/cases/${c.id}`, { step: 2 });
+        await a.put(`/api/cases/${c.id}/process-ticket`, { url: 'https://discord.com/channels/123456789012345678/234567890123456789', label: 'DOJ' });
+        const ctx = await browser.newContext({ ...device, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+        const page = await ctx.newPage();
+        const problems = [];
+        page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
+        await page.goto(srv.base + '/login');
+        await page.fill('#email', TEAM.admin);
+        await page.fill('#password', PASSWORD);
+        await page.click('button[type=submit]');
+        await page.waitForURL(/dashboard/);
+        await page.waitForSelector('#nav a.nav-item', { state: 'attached' });
+        await page.goto(`${srv.base}/dashboard?case=${c.id}#cases`);
+        await page.waitForSelector('#modalBody .case-head');
+        await page.waitForTimeout(500);
+
+        // Kopf: Aktenzeichen klein darüber, Titel einzeilig, Rechtsgebiet als Etikett; kein „Akte bearbeiten“
+        assert.equal(await page.$('#modalBody details.edit-box'), null);
+        assert.match(await page.textContent('#modalBody .case-area'), /Strafrecht/);
+        const title = await page.$eval('#modalTitle', (e) => ({ lines: Math.round(e.getBoundingClientRect().height / parseFloat(getComputedStyle(e).lineHeight)), tip: e.title }));
+        assert.equal(title.tip, 'Raubüberfall Vinewood');
+        assert.ok(title.lines <= 1, 'Titel einzeilig');
+        assert.equal(await page.$$eval('#modalBody .stats-4 .fact', (els) => els.length), 4);
+
+        // Feld per Klick ändern: Enter speichert, „Rückgängig“ setzt zurück – ohne Neuladen der Akte
+        await page.click('#modalBody [data-ie="courtRef"]');
+        await page.fill('#modalBody .ie-input', 'LS-2026/77');
+        await page.keyboard.press('Enter');
+        await page.waitForFunction(() => document.querySelector('[data-ie="courtRef"]')?.textContent.includes('LS-2026/77'));
+        assert.equal((await a.get(`/api/cases/${c.id}`)).json.case.courtRef, 'LS-2026/77');
+        await page.click('.ps-toast-action:has-text("Rückgängig")');
+        await page.waitForFunction(() => !document.querySelector('[data-ie="courtRef"]')?.textContent.includes('LS-2026/77'));
+        assert.equal((await a.get(`/api/cases/${c.id}`)).json.case.courtRef || '', '');
+        // Esc verwirft
+        await page.click('#modalBody [data-ie="opponent"]');
+        await page.fill('#modalBody .ie-input', 'Jemand anderes');
+        await page.keyboard.press('Escape');
+        assert.equal((await a.get(`/api/cases/${c.id}`)).json.case.opponent, 'Paul Weber');
+        assert.equal(await page.$('#modalBody .ie-input'), null);
+
+        // Interessenkonflikt: Gegenpartei „Paul Weber“ ist Mandant in der anderen Akte
+        assert.match(await page.textContent('#modalBody .party-warn'), /Mandant/);
+        // Beteiligte hinzufügen und entfernen
+        await page.fill('#modalBody form[data-form="party-add"] [name="name"]', 'Hans Zeuge');
+        await page.selectOption('#modalBody form[data-form="party-add"] [name="role"]', 'zeuge');
+        await page.click('#modalBody form[data-form="party-add"] button[type="submit"]');
+        await page.waitForSelector('#modalBody .party-row');
+        assert.equal((await a.get(`/api/cases/${c.id}`)).json.parties.length, 1);
+        await page.click('#modalBody [data-action="party-del"]');
+        await page.waitForFunction(() => !document.querySelector('#modalBody .party-row'));
+
+        // Details lassen sich einklappen – das gilt auch beim nächsten Öffnen
+        await page.click('#modalBody details.case-details > summary');
+        assert.equal(await page.$eval('#modalBody details.case-details', (d) => d.open), false);
+        await page.waitForFunction(() => localStorage.getItem('ps.caseDetailsClosed') === '1');
+        await page.reload();
+        await page.waitForSelector('#modalBody .case-head');
+        assert.equal(await page.$eval('#modalBody details.case-details', (d) => d.open), false);
+
+        // Verlauf: frühere Schritte des Verfahrens sind zu einer Zeile eingeklappt, der aktuelle ist offen
+        const phases = await page.$$eval('#modalBody details.phase', (els) => els.map((d) => d.open));
+        assert.ok(phases.length >= 2, 'mehrere Phasen');
+        assert.equal(phases[phases.length - 1], true, 'letzte Phase offen');
+        assert.equal(phases[0], false, 'frühere Phase zu');
+
+        // Chips: Ticket und Prozess in einer Zeile
+        assert.match(await page.textContent('#modalBody .case-chips .case-chip'), /Prozess · DOJ/);
+        await page.click('#modalBody .case-chips summary.case-chip');
+        assert.ok(await page.isVisible('#modalBody .chip-pop'), 'Menü am Chip');
+        if (device === PHONE) assert.ok((await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 1, 'Akte passt aufs Handy');
+        assert.deepEqual(problems, []);
+        await ctx.close();
+        void other;
+      } finally {
+        await browser.close();
+        await srv.stop();
+      }
+    });
+  }
+
+  it('Breiter Bildschirm: Dokument-Vorschau in der Seitenleiste ohne Neuladen; Anklagepunkt → Schriftsatz vorbefüllt', async () => {
+    const srv = await startServer();
+    const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+    const IMG = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'icon-512.png'));
+    try {
+      const a = client(srv.base);
+      await a.login(TEAM.admin);
+      const c = (await a.post('/api/cases', { title: 'Raubüberfall Vinewood', area: 'strafrecht', clientName: 'Vito Russo' })).json.case;
+      await a.upload(`/api/cases/${c.id}/attachments?caption=Tatort`, IMG, 'image/png');
+      await a.upload(`/api/cases/${c.id}/attachments?caption=Bodycam`, IMG, 'image/png');
+      const parsed = (await a.post('/api/penal/parse', { text: '§ 33 StGB' })).json.items;
+      await a.post(`/api/cases/${c.id}/charges/bulk`, { items: parsed.map((i) => ({ offenceId: i.offenceId, count: i.count })) });
+      const ctx = await browser.newContext({ viewport: { width: 1600, height: 1000 }, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+      const page = await ctx.newPage();
+      const problems = [];
+      page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
+      await page.goto(srv.base + '/login');
+      await page.fill('#email', TEAM.admin);
+      await page.fill('#password', PASSWORD);
+      await page.click('button[type=submit]');
+      await page.waitForURL(/dashboard/);
+      await page.waitForSelector('#nav a.nav-item', { state: 'attached' });
+      await page.goto(`${srv.base}/dashboard?case=${c.id}#cases`);
+      await page.waitForSelector('#modalBody .att');
+      await page.waitForTimeout(500);
+      await page.click('#modalBody .att[data-index="0"]');
+      await page.waitForSelector('#docPeek img');
+      assert.equal(await page.$('#lightbox, .lightbox.open'), null, 'keine Großansicht über der Akte');
+      assert.match(await page.textContent('#docPeek .dp-nav'), /1 \/ 2/);
+      await page.click('#docPeek [data-action="peek-step"][data-dir="1"]');
+      await page.waitForFunction(() => /2 \/ 2/.test(document.querySelector('#docPeek .dp-nav')?.textContent || ''));
+      // Akte bleibt daneben benutzbar (kein Überlappen mit dem Inhalt)
+      const overlap = await page.evaluate(() => document.querySelector('#modalBody').getBoundingClientRect().right <= document.querySelector('#docPeek').getBoundingClientRect().left + 1);
+      assert.ok(overlap, 'Vorschau neben der Akte');
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(() => !document.querySelector('#docPeek'));
+      assert.ok(await page.isVisible('#modalBody .case-head'), 'Esc schließt zuerst die Vorschau, nicht die Akte');
+
+      // Anklagepunkt → Schriftsatz mit vorbefülltem Anklagepunkt
+      await page.click('#secCharges [data-action="charge-brief"]');
+      await page.waitForSelector('form[data-form="brief-new"]');
+      assert.match(await page.inputValue('#bf_anklagepunkte'), /33/);
+      assert.match(await page.inputValue('#bf_begruendung'), /^Zum Vorwurf/);
+      assert.deepEqual(problems, []);
+      await ctx.close();
     } finally {
       await browser.close();
       await srv.stop();

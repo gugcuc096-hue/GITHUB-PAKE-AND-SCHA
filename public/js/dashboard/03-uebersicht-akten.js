@@ -476,9 +476,9 @@ function caseTable() {
         rows,
         (c) => `<tr class="row${c.idleDays ? ' row-idle' : ''}${selecting && st.caseSel.has(c.id) ? ' is-picked' : ''}" data-action="${selecting ? 'case-pick' : 'open-case'}" data-id="${c.id}"${selecting ? ` aria-selected="${st.caseSel.has(c.id)}"` : ''}>
           ${selecting ? `<td class="td-check"><span class="pick-box" aria-hidden="true">${icon('check', 'ico-sm')}</span></td>` : ''}<td class="td-main"><div class="case-meta"><span class="font-mono text-gold text-xs">${esc(c.caseNumber)}</span><span class="case-dot" aria-hidden="true">·</span><span>${esc(AREAS[c.area] || c.area)}</span>${staff ? '' : caseLevelBadge(c)}</div>
-            <div class="font-medium case-title-line">${staff ? starBtn(c) : ''}${esc(c.title)}${c.chatUnread ? ` <span class="chat-new" title="Neue Nachrichten">${icon('chat', 'ico-sm')}${c.chatUnread}</span>` : ''}</div></td>
+            <div class="font-medium case-title-line" title="${esc(c.title)}">${staff ? starBtn(c) : ''}<span class="case-title-text">${esc(c.title)}</span>${c.chatUnread ? ` <span class="chat-new" title="Neue Nachrichten">${icon('chat', 'ico-sm')}${c.chatUnread}</span>` : ''}</div></td>
           ${staff ? `<td data-label="Mandant">${esc(c.clientName)}${c.membership ? `<div class="mt-1">${memberBadge(c.membership)}</div>` : ''}</td>` : ''}
-          <td data-label="Zuständig">${c.lawyerName ? `<div class="who"><span class="who-lead">${esc(c.lawyerName)}</span>${(c.coLawyers || []).length ? `<div class="text-xs text-dim">+ ${esc(c.coLawyers.map((l) => l.name).join(', '))}</div>` : ''}</div>` : badge('Unbesetzt', 'amber')}</td>
+          <td data-label="Zuständig">${whoHtml(c)}</td>
           ${staff ? `<td data-label="Priorität">${priorityBadge(c, true)}</td>` : ''}
           <td data-label="Status">${stageBadge(c)}</td>
           <td data-label="Letzte Aktivität" class="nowrap">${activityCell(c)}</td></tr>`,
@@ -951,6 +951,42 @@ function attachmentsSection(c, attachments, linkedEvidence = []) {
 }
 
 /*
+ * Vorschau neben der Akte (ab 1500 px Breite): Ein Klick auf ein Beweisbild zeigt es rechts neben der Akte, ohne das
+ * Fenster zu wechseln – mit Blättern, Download und Schwärzen. Auf kleineren Bildschirmen bleibt die Großansicht.
+ */
+const peekOk = () => window.innerWidth >= 1500 && !!$('#modal.open');
+function docPeekOpen(index, linked) {
+  const list = linked ? st.linkedAttachments : st.caseAttachments;
+  const a = list[index];
+  if (!a) return;
+  let box = $('#docPeek');
+  if (!box) {
+    box = document.createElement('aside');
+    box.id = 'docPeek';
+    box.className = 'doc-peek';
+    box.setAttribute('aria-label', 'Vorschau');
+    document.body.appendChild(box);
+  }
+  box.dataset.index = String(index);
+  box.dataset.linked = linked ? '1' : '';
+  const no = linked ? a.no : index + 1;
+  box.innerHTML = `<div class="dp-head"><span class="dp-no">Beweismittel B${no}${linked ? ` · ${esc(a.caseNumber)}` : ''}</span>
+      <span class="dp-nav"><button type="button" class="icon-btn sm" data-action="peek-step" data-dir="-1" aria-label="Vorheriges Bild" ${index <= 0 ? 'disabled' : ''}>${icon('chevronLeft', 'ico-sm')}</button><span>${index + 1} / ${list.length}</span><button type="button" class="icon-btn sm" data-action="peek-step" data-dir="1" aria-label="Nächstes Bild" ${index >= list.length - 1 ? 'disabled' : ''}>${icon('chevronRight', 'ico-sm')}</button></span>
+      <button type="button" class="icon-btn sm" data-action="peek-close" aria-label="Vorschau schließen" title="Schließen (Esc)">${icon('x', 'ico-sm')}</button></div>
+    <div class="dp-img"><img src="${esc(a.url)}" alt="${esc(a.caption)}"></div>
+    <div class="dp-meta"><strong>${esc(a.caption || 'Anhang')}</strong><span>${esc(a.uploaderName)} · ${esc(fmtDate(a.createdAt))}${a.internal ? ' · <span class="stamp-mini">Vertraulich</span>' : ''}</span></div>
+    <div class="dp-actions"><a class="btn-ghost btn-sm" href="${esc(a.url)}" download>${icon('download', 'ico-sm')}<span>Herunterladen</span></a>${!linked && isStaff() ? `<button type="button" class="btn-ghost btn-sm" data-action="redact-open" data-index="${index}">${icon('edit', 'ico-sm')}<span>Schwärzen</span></button>` : ''}</div>`;
+  $('#modal').classList.add('has-peek');
+  $$('.att.is-peeked').forEach((b) => b.classList.remove('is-peeked'));
+  $(`.att[${linked ? 'data-linked' : 'data-index'}="${index}"]`)?.classList.add('is-peeked');
+}
+function docPeekClose() {
+  $('#docPeek')?.remove();
+  $('#modal')?.classList.remove('has-peek');
+  $$('.att.is-peeked').forEach((b) => b.classList.remove('is-peeked'));
+}
+
+/*
  * Schwärzen (nur Kanzlei): Auf einer Kopie des Beweisbilds Rechtecke ziehen → schwarze Balken. Gespeichert wird eine
  * neue, geschwärzte Kopie als eigenes Beweismittel; das Original bleibt unverändert in der Akte.
  */
@@ -1049,6 +1085,9 @@ function caseStats(c, { appointments, tasks }) {
   return [
     fact('Nächste Frist / Termin', next ? esc(next.title) : '<span class="text-dim">keine</span>', 'secEvents', next ? countdownHtml(next) : ''),
     fact('Aufgaben', open.length ? `${open.length} offen` : '<span class="text-dim">keine offen</span>', 'secTasks', overdue ? `<span class="countdown cd-over">${overdue} überfällig</span>` : ''),
+    c.canManageLawyers
+      ? `<button type="button" class="fact" data-action="case-team-edit" data-id="${c.id}" title="Zuständige ändern"><span class="k">Zuständig</span><span class="v">${whoHtml(c, { duty: true })}</span></button>`
+      : `<div class="fact"><span class="k">Zuständig</span><span class="v">${whoHtml(c, { duty: true })}</span></div>`,
     fact('Letzte Aktivität', c.idleDays ? `<span class="is-idle">${esc(relDays(c.updatedAt))}</span>` : esc(relDays(c.updatedAt)), 'secNotes'),
   ].join('');
 }

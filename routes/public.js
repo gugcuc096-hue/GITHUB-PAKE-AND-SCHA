@@ -7,6 +7,7 @@ const { wrap, parseBody, AREAS, URGENCIES, URGENCY_LABEL, PRIORITY_DISCORD, PRIO
 const { addSystemNote, getCase, onDutyMembers, syncCaseWork } = require('../models');
 const discord = require('../discord');
 const tickets = require('../tickets');
+const { intakeTitle, AREA_TITLES } = require('../caseTitles');
 
 const router = express.Router();
 
@@ -87,13 +88,6 @@ function wishLawyer(teamMemberId) {
   );
 }
 
-const AREA_TITLES = {
-  strafrecht: 'Strafrecht / Festnahme',
-  zivilrecht: 'Zivilrecht / Schadensersatz',
-  verfassungsrecht: 'Verfassungsbeschwerde',
-  vertragsrecht: 'Vertragsrecht / Ausarbeitung',
-  sonstiges: 'Sonstiges Anliegen',
-};
 
 router.post(
   '/cases',
@@ -102,7 +96,8 @@ router.post(
     const d = parseBody(requestSchema, req, res);
     if (!d) return;
     const account = req.user && req.user.role === 'mandant' ? req.user : null;
-    const title = truncate(`${AREA_TITLES[d.area]}: ${d.description.replace(/\s+/g, ' ')}`, 110);
+    // Kurzer Titel mit Namen; der Text des Mandanten steht im Sachverhalt
+    const title = intakeTitle(d.area, account ? account.display_name : d.name);
     const pin = randomPin();
     const lawyer = wishLawyer(d.teamMemberId);
 
