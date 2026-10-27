@@ -58,6 +58,7 @@ function chargesSection(c, data, deals = []) {
                 <span>${ch.count}×</span>
                 <button type="button" data-action="charge-count" data-case-id="${c.id}" data-id="${ch.id}" data-count="${ch.count + 1}" ${ch.count >= 20 ? 'disabled' : ''} aria-label="Einmal mehr">+</button>
               </span>
+              <button type="button" class="icon-btn sm" data-action="charge-brief" data-cite="${esc(citeShort(ch))}" data-title="${esc(ch.title)}" data-range="${esc(penaltyText(ch))}" aria-label="Schriftsatz zu diesem Anklagepunkt" title="Schriftsatz dazu – mit diesem Tatbestand vorbefüllt">${icon('doc', 'ico-sm')}</button>
               <button type="button" class="icon-btn sm" data-action="charge-remove" data-case-id="${c.id}" data-id="${ch.id}" aria-label="Anklagepunkt entfernen" title="Entfernen">${icon('trash', 'ico-sm')}</button>`
               : `${ch.attempted ? badge('Versuch', 'slate') : ''}${ch.aiding ? badge('Beihilfe', 'slate') : ''}<span class="chg-count">${ch.count}×</span>`
           }
@@ -352,6 +353,18 @@ Object.assign(actions, {
     const on = el.getAttribute('aria-pressed') !== 'true';
     el.classList.toggle('on', on); // sofort sichtbar
     await afterCharges(Number(el.dataset.caseId), await api.patch(`/api/cases/${el.dataset.caseId}/charges/${el.dataset.id}`, { [el.dataset.flag]: on }));
+  },
+  // Schriftsatz zu einem einzelnen Anklagepunkt: Tatbestand und Strafrahmen kommen vorbefüllt ins Formular
+  'charge-brief': async (el) => {
+    await actions['brief-new']();
+    const list = $('#bf_anklagepunkte');
+    if (list) list.value = `${el.dataset.cite} ${el.dataset.title}${el.dataset.range ? ` (${el.dataset.range})` : ''}`;
+    const why = $('#bf_begruendung');
+    if (why) {
+      if (!why.value) why.value = `Zum Vorwurf „${el.dataset.title}“ (${el.dataset.cite}): `;
+      why.focus();
+      why.setSelectionRange(why.value.length, why.value.length);
+    }
   },
   'charge-remove': async (el) => {
     el.closest('.chg-row')?.classList.add('undo-hidden');

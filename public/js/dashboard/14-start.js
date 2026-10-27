@@ -84,6 +84,10 @@ document.addEventListener('keydown', (e) => {
       closeDutyPop();
       return;
     }
+    if ($('#docPeek')) {
+      docPeekClose();
+      return;
+    }
     if ($('#modal').classList.contains('open')) guard(() => modalDismiss());
     else closeSidebar();
   }
@@ -349,6 +353,175 @@ document.addEventListener('input', (e) => {
     onInvoiceInput(t);
   }
 });
+
+/*
+ * Felder in der Akte direkt ändern (siehe ie() in 05-akte-kalender-post.js): Klick oder Enter öffnet die Eingabe, Enter
+ * bzw. Verlassen speichert, Esc verwirft. Danach „Rückgängig“. Die Akte wird nicht neu geladen.
+ */
+const IE_OPTIONS = { area: () => Object.entries(AREAS) };
+function ieShow(el, value) {
+  el.dataset.value = value;
+  const shown = el.dataset.ie === 'area' ? AREAS[value] || value : value;
+  el.innerHTML = shown ? esc(shown) : `<span class="ie-empty">${esc(el.dataset.placeholder || '')}</span>`;
+  el.classList.remove('is-editing');
+}
+function ieSync(id, key, value) {
+  const c = st.caseInfo && st.caseInfo.id === id ? st.caseInfo : null;
+  if (c) c[key] = value;
+  const row = st.cases.find((x) => x.id === id);
+  if (row) row[key] = value;
+  casePrefetch.clear();
+  if (key === 'title') {
+    const head = $('#modalTitle');
+    if (head) head.title = value;
+  }
+}
+function ieOpen(el) {
+  if (el.classList.contains('is-editing')) return;
+  const type = el.dataset.type;
+  const old = el.dataset.value || '';
+  el.classList.add('is-editing');
+  let input;
+  if (type === 'select') {
+    input = document.createElement('select');
+    input.innerHTML = IE_OPTIONS[el.dataset.ie]().map(([k, l]) => opt(k, l, k === old)).join('');
+  } else if (type === 'textarea') {
+    input = document.createElement('textarea');
+    input.rows = Math.min(10, Math.max(3, old.split('\n').length + 1));
+    input.value = old;
+  } else {
+    input = document.createElement('input');
+    input.type = 'text';
+    input.value = old;
+  }
+  input.className = 'field ie-input';
+  input.maxLength = { title: 120, clientName: 80, clientPhone: 40, opponent: 120, courtRef: 60, description: 4000, publicNote: 500 }[el.dataset.ie] || 200;
+  input.setAttribute('aria-label', IE_LABEL[el.dataset.ie] || 'Feld');
+  el.textContent = '';
+  el.appendChild(input);
+  input.focus();
+  if (input.select && type !== 'select') input.select();
+  let done = false;
+  const finish = async (save) => {
+    if (done) return;
+    done = true;
+    const next = input.value.trim();
+    if (!save || next === old) return ieShow(el, old);
+    ieShow(el, old);
+    el.classList.add('is-saving');
+    const id = Number(el.dataset.id);
+    const key = el.dataset.ie;
+    try {
+      await api.patch('/api/cases/' + id, { [key]: next });
+    } catch (err) {
+      el.classList.remove('is-saving');
+      toast(err.message || 'Nicht gespeichert.', 'error');
+      return;
+    }
+    el.classList.remove('is-saving');
+    ieShow(el, next);
+    ieSync(id, key, next);
+    document.dispatchEvent(new Event('ps:changed'));
+    toast(`${IE_LABEL[key]} gespeichert.`, 'ok', {
+      duration: 6000,
+      action: {
+        label: 'Rückgängig',
+        onClick: () =>
+          guard(async () => {
+            await api.patch('/api/cases/' + id, { [key]: old });
+            ieSync(id, key, old);
+            if (el.isConnected) ieShow(el, old);
+            renderView();
+          }),
+      },
+    });
+    renderView(); // die Liste hinter der Akte zeigt den neuen Wert (Daten sind lokal schon aktuell)
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      finish(false);
+    } else if (e.key === 'Enter' && (type !== 'textarea' || e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      finish(true);
+    }
+  });
+  input.addEventListener('blur', () => finish(true));
+  if (type === 'select') input.addEventListener('change', () => finish(true));
+}
+document.addEventListener('click', (e) => {
+  const el = e.target.closest && e.target.closest('.ie[data-ie]');
+  if (el && !e.target.closest('.ie-input')) {
+    e.preventDefault();
+    ieOpen(el);
+  }
+});
+document.addEventListener('keydown', (e) => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.ie[data-ie]') && !e.target.classList.contains('is-editing')) {
+    e.preventDefault();
+    ieOpen(e.target);
+  }
+});
+// „Details“ in der Akte: zugeklappt bleibt zugeklappt (pro Gerät)
+document.addEventListener(
+  'toggle',
+  (e) => {
+    if (e.target.matches && e.target.matches('details.case-details')) {
+      try {
+        localStorage.setItem('ps.caseDetailsClosed', e.target.open ? '0' : '1');
+      } catch {
+        /* nur Komfort */
+      }
+    }
+  },
+  true
+);
+
+/* Beteiligte der Akte */
+forms['party-add'] = async (f) => {
+  const id = Number(f.dataset.id);
+  const fd = new FormData(f);
+  const r = await api.post(`/api/cases/${id}/parties`, { role: val(fd, 'role'), name: val(fd, 'name'), contact: val(fd, 'contact') });
+  toast('Beteiligten hinzugefügt.');
+  await reloadCase(id);
+  return r;
+};
+actions['party-del'] = async (el) => {
+  const id = Number(el.dataset.caseId);
+  await api.del(`/api/cases/${id}/parties/${el.dataset.id}`);
+  toast('Beteiligten entfernt.');
+  await reloadCase(id);
+};
+
+/* Zuständige Anwälte ändern (federführend und weitere) */
+actions['case-team-edit'] = async (el) => {
+  const id = Number(el.dataset.id);
+  const c = st.caseInfo && st.caseInfo.id === id ? st.caseInfo : null;
+  if (!c) return;
+  await load.lawyers();
+  openModal(`
+      <h2 id="modalTitle" class="modal-title">Zuständige Anwälte</h2>
+      <p class="modal-sub">Akte <span class="font-mono text-gold">${esc(c.caseNumber)}</span> – wer federführend ist und wer mitarbeitet.</p>
+      <form data-form="case-team" data-id="${id}" class="form-grid cols-2">
+        ${lawyerPicker({ leadId: c.lawyerId, coIds: (c.coLawyers || []).map((l) => l.id), withLead: isAdmin(), extra: caseTeam(c) })}
+        <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button><button type="button" class="btn-ghost btn-md" data-action="back-to-case">Abbrechen</button></div>
+      </form>`);
+};
+forms['case-team'] = async (f) => {
+  const fd = new FormData(f);
+  const id = Number(f.dataset.id);
+  const body = {};
+  if (f.elements.lawyerId) body.lawyerId = fd.get('lawyerId') ? Number(fd.get('lawyerId')) : null;
+  if (f.querySelector('[data-team]')) body.coLawyerIds = fd.getAll('coLawyerIds').map(Number);
+  const handover = f.elements.handover && !$('#handoverBox').hidden ? val(fd, 'handover') : '';
+  if (handover) body.handover = handover;
+  await api.patch('/api/cases/' + id, body);
+  toast('Zuständigkeit gespeichert.');
+  st.returnCase = null;
+  await openCase(id);
+  refreshBehind();
+};
 
 /*
  * Zahlenfelder bekommen eigene Tasten − / + im Stil der Kanzlei (die Systempfeile sind ausgeblendet). Die Tasten lösen

@@ -1283,6 +1283,20 @@ db.exec(`
     updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
   );
 `);
+// Beteiligte einer Akte (Gegenpartei, Zeugen, Gericht …) – mit Kontakt; die Kanzlei sieht Überschneidungen mit anderen Akten
+db.exec(`
+  CREATE TABLE IF NOT EXISTS case_parties (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id    INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    role       TEXT NOT NULL DEFAULT 'sonstige',
+    name       TEXT NOT NULL,
+    contact    TEXT NOT NULL DEFAULT '',
+    created_by TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_case_parties_case ON case_parties(case_id);
+`);
+
 // Verknüpfte Akten (z. B. ein Vorfall, mehrere Festgenommene) – je Paar eine Zeile, a_id < b_id
 db.exec(`
   CREATE TABLE IF NOT EXISTS case_links (
@@ -1343,6 +1357,29 @@ if (!getSetting('migrated_priority_from_urgency')) {
     .run().changes;
   setSetting('migrated_priority_from_urgency', new Date().toISOString());
   if (n) console.log(`Priorität aus der Dringlichkeit übernommen: ${n} Akte(n).`);
+}
+
+// Akten aus dem Website-Formular hießen „Strafrecht / Festnahme: <ganzer Text des Mandanten>“ – der Text steht im
+// Sachverhalt, der Titel wird kurz („Strafrecht / Festnahme – Name“). Einmalig; selbst vergebene Titel bleiben unberührt.
+if (!getSetting('migrated_short_titles')) {
+  const { AREA_TITLES, intakeTitle } = require('./caseTitles');
+  const rows = db
+    .prepare(
+      `SELECT c.id, c.title, c.area, COALESCE(NULLIF(c.client_name, ''), u.display_name, '') AS who
+         FROM cases c LEFT JOIN users u ON u.id = c.client_id WHERE c.source = 'web'`
+    )
+    .all();
+  const upd = db.prepare('UPDATE cases SET title = ? WHERE id = ?');
+  let n = 0;
+  for (const r of rows) {
+    const prefix = `${AREA_TITLES[r.area] || ''}: `;
+    if (r.who && AREA_TITLES[r.area] && r.title.startsWith(prefix)) {
+      upd.run(intakeTitle(r.area, r.who), r.id);
+      n++;
+    }
+  }
+  setSetting('migrated_short_titles', new Date().toISOString());
+  if (n) console.log(`Kurze Titel für Website-Anfragen: ${n} Akte(n).`);
 }
 
 // Akten-Chat neu: Bisherige Nachrichten gelten als gelesen (sonst wären beim ersten Start alle „neu“).

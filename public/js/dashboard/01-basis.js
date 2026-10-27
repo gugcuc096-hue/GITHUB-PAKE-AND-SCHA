@@ -380,6 +380,27 @@ function teamHtml(c) {
     .join(', ');
 }
 
+const NAME_TITLE_WORDS = new Set(['dr', 'prof', 'jur', 'med', 'rer', 'nat', 'mag', 'll', 'mba', 'von', 'van', 'de']);
+/** Rufname ohne Titel: „Prof. Dr. jur. Alois Pake Martinez“ → „Alois“. */
+function firstName(name) {
+  const w = String(name || '')
+    .split(/\s+/)
+    .map((x) => x.replace(/[.,]/g, ''))
+    .find((x) => x.length > 1 && !NAME_TITLE_WORDS.has(x.toLowerCase()));
+  return w || String(name || '—');
+}
+/**
+ * Zuständige kompakt: Initialen-Kreis und Rufname des federführenden Anwalts, „+2“ für die weiteren – alle Namen im
+ * Tooltip. Mit duty zusätzlich der Dienststatus (grüner Punkt).
+ */
+function whoHtml(c, { duty = false } = {}) {
+  const team = caseTeam(c);
+  if (!team.length) return '<span class="badge badge-amber">Unbesetzt</span>';
+  const lead = team[0];
+  const s = duty ? (c.lawyerDuty || {})[lead.id] : null;
+  return `<span class="who2" title="${esc(team.map((l) => l.name).join(', '))}"><span class="who2-av" aria-hidden="true">${esc(initials(lead.name))}</span><span class="who2-name">${esc(firstName(lead.name))}</span>${team.length > 1 ? `<span class="who2-more">+${team.length - 1}</span>` : ''}${DUTY_SHORT[s] ? `<span class="duty-tag s-${s}"><span class="duty-dot s-${s}"></span>${DUTY_SHORT[s]}</span>` : ''}</span>`;
+}
+
 /**
  * Auswahl der zuständigen Anwälte. withLead: Auswahl des federführenden Anwalts (Board of Partners);
  * sonst ist leadId fest (z. B. man selbst) und nur weitere Anwälte werden gewählt.

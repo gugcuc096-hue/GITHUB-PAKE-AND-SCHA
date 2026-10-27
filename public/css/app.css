@@ -2202,3 +2202,106 @@ tr:not(:hover) .star-btn:not(.on) { opacity: 0.25; }
 /* C8: Leerzustände – der nächste Schritt direkt darunter */
 .empty .empty-next { margin-top: 0.85rem; display: flex; justify-content: center; flex-wrap: wrap; gap: 0.5rem; }
 .empty-line .empty-next { margin-left: auto; }
+
+/* ---------------------------------------------------------------- Akte neu geordnet: Kopf, Details, Beteiligte, Phasen */
+/* Zuständige kompakt (Liste, Statuszeile): Kreis mit Initialen, Rufname, „+2“ */
+.who2 { display: inline-flex; align-items: center; gap: 0.45rem; min-width: 0; }
+.who2-av { position: relative; flex: none; display: inline-grid; place-items: center; width: 1.7rem; height: 1.7rem; border-radius: 50%; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.02em; color: #1a1305; background: linear-gradient(145deg, #e8c860, #b8962e); }
+.who2-av .duty-dot { position: absolute; right: -2px; bottom: -2px; width: 0.55rem; height: 0.55rem; border: 2px solid #0b1226; }
+.who2-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.who2-more { flex: none; font-size: 0.72rem; color: var(--text-dim); padding: 0.1rem 0.4rem; border-radius: 999px; border: 1px solid var(--glass-border); }
+
+/* Aktenkopf: Zeile mit Aktenzeichen, Rechtsgebiet und Tickets, darunter der Titel in einer Zeile */
+.case-area { font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); }
+.case-title { margin: 0.2rem 0 0; font-family: var(--font-display); font-size: clamp(1.35rem, 2.2vw + 0.7rem, 1.95rem); font-weight: 600; line-height: 1.25; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+@media (min-width: 768px) { .case-title { -webkit-line-clamp: 1; } }
+.case-title .ie-title { display: inline; }
+.case-title:has(.is-editing) { display: block; overflow: visible; }
+.case-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.7rem; }
+.case-chipmenu { position: relative; display: inline-block; }
+.case-chip { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0.65rem; border-radius: 999px; font-size: 0.76rem; line-height: 1.3; color: var(--text-muted); border: 1px solid var(--glass-border); background: rgba(15, 23, 42, 0.5); cursor: pointer; list-style: none; transition: border-color 0.15s, color 0.15s; }
+.case-chip::-webkit-details-marker { display: none; }
+.case-chip:hover { border-color: rgba(212, 175, 55, 0.45); color: var(--text-main); }
+.case-chip .ico { width: 14px; height: 14px; color: #8c96ff; flex: none; }
+.chip-state { width: 0.45rem; height: 0.45rem; border-radius: 50%; background: var(--text-dim); }
+.case-chip.tone-ok .chip-state { background: #34d399; box-shadow: 0 0 6px rgba(52, 211, 153, 0.6); }
+.case-chip.tone-amber .chip-state { background: #f59e0b; }
+.case-chip.tone-red .chip-state { background: #f87171; }
+.case-chip.tone-sky .chip-state { background: #38bdf8; }
+.chip-pop { min-width: 17rem; max-width: 22rem; padding: 0.7rem; gap: 0.55rem; }
+.chip-pop-head { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.chip-pop-hint { margin: 0; font-size: 0.78rem; color: var(--text-muted); line-height: 1.45; }
+.chip-pop-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+.pt-box { margin: 0 0 1rem; }
+
+/* Direkt änderbare Felder */
+.ie { cursor: text; border-radius: 6px; padding: 0 0.15rem; margin: 0 -0.15rem; border-bottom: 1px dashed transparent; transition: background 0.15s, border-color 0.15s; }
+.ie:hover, .ie:focus-visible { background: rgba(212, 175, 55, 0.08); border-bottom-color: rgba(212, 175, 55, 0.5); outline: none; }
+.ie-empty { color: var(--text-dim); font-style: italic; font-weight: 400; font-size: 0.9em; }
+.ie.is-saving { opacity: 0.6; }
+.ie.is-editing { display: block; background: none; border-color: transparent; padding: 0; margin: 0; }
+.ie-input { width: 100%; font: inherit; padding: 0.35rem 0.6rem; border-radius: 10px; }
+.ie-title .ie-input { font-family: var(--font-display); font-size: 1.3rem; }
+.ie-block .ie { display: block; white-space: pre-wrap; line-height: 1.55; color: var(--text-muted); font-size: 0.9rem; padding: 0.4rem 0.5rem; margin: 0 -0.5rem; }
+.ie-block .ie.is-editing { padding: 0; margin: 0; }
+.ie-link { background: none; border: 0; padding: 0; color: var(--gold-light); font-size: 0.78rem; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.ie-link:hover { color: var(--gold-500); }
+
+/* Details der Akte */
+.case-details { border: 1px solid var(--glass-border); border-radius: 14px; background: rgba(15, 23, 42, 0.3); padding: 0 1rem; }
+.case-details[open] { padding-bottom: 1rem; }
+.case-details > summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; padding: 0.7rem 0; font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-dim); }
+.case-details > summary::-webkit-details-marker { display: none; }
+.case-details > summary::after { content: '–'; color: var(--gold-500); font-size: 1.1rem; letter-spacing: 0; }
+.case-details:not([open]) > summary::after { content: '+'; }
+.case-details .info-grid { margin-top: 0.1rem; }
+.k.inline { display: inline; }
+.account-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid var(--line); font-size: 0.85rem; }
+
+/* Beteiligte */
+.parties { margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid var(--line); }
+.parties > .k { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin-bottom: 0.4rem; }
+.party-row { display: grid; grid-template-columns: 9rem minmax(0, 1.2fr) minmax(0, 1fr) auto; align-items: center; gap: 0.6rem; padding: 0.4rem 0; border-bottom: 1px solid var(--line); font-size: 0.88rem; }
+.party-row:last-of-type { border-bottom: 0; }
+.party-role { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold-light); }
+.party-contact { color: var(--text-muted); overflow-wrap: anywhere; }
+.party-add { display: grid; grid-template-columns: 10rem minmax(0, 1.2fr) minmax(0, 1fr) auto; gap: 0.5rem; align-items: center; margin-top: 0.7rem; }
+.party-add .field { padding: 0.4rem 0.6rem; font-size: 0.85rem; }
+.party-warn { display: flex; gap: 0.6rem; padding: 0.6rem 0.8rem; margin-bottom: 0.6rem; border-radius: 12px; border: 1px solid rgba(245, 158, 11, 0.35); background: rgba(245, 158, 11, 0.07); color: #fde68a; font-size: 0.82rem; line-height: 1.5; }
+.party-warn .ico-sm { flex: none; margin-top: 0.2rem; }
+.party-warn-note { display: block; margin-top: 0.2rem; color: var(--text-muted); }
+.ov-link { background: none; border: 0; padding: 0; font-family: 'JetBrains Mono', monospace; color: var(--gold-500); cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+@media (max-width: 640px) {
+  .party-row { grid-template-columns: 1fr auto; }
+  .party-row .party-contact { grid-column: 1 / -1; }
+  .party-add { grid-template-columns: 1fr; }
+}
+
+/* Verlauf nach Phasen */
+.timeline.phases { display: grid; gap: 0.5rem; }
+.phase { border: 1px solid var(--line); border-radius: 12px; padding: 0 0.9rem; background: rgba(15, 23, 42, 0.25); }
+.phase[open] { padding-bottom: 0.6rem; border-color: var(--glass-border); }
+.phase > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; padding: 0.6rem 0; }
+.phase > summary::-webkit-details-marker { display: none; }
+.phase-name { font-weight: 600; font-size: 0.9rem; }
+.phase-meta { font-size: 0.75rem; color: var(--text-dim); }
+.phase:not([open]) .phase-name { color: var(--text-muted); font-weight: 500; }
+
+/* Aktenliste: Titel in einer Zeile, volle Länge im Tooltip */
+.case-title-line { display: flex; align-items: center; min-width: 0; }
+.case-title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.case-title-line .chat-new { flex: none; margin-left: 0.4rem; }
+
+/* Vorschau neben der Akte (ab 1500 px): die Akte rückt nach links, rechts steht das Beweisbild */
+@media (min-width: 1500px) {
+  #modal.has-peek { padding-right: calc(min(32rem, 30vw) + 2rem); }
+  .doc-peek { position: fixed; z-index: 75; top: 1rem; bottom: 1rem; right: 1rem; width: min(32rem, 30vw); display: flex; flex-direction: column; gap: 0.7rem; padding: 0.9rem; border-radius: 18px; border: 1px solid var(--gold-hairline); background: rgba(8, 13, 30, 0.96); backdrop-filter: blur(12px); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55); animation: pop-in 0.18s ease-out; transform-origin: top right; }
+}
+.doc-peek .dp-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold-light); }
+.doc-peek .dp-nav { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--text-dim); letter-spacing: 0; text-transform: none; }
+.doc-peek .dp-img { flex: 1; min-height: 0; display: grid; place-items: center; border-radius: 12px; background: rgba(2, 5, 14, 0.6); overflow: auto; }
+.doc-peek .dp-img img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.doc-peek .dp-meta { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.85rem; }
+.doc-peek .dp-meta span { color: var(--text-dim); font-size: 0.78rem; }
+.doc-peek .dp-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.att.is-peeked { outline: 2px solid var(--gold-500); outline-offset: 2px; }

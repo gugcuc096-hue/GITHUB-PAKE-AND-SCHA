@@ -109,6 +109,7 @@ app.use('/api/cases/:id', (req, res, next) => {
 });
 app.use('/api/cases/:id/external', externalRoutes.caseRouter);
 app.use('/api/cases/:id/contracts', contractRoutes.caseRouter);
+app.use('/api/cases/:id/parties', require('./routes/parties').router); // Beteiligte der Akte
 app.use('/api/cases/:id/charges', require('./routes/penal').caseRouter); // Anklagepunkte & Strafmaß-Rechner
 app.use('/api/cases/:id/fivenet', externalRoutes.caseRouter); // ältere Adresse, bleibt gültig
 app.use('/api/cases', require('./routes/cases'));
