@@ -1640,10 +1640,11 @@ input.field[aria-expanded="true"] { border-color: var(--gold-500); box-shadow: 0
 .chg-k { font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); }
 .chg-big { font-family: var(--font-display); font-size: 1.6rem; font-weight: 600; line-height: 1.2; color: var(--gold-500); margin-top: 0.25rem; }
 .chg-sub { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem; }
-.chg-est-row { display: flex; gap: 0.6rem; margin-top: 0.4rem; }
-.chg-est { flex: 1; min-width: 0; display: flex; align-items: center; gap: 0.4rem; }
-.chg-est .field { min-width: 0; padding: 0.45rem 0.65rem; font-size: 1rem; }
-.chg-est span { flex: none; font-size: 0.8rem; color: var(--text-dim); }
+.chg-est-row { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.4rem; }
+.chg-est { flex: 1 1 8.5rem; min-width: 0; display: flex; align-items: center; gap: 0.4rem; }
+.chg-est .field { min-width: 0; padding: 0.45rem 0.4rem; font-size: 1rem; }
+.chg-est > span:not(.num-step) { flex: none; font-size: 0.8rem; color: var(--text-dim); }
+.chg-est .num-step { flex: 1 1 0; width: auto; }
 .chg-reduced { margin-top: 0.6rem; font-size: 0.8rem; }
 @media (max-width: 767px) { .chg-sum { grid-template-columns: 1fr 1fr; } .chg-est-cell { grid-column: 1 / -1; } }
 .chg-mitig { display: flex; align-items: center; gap: 0.45rem; margin: 0.7rem 0 0; font-size: 0.8rem; color: var(--gold-light); }

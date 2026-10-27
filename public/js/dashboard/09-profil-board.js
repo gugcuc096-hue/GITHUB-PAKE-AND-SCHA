@@ -849,6 +849,20 @@ function updatePromotePreview() {
 /* ---------------------------------------------------------------- Gemeinsam (auch für Mandanten geladen)
  * Stehen hier statt in 09-verwaltung.js: die Verwaltungsteile lädt das Dashboard nur für die Kanzlei nach. */
 /** Übersicht: kurze Zeile, wer heute abgemeldet ist. */
+/* Hilfen für Akte und Abwesenheiten – im Kern-Paket, weil die Akte schon vor dem Kanzlei-Paket gezeichnet werden kann */
+/** Dauer lesbar: 45 Min · 3 Std 20 Min · 4 T 6 Std */
+function fmtDur(ms) {
+  if (ms == null) return '—';
+  const min = Math.max(0, Math.round(ms / 60000));
+  if (min < 60) return `${min} Min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h} Std${min % 60 ? ` ${min % 60} Min` : ''}`;
+  const d = Math.floor(h / 24);
+  return `${d} ${d === 1 ? 'Tag' : 'Tage'}${h % 24 ? ` ${h % 24} Std` : ''}`;
+}
+const ROLE_BADGE = { lead: ['federführend', 'gold'], co: ['weiterer Anwalt', 'sky'] };
+const dayDe = (d) => new Date(`${d}T12:00:00`).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+
 function absenceStrip() {
   const now = (st.absences?.absences || []).filter((a) => a.state === 'aktiv');
   if (!isStaff() || !now.length) return '';
