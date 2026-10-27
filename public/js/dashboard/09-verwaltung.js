@@ -141,17 +141,6 @@ function coopDetectHtml(r, name) {
 }
 
 /* ---------------------------------------------------------------- Aktenbearbeitung (nur Board of Partners) */
-/** Dauer lesbar: 45 Min · 3 Std 20 Min · 4 T 6 Std */
-function fmtDur(ms) {
-  if (ms == null) return '—';
-  const min = Math.max(0, Math.round(ms / 60000));
-  if (min < 60) return `${min} Min`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `${h} Std${min % 60 ? ` ${min % 60} Min` : ''}`;
-  const d = Math.floor(h / 24);
-  return `${d} ${d === 1 ? 'Tag' : 'Tage'}${h % 24 ? ` ${h % 24} Std` : ''}`;
-}
-const ROLE_BADGE = { lead: ['federführend', 'gold'], co: ['weiterer Anwalt', 'sky'] };
 const WORK_DAYS = [
   [7, '7 Tage'],
   [30, '30 Tage'],
@@ -459,7 +448,6 @@ views.stats = {
 
 /* ---------------------------------------------------------------- Abmeldungen */
 const ABSENCE_BADGE = { aktiv: ['abgemeldet', 'amber'], geplant: ['geplant', 'sky'], vorbei: ['beendet', 'slate'] };
-const dayDe = (d) => new Date(`${d}T12:00:00`).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
 const absenceDays = (a) => Math.round((new Date(`${a.endDate}T12:00:00`) - new Date(`${a.startDate}T12:00:00`)) / 864e5) + 1;
 
 

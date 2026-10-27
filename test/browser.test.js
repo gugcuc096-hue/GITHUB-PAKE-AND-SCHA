@@ -3207,6 +3207,12 @@ describe('Browser: Zahlenfelder mit eigenen Tasten, Kästchen im Kanzlei-Stil, E
       await page.click('#secCharges .chg-est .num-btn[data-dir="1"] >> nth=0');
       await page.waitForTimeout(600);
       assert.equal(await page.inputValue('#secCharges .chg-est input >> nth=0'), '2');
+      // nichts überlappt: Felder und ihre Beschriftung (HE / $) liegen nebeneinander oder untereinander, nie übereinander
+      const boxes = await page.$$eval('#secCharges .chg-est-cell .num-step, #secCharges .chg-est-cell .chg-est > span:not(.num-step)', (els) => els.map((e) => e.getBoundingClientRect()).map((r) => [r.left, r.top, r.right, r.bottom]));
+      for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+        const [a, b] = [boxes[i], boxes[j]];
+        assert.ok(a[2] <= b[0] + 1 || b[2] <= a[0] + 1 || a[3] <= b[1] + 1 || b[3] <= a[1] + 1, `Felder überlappen: ${a} / ${b}`);
+      }
       assert.equal(caseReads.length, reads, 'die Akte wird beim Ändern der Einschätzung nicht neu geladen');
       assert.equal((await a.get(`/api/cases/${c.id}`)).json.case ? true : false, true);
       assert.deepEqual(problems, []);
