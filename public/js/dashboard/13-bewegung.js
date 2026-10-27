@@ -353,3 +353,126 @@ function growBars(root) {
     if (bar.style.width) bar.animate([{ width: '0%' }, { width: bar.style.width }], { duration: 750, delay: Math.min(i, 12) * 40, easing: FLY_EASE, fill: 'backwards' });
   });
 }
+
+/* ================================================================
+   Wischen an Zeilen (Handy): Akte nach links = merken (Stern), nach rechts = Nachrichten als gelesen;
+   Aufgabe nach rechts = erledigt. Die Zeile folgt dem Finger, ein Streifen dahinter nennt die Aktion; erst ab ~84 px
+   wird sie ausgelöst, sonst federt die Zeile zurück. Das Fenster nach unten ziehen zum Schließen gibt es separat (14-start.js).
+   ================================================================ */
+(() => {
+  const TH = 84;
+  const ROW_SEL = '#caseList tr.row, #content .task-row';
+  let sw = null; // { el, x, y, dx, on, hint }
+  let swipedAt = 0;
+  const small = () => window.innerWidth < 768 && !$('#modal.open');
+  const kindOf = (el) => (el.matches('tr.row') ? 'case' : 'task');
+  function hintFor(el, dir) {
+    const kind = kindOf(el);
+    if (kind === 'case') {
+      const c = st.cases.find((x) => x.id === Number(el.dataset.id));
+      if (dir < 0) return c ? { text: c.starred ? 'Nicht mehr merken' : 'Merken', ico: 'star' } : null;
+      return c && c.chatUnread ? { text: 'Als gelesen', ico: 'check' } : { text: 'Nichts Neues', ico: 'check', idle: true };
+    }
+    if (dir > 0) return { text: el.classList.contains('is-done') ? 'Wieder öffnen' : 'Erledigt', ico: 'check' };
+    return null;
+  }
+  function makeHint(el, dir, info) {
+    const r = el.getBoundingClientRect();
+    const h = document.createElement('div');
+    h.className = `swipe-hint ${dir < 0 ? 'is-left' : 'is-right'}`;
+    h.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;`;
+    h.innerHTML = `${info.ico === 'star' ? icon('star', 'ico-sm') : icon('check', 'ico-sm')}<span>${esc(info.text)}</span>`;
+    document.body.appendChild(h);
+    return h;
+  }
+  const clear = (animate) => {
+    if (!sw) return;
+    const { el, hint } = sw;
+    if (hint) hint.remove();
+    el.classList.remove('is-swiping');
+    if (animate) {
+      el.classList.add('is-settling');
+      el.style.transform = '';
+      setTimeout(() => el.classList.remove('is-settling', 'swipe-row'), 260);
+    } else {
+      el.style.transform = '';
+      el.classList.remove('swipe-row');
+    }
+    sw = null;
+  };
+  document.addEventListener(
+    'pointerdown',
+    (e) => {
+      if (e.pointerType !== 'touch' || !small()) return;
+      const el = e.target.closest && e.target.closest(ROW_SEL);
+      if (!el || e.target.closest('button, a, input, select, textarea, summary')) return;
+      sw = { el, x: e.clientX, y: e.clientY, dx: 0, on: false, hint: null, dir: 0 };
+    },
+    { passive: true }
+  );
+  document.addEventListener(
+    'pointermove',
+    (e) => {
+      if (!sw || e.pointerType !== 'touch') return;
+      const dx = e.clientX - sw.x;
+      const dy = e.clientY - sw.y;
+      if (!sw.on) {
+        if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) return void (sw = null); // senkrecht: normales Scrollen
+        if (Math.abs(dx) < 12) return;
+        sw.on = true;
+        sw.el.classList.add('swipe-row', 'is-swiping');
+      }
+      const dir = dx < 0 ? -1 : 1;
+      const info = hintFor(sw.el, dir);
+      if (dir !== sw.dir) {
+        if (sw.hint) sw.hint.remove();
+        sw.hint = info ? makeHint(sw.el, dir, info) : null;
+        sw.dir = dir;
+        sw.info = info;
+      }
+      // Gummiband: nach 120 px wird es zäher
+      const abs = Math.abs(dx);
+      const eff = Math.sign(dx) * (abs <= 120 ? abs : 120 + (abs - 120) * 0.25);
+      sw.el.style.transform = info ? `translateX(${eff}px)` : `translateX(${eff * 0.2}px)`;
+      sw.dx = dx;
+      if (sw.hint) sw.hint.classList.toggle('show', Math.abs(dx) > 24);
+    },
+    { passive: true }
+  );
+  const finish = async () => {
+    if (!sw) return;
+    const cur = sw;
+    if (!cur.on) return void (sw = null);
+    const fire = Math.abs(cur.dx) >= TH && cur.info && !cur.info.idle;
+    const el = cur.el;
+    const id = Number(el.dataset.id);
+    const kind = kindOf(el);
+    const dir = cur.dir;
+    clear(true);
+    swipedAt = Date.now(); // das folgende „click“ der Berührung soll die Zeile nicht öffnen
+    if (!fire) return;
+    await guard(async () => {
+      if (kind === 'case' && dir < 0) {
+        const c = st.cases.find((x) => x.id === id);
+        if (c) await actions['case-star']({ dataset: { id: String(id) }, getAttribute: () => String(!!c.starred) });
+      } else if (kind === 'case') {
+        await markChatRead(id, 2147483647, 0);
+      } else {
+        el.querySelector('.task-check')?.click();
+      }
+    });
+  };
+  document.addEventListener('pointerup', finish, { passive: true });
+  document.addEventListener('pointercancel', () => clear(true), { passive: true });
+  // Wurde gerade gewischt, öffnet das anschließende Tippen-Ende die Akte nicht
+  document.addEventListener(
+    'click',
+    (e) => {
+      if (e.isTrusted && Date.now() - swipedAt < 450 && e.target.closest && e.target.closest(ROW_SEL)) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    },
+    true
+  );
+})();

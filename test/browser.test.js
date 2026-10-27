@@ -1237,7 +1237,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
             maxWidth: getComputedStyle(document.querySelector('#content')).maxWidth,
           };
         });
-        assert.equal(ov.idle, 'vor 8 Tagen');
+        assert.match(ov.idle, /^vor [78] Tagen$/);
         assert.equal(ov.tag, false, 'kein Etikett „liegt seit …“ in der Übersicht');
         assert.equal(ov.stripe, 'none', 'kein farbiger Streifen am Rand');
         assert.ok(ov.oneLine, 'Fälligkeit und Knöpfe der Aufgabe in einer Zeile');
@@ -1252,7 +1252,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         assert.doesNotMatch(await page.textContent(`${qRow} .td-main`), /liegt seit/);
         assert.match((await page.textContent(`${qRow} .case-meta`)).trim(), /^PS-\d{4}-\d{4}\s*·\s*Strafrecht$/);
         assert.ok((await page.$$eval('#caseList th', (ths) => ths.map((t) => t.textContent))).includes('Letzte Aktivität'));
-        assert.equal((await page.textContent(`${qRow} td[data-label="Letzte Aktivität"] .act-idle`)).trim(), 'vor 8 Tagen');
+        assert.match((await page.textContent(`${qRow} td[data-label="Letzte Aktivität"] .act-idle`)).trim(), /^vor [78] Tagen$/); // je nach Uhrzeit (Berlin/UTC) 7 oder 8
         // Status genauer als „In Bearbeitung“: der Schritt des Verfahrens bzw. „Offen“; Priorität kurz („Hoch“)
         assert.equal((await page.textContent(`${qRow} td[data-label="Status"]`)).trim(), 'Eingang');
         assert.equal((await page.textContent(`#caseList tr.row[data-id="${webCase.id}"] td[data-label="Status"]`)).trim(), 'Offen');
@@ -2001,7 +2001,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       await page.waitForSelector(row(t1.id));
       await settle();
       await page.click(`${row(t1.id)} [data-action="task-delete"]`);
-      assert.equal(await page.isVisible(row(t1.id)), false, 'sofort ausgeblendet');
+      await page.waitForSelector(row(t1.id), { state: 'hidden', timeout: 1500 }); // faltet sich in 0,2 s zusammen
+      assert.equal(await page.isVisible(row(t1.id)), false, 'ausgeblendet');
       assert.equal(await page.$('.ps-dialog-root'), null, 'keine Nachfrage');
       const undo = page.locator('.ps-toast-action', { hasText: 'Rückgängig' });
       await undo.click();
@@ -2241,11 +2242,11 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       // Auf langsamen Rechnern kann die Seite noch nachgezeichnet werden (Ladeplatzhalter → Inhalt): warten, bis alle Blöcke einblenden
       await page.waitForFunction(() => {
         const els = [...document.querySelectorAll('#content.view-in > *')];
-        return els.length >= 2 && els.every((e) => getComputedStyle(e).animationName === 'view-in');
+        return els.length >= 2 && els.every((e) => /^(view-in|ps-page-(fwd|back))$/.test(getComputedStyle(e).animationName));
       }, null, { timeout: 5000 });
       const anim = await page.$$eval('#content.view-in > *', (els) => els.map((e) => [getComputedStyle(e).animationName, parseFloat(getComputedStyle(e).animationDelay)]));
       assert.ok(anim.length >= 2, 'mehrere Blöcke');
-      assert.ok(anim.every(([n]) => n === 'view-in'));
+      assert.ok(anim.every(([n]) => /^(view-in|ps-page-(fwd|back))$/.test(n)));
       assert.ok(anim[1][1] > anim[0][1] && Math.max(...anim.map(([, d]) => d)) <= 0.2, `gestaffelt: ${JSON.stringify(anim)}`);
       // Fenster schließen: echtes Fenster sofort zu, eine stumme Kopie ohne ids blendet aus und ist danach weg
       await page.evaluate(() => openModal(eventForm(null)));
@@ -2287,11 +2288,12 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         );
       });
       const started = async (name) => {
-        await page.waitForFunction((n) => window.__anims.some((a) => a.name === n), name);
-        return page.evaluate((n) => window.__anims.filter((a) => a.name === n), name);
+        const names = [].concat(name); // Seitenwechsel: „view-in“ oder – mit Richtung – „ps-page-fwd/back“
+        await page.waitForFunction((n) => window.__anims.some((a) => n.includes(a.name)), names);
+        return page.evaluate((n) => window.__anims.filter((a) => n.includes(a.name)), names);
       };
       await page.evaluate(() => (location.hash = '#tasks'));
-      const view = await started('view-in');
+      const view = await started(['view-in', 'ps-page-fwd', 'ps-page-back']);
       assert.ok(view.every((a) => a.fades && !a.moves), `Seitenwechsel blendet nur über: ${JSON.stringify(view)}`);
       await page.evaluate(() => openModal(eventForm(null)));
       const card = await started('modal-in');
@@ -3658,6 +3660,166 @@ describe('Browser: Nachladen in der Akte, Listen virtuell zeichnen, weniger Live
       assert.equal(staff.streams.length, 2, 'neue Verbindung nach der Rückkehr');
       await staff.ctx.close();
       await mandant.ctx.close();
+    } finally {
+      await browser.close();
+      await srv.stop();
+    }
+  });
+});
+
+describe('Browser: Bewegungs-System – Tokens, Knöpfe, Felder, Menüs, Fenster-Tiefe, Richtung, Indikator, Konfetti, Wischen', { skip: chromium ? false : 'Playwright nicht installiert' }, () => {
+  const loginAs = async (page, base, mail, pw = PASSWORD) => {
+    await page.goto(base + '/login');
+    await page.fill('#email', mail);
+    await page.fill('#password', pw);
+    await page.click('button[type=submit]');
+    await page.waitForURL(/dashboard/);
+    await page.waitForSelector('#nav a.nav-item', { state: 'attached' });
+  };
+
+  it('PC: gemeinsame Zeiten, Ring am Knopf, Goldlinie im Feld, Menü schließt rückwärts, Richtung, Indikator, Tiefe, Konfetti', async () => {
+    const srv = await startServer();
+    const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+    try {
+      const a = client(srv.base);
+      const me = await a.login(TEAM.admin);
+      const c = (await a.post('/api/cases', { title: 'Raubüberfall Vinewood', area: 'strafrecht', clientName: 'Vito Russo', lawyerId: me.id })).json.case;
+      const ctx = await browser.newContext({ ...DESKTOP, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+      const page = await ctx.newPage();
+      const problems = [];
+      page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
+      await loginAs(page, srv.base, TEAM.admin);
+      await page.waitForTimeout(600);
+
+      // 1 Tokens: eine Quelle für Dauer und Easing, die bestehende Seiteneinblendung nutzt sie
+      const tok = await page.evaluate(() => {
+        const cs = getComputedStyle(document.documentElement);
+        return { micro: cs.getPropertyValue('--m-micro').trim(), panel: cs.getPropertyValue('--m-panel').trim(), page: cs.getPropertyValue('--m-page').trim() };
+      });
+      const ms = (v) => Math.round(parseFloat(v) * (v.endsWith('ms') ? 1 : 1000)); // die Auslieferung verkleinert „120ms“ zu „.12s“
+      assert.deepEqual({ micro: ms(tok.micro), panel: ms(tok.panel), page: ms(tok.page) }, { micro: 120, panel: 220, page: 380 });
+
+      // 2 Knopf: Ring vom Klickpunkt, danach weg
+      await page.evaluate(() => (location.hash = '#cases'));
+      await page.waitForSelector('#caseList tr.row');
+      await page.waitForTimeout(500);
+      const btn = page.locator('.page-head .btn-gold, #content .btn-gold').first();
+      const box = await btn.boundingBox();
+      await page.mouse.move(box.x + 10, box.y + 10);
+      await page.mouse.down();
+      assert.ok(await page.$('.btn-gold .ps-ripple'), 'Ring läuft');
+      await page.mouse.up();
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(() => !document.querySelector('.ps-ripple'), null, { timeout: 2000 });
+
+      // 3 Feld: die Goldlinie wächst beim Fokus
+      await page.evaluate(() => (location.hash = '#cases'));
+      await page.focus('#caseSearch');
+      await page.waitForTimeout(300);
+      assert.match(await page.$eval('#caseSearch', (e) => getComputedStyle(e).backgroundSize), /100%/);
+
+      // 10 Richtung: Menü abwärts = von rechts, zurück = von links; der Gold-Indikator wandert mit
+      await page.evaluate(() => (location.hash = '#overview'));
+      await page.waitForSelector('#nav a.nav-item.active');
+      await page.waitForTimeout(500);
+      const y1 = await page.$eval('.nav-ind', (e) => getComputedStyle(e).transform);
+      await page.evaluate(() => (location.hash = '#calendar'));
+      await page.waitForFunction(() => document.querySelector('#content').dataset.dir === 'fwd');
+      await page.waitForTimeout(500);
+      const y2 = await page.$eval('.nav-ind', (e) => getComputedStyle(e).transform);
+      assert.notEqual(y1, y2, 'Indikator wandert zum aktiven Punkt');
+      await page.evaluate(() => (location.hash = '#overview'));
+      await page.waitForFunction(() => document.querySelector('#content').dataset.dir === 'back');
+
+      // 5 Fenster mit Tiefe: Unterfenster über der Akte zeigt die Kante dahinter, zurück nimmt sie weg
+      await page.evaluate((id) => openCase(id), c.id);
+      await page.waitForSelector('#modalBody .case-head');
+      assert.equal(await page.$eval('#modalCard', (e) => e.classList.contains('is-stacked')), false);
+      await page.evaluate((id) => actions['task-new']({ dataset: { caseId: String(id) } }), c.id);
+      await page.waitForSelector('form[data-form="task"]');
+      assert.equal(await page.$eval('#modalCard', (e) => e.classList.contains('is-stacked')), true, 'Kante des vorherigen Fensters');
+      await page.click('form[data-form="task"] [data-action="back-to-case"]');
+      await page.waitForSelector('#modalBody .case-head');
+      assert.equal(await page.$eval('#modalCard', (e) => e.classList.contains('is-stacked')), false);
+
+      // 4 Menü „Mehr“: schließt mit Ausblenden (is-closing), dann ist es zu
+      await page.click('details.more-menu > summary');
+      assert.equal(await page.$eval('details.more-menu', (d) => d.open), true);
+      await page.click('details.more-menu > summary');
+      assert.equal(await page.$eval('details.more-menu', (d) => d.classList.contains('is-closing')), true);
+      await page.waitForFunction(() => !document.querySelector('details.more-menu').open, null, { timeout: 1500 });
+
+      // 8 Konfetti
+      await page.evaluate(() => window.PS.confetti(200, 200));
+      assert.ok((await page.$$('.ps-confetti i')).length >= 20);
+      await page.waitForFunction(() => !document.querySelector('.ps-confetti'), null, { timeout: 4000 });
+
+      // Bewegung aus: kein Ring, kein Konfetti
+      await page.evaluate(() => window.PS.motion.set('off'));
+      await page.keyboard.press('Escape');
+      await page.evaluate(() => window.PS.confetti(200, 200));
+      assert.equal(await page.$('.ps-confetti'), null);
+      assert.deepEqual(problems, []);
+      await ctx.close();
+    } finally {
+      await browser.close();
+      await srv.stop();
+    }
+  });
+
+  it('Handy: Akte nach links wischen merkt sie, nach rechts markiert Nachrichten als gelesen, Aufgabe nach rechts ist erledigt', async () => {
+    const srv = await startServer();
+    const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+    try {
+      const a = client(srv.base);
+      const me = await a.login(TEAM.admin);
+      const c = (await a.post('/api/cases', { title: 'Raubüberfall Vinewood', area: 'strafrecht', clientName: 'Vito Russo', lawyerId: me.id })).json.case;
+      const t = (await a.post('/api/tasks', { title: 'Wischen-Test', caseId: c.id })).json.task;
+      const ctx = await browser.newContext({ ...PHONE, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+      const page = await ctx.newPage();
+      const problems = [];
+      page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
+      await loginAs(page, srv.base, TEAM.admin);
+      const swipe = (sel, dx) =>
+        page.evaluate(
+          ({ sel, dx }) => {
+            const el = document.querySelector(sel);
+            const r = el.getBoundingClientRect();
+            const x = r.left + r.width / 2;
+            const y = r.top + Math.min(r.height / 2, 40);
+            const ev = (type, px) => el.dispatchEvent(new PointerEvent(type, { pointerType: 'touch', pointerId: 7, clientX: px, clientY: y, bubbles: true, cancelable: true, isPrimary: true }));
+            ev('pointerdown', x);
+            for (let i = 1; i <= 8; i++) ev('pointermove', x + (dx * i) / 8);
+            ev('pointerup', x + dx);
+          },
+          { sel, dx }
+        );
+
+      await page.evaluate(() => (location.hash = '#cases'));
+      await page.waitForSelector('#caseList tr.row');
+      await page.waitForTimeout(600);
+      assert.equal((await a.get('/api/cases')).json.cases.find((x) => x.id === c.id).starred, false);
+      await swipe(`#caseList tr.row[data-id="${c.id}"]`, -140);
+      await page.waitForFunction(() => document.querySelectorAll('.swipe-hint').length === 0);
+      await page.waitForTimeout(400);
+      assert.equal((await a.get('/api/cases')).json.cases.find((x) => x.id === c.id).starred, true, 'nach links: gemerkt');
+      assert.equal(await page.$('#modal.open'), null, 'das Wischen öffnet die Akte nicht');
+
+      // Kurzes Wischen löst nichts aus
+      await swipe(`#caseList tr.row[data-id="${c.id}"]`, 30);
+      await page.waitForTimeout(400);
+      assert.equal(await page.$('#modal.open'), null);
+
+      await page.evaluate(() => (location.hash = '#tasks'));
+      await page.waitForSelector('#content .task-row');
+      await page.waitForTimeout(600);
+      await swipe(`#content .task-row:has([data-action="task-delete"][data-id="${t.id}"])`, 150);
+      await page.waitForFunction(() => document.querySelector('#content .task-row.is-done'));
+      await page.waitForTimeout(500);
+      assert.equal((await a.get(`/api/cases/${c.id}`)).json.tasks.find((x) => x.id === t.id).done, true, 'nach rechts: erledigt');
+      assert.ok((await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 1, 'kein seitliches Überlaufen');
+      assert.deepEqual(problems, []);
+      await ctx.close();
     } finally {
       await browser.close();
       await srv.stop();
