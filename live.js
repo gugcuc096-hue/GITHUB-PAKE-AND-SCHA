@@ -87,7 +87,9 @@ function middleware(req, res, next) {
   const path = req.path; // relativ zu /api
   const tab = String(req.get('x-ps-tab') || '').slice(0, 40);
   res.on('finish', () => {
-    if (res.statusCode >= 400 || !clients.size) return;
+    if (res.statusCode >= 400) return;
+    require('./routes/start').invalidate(); // Zähler der Navigation neu berechnen
+    if (!clients.size) return;
     // Vorschaubild eines Anhangs: ändert für andere nichts Sichtbares – niemand muss neu laden
     if (/^\/cases\/\d+\/attachments\/\d+\/thumb$/.test(path)) return;
     // Merkliste (Stern): gilt nur für die eigene Person – andere müssen nichts nachladen

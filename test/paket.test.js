@@ -225,3 +225,25 @@ describe('Automatisch aufräumen', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 });
+
+describe('Zwischenspeicher für die Zähler', () => {
+  it('antwortet 15 Sekunden aus dem Speicher – jede Änderung über die API leert ihn sofort', async () => {
+    const start = async () => (await as.mandant.get('/api/start?me=0')).json.counts.unread || 0;
+    const base = await start();
+    // Änderung an der Datenbank vorbei (z. B. Discord-Bot): bleibt bis zum Ablauf unsichtbar
+    const senderId = data.admin.id;
+    sql.prepare('INSERT INTO messages (sender_id, recipient_id, subject, body) VALUES (?, ?, ?, ?)').run(senderId, data.mandant.id, 'Direkt', 'ohne API');
+    assert.equal(await start(), base, 'aus dem Zwischenspeicher');
+    // Änderung über die API (egal von wem) leert den Speicher
+    assert.equal((await as.admin.post('/api/messages', { recipientId: data.mandant.id, subject: 'Über die API', body: 'Hallo' })).status, 201);
+    assert.equal(await start(), base + 2, 'frisch gezählt');
+  });
+
+  it('Rollen und Personen teilen sich keinen Eintrag; der erste Abruf mit Konto kommt immer frisch', async () => {
+    const admin = (await as.admin.get('/api/start?me=0')).json.counts;
+    const mandant = (await as.mandant.get('/api/start?me=0')).json.counts;
+    assert.notDeepEqual(Object.keys(admin).sort(), Object.keys(mandant).sort());
+    const full = (await as.mandant.get('/api/start')).json;
+    assert.equal(full.me.user.id, data.mandant.id, 'mit Konto, nicht aus dem Speicher');
+  });
+});

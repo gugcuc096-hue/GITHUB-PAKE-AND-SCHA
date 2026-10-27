@@ -972,6 +972,41 @@ document.addEventListener('focusout', () =>
     1200
   )
 );
+/*
+ * Weniger Live-Verbindungen: Die Kanzlei hält eine Verbindung offen, Mandanten nur, solange sie eine Akte (mit Chat)
+ * offen haben – sonst fragt das Dashboard alle 30 Sekunden nach (Zähler und Liste dahinter). Ist der Tab lange
+ * verdeckt, wird die Verbindung getrennt und beim Zurückkehren samt Nachholen neu aufgebaut.
+ */
+live.idleMs = 5 * 60 * 1000; // so lange darf ein verdeckter Tab die Verbindung halten
+live.asleep = false;
+const liveWanted = () => !!st.user && !live.asleep && (isStaff() || !!st.modalCaseId);
+function liveDisconnect() {
+  if (!live.es) return;
+  live.es.close();
+  live.es = null;
+  live.ok = false;
+  live.down = true; // beim nächsten Verbinden alles nachholen, was inzwischen passiert ist
+  clearTimeout(live.downTimer);
+  if (live.bar === 'down') sysBar(null);
+}
+function liveSync() {
+  if (liveWanted()) liveConnect();
+  else liveDisconnect();
+}
+document.addEventListener('visibilitychange', () => {
+  clearTimeout(live.idleTimer);
+  if (document.hidden) {
+    live.idleTimer = setTimeout(() => {
+      live.asleep = true;
+      liveSync();
+    }, live.idleMs);
+  } else if (live.asleep) {
+    live.asleep = false;
+    liveSync();
+  }
+});
+setInterval(liveSync, 3000); // Mandant öffnet bzw. schließt eine Akte → Verbindung folgt
+
 function liveConnect() {
   if (!window.EventSource || live.es || !st.user) return;
   const es = new EventSource('/api/events?tab=' + encodeURIComponent(window.PS.tab));
@@ -1148,6 +1183,8 @@ setInterval(() => {
   badgeTick++;
   if (!st.user || (document.hidden && badgeTick % 2) || (live.ok && badgeTick % 4)) return;
   refreshBadges();
+  // Ohne Live-Verbindung (Mandant ohne offene Akte): auch die Seite dahinter aktuell halten
+  if (!live.es && !document.hidden && !isStaff()) liveView();
 }, 30000);
 setInterval(() => {
   if (document.hidden || !st.user || !isStaff() || st.view === 'duty') return;
@@ -1335,7 +1372,7 @@ document.addEventListener('ps:form-ok', () => buzz());
     syncHistory();
   }
   if (st.user.needsName) askInitialName();
-  liveConnect();
+  liveSync();
   replayUndoDeletes(); // beim letzten Verlassen nicht mehr durchgekommene Löschungen nachholen
 })();
 

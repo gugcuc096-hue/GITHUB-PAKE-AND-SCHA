@@ -1627,6 +1627,36 @@ const actions = {
       label: 'Aufgabe',
       after: afterTaskChange,
     }),
+  // Ältere Nachrichten einer Akte nachladen (die Akte zeigt zuerst nur die jüngsten)
+  'chat-older': async (el) => {
+    const list = $('#chatList');
+    const first = list && list.querySelector('.chat-msg[data-id]');
+    if (!list || !first) return;
+    const caseId = Number(el.dataset.caseId);
+    el.disabled = true;
+    const r = await api.get(`/api/cases/${caseId}/chat?before=${first.dataset.id}&limit=40`);
+    caseFull.add(caseId);
+    const old = r.messages;
+    if (old.length) {
+      const lastDay = chatDayLabel(old[old.length - 1].createdAt);
+      const firstSep = list.querySelector('.chat-day');
+      if (firstSep && firstSep.textContent.trim() === lastDay) firstSep.remove(); // Tag steht schon bei den älteren
+      // Leseposition bleibt: die bisher oberste Nachricht soll auf dem Bildschirm stehen bleiben (Liste oder Fenster scrollt)
+      const top = first.getBoundingClientRect().top;
+      el.closest('.chat-more').insertAdjacentHTML('afterend', chatBubbles(old, caseBubble));
+      let scroller = list;
+      while (scroller && !(scroller.scrollHeight > scroller.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(scroller).overflowY))) scroller = scroller.parentElement;
+      if (scroller) scroller.scrollTo({ top: scroller.scrollTop + first.getBoundingClientRect().top - top, behavior: 'instant' });
+    }
+    if (r.more) el.disabled = false;
+    else el.closest('.chat-more').remove();
+  },
+  // Älteren Verlauf: die Akte wird ganz neu geladen (Phasen gruppieren sich dabei richtig)
+  'log-older': async (el) => {
+    const caseId = Number(el.dataset.caseId);
+    caseFull.add(caseId);
+    await reloadCase(caseId);
+  },
   // Fehlende Unterlagen
   'req-new': (el) => {
     const caseId = Number(el.dataset.caseId);

@@ -1653,7 +1653,9 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.locator('#content tr.more-rows').scrollIntoViewIfNeeded();
         await page.waitForFunction(() => document.querySelectorAll('#content tr[data-action="open-case"]').length === 100);
         assert.match(await page.textContent('#content tr.more-rows'), /19 weitere Einträge/);
-        await page.click('#content tr.more-rows .more-btn');
+        // Der Knopf kann gleichzeitig vom Beobachter ausgelöst werden (liegt schon fast im Bild): dann ist er weg und alles da
+        await page.evaluate(() => document.querySelector('#content tr.more-rows .more-btn')?.click());
+        await page.waitForFunction(() => document.querySelectorAll('#content tr[data-action="open-case"]').length === 119);
         assert.equal(await rows(), 119);
         assert.equal(await page.$$('#content tr.more-rows').then((x) => x.length), 0, 'kein Knopf mehr');
         // Suche filtert weiterhin über alle Akten
@@ -1949,7 +1951,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       await page.waitForSelector(row);
       await settle();
       const loads = [];
-      page.on('request', (r) => r.method() === 'GET' && r.url().endsWith(`/api/cases/${kase.id}`) && loads.push(r.url()));
+      page.on('request', (r) => r.method() === 'GET' && new RegExp(`/api/cases/${kase.id}(\\?lean=1)?$`).test(r.url()) && loads.push(r.url()));
       await page.evaluate(() => {
         window.__cardIn = [];
         document.querySelector('#modalCard').addEventListener('animationstart', (e) => e.target.id === 'modalCard' && window.__cardIn.push(e.animationName));
@@ -3198,7 +3200,7 @@ describe('Browser: Zahlenfelder mit eigenen Tasten, Kästchen im Kanzlei-Stil, E
       const problems = [];
       page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
       const caseReads = [];
-      page.on('request', (r) => r.method() === 'GET' && new RegExp(`/api/cases/${c.id}$`).test(r.url()) && caseReads.push(r.url()));
+      page.on('request', (r) => r.method() === 'GET' && new RegExp(`/api/cases/${c.id}(\\?lean=1)?$`).test(r.url()) && caseReads.push(r.url()));
       await page.goto(srv.base + '/login');
       await page.fill('#email', TEAM.admin);
       await page.fill('#password', PASSWORD);
@@ -3498,6 +3500,164 @@ describe('Browser: Abschluss mit Rechnungs-Vorschlag und Strafmaß, Aufgaben-Pak
       assert.deepEqual((await m.get('/api/requests/mine')).json.requests, []);
       assert.deepEqual(problems, []);
       await ctx.close();
+    } finally {
+      await browser.close();
+      await srv.stop();
+    }
+  });
+});
+
+describe('Browser: Nachladen in der Akte, Listen virtuell zeichnen, weniger Live-Verbindungen', { skip: chromium ? false : 'Playwright nicht installiert' }, () => {
+  const loginAs = async (page, base, mail, pw = PASSWORD) => {
+    await page.goto(base + '/login');
+    await page.fill('#email', mail);
+    await page.fill('#password', pw);
+    await page.click('button[type=submit]');
+    await page.waitForURL(/dashboard/);
+    await page.waitForSelector('#nav a.nav-item', { state: 'attached' });
+  };
+
+  for (const [label, device] of [['PC', DESKTOP], ['Handy', PHONE]]) {
+    it(`Akte am ${label}: zuerst die jüngsten Nachrichten und Einträge, „Ältere laden“ holt den Rest ohne Sprung`, async () => {
+      const srv = await startServer();
+      const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+      try {
+        const a = client(srv.base);
+        await a.login(TEAM.admin);
+        const c = (await a.post('/api/cases', { title: 'Lange Akte', area: 'zivilrecht', clientName: 'Lena Lang' })).json.case;
+        for (let i = 1; i <= 55; i++) await a.post(`/api/cases/${c.id}/notes`, { body: `Nachricht ${i}`, internal: false });
+        for (let i = 1; i <= 70; i++) await a.post(`/api/cases/${c.id}/notes`, { body: `Interne Notiz ${i}`, internal: true });
+        const ctx = await browser.newContext({ ...device, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+        const page = await ctx.newPage();
+        const problems = [];
+        page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
+        await loginAs(page, srv.base, TEAM.admin);
+        await page.goto(`${srv.base}/dashboard?case=${c.id}#cases`);
+        await page.waitForSelector('#chatList .chat-msg');
+        await page.waitForTimeout(500);
+        assert.equal((await page.$$('#chatList .chat-msg')).length, 40);
+        assert.match(await page.textContent('#chatList .chat-msg'), /Nachricht 16/);
+        assert.match(await page.textContent('.log-more'), /ältere Einträge laden/);
+
+        // Ältere Nachrichten: 15 kommen dazu, der Knopf verschwindet, die Leseposition bleibt
+        await page.evaluate(() => {
+          document.querySelector('#secChat').scrollIntoView({ block: 'center' });
+          document.querySelector('#chatList').scrollTo({ top: 0, behavior: 'instant' }); // oben im Chat – dort sitzt „Ältere laden“
+        });
+        const before = await page.evaluate(() => document.querySelector('#chatList .chat-msg').getBoundingClientRect().top);
+        await page.click('.chat-more [data-action="chat-older"]');
+        await page.waitForFunction(() => document.querySelectorAll('#chatList .chat-msg').length === 55);
+        assert.equal(await page.$('.chat-more'), null);
+        const msgs = await page.$$eval('#chatList .chat-msg .chat-text', (els) => els.map((e) => e.textContent));
+        assert.equal(msgs[0], 'Nachricht 1');
+        assert.equal(msgs[54], 'Nachricht 55');
+        assert.equal(new Set(msgs).size, 55, 'keine doppelten Nachrichten');
+        const after = await page.evaluate(() => [...document.querySelectorAll('#chatList .chat-msg')][15].getBoundingClientRect().top);
+        assert.ok(Math.abs(after - before) < 60, `Leseposition bleibt (${before} → ${after})`);
+
+        // Älterer Verlauf: Akte wird mit allem neu gezeichnet; die geladenen Nachrichten bleiben
+        await page.click('.log-more [data-action="log-older"]');
+        await page.waitForFunction(() => !document.querySelector('.log-more'));
+        assert.equal((await page.$$('#chatList .chat-msg')).length, 55);
+        assert.match(await page.textContent('#secNotes'), /Interne Notiz 1\b/);
+        if (device === PHONE) assert.ok((await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 1, 'Akte passt aufs Handy');
+        assert.deepEqual(problems, []);
+        await ctx.close();
+      } finally {
+        await browser.close();
+        await srv.stop();
+      }
+    });
+  }
+
+  it('Aktenliste: weit entfernte Abschnitte werden durch Platzhalter gleicher Höhe ersetzt und beim Zurückscrollen wieder gezeichnet', async () => {
+    const srv = await startServer();
+    const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+    try {
+      const a = client(srv.base);
+      await a.login(TEAM.admin);
+      for (let i = 1; i <= 330; i++) await a.post('/api/cases', { title: `Akte Nummer ${i}`, area: 'zivilrecht', clientName: `Mandant ${i}` });
+      const ctx = await browser.newContext({ ...DESKTOP, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+      const page = await ctx.newPage();
+      const problems = [];
+      page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
+      await loginAs(page, srv.base, TEAM.admin);
+      await page.goto(`${srv.base}/dashboard#cases`);
+      await page.waitForSelector('#caseList tr.row');
+      // Nach unten scrollen, bis alles gezeichnet ist
+      for (let i = 0; i < 12 && (await page.$('#content tr.more-rows')); i++) {
+        await page.locator('#content tr.more-rows').scrollIntoViewIfNeeded();
+        await page.waitForTimeout(250);
+      }
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+      await page.waitForFunction(() => document.querySelectorAll('#caseList tr.v-gap').length > 0, null, { timeout: 5000 });
+      const bottom = await page.evaluate(() => ({ rows: document.querySelectorAll('#caseList tr.row').length, gaps: document.querySelectorAll('#caseList tr.v-gap').length, height: document.documentElement.scrollHeight }));
+      assert.ok(bottom.rows < 330, `weniger Zeilen im DOM (${bottom.rows})`);
+      assert.ok(bottom.gaps >= 1);
+      // Die Seite behält ihre Länge (Platzhalter = Höhe der Zeilen): zurück nach oben, alles wieder da
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.waitForFunction(() => document.querySelectorAll('#caseList tr.v-gap').length === 0 || document.querySelectorAll('#caseList tr.row').length > 100, null, { timeout: 5000 });
+      await page.waitForTimeout(300);
+      const top = await page.evaluate(() => ({ height: document.documentElement.scrollHeight }));
+      assert.ok(Math.abs(top.height - bottom.height) / bottom.height < 0.05, `Länge bleibt (${bottom.height} → ${top.height})`);
+      // Suche arbeitet weiter über alle Akten, auch über die zusammengeklappten
+      await page.fill('#caseSearch', 'Nummer 300');
+      await page.waitForFunction(() => document.querySelectorAll('#caseList tr.row').length === 1);
+      assert.deepEqual(problems, []);
+      await ctx.close();
+    } finally {
+      await browser.close();
+      await srv.stop();
+    }
+  });
+
+  it('Live-Verbindungen: Kanzlei sofort, Mandant nur mit offener Akte, verdeckter Tab trennt und holt beim Zurückkehren nach', async () => {
+    const srv = await startServer();
+    const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+    try {
+      const a = client(srv.base);
+      await a.login(TEAM.admin);
+      const m = client(srv.base);
+      assert.equal((await m.post('/api/auth/register', { displayName: 'Tina Termin', email: 'tina.termin', password: 'Mandanten-Passwort-5' })).status, 201);
+      const c = (await a.post('/api/cases', { title: 'Beratung Mietrecht', area: 'zivilrecht', clientEmail: 'tina.termin' })).json.case;
+
+      const watch = async (mail, pw) => {
+        const ctx = await browser.newContext({ ...DESKTOP, locale: 'de-DE' });
+        const page = await ctx.newPage();
+        const streams = [];
+        page.on('request', (r) => r.url().includes('/api/events?') && streams.push(Date.now()));
+        await loginAs(page, srv.base, mail, pw);
+        return { ctx, page, streams };
+      };
+
+      const staff = await watch(TEAM.admin);
+      await staff.page.waitForFunction(() => !!live.es, null, { timeout: 5000 });
+      assert.equal(staff.streams.length, 1, 'Kanzlei: eine Verbindung');
+
+      const mandant = await watch('tina.termin', 'Mandanten-Passwort-5');
+      await mandant.page.waitForSelector('.todo, .todo-done, #content');
+      await mandant.page.waitForTimeout(3800);
+      assert.equal(mandant.streams.length, 0, 'Mandant ohne offene Akte: keine Live-Verbindung');
+      assert.equal(await mandant.page.evaluate(() => live.es), null);
+      await mandant.page.evaluate((id) => openCase(id), c.id);
+      await mandant.page.waitForFunction(() => !!live.es, null, { timeout: 5000 });
+      assert.equal(mandant.streams.length, 1, 'Akte offen: Verbindung');
+
+      // Verdeckter Tab: nach der Wartezeit getrennt, beim Zurückkehren wieder verbunden
+      await staff.page.evaluate(() => {
+        live.idleMs = 300;
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      await staff.page.waitForFunction(() => live.es === null, null, { timeout: 5000 });
+      await staff.page.evaluate(() => {
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      await staff.page.waitForFunction(() => !!live.es, null, { timeout: 5000 });
+      assert.equal(staff.streams.length, 2, 'neue Verbindung nach der Rückkehr');
+      await staff.ctx.close();
+      await mandant.ctx.close();
     } finally {
       await browser.close();
       await srv.stop();

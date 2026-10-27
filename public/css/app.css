@@ -2336,3 +2336,11 @@ tr:not(:hover) .star-btn:not(.on) { opacity: 0.25; }
 .slot-box { border: 1px dashed var(--line, rgba(255, 255, 255, 0.15)); border-radius: 10px; padding: 0.6rem 0.8rem; }
 .slot-box summary { cursor: pointer; font-size: 0.875rem; }
 .slot-box[open] summary { margin-bottom: 0.5rem; }
+
+/* Ältere Nachrichten / Einträge nachladen */
+.chat-more, .log-more { display: flex; justify-content: center; padding: 0.4rem 0 0.8rem; }
+.log-more { padding: 0.8rem 0 0; }
+
+/* Virtuell gezeichnete Listen: Platzhalter für weit entfernte Abschnitte */
+.v-gap { pointer-events: none; padding: 0; border: 0; overflow: hidden; }
+tr.v-gap > td { padding: 0; border: 0; }
