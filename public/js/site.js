@@ -370,6 +370,7 @@
   /* ---------------------------------------------------------------- Anmelden auf der Startseite */
   const dlg = document.getElementById('loginDialog');
   let challenge = null;
+  let loginDone = false; // im Dialog angemeldet
   function openLogin() {
     if (!dlg) return goTo('/login');
     dlg.classList.remove('opacity-0', 'pointer-events-none');
@@ -386,6 +387,7 @@
     const r = await api.get('/api/auth/session');
     me = r?.user ?? null;
     if (!me) throw new Error('Anmeldung nicht möglich.');
+    loginDone = true;
     // Kanzlei und Konten mit Pflicht-Änderung gehören ins Dashboard – Mandanten bleiben hier
     if (me.role !== 'mandant' || me.mustChangePassword) return goTo('/dashboard');
     closeLogin();
@@ -478,8 +480,12 @@
   window.PS.drafts.watch({ scope: 'website' });
 
   window.PS.boot('session', '/api/auth/session')
-    .then((r) => (me = r?.user ?? null))
-    .catch(() => (me = null))
+    .then((r) => {
+      if (!loginDone) me = r?.user ?? null; // eine späte Antwort darf die Anmeldung im Dialog nicht überschreiben
+    })
+    .catch(() => {
+      if (!loginDone) me = null;
+    })
     .finally(() => {
       updateAuthNav();
       renderSwitch();

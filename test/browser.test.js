@@ -3879,12 +3879,11 @@ describe('Browser: Startseite ↔ Dashboard – Anmelden im Dialog, „Willkomme
         assert.match(strip, /Terminvorschlag/);
         assert.match(strip, /Beratung Mietrecht/);
         if (device === PHONE) assert.ok((await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 1, 'Startseite passt aufs Handy');
-        // Umschalter statt „Login“ (am Handy steht er nicht in der Kopfleiste: dort gibt es das Menü)
-        if (device === DESKTOP) {
-          assert.equal(await page.isVisible('header .site-switch'), true);
-          assert.equal(await page.$eval('header .site-switch a.is-active', (e) => e.textContent), 'Website');
-          assert.equal(await page.isVisible('header .btn-outline[data-auth-link]'), false, 'kein „Login“ mehr');
-        }
+        // Umschalter und Profilbild in der Leiste über der Kopfzeile, die Kopfzeile selbst führt als „Dashboard“ weiter
+        assert.equal(await page.isVisible('.topstrip .site-switch'), true);
+        assert.equal(await page.$eval('.topstrip .site-switch a.is-active', (e) => e.textContent), 'Website');
+        assert.equal(await page.isVisible('.topstrip .site-avatar'), true);
+        assert.equal(await page.isVisible('.topstrip [data-auth-link]'), false, 'kein „Mandantenportal →“ mehr');
 
         // Direktlink: der Terminvorschlag öffnet sich im Dashboard mit den Zeiten zur Auswahl
         await page.click(`#welcomeStrip a[href="/dashboard?event=${ev.id}"]`);
