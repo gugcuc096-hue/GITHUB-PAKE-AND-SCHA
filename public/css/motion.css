@@ -1,0 +1,118 @@
+/*
+ * Bewegungs-System: eine Quelle für Dauer und Easing, damit sich alles gleich anfühlt – im Dashboard und auf der
+ * Website. Mikro (Knöpfe, Felder) 120 ms, Panels (Menüs, Fenster) 220 ms, Seiten 380 ms.
+ * „Bewegung reduzieren“ (calm.css): die Zeiten bleiben, Bewegung entfällt – es wird nur überblendet.
+ * Wird nach app.css/controls.css und vor calm.css geladen.
+ */
+:root {
+  --m-micro: 120ms;
+  --m-panel: 220ms;
+  --m-page: 380ms;
+  --m-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --m-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --m-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ---------------------------------------------------------------- 2. Knöpfe: Druck-Feedback, Ring, Haken */
+.btn-gold, .btn-outline, .btn-ghost, .btn-danger, .btn-discord, .icon-btn { position: relative; transition: transform var(--m-micro) var(--m-ease), background-color var(--m-micro) ease, border-color var(--m-micro) ease, box-shadow var(--m-panel) var(--m-ease), color var(--m-micro) ease, filter var(--m-micro) ease, opacity var(--m-micro) ease; }
+.btn-gold:active:not(:disabled), .btn-outline:active:not(:disabled), .btn-ghost:active:not(:disabled), .btn-danger:active:not(:disabled), .btn-discord:active:not(:disabled), .icon-btn:active:not(:disabled) { transform: scale(0.965); }
+/* Ring, der vom Klickpunkt aus läuft (motion.js setzt Ort und Größe); die Hülle schneidet ihn am Knopfrand ab */
+.ps-ripple-box { position: absolute; inset: 0; z-index: 0; overflow: hidden; border-radius: inherit; pointer-events: none; }
+.ps-ripple { position: absolute; z-index: 0; left: 0; top: 0; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; pointer-events: none; border: 2px solid rgba(243, 229, 171, 0.65); opacity: 0.9; animation: ps-ripple 520ms var(--m-ease) forwards; }
+.btn-gold .ps-ripple { border-color: rgba(2, 5, 14, 0.35); }
+@keyframes ps-ripple { to { transform: scale(var(--r, 20)); opacity: 0; } }
+/* Nach dem Speichern: der Inhalt des Knopfes weicht kurz einem Haken */
+.is-done > * { opacity: 0; transition: opacity var(--m-micro) ease; }
+.is-done::before { content: ''; position: absolute; left: 50%; top: 50%; width: 20px; height: 20px; margin: -10px 0 0 -10px; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / contain no-repeat; animation: ps-check var(--m-panel) var(--m-spring) both; }
+@keyframes ps-check { from { transform: scale(0.3); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* ---------------------------------------------------------------- 3. Felder: Goldlinie wächst, Label folgt, Fehler wackelt */
+.field { transition: border-color var(--m-micro) ease, box-shadow var(--m-panel) var(--m-ease), background-color var(--m-micro) ease, height var(--m-panel) var(--m-ease); background-repeat: no-repeat; background-position: center bottom; background-size: 0% 2px; background-image: linear-gradient(90deg, transparent, var(--gold-500, #d4af37), transparent); }
+.field:focus, .field:focus-visible { background-size: 100% 2px; }
+select.field { background-size: auto; background-image: none; } /* Pfeil und Anzeige der Auswahl bleiben, wie sie sind */
+select.field:focus { background-size: auto; }
+.label { transition: color var(--m-micro) ease, transform var(--m-panel) var(--m-ease), letter-spacing var(--m-panel) var(--m-ease); transform-origin: left center; }
+:is(div, label, p):has(> .field:focus) > .label, :is(div, label, p):has(> .field:focus) > .label-row .label { color: var(--gold-light, #f3e5ab); transform: translateY(-1px) scale(1.02); }
+.chat-input { transition: height var(--m-panel) var(--m-ease), border-color var(--m-micro) ease, box-shadow var(--m-panel) var(--m-ease); }
+/* Fehler: das Feld wackelt kurz (js: .ps-shake) */
+.ps-shake { animation: ps-shake 360ms var(--m-ease-in-out); border-color: rgba(248, 113, 113, 0.75) !important; }
+@keyframes ps-shake { 0%, 100% { transform: none; } 18% { transform: translateX(-6px); } 36% { transform: translateX(5px); } 54% { transform: translateX(-4px); } 72% { transform: translateX(3px); } }
+
+/* ---------------------------------------------------------------- 4. Menüs: aus dem Anker aufklappen, Einträge laufen ein, rückwärts beim Schließen */
+.more-menu[open] > .more-pop, .pop-wrap .pop { animation: ps-pop-in var(--m-panel) var(--m-ease) both; }
+.more-menu.is-closing > .more-pop { animation: ps-pop-out var(--m-micro) ease-in both; }
+@keyframes ps-pop-in { from { opacity: 0; transform: translateY(-6px) scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes ps-pop-out { to { opacity: 0; transform: translateY(-4px) scale(0.97); } }
+.more-menu[open] .more-item, .more-menu[open] .chip-pop-actions > * { animation: ps-item-in var(--m-panel) var(--m-ease) both; }
+.more-menu[open] .more-item:nth-child(1) { animation-delay: 20ms; }
+.more-menu[open] .more-item:nth-child(2) { animation-delay: 45ms; }
+.more-menu[open] .more-item:nth-child(3) { animation-delay: 70ms; }
+.more-menu[open] .more-item:nth-child(4) { animation-delay: 95ms; }
+.more-menu[open] .more-item:nth-child(n + 5) { animation-delay: 120ms; }
+@keyframes ps-item-in { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
+@supports (appearance: base-select) {
+  :is(select.field, select)::picker(select) { scale: 0.97; transform-origin: top center; transition: opacity var(--m-micro) ease, translate var(--m-panel) var(--m-ease), scale var(--m-panel) var(--m-ease), overlay var(--m-panel) allow-discrete, display var(--m-panel) allow-discrete; }
+  :is(select.field, select):open::picker(select) { scale: 1; }
+  @starting-style { :is(select.field, select):open::picker(select) { scale: 0.97; } }
+}
+
+/* ---------------------------------------------------------------- 5. Fenster mit Tiefe */
+/* Unterfenster: das vorherige schimmert als Kante dahinter, der Inhalt gleitet vor bzw. zurück */
+#modalCard.is-stacked { box-shadow: 0 -9px 0 -5px rgba(212, 175, 55, 0.35), 0 -17px 0 -11px rgba(212, 175, 55, 0.18), var(--modal-shadow, 0 30px 80px rgba(0, 0, 0, 0.6)); transition: box-shadow var(--m-panel) var(--m-ease); }
+#modalBody.swap-fwd { animation: ps-swap-fwd var(--m-panel) var(--m-ease) both; }
+#modalBody.swap-back { animation: ps-swap-back var(--m-panel) var(--m-ease) both; }
+@keyframes ps-swap-fwd { from { opacity: 0; transform: translateX(22px) scale(0.99); } to { opacity: 1; transform: none; } }
+@keyframes ps-swap-back { from { opacity: 0; transform: translateX(-22px) scale(0.99); } to { opacity: 1; transform: none; } }
+
+/* ---------------------------------------------------------------- 6. Listen: neue Zeilen gleiten ein, gelöschte falten sich zu */
+.ps-row-in { animation: ps-row-in var(--m-panel) var(--m-ease) both; }
+@keyframes ps-row-in { from { opacity: 0; transform: translateY(-8px); max-height: 0; } to { opacity: 1; transform: none; max-height: 12rem; } }
+.undo-hidden { animation: ps-row-out var(--m-panel) var(--m-ease-in-out) forwards; overflow: hidden; }
+@keyframes ps-row-out { 0% { display: revert; } 99% { opacity: 0; transform: translateX(14px); max-height: 0; margin-top: 0; margin-bottom: 0; padding-top: 0; padding-bottom: 0; } 100% { opacity: 0; display: none; } }
+.task-row, .req-row, .party-row, .list-row, .tl-item { transition: background-color var(--m-micro) ease, opacity var(--m-panel) ease, transform var(--m-panel) var(--m-ease); }
+
+/* ---------------------------------------------------------------- 10. Seitenwechsel mit Richtung, gleitender Menü-Indikator */
+/* Seitlich nur ab Tablet-Breite: am Handy würde das Hineingleiten die Seite kurz breiter machen */
+@media (min-width: 768px) {
+  #content.view-in[data-dir="fwd"] > * { animation-name: ps-page-fwd; animation-duration: var(--m-page); }
+  #content.view-in[data-dir="back"] > * { animation-name: ps-page-back; animation-duration: var(--m-page); }
+}
+@keyframes ps-page-fwd { from { opacity: 0; transform: translateX(26px); } to { opacity: 1; transform: none; } }
+@keyframes ps-page-back { from { opacity: 0; transform: translateX(-26px); } to { opacity: 1; transform: none; } }
+.nav { position: relative; }
+.nav-ind { position: absolute; z-index: 0; left: 0; top: 0; width: 3px; height: 24px; border-radius: 3px; background: linear-gradient(180deg, var(--gold-light, #f3e5ab), var(--gold-500, #d4af37)); box-shadow: 0 0 12px rgba(212, 175, 55, 0.55); pointer-events: none; transition: transform var(--m-panel) var(--m-ease), height var(--m-panel) var(--m-ease), opacity var(--m-micro) ease; }
+.nav-ind.is-hidden { opacity: 0; }
+.nav .nav-item { position: relative; z-index: 1; }
+.nav-count.ps-bump { animation: ps-bump var(--m-panel) var(--m-spring); }
+@keyframes ps-bump { 40% { transform: scale(1.35); } }
+
+/* ---------------------------------------------------------------- 8. Konfetti in Gold */
+.ps-confetti { position: fixed; left: 0; top: 0; width: 0; height: 0; z-index: 9999; pointer-events: none; }
+.ps-confetti i { position: absolute; width: 7px; height: 11px; border-radius: 2px; background: var(--c, #d4af37); will-change: transform, opacity; }
+
+/* ---------------------------------------------------------------- 9. Wischen an Zeilen (Handy) */
+.swipe-row { touch-action: pan-y; will-change: transform; }
+.swipe-row.is-swiping { transition: none; }
+.swipe-row.is-settling { transition: transform var(--m-panel) var(--m-ease); }
+.swipe-hint { position: fixed; z-index: 30; display: flex; align-items: center; gap: 0.5rem; padding: 0 1rem; border-radius: 12px; font-size: 0.8rem; font-weight: 600; color: #02050e; pointer-events: none; opacity: 0; transition: opacity var(--m-micro) ease; }
+.swipe-hint.is-left { background: rgba(212, 175, 55, 0.92); justify-content: flex-end; }
+.swipe-hint.is-right { background: rgba(52, 211, 153, 0.92); justify-content: flex-start; }
+.swipe-hint.show { opacity: 1; }
+@media (max-width: 767px) { #caseList tr.row, #content .task-row { touch-action: pan-y; } }
+
+/* ---------------------------------------------------------------- 7. Platzhalter nach Ansicht */
+.skel-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.skel-cell { aspect-ratio: 1.4; border-radius: 10px; background: linear-gradient(110deg, rgba(255, 255, 255, 0.04) 30%, rgba(255, 255, 255, 0.09) 50%, rgba(255, 255, 255, 0.04) 70%); background-size: 200% 100%; animation: shimmer 1.6s linear infinite; }
+.skel-split { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr); gap: 1rem; }
+@media (max-width: 767px) { .skel-split { grid-template-columns: 1fr; } }
+.skel-pills { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.skel-page { animation: skel-in var(--m-panel) ease both; }
+
+/* ---------------------------------------------------------------- 1. Bestehende Bewegungen auf die gemeinsamen Zeiten gelegt */
+#content.view-in > * { animation-duration: var(--m-page); animation-timing-function: var(--m-ease); }
+#modalBody.swap-in, .swap-in, .modal.open { animation-duration: var(--m-panel); }
+.nav-group.nav-reveal { animation-duration: var(--m-panel); animation-timing-function: var(--m-ease); }
+body.page-in { animation-duration: var(--m-page); }
+.ps-toast { animation-duration: var(--m-panel); animation-timing-function: var(--m-ease); }
+@media (max-width: 639px) { .modal-card { animation-duration: var(--m-page); animation-timing-function: var(--m-ease); } }
+@media (min-width: 640px) { .modal-card { animation-duration: var(--m-panel); animation-timing-function: var(--m-ease); } }

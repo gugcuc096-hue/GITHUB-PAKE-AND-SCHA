@@ -446,7 +446,10 @@ function openModal(html, { wide = false, key = null, reopen = null, child = fals
   if (!wasOpen && st.morphFrom) morphOpen(st.morphFrom);
   st.morphFrom = null;
   // Fensterwechsel (neues Fenster über dem alten, Zurück, Inhalt nach dem Laden): weich statt hart
-  if (wasOpen) playIn(body, 'swap-in');
+  if (wasOpen) {
+    body.classList.remove('swap-in', 'swap-back');
+    playIn(body, st.modalStack.length ? 'swap-fwd' : 'swap-in');
+  }
   // Neu geöffnet: Abschnitte blenden gestaffelt ein (der Aktenkopf fliegt schon aus der Zeile), Zahlen zählen hoch
   else {
     playIn(body, 'modal-stagger');
@@ -463,7 +466,10 @@ function openModal(html, { wide = false, key = null, reopen = null, child = fals
   const focusTarget = $('#modalBody [autofocus]');
   if (focusTarget && window.matchMedia('(min-width: 768px)').matches) focusTarget.focus();
   scheduleHistory();
+  syncDepth();
 }
+/** Unterfenster: das vorherige Fenster schimmert als Kante hinter dem Blatt (motion.css). */
+const syncDepth = () => $('#modalCard')?.classList.toggle('is-stacked', st.modalStack.length > 0);
 /*
  * Lange Listen (Akten, Rechnungen, Mandanten, Aufgaben): erst LIST_PAGE Einträge zeichnen, beim Scrollen kommen die
  * nächsten von selbst (oder per Klick auf „… weitere“). Gefiltert und gesucht wird weiter über alle Einträge – so
@@ -723,6 +729,7 @@ function fadeOutModal(modal, { morph = false } = {}) {
 /** Alles schließen – auch die vorherigen Fenster (Seitenwechsel, Abmelden). morph: Akte zieht sich in ihre Zeile zurück. */
 function closeModal({ morph = false } = {}) {
   st.modalStack = [];
+  $('#modalCard')?.classList.remove('is-stacked');
   st.modalCurrent = null;
   const modal = $('#modal');
   if (!modal.classList.contains('open')) return;
@@ -769,7 +776,8 @@ async function modalBack() {
   } else {
     body.innerHTML = '';
     body.appendChild(prev.nodes);
-    playIn(body, 'swap-in');
+    body.classList.remove('swap-in', 'swap-fwd');
+    playIn(body, 'swap-back');
     Object.assign(st, prev.state);
     st.modalCurrent = { key: prev.key || null, reopen: null, wide: !!prev.wide };
     $('#modalCard').classList.toggle('wide', !!prev.wide);
@@ -778,6 +786,7 @@ async function modalBack() {
     tickCountdowns();
     scheduleHistory();
   }
+  syncDepth();
   restoreModalScroll(prev.scroll);
   if (flyBack) flyBack();
 }
@@ -827,10 +836,19 @@ function loadingHtml(view = st.view) {
     ? `<div class="kpi-grid kpi-grid-3 skel-kpis">${'<div class="panel kpi">' + line('45%') + line('60%', 'skel-lg mt-3') + '</div>'}${'<div class="panel kpi">' + line('40%') + line('55%', 'skel-lg mt-3') + '</div>'}${'<div class="panel kpi">' + line('50%') + line('35%', 'skel-lg mt-3') + '</div>'}</div>`
     : '';
   const row = (w) => `<div class="skel-row"><div class="skel-dot"></div><div class="flex-1">${line(w)}${line('38%', 'mt-2 skel-sm')}</div>${line('70px', 'skel-pill')}</div>`;
+  // Umrisse je nach Ansicht: Kalender als Monatsraster, Post zweispaltig, Akten/Listen mit Filterleiste und Zeilen
+  const body =
+    view === 'calendar'
+      ? `<div class="panel panel-pad"><div class="skel-grid">${Array.from({ length: 35 }, () => '<div class="skel-cell"></div>').join('')}</div></div>`
+      : view === 'mail'
+        ? `<div class="skel-split"><div class="panel panel-pad">${['70%', '55%', '64%', '48%'].map(row).join('')}</div><div class="panel panel-pad">${line('60%', 'skel-title')}${line('90%', 'mt-4')}${line('82%', 'mt-3')}${line('88%', 'mt-3')}${line('40%', 'mt-3')}</div></div>`
+        : ['cases', 'clients', 'tasks', 'invoices'].includes(view)
+          ? `<div class="skel-pills">${['86px', '110px', '96px', '120px'].map((w) => line(w, 'skel-pill')).join('')}</div><div class="panel panel-pad">${['72%', '58%', '66%', '50%', '62%', '56%', '68%'].map(row).join('')}</div>`
+          : `<div class="panel panel-pad">${['72%', '58%', '66%', '50%', '62%'].map(row).join('')}</div>`;
   return `<div class="skel-page" aria-busy="true"><p class="sr-only" role="status">Wird geladen …</p>
       <div class="page-head"><div class="flex-1">${line('min(320px, 60%)', 'skel-title')}${line('min(460px, 85%)', 'mt-3')}</div></div>
       ${kpis}
-      <div class="panel panel-pad">${['72%', '58%', '66%', '50%', '62%'].map(row).join('')}</div>
+      ${body}
     </div>`;
 }
 const errorHtml = (msg) =>
@@ -863,6 +881,10 @@ function go(view) {
 async function goNow(view) {
   if (!allowed(view)) view = 'overview';
   if (view !== 'invoice-new') st.invoiceFrom = null; // Rechnung aus einer Akte: Rückweg gilt nur bis zum Verlassen der Seite
+  // Richtung des Seitenwechsels: weiter unten im Menü = von rechts, zurück = von links (motion.css)
+  const order = Object.keys(VIEWS);
+  const dir = order.indexOf(view) >= order.indexOf(st.view) ? 'fwd' : 'back';
+  $('#content').dataset.dir = dir;
   st.view = view;
   closeModal();
   closeSidebar();

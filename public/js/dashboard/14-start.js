@@ -144,7 +144,7 @@ document.addEventListener('submit', (e) => {
       throw err;
     }
     ok = true;
-    document.dispatchEvent(new CustomEvent('ps:form-ok', { detail: f.dataset.form }));
+    (f.isConnected ? f : document).dispatchEvent(new CustomEvent('ps:form-ok', { bubbles: true, detail: f.dataset.form })); // am Formular: der Speichern-Knopf zeigt kurz einen Haken
   }).finally(() => {
     draftDone(ok);
     buttons.forEach((b) => b.isConnected && (b.disabled = false));
@@ -297,8 +297,13 @@ document.addEventListener('input', (e) => {
     st.listSearchTimer = setTimeout(() => flipFill($('#clientList'), clientTable()), 120);
   } else if (t.classList && t.classList.contains('chat-input')) {
     // Eingabefeld wächst mit (bis zu einigen Zeilen)
+    // Eingabefeld wächst weich: von der bisherigen zur neuen Höhe (die Zeit steht in motion.css)
+    const was = t.offsetHeight;
     t.style.height = 'auto';
-    t.style.height = Math.min(t.scrollHeight + 2, 180) + 'px';
+    const next = Math.min(t.scrollHeight + 2, 180);
+    t.style.height = `${was}px`;
+    void t.offsetHeight;
+    t.style.height = `${next}px`;
   } else if (t.id === 'gsInput') {
     st.gsQuery = t.value;
     clearTimeout(st.gsTimer);

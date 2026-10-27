@@ -214,6 +214,7 @@ const forms = {
     };
     const actual = { actualHe: num('actualHe'), actualFine: num('actualFine') };
     await api.patch('/api/cases/' + id, { status: 'geschlossen', outcome, ...(actual.actualHe !== undefined ? { actualHe: actual.actualHe } : {}), ...(actual.actualFine !== undefined ? { actualFine: actual.actualFine } : {}) });
+    if (OUTCOMES[outcome][1] === true && window.PS.confetti) window.PS.confetti(window.innerWidth / 2, Math.round(window.innerHeight * 0.35)); // Erfolg: goldenes Konfetti
     await returnOrClose();
     // Ohne Rechnung abgeschlossen: noch einmal anbieten (sechs Sekunden), statt die Akte stillschweigend zu verlassen
     toast(`Verfahren abgeschlossen – ${OUTCOMES[outcome][0]}`, 'ok', f.dataset.noInvoice ? { duration: 8000, action: { label: 'Rechnung erstellen', onClick: () => guard(() => actions['new-invoice']({ dataset: { caseId: String(id) } })) } } : {});
