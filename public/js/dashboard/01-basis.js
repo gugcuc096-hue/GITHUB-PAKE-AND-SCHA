@@ -219,6 +219,7 @@ const st = {
   eventCache: new Map(),
   invoices: [],
   paymentReports: 0, // Kanzlei: offene Rechnungen, die der Mandant als bezahlt gemeldet hat (Badge „Rechnungen“)
+  openRequests: [], // Mandant: von der Kanzlei angeforderte Unterlagen („Was ist zu tun?“)
   toSign: [], // Mandant: Verträge/Schriftsätze, die auf seine Unterschrift warten („Was ist zu tun?“)
   board: [],
   fees: [],
@@ -683,6 +684,9 @@ const load = {
   async unread() {
     if (load.primed.delete('unread')) return;
     st.unread = (await api.get('/api/messages/unread-count')).unread;
+  },
+  async requests() {
+    st.openRequests = (await api.get('/api/requests/mine')).requests;
   },
   async messages() {
     st.messages = (await api.get('/api/messages?box=' + st.mailBox)).messages;

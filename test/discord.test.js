@@ -316,3 +316,40 @@ describe('Liegengebliebene Akten', () => {
     assert.equal(row(c, staff).idleDays, 30);
   });
 });
+
+describe('Fehlende Unterlagen: Erinnerung nach drei Tagen', () => {
+  let db, stub, requests, clientId, caseId;
+  before(() => {
+    if (!process.env.DB_PATH) process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pake-scha-req-')), 'r.db');
+    process.env.DISCORD_BOT_TOKEN = 'test-token';
+    stub = require('./discordStub');
+    ({ db } = require('../db'));
+    requests = require('../docRequests');
+    clientId = Number(db.prepare(`INSERT INTO users (email, password_hash, display_name, role, discord_id) VALUES ('req.mandant@x.ls', 'x', 'Req Mandant', 'mandant', ?)`).run(MEMBERS.jaywa).lastInsertRowid);
+    caseId = Number(db.prepare(`INSERT INTO cases (case_number, access_pin, title, client_id, status, client_name) VALUES ('PS-REQ-A', '0000', 'Akte Req', ?, 'offen', 'Req Mandant')`).run(clientId).lastInsertRowid);
+  });
+
+  it('erinnert einmal per DM – nicht vorher, nicht erledigte, nicht nach dem Abschluss', async () => {
+    const add = (title, daysAgo) => Number(db.prepare(`INSERT INTO case_requests (case_id, title, created_at) VALUES (?, ?, datetime('now', ?))`).run(caseId, title, `-${daysAgo} days`).lastInsertRowid);
+    const old = add('Beleg alt', 4);
+    add('Beleg neu', 1);
+    const done = add('Beleg erledigt', 5);
+    db.prepare("UPDATE case_requests SET done_at = datetime('now') WHERE id = ?").run(done);
+
+    const before = stub.state.dms.length;
+    await requests.sweep();
+    const sent = stub.state.dms.slice(before).filter((d) => d.to === MEMBERS.jaywa);
+    assert.equal(sent.length, 1);
+    assert.match(JSON.stringify(sent[0].embeds), /Beleg alt/);
+    assert.doesNotMatch(JSON.stringify(sent[0].embeds), /Beleg neu|Beleg erledigt/);
+    assert.ok(db.prepare('SELECT reminded_at FROM case_requests WHERE id = ?').get(old).reminded_at);
+
+    await requests.sweep();
+    assert.equal(stub.state.dms.slice(before).filter((d) => d.to === MEMBERS.jaywa).length, 1, 'zweiter Durchlauf: nichts Neues');
+
+    db.prepare("UPDATE cases SET status = 'geschlossen' WHERE id = ?").run(caseId);
+    db.prepare("UPDATE case_requests SET created_at = datetime('now', '-9 days')").run();
+    await requests.sweep();
+    assert.equal(stub.state.dms.slice(before).filter((d) => d.to === MEMBERS.jaywa).length, 1, 'geschlossene Akte: keine Erinnerung');
+  });
+});

@@ -166,6 +166,16 @@ router.post('/case-join', express.urlencoded({ extended: false, limit: '2kb' }),
   startFlow(req, res, 'case', String(c.id));
 });
 
+/** Beitrittslink aus der Akte (die Kanzlei schickt ihn dem Mandanten): Aktenzeichen + Pin in der Adresse. */
+router.get('/case-join', joinLimiter, (req, res) => {
+  const number = String(req.query.c || '').trim().toUpperCase().slice(0, 30);
+  const pin = String(req.query.p || '').trim().slice(0, 10);
+  if (!tickets.active()) return res.redirect('/?ticket=disabled');
+  const c = number && pin ? db.prepare('SELECT id FROM cases WHERE case_number = ? AND access_pin = ?').get(number, pin) : null;
+  if (!c) return res.redirect('/?ticket=notfound');
+  startFlow(req, res, 'case', String(c.id));
+});
+
 /** Direkt nach der Mandatsanfrage: Konto mit Discord anlegen – die Akte hängt danach am Konto. */
 router.post('/case-account', express.urlencoded({ extended: false, limit: '2kb' }), joinLimiter, (req, res) => {
   if (!fromOwnSite(req)) return res.redirect('/?ticket=error');

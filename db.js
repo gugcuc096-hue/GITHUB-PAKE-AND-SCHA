@@ -1242,6 +1242,8 @@ addColumn('case_attachments', 'thumb', 'TEXT');
 addColumn('case_chat_reads', 'read_at', 'TEXT');
 addColumn('cases', 'chat_nudged_id', 'INTEGER');
 addColumn('appointments', 'client_response', 'TEXT');
+// Terminvorschlag: bis zu drei Zeiten (JSON, aufsteigend) – der Mandant wählt eine, der Termin ist dann bestätigt
+addColumn('appointments', 'slots', 'TEXT');
 addColumn('appointments', 'client_response_at', 'TEXT');
 // Deal-Rechner: Angebote der Staatsanwaltschaft und die Antwort des Mandanten
 db.exec(`
@@ -1274,6 +1276,9 @@ db.exec(`
 addColumn('cases', 'sentence_estimate', 'INTEGER');
 addColumn('cases', 'sentence_fine', 'INTEGER');
 addColumn('cases', 'sentence_reduced', 'INTEGER NOT NULL DEFAULT 0');
+// Tatsächliches Strafmaß beim Abschluss (Vergleich mit der Einschätzung der Kanzlei, nur intern)
+addColumn('cases', 'sentence_actual_he', 'INTEGER');
+addColumn('cases', 'sentence_actual_fine', 'INTEGER');
 // Mandantenkartei: Stammdaten je Mandant (Schlüssel wie bei Notizen) – Geburtsdatum (IC) aus dem letzten Vertrag
 db.exec(`
   CREATE TABLE IF NOT EXISTS client_profiles (
@@ -1424,6 +1429,42 @@ try {
 } catch (err) {
   console.warn('Volltextsuche nicht verfügbar – die Suche arbeitet ohne Index:', err.message);
 }
+
+// Aufgaben-Pakete je Anlass (z. B. „Festnahme“): vom Board gepflegt, per Klick in eine Akte übernommen.
+// items: eine Aufgabe je Zeile, optional mit Frist in Tagen: „Haftprüfung beantragen | 2“.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS task_packages (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT NOT NULL,
+    area       TEXT NOT NULL DEFAULT '',
+    items      TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
+if (!getSetting('seeded_task_packages')) {
+  const ins = db.prepare('INSERT INTO task_packages (name, area, items) VALUES (?, ?, ?)');
+  ins.run('Festnahme', 'strafrecht', 'Vollmacht einholen | 1\nAkteneinsicht beantragen | 2\nHaftprüfung beantragen | 2\nMandanten im Gewahrsam besuchen | 1\nBeweismittel sichern | 3');
+  ins.run('Anklage erhalten', 'strafrecht', 'Anklageschrift prüfen | 2\nVerteidigungsstrategie festlegen | 5\nStrafmaß-Einschätzung erstellen | 5\nHauptverhandlung vorbereiten | 10');
+  ins.run('Schadensersatz', 'zivilrecht', 'Unterlagen und Belege anfordern | 2\nAnspruch prüfen | 4\nSchreiben an die Gegenseite aufsetzen | 7\nAntwortfrist der Gegenseite eintragen | 7');
+  ins.run('Vertragsabschluss', 'vertragsrecht', 'Anforderungen aufnehmen | 1\nVertragsentwurf erstellen | 5\nEntwurf mit dem Mandanten abstimmen | 7\nUnterzeichnung organisieren | 10');
+  setSetting('seeded_task_packages', '1');
+}
+
+// Fehlende Unterlagen („Beleg fehlt“): die Kanzlei fordert an, der Mandant sieht ein To-do im Portal, nach 3 Tagen erinnert Discord
+db.exec(`
+  CREATE TABLE IF NOT EXISTS case_requests (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id      INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    title        TEXT NOT NULL,
+    note         TEXT NOT NULL DEFAULT '',
+    created_by   TEXT NOT NULL DEFAULT '',
+    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    done_at      TEXT,
+    done_by      TEXT NOT NULL DEFAULT '',
+    reminded_at  TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_case_requests_case ON case_requests(case_id);
+`);
 
 module.exports = {
   db,

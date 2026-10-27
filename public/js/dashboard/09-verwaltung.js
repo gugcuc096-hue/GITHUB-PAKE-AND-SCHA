@@ -426,6 +426,16 @@ views.stats = {
           )
           .join('')}</div>`
       : empty('Noch keine abgeschlossene Akte mit Ergebnis.', 'scale');
+    // Einschätzung (Strafmaß-Rechner) gegen das tatsächliche Strafmaß: wie gut liegt die Kanzlei mit ihrer Prognose?
+    const f = s.forecast || { count: 0 };
+    const forecast = f.count
+      ? `<div class="forecast">
+          <div class="fc-facts info-grid"><div class="fact"><span class="k">Treffer (±10 %)</span><span class="v">${Math.round((f.hit / f.count) * 100)} %</span></div>
+          <div class="fact"><span class="k">Ø Abweichung</span><span class="v">${esc(String(f.avgAbs).replace('.', ','))} HE</span></div>
+          <div class="fact"><span class="k">Tendenz</span><span class="v">${f.avgDiff > 0 ? '+' : ''}${esc(String(f.avgDiff).replace('.', ','))} HE</span></div></div>
+          <p class="form-hint mt-2">${f.count} ${f.count === 1 ? 'Akte' : 'Akten'} mit Einschätzung und tatsächlichem Strafmaß · ${f.better} milder, ${f.worse} härter als eingeschätzt · „Tendenz“ über 0 = das Gericht urteilt härter als die Prognose.</p>
+        </div>`
+      : empty('Noch keine Akte mit Einschätzung und tatsächlichem Strafmaß – beim Abschließen einer Strafsache eintragen.', 'scale');
     const success = k.success;
     return `
         <div class="page-head">
@@ -442,7 +452,8 @@ views.stats = {
           <section class="panel panel-pad"><div class="panel-head"><div><h2 class="panel-title">Akten je Monat</h2><div class="text-xs text-dim">neu angelegt und abgeschlossen · ${esc(span)}</div></div></div>${caseChart}</section>
         </div>
         <section class="panel panel-pad mb-4 lg:mb-5"><div class="panel-head"><div><h2 class="panel-title">Je Anwalt</h2><div class="text-xs text-dim">nach federführendem Anwalt · alle Akten</div></div></div>${lawyerRows}</section>
-        <section class="panel panel-pad"><div class="panel-head"><div><h2 class="panel-title">Ergebnisse</h2><div class="text-xs text-dim">abgeschlossene Akten · alle Zeit</div></div></div>${outcomes}</section>`;
+        <section class="panel panel-pad"><div class="panel-head"><div><h2 class="panel-title">Ergebnisse</h2><div class="text-xs text-dim">abgeschlossene Akten · alle Zeit</div></div></div>${outcomes}</section>
+        <section class="panel panel-pad mt-4 lg:mt-5"><div class="panel-head"><div><h2 class="panel-title">Einschätzung gegen Ergebnis</h2><div class="text-xs text-dim">Strafmaß-Prognose der Kanzlei und tatsächliches Strafmaß · nur Strafsachen</div></div></div>${forecast}</section>`;
   },
 };
 

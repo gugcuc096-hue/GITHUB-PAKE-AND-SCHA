@@ -208,9 +208,15 @@ const forms = {
     const id = Number(f.dataset.id);
     const outcome = f.elements.outcome.value;
     if (!outcome) throw new Error('Bitte das Ergebnis wählen.');
-    await api.patch('/api/cases/' + id, { status: 'geschlossen', outcome });
+    const num = (name) => {
+      const v = f.elements[name] ? String(f.elements[name].value).trim() : '';
+      return v === '' ? undefined : Math.max(0, Math.round(Number(v)));
+    };
+    const actual = { actualHe: num('actualHe'), actualFine: num('actualFine') };
+    await api.patch('/api/cases/' + id, { status: 'geschlossen', outcome, ...(actual.actualHe !== undefined ? { actualHe: actual.actualHe } : {}), ...(actual.actualFine !== undefined ? { actualFine: actual.actualFine } : {}) });
     await returnOrClose();
-    toast(`Verfahren abgeschlossen – ${OUTCOMES[outcome][0]}`);
+    // Ohne Rechnung abgeschlossen: noch einmal anbieten (sechs Sekunden), statt die Akte stillschweigend zu verlassen
+    toast(`Verfahren abgeschlossen – ${OUTCOMES[outcome][0]}`, 'ok', f.dataset.noInvoice ? { duration: 8000, action: { label: 'Rechnung erstellen', onClick: () => guard(() => actions['new-invoice']({ dataset: { caseId: String(id) } })) } } : {});
   },
   'process-ticket': async (f) => {
     const fd = new FormData(f);
@@ -255,6 +261,22 @@ const forms = {
     toast('Zwei-Faktor-Anmeldung ausgeschaltet.');
     renderView();
   },
+  'req-add': async (f) => {
+    const fd = new FormData(f);
+    const caseId = Number(f.dataset.caseId);
+    await api.post(`/api/cases/${caseId}/requests`, { title: val(fd, 'title'), note: val(fd, 'note') });
+    toast('Unterlage angefordert – der Mandant wird benachrichtigt.');
+    await returnOrClose();
+    await reloadCase(caseId);
+  },
+  'task-package': async (f) => {
+    const fd = new FormData(f);
+    const body = { name: val(fd, 'name'), area: val(fd, 'area'), items: val(fd, 'items') };
+    if (f.dataset.id) await api.patch(`/api/task-packages/${f.dataset.id}`, body);
+    else await api.post('/api/task-packages', body);
+    toast('Paket gespeichert.');
+    await actions['task-package-edit']({ dataset: { caseId: f.dataset.caseId } });
+  },
   'chat-send': async (f) => {
     const caseId = Number(f.dataset.caseId);
     await chatSendNow(f, '#chatList', caseBubble, async (body) => (await api.post(`/api/cases/${caseId}/notes`, { body, internal: false })).message);
@@ -291,9 +313,11 @@ const forms = {
       assignedTo: fd.get('assignedTo') ? Number(fd.get('assignedTo')) : null,
       clientVisible: fd.get('clientVisible') === 'on',
     };
+    const slots = ['slot2', 'slot3'].filter((k) => fd.get(k)).map((k) => new Date(fd.get(k)).toISOString());
+    if (!id && slots.length) body.slots = slots;
     if (id) await api.patch('/api/calendar/' + id, body);
     else await api.post('/api/calendar', body);
-    toast(id ? 'Eintrag gespeichert.' : 'Eintrag angelegt.');
+    toast(id ? 'Eintrag gespeichert.' : slots.length ? 'Terminvorschlag gesendet – der Mandant wählt eine Zeit.' : 'Eintrag angelegt.');
     await returnOrClose();
   },
   'event-request': async (f) => {

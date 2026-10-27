@@ -298,6 +298,12 @@ const actions = {
     toast({ bestaetigt: 'Termin bestätigt.', abgesagt: 'Termin abgesagt.', erledigt: 'Frist als erledigt markiert.' }[el.dataset.status] || 'Gespeichert.');
     await returnOrClose();
   },
+  // Terminvorschlag: Mandant tippt eine Zeit an
+  'event-choose': async (el) => {
+    await api.post(`/api/calendar/${el.dataset.id}/choose`, { startsAt: el.dataset.at });
+    toast('Termin bestätigt – danke!');
+    await returnOrClose();
+  },
   'event-delete': async (el) => {
     const id = Number(el.dataset.id);
     const ev = st.eventCache.get(id);
@@ -1310,6 +1316,29 @@ const actions = {
     }
   },
   // Discord-Ticket einer Akte
+  // Beitrittslink für den Mandanten: in die Zwischenablage (Handy im Spiel) und – mit Konto – als Nachricht in die Akte
+  'client-join-link': async (el) => {
+    const id = Number(el.dataset.id);
+    const { url, text } = await api.get(`/api/cases/${id}/join-link`);
+    const ok = await copy(text);
+    const hasAccount = st.caseInfo && st.caseInfo.id === id && st.caseInfo.hasClientAccount;
+    toast(ok ? 'Beitrittslink kopiert.' : `Link: ${url}`, 'ok', {
+      duration: 9000,
+      ...(hasAccount
+        ? {
+            action: {
+              label: 'Als Nachricht senden',
+              onClick: () =>
+                guard(async () => {
+                  await api.post(`/api/cases/${id}/notes`, { body: text, internal: false });
+                  toast('Nachricht an den Mandanten gesendet.');
+                  await reloadCase(id);
+                }),
+            },
+          }
+        : {}),
+    });
+  },
   'ticket-sync': async (el) => {
     el.disabled = true;
     try {
@@ -1598,6 +1627,56 @@ const actions = {
       label: 'Aufgabe',
       after: afterTaskChange,
     }),
+  // Fehlende Unterlagen
+  'req-new': (el) => {
+    const caseId = Number(el.dataset.caseId);
+    st.returnCase = st.modalCaseId === caseId ? caseId : null;
+    openModal(`<h2 id="modalTitle" class="modal-title">Unterlage anfordern</h2>
+      <p class="modal-sub">Der Mandant sieht es im Portal unter „Was ist zu tun?“ und im Discord-Ticket. Nach 3 Tagen erinnert ihn der Bot einmal.</p>
+      <form data-form="req-add" data-case-id="${caseId}" class="form-grid">
+        <div><label class="label" for="rqTitle">Was fehlt?</label><input id="rqTitle" name="title" class="field" required minlength="2" maxlength="120" placeholder="z. B. Beleg der Zahlung, Foto des Unfallorts" autofocus></div>
+        <div><label class="label" for="rqNote">Hinweis (optional)</label><textarea id="rqNote" name="note" class="field" rows="3" maxlength="500"></textarea></div>
+        <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('send', 'ico-sm')}<span>Anfordern</span></button><button type="button" class="btn-ghost btn-md" data-action="back-to-case">Abbrechen</button></div>
+      </form>`);
+  },
+  'req-toggle': async (el) => {
+    const caseId = Number(el.dataset.caseId);
+    await api.patch(`/api/cases/${caseId}/requests/${el.dataset.id}`, { done: !!el.dataset.done });
+    if (!isStaff()) load.requests().catch(() => {});
+    await reloadCase(caseId);
+  },
+  'req-del': async (el) => {
+    const caseId = Number(el.dataset.caseId);
+    if (!(await askDelete('Anforderung löschen?', 'Sie verschwindet auch beim Mandanten.'))) return;
+    await api.del(`/api/cases/${caseId}/requests/${el.dataset.id}`);
+    await reloadCase(caseId);
+  },
+  'task-package': async (el) => {
+    const caseId = Number(el.dataset.caseId);
+    st.returnCase = st.modalCaseId === caseId ? caseId : null;
+    const { packages } = await api.get('/api/task-packages');
+    const html = taskPackagesHtml(caseId, packages, st.caseInfo && st.caseInfo.id === caseId ? st.caseInfo.area : '');
+    if ($('#modalBody .pack-list, #modalBody .pack-form')) replaceModal(html);
+    else openModal(html);
+  },
+  'task-package-edit': async (el) => {
+    const caseId = Number(el.dataset.caseId);
+    const { packages } = await api.get('/api/task-packages');
+    replaceModal(taskPackagesEditHtml(caseId, packages));
+  },
+  'task-package-apply': async (el) => {
+    const caseId = Number(el.dataset.caseId);
+    const r = await api.post(`/api/task-packages/${el.dataset.id}/apply`, { caseId });
+    toast(r.added ? `${r.added} ${r.added === 1 ? 'Aufgabe' : 'Aufgaben'} angelegt${r.skipped ? ` (${r.skipped} schon vorhanden)` : ''}.` : 'Alle Aufgaben des Pakets sind schon in der Akte.');
+    await returnOrClose();
+    await afterTaskChange();
+  },
+  'task-package-del': async (el) => {
+    if (!(await askDelete('Paket löschen?', 'Bereits angelegte Aufgaben bleiben in den Akten.'))) return;
+    await api.del(`/api/task-packages/${el.dataset.id}`);
+    toast('Paket gelöscht.');
+    await actions['task-package-edit'](el);
+  },
   'task-checklist': async (el) => {
     const caseId = Number(el.dataset.caseId);
     const r = await api.post('/api/tasks/checklist', { caseId });

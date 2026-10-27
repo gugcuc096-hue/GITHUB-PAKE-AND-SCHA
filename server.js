@@ -109,6 +109,9 @@ app.use('/api/cases/:id', (req, res, next) => {
 });
 app.use('/api/cases/:id/external', externalRoutes.caseRouter);
 app.use('/api/cases/:id/contracts', contractRoutes.caseRouter);
+app.use('/api/task-packages', require('./routes/taskPackages').router); // Aufgaben-Pakete je Anlass
+app.use('/api/cases/:id/requests', require('./routes/docRequests').caseRouter); // fehlende Unterlagen der Akte
+app.use('/api/requests', require('./routes/docRequests').mineRouter);
 app.use('/api/cases/:id/parties', require('./routes/parties').router); // Beteiligte der Akte
 app.use('/api/cases/:id/charges', require('./routes/penal').caseRouter); // Anklagepunkte & Strafmaß-Rechner
 app.use('/api/cases/:id/fivenet', externalRoutes.caseRouter); // ältere Adresse, bleibt gültig
@@ -232,6 +235,8 @@ const reminderTimer = setInterval(() => {
     require('./memberships').sweep().catch((err) => console.warn('VIP-Ablauf fehlgeschlagen:', err.message));
     // Zahlungserinnerung für überfällige Rechnungen (einmal je Rechnung)
     require('./paymentReminders').sweep().catch((err) => console.warn('Zahlungserinnerungen fehlgeschlagen:', err.message));
+    // Fehlende Unterlagen: Mandant nach 3 Tagen einmal erinnern
+    require('./docRequests').sweep().catch((err) => console.warn('Erinnerung an fehlende Unterlagen fehlgeschlagen:', err.message));
     // Liegengebliebene Akten: zuständigen Anwalt einmal je Ruhephase erinnern
     require('./idleCases').sweep().catch((err) => console.warn('Hinweis auf liegengebliebene Akten fehlgeschlagen:', err.message));
     // Abgelehnte Bewerbungen und erledigte Anliegen nach X Tagen löschen (Einstellung, 0 = aus)

@@ -56,6 +56,7 @@ const createSchema = z.object({
   caseId: z.number().int().positive().nullable().optional(),
   assignedTo: z.number().int().positive().nullable().optional(),
   clientVisible: z.boolean().optional(),
+  slots: z.array(isoDateTime).max(2).optional(), // weitere Zeiten zur Auswahl für den Mandanten (Terminvorschlag)
 });
 
 router.post(
@@ -92,9 +93,16 @@ router.post(
         const a = db.prepare("SELECT id FROM users WHERE id = ? AND role IN ('anwalt','admin')").get(assignedTo);
         if (!a) return res.status(400).json({ error: 'Die zuständige Person existiert nicht.' });
       }
+      // Terminvorschlag: bis zu drei Zeiten, der Mandant wählt eine (Termin ist bis dahin „angefragt“)
+      if (d.slots && d.slots.length) {
+        if (d.type !== 'mandant' || !c || !c.client_id) {
+          return res.status(400).json({ error: 'Terminvorschläge gibt es nur für Mandantengespräche in einer Akte mit Mandanten-Konto.' });
+        }
+        if (d.clientVisible === false) return res.status(400).json({ error: 'Ein Terminvorschlag muss für den Mandanten sichtbar sein.' });
+      }
       row = {
         type: d.type,
-        status: 'bestaetigt',
+        status: d.slots && d.slots.length ? 'angefragt' : 'bestaetigt',
         clientId: c ? c.client_id : null,
         assignedTo,
         clientVisible: (d.clientVisible ?? ['mandant', 'gericht'].includes(d.type)) ? 1 : 0,
@@ -102,16 +110,25 @@ router.post(
       };
     }
 
+    let slotList = null;
+    let first = startsAt;
+    if (u.role !== 'mandant' && d.slots && d.slots.length) {
+      slotList = [...new Set([startsAt, ...d.slots.map((x) => new Date(x).toISOString())])].sort();
+      if (slotList.some((x) => new Date(x) < new Date())) return res.status(400).json({ error: 'Bitte Zeiten in der Zukunft wählen.' });
+      first = slotList[0];
+    }
     const info = db
       .prepare(
-        `INSERT INTO appointments (case_id, client_id, type, title, starts_at, ends_at, location, note, status, assigned_to, created_by, client_visible)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO appointments (case_id, client_id, type, title, starts_at, ends_at, location, note, status, assigned_to, created_by, client_visible, slots)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .run(c ? c.id : null, row.clientId, row.type, d.title, startsAt, endsAt, row.location, d.note || '', row.status, row.assignedTo, u.id, row.clientVisible);
+      .run(c ? c.id : null, row.clientId, row.type, d.title, first, endsAt, row.location, d.note || '', row.status, row.assignedTo, u.id, row.clientVisible, slotList && slotList.length > 1 ? JSON.stringify(slotList) : null);
 
     const a = getAppointment(Number(info.lastInsertRowid));
     if (u.role === 'mandant') ticketAppointment(a, '📅 Terminanfrage des Mandanten', { by: u, mention: 'lawyers' });
-    else ticketAppointment(a, a.status === 'angefragt' ? '📅 Terminvorschlag' : a.type === 'frist' ? '⏳ Neue Frist' : '📅 Neuer Termin', { by: u });
+    else if (slotList && slotList.length > 1) {
+      ticketAppointment(a, '📅 Terminvorschlag – bitte eine Zeit wählen', { by: u, note: `${slotList.map((x) => `• ${fmtDiscordTime(x)}`).join('\n')}\n\nSie wählen im Mandantenportal unter „Termine“ mit einem Klick.` });
+    } else ticketAppointment(a, a.status === 'angefragt' ? '📅 Terminvorschlag' : a.type === 'frist' ? '⏳ Neue Frist' : '📅 Neuer Termin', { by: u });
     if (u.role === 'mandant') {
       discord.notify('appointment.requested', {
         title: `${TYPE_ICON.mandant} Terminanfrage: ${a.title}`,
@@ -136,7 +153,7 @@ router.post(
       });
     }
     require('../googleDocs').touchExtract(a.case_id); // Termine stehen im Aktenauszug
-    if (u.role !== 'mandant') apptConfirm.askClient(a.id).catch(() => {}); // „Passt“ / „Passt nicht“ per Discord-DM
+    if (u.role !== 'mandant' && !(slotList && slotList.length > 1)) apptConfirm.askClient(a.id).catch(() => {}); // „Passt“ / „Passt nicht“ per Discord-DM (Vorschläge wählt der Mandant im Portal)
     res.status(201).json({ event: apptRow(a, u) });
   })
 );
@@ -181,6 +198,7 @@ router.patch(
     if (d.location !== undefined) set('location', d.location);
     if (d.note !== undefined) set('note', d.note);
     if (d.status !== undefined) set('status', d.status);
+    if (d.status === 'bestaetigt' || d.status === 'abgesagt' || (d.startsAt !== undefined && new Date(d.startsAt).toISOString() !== a.starts_at)) set('slots', null);
     if (d.clientVisible !== undefined) set('client_visible', d.clientVisible ? 1 : 0);
     if (d.assignedTo !== undefined) {
       if (d.assignedTo) {
@@ -218,6 +236,33 @@ router.patch(
     const gdocs = require('../googleDocs');
     gdocs.touchExtract(updated.case_id);
     if (a.case_id !== updated.case_id) gdocs.touchExtract(a.case_id);
+    res.json({ event: apptRow(getAppointment(a.id), u) });
+  })
+);
+
+/** Mandant wählt eine der vorgeschlagenen Zeiten: der Termin ist damit bestätigt. */
+router.post(
+  '/:id/choose',
+  wrap(async (req, res) => {
+    const u = req.user;
+    const id = idParam(req);
+    const a = id && getAppointment(id);
+    if (!a || !apptVisible(a, u) || isStaff(u)) return res.status(404).json({ error: 'Termin nicht gefunden.' });
+    const d = parseBody(z.object({ startsAt: isoDateTime }), req, res);
+    if (!d) return;
+    const slots = apptRow(a, u).slots;
+    const pick = new Date(d.startsAt).toISOString();
+    if (a.status !== 'angefragt' || slots.length < 2 || !slots.includes(pick)) return res.status(400).json({ error: 'Diese Zeit steht nicht zur Auswahl (mehr).' });
+    db.prepare("UPDATE appointments SET starts_at = ?, status = 'bestaetigt', slots = NULL, reminded = 0, client_reminded = 0, client_response = 'zugesagt', client_response_at = datetime('now') WHERE id = ?").run(pick, a.id);
+    const updated = getAppointment(a.id);
+    ticketAppointment(updated, '✅ Termin vom Mandanten gewählt', { by: u, mention: 'lawyers' });
+    discord.notify('appointment.requested', {
+      title: `✅ Termin gewählt: ${truncate(updated.title, 200)}`,
+      description: `${u.display_name} hat eine Zeit gewählt.`,
+      fields: [{ name: 'Wann', value: fmtDiscordTime(updated.starts_at), inline: false }, { name: 'Akte', value: updated.case_number || '—' }],
+      mentionIds: updated.assigned_discord_id ? [updated.assigned_discord_id] : [],
+    });
+    require('../googleDocs').touchExtract(updated.case_id);
     res.json({ event: apptRow(getAppointment(a.id), u) });
   })
 );

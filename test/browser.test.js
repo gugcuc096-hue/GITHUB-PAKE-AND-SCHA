@@ -3379,3 +3379,128 @@ describe('Browser: Aufgeräumte Akte – Direktbearbeitung, Chips, Beteiligte, P
     }
   });
 });
+
+describe('Browser: Abschluss mit Rechnungs-Vorschlag und Strafmaß, Aufgaben-Pakete, fehlende Unterlagen, Terminvorschläge', { skip: chromium ? false : 'Playwright nicht installiert' }, () => {
+  const inDays = (n, h = 10) => {
+    const d = new Date(Date.now() + n * 864e5);
+    d.setUTCHours(h, 0, 0, 0);
+    return d.toISOString();
+  };
+  for (const [label, device] of [['PC', DESKTOP], ['Handy', PHONE]]) {
+    it(`Akte am ${label}: Abschluss schlägt Rechnung vor und erfasst das Strafmaß, Aufgaben-Paket, Unterlage anfordern, Statistik`, async () => {
+      const srv = await startServer();
+      const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+      try {
+        const a = client(srv.base);
+        const me = await a.login(TEAM.admin);
+        const c = (await a.post('/api/cases', { title: 'Raubüberfall Vinewood', area: 'strafrecht', clientName: 'Vito Russo', lawyerId: me.id })).json.case;
+        await a.patch(`/api/cases/${c.id}/charges/sentence`, { he: 40 });
+        const ctx = await browser.newContext({ ...device, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+        const page = await ctx.newPage();
+        const problems = [];
+        page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
+        await page.goto(srv.base + '/login');
+        await page.fill('#email', TEAM.admin);
+        await page.fill('#password', PASSWORD);
+        await page.click('button[type=submit]');
+        await page.waitForURL(/dashboard/);
+        await page.waitForSelector('#nav a.nav-item', { state: 'attached' });
+        await page.goto(`${srv.base}/dashboard?case=${c.id}#cases`);
+        await page.waitForSelector('#modalBody .case-head');
+        await page.waitForTimeout(500);
+
+        // Aufgaben-Paket: Auswahl, Übernehmen legt die Aufgaben an
+        await page.click('#secTasks [data-action="task-package"], [data-action="task-package"]');
+        await page.waitForSelector('.pack-list .pack');
+        assert.ok(await page.$('.pack.is-fit'), 'Paket zum Rechtsgebiet zuerst');
+        await page.click('.pack:has(strong:text-is("Festnahme")) [data-action="task-package-apply"]');
+        await page.waitForSelector('#modalBody .case-head');
+        await page.waitForFunction(() => document.querySelectorAll('#secTasks .task-row, #secTasks .task-item').length >= 4);
+        assert.ok((await a.get(`/api/cases/${c.id}`)).json.tasks.length >= 4);
+
+        // Unterlage anfordern
+        await page.click('#secRequests [data-action="req-new"]');
+        await page.fill('#rqTitle', 'Foto der Verletzungen');
+        await page.click('form[data-form="req-add"] button[type="submit"]');
+        await page.waitForSelector('#secRequests .req-row');
+        assert.match(await page.textContent('#secRequests .req-title'), /Foto der Verletzungen/);
+        await page.click('#secRequests [data-action="req-toggle"]');
+        await page.waitForSelector('#secRequests .req-row.is-done');
+
+        // Abschließen: Hinweis auf fehlende Rechnung, Strafmaß-Felder mit der Einschätzung
+        await page.click('.track-node:last-child, [data-action="case-close"]');
+        await page.waitForSelector('form[data-form="case-close"]');
+        assert.match(await page.textContent('.close-invoice'), /Noch keine Rechnung/);
+        assert.ok(await page.$('.close-invoice [data-action="new-invoice"]'));
+        assert.match(await page.textContent('#modalBody'), /40 HE/);
+        await page.selectOption('#ccOutcome', 'milderung');
+        await page.fill('input[name="actualHe"]', '44');
+        if (device === PHONE) assert.ok((await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 1, 'Abschluss passt aufs Handy');
+        await page.click('form[data-form="case-close"] button[type="submit"]');
+        await page.waitForFunction(() => /Rechnung erstellen/.test(document.querySelector('.ps-toast')?.textContent || ''));
+        const closed = (await a.get(`/api/cases/${c.id}`)).json;
+        assert.equal(closed.sentence.actualHe, 44);
+
+        // Statistik (Board): Einschätzung gegen Ergebnis
+        await page.evaluate(() => (location.hash = '#stats'));
+        await page.waitForSelector('.forecast');
+        assert.match(await page.textContent('.forecast'), /Treffer/);
+        assert.match(await page.textContent('.forecast'), /\+4/);
+        assert.deepEqual(problems, []);
+        await ctx.close();
+      } finally {
+        await browser.close();
+        await srv.stop();
+      }
+    });
+  }
+
+  it('Mandantenportal am Handy: Unterlage nachreichen und Terminvorschlag mit einem Klick wählen', async () => {
+    const srv = await startServer();
+    const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+    try {
+      const a = client(srv.base);
+      await a.login(TEAM.admin);
+      const m = client(srv.base);
+      assert.equal((await m.post('/api/auth/register', { displayName: 'Tina Termin', email: 'tina.termin', password: 'Mandanten-Passwort-5' })).status, 201);
+      const c = (await a.post('/api/cases', { title: 'Beratung Mietrecht', area: 'zivilrecht', clientEmail: 'tina.termin' })).json.case;
+      await a.post(`/api/cases/${c.id}/requests`, { title: 'Mietvertrag als Foto', note: 'Bitte alle Seiten' });
+      const ev = (await a.post('/api/calendar', { type: 'mandant', title: 'Erstgespräch', startsAt: inDays(5, 14), caseId: c.id, slots: [inDays(3, 10), inDays(4, 16)] })).json.event;
+      const ctx = await browser.newContext({ ...PHONE, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+      const page = await ctx.newPage();
+      const problems = [];
+      page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
+      await page.goto(srv.base + '/login');
+      await page.fill('#email', 'tina.termin');
+      await page.fill('#password', 'Mandanten-Passwort-5');
+      await page.click('button[type=submit]');
+      await page.waitForURL(/dashboard/);
+      await page.waitForSelector('.todo-item');
+      const todo = await page.textContent('.todo');
+      assert.match(todo, /Unterlage nachreichen: Mietvertrag als Foto/);
+      assert.match(todo, /Terminvorschlag: Erstgespräch/);
+      assert.ok((await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 1, 'Portal passt aufs Handy');
+
+      await page.click('.todo-item:has-text("Terminvorschlag") [data-action="open-event"]');
+      await page.waitForSelector('.slot-pick [data-action="event-choose"]');
+      assert.equal((await page.$$('.slot-pick [data-action="event-choose"]')).length, 3);
+      await page.click('.slot-pick [data-action="event-choose"] >> nth=1');
+      await page.waitForFunction(() => !document.querySelector('.slot-pick'));
+      const got = (await a.get('/api/calendar')).json.events.find((e) => e.id === ev.id);
+      assert.equal(got.status, 'bestaetigt');
+      assert.equal(got.proposal, false);
+
+      // Unterlage abhaken verschwindet aus „Was ist zu tun?“
+      await page.evaluate(() => (location.hash = '#overview'));
+      await page.waitForSelector('.todo-item:has-text("Unterlage nachreichen")');
+      await page.click('.todo-item:has-text("Unterlage nachreichen") [data-action="req-toggle"]');
+      await page.waitForFunction(() => !/Unterlage nachreichen/.test(document.querySelector('.todo, .todo-done')?.textContent || ''));
+      assert.deepEqual((await m.get('/api/requests/mine')).json.requests, []);
+      assert.deepEqual(problems, []);
+      await ctx.close();
+    } finally {
+      await browser.close();
+      await srv.stop();
+    }
+  });
+});
