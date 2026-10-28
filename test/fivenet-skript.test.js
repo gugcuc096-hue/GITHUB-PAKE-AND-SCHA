@@ -168,4 +168,58 @@ describe('FiveNet-Übernahme im Dashboard (Browser)', { skip: chromium ? false :
     assert.equal(await page.inputValue('#fnDocType'), 'Eigene Art', 'vorhandene Eingabe bleibt');
     await ctx.close();
   });
+
+  it('Zwischenüberschriften: <h1>–<h6>, Fettdruck-Absätze, GROSSBUCHSTABEN und „§ 3 Titel“ werden erkannt – Sätze und Kürzel nicht', async () => {
+    const ctx = await browser.newContext({ viewport: { width: 1366, height: 900 }, locale: 'de-DE' });
+    const page = await ctx.newPage();
+    await login(page);
+    const r = await page.evaluate(() => {
+      const html = '<h1>Polizeibericht</h1><p>Einleitung des Berichts.</p><h3>Beweismittel</h3><p>B1 liegt vor.</p><p><strong>Zeugenaussagen</strong></p><p><strong>Das ist ein ganzer Satz im Fettdruck.</strong></p><p>SACHVERHALT UND ABLAUF</p><p>LSPD</p><p>DOC - 74412</p><p>§ 3 Pflichten des Mandanten</p><ul><li><strong>Listenpunkt fett</strong></li></ul><table><tr><td><strong>Zelle</strong></td><td>Wert</td></tr></table>';
+      const { text } = parsePastedHtml(html);
+      return { text, html: PS.transcriptHtml(text), plain: PS.transcriptPlain(text) };
+    });
+    const lines = r.text.split('\n');
+    assert.ok(lines.includes('## Polizeibericht'), 'h1 groß');
+    assert.ok(lines.includes('### Beweismittel'), 'h3 klein');
+    assert.ok(lines.includes('### Zeugenaussagen'), 'Fettdruck-Absatz');
+    assert.ok(lines.includes('Das ist ein ganzer Satz im Fettdruck.'), 'Satz bleibt Text');
+    assert.ok(lines.includes('### SACHVERHALT UND ABLAUF'), 'Großbuchstaben');
+    assert.ok(lines.includes('LSPD') && lines.includes('DOC - 74412'), 'Kürzel und Aktenzeichen bleiben Text');
+    assert.ok(lines.includes('### § 3 Pflichten des Mandanten'), 'Paragraph');
+    assert.ok(!lines.some((l) => /^#+ (Zelle|Wert)/.test(l)), 'Tabellenzellen keine Überschrift');
+    assert.match(r.html, /<span class="tx-h tx-h2" role="heading" aria-level="3">Polizeibericht<\/span>/);
+    assert.match(r.html, /tx-h3[^>]*>Beweismittel</);
+    assert.ok(!r.html.includes('##'), 'Markierungen verschwinden in der Anzeige');
+    assert.ok(!r.plain.includes('##'), 'Klartext ohne Markierungen');
+    assert.match(r.plain, /Beweismittel\n\nB1 liegt vor\./);
+    // Text ist maskiert
+    assert.equal(await page.evaluate(() => PS.transcriptHtml('## <b>x</b>\n<i>y</i>')), '<span class="tx-h tx-h2" role="heading" aria-level="3">&lt;b&gt;x&lt;/b&gt;</span>&lt;i&gt;y&lt;/i&gt;');
+    await ctx.close();
+  });
+
+  it('Abschrift mit Überschriften: Anzeige in der Akte groß, Textdatei und Kopie ohne Markierungen', async () => {
+    const a = client(srv.base);
+    await a.login(TEAM.admin);
+    const c = (await a.post('/api/cases', { title: 'Abschrift Überschriften', area: 'strafrecht', clientName: 'Hanna Heading' })).json.case;
+    const link = await a.post(`/api/cases/${c.id}/external`, { provider: 'fivenet', input: '4801', attest: true, title: 'Bericht', contentText: '## Sachverhalt\nDer Fahrer wurde angehalten.\n\n### Beweise\nB1 und B2' });
+    assert.equal(link.status, 201, link.text);
+    const txt = await a.get(`/api/cases/${c.id}/external/${link.json.document.id}/text`);
+    assert.equal(txt.status, 200);
+    assert.ok(!txt.text.includes('##'), 'Textdatei ohne Markierungen');
+    assert.match(txt.text, /Sachverhalt\r\n\r\nDer Fahrer wurde angehalten\./);
+    const ctx = await browser.newContext({ viewport: { width: 1366, height: 900 }, locale: 'de-DE' });
+    const page = await ctx.newPage();
+    await login(page);
+    await page.evaluate((id) => openCase(id), c.id);
+    await page.waitForSelector('.fn-text summary');
+    await page.click('.fn-text summary');
+    await page.waitForSelector('.fn-pre .tx-h2');
+    const sizes = await page.$$eval('.fn-pre .tx-h2, .fn-pre .tx-h3', (els) => els.map((e) => [e.textContent, parseFloat(getComputedStyle(e).fontSize)]));
+    const body = await page.$eval('.fn-pre', (e) => parseFloat(getComputedStyle(e).fontSize));
+    assert.deepEqual(sizes.map((x) => x[0]), ['Sachverhalt', 'Beweise']);
+    assert.ok(sizes[0][1] > body * 1.4 && sizes[1][1] > body, `Überschriften größer als der Text: ${JSON.stringify(sizes)} vs ${body}`);
+    // Kopieren: ohne Markierungen
+    assert.ok(!(await page.evaluate((t) => PS.transcriptPlain(t), '## Sachverhalt\nText')).includes('#'));
+    await ctx.close();
+  });
 });

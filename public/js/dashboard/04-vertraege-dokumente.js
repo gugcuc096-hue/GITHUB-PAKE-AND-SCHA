@@ -367,7 +367,7 @@ function externalDocCard(d, c, sortable = false) {
   const rows = sheet && d.contentText ? d.contentText.split('\n').filter(Boolean).length : 0;
   const content = d.contentText
     ? `<details class="fn-text"><summary>${icon(sheet ? 'table' : 'doc', 'ico-sm')}<span>${sheet ? 'Tabelle anzeigen' : 'Abschrift anzeigen'}</span><span class="text-dim text-xs">${sheet ? `${rows.toLocaleString('de-DE')} Zeile${rows === 1 ? '' : 'n'}` : `${d.contentText.length.toLocaleString('de-DE')} Zeichen`} · Stand ${esc(fmtDate(d.contentAt))}${d.contentByName ? ' · ' + esc(d.contentByName) : ''}</span></summary>
-          ${sheet ? sheetTable(d.contentText) : `<div class="fn-pre">${esc(d.contentText)}</div>`}
+          ${sheet ? sheetTable(d.contentText) : `<div class="fn-pre">${PS.transcriptHtml(d.contentText)}</div>`}
           <div class="fn-actions"><button type="button" class="btn-ghost btn-sm" data-action="fn-copy-text" data-id="${d.id}">${icon('copy', 'ico-sm')}<span>${sheet ? 'Tabelle kopieren (für Excel/Sheets)' : 'Text kopieren'}</span></button>
             <a class="btn-ghost btn-sm" href="${extUrl(c.id, d.id, '/text')}" download>${icon('download', 'ico-sm')}<span>Als Textdatei</span></a></div>
           <p class="form-hint">Abschrift – maßgeblich ist das Original in ${esc(p.name)}; spätere Änderungen dort sind hier erst nach „Aktualisieren“ enthalten.</p></details>`
@@ -683,7 +683,7 @@ function parseGermanDate(text) {
  * als Titel. Es sind nur Vorschläge – sie landen in leeren Feldern und werden zur Prüfung gemeldet.
  */
 function guessFivenetMeta(text, docTypes = []) {
-  const lines = String(text || '').split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 60);
+  const lines = String(text || '').split('\n').map((l) => l.trim().replace(/^#{2,3} /, '')).filter(Boolean).slice(0, 60);
   const label = (re) => {
     for (const l of lines) {
       const m = l.match(re);
@@ -821,6 +821,33 @@ const FN_MAX_IMAGES = 10;
  * Wandelt kopiertes HTML aus FiveNet in lesbaren Text und sammelt die Bildadressen.
  * DOMParser lädt keine Bilder und führt keine Skripte aus; übernommen werden nur Textknoten.
  */
+/** Ein Absatz, der nur aus einem kurzen Fettdruck ohne Satzzeichen am Ende besteht, ist meist eine Zwischenüberschrift. */
+function boldOnly(n) {
+  const kids = [...n.childNodes].filter((c) => !(c.nodeType === 3 && !c.nodeValue.trim()));
+  if (kids.length !== 1 || kids[0].nodeType !== 1 || !/^(STRONG|B)$/.test(kids[0].tagName)) return false;
+  const t = kids[0].textContent.replace(/\s+/g, ' ').trim();
+  return t.length >= 3 && t.length <= 80 && !/[.,;!?:]$/.test(t);
+}
+
+/**
+ * Überschriften, die im Text selbst stehen (ohne HTML-Auszeichnung): Zeilen nur in GROSSBUCHSTABEN („SACHVERHALT“,
+ * „BEWEISMITTEL UND ZEUGEN“) und „§ 3 Pflichten des Mandanten“ – jeweils kurz und ohne Satzzeichen am Ende. Bereits
+ * markierte Zeilen bleiben unverändert; „DOC - 74412“ oder ein einzelnes Kürzel zählen nicht.
+ */
+function markHeadings(text) {
+  return String(text || '')
+    .split('\n')
+    .map((line) => {
+      const l = line.trim();
+      if (!l || l.length > 80 || /^#|^•|^\[Bild\]|[.,;:!?]$/.test(l)) return line;
+      const letters = l.replace(/[^A-Za-zÄÖÜäöüß]/g, '');
+      const caps = letters.length >= 4 && l === l.toUpperCase() && (letters.length >= 8 || /\s/.test(l)) && !/\d{3,}/.test(l);
+      const para = /^§\s*\d+[a-z]?\s+\p{Lu}/u.test(l) && l.length <= 70;
+      return caps || para ? `### ${l}` : line;
+    })
+    .join('\n');
+}
+
 function parsePastedHtml(html) {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   doc.querySelectorAll('script, style, noscript, template, svg, button, input, select, textarea').forEach((n) => n.remove());
@@ -852,6 +879,13 @@ function parsePastedHtml(html) {
       }
       const cell = tag === 'TD' || tag === 'TH';
       const block = FN_BLOCK.has(tag) && !inCell;
+      // Zwischenüberschriften: <h1>/<h2> groß („## “), <h3>–<h6> und Absätze nur aus Fettdruck kleiner („### “)
+      const level = inCell ? 0 : /^H[12]$/.test(tag) ? 2 : /^H[3-6]$/.test(tag) ? 3 : (tag === 'P' || tag === 'DIV') && boldOnly(n) ? 3 : 0;
+      if (level) {
+        const t = n.textContent.replace(/\s+/g, ' ').trim();
+        if (t) out.push(`\n${'#'.repeat(level)} ${t}\n`);
+        continue;
+      }
       // Listenpunkte und Tabellenzeilen ohne Leerzeile untereinander, Absätze mit Leerzeile.
       const tight = tag === 'LI' || tag === 'TR' || tag === 'DT' || tag === 'DD';
       if (block) out.push('\n');
@@ -872,7 +906,7 @@ function parsePastedHtml(html) {
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
-  return { text, images };
+  return { text: markHeadings(text), images };
 }
 
 /**

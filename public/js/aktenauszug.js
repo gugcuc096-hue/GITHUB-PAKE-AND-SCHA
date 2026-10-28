@@ -151,7 +151,7 @@
                 <div class="dim">${[PROVIDER[d.provider] || d.provider, d.docType, d.docDate ? dayDe(d.docDate) : null, d.docAuthor ? `Verfasser: ${d.docAuthor}` : null].filter(Boolean).map(esc).join(' · ')}</div>
                 ${d.url ? `<div><a href="${esc(d.url)}">${esc(d.url)}</a></div>` : ''}
                 ${d.summary ? `<div class="text" style="margin-top:0.3rem">${esc(d.summary)}</div>` : ''}
-                ${withText && d.contentText ? `<div class="transcript">${esc(d.contentText)}</div>` : ''}</div>`
+                ${withText && d.contentText ? `<div class="transcript">${PS.transcriptHtml(d.contentText)}</div>` : ''}</div>`
             )
             .join('')
         : '<p class="empty">Keine externen Dokumente.</p>'

@@ -95,6 +95,18 @@ function para(children, o = {}) {
   });
 }
 
+/** Abschrift als Absätze: Zwischenüberschriften („## “ / „### “) fett und größer, Text wie bisher auf hellem Grund. */
+function transcriptParts(text) {
+  const shade = { fill: 'F7F7F5', indent: { left: tw(rem(0.7)), right: tw(rem(0.7)) } };
+  return require('./transcript')
+    .segments(text)
+    .map((seg, i) =>
+      seg.body !== undefined
+        ? [seg.body, { font: 'Inter', size: rem(0.8), color: INK, line: 1.5, before: rem(i ? 0.15 : 0.4), ...shade }]
+        : [runs(seg.text, { font: 'Inter', size: rem(seg.level === 2 ? 1.0 : 0.88), bold: true, color: INK }), { before: rem(i ? 0.45 : 0.4), keepNext: true, ...shade }]
+    );
+}
+
 /** Leerer Absatz als Abstand (Google übernimmt Abstände in Punkt zuverlässiger als feste Zeilenhöhen). */
 const spacer = (pt) => para([new D.TextRun({ text: '', size: 2 })], { before: pt, mark: 1 });
 
@@ -912,7 +924,7 @@ async function extractDocx(data, firm, options = {}) {
         ...(metaLine ? [[metaLine, { font: 'Inter', size: rem(0.84), color: MUTED, keepNext: true }]] : []),
         ...(d.url ? [[[link(d.url)], { keepNext: !!(d.summary || (opts.docsText && d.contentText)) }]] : []),
         ...(d.summary ? [[d.summary, { font: 'Inter', size: rem(0.84), color: INK, line: 1.6, before: rem(0.3) }]] : []),
-        ...(opts.docsText && d.contentText ? [[d.contentText, { font: 'Inter', size: rem(0.8), color: INK, line: 1.5, before: rem(0.4), fill: 'F7F7F5', indent: { left: tw(rem(0.7)), right: tw(rem(0.7)) } }]] : []),
+        ...(opts.docsText && d.contentText ? transcriptParts(d.contentText) : []),
       ];
       parts.forEach(([content, o], j) => body.push(para(content, j === parts.length - 1 && !last ? { ...o, border: sep } : o)));
     });

@@ -998,5 +998,34 @@
   document.addEventListener('scroll', readProgress, { capture: true, passive: true });
   const readBarOff = () => readBar && (readBar.style.opacity = '0');
 
-  window.PS = { readBarOff, boot, api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog, closeToDashboard, drafts, applications, tab, fieldError, fieldErrors, clearFieldErrors, countUp, roll, motion };
+  /**
+   * Abschrift mit Zwischenüberschriften („## “ groß, „### “ kleiner – siehe transcript.js) als HTML; alles andere bleibt Text.
+   * Der Aufrufer setzt white-space: pre-wrap auf den Behälter.
+   */
+  function transcriptHtml(text) {
+    const out = [];
+    let buf = [];
+    const flush = () => {
+      const body = buf.join('\n').replace(/^\n+|\n+$/g, '');
+      if (body) out.push(esc(body));
+      buf = [];
+    };
+    for (const line of String(text || '').split('\n')) {
+      const m = line.match(/^(#{2,3}) (\S.*)$/);
+      if (m) {
+        flush();
+        out.push(`<span class="tx-h tx-h${m[1].length}" role="heading" aria-level="${m[1].length + 1}">${esc(m[2].trim())}</span>`);
+      } else buf.push(line);
+    }
+    flush();
+    return out.join('');
+  }
+  /** Dasselbe als Klartext ohne Markierungen (Kopieren). */
+  const transcriptPlain = (text) =>
+    String(text || '')
+      .split('\n')
+      .map((l) => l.replace(/^#{2,3} (?=\S)/, ''))
+      .join('\n');
+
+  window.PS = { transcriptHtml, transcriptPlain, readBarOff, boot, api, esc, fmtDate, parseDate, money, copy, toast, resizeImage, confirm: confirmDialog, closeToDashboard, drafts, applications, tab, fieldError, fieldErrors, clearFieldErrors, countUp, roll, motion };
 })();

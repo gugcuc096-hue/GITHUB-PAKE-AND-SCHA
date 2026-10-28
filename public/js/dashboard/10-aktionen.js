@@ -1565,7 +1565,7 @@ const actions = {
   'fn-copy-text': async (el) => {
     const d = st.caseDocs.find((x) => x.id === Number(el.dataset.id));
     if (!d) return;
-    const ok = await copy(d.contentText);
+    const ok = await copy(PS.transcriptPlain(d.contentText));
     toast(ok ? 'Abschrift kopiert.' : 'Kopieren nicht möglich.', ok ? 'ok' : 'error');
   },
   'fn-delete': async (el) => {
