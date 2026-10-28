@@ -78,7 +78,8 @@ function render(page, origin) {
       html = html.replace(new RegExp(`(<!--ranks:${level}-->)[\\s\\S]*?(<!--/ranks:${level}-->)`), (_, a, b) => `${a}${cards}\n${b}`);
     }
   }
-  return html.replace(/(content=")\/img\/og-image\.png"/g, `$1${origin}/img/og-image.png"`);
+  html = html.replace(/(content=")\/img\/og-image\.png"/g, `$1${origin}/img/og-image.png"`);
+  return html.replace('</head>', `    ${require('./seo').headExtras(page, origin)}\n</head>`);
 }
 
 /*
