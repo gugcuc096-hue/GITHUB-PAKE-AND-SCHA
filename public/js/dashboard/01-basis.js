@@ -528,21 +528,37 @@ function isoWeek(d) {
   t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
   return Math.ceil(((t - Date.UTC(t.getUTCFullYear(), 0, 1)) / 864e5 + 1) / 7);
 }
+/**
+ * „Als Rang ansehen“ (Einstellungen → Rechte & Schalter): Menü und Seitenfreigabe wie bei einer anderen Rolle –
+ * nur zum Prüfen; die Daten bleiben die der eigenen Anmeldung.
+ */
+function viewRole() {
+  const as = st.viewAs;
+  if (!as) return { staff: isStaff(), admin: isAdmin(), board: isBoard(), has: can };
+  const webadmin = (st.access && st.access.matrix && st.access.matrix.webadmin) || CONFIG_PERMS;
+  return {
+    mandant: { staff: false, admin: false, board: false, has: () => false },
+    mitarbeiter: { staff: true, admin: false, board: false, has: () => false },
+    board: { staff: true, admin: false, board: true, has: (k) => !!(st.access && st.access.matrix && st.access.matrix.board.includes(k)) },
+    webadmin: { staff: true, admin: false, board: false, has: (k) => webadmin.includes(k) },
+  }[as];
+}
 function allowed(view) {
   const v = VIEWS[view];
   if (!v) return false;
-  if (v.admin && !isAdmin()) return false;
-  if (v.board && !isBoard()) return false;
-  if (v.perm && !canAny(v.perm)) return false;
+  const r = viewRole();
+  if (v.admin && !r.admin) return false;
+  if (v.board && !r.board) return false;
+  if (v.perm && !v.perm.some((k) => r.has(k))) return false;
   if (v.feature && !feature(v.feature)) return false;
-  if (v.staff && !isStaff()) return false;
-  if (v.client && isStaff()) return false; // nur für Mandanten (z. B. VIP & Lifetime anfragen)
+  if (v.staff && !r.staff) return false;
+  if (v.client && r.staff) return false; // nur für Mandanten (z. B. VIP & Lifetime anfragen)
   return true;
 }
 function viewLabel(view, short = false) {
   const v = VIEWS[view];
   if (!v) return '';
-  if (!isStaff() && v.clientLabel) return v.clientLabel;
+  if (!viewRole().staff && v.clientLabel) return v.clientLabel;
   return (short && v.short) || v.label;
 }
 /** Tage zwischen heute und einem Datum "YYYY-MM-DD" (negativ = Vergangenheit). */

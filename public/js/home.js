@@ -292,12 +292,12 @@ function toggleFaq(item) {
 /* ---------- Copy Email ---------- */
 function copyEmail() {
     const btn = document.getElementById('emailCopyBtn');
-    const email = 'kontakt@pake-scha.ls';
+    const email = btn.dataset.email || 'kontakt@pake-scha.ls';
     const done = () => {
         btn.textContent = 'E-Mail kopiert ✓';
         btn.classList.add('copied');
         showToast('Kopiert', 'Die E-Mail-Adresse wurde in die Zwischenablage übernommen.');
-        setTimeout(() => { btn.textContent = 'kontakt@pake-scha.ls kopieren'; btn.classList.remove('copied'); }, 2500);
+        setTimeout(() => { btn.textContent = `${email} kopieren`; btn.classList.remove('copied'); }, 2500);
     };
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(email).then(done).catch(() => { window.location.href = 'mailto:' + email; });

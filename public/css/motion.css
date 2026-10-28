@@ -194,3 +194,22 @@ html.ps-leaving body { opacity: 0; transform: scale(0.993); transition: opacity 
 .topstrip .site-switch { padding: 2px; font-size: 0.66rem; }
 .topstrip .site-switch > a { min-height: 26px; padding: 0 0.7rem; }
 .topstrip .site-avatar { width: 26px; height: 26px; font-size: 0.7rem; }
+
+/* Banner (Website und Dashboard), Links im Kontaktbereich, Vorschau-Band */
+.site-banner { position: relative; z-index: 60; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.35rem 0.9rem; padding: 0.55rem 2.6rem 0.55rem 1rem; font-size: 0.85rem; line-height: 1.35; text-align: center; color: #02050e; background: linear-gradient(90deg, #b8962e, #f3e5ab 50%, #b8962e); animation: ps-banner-in var(--m-page, 0.3s) var(--m-ease, ease) both; transition: opacity 0.2s ease, transform 0.2s ease; }
+.site-banner.tone-sky { background: linear-gradient(90deg, #0369a1, #7dd3fc 50%, #0369a1); }
+.site-banner.tone-amber { background: linear-gradient(90deg, #b45309, #fbbf24 50%, #b45309); }
+.site-banner.tone-red { color: #fff; background: linear-gradient(90deg, #7f1d1d, #dc2626 50%, #7f1d1d); }
+.site-banner.tone-green { background: linear-gradient(90deg, #047857, #6ee7b7 50%, #047857); }
+.site-banner.is-leaving { opacity: 0; transform: translateY(-6px); }
+.site-banner-text { font-weight: 600; }
+.site-banner-link { font-weight: 700; color: inherit; text-decoration: underline; text-underline-offset: 3px; white-space: nowrap; }
+.site-banner-x { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); width: 1.9rem; height: 1.9rem; border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.12); color: inherit; font-size: 1.2rem; line-height: 1; cursor: pointer; }
+.site-banner-x:hover { background: rgba(0, 0, 0, 0.25); }
+@keyframes ps-banner-in { from { opacity: 0; transform: translateY(-100%); } to { opacity: 1; transform: none; } }
+.dash-banner { margin: 0 0 1rem; border-radius: 14px; overflow: hidden; }
+.site-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin-top: 1.25rem; }
+.site-links a { padding: 0.4rem 0.95rem; border-radius: 999px; font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold-light, #f3e5ab); border: 1px solid var(--gold-hairline, rgba(212, 175, 55, 0.35)); text-decoration: none; transition: background-color 0.18s ease, transform 0.18s ease; }
+.site-links a:hover { background: rgba(212, 175, 55, 0.14); transform: translateY(-1px); }
+.site-preview { position: sticky; top: 0; z-index: 90; padding: 0.5rem 1rem; text-align: center; font-size: 0.8rem; color: #02050e; background: #fbbf24; }
+.site-preview a { color: inherit; font-weight: 700; text-decoration: underline; margin-left: 0.5rem; }

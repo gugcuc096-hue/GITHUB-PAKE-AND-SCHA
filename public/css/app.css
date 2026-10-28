@@ -2360,3 +2360,31 @@ tr.v-gap > td { padding: 0; border: 0; }
   .perm-table thead th { font-size: 0.58rem; letter-spacing: 0.02em; }
   .perm-hint { display: none; }
 }
+
+/* Einstellungen → Texte & Banner */
+.cfg-bar { align-items: center; flex-wrap: wrap; }
+.cfg-spacer { flex: 1 1 auto; }
+.cfg-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto; gap: 0.5rem; align-items: start; margin-bottom: 0.5rem; }
+.term-row { grid-template-columns: 7rem minmax(0, 1fr) minmax(0, 1fr); align-items: center; }
+.cfg-term-name { font-weight: 600; color: var(--text); }
+.hint-row { grid-template-columns: minmax(0, 12rem) minmax(0, 1fr) auto; }
+.cfg-hint-key { font-size: 0.72rem; color: var(--text-dim); word-break: break-all; padding-top: 0.6rem; }
+.link-row { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto; }
+.home-secs { display: flex; flex-direction: column; gap: 0.35rem; }
+.home-sec { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.45rem 0.7rem; border: 1px solid var(--glass-border); border-radius: 10px; background: rgba(255, 255, 255, 0.03); }
+.home-sec-btns { display: inline-flex; gap: 0.25rem; }
+.msg-box { padding: 0.9rem 1rem; border: 1px solid var(--glass-border); border-radius: 14px; background: rgba(255, 255, 255, 0.02); }
+.msg-preview { margin-top: 0.6rem; padding: 0.7rem 0.9rem; border-radius: 10px; border-left: 3px solid var(--gold-500); background: rgba(255, 255, 255, 0.04); font-size: 0.85rem; line-height: 1.5; color: var(--text-muted); }
+.cfg-live { padding: 0.6rem 0; }
+.cfg-file { cursor: pointer; }
+.view-as-band { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin: 0 0 1rem; padding: 0.55rem 0.9rem; border-radius: 12px; font-size: 0.85rem; color: #02050e; background: #fbbf24; }
+.view-as-band .btn-ghost { color: #02050e; border-color: rgba(0, 0, 0, 0.35); }
+body.hint-edit .form-hint[data-hint-key] { outline: 1px dashed var(--gold-500); outline-offset: 3px; cursor: pointer; border-radius: 4px; }
+body.hint-edit .form-hint[data-hint-key]:hover { background: rgba(212, 175, 55, 0.12); }
+.hint-edit-btns { display: flex; gap: 0.4rem; margin-top: 0.4rem; }
+@media (max-width: 640px) {
+  .cfg-row, .term-row, .hint-row, .link-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .term-row > .cfg-term-name { grid-column: 1 / -1; }
+  .term-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .cfg-row > .field:first-of-type, .faq-row > .field { grid-column: 1 / -1; }
+}

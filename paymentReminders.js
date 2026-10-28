@@ -48,13 +48,15 @@ async function sendReminder(invoiceId, by = null) {
   const label = inv.kind === 'honorarvereinbarung' ? 'Honorarvereinbarung' : 'Rechnung';
   const late = overdueDays(inv.due_date);
   const payInfo = getSetting('firm_payment_info', 'Zahlbar per Überweisung an Pake & Scha Legal Consulting (Maze Bank).');
-  const description = [
-    late > 0
-      ? `Die ${label} **${inv.number}** über **${money(inv.total)}** war am **${fmtDay(inv.due_date)}** fällig und ist noch offen.`
-      : `Die ${label} **${inv.number}** über **${money(inv.total)}** ist noch offen${inv.due_date ? ` (fällig am ${fmtDay(inv.due_date)})` : ''}.`,
-    `Bitte begleichen Sie den Betrag. ${payInfo}`,
-    'Bereits bezahlt? Dann ist diese Nachricht hinfällig. Die Rechnung finden Sie im Mandantenportal unter „Rechnungen“.',
-  ].join('\n\n');
+  const description = require('./messageTemplates').render('payment', {
+    mandant: inv.client_name || inv.case_client_name || '',
+    aktenzeichen: inv.case_number || '',
+    rechnung: label,
+    nummer: inv.number,
+    betrag: money(inv.total),
+    faelligkeit: late > 0 ? `war am **${fmtDay(inv.due_date)}** fällig und ist noch offen` : `ist noch offen${inv.due_date ? ` (fällig am ${fmtDay(inv.due_date)})` : ''}`,
+    zahlungshinweis: payInfo,
+  });
   const fields = [
     { name: 'Betrag', value: money(inv.total) },
     ...(inv.due_date ? [{ name: late > 0 ? 'Überfällig seit' : 'Fällig am', value: late > 0 ? `${fmtDay(inv.due_date)} (${late} ${late === 1 ? 'Tag' : 'Tage'})` : fmtDay(inv.due_date) }] : []),

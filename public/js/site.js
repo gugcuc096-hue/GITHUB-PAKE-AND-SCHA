@@ -587,9 +587,10 @@
     const box = document.getElementById('firmStats');
     if (!box) return;
     const cards = [];
-    if (firmStats.visible && firmStats.closed) cards.push([firmStats.closed.toLocaleString('de-DE'), 'Verfahren abgeschlossen']);
-    if (firmStats.visible && firmStats.successRate != null) cards.push([`${firmStats.successRate} %`, 'Erfolgsquote']);
-    if (firmStats.visible && firmStats.rating) cards.push([`${firmStats.rating.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ★`, `Ø aus ${firmStats.ratingCount} Bewertungen`]);
+    const kpi = window.PS.kpis || {}; // welche Kennzahlen öffentlich stehen (Dashboard → Texte & Banner → Startseite)
+    if (firmStats.visible && firmStats.closed && kpi.closed !== false) cards.push([firmStats.closed.toLocaleString('de-DE'), 'Verfahren abgeschlossen']);
+    if (firmStats.visible && firmStats.successRate != null && kpi.success !== false) cards.push([`${firmStats.successRate} %`, 'Erfolgsquote']);
+    if (firmStats.visible && firmStats.rating && kpi.rating !== false) cards.push([`${firmStats.rating.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ★`, `Ø aus ${firmStats.ratingCount} Bewertungen`]);
     box.classList.toggle('hidden', !cards.length);
     if (!cards.length) return;
     box.innerHTML = `
@@ -599,6 +600,7 @@
       ${firmStats.visible && firmStats.successRate != null ? '<p class="text-[0.7rem] text-center text-[var(--text-dim)] mt-3">Erfolgsquote: Freispruch, Einstellung, Strafmilderung, Vergleich oder gewonnen – reine Beratungen zählen nicht mit.</p>' : ''}`;
     window.PS.countUp(box, { whenVisible: true }); // Zahlen zählen hoch, sobald sie ins Bild scrollen
   }
+  window.addEventListener('ps:kpis', renderStats);
   window.PS.boot('stats', '/api/public/stats')
     .then((d) => {
       Object.assign(firmStats, {

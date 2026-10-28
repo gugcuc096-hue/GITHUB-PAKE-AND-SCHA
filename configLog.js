@@ -97,6 +97,8 @@ function revert(id, user) {
          ON CONFLICT(page, key) DO UPDATE SET text = excluded.text, updated_by = excluded.updated_by, updated_at = excluded.updated_at`
       ).run(page, key, (o && o.original) || before.original || before.text, before.text, user.id);
     }
+  } else if (r.area === 'site_config') {
+    require('./siteConfig').setPublished(r.key, before);
   } else if (r.area === 'permissions') {
     require('./permissions').saveMatrix(before || require('./permissions').DEFAULTS);
   } else {
@@ -108,4 +110,7 @@ function revert(id, user) {
   return row(db.prepare('SELECT * FROM config_log WHERE id = ?').get(id));
 }
 
-module.exports = { add, list, revert, FEATURE_LABEL };
+/** Einstellung aus der Tabelle `settings`, die ein Mensch ändert (für Export/Import) – sonst null. */
+const settingDef = (key) => (SECRET.test(key) ? null : SETTINGS.find((d) => d.re.test(key)) || null);
+
+module.exports = { add, list, revert, settingDef, labelFor, FEATURE_LABEL };

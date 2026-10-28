@@ -336,7 +336,7 @@ function sendClientReminders() {
     tickets
       .dmClient(a.case_id, {
         title: `⏰ Erinnerung: ${truncate(a.title, 200)}`,
-        description: 'Ihr Termin bei Pake & Scha beginnt bald. Bitte seien Sie pünktlich – falls etwas dazwischenkommt, sagen Sie den Termin im Mandantenportal ab.',
+        description: require('../messageTemplates').render('appointment', { mandant: a.client_name || a.case_client_name || '', aktenzeichen: a.case_number || '', termin: a.title, ort: a.location || '' }),
         fields: [{ name: 'Wann', value: fmtDiscordTime(a.starts_at), inline: false }, ...(a.location ? [{ name: 'Ort', value: a.location }] : [])],
         color: tickets.COLORS.blue,
       })

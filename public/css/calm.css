@@ -63,3 +63,5 @@ body.site-home *, body.site-home *::before, body.site-home *::after {
 .welcome-strip { animation: none !important; }
 html.ps-leaving body { transform: none !important; transition-duration: 90ms !important; }
 .welcome-chip:hover, .welcome-go:hover, .welcome-avatar:hover, .welcome-cases a:hover, .site-avatar:hover { transform: none !important; }
+@keyframes ps-banner-in { from { opacity: 0; } to { opacity: 1; } }
+.site-banner.is-leaving, .site-links a:hover { transform: none !important; }

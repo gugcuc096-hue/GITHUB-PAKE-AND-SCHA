@@ -9,7 +9,8 @@ const { getCase } = require('./models');
 const tickets = require('./tickets');
 const { dm } = require('./memberships');
 
-const REMIND_DAYS = 3;
+const REMIND_DAYS = 3; // Standard; einstellbar unter Einstellungen → Texte & Banner → Mitteilungen
+const remindDays = () => require('./siteConfig').get('messages').docsAfterDays || REMIND_DAYS;
 
 const row = (r) => ({ id: r.id, title: r.title, note: r.note, createdBy: r.created_by, createdAt: r.created_at, done: !!r.done_at, doneAt: r.done_at, doneBy: r.done_by });
 
@@ -31,7 +32,7 @@ function openForClient(userId) {
 async function tell(caseId, r, { title, by }) {
   const c = getCase(caseId);
   if (!c) return [];
-  const description = [`**${r.title}**`, r.note || '', 'Bitte reichen Sie die Unterlage über Ihre Akte im Mandantenportal oder per Nachricht an die Kanzlei nach.'].filter(Boolean).join('\n\n');
+  const description = require('./messageTemplates').render('docs', { mandant: c.client_account_name || c.client_name || '', aktenzeichen: c.case_number, unterlage: r.title, notiz: r.note || '' });
   const sent = [];
   if (c.client_id && (await dm(c.client_id, { title, description, fields: [{ name: 'Akte', value: c.case_number }], color: tickets.COLORS.gold }))) sent.push('Discord-DM');
   if (tickets.active() && !c.discord_deleted) {
@@ -55,7 +56,7 @@ async function sweep() {
           WHERE r.done_at IS NULL AND r.reminded_at IS NULL AND c.status != 'geschlossen'
             AND r.created_at <= datetime('now', ?)`
       )
-      .all(`-${REMIND_DAYS} days`);
+      .all(`-${remindDays()} days`);
     for (const r of due) {
       db.prepare('UPDATE case_requests SET reminded_at = ? WHERE id = ?').run(new Date().toISOString(), r.id);
       await tell(r.case_id, r, { title: '⏰ Erinnerung: Unterlage fehlt noch' }).catch((err) => console.warn(`Erinnerung an Unterlage ${r.id} fehlgeschlagen:`, err.message));

@@ -1340,6 +1340,7 @@ document.addEventListener('ps:form-ok', () => buzz());
     const { me } = await load.start(); // Konto + Zähler + Dienststatus in einem Abruf
     st.user = me.user;
     st.features = me.features || null;
+    st.siteConfig = me.siteConfig || null;
     st.twoFactor = me.twoFactor;
     setRanks(me.ranks);
   } catch {
@@ -1348,6 +1349,13 @@ document.addEventListener('ps:form-ok', () => buzz());
   }
   if (isStaff()) await loadStaffParts();
   renderUser();
+  // Banner, Beschriftungen und Hinweise aus Einstellungen → Texte & Banner
+  if (window.PS.siteConfig && st.siteConfig) {
+    PS.siteConfig.setLabels(st.siteConfig.labels);
+    PS.siteConfig.banner(st.siteConfig.banner, $('#content'), { className: 'dash-banner' });
+    PS.siteConfig.observe($('#content'), $('#modalBody'), $('#nav'), $('#bottomNav'));
+    PS.siteConfig.labels(document.body);
+  }
   // Angefangene Texte je Konto im Browser behalten (Rechnungs-Entwurf eigens, siehe 06-rechnungen)
   window.PS.drafts.watch({ scope: `u${st.user.id}`, onRestore: () => toast('Angefangene Eingaben wiederhergestellt.') });
 
