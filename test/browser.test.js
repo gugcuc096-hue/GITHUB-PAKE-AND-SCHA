@@ -212,11 +212,15 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
 
       // Weit unten in der Akte: das X bleibt oben rechts sichtbar und klickbar
       await page.$eval(scroller, (el) => (el.scrollTop = el.scrollHeight));
-      await page.waitForTimeout(300);
-      const closeVisible = await page.$eval('.modal-close', (x) => {
-        const r = x.getBoundingClientRect();
-        return r.top >= 0 && r.bottom <= window.innerHeight && x.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
-      });
+      // Auf langsamen Rechnern setzt sich die Ansicht nach dem Scrollen erst einen Moment später – deshalb abwarten statt einmal prüfen
+      const closeVisible = await page
+        .waitForFunction(() => {
+          const x = document.querySelector('.modal-close');
+          if (!x) return false;
+          const r = x.getBoundingClientRect();
+          return r.top >= 0 && r.bottom <= window.innerHeight && x.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+        }, null, { timeout: 4000 })
+        .then(() => true, () => false);
       assert.ok(closeVisible, 'X auch unten in der Akte sichtbar');
       await page.$eval(scroller, (el) => (el.scrollTop = 0));
       const [besideX, besideY] = device === PHONE ? [195, 10] : [1340, 450];
