@@ -1229,6 +1229,8 @@ video {
   letter-spacing: 0.2em;
 }.tracking-\[0\.35em\] {
   letter-spacing: 0.35em;
+}.tracking-\[0\.4em\] {
+  letter-spacing: 0.4em;
 }.tracking-normal {
   letter-spacing: 0em;
 }.tracking-tight {

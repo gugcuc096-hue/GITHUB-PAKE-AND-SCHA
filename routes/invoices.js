@@ -22,6 +22,7 @@ function firmInfo() {
     address: getSetting('firm_address', 'Pake & Scha Legal Consulting\nWürfelpark\nLos Santos, San Andreas'),
     paymentInfo: getSetting('firm_payment_info', 'Zahlbar per Überweisung an Pake & Scha Legal Consulting (Maze Bank).'),
     contact: getSetting('firm_contact', 'kontakt@pake-scha.ls'),
+    seat: require('../models').firmSeat(),
   };
 }
 

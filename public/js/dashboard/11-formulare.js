@@ -802,6 +802,7 @@ const forms = {
     const fd = new FormData(f);
     const res = await api.patch('/api/admin/settings', {
       firmAddress: val(fd, 'firmAddress'),
+      firmSeat: val(fd, 'firmSeat') || undefined,
       firmPaymentInfo: val(fd, 'firmPaymentInfo'),
       firmContact: val(fd, 'firmContact'),
       invoiceReminderDays: Number(val(fd, 'invoiceReminderDays') || 0),

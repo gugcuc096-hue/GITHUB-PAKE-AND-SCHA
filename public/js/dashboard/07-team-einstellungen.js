@@ -462,6 +462,7 @@ views.settings = {
         <section class="panel panel-pad">
           <div class="panel-head"><h2 class="panel-title">Kanzleidaten & Erinnerungen</h2></div>
           <form data-form="settings-firm" class="form-grid cols-2">
+            <div><label class="label">Kanzleisitz (Website, Rechnungen, Termine)</label><input name="firmSeat" class="field" maxlength="80" value="${esc(s.firmSeat || 'Würfelpark, Los Santos')}" placeholder="Würfelpark, Los Santos"><p class="form-hint">Steht auf der Startseite, in Rechnungen und Dokumenten – und als Ort neuer Termine („Kanzlei Würfelpark“).</p></div>
             <div><label class="label">Anschrift (Briefkopf)</label><textarea name="firmAddress" rows="3" maxlength="300" class="field">${esc(s.firmAddress)}</textarea></div>
             <div><label class="label">Zahlungshinweis</label><textarea name="firmPaymentInfo" rows="3" maxlength="300" class="field">${esc(s.firmPaymentInfo)}</textarea></div>
             <div><label class="label">Kontakt</label><input name="firmContact" maxlength="120" class="field" value="${esc(s.firmContact)}"></div>

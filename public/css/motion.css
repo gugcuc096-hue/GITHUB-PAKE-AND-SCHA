@@ -116,3 +116,49 @@ body.page-in { animation-duration: var(--m-page); }
 .ps-toast { animation-duration: var(--m-panel); animation-timing-function: var(--m-ease); }
 @media (max-width: 639px) { .modal-card { animation-duration: var(--m-page); animation-timing-function: var(--m-ease); } }
 @media (min-width: 640px) { .modal-card { animation-duration: var(--m-panel); animation-timing-function: var(--m-ease); } }
+
+/* ================================================================
+   Website ↔ Dashboard: ein Umschalter, „Willkommen zurück“, sanfter Übergang
+   ================================================================ */
+.site-switch { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border-radius: 999px; border: 1px solid var(--gold-hairline, rgba(212, 175, 55, 0.35)); background: rgba(255, 255, 255, 0.04); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
+.site-switch > a { display: inline-flex; align-items: center; min-height: 30px; padding: 0 0.85rem; border-radius: 999px; color: var(--text-muted, #cbd5e1); text-decoration: none; transition: background-color var(--m-micro) ease, color var(--m-micro) ease; }
+.site-switch > a:hover { color: #fff; background: rgba(255, 255, 255, 0.07); }
+.site-switch > a.is-active { color: #02050e; background: linear-gradient(135deg, #d4af37, #b8962e); }
+@media (max-width: 639px) { .site-switch-top { display: none; } }
+.site-avatar { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; font-family: var(--font-display, Georgia, serif); font-weight: 700; font-size: 0.85rem; color: #02050e; background: linear-gradient(135deg, #f3e5ab, #d4af37); text-decoration: none; flex: none; transition: transform var(--m-micro) var(--m-ease); }
+.site-avatar:hover { transform: scale(1.06); }
+
+.welcome-strip { position: relative; z-index: 30; border-bottom: 1px solid var(--gold-hairline, rgba(212, 175, 55, 0.35)); background: linear-gradient(90deg, rgba(212, 175, 55, 0.12), rgba(212, 175, 55, 0.03)); animation: ps-welcome-in var(--m-page) var(--m-ease) both; }
+@keyframes ps-welcome-in { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+.welcome-in { max-width: 80rem; margin: 0 auto; padding: 0.8rem 1.25rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 1.1rem; }
+.welcome-hi { font-family: var(--font-display, Georgia, serif); font-size: 1.25rem; color: #fff; margin-right: 0.25rem; }
+.welcome-hi strong { color: var(--gold-light, #f3e5ab); font-weight: 600; }
+.welcome-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; flex: 1 1 18rem; min-width: 0; }
+.welcome-chip { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.7rem; border-radius: 999px; font-size: 0.78rem; font-weight: 500; color: #e2e8f0; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); text-decoration: none; transition: transform var(--m-micro) var(--m-ease), border-color var(--m-micro) ease, background-color var(--m-micro) ease; }
+.welcome-chip:hover { transform: translateY(-1px); border-color: var(--gold-500, #d4af37); background: rgba(212, 175, 55, 0.14); }
+.welcome-chip::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #94a3b8; }
+.welcome-chip.tone-amber::before { background: #fbbf24; }
+.welcome-chip.tone-gold::before { background: #d4af37; }
+.welcome-chip.tone-sky::before { background: #7dd3fc; }
+.welcome-chip.tone-ok::before { background: #34d399; }
+.welcome-cases { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.9rem; font-size: 0.8rem; color: var(--text-dim, #8a96b3); }
+.welcome-cases a { color: #e2e8f0; text-decoration: none; display: inline-flex; gap: 0.4rem; max-width: 18rem; }
+.welcome-cases a:hover { color: var(--gold-light, #f3e5ab); }
+.welcome-cases a b { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 500; color: var(--gold-500, #d4af37); }
+.welcome-cases a span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.welcome-go { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; min-height: 36px; padding: 0 1rem; border-radius: 999px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.04em; color: #02050e; background: linear-gradient(135deg, #d4af37, #b8962e); text-decoration: none; margin-left: auto; transition: transform var(--m-micro) var(--m-ease), box-shadow var(--m-panel) ease; box-shadow: 0 4px 18px rgba(212, 175, 55, 0.28); }
+.welcome-go:hover { transform: translateY(-1px); box-shadow: 0 8px 26px rgba(212, 175, 55, 0.45); }
+@media (max-width: 640px) { .welcome-go { margin-left: 0; width: 100%; } .welcome-hi { font-size: 1.1rem; } }
+
+/* Seitenwechsel Website ↔ Dashboard: die Seite blendet kurz aus, die nächste blendet ein (body.page-in bzw. view-in) */
+html.ps-leaving body { opacity: 0; transform: scale(0.993); transition: opacity 170ms ease, transform 170ms var(--m-ease); }
+
+/* Anmelde-Dialog auf der Startseite */
+#loginDialog .login-note { min-height: 1.2rem; font-size: 0.8rem; color: #fca5a5; }
+#loginDialog .login-alt { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; margin-top: 1rem; font-size: 0.8rem; color: var(--text-dim, #8a96b3); }
+#loginDialog .login-alt a, #loginDialog .login-alt button { color: var(--gold-500, #d4af37); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; font: inherit; }
+
+/* In der schmalen Leiste über der Kopfzeile der Website */
+.topstrip .site-switch { padding: 2px; font-size: 0.66rem; }
+.topstrip .site-switch > a { min-height: 26px; padding: 0 0.7rem; }
+.topstrip .site-avatar { width: 26px; height: 26px; font-size: 0.7rem; }

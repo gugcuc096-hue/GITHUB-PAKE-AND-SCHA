@@ -56,7 +56,7 @@
             ${hv
                 ? `<div class="sign"><div>Ort, Datum · Unterschrift Mandant</div><div>Ort, Datum · Pake &amp; Scha Legal Consulting</div></div>`
                 : `<div class="issuer">Mit freundlichen Grüßen<div class="name">${esc(inv.issuerName || 'Pake & Scha')}</div>${inv.issuerRank ? esc(inv.issuerRank) + ' · ' : ''}Pake &amp; Scha Legal Consulting</div>`}
-            <div class="foot"><span>Pake &amp; Scha Legal Consulting · Würfelpark, Los Santos</span><span>${esc(inv.number)}</span></div>`;
+            <div class="foot"><span>Pake &amp; Scha Legal Consulting · ${esc(firm.seat || 'Würfelpark, Los Santos')}</span><span>${esc(inv.number)}</span></div>`;
         if (new URLSearchParams(location.search).get('print') === '1') setTimeout(() => window.print(), 400);
     }
 

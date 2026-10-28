@@ -1354,12 +1354,14 @@ document.addEventListener('ps:form-ok', () => buzz());
   const discordState = params.get('discord');
   const googleState = params.get('google');
   const caseParam = Number(params.get('case'));
+  const eventParam = Number(params.get('event')); // Link von der Startseite: Termin(vorschlag) öffnen
+  const newParam = params.get('new'); // Link von der Startseite: „Mandat einreichen“ als angemeldeter Mandant
   // Neu geladen, während eine Akte offen war: der Verlaufseintrag gehört schon zur Akte – nur wieder öffnen
   const restoring = params.has('case') && onOverlayEntry();
   // Akte per Link ohne Seite (Discord „Im Dashboard öffnen“, /akte, Startseite): dahinter liegt die Aktenliste –
   // X führt dorthin statt zur Übersicht
   const hash = location.hash || (params.has('case') && !restoring ? '#cases' : '');
-  if (!restoring && (discordState || googleState || params.has('case'))) history.replaceState(null, '', location.pathname + hash);
+  if (!restoring && (discordState || googleState || params.has('case') || params.has('event') || params.has('new'))) history.replaceState(null, '', location.pathname + hash);
   if (discordState && DISCORD_MSG[discordState]) toast(...DISCORD_MSG[discordState]);
   if (googleState && GOOGLE_MSG[googleState]) toast(...GOOGLE_MSG[googleState]);
   if (googleState) st.settingsTab = 'integrations'; // Google Docs stehen unter Einstellungen → Integrationen
@@ -1371,6 +1373,13 @@ document.addEventListener('ps:form-ok', () => buzz());
       await guard(() => openCase(caseParam));
       // „Jetzt bewerten“ aus der Discord-Nachricht: gleich zur Bewertung in der Akte
       if (params.get('bewerten')) $('#secReview')?.scrollIntoView({ block: 'start' });
+    } else if (Number.isInteger(eventParam) && eventParam > 0) {
+      await guard(async () => {
+        await load.events();
+        await openEvent(eventParam);
+      });
+    } else if (newParam === 'case') {
+      await guard(() => newCaseModal());
     }
   } finally {
     st.histPaused = false;

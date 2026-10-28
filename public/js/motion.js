@@ -233,4 +233,31 @@
     Promise.all(done).then(() => box.remove());
   }
   PS.confetti = confetti;
+
+  /* ---------------------------------------------------------------- Website ↔ Dashboard: sanfter Übergang */
+  // Die Seite blendet kurz aus, die nächste blendet selbst ein (body.page-in bzw. Seitenaufbau des Dashboards).
+  const GO_PATHS = new Set(['/', '/dashboard', '/login', '/registrieren']);
+  function go(url) {
+    if (calm()) return void (location.href = url);
+    document.documentElement.classList.add('ps-leaving');
+    setTimeout(() => (location.href = url), 180);
+  }
+  PS.go = go;
+  window.addEventListener('pageshow', (e) => e.persisted && document.documentElement.classList.remove('ps-leaving')); // Zurück-Taste
+  document.addEventListener('click', (e) => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const a = e.target.closest && e.target.closest('a[href]');
+    if (!a || a.target === '_blank' || a.hasAttribute('download') || a.hasAttribute('data-nofade')) return;
+    let u;
+    try {
+      u = new URL(a.href, location.href);
+    } catch {
+      return;
+    }
+    if (u.origin !== location.origin || !GO_PATHS.has(u.pathname)) return;
+    if (u.pathname === location.pathname && (u.hash || !u.search) && !a.hasAttribute('data-leave')) return; // gleiche Seite (Sprungmarke)
+    if (u.pathname === location.pathname && u.search === location.search) return;
+    e.preventDefault();
+    go(u.pathname + u.search + u.hash);
+  });
 })();

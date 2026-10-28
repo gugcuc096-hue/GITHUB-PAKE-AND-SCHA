@@ -628,7 +628,13 @@ function onDutyMembers() {
     }));
 }
 
+/** Kanzleisitz („Würfelpark, Los Santos“): eine Einstellung für Website, Rechnungen, Dokumente und Termin-Orte. */
+const firmSeat = () => getSetting('firm_seat', 'Würfelpark, Los Santos') || 'Würfelpark, Los Santos';
+const firmPlace = () => firmSeat().split(',')[0].trim() || 'Würfelpark';
+
 module.exports = {
+  firmSeat,
+  firmPlace,
   idleLimit,
   setIdleLimit,
   caseIdleDays,

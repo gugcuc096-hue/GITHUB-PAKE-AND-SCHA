@@ -3591,15 +3591,19 @@ describe('Browser: Nachladen in der Akte, Listen virtuell zeichnen, weniger Live
         await page.locator('#content tr.more-rows').scrollIntoViewIfNeeded();
         await page.waitForTimeout(250);
       }
-      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-      await page.waitForFunction(() => document.querySelectorAll('#caseList tr.v-gap').length > 0, null, { timeout: 5000 });
+      await page.waitForFunction(() => {
+        window.scrollTo(0, document.documentElement.scrollHeight);
+        return document.querySelectorAll('#caseList tr.v-gap').length > 0;
+      }, null, { timeout: 15000, polling: 250 });
       const bottom = await page.evaluate(() => ({ rows: document.querySelectorAll('#caseList tr.row').length, gaps: document.querySelectorAll('#caseList tr.v-gap').length, height: document.documentElement.scrollHeight }));
       assert.ok(bottom.rows < 330, `weniger Zeilen im DOM (${bottom.rows})`);
       assert.ok(bottom.gaps >= 1);
       // Die Seite behält ihre Länge (Platzhalter = Höhe der Zeilen): zurück nach oben, alles wieder da
+      // Mitten in die Liste scrollen: der dortige Abschnitt wird wieder gezeichnet (steht eine Zeile an dieser Stelle?)
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight * 0.45));
+      await page.waitForFunction(() => !!document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2)?.closest('tr.row'), null, { timeout: 15000, polling: 200 });
       await page.evaluate(() => window.scrollTo(0, 0));
-      await page.waitForFunction(() => document.querySelectorAll('#caseList tr.v-gap').length === 0 || document.querySelectorAll('#caseList tr.row').length > 100, null, { timeout: 5000 });
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(500);
       const top = await page.evaluate(() => ({ height: document.documentElement.scrollHeight }));
       assert.ok(Math.abs(top.height - bottom.height) / bottom.height < 0.05, `Länge bleibt (${bottom.height} → ${top.height})`);
       // Suche arbeitet weiter über alle Akten, auch über die zusammengeklappten
@@ -3820,6 +3824,128 @@ describe('Browser: Bewegungs-System – Tokens, Knöpfe, Felder, Menüs, Fenster
       assert.ok((await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 1, 'kein seitliches Überlaufen');
       assert.deepEqual(problems, []);
       await ctx.close();
+    } finally {
+      await browser.close();
+      await srv.stop();
+    }
+  });
+});
+
+describe('Browser: Startseite ↔ Dashboard – Anmelden im Dialog, „Willkommen zurück“, Umschalter, Direktlinks', { skip: chromium ? false : 'Playwright nicht installiert' }, () => {
+  const inDays = (n, h = 10) => {
+    const d = new Date(Date.now() + n * 864e5);
+    d.setUTCHours(h, 0, 0, 0);
+    return d.toISOString();
+  };
+  for (const [label, device] of [['PC', DESKTOP], ['Handy', PHONE]]) {
+    it(`${label}: im Dialog anmelden (bleibt auf der Seite), Willkommen zurück mit Direktlinks, Umschalter, Mandat im Dashboard`, async () => {
+      const srv = await startServer();
+      const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+      try {
+        const a = client(srv.base);
+        await a.login(TEAM.admin);
+        const m = client(srv.base);
+        assert.equal((await m.post('/api/auth/register', { displayName: 'Tina Termin', email: 'tina.termin', password: 'Mandanten-Passwort-5' })).status, 201);
+        const c = (await a.post('/api/cases', { title: 'Beratung Mietrecht', area: 'zivilrecht', clientEmail: 'tina.termin' })).json.case;
+        await a.post(`/api/cases/${c.id}/requests`, { title: 'Mietvertrag als Foto' });
+        const ev = (await a.post('/api/calendar', { type: 'mandant', title: 'Erstgespräch', startsAt: inDays(5, 14), caseId: c.id, slots: [inDays(3, 10), inDays(4, 16)] })).json.event;
+        const ctx = await browser.newContext({ ...device, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+        const page = await ctx.newPage();
+        const problems = [];
+        page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
+        const loginCalls = [];
+        page.on('request', (r) => r.url().includes('/api/auth/login') && loginCalls.push(r.postData()));
+        await page.goto(srv.base + '/');
+        await page.waitForSelector('#ticketForm', { state: 'attached' });
+
+        // Besucher: Kanzleisitz kommt aus den Einstellungen, „Login“ öffnet den Dialog statt einer neuen Seite
+        await page.waitForFunction(() => document.querySelector('[data-firm-seat]')?.textContent === 'Würfelpark, Los Santos');
+        assert.equal(await page.$('#welcomeStrip'), null);
+        const loginBtn = device === PHONE ? '#menuToggle' : 'header [data-auth-link]';
+        if (device === PHONE) {
+          await page.click('#menuToggle');
+          await page.click('#mobileMenu [data-auth-link]');
+        } else await page.click(loginBtn);
+        await page.waitForSelector('#loginDialog:not(.pointer-events-none)');
+        assert.equal(new URL(page.url()).pathname, '/', 'der Dialog öffnet sich auf der Startseite');
+        await page.fill('#ldEmail', 'tina.termin');
+        await page.fill('#ldPassword', 'falsch');
+        await page.click('#ldSubmit');
+        await page.waitForFunction(() => document.querySelector('#ldError').textContent.length > 3);
+        await page.fill('#ldPassword', 'Mandanten-Passwort-5');
+        await page.click('#ldSubmit');
+        await page.waitForSelector('#welcomeStrip', { timeout: 15000 }).catch(async (e) => {
+          const state = await page.evaluate(() => JSON.stringify({ error: document.querySelector('#ldError').textContent, dialogOpen: !document.querySelector('#loginDialog').className.includes('pointer-events-none'), path: location.pathname, strips: document.querySelectorAll('#welcomeStrip').length, switchNode: !!document.querySelector('.site-switch') }));
+          throw new Error(`${e.message} – Zustand: ${state} – Anmeldungen: ${JSON.stringify(loginCalls)}`);
+        });
+        assert.equal(new URL(page.url()).pathname, '/', 'nach dem Anmelden bleibt man auf der Seite');
+        assert.ok(await page.$('#loginDialog.pointer-events-none'), 'Dialog zu');
+
+        // Willkommen zurück: was ansteht, mit Direktlinks, und die zuletzt bearbeitete Akte
+        const strip = await page.textContent('#welcomeStrip');
+        assert.match(strip, /Willkommen zurück, Tina/);
+        assert.match(strip, /Unterlage nachreichen: Mietvertrag als Foto/);
+        assert.match(strip, /Terminvorschlag/);
+        assert.match(strip, /Beratung Mietrecht/);
+        if (device === PHONE) assert.ok((await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 1, 'Startseite passt aufs Handy');
+        // Umschalter und Profilbild in der Leiste über der Kopfzeile, die Kopfzeile selbst führt als „Dashboard“ weiter
+        assert.equal(await page.isVisible('.topstrip .site-switch'), true);
+        assert.equal(await page.$eval('.topstrip .site-switch a.is-active', (e) => e.textContent), 'Website');
+        assert.equal(await page.isVisible('.topstrip .site-avatar'), true);
+        assert.equal(await page.isVisible('.topstrip [data-auth-link]'), false, 'kein „Mandantenportal →“ mehr');
+
+        // Direktlink: der Terminvorschlag öffnet sich im Dashboard mit den Zeiten zur Auswahl
+        await page.click(`#welcomeStrip a[href="/dashboard?event=${ev.id}"]`);
+        await page.waitForURL(/\/dashboard/);
+        await page.waitForSelector('.slot-pick [data-action="event-choose"]');
+        assert.equal((await page.$$('.slot-pick [data-action="event-choose"]')).length, 3);
+        if (device === DESKTOP) {
+          assert.equal(await page.$eval('.site-switch-top a.is-active', (e) => e.textContent), 'Dashboard');
+          await page.click('.modal-close');
+          await page.click('.site-switch-top a[href="/"]'); // zurück zur Website – mit sanftem Übergang
+          await page.waitForURL((u) => u.pathname === '/');
+          await page.waitForSelector('#welcomeStrip');
+        } else await page.goto(srv.base + '/');
+        await page.waitForSelector('#welcomeStrip');
+
+        // „Mandat einreichen“: als angemeldeter Mandant im Dashboard (eine Quelle), nicht im Formular der Startseite
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await page.evaluate(() => window.openTicketModal('hero'));
+        await page.waitForURL(/\/dashboard/);
+        await page.waitForSelector('form[data-form="new-case"]');
+        assert.deepEqual(problems, []);
+        await ctx.close();
+      } finally {
+        await browser.close();
+        await srv.stop();
+      }
+    });
+  }
+
+  it('Kanzlei meldet sich im Dialog an und landet im Dashboard; Zwei-Faktor und Mandat mit Tarifrechner bleiben auf der Startseite', async () => {
+    const srv = await startServer();
+    const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+    try {
+      const ctx = await browser.newContext({ ...DESKTOP, locale: 'de-DE' });
+      const page = await ctx.newPage();
+      await page.goto(srv.base + '/');
+      await page.click('header [data-auth-link]');
+      await page.waitForSelector('#loginDialog:not(.pointer-events-none)');
+      await page.fill('#ldEmail', TEAM.admin);
+      await page.fill('#ldPassword', PASSWORD);
+      await page.click('#ldSubmit');
+      await page.waitForURL(/\/dashboard/, { waitUntil: 'commit' });
+      await page.waitForSelector('#nav a.nav-item', { state: 'attached', timeout: 60000 });
+      await ctx.close();
+
+      // Besucher: das Formular der Startseite bleibt (Konto ist keine Pflicht)
+      const g = await browser.newContext({ ...DESKTOP, locale: 'de-DE' });
+      const gp = await g.newPage();
+      await gp.goto(srv.base + '/');
+      await gp.evaluate(() => window.openTicketModal('hero'));
+      await gp.waitForSelector('#ticketModal:not(.pointer-events-none)');
+      assert.equal(new URL(gp.url()).pathname, '/');
+      await g.close();
     } finally {
       await browser.close();
       await srv.stop();

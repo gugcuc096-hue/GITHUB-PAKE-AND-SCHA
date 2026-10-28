@@ -284,14 +284,214 @@
     else location.href = '/login?next=' + encodeURIComponent(target);
   });
 
+  /* ---------------------------------------------------------------- Verbindung zum Dashboard */
+  const initials = (n) =>
+    String(n || '?')
+      .replace(/\b(Dr|Prof|jur|med|rer|nat)\.\s*/gi, '')
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((w) => w[0] || '')
+      .join('')
+      .toUpperCase();
+  const goTo = (url) => (window.PS.go ? window.PS.go(url) : (location.href = url));
+
+  /** Umschalter „Website | Dashboard“ und Profilbild in der Kopfleiste – statt „Login“, sobald man angemeldet ist. */
+  function renderSwitch() {
+    // In der schmalen Leiste über der Kopfzeile (dort stand „Mandantenportal →“) – in der Kopfzeile selbst ist kein Platz
+    const bar = document.querySelector('.topstrip .flex.items-center.gap-5');
+    if (!bar) return;
+    bar.querySelectorAll('.site-switch, .site-avatar').forEach((n) => n.remove());
+    const login = bar.querySelector('[data-auth-link]');
+    if (!me) {
+      if (login) login.classList.remove('hidden');
+      return;
+    }
+    const sw = document.createElement('div');
+    sw.className = 'site-switch';
+    sw.setAttribute('role', 'group');
+    sw.setAttribute('aria-label', 'Bereich wechseln');
+    sw.innerHTML = '<a href="/" class="is-active" aria-current="page" data-nofade>Website</a><a href="/dashboard">Dashboard</a>';
+    const av = document.createElement('a');
+    av.className = 'site-avatar';
+    av.href = '/dashboard#profile';
+    av.title = me.displayName || 'Mein Profil';
+    av.setAttribute('aria-label', 'Mein Profil');
+    av.textContent = initials(me.displayName);
+    if (login) {
+      login.classList.add('hidden');
+      login.before(sw, av);
+    } else bar.append(sw, av);
+  }
+
+  /** „Willkommen zurück“: was gerade ansteht, mit Direktlinks – und die letzten Akten. */
+  async function renderWelcome() {
+    document.getElementById('welcomeStrip')?.remove();
+    if (!me) return;
+    let sum = null;
+    try {
+      sum = await api.get('/api/summary?today=' + new Date().toLocaleDateString('sv-SE'));
+    } catch {
+      sum = null;
+    }
+    if (!me) return; // inzwischen abgemeldet
+    const header = document.querySelector('header');
+    if (!header) return;
+    const items = sum && sum.items ? sum.items : [];
+    const chips = items.length
+      ? items.map((i) => `<a class="welcome-chip tone-${esc(i.tone || '')}" href="${esc(i.href)}">${esc(i.text)}</a>`).join('')
+      : '<span class="welcome-chip tone-ok">Im Moment gibt es nichts zu tun</span>';
+    const cases = sum && sum.cases && sum.cases.length ? `<div class="welcome-cases"><span>Zuletzt bearbeitet:</span>${sum.cases.map((c) => `<a href="${esc(c.href)}"><b>${esc(c.caseNumber)}</b><span>${esc(c.title)}</span></a>`).join('')}</div>` : '';
+    const strip = document.createElement('section');
+    strip.id = 'welcomeStrip';
+    strip.className = 'welcome-strip';
+    strip.setAttribute('aria-label', 'Willkommen zurück');
+    strip.innerHTML = `<div class="welcome-in"><span class="welcome-hi">Willkommen zurück, <strong>${esc((sum && sum.name) || (me.displayName || '').split(' ')[0])}</strong></span>
+      <div class="welcome-chips">${chips}</div><a class="welcome-go" href="/dashboard">${me.role === 'mandant' ? 'Zu meinen Akten' : 'Zum Dashboard'} →</a>${cases}</div>`;
+    header.after(strip);
+    // Das Dashboard schon im Hintergrund laden – der Wechsel dauert dann kaum noch (gleiche Versionsnummer wie diese Seite)
+    const v = new URL(document.querySelector('script[src*="/js/site.js"]')?.src || location.href, location.href).searchParams.get('v');
+    if (v && !document.getElementById('dashPrefetch')) {
+      const l = document.createElement('link');
+      l.id = 'dashPrefetch';
+      l.rel = 'prefetch';
+      l.as = 'script';
+      l.href = `/js/dashboard.bundle.js?v=${encodeURIComponent(v)}`;
+      document.head.appendChild(l);
+    }
+  }
+
+  /** Kanzleisitz aus den Einstellungen (dieselbe Angabe wie in Rechnungen und Terminen). */
+  api.get('/api/public/firm').then((f) => {
+    document.querySelectorAll('[data-firm-seat]').forEach((el) => (el.textContent = f.seat));
+    document.querySelectorAll('[data-firm-place]').forEach((el) => (el.textContent = f.place));
+  }).catch(() => {});
+
+  /* ---------------------------------------------------------------- Anmelden auf der Startseite */
+  const dlg = document.getElementById('loginDialog');
+  let challenge = null;
+  let loginDone = false; // im Dialog angemeldet
+  function openLogin() {
+    if (!dlg) return goTo('/login');
+    dlg.classList.remove('opacity-0', 'pointer-events-none');
+    document.body.style.overflow = 'hidden';
+    api.get('/api/discord/status').then((s) => s.oauth && document.getElementById('ldDiscord').classList.remove('hidden')).catch(() => {});
+    // Cursor ins erste Feld – aber nie, wenn jemand schon schneller war und ein Feld im Dialog gewählt hat
+    setTimeout(() => !dlg.contains(document.activeElement) && document.getElementById('ldEmail').focus(), 60);
+  }
+  function closeLogin() {
+    if (!dlg) return;
+    dlg.classList.add('opacity-0', 'pointer-events-none');
+    document.body.style.overflow = '';
+  }
+  async function afterLogin() {
+    const r = await api.get('/api/auth/session');
+    me = r?.user ?? null;
+    if (!me) throw new Error('Anmeldung nicht möglich.');
+    loginDone = true;
+    // Kanzlei und Konten mit Pflicht-Änderung gehören ins Dashboard – Mandanten bleiben hier
+    if (me.role !== 'mandant' || me.mustChangePassword) return goTo('/dashboard');
+    closeLogin();
+    updateAuthNav();
+    renderSwitch();
+    renderWelcome();
+    showToast('Angemeldet', `Willkommen zurück, ${(me.displayName || '').split(' ')[0]}.`);
+  }
+  if (dlg) {
+    document.querySelectorAll('[data-auth-link]').forEach((a) =>
+      a.addEventListener('click', (e) => {
+        if (me || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return; // angemeldet: ganz normal ins Dashboard
+        e.preventDefault();
+        e.stopPropagation();
+        openLogin();
+      }, true)
+    );
+    dlg.querySelector('[data-login-close]').addEventListener('click', closeLogin);
+    dlg.addEventListener('click', (e) => e.target === dlg && closeLogin());
+    document.addEventListener('keydown', (e) => e.key === 'Escape' && !dlg.classList.contains('pointer-events-none') && closeLogin());
+    document.getElementById('loginDialogForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const err = document.getElementById('ldError');
+      const btn = document.getElementById('ldSubmit');
+      const email = document.getElementById('ldEmail').value.trim();
+      const password = document.getElementById('ldPassword').value;
+      err.textContent = '';
+      if (!email || !password) return void (err.textContent = 'Bitte E-Mail und Passwort eingeben.');
+      btn.disabled = true;
+      try {
+        const r = await api.post('/api/auth/login', { email, password });
+        if (r.twoFactor) {
+          challenge = r.twoFactor.challenge;
+          document.getElementById('ldCodeTo').textContent = r.twoFactor.to || 'Ihr Discord';
+          document.getElementById('loginDialogForm').classList.add('hidden');
+          document.getElementById('ldAlt').classList.add('hidden');
+          document.getElementById('loginCodeForm').classList.remove('hidden');
+          document.getElementById('ldCode').focus();
+        } else await afterLogin();
+      } catch (ex) {
+        err.textContent = ex.message;
+        document.getElementById('ldPassword').select();
+      } finally {
+        btn.disabled = false;
+      }
+    });
+    const codeForm = document.getElementById('loginCodeForm');
+    let sending = false;
+    const sendCode = async () => {
+      const code = document.getElementById('ldCode').value.replace(/\D/g, '');
+      const err = document.getElementById('ldCodeError');
+      if (code.length !== 6) return void (err.textContent = 'Bitte den 6-stelligen Code eingeben.');
+      if (sending) return;
+      sending = true;
+      err.textContent = '';
+      try {
+        await api.post('/api/auth/login/code', { challenge, code, trust: document.getElementById('ldTrust').checked });
+        await afterLogin();
+      } catch (ex) {
+        err.textContent = ex.message;
+        if (ex.status === 410) document.getElementById('ldCodeBack').click();
+      } finally {
+        sending = false;
+      }
+    };
+    codeForm.addEventListener('submit', (e) => (e.preventDefault(), sendCode()));
+    document.getElementById('ldCode').addEventListener('input', (e) => e.target.value.replace(/\D/g, '').length === 6 && sendCode());
+    document.getElementById('ldCodeBack').addEventListener('click', () => {
+      challenge = null;
+      codeForm.classList.add('hidden');
+      document.getElementById('loginDialogForm').classList.remove('hidden');
+      document.getElementById('ldAlt').classList.remove('hidden');
+      document.getElementById('ldPassword').value = '';
+    });
+  }
+
+  /* ---------------------------------------------------------------- „Mandat einreichen“ – eine Quelle für Angemeldete */
+  // Angemeldete Mandanten legen Mandate im Dashboard an (dort hängen sie am Konto, mit Dringlichkeit und Verlauf);
+  // das Formular der Startseite bleibt für Besucher ohne Konto – und für Tarifrechner bzw. Wunschanwalt.
+  const baseOpenTicket = window.openTicketModal;
+  if (typeof baseOpenTicket === 'function') {
+    window.openTicketModal = (source, lawyer) => {
+      if (me && me.role === 'mandant' && !lawyer && source !== 'calc') return goTo('/dashboard?new=case');
+      return baseOpenTicket(source, lawyer);
+    };
+  }
+
   /* ---------------------------------------------------------------- Start */
   // Angefangene Texte (Mandat, Anliegen, Antwort) bleiben auf diesem Gerät erhalten
   window.PS.drafts.watch({ scope: 'website' });
 
   window.PS.boot('session', '/api/auth/session')
-    .then((r) => (me = r?.user ?? null))
-    .catch(() => (me = null))
-    .finally(updateAuthNav);
+    .then((r) => {
+      if (!loginDone) me = r?.user ?? null; // eine späte Antwort darf die Anmeldung im Dialog nicht überschreiben
+    })
+    .catch(() => {
+      if (!loginDone) me = null;
+    })
+    .finally(() => {
+      updateAuthNav();
+      renderSwitch();
+      renderWelcome();
+    });
 
   // Von einer Profilseite (/team/<name>): „Mandat anfragen“ → /?anwalt=<id> (Wunschanwalt) bzw. /?mandat=1 (ohne Konto)
   const wish = new URLSearchParams(location.search);
