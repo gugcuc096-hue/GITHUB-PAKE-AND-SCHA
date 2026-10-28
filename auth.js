@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const { db } = require('./db');
 const { EMAIL_DOMAIN, isBoard } = require('./helpers');
 const { avatarUrl } = require('./uploads');
+const permissions = require('./permissions');
 
 const SESSION_COOKIE = 'sid';
 const SESSION_DAYS = 7;
@@ -126,6 +127,10 @@ function publicUser(u) {
     rank: u.rank || null,
     // Board of Partners: Rolle „Board of Partners“ (admin) oder Partner-Rang – z. B. für die Aktenbearbeitung
     board: isBoard(u),
+    // Inhaber / Web-Admin und die Rechte für die Konfiguration (Einstellungen, Website, Vorlagen …)
+    owner: permissions.isOwner(u),
+    webAdmin: permissions.isWebAdmin(u),
+    perms: permissions.permsOf(u),
     active: !!u.active,
     mustChangePassword: !!u.must_change_password,
     // Konto per Discord angelegt: Name im Spiel noch einmal abfragen

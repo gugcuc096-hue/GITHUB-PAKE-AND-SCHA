@@ -5,6 +5,7 @@ const { db } = require('../db');
 const { requireAuth, isStaff } = require('../auth');
 const { wrap, parseBody, idParam, isoDateTime, EVENT_TYPES, truncate } = require('../helpers');
 const { getCase, caseAccess, APPT_SELECT, getAppointment, apptVisible, apptRow, firmPlace } = require('../models');
+const features = require('../features');
 const discord = require('../discord');
 const tickets = require('../tickets');
 const apptConfirm = require('../apptConfirm');
@@ -113,6 +114,7 @@ router.post(
     let slotList = null;
     let first = startsAt;
     if (u.role !== 'mandant' && d.slots && d.slots.length) {
+      if (!features.on('slots')) return res.status(400).json({ error: 'Terminvorschläge sind ausgeschaltet.' });
       slotList = [...new Set([startsAt, ...d.slots.map((x) => new Date(x).toISOString())])].sort();
       if (slotList.some((x) => new Date(x) < new Date())) return res.status(400).json({ error: 'Bitte Zeiten in der Zukunft wählen.' });
       first = slotList[0];

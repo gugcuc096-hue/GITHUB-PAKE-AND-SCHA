@@ -81,6 +81,12 @@ globalThis.fetch = async (input, init = {}) => {
     if (method === 'GET' && path === `/guilds/${GUILD}`) return json(200, { id: GUILD, name: 'Testserver', icon: null, approximate_member_count: members.length });
     if (method === 'GET' && path === `/guilds/${GUILD}/roles`) return json(200, roles);
     if (method === 'GET' && path === `/guilds/${GUILD}/channels`) return json(200, [{ id: '900000000000000500', name: 'willkommen', type: 0, position: 1 }]);
+    // Rolle anlegen („Web Admin“): fortlaufende IDs ab …801
+    if (method === 'POST' && path === `/guilds/${GUILD}/roles`) {
+      const role = { id: String(900000000000000800n + BigInt(roles.length)), name: body.name, position: 1, permissions: '0', color: body.color || 0 };
+      roles.push(role);
+      return json(200, role);
+    }
     // Ticket-Kanäle anlegen (Akten-Tickets): fortlaufende IDs ab …701
     if (method === 'POST' && path === `/guilds/${GUILD}/channels`) {
       const id = String(900000000000000700n + BigInt(++state.channelSeq));

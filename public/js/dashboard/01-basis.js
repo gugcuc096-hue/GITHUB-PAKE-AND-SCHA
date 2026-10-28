@@ -165,6 +165,8 @@ const icon = (name, cls = 'ico') =>
 const DISCORD_ICON =
   '<svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.37a19.79 19.79 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.865-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.74 19.74 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.1 13.1 0 01-1.872-.892.077.077 0 01-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 01.078-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.009c.12.1.246.198.373.292a.077.077 0 01-.006.127 12.3 12.3 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.84 19.84 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>';
 
+/** Wer irgendein Konfigurations-Recht hat, sieht „Einstellungen“. */
+const CONFIG_PERMS = ['settings.edit', 'site.edit', 'discord.edit', 'system.edit', 'templates.edit', 'config.audit'];
 const VIEWS = {
   overview: { label: 'Übersicht', icon: 'home' },
   cases: { label: 'Akten', clientLabel: 'Meine Akten', icon: 'folder' },
@@ -172,7 +174,7 @@ const VIEWS = {
   tasks: { label: 'Aufgaben', icon: 'tasks', staff: true },
   calendar: { label: 'Kalender & Fristen', short: 'Kalender', clientLabel: 'Termine', icon: 'calendar' },
   invoices: { label: 'Rechnungen', icon: 'receipt' },
-  'vip-angebot': { label: 'VIP & Lifetime', short: 'VIP', icon: 'crown', client: true },
+  'vip-angebot': { label: 'VIP & Lifetime', short: 'VIP', icon: 'crown', client: true, feature: 'vip' },
   mail: { label: 'Kanzlei-Post', short: 'Post', icon: 'mail' },
   // Menügruppen (Überschrift „section“): Kanzlei und Board of Partners lassen sich auf- und zuklappen; Seiten eines
   // Bündels (NAV_HUBS) sind ein Menüpunkt mit Reitern oben
@@ -187,16 +189,16 @@ const VIEWS = {
   resolutions: { label: 'Beschlüsse', icon: 'ballot', board: true, section: 'Board of Partners' },
   applications: { label: 'Bewerbungen', icon: 'userAdd', board: true, section: 'Board of Partners' },
   'name-requests': { label: 'Namensänderungen', short: 'Namen', icon: 'edit', board: true, section: 'Board of Partners' },
-  reviews: { label: 'Mandantenstimmen', short: 'Stimmen', icon: 'star', board: true, section: 'Board of Partners' },
-  team: { label: 'Team', icon: 'users', admin: true, section: 'Board of Partners' },
+  reviews: { label: 'Mandantenstimmen', short: 'Stimmen', icon: 'star', board: true, feature: 'reviews', section: 'Board of Partners' },
+  team: { label: 'Team', icon: 'users', perm: ['site.edit'], section: 'Board of Partners' },
   users: { label: 'Benutzer', icon: 'key', admin: true, section: 'Board of Partners' },
   stats: { label: 'Kanzlei-Statistik', short: 'Statistik', icon: 'chart', board: true, section: 'Board of Partners' },
   work: { label: 'Kanzlei-Statistik', short: 'Statistik', icon: 'briefcase', board: true, hidden: true }, // Reiter „Aktenbearbeitung“ der Kanzlei-Statistik
-  vip: { label: 'VIP & Lifetime', short: 'VIP', icon: 'crown', board: true, section: 'Board of Partners' },
+  vip: { label: 'VIP & Lifetime', short: 'VIP', icon: 'crown', board: true, feature: 'vip', section: 'Board of Partners' },
   cooperations: { label: 'Kooperationen', icon: 'tag', board: true, section: 'Board of Partners' },
-  fees: { label: 'Honorarordnung', icon: 'scale', admin: true, section: 'Board of Partners' },
+  fees: { label: 'Honorarordnung', icon: 'scale', perm: ['fees.edit'], section: 'Verwaltung' },
   audit: { label: 'Protokoll', icon: 'list', admin: true, section: 'Board of Partners' },
-  settings: { label: 'Einstellungen', icon: 'cog', admin: true, section: 'Board of Partners' },
+  settings: { label: 'Einstellungen', icon: 'cog', perm: CONFIG_PERMS, section: 'Verwaltung' },
   profile: { label: 'Mein Profil', short: 'Profil', icon: 'user', section: 'Konto' },
   'invoice-new': { label: 'Neues Dokument', icon: 'receipt', staff: true, hidden: true },
 };
@@ -320,6 +322,11 @@ const isStaff = () => !!st.user && (st.user.role === 'anwalt' || st.user.role ==
 const isAdmin = () => !!st.user && st.user.role === 'admin';
 /** Board of Partners (Founding/Equity Partner, Partner) – z. B. Auswertung der Aktenbearbeitung. */
 const isBoard = () => !!st.user && !!st.user.board;
+/** Recht zur Konfiguration (Inhaber / Web-Admin / Rechte-Tabelle) – z. B. can('fees.edit'). */
+const can = (key) => !!st.user && (st.user.perms || []).includes(key);
+const canAny = (keys) => keys.some(can);
+/** Funktion eingeschaltet? (Schalter unter Einstellungen → Rechte & Schalter) */
+const feature = (key) => !st.features || st.features[key] !== false;
 const badge = (text, color = 'gold') => `<span class="badge badge-${color}">${esc(text)}</span>`;
 const statusBadge = (map, key) => badge(...(map[key] || [key, 'slate']));
 /**
@@ -526,6 +533,8 @@ function allowed(view) {
   if (!v) return false;
   if (v.admin && !isAdmin()) return false;
   if (v.board && !isBoard()) return false;
+  if (v.perm && !canAny(v.perm)) return false;
+  if (v.feature && !feature(v.feature)) return false;
   if (v.staff && !isStaff()) return false;
   if (v.client && isStaff()) return false; // nur für Mandanten (z. B. VIP & Lifetime anfragen)
   return true;

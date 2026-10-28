@@ -2,7 +2,8 @@
 const express = require('express');
 const { z } = require('zod');
 const { db, tx, getSetting } = require('../db');
-const { requireAuth, requireAdmin, hashPassword, generateTempPassword, destroyAllSessions } = require('../auth');
+const { requirePerm } = require('../permissions');
+const { requireAuth, hashPassword, generateTempPassword, destroyAllSessions } = require('../auth');
 const { wrap, parseBody, idParam, deriveInitials, RANKS, rankEnum, firmEmail, EMAIL_HINT } = require('../helpers');
 const { teamRow, TEAM_SELECT, logActivity } = require('../models');
 const { imageBody, saveImage, removeFile } = require('../uploads');
@@ -31,7 +32,7 @@ publicRouter.get('/', (req, res) => {
 
 /* Board of Partners: Team verwalten */
 const adminRouter = express.Router();
-adminRouter.use(requireAuth, requireAdmin);
+adminRouter.use(requireAuth, requirePerm('site.edit'));
 
 const accountSchema = z.object({
   email: z.string().trim().min(1).max(120), // Teil vor dem @ oder Adresse mit @pake-scha.ls
@@ -101,6 +102,7 @@ adminRouter.post(
   wrap(async (req, res) => {
     const d = parseBody(memberSchema, req, res);
     if (!d) return;
+    if (d.createAccount && req.user.role !== 'admin') return res.status(403).json({ error: 'Konten legt nur das Board of Partners an (Menü „Benutzer“).' });
     if (d.userId) {
       const problem = checkLinkTarget(d.userId);
       if (problem) return res.status(400).json({ error: problem });
@@ -147,6 +149,7 @@ adminRouter.patch(
     if (!m) return res.status(404).json({ error: 'Teammitglied nicht gefunden.' });
     const d = parseBody(memberSchema.partial(), req, res);
     if (!d) return;
+    if (d.createAccount && req.user.role !== 'admin') return res.status(403).json({ error: 'Konten legt nur das Board of Partners an (Menü „Benutzer“).' });
     if (d.userId) {
       const problem = checkLinkTarget(d.userId, m.id);
       if (problem) return res.status(400).json({ error: problem });

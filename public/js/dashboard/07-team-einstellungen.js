@@ -426,20 +426,24 @@ views.settings = {
     const modul = new URLSearchParams(location.search).get('modul');
     if (BOT_MODULES.some(([k]) => k === modul)) st.botModule = modul;
     if (modul) history.replaceState(history.state, '', `${location.pathname}?tab=${st.settingsTab || 'general'}#settings`);
+    // Nur laden, wofür das Recht da ist (Web-Admins haben je nach Rechte-Tabelle nicht alle Bereiche)
+    const need = (key, fn) => (can(key) ? fn() : Promise.resolve(null));
+    const soft = (promise) => promise.catch(() => null);
     const [r, tpl, tk, bot, backups] = await Promise.all([
-      api.get('/api/admin/settings'),
-      api.get('/api/contract-templates?all=1'),
-      api.get('/api/tickets/settings'),
-      api.get('/api/bot').catch(() => null),
-      api.get('/api/admin/backups').catch(() => null),
-      load.fivenet(true),
-      api.get('/api/site/ranks').then((x) => (st.siteRanks = x.ranks), () => (st.siteRanks = [])),
-      api.get('/api/site/texts').then((x) => (st.siteTexts = x.texts), () => (st.siteTexts = [])),
-      api.get('/api/storage/items').then((x) => (st.storageAdmin = x), () => (st.storageAdmin = null)),
+      soft(api.get('/api/admin/settings')),
+      need('templates.edit', () => soft(api.get('/api/contract-templates?all=1'))),
+      need('discord.edit', () => soft(api.get('/api/tickets/settings'))),
+      need('discord.edit', () => soft(api.get('/api/bot'))),
+      need('system.edit', () => soft(api.get('/api/admin/backups'))),
+      need('system.edit', () => load.fivenet(true)),
+      need('site.edit', () => api.get('/api/site/ranks').then((x) => (st.siteRanks = x.ranks), () => (st.siteRanks = []))),
+      need('site.edit', () => api.get('/api/site/texts').then((x) => (st.siteTexts = x.texts), () => (st.siteTexts = []))),
+      need('system.edit', () => api.get('/api/storage/items').then((x) => (st.storageAdmin = x), () => (st.storageAdmin = null))),
+      loadAccess().catch(() => (st.access = null)),
     ]);
-    st.google = await api.get('/api/google/status').catch(() => null);
+    st.google = can('system.edit') ? await api.get('/api/google/status').catch(() => null) : null;
     st.backups = backups;
-    st.settings = r.settings;
+    st.settings = (r && r.settings) || st.settings || {};
     st.contractTemplates = tpl;
     st.ticketSettings = tk;
     st.bot = bot;
@@ -448,11 +452,13 @@ views.settings = {
   },
   render() {
     const s = st.settings;
-    const tab = SETTINGS_TABS.some(([k]) => k === st.settingsTab) ? st.settingsTab : 'general';
+    const tabs = SETTINGS_TABS.filter(([k]) => canAny(TAB_PERMS[k]));
+    const tab = tabs.some(([k]) => k === st.settingsTab) ? st.settingsTab : tabs.length ? tabs[0][0] : 'access';
     const head = `<div class="page-head"><div><h1 class="page-title">Einstellungen</h1><p class="page-sub">Kanzlei &amp; Rechnungen, Website, Discord, Integrationen, Lager und System. Vertrags- und Schriftsatz-Vorlagen stehen im Kanzlei-Wiki.</p></div></div>
         <div class="chip-row settings-tabs" role="tablist" aria-label="Bereiche der Einstellungen">${SETTINGS_TABS.map(
           ([k, label, ic]) => `<button type="button" class="chip ${tab === k ? 'active' : ''}" role="tab" aria-selected="${tab === k}" data-action="settings-tab" data-tab="${k}">${ic === 'discord' ? DISCORD_ICON : icon(ic, 'ico-sm')}<span>${esc(label)}</span></button>`
         ).join('')}</div>`;
+    if (tab === 'access') return head + accessPanels();
     if (tab === 'bot') return head + botSettings();
     if (tab === 'integrations') return `${head}${fivenetSettingsPanel(s)}${googleDocsPanel(st.google)}`;
     if (tab === 'lager') return head + storageSettingsPanel();
@@ -490,7 +496,18 @@ const SETTINGS_TABS = [
   ['integrations', 'Integrationen', 'link'],
   ['lager', 'Lager', 'box'],
   ['system', 'System', 'shield'],
+  ['access', 'Rechte & Schalter', 'key'],
 ];
+/** Welches Recht einen Reiter öffnet (irgendeines der genannten). */
+const TAB_PERMS = {
+  general: ['settings.edit'],
+  site: ['site.edit'],
+  bot: ['discord.edit'],
+  integrations: ['system.edit'],
+  lager: ['system.edit'],
+  system: ['system.edit'],
+  access: CONFIG_PERMS,
+};
 
 /** Discord → Webhook: Kanzlei-Updates in Kanäle, je Ereignis Kanal und Rolle. */
 function discordWebhookPanel(s) {

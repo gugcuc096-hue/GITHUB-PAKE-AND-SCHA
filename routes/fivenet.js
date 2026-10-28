@@ -6,7 +6,8 @@
 const express = require('express');
 const { z } = require('zod');
 const { db } = require('../db');
-const { requireAuth, requireStaff, requireAdmin } = require('../auth');
+const { requireAuth, requireStaff } = require('../auth');
+const { requirePerm } = require('../permissions');
 const { wrap, parseBody } = require('../helpers');
 const fivenet = require('../fivenet');
 
@@ -70,7 +71,7 @@ router.post(
 /** Erreichbarkeit der FiveNet-Instanz prüfen (öffentlicher Endpunkt /api/version). */
 router.post(
   '/check',
-  requireAdmin,
+  requirePerm('system.edit'),
   wrap(async (req, res) => {
     const inst = fivenet.instance();
     res.json({ instance: { url: inst.url, host: inst.host }, result: await fivenet.checkInstance(inst) });

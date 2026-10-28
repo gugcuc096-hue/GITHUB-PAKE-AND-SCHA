@@ -68,6 +68,7 @@ app.use(compression());
 app.use(express.json({ limit: '300kb' }));
 app.use(cookieParser());
 app.use(loadUser);
+app.use((req, res, next) => require('./db').actor.run({ user: req.user }, next)); // Wer ändert? – fürs Änderungsprotokoll
 
 // CSRF-Schutz zusätzlich zu SameSite-Cookies: schreibende Anfragen nur von der eigenen Domain.
 app.use('/api', (req, res, next) => {
@@ -143,6 +144,7 @@ app.use('/api/contract-templates', contractRoutes.templatesRouter);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/site', require('./routes/site'));
+app.use('/api/access', require('./routes/access').router); // Inhaber, Web-Admins, Rechte-Tabelle, Protokoll, Schalter
 app.use('/api/onboarding', require('./routes/onboarding'));
 app.use('/api/board', require('./routes/board'));
 app.use('/api/invoices', require('./routes/invoices'));
@@ -158,6 +160,7 @@ app.use('/api/admin', admin.router);
 app.use('/api/discord', require('./routes/discord'));
 app.use('/api/tickets', require('./routes/tickets'));
 app.use('/api/bot', require('./routes/bot').router);
+app.use('/api/public', require('./routes/access').publicRouter);
 app.use('/api/public', require('./routes/public'));
 app.use('/api/public', applications.publicRouter);
 app.use('/api/public', concernRoutes.publicRouter);
@@ -222,6 +225,7 @@ app.use((err, req, res, next) => {
 
 /* ---------------------------------------------------------------- Start */
 runBootstrap();
+require('./permissions').ensureOwner();
 require('./ranks').init(); // Ränge aus der Datenbank (beim ersten Start: die bisherigen sechs)
 require('./penal').init(); // Strafgesetzbuch & Strafkatalog (beim ersten Start aus seeds/stgb.json)
 require('./routes/wiki').seed(); // Kanzlei-Wiki: Grundlagen-Artikel beim ersten Start

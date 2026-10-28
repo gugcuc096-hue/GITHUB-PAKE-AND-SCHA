@@ -203,6 +203,25 @@ function notizCommand(body, u) {
   return done(`Interne Notiz zu **${c.case_number}** gespeichert – nur für die Kanzlei sichtbar (nicht für den Mandanten, nicht im Ticket).\n\n>>> ${truncate(text, 1500)}`, 'Notiz gespeichert');
 }
 
+/* ---------------------------------------------------------------- /webadmin (nur der Inhaber) */
+function webAdminCommand(body, u) {
+  if (!u) return fail(NOT_LINKED, 'Kein verknüpftes Konto');
+  const perms = require('./permissions');
+  if (!perms.isOwner(u)) return fail('Web-Admins ernennt und entzieht nur der Inhaber der Kanzlei-Website.');
+  const action = option(body, 'aktion');
+  const list = db.prepare("SELECT display_name, discord_id FROM users WHERE web_admin = 1 AND active = 1 ORDER BY display_name").all();
+  if (action === 'liste') {
+    return info(list.length ? list.map((w) => `• **${w.display_name}**${w.discord_id ? ` (<@${w.discord_id}>)` : ''}`).join('\n') : 'Noch keine Web-Admins ernannt.', 'Web-Admins');
+  }
+  const target = option(body, 'person');
+  if (!target) return fail('Bitte eine Person angeben.');
+  const t = db.prepare('SELECT id, display_name FROM users WHERE discord_id = ?').get(String(target));
+  if (!t) return fail('Diese Person hat kein verknüpftes Konto auf der Website.');
+  const r = perms.setWebAdmin(u, t.id, action === 'ernennen');
+  if (!r.ok) return fail(r.error);
+  return done(action === 'ernennen' ? `**${t.display_name}** ist jetzt Web-Admin und bekommt die Discord-Rolle „Web Admin“.` : `**${t.display_name}** ist kein Web-Admin mehr.`, 'Web-Admin');
+}
+
 /* ---------------------------------------------------------------- /dienst, /imdienst */
 const DUTY_ICON = { dienst: '🟢', gericht: '⚖️', pause: '☕', off: '⚪' };
 
@@ -287,7 +306,7 @@ function hilfeCommand(body, u) {
     fields.push(
       {
         name: 'Kanzlei',
-        value: ['`/dienst` – Dienststatus setzen (Im Dienst, Gericht, Pause, Außer Dienst)', '`/notiz` – interne Notiz zur Akte (Mandant sieht sie nie)'].join('\n'),
+        value: ['`/dienst` – Dienststatus setzen (Im Dienst, Gericht, Pause, Außer Dienst)', '`/notiz` – interne Notiz zur Akte (Mandant sieht sie nie)', ...(u && require('./permissions').isOwner(u) ? ['`/webadmin` – Web-Admins ernennen oder entziehen (nur Inhaber)'] : [])].join('\n'),
         inline: false,
       },
       {
@@ -325,6 +344,7 @@ module.exports = {
     dienst: dienstCommand,
     imdienst: imDienstCommand,
     termine: termineCommand,
+    webadmin: webAdminCommand,
     hilfe: hilfeCommand,
   },
 };

@@ -25,7 +25,7 @@ const STATE_COOKIE = 'gd_state';
 const stateCookie = () => ({ httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/api/google' });
 const LABEL = { invoice: 'Rechnung', contract: 'Vertrag', extract: 'Aktenauszug' };
 
-const boardOnly = (req, res, next) => (isBoard(req.user) ? next() : res.status(403).json({ error: 'Nur das Board of Partners verwaltet die Google-Verbindung.' }));
+const boardOnly = require('../permissions').requirePerm('system.edit'); // Google-Verbindung: Inhaber / Web-Admin
 
 /* ---------------------------------------------------------------- Verbindung (Board) */
 router.get('/status', requireAuth, boardOnly, (req, res) => {
