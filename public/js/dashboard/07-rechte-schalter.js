@@ -1,3 +1,9 @@
+/*
+ * Kanzlei-Dashboard – Einstellungen: Rechte & Schalter (Inhaber, Web-Admins, Rechte-Tabelle, Feature-Schalter, Änderungsprotokoll).
+ * Wird nach den vorherigen Teilen geladen (Reihenfolge siehe dashboard.html).
+ */
+'use strict';
+
 /* ================================================================
    Einstellungen → Rechte & Schalter
    Inhaber und Web-Admins, Rechte-Tabelle, Feature-Schalter, Änderungsprotokoll

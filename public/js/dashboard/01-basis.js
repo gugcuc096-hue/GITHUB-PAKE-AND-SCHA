@@ -190,12 +190,12 @@ const VIEWS = {
   applications: { label: 'Bewerbungen', icon: 'userAdd', board: true, section: 'Board of Partners' },
   'name-requests': { label: 'Namensänderungen', short: 'Namen', icon: 'edit', board: true, section: 'Board of Partners' },
   reviews: { label: 'Mandantenstimmen', short: 'Stimmen', icon: 'star', board: true, feature: 'reviews', section: 'Board of Partners' },
+  team: { label: 'Team', icon: 'users', perm: ['site.edit'], section: 'Board of Partners' },
   users: { label: 'Benutzer', icon: 'key', admin: true, section: 'Board of Partners' },
   stats: { label: 'Kanzlei-Statistik', short: 'Statistik', icon: 'chart', board: true, section: 'Board of Partners' },
   work: { label: 'Kanzlei-Statistik', short: 'Statistik', icon: 'briefcase', board: true, hidden: true }, // Reiter „Aktenbearbeitung“ der Kanzlei-Statistik
   vip: { label: 'VIP & Lifetime', short: 'VIP', icon: 'crown', board: true, feature: 'vip', section: 'Board of Partners' },
   cooperations: { label: 'Kooperationen', icon: 'tag', board: true, section: 'Board of Partners' },
-  team: { label: 'Team', icon: 'users', perm: ['site.edit'], section: 'Verwaltung' },
   fees: { label: 'Honorarordnung', icon: 'scale', perm: ['fees.edit'], section: 'Verwaltung' },
   audit: { label: 'Protokoll', icon: 'list', admin: true, section: 'Board of Partners' },
   settings: { label: 'Einstellungen', icon: 'cog', perm: CONFIG_PERMS, section: 'Verwaltung' },
