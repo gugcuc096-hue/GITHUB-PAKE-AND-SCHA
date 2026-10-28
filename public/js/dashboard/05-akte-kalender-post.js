@@ -257,7 +257,7 @@ function ticketChips(c, t, transcripts = []) {
         label,
         tone,
         body: `<div class="chip-pop-head">${ticketState(t)}${t.exists ? client : ''}</div><p class="chip-pop-hint">${esc(hint)}</p>${t.error ? `<p class="chip-pop-hint text-red-300">${icon('alert', 'ico-sm')} ${esc(t.error)}</p>` : ''}
-          <div class="chip-pop-actions">${ticketOpen(t.url)}${verlauf}<button class="btn-ghost btn-sm" data-action="ticket-sync" data-id="${c.id}">${t.exists ? 'Abgleichen' : t.deleted ? 'Neu anlegen' : 'Ticket anlegen'}</button>${t.exists && !t.clientInTicket && c.canEdit ? `<button class="btn-outline btn-sm" data-action="client-join-link" data-id="${c.id}" title="Beitrittslink erzeugen: kopieren oder als Nachricht senden">${icon('link', 'ico-sm')}<span>Mandanten-Link</span></button>` : ''}</div>`,
+          <div class="chip-pop-actions">${ticketOpen(t.url)}${verlauf}<button class="btn-ghost btn-sm" data-action="ticket-sync" data-id="${c.id}">${t.exists ? 'Abgleichen' : t.deleted ? 'Neu anlegen' : 'Ticket anlegen'}</button>${t.exists && !t.clientInTicket && c.canEdit && feature('clientLink') ? `<button class="btn-outline btn-sm" data-action="client-join-link" data-id="${c.id}" title="Beitrittslink erzeugen: kopieren oder als Nachricht senden">${icon('link', 'ico-sm')}<span>Mandanten-Link</span></button>` : ''}</div>`,
       })
     );
   }
@@ -1442,7 +1442,7 @@ function eventForm(e, preset = {}) {
         <div class="span-2"><label class="label">Ort</label><input name="location" class="field" maxlength="120" value="${esc(v.location ?? (type === 'frist' ? '' : 'Kanzlei Würfelpark'))}" placeholder="z. B. District Court, Saal 2"></div>
         <div class="span-2"><label class="label">Notiz</label><textarea name="note" rows="3" class="field" maxlength="1000" placeholder="Vorbereitung, Unterlagen, Hinweise …">${esc(v.note || '')}</textarea></div>
         <label class="check span-2"><input type="checkbox" name="clientVisible" ${visible ? 'checked' : ''}> Für den Mandanten im Portal sichtbar</label>
-        ${isNew ? `<details class="span-2 slot-box"><summary>Terminvorschlag: Mandant wählt die Zeit</summary>
+        ${isNew && feature('slots') ? `<details class="span-2 slot-box"><summary>Terminvorschlag: Mandant wählt die Zeit</summary>
           <p class="form-hint">Nur für Mandantengespräche in einer Akte mit Mandanten-Konto. Oben steht die erste Zeit, hier bis zu zwei weitere – der Mandant tippt im Portal eine an, danach ist der Termin bestätigt.</p>
           <div class="form-grid cols-2"><div><label class="label" for="evSlot2">Zweite Zeit</label><input id="evSlot2" name="slot2" type="datetime-local" class="field"></div>
           <div><label class="label" for="evSlot3">Dritte Zeit</label><input id="evSlot3" name="slot3" type="datetime-local" class="field"></div></div></details>`

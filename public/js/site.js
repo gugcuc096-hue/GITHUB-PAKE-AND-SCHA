@@ -480,9 +480,23 @@
   // Angefangene Texte (Mandat, Anliegen, Antwort) bleiben auf diesem Gerät erhalten
   window.PS.drafts.watch({ scope: 'website' });
 
+  // Ausgeschaltete Funktionen (Dashboard → Einstellungen → Rechte & Schalter) verschwinden von der Startseite
+  const FEATURE_HIDE = {
+    vip: ['#vip', 'a[href="#vip"]'],
+    reviews: ['#stimmen', 'a[href="#stimmen"]'],
+    karriere: ['#karriere', 'a[href="#karriere"]', 'a[href="/karriere"]'],
+  };
+  function applyFeatures(f) {
+    if (!f) return;
+    for (const [key, selectors] of Object.entries(FEATURE_HIDE)) {
+      if (f[key] !== false) continue;
+      document.querySelectorAll(selectors.join(',')).forEach((el) => (el.style.display = 'none'));
+    }
+  }
   window.PS.boot('session', '/api/auth/session')
     .then((r) => {
       if (!loginDone) me = r?.user ?? null; // eine späte Antwort darf die Anmeldung im Dialog nicht überschreiben
+      applyFeatures(r && r.features);
     })
     .catch(() => {
       if (!loginDone) me = null;

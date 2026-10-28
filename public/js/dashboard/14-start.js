@@ -1339,6 +1339,7 @@ document.addEventListener('ps:form-ok', () => buzz());
   try {
     const { me } = await load.start(); // Konto + Zähler + Dienststatus in einem Abruf
     st.user = me.user;
+    st.features = me.features || null;
     st.twoFactor = me.twoFactor;
     setRanks(me.ranks);
   } catch {

@@ -353,3 +353,49 @@ describe('Fehlende Unterlagen: Erinnerung nach drei Tagen', () => {
     assert.equal(stub.state.dms.slice(before).filter((d) => d.to === MEMBERS.jaywa).length, 1, 'geschlossene Akte: keine Erinnerung');
   });
 });
+
+describe('Discord-Rolle „Web Admin“', () => {
+  let db, stub, bot, setSetting;
+  // Konto zu dieser Discord-ID (andere Tests haben sie teils schon vergeben)
+  const linked = (email, name, discordId) => {
+    const have = db.prepare('SELECT id FROM users WHERE discord_id = ?').get(discordId);
+    if (have) return have.id;
+    return Number(db.prepare(`INSERT INTO users (email, password_hash, display_name, role, discord_id) VALUES (?, 'x', ?, 'anwalt', ?)`).run(email, name, discordId).lastInsertRowid);
+  };
+  before(() => {
+    if (!process.env.DB_PATH) process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pake-scha-wa-')), 'w.db');
+    process.env.DISCORD_BOT_TOKEN = 'test-token';
+    stub = require('./discordStub');
+    ({ db, setSetting } = require('../db'));
+    bot = require('../discordBot');
+    setSetting('discord_ticket_guild', GUILD);
+  });
+
+  it('wird angelegt, einmal – und folgt dann dem Dashboard', async () => {
+    const mo = linked('wa.mo@x.ls', 'Wa Mo', MEMBERS.mo);
+    db.prepare('UPDATE users SET web_admin = 1 WHERE id = ?').run(mo);
+    const r = await bot.ensureWebAdminRole();
+    assert.equal(r.created, true);
+    assert.equal((await bot.ensureWebAdminRole()).created, false); // zweites Mal: vorhandene Rolle
+    assert.equal(bot.webAdminRole(), r.roleId);
+    const { desiredRoles } = bot._test;
+    assert.ok(desiredRoles(MEMBERS.mo, [ROLES.burgershot]).has(r.roleId), 'Web-Admin bekommt die Rolle');
+    db.prepare('UPDATE users SET web_admin = 0 WHERE id = ?').run(mo);
+    assert.ok(!desiredRoles(MEMBERS.mo, [ROLES.burgershot, r.roleId]).has(r.roleId), 'entzogen → Rolle weg');
+    // Mitglieder ohne verknüpftes Konto behalten ihre Rollen
+    assert.ok(desiredRoles('900000000000009999', [ROLES.burgershot, r.roleId]).has(r.roleId));
+  });
+
+  it('/webadmin: nur der Inhaber ernennt und entzieht', () => {
+    const cmd = require('../botCommands').commands.webadmin;
+    const owner = { id: 9001, role: 'admin', is_owner: 1, display_name: 'Inhaber' };
+    const body = (aktion, person) => ({ data: { options: [{ name: 'aktion', value: aktion }, ...(person ? [{ name: 'person', value: person }] : [])] } });
+    const other = linked('wa.jay@x.ls', 'Wa Jay', MEMBERS.jaywa);
+    db.prepare("UPDATE users SET role = 'anwalt', active = 1, display_name = 'Wa Jay' WHERE id = ?").run(other);
+    assert.match(JSON.stringify(cmd(body('ernennen', MEMBERS.jaywa), { id: 9002, role: 'anwalt', display_name: 'X' })), /nur der Inhaber/);
+    assert.match(JSON.stringify(cmd(body('ernennen', MEMBERS.jaywa), owner)), /ist jetzt Web-Admin/);
+    assert.equal(db.prepare('SELECT web_admin FROM users WHERE id = ?').get(other).web_admin, 1);
+    assert.match(JSON.stringify(cmd(body('liste'), owner)), /Wa Jay/);
+    assert.match(JSON.stringify(cmd(body('entziehen', MEMBERS.jaywa), owner)), /kein Web-Admin mehr/);
+  });
+});

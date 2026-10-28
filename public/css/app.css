@@ -2344,3 +2344,19 @@ tr:not(:hover) .star-btn:not(.on) { opacity: 0.25; }
 /* Virtuell gezeichnete Listen: Platzhalter für weit entfernte Abschnitte */
 .v-gap { pointer-events: none; padding: 0; border: 0; overflow: hidden; }
 tr.v-gap > td { padding: 0; border: 0; }
+
+/* Einstellungen → Rechte & Schalter: Rechte-Tabelle */
+.perm-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.perm-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.perm-table th, .perm-table td { padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--glass-border); text-align: center; }
+.perm-table thead th { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); font-weight: 600; }
+.perm-table th[scope='row'], .perm-table thead th:first-child { text-align: left; }
+.perm-name { display: block; color: var(--text); font-weight: 600; }
+.perm-hint { display: block; color: var(--text-dim); font-size: 0.75rem; font-weight: 400; margin-top: 0.1rem; }
+.perm-cell input[type='checkbox'] { width: 1.15rem; height: 1.15rem; accent-color: var(--gold-500); cursor: pointer; }
+.perm-cell .ico-sm { color: var(--gold-500); }
+@media (max-width: 640px) {
+  .perm-table th, .perm-table td { padding: 0.5rem 0.2rem; }
+  .perm-table thead th { font-size: 0.58rem; letter-spacing: 0.02em; }
+  .perm-hint { display: none; }
+}
