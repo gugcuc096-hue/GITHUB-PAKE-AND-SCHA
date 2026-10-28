@@ -3638,6 +3638,8 @@ describe('Browser: Nachladen in der Akte, Listen virtuell zeichnen, weniger Live
 
       const staff = await watch(TEAM.admin);
       await staff.page.waitForFunction(() => !!live.es, null, { timeout: 5000 });
+      // Das Request-Ereignis kommt etwas nach dem Anlegen des EventSource (auf langsamen Runnern erst später)
+      for (let i = 0; i < 30 && !staff.streams.length; i++) await staff.page.waitForTimeout(100);
       assert.equal(staff.streams.length, 1, 'Kanzlei: eine Verbindung');
 
       const mandant = await watch('tina.termin', 'Mandanten-Passwort-5');
