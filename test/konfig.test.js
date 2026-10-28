@@ -236,3 +236,44 @@ describe('Texte & Banner im Browser', { skip: chromium ? false : 'Playwright nic
     });
   }
 });
+
+describe('Kleine Darstellungsfehler: Haken und Schließen-Kreuz', { skip: chromium ? false : 'Playwright nicht installiert' }, () => {
+  it('das Schließen-Kreuz sitzt oben rechts im Fenster; erledigte Zeilen tragen keinen schwebenden Haken', async () => {
+    const srv = await startServer();
+    const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+    try {
+      const a = client(srv.base);
+      const me = await a.login(TEAM.admin);
+      const c = (await a.post('/api/cases', { title: 'Haken-Test', area: 'zivilrecht', clientName: 'Hanna Haken', lawyerId: me.id })).json.case;
+      const t = (await a.post('/api/tasks', { title: 'Erledigte Aufgabe', caseId: c.id })).json.task;
+      await a.patch(`/api/tasks/${t.id}`, { done: true });
+      for (const device of [{ viewport: { width: 1366, height: 900 } }, { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }]) {
+        const ctx = await browser.newContext({ ...device, locale: 'de-DE' });
+        const page = await ctx.newPage();
+        await page.goto(`${srv.base}/login`);
+        await page.fill('#email', TEAM.admin);
+        await page.fill('#password', PASSWORD);
+        await page.click('button[type=submit]');
+        await page.waitForURL(/dashboard/);
+        await page.goto(`${srv.base}/dashboard?case=${c.id}`);
+        await page.waitForSelector('#modal.open .modal-close');
+        await page.waitForTimeout(800);
+        const geo = await page.evaluate(() => {
+          const card = document.querySelector('#modal .modal-card').getBoundingClientRect();
+          const x = document.querySelector('#modal .modal-close').getBoundingClientRect();
+          return { insideX: x.left >= card.left && x.right <= card.right + 1, right: card.right - x.right, top: x.top - card.top };
+        });
+        assert.equal(geo.insideX, true, `Kreuz im Fenster: ${JSON.stringify(geo)}`);
+        assert.ok(geo.right >= 0 && geo.right < 40, `Kreuz rechts: ${JSON.stringify(geo)}`);
+        assert.ok(geo.top >= 0 && geo.top < 40, `Kreuz oben: ${JSON.stringify(geo)}`);
+        // Erledigte Zeilen: kein Haken-Pseudoelement (der gehört nur dem Speichern-Knopf)
+        const stray = await page.evaluate(() => [...document.querySelectorAll('.is-done')].filter((el) => getComputedStyle(el, '::before').maskImage !== 'none' && getComputedStyle(el, '::before').content === '\"\"').length);
+        assert.equal(stray, 0, 'kein schwebender Haken');
+        await ctx.close();
+      }
+    } finally {
+      await browser.close();
+      await srv.stop();
+    }
+  });
+});
