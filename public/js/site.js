@@ -317,14 +317,44 @@
     av.href = '/dashboard#profile';
     av.title = me.displayName || 'Mein Profil';
     av.setAttribute('aria-label', 'Mein Profil');
-    av.textContent = initials(me.displayName);
+    avatarInto(av, me);
     if (login) {
       login.classList.add('hidden');
       login.before(sw, av);
     } else bar.append(sw, av);
   }
 
-  /** „Willkommen zurück“: was gerade ansteht, mit Direktlinks – und die letzten Akten. */
+  /** Profilbild (eigenes Foto oder Discord-Bild) – ohne Bild die Initialen auf Gold. */
+  function avatarInto(el, u) {
+    el.textContent = '';
+    if (u.avatarUrl) {
+      const img = document.createElement('img');
+      img.alt = '';
+      img.decoding = 'async';
+      img.src = u.avatarUrl;
+      img.addEventListener('error', () => {
+        img.remove();
+        el.classList.remove('has-photo');
+        el.textContent = initials(u.displayName);
+      });
+      el.classList.add('has-photo');
+      el.appendChild(img);
+    } else el.textContent = initials(u.displayName);
+  }
+  const WELCOME_ICON = {
+    tasks: '<path d="M9 11l2 2 4-4M5 5h14v14H5z"/>',
+    calendar: '<path d="M7 3v3m10-3v3M4 9h16M5 5h14a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z"/>',
+    invoices: '<path d="M7 3h10v18l-2.5-1.5L12 21l-2.5-1.5L7 21zM10 8h4M10 12h4"/>',
+    mail: '<path d="M4 6h16v12H4zM4 7l8 6 8-6"/>',
+    chat: '<path d="M5 5h14v10H9l-4 4z"/>',
+    requests: '<path d="M8 12.5l5.5-5.5a3 3 0 014.2 4.2L10 19a5 5 0 01-7-7l7-7"/>',
+    contract: '<path d="M4 20l4-1 11-11-3-3L5 16zM14 6l3 3"/>',
+    next: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
+    ok: '<path d="M5 13l4 4L19 7"/>',
+  };
+  const welcomeIcon = (kind) => `<span class="wc-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${WELCOME_ICON[kind] || WELCOME_ICON[{ proposal: 'calendar', contract: 'contract', invoice: 'invoices' }[kind]] || WELCOME_ICON.next}</svg></span>`;
+
+  /** „Willkommen zurück“: Profilbild, was gerade ansteht (mit Direktlinks) und die zuletzt bearbeiteten Akten. */
   async function renderWelcome() {
     document.getElementById('welcomeStrip')?.remove();
     if (!me) return;
@@ -339,15 +369,30 @@
     if (!header) return;
     const items = sum && sum.items ? sum.items : [];
     const chips = items.length
-      ? items.map((i) => `<a class="welcome-chip tone-${esc(i.tone || '')}" href="${esc(i.href)}">${esc(i.text)}</a>`).join('')
-      : '<span class="welcome-chip tone-ok">Im Moment gibt es nichts zu tun</span>';
-    const cases = sum && sum.cases && sum.cases.length ? `<div class="welcome-cases"><span>Zuletzt bearbeitet:</span>${sum.cases.map((c) => `<a href="${esc(c.href)}"><b>${esc(c.caseNumber)}</b><span>${esc(c.title)}</span></a>`).join('')}</div>` : '';
+      ? items.map((i) => `<a class="welcome-chip tone-${esc(i.tone || '')}" href="${esc(i.href)}">${welcomeIcon(i.kind)}<span>${esc(i.text)}</span></a>`).join('')
+      : `<span class="welcome-chip tone-ok">${welcomeIcon('ok')}<span>Alles erledigt – im Moment gibt es nichts zu tun</span></span>`;
+    const cases = sum && sum.cases && sum.cases.length ? `<div class="welcome-row"><span class="welcome-label">Zuletzt bearbeitet</span><div class="welcome-cases">${sum.cases.map((c) => `<a href="${esc(c.href)}"><b>${esc(c.caseNumber)}</b><span>${esc(c.title)}</span></a>`).join('')}</div></div>` : '';
+    const who = me.role === 'mandant' ? 'Mandantenkonto' : me.rank || (me.role === 'admin' ? 'Board of Partners' : 'Kanzlei');
+    const day = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+    const duty = me.duty && me.duty.status && me.duty.status !== 'off' ? `<i class="av-dot on-${esc(me.duty.status)}" title="${esc({ dienst: 'Im Dienst', gericht: 'Im Gericht', pause: 'Pause' }[me.duty.status] || '')}"></i>` : '<i class="av-dot"></i>';
     const strip = document.createElement('section');
     strip.id = 'welcomeStrip';
     strip.className = 'welcome-strip';
     strip.setAttribute('aria-label', 'Willkommen zurück');
-    strip.innerHTML = `<div class="welcome-in"><span class="welcome-hi">Willkommen zurück, <strong>${esc((sum && sum.name) || (me.displayName || '').split(' ')[0])}</strong></span>
-      <div class="welcome-chips">${chips}</div><a class="welcome-go" href="/dashboard">${me.role === 'mandant' ? 'Zu meinen Akten' : 'Zum Dashboard'} →</a>${cases}</div>`;
+    strip.innerHTML = `<div class="welcome-in">
+      <div class="welcome-id"><a class="welcome-avatar" href="/dashboard#profile" aria-label="Mein Profil"><span class="av-ini"></span>${duty}</a>
+        <div class="welcome-who"><span class="welcome-hi">Willkommen zurück, <strong>${esc((sum && sum.name) || (me.displayName || '').split(' ')[0])}</strong></span><span class="welcome-sub">${esc(who)} · ${esc(day)}</span></div></div>
+      <div class="welcome-chips">${chips}</div>
+      <a class="welcome-go" href="/dashboard">${me.role === 'mandant' ? 'Zu meinen Akten' : 'Zum Dashboard'} →</a></div>${cases}`;
+    const av = strip.querySelector('.welcome-avatar .av-ini');
+    if (me.avatarUrl) {
+      const img = document.createElement('img');
+      img.alt = '';
+      img.decoding = 'async';
+      img.src = me.avatarUrl;
+      img.addEventListener('error', () => img.replaceWith(Object.assign(document.createElement('span'), { className: 'av-ini', textContent: initials(me.displayName) })));
+      av.replaceWith(img);
+    } else av.textContent = initials(me.displayName);
     header.after(strip);
     // Das Dashboard schon im Hintergrund laden – der Wechsel dauert dann kaum noch (gleiche Versionsnummer wie diese Seite)
     const v = new URL(document.querySelector('script[src*="/js/site.js"]')?.src || location.href, location.href).searchParams.get('v');
