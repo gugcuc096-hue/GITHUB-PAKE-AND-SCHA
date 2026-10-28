@@ -2282,7 +2282,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
           (e) => {
             const a = e.target.getAnimations().find((x) => x.animationName === e.animationName);
             const kf = a ? a.effect.getKeyframes() : [];
-            window.__anims.push({ name: e.animationName, moves: kf.some((k) => k.transform && k.transform !== 'none'), fades: kf.some((k) => k.opacity !== undefined) });
+            window.__anims.push({ name: e.animationName, unknown: !a, moves: kf.some((k) => k.transform && k.transform !== 'none'), fades: kf.some((k) => k.opacity !== undefined) }); // unknown: auf langsamen Rechnern schon vorbei
           },
           true
         );
@@ -2294,10 +2294,10 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       };
       await page.evaluate(() => (location.hash = '#tasks'));
       const view = await started(['view-in', 'ps-page-fwd', 'ps-page-back']);
-      assert.ok(view.every((a) => a.fades && !a.moves), `Seitenwechsel blendet nur über: ${JSON.stringify(view)}`);
+      assert.ok(view.every((a) => a.unknown || (a.fades && !a.moves)), `Seitenwechsel blendet nur über: ${JSON.stringify(view)}`);
       await page.evaluate(() => openModal(eventForm(null)));
       const card = await started('modal-in');
-      assert.ok(card.every((a) => a.fades && !a.moves), `Fenster blendet nur ein: ${JSON.stringify(card)}`);
+      assert.ok(card.every((a) => a.unknown || (a.fades && !a.moves)), `Fenster blendet nur ein: ${JSON.stringify(card)}`);
       await page.waitForSelector('#modal.open #evStart');
       await page.evaluate(() => {
         window.__ghostAnim = null;

@@ -242,7 +242,16 @@
     if (allTab && categories && categories.length) {
       const wasActive = document.querySelector('.tab-btn.active');
       allTab.parentElement.querySelectorAll('.tab-btn:not([data-cat="all"])').forEach((b) => b.remove());
-      for (const [key, label] of cats) allTab.parentElement.insertAdjacentHTML('beforeend', `<button data-act="category" class="tab-btn" data-cat="${esc(key)}">${esc(label)}</button>`);
+      for (const [key, label] of cats) {
+        // home.js hängt die Klick-Handler nur beim Laden an – neue Reiter bekommen ihren hier
+        const b = document.createElement('button');
+        b.className = 'tab-btn';
+        b.dataset.act = 'category';
+        b.dataset.cat = key;
+        b.textContent = label;
+        b.addEventListener('click', () => typeof window.setCategory === 'function' && window.setCategory(key));
+        allTab.parentElement.appendChild(b);
+      }
       const keep = wasActive && cats.some(([k]) => k === wasActive.dataset.cat) ? wasActive.dataset.cat : 'all';
       allTab.parentElement.querySelectorAll('.tab-btn').forEach((b) => b.classList.toggle('active', b.dataset.cat === keep));
     }
