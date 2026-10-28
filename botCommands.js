@@ -171,7 +171,7 @@ function akteCommand(body, u) {
       color: c.status === 'geschlossen' ? COLORS.slate : (staff ? c.priority >= 4 : c.urgency === 'notfall') ? COLORS.red : COLORS.gold,
       fields: [
         { name: 'Status', value: CASE_STATUS[c.status] || c.status },
-        { name: 'Verfahrensstand', value: STEPS[c.step] || STEPS[0] },
+        { name: 'Verfahrensstand', value: require('./areas').stepsOf(c.area)[c.step] || STEPS[0] },
         // Antwort sieht nur, wer fragt: die Kanzlei bekommt die (interne) Priorität, der Mandant seine Angabe
         staff
           ? { name: 'Priorität', value: PRIORITY_DISCORD[c.priority] || PRIORITY_DISCORD[2] }

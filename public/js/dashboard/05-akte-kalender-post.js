@@ -91,7 +91,7 @@ function taskPackagesHtml(caseId, packages, area) {
 function taskPackagesEditHtml(caseId, packages) {
   const form = (p) => `<form data-form="task-package" ${p ? `data-id="${p.id}"` : ''} data-case-id="${caseId}" class="pack-form form-grid cols-2">
       <div><label class="label">Name</label><input name="name" class="field" required minlength="2" maxlength="60" value="${esc(p ? p.name : '')}" placeholder="z. B. Festnahme"></div>
-      <div><label class="label">Rechtsgebiet</label><select name="area" class="field"><option value="">Alle</option>${Object.entries(AREAS).map(([k, l]) => opt(k, l, p && p.area === k)).join('')}</select></div>
+      <div><label class="label">Rechtsgebiet</label><select name="area" class="field"><option value="">Alle</option>${areaOptions(p && p.area).map(([k, l]) => opt(k, l, p && p.area === k)).join('')}</select></div>
       <div class="span-2"><label class="label">Aufgaben <span class="text-dim font-normal normal-case tracking-normal">– eine je Zeile, optional „| Tage“ bis zur Frist</span></label><textarea name="items" class="field" rows="5" maxlength="3000" required placeholder="Vollmacht einholen | 1&#10;Akteneinsicht beantragen | 2">${esc(p ? p.itemsText : '')}</textarea></div>
       <div class="span-2 form-actions"><button type="submit" class="btn-outline btn-sm">${icon('check', 'ico-sm')}<span>${p ? 'Speichern' : 'Paket anlegen'}</span></button>${p ? `<button type="button" class="btn-ghost btn-sm danger" data-action="task-package-del" data-id="${p.id}" data-case-id="${caseId}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>` : ''}</div>
     </form>`;
@@ -535,8 +535,8 @@ function closeOpenItems({ invoices = [], contracts = [], tasks = [], appointment
     .forEach((a) => items.push([icon('calendar', 'ico-sm'), `${esc(a.typeLabel || 'Termin')} „${esc(a.title)}“ am ${esc(fmtDate(a.startsAt))}`]));
   return items;
 }
-function outcomeOptions(selected = '') {
-  return `<option value="">Bitte wählen …</option>${Object.entries(OUTCOMES)
+function outcomeOptions(selected = '', area = '') {
+  return `<option value="">Bitte wählen …</option>${outcomeEntries(area, selected)
     .map(([k, [l]]) => opt(k, l, k === selected))
     .join('')}`;
 }
@@ -567,7 +567,7 @@ function closeCaseHtml(data) {
       ${check}${invoiceHint}
       <form data-form="case-close" data-id="${c.id}" data-no-invoice="${noInvoice ? '1' : ''}" class="form-grid mt-5">
         <div><label class="label" for="ccOutcome">Ergebnis</label>
-          <select id="ccOutcome" name="outcome" class="field" required>${outcomeOptions(c.outcome || '')}</select>
+          <select id="ccOutcome" name="outcome" class="field" required>${outcomeOptions(c.outcome || '', c.area)}</select>
           <p class="form-hint">Nur für die Kanzlei – daraus entsteht die Erfolgsquote auf der Startseite. Beratung ohne Verfahren und vorzeitig beendete Mandate zählen dort nicht mit.</p></div>
         ${
           sent && sent.estimateHe != null
@@ -883,7 +883,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
   // Bearbeitungsstand: die vier Schritte des Verfahrens und als fünfter Kreis „Abgeschlossen“. Zuständige Anwälte klicken
   // direkt an: einen Schritt, „Abgeschlossen“ (schließt das Verfahren) oder bei abgeschlossener Akte einen Schritt (öffnet
   // sie wieder dort).
-  const stages = [...STEPS, 'Abgeschlossen'];
+  const stages = [...stepsOf(c.area), 'Abgeschlossen'];
   const last = stages.length - 1;
   const at = c.closed ? last : c.step;
   const track = `
@@ -956,7 +956,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
   const statusValue = c.canEdit
     ? `${dot}<select data-case-status data-id="${c.id}" data-value="${esc(stageValue)}" aria-label="Stand der Akte">${[
         opt('offen', 'Offen', stageValue === 'offen'),
-        ...STEPS.map((s, i) => opt(`step:${i}`, s, stageValue === `step:${i}`)),
+        ...stepsOf(c.area).map((s, i) => opt(`step:${i}`, s, stageValue === `step:${i}`)),
         opt('geschlossen', 'Abgeschlossen', stageValue === 'geschlossen'),
       ].join('')}</select>`
     : `${dot}<span>${esc(caseStage(c)[0])}</span>`;
@@ -970,7 +970,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
   const outcomeValue =
     staff && c.closed
       ? c.canEdit
-        ? `<select data-case-outcome data-id="${c.id}" data-value="${esc(c.outcome || '')}" aria-label="Ergebnis des Verfahrens">${c.outcome ? '' : '<option value="">Nicht erfasst</option>'}${Object.entries(OUTCOMES)
+        ? `<select data-case-outcome data-id="${c.id}" data-value="${esc(c.outcome || '')}" aria-label="Ergebnis des Verfahrens">${c.outcome ? '' : '<option value="">Nicht erfasst</option>'}${outcomeEntries(c.area, c.outcome)
             .map(([k, [, , short]]) => opt(k, short, k === c.outcome))
             .join('')}</select>`
         : `<span>${esc(c.outcome && OUTCOMES[c.outcome] ? OUTCOMES[c.outcome][2] : 'Nicht erfasst')}</span>`
@@ -1159,9 +1159,9 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       ${staff ? '' : reviewSection(c, review)}
       ${
         c.canEdit
-          ? `<div class="section"><h3 class="section-title">Sachverhalt</h3><div class="ie-block">${ie(c, 'description', c.description, { type: 'textarea', placeholder: 'Sachverhalt beschreiben …', cls: 'ie-text' })}</div></div>
+          ? `${intakeAnswersHtml(c)}<div class="section"><h3 class="section-title">Sachverhalt</h3><div class="ie-block">${ie(c, 'description', c.description, { type: 'textarea', placeholder: 'Sachverhalt beschreiben …', cls: 'ie-text' })}</div></div>
       <div class="section"><h3 class="section-title">Statushinweis <span class="text-xs text-dim font-normal">sichtbar für den Mandanten</span></h3><div class="ie-block">${ie(c, 'publicNote', c.publicNote, { type: 'textarea', placeholder: 'Statushinweis für den Mandanten …', cls: 'ie-text' })}</div></div>`
-          : `${c.description ? `<div class="section"><h3 class="section-title">Sachverhalt</h3><p class="text-sm whitespace-pre-wrap text-muted">${esc(c.description)}</p></div>` : emptySection('', 'Sachverhalt', 'noch nicht beschrieben')}
+          : `${intakeAnswersHtml(c)}${c.description ? `<div class="section"><h3 class="section-title">Sachverhalt</h3><p class="text-sm whitespace-pre-wrap text-muted">${esc(c.description)}</p></div>` : emptySection('', 'Sachverhalt', 'noch nicht beschrieben')}
       ${c.publicNote ? `<div class="section"><h3 class="section-title">Statushinweis</h3><div class="banner banner-gold mb-0"><p class="text-sm whitespace-pre-wrap">${esc(c.publicNote)}</p></div></div>` : ''}`
       }
       ${parts.charges}
@@ -1192,6 +1192,38 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       </div>`;
 }
 
+/** Zusatzfelder des Rechtsgebiets im Formular „Neue Akte / Mandat einreichen“ (Einstellungen → Listen → Rechtsgebiete). */
+function areaFieldsHtml(areaKey, saved = {}, staff = false) {
+  const a = AREA_META.list.find((x) => x.key === areaKey);
+  if (!a || !a.fields || !a.fields.length) return '';
+  const field = (f) => {
+    const id = `ncF-${f.key}`;
+    const req = f.required && !staff && f.type !== 'checkbox' ? ' required' : '';
+    const label = `${esc(f.label)}${f.required && !staff ? ' *' : ''}`;
+    const hint = f.hint ? `<p class="form-hint">${esc(f.hint)}</p>` : '';
+    const v = saved[f.key] ?? '';
+    if (f.type === 'checkbox') return `<label class="check span-2"><input type="checkbox" id="${id}" data-answer="${esc(f.key)}" ${v === true || v === 'Ja' ? 'checked' : ''}> ${esc(f.label)}</label>`;
+    if (f.type === 'textarea') return `<div class="span-2"><label class="label" for="${id}">${label}</label><textarea id="${id}" data-answer="${esc(f.key)}" rows="3" maxlength="2000" class="field"${req}>${esc(v)}</textarea>${hint}</div>`;
+    if (f.type === 'select') return `<div><label class="label" for="${id}">${label}</label><select id="${id}" data-answer="${esc(f.key)}" class="field"${req}><option value="">– bitte wählen –</option>${f.options.map((o) => opt(o, o, v === o)).join('')}</select>${hint}</div>`;
+    return `<div><label class="label" for="${id}">${label}</label><input id="${id}" data-answer="${esc(f.key)}" type="${f.type === 'date' ? 'date' : 'text'}" ${f.type === 'number' ? 'inputmode="decimal"' : ''} maxlength="300" class="field" value="${esc(v)}"${req}>${hint}</div>`;
+  };
+  return `<div class="area-fields-grid form-grid cols-2"><div class="span-2 label mb-0">Angaben zu ${esc(a.name)}</div>${a.fields.map(field).join('')}</div>`;
+}
+document.addEventListener('change', (e) => {
+  const sel = e.target.closest && e.target.closest('form[data-form="new-case"] [data-area-select]');
+  const box = sel && document.getElementById('ncAreaFields');
+  if (!box) return;
+  const saved = {};
+  box.querySelectorAll('[data-answer]').forEach((el) => (saved[el.dataset.answer] = el.type === 'checkbox' ? el.checked : el.value));
+  box.innerHTML = areaFieldsHtml(sel.value, saved, isStaff());
+});
+/** Antworten auf die Zusatzfelder in der Akte (Bezeichnung zum Zeitpunkt des Einreichens). */
+function intakeAnswersHtml(c) {
+  const rows = Object.values(c.intakeAnswers || {});
+  if (!rows.length) return '';
+  return `<div class="section"><h3 class="section-title">Angaben zum Mandat</h3><dl class="intake-answers">${rows.map((r) => `<div><dt>${esc(r.label)}</dt><dd>${esc(r.value)}</dd></div>`).join('')}</dl></div>`;
+}
+
 async function newCaseModal() {
   const staff = isStaff();
   if (staff) await load.lawyers();
@@ -1204,13 +1236,14 @@ async function newCaseModal() {
           <div><label class="label" for="ncPhone">Telefon (im Spiel)</label><input id="ncPhone" name="clientPhone" class="field" maxlength="40" placeholder="555-0123"></div>
           <div class="span-2"><label class="label" for="ncEmail">…oder Login-E-Mail eines registrierten Mandanten (optional)</label><input id="ncEmail" name="clientEmail" type="text" autocapitalize="none" spellcheck="false" class="field" placeholder="z. B. max.mustermann@pake-scha.ls – verknüpft die Akte mit dem Konto"></div>` : ''}
         <div class="span-2"><label class="label" for="ncTitle">Titel</label><input id="ncTitle" name="title" class="field" required minlength="3" maxlength="120" placeholder="z. B. Festnahme am Legion Square" ${staff ? '' : 'autofocus'}></div>
-        <div><label class="label">Rechtsgebiet</label><select name="area" class="field">${Object.entries(AREAS).map(([k, l]) => opt(k, l)).join('')}</select></div>
+        <div><label class="label">Rechtsgebiet</label><select name="area" class="field" data-area-select>${areaOptions().map(([k, l]) => opt(k, l)).join('')}</select></div>
         ${staff
           ? `<div><label class="label">Priorität</label><select name="priority" class="field">${Object.entries(PRIORITY).map(([k, [l]]) => opt(k, l, k === '2')).join('')}</select></div>`
           : `<div><label class="label">Dringlichkeit</label><select name="urgency" class="field">${Object.entries(URGENCY).map(([k, [l]]) => opt(k, l)).join('')}</select></div>`}
         ${staff ? `<div><label class="label">Gegenpartei</label><input name="opponent" class="field" maxlength="120" placeholder="optional"></div>
           <div><label class="label">Gerichtsaktenzeichen</label><input name="courtRef" class="field" maxlength="60" placeholder="optional"></div>` : ''}
         ${staff ? lawyerPicker({ leadId: st.user.id, withLead: isAdmin(), emptyLead: 'Noch niemand (offene Anfrage)' }) : ''}
+        <div class="span-2 area-fields" id="ncAreaFields">${areaFieldsHtml((areaOptions()[0] || [''])[0], {}, staff)}</div>
         <div class="span-2"><label class="label">Sachverhalt</label><textarea name="description" rows="5" class="field" ${staff ? '' : 'required minlength="10"'} maxlength="4000" placeholder="Was ist passiert? Wer ist beteiligt? Gibt es bereits Fristen oder Termine?"></textarea></div>
         <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>${staff ? 'Akte anlegen' : 'Mandat einreichen'}</span></button></div>
       </form>`);

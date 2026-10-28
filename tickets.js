@@ -412,7 +412,7 @@ function memberOverwrite(id, kind, closed) {
   return { id, type: 1, allow: String(MEMBER_ALLOW), deny: '0' };
 }
 
-const AREA_LABEL = { strafrecht: 'Strafrecht', zivilrecht: 'Zivilrecht', verfassungsrecht: 'Verfassungsrecht', vertragsrecht: 'Vertragsrecht', sonstiges: 'Sonstiges' };
+const AREA_LABEL = new Proxy({}, { get: (_, k) => (typeof k === 'string' ? require('./areas').name(k) : undefined) }); // Name aus Einstellungen → Listen → Rechtsgebiete
 
 function lawyerText(c) {
   const all = caseLawyers(c);
@@ -474,7 +474,7 @@ async function createChannel(c, { quiet = false } = {}) {
           { name: 'Rechtsgebiet', value: AREA_LABEL[c.area] || c.area || '—' },
           // Der Mandant liest mit: nur seine eigene Angabe – die Priorität der Kanzlei bleibt intern.
           { name: 'Dringlichkeit (Angabe Mandant)', value: URGENCY_LABEL[c.urgency] || c.urgency },
-          { name: 'Status', value: `${CASE_STATUS[c.status]} · ${STEPS[c.step] || STEPS[0]}` },
+          { name: 'Status', value: `${CASE_STATUS[c.status]} · ${require('./areas').stepsOf(c.area)[c.step] || STEPS[0]}` },
           { name: 'Zuständig', value: lawyerText(c), inline: false },
           ...(clientIn
             ? []

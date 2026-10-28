@@ -27,7 +27,7 @@ const memberships = require('../memberships');
 const contractDiscord = require('../contractDiscord');
 
 const header = () => getSetting('contract_header', contracts.DEFAULT_HEADER);
-const AREA_LABEL = { strafrecht: 'Strafrecht', zivilrecht: 'Zivilrecht', verfassungsrecht: 'Verfassungsrecht', vertragsrecht: 'Vertragsrecht', sonstiges: 'Sonstiges' };
+const AREA_LABEL = new Proxy({}, { get: (_, k) => (typeof k === 'string' ? require('../areas').name(k) : undefined) });
 const text = (max) => z.string().trim().max(max);
 const FIELD_MAX = { grundgebuehr: 200, zusatzgebuehr: 200, leistungen: 3000, empfaenger: 400, betreff: 200, festnahme: 200, begruendung: 6000, fivenet_az: 300, anklagepunkte: 3000 };
 const fieldSchema = z.object(Object.fromEntries(Object.keys(contracts.FIELDS).map((k) => [k, text(FIELD_MAX[k] || 120).optional()])));

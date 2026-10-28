@@ -700,7 +700,7 @@ async function contractDocx(k, c, headerText, opts = {}) {
 /* ================================================================
    Aktenauszug (aktenauszug.html + public/js/aktenauszug.js)
    ================================================================ */
-const AREAS = { strafrecht: 'Strafrecht', zivilrecht: 'Zivilrecht', verfassungsrecht: 'Verfassungsrecht', vertragsrecht: 'Vertragsrecht', sonstiges: 'Sonstiges' };
+const AREAS = new Proxy({}, { get: (_, k) => (typeof k === 'string' ? require('./areas').name(k) : undefined) });
 const URGENCY = { normal: 'Normal', eilig: 'Eilig', notfall: 'Notfall' };
 const PRIORITY = { 1: 'Niedrig', 2: 'Normal', 3: 'Hoch', 4: 'Kritisch' };
 const EVENT_STATUS = { angefragt: 'Angefragt', bestaetigt: 'Bestätigt', abgesagt: 'Abgesagt', erledigt: 'Erledigt' };

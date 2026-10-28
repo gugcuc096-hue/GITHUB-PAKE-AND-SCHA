@@ -143,6 +143,7 @@ app.use('/api/contract-templates', contractRoutes.templatesRouter);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/site', require('./routes/site'));
+app.use('/api/areas', require('./routes/areas').router); // Rechtsgebiete als Daten (Einstellungen → Listen)
 app.use('/api/config', require('./routes/siteConfig').router); // Banner, Startseite, Beschriftungen, Mitteilungen, Export/Import
 app.use('/api/access', require('./routes/access').router); // Inhaber, Web-Admins, Rechte-Tabelle, Protokoll, Schalter
 app.use('/api/onboarding', require('./routes/onboarding'));
@@ -162,6 +163,7 @@ app.use('/api/tickets', require('./routes/tickets'));
 app.use('/api/bot', require('./routes/bot').router);
 app.use('/api/public', require('./routes/access').publicRouter);
 app.use('/api/public', require('./routes/siteConfig').publicRouter);
+app.use('/api/public', require('./routes/areas').publicRouter);
 app.use('/api/public', require('./routes/public'));
 app.use('/api/public', applications.publicRouter);
 app.use('/api/public', concernRoutes.publicRouter);

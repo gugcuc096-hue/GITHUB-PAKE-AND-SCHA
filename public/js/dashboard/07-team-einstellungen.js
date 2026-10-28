@@ -440,6 +440,7 @@ views.settings = {
       need('site.edit', () => api.get('/api/site/texts').then((x) => (st.siteTexts = x.texts), () => (st.siteTexts = []))),
       need('system.edit', () => api.get('/api/storage/items').then((x) => (st.storageAdmin = x), () => (st.storageAdmin = null))),
       loadAccess().catch(() => (st.access = null)),
+      can('settings.edit') ? loadLists().catch(() => (st.lists = null)) : Promise.resolve(),
       canAny(['site.edit', 'settings.edit']) ? loadConfig().catch(() => (st.cfg = null)) : Promise.resolve(),
     ]);
     st.google = can('system.edit') ? await api.get('/api/google/status').catch(() => null) : null;
@@ -461,6 +462,7 @@ views.settings = {
         ).join('')}</div>`;
     if (tab === 'access') return head + accessPanels();
     if (tab === 'texte') return head + configPanels();
+    if (tab === 'listen') return head + listsPanels();
     if (tab === 'bot') return head + botSettings();
     if (tab === 'integrations') return `${head}${fivenetSettingsPanel(s)}${googleDocsPanel(st.google)}`;
     if (tab === 'lager') return head + storageSettingsPanel();
@@ -498,6 +500,7 @@ const SETTINGS_TABS = [
   ['integrations', 'Integrationen', 'link'],
   ['lager', 'Lager', 'box'],
   ['system', 'System', 'shield'],
+  ['listen', 'Listen', 'tag'],
   ['texte', 'Texte & Banner', 'edit'],
   ['access', 'Rechte & Schalter', 'key'],
 ];
@@ -509,6 +512,7 @@ const TAB_PERMS = {
   integrations: ['system.edit'],
   lager: ['system.edit'],
   system: ['system.edit'],
+  listen: ['settings.edit'],
   texte: ['site.edit', 'settings.edit'],
   access: CONFIG_PERMS,
 };

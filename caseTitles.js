@@ -13,7 +13,7 @@ const AREA_TITLES = {
 
 /** „Strafrecht / Festnahme – Esad De La Cruz“ (höchstens 110 Zeichen). */
 function intakeTitle(area, name) {
-  const base = AREA_TITLES[area] || AREA_TITLES.sonstiges;
+  const base = require('./areas').intakeTitleOf(area) || AREA_TITLES[area] || AREA_TITLES.sonstiges;
   const who = String(name || '').replace(/\s+/g, ' ').trim();
   const title = who ? `${base} – ${who}` : base;
   return title.length > 110 ? `${title.slice(0, 109)}…` : title;

@@ -41,7 +41,7 @@ router.get('/', (req, res) => {
 
 const schema = z.object({
   name: z.string().trim().min(2).max(60),
-  area: z.enum([...AREAS, '']).default(''),
+  area: z.union([require('../areas').keySchema, z.literal('')]).default(''),
   items: z.string().trim().min(2).max(3000),
 });
 

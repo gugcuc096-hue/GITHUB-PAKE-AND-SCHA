@@ -16,7 +16,7 @@ const { logActivity } = require('../models');
 const features = require('../features');
 const discord = require('../discord');
 
-const AREA_LABEL = { strafrecht: 'Strafrecht', zivilrecht: 'Zivilrecht', verfassungsrecht: 'Verfassungsrecht', vertragsrecht: 'Vertragsrecht', sonstiges: 'Sonstiges' };
+const AREA_LABEL = new Proxy({}, { get: (_, k) => (typeof k === 'string' ? require('../areas').name(k) : undefined) });
 const NAME_MODES = ['voll', 'initialen', 'anonym'];
 
 /** Anzeigename auf der Website je nach Wunsch des Mandanten. */

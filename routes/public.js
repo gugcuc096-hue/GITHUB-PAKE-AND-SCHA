@@ -7,7 +7,8 @@ const { wrap, parseBody, AREAS, URGENCIES, URGENCY_LABEL, PRIORITY_DISCORD, PRIO
 const { addSystemNote, getCase, onDutyMembers, syncCaseWork } = require('../models');
 const discord = require('../discord');
 const tickets = require('../tickets');
-const { intakeTitle, AREA_TITLES } = require('../caseTitles');
+const { intakeTitle } = require('../caseTitles');
+const areas = require('../areas');
 
 const router = express.Router();
 
@@ -74,7 +75,8 @@ router.get('/stats', (req, res) => {
 const requestSchema = z.object({
   name: z.string().trim().min(2).max(80),
   phone: z.string().trim().max(40).optional(),
-  area: z.enum(AREAS),
+  area: areas.activeKeySchema,
+  answers: z.record(z.any()).optional(),
   urgency: z.enum(URGENCIES).default('normal'),
   description: z.string().trim().min(10).max(4000),
   teamMemberId: z.number().int().positive().optional(), // Wunschanwalt (Teamkarte „Direkt anfragen“)
@@ -103,6 +105,8 @@ router.post(
     if (!d) return;
     const account = req.user && req.user.role === 'mandant' ? req.user : null;
     // Kurzer Titel mit Namen; der Text des Mandanten steht im Sachverhalt
+    const checked = areas.checkAnswers(d.area, d.answers);
+    if (checked.error) return res.status(400).json({ error: checked.error });
     const title = intakeTitle(d.area, account ? account.display_name : d.name);
     const pin = randomPin();
     const lawyer = wishLawyer(d.teamMemberId);
@@ -110,11 +114,11 @@ router.post(
     const id = tx(() => {
       const info = db
         .prepare(
-          `INSERT INTO cases (case_number, access_pin, title, area, urgency, priority, description, client_id, client_name, client_phone, lawyer_id, status, source)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'web')`
+          `INSERT INTO cases (case_number, access_pin, title, area, urgency, priority, description, client_id, client_name, client_phone, lawyer_id, status, source, intake_answers)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'web', ?)`
         )
         // Start-Priorität aus der Dringlichkeit, die der Mandant angibt (die Kanzlei passt sie danach an)
-        .run(nextCaseNumber(), pin, title, d.area, d.urgency, PRIORITY_FROM_URGENCY[d.urgency] || 2, d.description, account ? account.id : null, account ? '' : d.name, d.phone || '', lawyer ? lawyer.id : null, lawyer ? 'in_bearbeitung' : 'offen');
+        .run(nextCaseNumber(), pin, title, d.area, d.urgency, PRIORITY_FROM_URGENCY[d.urgency] || 2, d.description, account ? account.id : null, account ? '' : d.name, d.phone || '', lawyer ? lawyer.id : null, lawyer ? 'in_bearbeitung' : 'offen', Object.keys(checked.answers).length ? JSON.stringify(checked.answers) : null);
       const newId = Number(info.lastInsertRowid);
       addSystemNote(newId, null, `Mandatsanfrage über das Website-Formular eingegangen${lawyer ? ` – gewünscht: ${lawyer.display_name}` : ''}.`);
       if (lawyer) syncCaseWork(newId);
@@ -129,7 +133,7 @@ router.post(
       fields: [
         { name: 'Mandant', value: account ? account.display_name : d.name },
         { name: 'Telefon', value: d.phone || '—' },
-        { name: 'Rechtsgebiet', value: AREA_TITLES[d.area] },
+        { name: 'Rechtsgebiet', value: areas.name(d.area) },
         lawyer ? { name: 'Wunschanwalt', value: `${lawyer.display_name} (zugewiesen)` } : null,
         { name: 'Priorität', value: PRIORITY_DISCORD[c.priority] || PRIORITY_DISCORD[2] },
         d.urgency !== 'normal' ? { name: 'Dringlichkeit (Angabe Mandant)', value: URGENCY_LABEL[d.urgency] || d.urgency } : null,

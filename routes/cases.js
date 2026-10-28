@@ -43,6 +43,7 @@ const {
   logActivity,
 } = require('../models');
 const features = require('../features');
+const areas = require('../areas');
 const discord = require('../discord');
 const tickets = require('../tickets');
 const reviewRequest = require('../reviewRequest');
@@ -145,7 +146,7 @@ function handover(c, by, leadId, text) {
           fields: [
             { name: 'Übergabe', value: truncate(text || '– (keine Notiz)', 1000), inline: false },
             { name: 'Mandant', value: c.client_name || '–' },
-            { name: 'Stand', value: c.status === 'geschlossen' ? 'Abgeschlossen' : STEPS[c.step] || STEPS[0] },
+            { name: 'Stand', value: c.status === 'geschlossen' ? 'Abgeschlossen' : areas.stepsOf(c.area)[c.step] || STEPS[0] },
           ],
         }),
       ],
@@ -204,9 +205,10 @@ router.post('/:id/chat/read', (req, res) => {
 /* ---------------------------------------------------------------- Anlegen */
 const createSchema = z.object({
   title: z.string().trim().min(3).max(120),
-  area: z.enum(AREAS),
+  area: areas.activeKeySchema,
   urgency: z.enum(URGENCIES).default('normal'),
   description: z.string().trim().max(4000).default(''),
+  answers: z.record(z.any()).optional(), // Antworten auf die Zusatzfelder des Rechtsgebiets
   clientEmail: z.string().trim().max(120).optional(), // Login-Adresse, Teil vor dem @ oder frühere Adresse
   clientName: z.string().trim().max(80).optional(),
   clientPhone: z.string().trim().max(40).optional(),
@@ -259,12 +261,16 @@ router.post(
       coIds = coIds.filter((cid) => cid !== lawyerId);
     }
 
+    // Zusatzfelder des Rechtsgebiets: von Mandanten Pflicht, wo so eingestellt; die Kanzlei darf Lücken lassen
+    const checked = areas.checkAnswers(d.area, d.answers, { enforceRequired: u.role === 'mandant' });
+    if (checked.error) return res.status(400).json({ error: checked.error });
+
     const id = tx(() => {
       const info = db
         .prepare(
           `INSERT INTO cases (case_number, access_pin, title, area, urgency, priority, description, client_id, client_name, client_phone,
-                              opponent, court_ref, lawyer_id, status, source)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                              opponent, court_ref, lawyer_id, status, source, intake_answers)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .run(
           nextCaseNumber(),
@@ -281,7 +287,8 @@ router.post(
           d.courtRef || '',
           lawyerId,
           lawyerId ? 'in_bearbeitung' : 'offen',
-          source
+          source,
+          Object.keys(checked.answers).length ? JSON.stringify(checked.answers) : null
         );
       const newId = Number(info.lastInsertRowid);
       const addCo = db.prepare('INSERT INTO case_lawyers (case_id, user_id, added_by) VALUES (?, ?, ?)');
@@ -625,7 +632,7 @@ router.put('/:id/star', (req, res) => {
 /* ---------------------------------------------------------------- Bearbeiten */
 const updateSchema = z.object({
   title: z.string().trim().min(3).max(120).optional(),
-  area: z.enum(AREAS).optional(),
+  area: areas.keySchema.optional(),
   urgency: z.enum(URGENCIES).optional(),
   description: z.string().trim().max(4000).optional(),
   clientName: z.string().trim().max(80).optional(),
@@ -777,7 +784,7 @@ router.patch(
       sets.push(`${FIELD_COLUMNS[key]} = ?`);
       values.push(d[key]);
     }
-    if (d.step !== undefined && d.step !== c.step) history.push(`Verfahrensstand: ${STEPS[d.step]}`);
+    if (d.step !== undefined && d.step !== c.step) history.push(`Verfahrensstand: ${areas.stepsOf(c.area)[d.step]}`);
     // Priorität ist intern: eigener (interner) Verlaufseintrag, nichts davon im Ticket oder für den Mandanten
     const internalHistory = [];
     if (d.priority !== undefined && d.priority !== (c.priority || 2)) {
@@ -845,7 +852,7 @@ router.patch(
     }
     // Sieg-Moment: Erfolg fürs Team in Discord feiern – ohne Mandant, Aktenzeichen oder Sachverhalt
     if (newStatus === 'geschlossen' && c.status !== 'geschlossen' && OUTCOMES[updated.outcome]?.success) {
-      const AREA = { strafrecht: 'Strafrecht', zivilrecht: 'Zivilrecht', verfassungsrecht: 'Verfassungsrecht', vertragsrecht: 'Vertragsrecht' };
+      const AREA = { [updated.area]: updated.area === 'sonstiges' ? '' : areas.name(updated.area) };
       discord.notify('case.victory', {
         title: `🏆 ${OUTCOMES[updated.outcome].label}!`,
         description: `Ein ${AREA[updated.area] ? `${AREA[updated.area]}s-` : ''}Mandat wurde erfolgreich abgeschlossen. Starke Arbeit, Team!`,
@@ -956,7 +963,7 @@ function ticketUpdate(before, c, u, { history, editFields, d, newStatus, newlyAs
     color: closing ? tickets.COLORS.slate : reopening ? tickets.COLORS.green : tickets.COLORS.gold,
     fields: [
       { name: 'Status', value: CASE_STATUS[c.status] },
-      { name: 'Verfahrensstand', value: STEPS[c.step] || STEPS[0] },
+      { name: 'Verfahrensstand', value: areas.stepsOf(c.area)[c.step] || STEPS[0] },
       { name: 'Zuständig', value: lawyerNames(c), inline: false },
     ],
     mention: statusChanged || stepChanged || noteChanged ? 'client' : undefined,

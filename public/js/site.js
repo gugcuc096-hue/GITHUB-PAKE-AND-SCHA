@@ -76,6 +76,43 @@
     document.getElementById('ticketAccount')?.addEventListener('click', () => joinTicket(res.caseNumber, res.pin, '/api/discord/case-account'));
   }
 
+  /* ---------------------------------------------------------------- Rechtsgebiete aus dem Dashboard (Auswahl und Zusatzfragen) */
+  let areaList = [];
+  const FIELD_CLS = 'w-full bg-slate-900/80 border border-[var(--glass-border)] rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--gold-500)]';
+  const LABEL_CLS = 'block text-xs uppercase tracking-wider text-[var(--text-muted)] mb-1';
+  function renderAreaFields() {
+    const box = document.getElementById('tkAreaFields');
+    const sel = document.getElementById('tkArea');
+    if (!box || !sel) return;
+    const a = areaList.find((x) => x.key === sel.value);
+    const saved = {};
+    box.querySelectorAll('[data-answer]').forEach((el) => (saved[el.dataset.answer] = el.type === 'checkbox' ? el.checked : el.value));
+    box.innerHTML = ((a && a.fields) || [])
+      .map((f) => {
+        const id = `tkF-${esc(f.key)}`;
+        const req = f.required && f.type !== 'checkbox' ? ' required' : '';
+        const label = `${esc(f.label)}${f.required ? ' *' : ''}`;
+        const hint = f.hint ? `<p class="text-[0.7rem] text-[var(--text-dim)] mt-1">${esc(f.hint)}</p>` : '';
+        if (f.type === 'checkbox') return `<label class="flex items-center gap-2 text-sm text-[var(--text-muted)]"><input id="${id}" type="checkbox" data-answer="${esc(f.key)}" class="accent-[var(--gold-500)]" ${saved[f.key] ? 'checked' : ''}> ${esc(f.label)}</label>${hint}`;
+        if (f.type === 'textarea') return `<div><label for="${id}" class="${LABEL_CLS}">${label}</label><textarea id="${id}" data-answer="${esc(f.key)}" rows="3" maxlength="2000" class="${FIELD_CLS}"${req}>${esc(saved[f.key] || '')}</textarea>${hint}</div>`;
+        if (f.type === 'select') return `<div><label for="${id}" class="${LABEL_CLS}">${label}</label><select id="${id}" data-answer="${esc(f.key)}" class="${FIELD_CLS}"${req}><option value="">– bitte wählen –</option>${f.options.map((o) => `<option ${saved[f.key] === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>${hint}</div>`;
+        const type = f.type === 'date' ? 'date' : f.type === 'number' ? 'text" inputmode="decimal' : 'text';
+        return `<div><label for="${id}" class="${LABEL_CLS}">${label}</label><input id="${id}" type="${type}" data-answer="${esc(f.key)}" maxlength="300" value="${esc(saved[f.key] || '')}" class="${FIELD_CLS}"${req}>${hint}</div>`;
+      })
+      .join('');
+  }
+  function applyAreas(list) {
+    areaList = list || [];
+    const sel = document.getElementById('tkArea');
+    if (!sel || !areaList.length) return;
+    const keep = sel.value;
+    sel.innerHTML = areaList.map((a) => `<option value="${esc(a.key)}">${esc(a.intakeTitle || a.name)}</option>`).join('');
+    if (areaList.some((a) => a.key === keep)) sel.value = keep;
+    renderAreaFields();
+  }
+  document.getElementById('tkArea')?.addEventListener('change', renderAreaFields);
+  window.PS.boot('areas', '/api/public/areas').then((r) => applyAreas(r && r.areas)).catch(() => {});
+
   window.handleFormSubmit = async function (e) {
     e.preventDefault();
     const form = e.target;
@@ -84,7 +121,10 @@
       setTimeout(() => (location.href = '/dashboard#cases'), 1400);
       return;
     }
+    const answers = {};
+    form.querySelectorAll('#tkAreaFields [data-answer]').forEach((el) => (answers[el.dataset.answer] = el.type === 'checkbox' ? el.checked : el.value.trim()));
     const data = {
+      answers,
       name: form.elements.name.value.trim(),
       phone: form.elements.phone.value.trim(),
       area: form.elements.area.value,

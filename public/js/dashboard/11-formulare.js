@@ -156,6 +156,9 @@ const forms = {
   'new-case': async (f) => {
     const fd = new FormData(f);
     const body = { title: val(fd, 'title'), area: val(fd, 'area'), urgency: val(fd, 'urgency') || 'normal', description: val(fd, 'description') };
+    const answers = {};
+    f.querySelectorAll('#ncAreaFields [data-answer]').forEach((el) => (answers[el.dataset.answer] = el.type === 'checkbox' ? el.checked : el.value.trim()));
+    if (Object.keys(answers).length) body.answers = answers;
     if (isStaff()) {
       if (val(fd, 'clientEmail')) body.clientEmail = val(fd, 'clientEmail');
       else if (!val(fd, 'clientName')) throw new Error('Bitte den Namen des Mandanten oder die E-Mail eines Mandantenkontos angeben.');
