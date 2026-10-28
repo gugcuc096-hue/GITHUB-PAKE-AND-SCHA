@@ -346,7 +346,8 @@ function apptRow(a, u) {
   return {
     id: a.id,
     type: a.type,
-    typeLabel: EVENT_TYPES[a.type] || a.type,
+    typeLabel: (a.kind && require('./eventKinds').nameOf(a.kind)) || EVENT_TYPES[a.type] || a.type,
+    kind: a.kind || null,
     title: a.title,
     startsAt: a.starts_at,
     endsAt: a.ends_at || null,

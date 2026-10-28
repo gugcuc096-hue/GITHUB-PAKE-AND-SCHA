@@ -308,6 +308,7 @@ const forms = {
     if (!fd.get('startsAt')) throw new Error('Bitte Datum und Uhrzeit angeben.');
     const body = {
       type: val(fd, 'type'),
+      kind: val(fd, 'kind') || null,
       title: val(fd, 'title'),
       startsAt: new Date(fd.get('startsAt')).toISOString(),
       endsAt: fd.get('endsAt') ? new Date(fd.get('endsAt')).toISOString() : null,

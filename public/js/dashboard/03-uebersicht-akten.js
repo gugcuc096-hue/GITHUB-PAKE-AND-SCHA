@@ -23,7 +23,7 @@ function eventRow(e, { date = true } = {}) {
   // Zusage des Mandanten per Discord-Knopf (nur Kanzlei sieht sie als Markierung)
   const reply = isStaff() && !closed && e.clientResponse ? (e.clientResponse === 'zugesagt' ? badge('Zugesagt', 'emerald') : badge('Passt nicht', 'red')) : '';
   const side = closed ? statusBadge(EVENT_STATUS, e.status) : `${e.status === 'angefragt' ? badge('Anfrage', 'amber') : ''}${reply}${countdownHtml(e)}`;
-  const meta = [EVENT_TYPES[e.type], `${date ? fmtDay(e.startsAt) + ', ' : ''}${fmtTime(e.startsAt)} Uhr`, e.caseNumber, isStaff() ? e.assignedName : null]
+  const meta = [evLabel(e), `${date ? fmtDay(e.startsAt) + ', ' : ''}${fmtTime(e.startsAt)} Uhr`, e.caseNumber, isStaff() ? e.assignedName : null]
     .filter(Boolean)
     .map(esc)
     .join(' · ');
@@ -142,7 +142,7 @@ function todoPanel() {
   });
   for (const e of soon) {
     const when = `${daysUntil(dayKey(parseDate(e.startsAt))) <= 0 ? 'Heute' : 'Morgen'}, ${fmtTime(e.startsAt)} Uhr`;
-    items.push(item('calendar', `${esc(when)}: ${esc(e.title)}`, [EVENT_TYPES[e.type], e.location, e.caseNumber ? `Akte ${e.caseNumber}` : ''].filter(Boolean).map(esc).join(' · '), `<button class="btn-outline btn-sm" data-action="open-event" data-id="${e.id}">Details</button>`));
+    items.push(item('calendar', `${esc(when)}: ${esc(e.title)}`, [evLabel(e), e.location, e.caseNumber ? `Akte ${e.caseNumber}` : ''].filter(Boolean).map(esc).join(' · '), `<button class="btn-outline btn-sm" data-action="open-event" data-id="${e.id}">Details</button>`));
   }
   if (st.unread) {
     items.push(item('mail', `${st.unread === 1 ? 'Eine ungelesene Nachricht' : `${st.unread} ungelesene Nachrichten`} in der Kanzlei-Post`, '', `<a class="btn-outline btn-sm" href="#mail">Öffnen</a>`));
@@ -579,7 +579,7 @@ function gsItem(type, x, q) {
   else if (type === 'tasks')
     body = line(`${x.done ? '✓ ' : ''}${hl(x.title, q)}`, [x.dueDate ? `fällig ${esc(fmtDateOnly(x.dueDate))}` : 'ohne Datum', x.assignedName ? esc(x.assignedName) : '', x.caseNumber ? esc(x.caseNumber) : '', x.done ? 'erledigt' : ''].filter(Boolean).join(' · '));
   else if (type === 'events')
-    body = line(hl(x.title, q), [esc(fmtDate(x.startsAt)), esc(EVENT_TYPES[x.type] || x.type), x.location ? hl(x.location, q) : '', x.caseNumber ? esc(x.caseNumber) : ''].filter(Boolean).join(' · '));
+    body = line(hl(x.title, q), [esc(fmtDate(x.startsAt)), esc(evLabel(x)), x.location ? hl(x.location, q) : '', x.caseNumber ? esc(x.caseNumber) : ''].filter(Boolean).join(' · '));
   else if (type === 'notes')
     body = line(`<span class="font-mono text-gold">${esc(x.caseNumber)}</span> · ${esc(x.caseTitle)}`, [hl(x.preview, q), `${esc(x.author)}${x.internal ? ' (intern)' : ''}`, esc(fmtDate(x.createdAt))].join(' · '));
   else if (type === 'wiki') body = line(hl(x.title, q), [esc(x.category), hl(x.preview, q)].join(' · '));
