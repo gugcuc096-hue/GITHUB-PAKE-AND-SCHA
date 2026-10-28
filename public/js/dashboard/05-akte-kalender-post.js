@@ -316,19 +316,20 @@ function partiesHtml(c, parties = [], overlaps = {}) {
   if ((overlaps.opponent || []).length) warn.push(`Die Gegenpartei ist in ${hit(overlaps.opponent)} <strong>Mandant</strong>.`);
   for (const p of parties) if ((p.overlaps || []).length) warn.push(`${esc(p.name)} (${esc(p.roleLabel)}) ist in ${hit(p.overlaps)} <strong>Mandant</strong>.`);
   const rows = parties
+    .filter((p) => p.role !== 'zeuge') // Zeugen haben einen eigenen Abschnitt
     .map(
       (p) => `<div class="party-row"><span class="party-role">${esc(p.roleLabel)}</span><span class="party-name">${esc(p.name)}</span><span class="party-contact">${esc(p.contact || '')}</span>
         ${c.canEdit ? `<button type="button" class="icon-btn sm" data-action="party-del" data-case-id="${c.id}" data-id="${p.id}" aria-label="Beteiligten entfernen" title="Entfernen">${icon('trash', 'ico-sm')}</button>` : ''}</div>`
     )
     .join('');
   const add = c.canEdit
-    ? `<form data-form="party-add" data-id="${c.id}" class="party-add"><select name="role" class="field" aria-label="Rolle">${Object.entries({ gegenpartei: 'Gegenpartei', zeuge: 'Zeuge', gericht: 'Gericht', staatsanwalt: 'Staatsanwaltschaft', sonstige: 'Sonstige' }).map(([k, l]) => opt(k, l)).join('')}</select>
+    ? `<form data-form="party-add" data-id="${c.id}" class="party-add"><select name="role" class="field" aria-label="Rolle">${Object.entries({ gegenpartei: 'Gegenpartei', gericht: 'Gericht', staatsanwalt: 'Staatsanwaltschaft', sonstige: 'Sonstige' }).map(([k, l]) => opt(k, l)).join('')}</select>
         <input name="name" class="field" required minlength="2" maxlength="120" placeholder="Name" aria-label="Name"><input name="contact" class="field" maxlength="160" placeholder="Kontakt (optional)" aria-label="Kontakt">
         <button type="submit" class="btn-outline btn-sm">${icon('plus', 'ico-sm')}<span>Hinzufügen</span></button></form>`
     : '';
   return `<div class="parties" id="partiesBox"><div class="k">Beteiligte</div>
       ${warn.length ? `<div class="party-warn">${icon('alert', 'ico-sm')}<div>${warn.join('<br>')}<span class="party-warn-note">Bitte auf einen möglichen Interessenkonflikt prüfen.</span></div></div>` : ''}
-      ${rows || '<p class="text-sm text-dim">Noch niemand erfasst.</p>'}${add}</div>`;
+      ${rows || '<p class="text-sm text-dim">Noch niemand erfasst. Zeugen: eigener Abschnitt weiter unten.</p>'}${add}</div>`;
 }
 
 /** Verlauf nach Phasen: frühere Schritte des Verfahrens sind eingeklappt, der aktuelle steht offen. */
@@ -1101,6 +1102,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
   const parts = {
     charges: staff ? chargesSection(c, charges, deals) : dealClientCard(c, deals),
     chat: chatSection(c, chat, ticket),
+    witnesses: witnessesSection(c, parties),
     contracts: contractsSection(c, contractList),
     briefs: briefsSection(c, briefList),
     external: externalSection(c, externalDocs),
@@ -1117,6 +1119,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     ['secCharges', 'Anklage', charges ? charges.charges.length : 0, parts.charges],
     ['secChat', 'Nachrichten', chat ? chat.messages.length : 0, parts.chat],
     ['secEvents', 'Termine', appointments.length, true],
+    ['secWitnesses', 'Zeugen', parties.filter((p) => p.role === 'zeuge').length, parts.witnesses],
     ['secContracts', 'Verträge', contractList.length, parts.contracts],
     ['secBriefs', 'Schriftsätze', briefList.length, parts.briefs],
     ['secExternal', 'Dokumente', externalDocs.length, parts.external],
@@ -1167,6 +1170,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       ${parts.charges}
       ${parts.chat}
       ${eventsSection}
+      ${parts.witnesses}
       ${parts.contracts}
       ${parts.briefs}
       ${parts.external}
@@ -1513,7 +1517,7 @@ function eventForm(e, preset = {}) {
   const isNew = !e;
   const v = e || {};
   const type = v.type || preset.type || 'gericht';
-  const start = v.startsAt ? toLocalInput(v.startsAt) : preset.day ? `${preset.day}T10:00` : '';
+  const start = v.startsAt ? toLocalInput(v.startsAt) : preset.start || (preset.day ? `${preset.day}T10:00` : '');
   const caseId = v.caseId ?? preset.caseId ?? null;
   const assigned = isNew ? st.user.id : v.assignedTo;
   const visible = isNew ? ['mandant', 'gericht'].includes(type) : v.clientVisible;
@@ -1542,13 +1546,13 @@ function eventForm(e, preset = {}) {
         .map(([k, l]) => `<label class="seg-opt"><input type="radio" name="type" value="${k}" ${type === k ? 'checked' : ''}><span><i class="cal-dot" style="background:${EVENT_COLORS[k]}"></i>${esc(l)}</span></label>`)
         .join('')}</div></div>
         ${eventKindBox(v, isNew)}
-        <div class="span-2"><label class="label" for="evTitle">Titel</label><input id="evTitle" name="title" class="field" required minlength="2" maxlength="120" value="${esc(v.title || '')}" placeholder="z. B. Hauptverhandlung Strafsache Doe" autofocus></div>
+        <div class="span-2"><label class="label" for="evTitle">Titel</label><input id="evTitle" name="title" class="field" required minlength="2" maxlength="120" value="${esc(v.title || preset.title || '')}" placeholder="z. B. Hauptverhandlung Strafsache Doe" autofocus></div>
         <div><label class="label" for="evStart">Beginn / Fälligkeit</label><input id="evStart" name="startsAt" type="datetime-local" class="field" required value="${start}"></div>
         <div><label class="label" for="evEnd">Ende (optional)</label><input id="evEnd" name="endsAt" type="datetime-local" class="field" value="${v.endsAt ? toLocalInput(v.endsAt) : ''}"></div>
         <div><label class="label">Akte (optional)</label><select name="caseId" class="field"><option value="">Keine Akte</option>${caseOpts}</select></div>
         <div><label class="label">Zuständig</label><select name="assignedTo" class="field"><option value="">Niemand</option>${st.lawyers.map((l) => opt(l.id, l.displayName, l.id === assigned)).join('')}</select></div>
         <div class="span-2"><label class="label">Ort</label><input name="location" class="field" maxlength="120" value="${esc(v.location ?? (type === 'frist' ? '' : 'Kanzlei Würfelpark'))}" placeholder="z. B. District Court, Saal 2"></div>
-        <div class="span-2"><label class="label">Notiz</label><textarea name="note" rows="3" class="field" maxlength="1000" placeholder="Vorbereitung, Unterlagen, Hinweise …">${esc(v.note || '')}</textarea></div>
+        <div class="span-2"><label class="label">Notiz</label><textarea name="note" rows="3" class="field" maxlength="1000" placeholder="Vorbereitung, Unterlagen, Hinweise …">${esc(v.note || preset.note || '')}</textarea></div>
         <label class="check span-2"><input type="checkbox" name="clientVisible" ${visible ? 'checked' : ''}> Für den Mandanten im Portal sichtbar</label>
         ${isNew && feature('slots') ? `<details class="span-2 slot-box"><summary>Terminvorschlag: Mandant wählt die Zeit</summary>
           <p class="form-hint">Nur für Mandantengespräche in einer Akte mit Mandanten-Konto. Oben steht die erste Zeit, hier bis zu zwei weitere – der Mandant tippt im Portal eine an, danach ist der Termin bestätigt.</p>

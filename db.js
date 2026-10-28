@@ -1321,6 +1321,24 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_case_parties_case ON case_parties(case_id);
 `);
+// Zeugenverwaltung: Lager, Stand, Ladung, erwartete und tatsächliche Aussage; dazu Vorhalte (Widersprüche)
+addColumn('case_parties', 'side', "TEXT NOT NULL DEFAULT ''"); // belastend | entlastend | neutral
+addColumn('case_parties', 'status', "TEXT NOT NULL DEFAULT 'offen'");
+addColumn('case_parties', 'summon_at', 'TEXT');
+addColumn('case_parties', 'expected', "TEXT NOT NULL DEFAULT ''");
+addColumn('case_parties', 'statement', "TEXT NOT NULL DEFAULT ''");
+db.exec(`
+  CREATE TABLE IF NOT EXISTS party_contradictions (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    party_id   INTEGER NOT NULL REFERENCES case_parties(id) ON DELETE CASCADE,
+    case_id    INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    text       TEXT NOT NULL,
+    ref        TEXT NOT NULL DEFAULT '',
+    created_by TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_party_contradictions_case ON party_contradictions(case_id);
+`);
 
 // Verknüpfte Akten (z. B. ein Vorfall, mehrere Festgenommene) – je Paar eine Zeile, a_id < b_id
 db.exec(`

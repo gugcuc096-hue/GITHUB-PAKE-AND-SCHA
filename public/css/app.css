@@ -870,6 +870,25 @@ details.edit-box[open] > summary::after { content: '–'; }
 .fn-pick-client { flex: none; max-width: 40%; font-size: 0.8rem; color: var(--text-dim); overflow-wrap: anywhere; text-align: right; }
 @media (max-width: 480px) { .fn-pick { flex-direction: column; align-items: flex-start; gap: 0.15rem; } .fn-pick-client { max-width: 100%; text-align: left; } }
 
+/* Zeugenverwaltung */
+.wit-list { display: grid; gap: 0.75rem; }
+.wit-card { border: 1px solid var(--line); border-radius: 14px; padding: 0.85rem 1rem; background: rgba(255, 255, 255, 0.02); display: flex; flex-direction: column; gap: 0.6rem; }
+.wit-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 0.5rem 1rem; }
+.wit-name { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.wit-contact { font-size: 0.8rem; color: var(--text-dim); }
+.wit-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.wit-summon { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.8rem; color: var(--gold-light); }
+.wit-block .k { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin-bottom: 0.2rem; cursor: default; }
+.wit-block p, .wit-statement { font-size: 0.9rem; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-muted); margin: 0; }
+.wit-contra { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.wit-contra li { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; padding: 0.4rem 0.6rem; border-left: 2px solid #f87171; background: rgba(248, 113, 113, 0.06); border-radius: 0 8px 8px 0; font-size: 0.88rem; }
+.wit-contra-text { min-width: 0; overflow-wrap: anywhere; }
+.wit-ref { display: inline-block; margin-left: 0.3rem; padding: 0 0.4rem; border-radius: 999px; font-size: 0.72rem; font-family: var(--font-mono, monospace); color: var(--gold-light); border: 1px solid var(--gold-hairline); }
+.wit-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+.wit-actions .push { margin-left: auto; }
+.wit-contra-form { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; gap: 0.5rem; }
+@media (max-width: 640px) { .wit-contra-form { grid-template-columns: minmax(0, 1fr); } }
+
 /* Aufgaben & Wiedervorlagen */
 .task-list { display: flex; flex-direction: column; }
 .task-row { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.65rem 0.4rem; border-bottom: 1px solid var(--line); }
