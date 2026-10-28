@@ -1067,10 +1067,10 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.waitForFunction(() => !document.querySelector('#modal').classList.contains('open'));
         assert.equal((await adm.get(`/api/cases/${kase.id}`)).status, 404, 'Akte gelöscht (Papierkorb)');
 
-        // Einstellungen: acht Reiter, Discord mit Webhook und Login als Module, System mit Datensicherung
+        // Einstellungen: neun Reiter, Discord mit Webhook und Login als Module, System mit Datensicherung
         await page.evaluate(() => (location.hash = '#settings'));
         await settle();
-        assert.deepEqual(await page.$$eval('#content .settings-tabs .chip', (els) => els.map((e) => e.textContent.trim())), ['Kanzlei & Rechnungen', 'Website & Ränge', 'Discord', 'Integrationen', 'Lager', 'System', 'Texte & Banner', 'Rechte & Schalter']);
+        assert.deepEqual(await page.$$eval('#content .settings-tabs .chip', (els) => els.map((e) => e.textContent.trim())), ['Kanzlei & Rechnungen', 'Website & Ränge', 'Discord', 'Integrationen', 'Lager', 'System', 'Listen', 'Texte & Banner', 'Rechte & Schalter']);
         assert.ok(await page.$('#content form[data-form="settings-firm"]'));
         // Website & Ränge: Bearbeiten-Links, Ränge mit Knöpfen, Rang-Dialog
         await page.click('#content .settings-tabs [data-tab="site"]');
