@@ -10,6 +10,8 @@ const AREA_TONE = { gold: 'gold', sky: 'sky', emerald: 'emerald', amber: 'amber'
 async function loadLists() {
   st.lists = await api.get('/api/areas');
   st.ekinds = await api.get('/api/event-kinds');
+  st.billing = await api.get('/api/billing');
+  st.billFees = (await api.get('/api/fees').catch(() => ({ fees: [] }))).fees; // für die Standardgebühren je Rechtsgebiet
 }
 async function refreshAreas() {
   await loadLists();
@@ -19,7 +21,7 @@ async function refreshAreas() {
 
 function listsPanels() {
   if (!st.lists) return '<div class="panel panel-pad"><p class="text-sm text-muted">Wird geladen …</p></div>';
-  return `${areasPanel()}<div class="mt-4 lg:mt-5">${eventKindsPanel()}</div>`;
+  return `${areasPanel()}<div class="mt-4 lg:mt-5">${eventKindsPanel()}</div><div class="mt-4 lg:mt-5">${invoiceTypesPanel()}</div><div class="mt-4 lg:mt-5">${feeCategoriesPanel()}</div>`;
 }
 
 function areasPanel() {
@@ -37,7 +39,7 @@ function areaCard(a, i, n) {
       <span class="area-dot tone-${esc(a.color)}" aria-hidden="true">${icon(a.icon, 'ico-sm')}</span>
       <div class="area-main">
         <div class="area-name"><strong>${esc(a.name)}</strong>${a.short ? `<span class="area-short">${esc(a.short)}</span>` : ''}${a.active ? '' : badge('ausgeblendet', 'slate')}</div>
-        <div class="area-meta">Website: „${esc(a.intakeTitle)}“ · ${u.cases} ${u.cases === 1 ? 'Akte' : 'Akten'}${u.packages ? ` · ${u.packages} Aufgaben-${u.packages === 1 ? 'Paket' : 'Pakete'}` : ''}${a.fields.length ? ` · ${a.fields.length} Zusatz${a.fields.length === 1 ? 'frage' : 'fragen'}` : ''}${a.customSteps ? ' · eigene Schritte' : ''}</div>
+        <div class="area-meta">Website: „${esc(a.intakeTitle)}“ · ${u.cases} ${u.cases === 1 ? 'Akte' : 'Akten'}${u.packages ? ` · ${u.packages} Aufgaben-${u.packages === 1 ? 'Paket' : 'Pakete'}` : ''}${a.fields.length ? ` · ${a.fields.length} Zusatz${a.fields.length === 1 ? 'frage' : 'fragen'}` : ''}${a.customSteps ? ' · eigene Schritte' : ''}${a.defaultFees.length ? ` · ${a.defaultFees.length} Standardgebühr${a.defaultFees.length === 1 ? '' : 'en'}` : ''}</div>
       </div>
       <div class="area-btns">
         <button type="button" class="icon-btn sm" data-action="area-move" data-key="${esc(a.key)}" data-dir="-1" aria-label="Nach oben" ${i === 0 ? 'disabled' : ''}>${icon('chevronUp', 'ico-sm')}</button>
@@ -80,7 +82,10 @@ function areaFormHtml(a) {
       <div class="span-2"><div class="label">Zusatzfragen im Mandatsformular</div><p class="form-hint mt-0">Erscheinen auf der Website und im Dashboard, sobald dieses Rechtsgebiet gewählt ist; die Antworten stehen in der Akte unter „Angaben zum Mandat“. Pflichtfragen gelten für Mandanten und Website-Anfragen.</p>
         <div id="arFields">${(a ? a.fields : []).map(areaFieldRow).join('')}</div>
         <button type="button" class="btn-outline btn-sm mt-2" data-action="area-field-add">${icon('plus', 'ico-sm')}<span>Frage hinzufügen</span></button></div>
-      ${a ? `<div class="span-2 form-hint">Aufgaben-Pakete für dieses Rechtsgebiet (${a.usage.packages}) pflegen Sie in der Akte unter „Aufgaben → Pakete“; Standardgebühren in der Honorarordnung.</div>` : ''}
+      <div class="span-2"><div class="label">Standardgebühren für neue Rechnungen</div><p class="form-hint mt-0">Wird eine Rechnung zu einer Akte dieses Rechtsgebiets erstellt, stehen diese Leistungen schon als Positionen drin (änderbar). Nichts angehakt = keine Vorbelegung.</p>
+        <div class="area-outcomes">${(st.billFees || []).map((f) => `<label class="check"><input type="checkbox" name="defFee" value="${f.id}" ${a && a.defaultFees.includes(f.id) ? 'checked' : ''}> ${esc(f.name)} <span class="text-dim">· ${esc(money(f.price))}</span></label>`).join('') || '<p class="text-sm text-dim">Die Honorarordnung ist noch leer.</p>'}</div>
+        <label class="label mt-3" for="arType">Rechnungsart (Vorgabe)</label><select id="arType" name="defaultType" class="field">${opt('', 'Keine Vorgabe', !a || !a.defaultType)}${st.billing.types.filter((t) => t.active || (a && a.defaultType === t.key)).map((t) => opt(t.key, t.name, a && a.defaultType === t.key)).join('')}</select></div>
+      ${a ? `<div class="span-2 form-hint">Aufgaben-Pakete für dieses Rechtsgebiet (${a.usage.packages}) pflegen Sie in der Akte unter „Aufgaben → Pakete“; die Preise stehen in der Honorarordnung.</div>` : ''}
       <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>${a ? 'Speichern' : 'Anlegen'}</span></button><button type="button" class="btn-ghost btn-md" data-action="close-modal">Abbrechen</button></div>
     </form>`;
 }
@@ -127,6 +132,8 @@ function collectArea(f) {
     checklist: String(fd.get('checklist') || '').split('\n').map((x) => x.trim()).filter(Boolean),
     outcomes: fd.getAll('outcome'),
     fields,
+    defaultFees: fd.getAll('defFee').map(Number),
+    defaultType: val(fd, 'defaultType'),
   };
 }
 
@@ -168,7 +175,7 @@ Object.assign(actions, {
 });
 
 /** Die gespeicherten Werte eines Rechtsgebiets als Eingabe für PUT (z. B. nur „aktiv“ umschalten). */
-const areaPayload = (a) => ({ name: a.name, short: a.short, color: a.color, icon: a.icon, intakeTitle: a.intakeTitle, active: a.active, steps: a.customSteps ? a.steps : null, checklist: a.checklist, outcomes: a.outcomes, fields: a.fields });
+const areaPayload = (a) => ({ name: a.name, short: a.short, color: a.color, icon: a.icon, intakeTitle: a.intakeTitle, active: a.active, steps: a.customSteps ? a.steps : null, checklist: a.checklist, outcomes: a.outcomes, fields: a.fields, defaultFees: a.defaultFees, defaultType: a.defaultType });
 
 Object.assign(forms, {
   'area-save': async (f) => {
@@ -294,3 +301,115 @@ Object.assign(forms, {
     renderView();
   },
 });
+
+/* ---------------------------------------------------------------- Rechnungsarten und Gebührenkategorien */
+const BILL_BASE_ICON = { rechnung: 'receipt', honorarvereinbarung: 'scale' };
+
+function billingRow(kind, x, i, n, meta) {
+  const protectedType = kind === 'itype' && ['rechnung', 'honorarvereinbarung'].includes(x.key);
+  return `<div class="area-card ${x.active ? '' : 'is-off'}">
+      <span class="area-dot tone-${kind === 'itype' ? 'gold' : 'sky'}" aria-hidden="true">${icon(kind === 'itype' ? BILL_BASE_ICON[x.base] : 'tag', 'ico-sm')}</span>
+      <div class="area-main"><div class="area-name"><strong>${esc(x.name)}</strong>${x.active ? '' : badge('ausgeblendet', 'slate')}</div><div class="area-meta">${meta}</div></div>
+      <div class="area-btns">
+        <button type="button" class="icon-btn sm" data-action="${kind}-move" data-key="${esc(x.key)}" data-dir="-1" aria-label="Nach oben" ${i === 0 ? 'disabled' : ''}>${icon('chevronUp', 'ico-sm')}</button>
+        <button type="button" class="icon-btn sm" data-action="${kind}-move" data-key="${esc(x.key)}" data-dir="1" aria-label="Nach unten" ${i === n - 1 ? 'disabled' : ''}>${icon('chevronDown', 'ico-sm')}</button>
+        <button type="button" class="btn-outline btn-sm" data-action="${kind}-edit" data-key="${esc(x.key)}">${icon('edit', 'ico-sm')}<span>Bearbeiten</span></button>
+        <button type="button" class="btn-ghost btn-sm" data-action="${kind}-toggle" data-key="${esc(x.key)}">${x.active ? 'Ausblenden' : 'Einblenden'}</button>
+        ${x.usage || protectedType ? '<span class="icon-btn-ph" aria-hidden="true"></span>' : `<button type="button" class="icon-btn sm fn-danger" data-action="${kind}-delete" data-key="${esc(x.key)}" data-name="${esc(x.name)}" aria-label="Löschen">${icon('trash', 'ico-sm')}</button>`}
+      </div></div>`;
+}
+
+function invoiceTypesPanel() {
+  const list = st.billing.types;
+  return `<section class="panel panel-pad">
+      <div class="panel-head"><h2 class="panel-title">Rechnungsarten</h2><button type="button" class="btn-gold btn-sm" data-action="itype-new">${icon('plus', 'ico-sm')}<span>Neue Rechnungsart</span></button></div>
+      <p class="text-sm text-muted mb-4">Voreinstellungen für neue Rechnungen: Grundart (Rechnung oder Honorarvereinbarung), <strong>Zahlungsziel</strong>, <strong>Vorschuss</strong> in Prozent, eine <strong>Auslagenpauschale</strong> als eigene Position und ein Standardtext. Im Rechnungs-Generator wählen Sie die Art – alles bleibt dort änderbar.</p>
+      <div class="area-list">${list.map((t, i) => billingRow('itype', t, i, list.length, `${esc(billingBaseName(t.base))}${t.dueDays ? ` · Zahlungsziel ${t.dueDays} Tage` : ''}${t.advancePct ? ` · Vorschuss ${t.advancePct} %` : ''}${t.expenseAmount ? ` · ${esc(t.expenseLabel)} ${esc(money(t.expenseAmount))}` : ''}${t.usage ? ` · ${t.usage} Rechnungen` : ''}`)).join('')}</div>
+    </section>`;
+}
+const billingBaseName = (b) => (st.billing.bases && st.billing.bases[b]) || b;
+
+function feeCategoriesPanel() {
+  const list = st.billing.categories;
+  return `<section class="panel panel-pad">
+      <div class="panel-head"><h2 class="panel-title">Gebührenkategorien</h2><button type="button" class="btn-gold btn-sm" data-action="fcat-new">${icon('plus', 'ico-sm')}<span>Neue Kategorie</span></button></div>
+      <p class="text-sm text-muted mb-4">Die Gruppen der Honorarordnung – sie bilden auch die Reiter im Preisbereich der Website. Eine ausgeblendete Kategorie verschwindet samt ihren Leistungen von Website, Tarifrechner und Rechnungs-Generator.</p>
+      <div class="area-list">${list.map((c, i) => billingRow('fcat', c, i, list.length, `${c.usage} ${c.usage === 1 ? 'Leistung' : 'Leistungen'}`)).join('')}</div>
+    </section>`;
+}
+
+function itypeFormHtml(t) {
+  return `<h2 class="modal-title">${t ? `Rechnungsart: ${esc(t.name)}` : 'Neue Rechnungsart'}</h2>
+    <form data-form="itype-save" ${t ? `data-key="${esc(t.key)}"` : ''} class="form-grid cols-2">
+      <div><label class="label" for="itName">Name</label><input id="itName" name="name" class="field" required minlength="2" maxlength="60" value="${esc(t ? t.name : '')}" placeholder="z. B. Vorschussrechnung"></div>
+      <div><label class="label" for="itBase">Grundart</label><select id="itBase" name="base" class="field">${Object.entries(st.billing.bases).map(([b, l]) => opt(b, l, (t ? t.base : 'rechnung') === b)).join('')}</select><p class="form-hint">Bestimmt Nummernkreis (RE / HV) und Darstellung.</p></div>
+      <div><label class="label" for="itDue">Zahlungsziel in Tagen (0 = kein Datum)</label><input id="itDue" type="number" name="dueDays" min="0" max="365" class="field" value="${t ? t.dueDays : 7}"></div>
+      <div><label class="label" for="itAdv">Vorschuss in % (0 = keiner)</label><input id="itAdv" type="number" name="advancePct" min="0" max="100" class="field" value="${t ? t.advancePct : 0}"><p class="form-hint">Steht als Hinweis mit dem Betrag in den Anmerkungen.</p></div>
+      <div><label class="label" for="itExL">Auslagenpauschale: Bezeichnung</label><input id="itExL" name="expenseLabel" class="field" maxlength="80" value="${esc(t ? t.expenseLabel : '')}" placeholder="z. B. Auslagenpauschale"></div>
+      <div><label class="label" for="itExA">… Betrag in $ (0 = keine)</label><input id="itExA" type="number" name="expenseAmount" min="0" max="1000000" class="field" value="${t ? t.expenseAmount : 0}"></div>
+      <div class="span-2"><label class="label" for="itNote">Standardtext (Anmerkungen / Vereinbarungstext)</label><textarea id="itNote" name="note" class="field" rows="4" maxlength="3000" placeholder="z. B. Die Vergütung ist als Vorschuss vor Aufnahme der Tätigkeit fällig.">${esc(t ? t.note : '')}</textarea></div>
+      <label class="check span-2"><input type="checkbox" name="active" ${!t || t.active ? 'checked' : ''}> Eingeschaltet (im Rechnungs-Generator wählbar)</label>
+      <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>${t ? 'Speichern' : 'Anlegen'}</span></button><button type="button" class="btn-ghost btn-md" data-action="close-modal">Abbrechen</button></div>
+    </form>`;
+}
+const fcatFormHtml = (c) => `<h2 class="modal-title">${c ? `Kategorie: ${esc(c.name)}` : 'Neue Gebührenkategorie'}</h2>
+    <form data-form="fcat-save" ${c ? `data-key="${esc(c.key)}"` : ''} class="form-grid">
+      <div><label class="label" for="fcName">Name</label><input id="fcName" name="name" class="field" required minlength="2" maxlength="60" value="${esc(c ? c.name : '')}" placeholder="z. B. Verkehrsrecht"><p class="form-hint">Erscheint als Überschrift und als Reiter in der Honorarordnung der Website.</p></div>
+      <label class="check"><input type="checkbox" name="active" ${!c || c.active ? 'checked' : ''}> Eingeschaltet (Kategorie und Leistungen sichtbar)</label>
+      <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>${c ? 'Speichern' : 'Anlegen'}</span></button><button type="button" class="btn-ghost btn-md" data-action="close-modal">Abbrechen</button></div>
+    </form>`;
+const itypeBody = (f) => {
+  const fd = new FormData(f);
+  return { name: val(fd, 'name'), base: val(fd, 'base'), dueDays: Number(val(fd, 'dueDays') || 0), advancePct: Number(val(fd, 'advancePct') || 0), expenseLabel: val(fd, 'expenseLabel'), expenseAmount: Number(val(fd, 'expenseAmount') || 0), note: val(fd, 'note'), active: fd.has('active') };
+};
+const itypePayload = (t) => ({ name: t.name, base: t.base, dueDays: t.dueDays, advancePct: t.advancePct, expenseLabel: t.expenseLabel, expenseAmount: t.expenseAmount, note: t.note, active: t.active });
+
+/** Gemeinsames für beide Listen: umschalten, verschieben, löschen. */
+function billingActions(kind, path, list, payload, noun) {
+  const find = (key) => st.billing[list].find((x) => x.key === key);
+  const after = async () => {
+    await loadLists();
+    await refreshBillingViews();
+    renderView();
+  };
+  Object.assign(actions, {
+    [`${kind}-new`]: () => openModal(kind === 'itype' ? itypeFormHtml(null) : fcatFormHtml(null), { wide: kind === 'itype' }),
+    [`${kind}-edit`]: (el) => openModal(kind === 'itype' ? itypeFormHtml(find(el.dataset.key)) : fcatFormHtml(find(el.dataset.key)), { wide: kind === 'itype' }),
+    [`${kind}-toggle`]: async (el) => {
+      const x = find(el.dataset.key);
+      await api.put(`/api/billing/${path}/${x.key}`, { ...payload(x), active: !x.active });
+      toast(x.active ? `„${x.name}“ ausgeblendet.` : `„${x.name}“ eingeblendet.`);
+      await after();
+    },
+    [`${kind}-move`]: async (el) => {
+      const keys = st.billing[list].map((x) => x.key);
+      const i = keys.indexOf(el.dataset.key);
+      const j = i + Number(el.dataset.dir);
+      if (j < 0 || j >= keys.length) return;
+      [keys[i], keys[j]] = [keys[j], keys[i]];
+      await api.put(`/api/billing/${path}/order`, { keys });
+      await after();
+    },
+    [`${kind}-delete`]: async (el) => {
+      if (!(await askDelete(`${noun} löschen?`, `„${el.dataset.name}“ wird gelöscht.`))) return;
+      await api.del(`/api/billing/${path}/${el.dataset.key}`);
+      toast(`${noun} gelöscht.`);
+      await after();
+    },
+  });
+  forms[`${kind}-save`] = async (f) => {
+    const body = kind === 'itype' ? itypeBody(f) : { name: val(new FormData(f), 'name'), active: new FormData(f).has('active') };
+    if (f.dataset.key) await api.put(`/api/billing/${path}/${f.dataset.key}`, body);
+    else await api.post(`/api/billing/${path}`, body);
+    toast(f.dataset.key ? `${noun} gespeichert.` : `${noun} angelegt.`);
+    await modalBack();
+    await after();
+  };
+}
+billingActions('itype', 'types', 'types', itypePayload, 'Rechnungsart');
+billingActions('fcat', 'categories', 'categories', (c) => ({ name: c.name, active: c.active }), 'Kategorie');
+/** Rechnungs-Generator und Honorarordnung neu laden lassen, sobald sich Arten oder Kategorien ändern. */
+async function refreshBillingViews() {
+  st.invoiceTypes = null;
+  await load.fees().catch(() => {});
+}

@@ -78,6 +78,8 @@ const row = (r) => ({
   checklist: json(r.checklist, []),
   outcomes: json(r.outcomes, []),
   fields: json(r.fields, []),
+  defaultFees: json(r.default_fees, []).filter((n) => Number.isInteger(n)),
+  defaultType: r.default_type || '',
 });
 
 let cache = null;
@@ -140,15 +142,26 @@ const input = z.object({
       }
     })
     .default([]),
+  defaultFees: z.array(z.number().int().positive()).max(30).default([]),
+  defaultType: z.string().max(40).default(''),
 });
+
+/** Standardgebühren und Rechnungsart müssen es geben (sonst stillschweigend ignorieren wäre irreführend). */
+function checkDefaults(d) {
+  const ids = new Set(db.prepare('SELECT id FROM fees').all().map((r) => r.id));
+  const bad = d.defaultFees.find((id) => !ids.has(id));
+  if (bad) throw Object.assign(new Error('Eine der Standardgebühren gibt es nicht mehr.'), { status: 400 });
+  if (d.defaultType && !db.prepare('SELECT 1 FROM invoice_types WHERE key = ?').get(d.defaultType)) throw Object.assign(new Error('Diese Rechnungsart gibt es nicht.'), { status: 400 });
+}
 
 function create(data) {
   const d = input.parse(data);
+  checkDefaults(d);
   let key = slug(d.name) || 'gebiet';
   for (let i = 2; exists(key) || db.prepare('SELECT 1 FROM areas WHERE key = ?').get(key); i++) key = `${slug(d.name) || 'gebiet'}-${i}`;
   const max = db.prepare('SELECT COALESCE(MAX(sort_order), 0) AS m FROM areas').get().m;
-  db.prepare('INSERT INTO areas (key, name, short, color, icon, intake_title, sort_order, active, steps, checklist, outcomes, fields) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
-    key, d.name, d.short, d.color, d.icon, d.intakeTitle, max + 1, d.active ? 1 : 0, JSON.stringify(d.steps || []), JSON.stringify(d.checklist), JSON.stringify(d.outcomes), JSON.stringify(d.fields)
+  db.prepare('INSERT INTO areas (key, name, short, color, icon, intake_title, sort_order, active, steps, checklist, outcomes, fields, default_fees, default_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+    key, d.name, d.short, d.color, d.icon, d.intakeTitle, max + 1, d.active ? 1 : 0, JSON.stringify(d.steps || []), JSON.stringify(d.checklist), JSON.stringify(d.outcomes), JSON.stringify(d.fields), JSON.stringify(d.defaultFees), d.defaultType
   );
   bump();
   return get(key);
@@ -156,8 +169,9 @@ function create(data) {
 function update(key, data) {
   if (!exists(key)) throw Object.assign(new Error('Rechtsgebiet nicht gefunden.'), { status: 404 });
   const d = input.parse(data);
-  db.prepare('UPDATE areas SET name = ?, short = ?, color = ?, icon = ?, intake_title = ?, active = ?, steps = ?, checklist = ?, outcomes = ?, fields = ? WHERE key = ?').run(
-    d.name, d.short, d.color, d.icon, d.intakeTitle, d.active ? 1 : 0, JSON.stringify(d.steps || []), JSON.stringify(d.checklist), JSON.stringify(d.outcomes), JSON.stringify(d.fields), key
+  checkDefaults(d);
+  db.prepare('UPDATE areas SET name = ?, short = ?, color = ?, icon = ?, intake_title = ?, active = ?, steps = ?, checklist = ?, outcomes = ?, fields = ?, default_fees = ?, default_type = ? WHERE key = ?').run(
+    d.name, d.short, d.color, d.icon, d.intakeTitle, d.active ? 1 : 0, JSON.stringify(d.steps || []), JSON.stringify(d.checklist), JSON.stringify(d.outcomes), JSON.stringify(d.fields), JSON.stringify(d.defaultFees), d.defaultType, key
   );
   bump();
   return get(key);

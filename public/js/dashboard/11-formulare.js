@@ -369,6 +369,7 @@ const forms = {
     if (!d.clientName.trim()) throw new Error('Bitte den Empfänger angeben.');
     const res = await api.post('/api/invoices', {
       kind: d.kind,
+      typeKey: d.typeKey || d.kind,
       caseId: d.caseId || null,
       clientName: d.clientName.trim(),
       clientContact: d.clientContact.trim(),
@@ -391,7 +392,7 @@ const forms = {
       await openCase(from.caseId);
     } else await navigate('invoices');
     openModal(`
-        <h2 class="modal-title">${esc(INVOICE_KIND[inv.kind])} erstellt</h2>
+        <h2 class="modal-title">${esc(invKind(inv))} erstellt</h2>
         <p class="modal-sub">Nummer <span class="font-mono text-gold">${esc(inv.number)}</span> über <strong>${money(inv.total)}</strong> an ${esc(inv.clientName)}.</p>
         <div class="form-actions">
           <a class="btn-gold btn-md" href="/rechnung?id=${inv.id}" target="_blank" rel="noopener">${icon('eye', 'ico-sm')}<span>Ansehen</span></a>

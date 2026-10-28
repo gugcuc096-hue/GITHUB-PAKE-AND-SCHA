@@ -125,7 +125,7 @@ function todoPanel() {
     items.push(
       item(
         'receipt',
-        `${esc(INVOICE_KIND[i.kind])} <span class="font-mono text-gold">${esc(i.number)}</span> über ${esc(money(i.total))} begleichen`,
+        `${esc(invKind(i))} <span class="font-mono text-gold">${esc(i.number)}</span> über ${esc(money(i.total))} begleichen`,
         [due, i.caseNumber ? caseRef(i.caseNumber) : ''].filter(Boolean).join(' · '),
         `<button class="btn-gold btn-sm" data-action="inv-pay-report" data-id="${i.id}">${icon('check', 'ico-sm')}<span>Als bezahlt melden</span></button><a class="btn-ghost btn-sm" href="/rechnung?id=${i.id}" target="_blank" rel="noopener">Ansehen</a>`,
         i.overdueDays > 0 ? 'urgent' : ''

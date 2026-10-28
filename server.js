@@ -144,6 +144,7 @@ app.use('/api/calendar', calendarRoutes);
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/site', require('./routes/site'));
 app.use('/api/event-kinds', require('./routes/eventKinds').router); // Termin- und Fristenarten mit Fristenrechner
+app.use('/api/billing', require('./routes/billing').router); // Gebührenkategorien und Rechnungsarten
 app.use('/api/areas', require('./routes/areas').router); // Rechtsgebiete als Daten (Einstellungen → Listen)
 app.use('/api/config', require('./routes/siteConfig').router); // Banner, Startseite, Beschriftungen, Mitteilungen, Export/Import
 app.use('/api/access', require('./routes/access').router); // Inhaber, Web-Admins, Rechte-Tabelle, Protokoll, Schalter

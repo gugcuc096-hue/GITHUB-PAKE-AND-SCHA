@@ -172,13 +172,14 @@ async function updateUserField(t) {
 
 /* ---------------------------------------------------------------- Honorarordnung */
 function feeModal(f, category) {
-  const v = f || { category: category || 'rechtsberatung', inCalculator: true, active: true, price: 0 };
+  const cats = (st.feeCats || []).filter((c) => c.active || (f && f.category === c.key));
+  const v = f || { category: category || (cats[0] && cats[0].key) || 'rechtsberatung', inCalculator: true, active: true, price: 0 };
   openModal(`
       <h2 class="modal-title">${f ? 'Leistung bearbeiten' : 'Neue Leistung'}</h2>
       <p class="modal-sub">Erscheint sofort in der Honorarordnung, im Tarifrechner der Website und im Rechnungs-Generator.</p>
       <form data-form="fee" data-id="${f ? f.id : ''}" class="form-grid cols-2">
         <div class="span-2"><label class="label">Bezeichnung</label><input name="name" class="field" required minlength="2" maxlength="120" value="${esc(v.name || '')}" autofocus></div>
-        <div><label class="label">Kategorie</label><select name="category" class="field">${Object.entries(FEE_CATEGORIES).map(([k, l]) => opt(k, l, v.category === k)).join('')}</select></div>
+        <div><label class="label">Kategorie</label><select name="category" class="field">${cats.map((c) => opt(c.key, c.name, v.category === c.key)).join('')}</select></div>
         <div><label class="label">Preis ($)</label><input name="price" type="number" inputmode="numeric" min="0" step="1" required class="field" value="${esc(v.price)}"></div>
         <div class="span-2"><label class="label">Beschreibung</label><textarea name="description" rows="3" maxlength="400" class="field">${esc(v.description || '')}</textarea></div>
         <div><label class="label">Reihenfolge</label><input name="sortOrder" type="number" min="0" step="1" class="field" value="${esc(v.sortOrder ?? '')}" placeholder="automatisch"></div>
@@ -191,7 +192,9 @@ function feeModal(f, category) {
 }
 views.fees = {
   async load() {
-    st.adminFees = (await api.get('/api/admin/fees')).fees;
+    const r = await api.get('/api/admin/fees');
+    st.adminFees = r.fees;
+    st.feeCats = r.categories;
   },
   render() {
     return `
@@ -199,11 +202,12 @@ views.fees = {
           <div><h1 class="page-title">Honorarordnung</h1><p class="page-sub">Preise und Leistungen pflegen – die Website und der Tarifrechner übernehmen Änderungen sofort.</p></div>
           <div class="page-actions"><a href="/#honorar" target="_blank" rel="noopener" class="btn-outline btn-md">${icon('globe', 'ico-sm')}<span>Website ansehen</span></a><button class="btn-gold btn-md" data-action="fee-new">${icon('plus')}<span>Leistung hinzufügen</span></button></div>
         </div>
-        ${Object.entries(FEE_CATEGORIES)
-        .map(([cat, label]) => {
+        ${st.feeCats
+        .map((c) => {
+          const cat = c.key;
           const rows = st.adminFees.filter((f) => f.category === cat);
-          return `<section class="panel panel-pad mb-4">
-              <div class="panel-head"><h2 class="panel-title">${esc(label)}</h2><button class="btn-ghost btn-sm" data-action="fee-new" data-category="${cat}">${icon('plus', 'ico-sm')}<span>Leistung</span></button></div>
+          return `<section class="panel panel-pad mb-4${c.active ? '' : ' is-off'}">
+              <div class="panel-head"><h2 class="panel-title">${esc(c.name)} ${c.active ? '' : badge('Ausgeblendet', 'slate')}</h2><button class="btn-ghost btn-sm" data-action="fee-new" data-category="${cat}">${icon('plus', 'ico-sm')}<span>Leistung</span></button></div>
               ${rows.length
               ? rows
                   .map(
@@ -216,7 +220,8 @@ views.fees = {
               : '<p class="text-sm text-dim py-2">Keine Leistungen in dieser Kategorie.</p>'}
             </section>`;
         })
-        .join('')}`;
+        .join('')}
+        <p class="text-xs text-dim">Kategorien (und die Reiter der Website) legen Sie unter Einstellungen → Listen an, benennen sie um oder blenden sie aus.</p>`;
   },
 };
 

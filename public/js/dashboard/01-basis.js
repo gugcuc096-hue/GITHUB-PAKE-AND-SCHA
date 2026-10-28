@@ -73,7 +73,16 @@ const EVENT_COLORS = { mandant: '#34d399', gericht: '#d4af37', frist: '#f87171',
 const EVENT_STATUS = { angefragt: ['Angefragt', 'amber'], bestaetigt: ['Bestätigt', 'emerald'], abgesagt: ['Abgesagt', 'slate'], erledigt: ['Erledigt', 'slate'] };
 const INVOICE_STATUS = { offen: ['Offen', 'amber'], bezahlt: ['Bezahlt', 'emerald'], storniert: ['Storniert', 'slate'] };
 const INVOICE_KIND = { rechnung: 'Rechnung', honorarvereinbarung: 'Honorarvereinbarung' };
+/** Bezeichnung einer Rechnung: eigene Rechnungsart („Vorschussrechnung“), sonst die Grundart. */
+const invKind = (i) => i.typeLabel || INVOICE_KIND[i.kind] || 'Rechnung';
+// Kategorien der Honorarordnung – Vorgabe; beim Laden der Leistungen kommen die aktuellen (Einstellungen → Listen).
 const FEE_CATEGORIES = { rechtsberatung: 'Rechtsberatung', strafrecht: 'Strafrecht & Haftvertretung', notfall: 'Notfall & Sofortdienst', gericht: 'Gerichtsverfahren', vertraege: 'Verträge & Dokumente' };
+/** Gleiches Objekt behalten (andere Teile halten es fest), nur den Inhalt austauschen. */
+function setFeeCategories(list) {
+  if (!Array.isArray(list) || !list.length) return;
+  for (const k of Object.keys(FEE_CATEGORIES)) delete FEE_CATEGORIES[k];
+  for (const c of list) FEE_CATEGORIES[c.key] = c.name;
+}
 // Ränge der Kanzlei – Vorgabe; beim Start kommen die aktuellen Ränge vom Server (Einstellungen → Ränge).
 const RANK_GROUPS = { 'Board of Partners': ['Founding Partner', 'Equity Partner', 'Partner'], 'Associate Attorneys': ['Senior Associate', 'Associate', 'Junior Associate'] };
 const RANKS = Object.values(RANK_GROUPS).flat();
@@ -728,7 +737,9 @@ const load = {
     if (!st.contacts) st.contacts = (await api.get('/api/messages/contacts')).contacts;
   },
   async fees() {
-    st.fees = (await api.get('/api/fees')).fees;
+    const r = await api.get('/api/fees');
+    st.fees = r.fees;
+    setFeeCategories(r.categories);
   },
   async unread() {
     if (load.primed.delete('unread')) return;

@@ -34,7 +34,7 @@ async function paymentReportModal(id) {
   const { invoice: i, firm } = await api.get('/api/invoices/' + id);
   openModal(`
       <h2 class="modal-title">Zahlung melden</h2>
-      <p class="modal-sub">${esc(INVOICE_KIND[i.kind])} <span class="font-mono text-gold">${esc(i.number)}</span> über <strong>${money(i.total)}</strong>${i.dueDate ? ` · fällig ${esc(fmtDateOnly(i.dueDate))}` : ''}. Sobald die Kanzlei den Eingang geprüft hat, steht die Rechnung auf „Bezahlt“.</p>
+      <p class="modal-sub">${esc(invKind(i))} <span class="font-mono text-gold">${esc(i.number)}</span> über <strong>${money(i.total)}</strong>${i.dueDate ? ` · fällig ${esc(fmtDateOnly(i.dueDate))}` : ''}. Sobald die Kanzlei den Eingang geprüft hat, steht die Rechnung auf „Bezahlt“.</p>
       <div class="pay-info">${icon('receipt', 'ico-sm')}<div><div class="label">Zahlungsangaben der Kanzlei</div><div class="text-sm pre-line">${esc(firm.paymentInfo)}</div></div></div>
       <form data-form="inv-pay-report" data-id="${i.id}" class="form-grid">
         <div><label class="label" for="payNote">Hinweis an die Kanzlei <span class="text-dim">(optional)</span></label>
@@ -66,7 +66,7 @@ function invoiceTable(rows) {
       <tbody>${lazyRows(
         rows,
         (i) => `<tr data-inv="${i.id}">
-          <td class="td-main"><div class="font-mono text-gold text-sm nowrap">${docTitleLink(`/rechnung?id=${i.id}`, esc(i.number))}</div><div class="text-xs text-dim">${esc(INVOICE_KIND[i.kind])}${i.subject ? ' · ' + esc(i.subject) : ''}</div></td>
+          <td class="td-main"><div class="font-mono text-gold text-sm nowrap">${docTitleLink(`/rechnung?id=${i.id}`, esc(i.number))}</div><div class="text-xs text-dim">${esc(invKind(i))}${i.subject ? ' · ' + esc(i.subject) : ''}</div></td>
           <td data-label="Empfänger">${staff && i.clientKey ? clientLink(i.clientKey, i.clientName) : esc(i.clientName)}</td>
           <td data-label="Akte" class="nowrap">${i.caseNumber ? `<button class="text-gold font-mono text-xs hover:underline" data-action="open-case" data-id="${i.caseId}">${esc(i.caseNumber)}</button>` : '—'}</td>
           <td data-label="Betrag" class="font-mono nowrap" style="text-align:right">${money(i.total)}</td>
@@ -337,7 +337,7 @@ function summaryFiguresHtml() {
   const d = st.draft;
   const t = draftTotals(d);
   return `
-      <h2 class="panel-title mb-3">${esc(INVOICE_KIND[d.kind])}</h2>
+      <h2 class="panel-title mb-3">${esc((invoiceType(d.typeKey || d.kind) || {}).name || INVOICE_KIND[d.kind])}</h2>
       <div class="sum-row"><span class="text-muted">Positionen</span><span class="v">${d.items.length}</span></div>
       <div class="sum-row"><span class="text-muted">Zwischensumme</span><span class="v" data-count="inv:sub">${money(t.subtotal)}</span></div>
       ${t.mp ? `<div class="sum-row" style="color:#fcd34d"><span>${esc(t.memberName)} (${fmtPct(t.mp)} %)</span><span class="v" data-count="inv:member">− ${money(t.member)}</span></div>` : ''}
@@ -434,22 +434,57 @@ async function runCoopDetect() {
   updateInvoiceSummary();
 }
 
+/* Rechnungsarten (Einstellungen → Listen): Grundart, Zahlungsziel, Standardtext und Auslagenpauschale aus der Art; Standardgebühren aus dem Rechtsgebiet der Akte */
+const invoiceType = (key) => (st.invoiceTypes || []).find((t) => t.key === key) || null;
+function applyInvoiceType(d, t) {
+  d.typeKey = t.key;
+  d.kind = t.base;
+  d.dueDate = t.dueDays > 0 ? dayKey(new Date(Date.now() + t.dueDays * 864e5)) : '';
+  if (!d.notes.trim() || d.notesFromType) {
+    d.notes = t.note;
+    d.notesFromType = !!t.note;
+  }
+  d.items = d.items.filter((it) => !it.typeExpense);
+  if (t.expenseAmount > 0) d.items.push({ description: t.expenseLabel, quantity: 1, unitPrice: t.expenseAmount, typeExpense: true });
+}
+/** Einmal je Akte beim Öffnen: Rechnungsart der Voreinstellung bzw. des Rechtsgebiets, Standardgebühren nur bei leerer Rechnung. */
+function applyDraftDefaults(d) {
+  if (!st.invoiceTypes || d.defaultsFor === String(d.caseId)) return;
+  d.defaultsFor = String(d.caseId);
+  const c = d.caseId ? st.cases.find((x) => x.id === d.caseId) : null;
+  const def = c && st.areaDefaults ? st.areaDefaults[c.area] : null;
+  const fresh = !d.items.length;
+  if (def && fresh) {
+    for (const id of def.fees) {
+      const f = st.fees.find((x) => x.id === id);
+      if (f) d.items.push({ description: f.name, quantity: 1, unitPrice: f.price, feeId: f.id });
+    }
+  }
+  const t = invoiceType(def && def.type) || invoiceType(d.typeKey || d.kind);
+  if (t && !d.typeChosen && (fresh || d.typeApplied)) applyInvoiceType(d, t);
+  d.typeApplied = true;
+}
+
 views['invoice-new'] = {
   async load() {
-    const [coops, members] = await Promise.all([
+    const [coops, members, bill] = await Promise.all([
       api.get('/api/cooperations?basic=1').catch(() => ({ cooperations: [] })),
       api.get('/api/memberships/active').catch(() => ({ memberships: [] })),
+      api.get('/api/billing').catch(() => null),
       load.fees(),
       load.cases(),
     ]);
     st.coopList = coops.cooperations;
     st.memberList = members.memberships;
+    st.invoiceTypes = bill ? bill.types.filter((t) => t.active) : [];
+    st.areaDefaults = bill ? bill.areaDefaults : {};
     if (!st.draft) {
       // Seite neu geladen: die zuletzt angefangene Rechnung wieder aufnehmen
       const last = window.PS.drafts.store.get(window.PS.drafts.key('invoice|last'));
       st.draft = (last && savedInvoiceDraft(last === 'ohne' ? null : Number(last))) || newDraft();
     } else if (st.draft.caseId && st.draft.memberId == null) applyCaseToDraft(st.draft, st.draft.caseId);
     await loadContractBilling(st.draft, true);
+    applyDraftDefaults(st.draft);
     runCoopDetect(); // läuft im Hintergrund, die Seite wartet nicht auf Discord
   },
   render() {
@@ -486,10 +521,7 @@ views['invoice-new'] = {
         <form id="invoiceForm" data-form="invoice" data-nodraft class="inv-layout" novalidate>
           <div class="stack">
             <section class="panel panel-pad">
-              <div class="seg mb-4">
-                <label class="seg-opt"><input type="radio" name="kind" value="rechnung" ${!hv ? 'checked' : ''}><span>${icon('receipt', 'ico-sm')}Rechnung</span></label>
-                <label class="seg-opt"><input type="radio" name="kind" value="honorarvereinbarung" ${hv ? 'checked' : ''}><span>${icon('scale', 'ico-sm')}Honorarvereinbarung</span></label>
-              </div>
+              ${typeChooser(d)}
               <div class="form-grid cols-2">
                 <div class="span-2"><label class="label">Akte (optional)</label><select name="caseId" class="field"><option value="">Ohne Aktenbezug</option>${st.cases.map((c) => opt(c.id, `${c.caseNumber} – ${c.title}`, c.id === d.caseId)).join('')}</select></div>
                 <div><label class="label">Empfänger / Mandant</label><input name="clientName" class="field" required maxlength="120" value="${esc(d.clientName)}" placeholder="Name des Mandanten"></div>
@@ -528,6 +560,22 @@ views['invoice-new'] = {
   },
 };
 
+/** Nur die beiden Grundarten: wie bisher zwei Knöpfe; mit eigenen Rechnungsarten eine Auswahl samt Kurzinfo. */
+function typeChooser(d) {
+  const types = st.invoiceTypes || [];
+  const custom = types.some((t) => !['rechnung', 'honorarvereinbarung'].includes(t.key)) || types.length > 2;
+  if (!custom) {
+    const hv = d.kind === 'honorarvereinbarung';
+    return `<div class="seg mb-4">
+                <label class="seg-opt"><input type="radio" name="kind" value="rechnung" ${!hv ? 'checked' : ''}><span>${icon('receipt', 'ico-sm')}Rechnung</span></label>
+                <label class="seg-opt"><input type="radio" name="kind" value="honorarvereinbarung" ${hv ? 'checked' : ''}><span>${icon('scale', 'ico-sm')}Honorarvereinbarung</span></label>
+              </div>`;
+  }
+  const t = invoiceType(d.typeKey || d.kind);
+  const info = t ? [t.dueDays ? `Zahlungsziel ${t.dueDays} Tage` : '', t.advancePct ? `Vorschuss ${t.advancePct} % wird in den Anmerkungen vermerkt` : '', t.expenseAmount ? `${t.expenseLabel} ${money(t.expenseAmount)} als Position` : ''].filter(Boolean).join(' · ') : '';
+  return `<div class="mb-4"><label class="label" for="invType">Rechnungsart</label><select id="invType" name="typeKey" class="field">${types.map((x) => opt(x.key, x.name, x.key === (d.typeKey || d.kind))).join('')}</select>${info ? `<p class="form-hint">${esc(info)}</p>` : ''}</div>`;
+}
+
 function onInvoiceInput(t) {
   const d = st.draft;
   if (!d) return;
@@ -552,6 +600,7 @@ function onInvoiceInput(t) {
     }
   } else if (['clientName', 'clientContact', 'subject', 'notes', 'dueDate'].includes(t.name)) {
     d[t.name] = t.value;
+    if (t.name === 'notes') d.notesFromType = false;
   } else if (t.name === 'discountPct' || t.name === 'surchargePct') {
     d[t.name] = t.value === '' ? 0 : Number(t.value);
   }
@@ -563,11 +612,21 @@ function onInvoiceChange(t) {
   if (t.classList.contains('inv-fee')) return toggleInvoiceFee(Number(t.dataset.fee), t.checked);
   if (t.name === 'kind') {
     d.kind = t.value;
+    d.typeKey = t.value;
+    d.typeChosen = true;
+    const ty = invoiceType(t.value);
+    if (ty) applyInvoiceType(d, ty);
+    renderView();
+  } else if (t.name === 'typeKey') {
+    d.typeChosen = true;
+    const ty = invoiceType(t.value);
+    if (ty) applyInvoiceType(d, ty);
     renderView();
   } else if (t.name === 'caseId') {
     forgetInvoiceDraft(d.caseId); // der Entwurf zieht zur neuen Akte um
     d.caseId = t.value ? Number(t.value) : null;
     applyCaseToDraft(d, d.caseId);
+    applyDraftDefaults(d);
     if (d.coopAuto) {
       // automatisch gesetzte Kooperation gehörte zum Mandanten der vorigen Akte
       d.coopId = null;
@@ -713,7 +772,7 @@ function clientCard(d) {
   const invoicesPart = d.invoices.length
     ? `<div class="section"><h3 class="section-title">Rechnungen &amp; Honorare <span class="sec-count">${d.invoices.length}</span></h3>${d.invoices
         .map(
-          (i) => `<div class="list-row wrap inv-row"><div class="main"><div class="title">${docTitleLink(`/rechnung?id=${i.id}`, esc(i.number), 'font-mono text-gold')} · ${esc(INVOICE_KIND[i.kind])}</div>
+          (i) => `<div class="list-row wrap inv-row"><div class="main"><div class="title">${docTitleLink(`/rechnung?id=${i.id}`, esc(i.number), 'font-mono text-gold')} · ${esc(invKind(i))}</div>
               <div class="meta">${esc(fmtDate(i.createdAt))}${i.caseNumber ? ` · Akte ${esc(i.caseNumber)}` : ''}</div></div>
             <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end"><span class="font-mono nowrap">${money(i.total)}</span>${invoiceBadge(i)}${openDoc(i.googleDoc, `/rechnung?id=${i.id}`, 'Ansehen')}</div></div>`
         )

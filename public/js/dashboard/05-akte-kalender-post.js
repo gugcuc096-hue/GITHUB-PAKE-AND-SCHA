@@ -523,7 +523,7 @@ function closeOpenItems({ invoices = [], contracts = [], tasks = [], appointment
   const items = [];
   invoices
     .filter((i) => i.status === 'offen')
-    .forEach((i) => items.push([icon('receipt', 'ico-sm'), `${INVOICE_KIND[i.kind] || 'Rechnung'} <span class="font-mono">${esc(i.number)}</span> über ${esc(money(i.total))} ist noch offen${i.overdueDays > 0 ? ` – seit ${dayCount(i.overdueDays)} überfällig` : ''}`]));
+    .forEach((i) => items.push([icon('receipt', 'ico-sm'), `${invKind(i)} <span class="font-mono">${esc(i.number)}</span> über ${esc(money(i.total))} ist noch offen${i.overdueDays > 0 ? ` – seit ${dayCount(i.overdueDays)} überfällig` : ''}`]));
   contracts
     .filter((k) => !k.internal && k.status !== 'unterschrieben')
     .forEach((k) => items.push([icon('edit', 'ico-sm'), `${esc(k.templateName)} – ${k.status === 'entwurf' ? 'noch nicht unterschrieben' : 'Unterschrift fehlt noch'}`]));
@@ -1047,7 +1047,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
             const open = gd
               ? `<a class="icon-btn sm" href="${esc(gd)}" target="_blank" rel="noopener noreferrer" aria-label="Google Doc öffnen" title="Google Doc öffnen">${icon('doc', 'ico-sm')}</a>`
               : `<a class="icon-btn sm" href="/rechnung?id=${i.id}" target="_blank" rel="noopener" aria-label="Ansehen" title="Ansehen">${icon('eye', 'ico-sm')}</a>`;
-            return `<div class="list-row wrap inv-row"><div class="main"><div class="title">${docTitleLink(`/rechnung?id=${i.id}`, esc(i.number), 'font-mono text-gold')} · ${esc(INVOICE_KIND[i.kind])}</div><div class="meta">${esc(fmtDate(i.createdAt))} · ${esc(i.issuerName)}</div></div>
+            return `<div class="list-row wrap inv-row"><div class="main"><div class="title">${docTitleLink(`/rechnung?id=${i.id}`, esc(i.number), 'font-mono text-gold')} · ${esc(invKind(i))}</div><div class="meta">${esc(fmtDate(i.createdAt))} · ${esc(i.issuerName)}</div></div>
             <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end"><span class="font-mono nowrap">${money(i.total)}</span>${invoiceBadge(i)}${open}</div>${
               paymentButtons(i) ? `<div class="inv-pay-row">${paymentButtons(i)}</div>` : ''
             }</div>`;

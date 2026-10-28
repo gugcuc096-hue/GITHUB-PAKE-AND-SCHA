@@ -440,6 +440,8 @@ function invoiceRow(i) {
     id: i.id,
     number: i.number,
     kind: i.kind,
+    typeKey: i.type_key || null,
+    typeLabel: (i.type_key && require('./billing').typeName(i.type_key)) || '',
     caseId: i.case_id,
     caseNumber: i.case_number || null,
     clientName: i.client_name,
