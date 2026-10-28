@@ -86,6 +86,7 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
+app.use(require('./seo').noindex);
 app.use('/api', (req, res, next) => {
   res.set('Cache-Control', 'no-store');
   next();
@@ -189,7 +190,7 @@ app.use('/fonts', express.static(path.join(__dirname, 'public', 'fonts'), { maxA
 const sitePages = require('./sitePages');
 // Saubere Adressen ohne „.html“ (/login, /dashboard, /rechnung …). Alte Links – Lesezeichen, ältere Discord-Nachrichten,
 // die installierte App – leiten dauerhaft weiter; Suchparameter bleiben, den #Teil hängt der Browser selbst wieder an.
-const CLEAN = { index: '/', dashboard: '/dashboard', login: '/login', register: '/registrieren', karriere: '/karriere', bewerbung: '/bewerbung', vertrag: '/vertrag', invoice: '/rechnung', aktenauszug: '/aktenauszug', offline: '/offline' };
+const CLEAN = { index: '/', dashboard: '/dashboard', login: '/login', register: '/registrieren', karriere: '/karriere', bewerbung: '/bewerbung', vertrag: '/vertrag', invoice: '/rechnung', aktenauszug: '/aktenauszug', offline: '/offline', aufwachen: '/aufwachen' };
 const RENAMED = { index: '/', register: '/registrieren', invoice: '/rechnung' }; // auch ohne „.html“ nur noch unter dem neuen Namen
 app.get(/^\/([a-z0-9-]+)(\.html)?$/i, (req, res, next) => {
   const [, name, ext] = req.path.match(/^\/([a-z0-9-]+)(\.html)?$/i);
@@ -198,6 +199,7 @@ app.get(/^\/([a-z0-9-]+)(\.html)?$/i, (req, res, next) => {
   const q = req.originalUrl.indexOf('?');
   res.redirect(301, to + (q >= 0 ? req.originalUrl.slice(q) : ''));
 });
+app.use(require('./seo').router); // robots.txt, sitemap.xml, „nicht indexieren“ für Internes
 app.get('/', sitePages.handler('index'));
 app.get('/karriere', sitePages.handler('karriere'));
 for (const [route, file] of [['login', 'login.html'], ['registrieren', 'register.html'], ['bewerbung', 'bewerbung.html']]) app.get(`/${route}`, sitePages.previewHandler(file));

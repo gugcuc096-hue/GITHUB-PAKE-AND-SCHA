@@ -6,11 +6,22 @@
  * neue Nummer und wird neu geladen. Ohne Verbindung zeigt die App statt einer Browser-Fehlerseite eine eigene
  * Offline-Seite.
  */
-const CACHE = 'ps-offline-v3';
+const CACHE = 'ps-offline-v4';
 const OFFLINE_URL = '/offline';
+const WAKE_URL = '/aufwachen'; // ruhige Warteseite, wenn der Server nach einer Ruhepause (z. B. Render) erst aufwacht
+const WAKE_AFTER = 5000; // Antwortet der Server nach so vielen Millisekunden noch nicht, kommt die Warteseite
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([OFFLINE_URL, '/icon-192.png', '/fonts/cormorant-garamond-latin-wght-normal.woff2'])));
+  event.waitUntil(
+    caches.open(CACHE).then(async (cache) => {
+      await cache.addAll([OFFLINE_URL, '/icon-192.png', '/fonts/cormorant-garamond-latin-wght-normal.woff2']);
+      // Warteseite samt ihrem Skript (mit Versionsnummer) – beides muss da sein, wenn der Server schläft
+      const wake = await fetch(WAKE_URL);
+      const script = (await wake.clone().text()).match(/<script src="([^"]+)"/);
+      await cache.put(WAKE_URL, wake);
+      if (script) await (await caches.open(STATIC)).add(script[1]);
+    })
+  );
   self.skipWaiting();
 });
 
@@ -53,5 +64,22 @@ self.addEventListener('fetch', (event) => {
   // Seitenaufrufe: immer frisch übers Netz – ohne Verbindung die eigene Offline-Seite. Alles andere (API, Formulare,
   // Downloads, Bilder) läuft unverändert übers Netz.
   if (req.mode !== 'navigate') return;
-  event.respondWith(fetch(req).catch(() => caches.match(OFFLINE_URL)));
+  event.respondWith(navigate(req));
 });
+
+/** Seite holen; dauert die erste Antwort länger als WAKE_AFTER, erscheint die Warteseite (sie lädt die Adresse neu, sobald der Server antwortet). */
+async function navigate(req) {
+  const net = fetch(req);
+  net.catch(() => {}); // verworfene Antwort: kein unbehandelter Fehler
+  let timer;
+  const slow = new Promise((resolve) => (timer = setTimeout(() => resolve(null), WAKE_AFTER)));
+  try {
+    const first = await Promise.race([net, slow]);
+    if (first) return first;
+    return (await caches.match(WAKE_URL)) || net;
+  } catch {
+    return caches.match(OFFLINE_URL);
+  } finally {
+    clearTimeout(timer);
+  }
+}

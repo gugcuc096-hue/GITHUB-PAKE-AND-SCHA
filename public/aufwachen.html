@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#02050e">
+    <meta name="robots" content="noindex">
+    <title>Einen Moment bitte | Pake &amp; Scha</title>
+    <style>
+        :root { color-scheme: dark; }
+        @font-face { font-family: 'Cormorant Garamond'; font-weight: 300 700; font-display: swap; src: url('/fonts/cormorant-garamond-latin-wght-normal.woff2') format('woff2'); }
+        body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box;
+               background: #02050e; color: #cbd5e1; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; text-align: center; }
+        .card { max-width: 420px; }
+        img { width: 72px; height: 72px; border-radius: 16px; margin-bottom: 20px; }
+        h1 { font-family: 'Cormorant Garamond', Georgia, "Times New Roman", serif; font-variant-numeric: lining-nums; font-weight: 600; color: #fff; font-size: 28px; margin: 0 0 10px; }
+        p { margin: 0 0 22px; line-height: 1.55; }
+        .bar { height: 3px; width: 160px; margin: 0 auto; border-radius: 3px; background: rgba(212, 175, 55, 0.18); overflow: hidden; }
+        .bar::after { content: ''; display: block; height: 100%; width: 40%; border-radius: 3px; background: linear-gradient(90deg, #e6c25a, #b8912a); animation: slide 1.6s ease-in-out infinite; }
+        @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(260%); } }
+        @media (prefers-reduced-motion: reduce) { .bar::after { animation: none; width: 100%; opacity: 0.5; } }
+    </style>
+</head>
+<body>
+    <div class="card" role="status" aria-live="polite">
+        <img src="/icon-192.png" alt="">
+        <h1>Die Kanzlei wacht gerade auf</h1>
+        <p>Der Server startet nach einer Ruhepause neu – das dauert meist weniger als eine Minute. Diese Seite lädt von selbst weiter.</p>
+        <div class="bar" aria-hidden="true"></div>
+    </div>
+    <script src="/js/aufwachen.js"></script>
+</body>
+</html>
