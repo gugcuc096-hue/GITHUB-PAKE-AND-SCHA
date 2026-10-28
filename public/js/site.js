@@ -233,11 +233,30 @@
   });
 
   /* ---------------------------------------------------------------- Honorarordnung & Tarifrechner */
-  function renderFees(fees) {
+  function renderFees(fees, categories) {
     if (!fees.length) return; // statischer Inhalt der Seite bleibt als Rückfall bestehen
+    // Kategorien aus der Honorarordnung (Einstellungen → Listen): Überschriften und Reiter; ohne Angabe die eingebauten
+    const cats = categories && categories.length ? categories.map((c) => [c.key, c.name]) : FEE_CATEGORIES;
     const container = document.getElementById('priceListContainer');
+    const allTab = document.querySelector('.tab-btn[data-cat="all"]');
+    if (allTab && categories && categories.length) {
+      const wasActive = document.querySelector('.tab-btn.active');
+      allTab.parentElement.querySelectorAll('.tab-btn:not([data-cat="all"])').forEach((b) => b.remove());
+      for (const [key, label] of cats) {
+        // home.js hängt die Klick-Handler nur beim Laden an – neue Reiter bekommen ihren hier
+        const b = document.createElement('button');
+        b.className = 'tab-btn';
+        b.dataset.act = 'category';
+        b.dataset.cat = key;
+        b.textContent = label;
+        b.addEventListener('click', () => typeof window.setCategory === 'function' && window.setCategory(key));
+        allTab.parentElement.appendChild(b);
+      }
+      const keep = wasActive && cats.some(([k]) => k === wasActive.dataset.cat) ? wasActive.dataset.cat : 'all';
+      allTab.parentElement.querySelectorAll('.tab-btn').forEach((b) => b.classList.toggle('active', b.dataset.cat === keep));
+    }
     if (container) {
-      container.innerHTML = FEE_CATEGORIES.map(([key, label]) => {
+      container.innerHTML = cats.map(([key, label]) => {
         const list = fees.filter((f) => f.category === key);
         if (!list.length) return '';
         return `
@@ -556,7 +575,7 @@
     });
 
   window.PS.boot('fees', '/api/fees')
-    .then((r) => renderFees(r.fees || []))
+    .then((r) => renderFees(r.fees || [], r.categories))
     .catch(() => {});
 
   window.PS.boot('memberships', '/api/public/memberships')

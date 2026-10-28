@@ -24,7 +24,6 @@ const OUTCOMES = {
   beendet: { label: 'Mandat vorzeitig beendet', success: null },
 };
 const EVENT_TYPES = { mandant: 'Mandantengespräch', gericht: 'Gerichtstermin', frist: 'Frist', intern: 'Intern' };
-const FEE_CATEGORIES = ['rechtsberatung', 'strafrecht', 'notfall', 'gericht', 'vertraege'];
 const DUTY_STATUS = { dienst: 'Im Dienst', gericht: 'Im Gericht', pause: 'Pause', off: 'Außer Dienst' };
 const APPLICATION_STATUS = {
   eingegangen: 'Eingegangen',
@@ -310,7 +309,6 @@ module.exports = {
   PRIORITY_FROM_URGENCY,
   OUTCOMES,
   EVENT_TYPES,
-  FEE_CATEGORIES,
   DUTY_STATUS,
   APPLICATION_STATUS,
   CHECKLISTS,

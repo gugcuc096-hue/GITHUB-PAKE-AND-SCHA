@@ -5,11 +5,12 @@ const { db, nextInvoiceNumber, getSetting } = require('../db');
 const { requireAuth, requireStaff, requireAdmin, isStaff } = require('../auth');
 const { wrap, parseBody, idParam, dateOnly, truncate } = require('../helpers');
 const { imageBody, saveImage, removeFile, evidencePath } = require('../uploads');
-const { INVOICE_SELECT, invoiceRow, getCase, caseLawyers, addSystemNote, logActivity } = require('../models');
+const { INVOICE_SELECT, berlinToday, invoiceRow, getCase, caseLawyers, addSystemNote, logActivity } = require('../models');
 const discord = require('../discord');
 const tickets = require('../tickets');
 const coop = require('../cooperations');
 const memberships = require('../memberships');
+const billing = require('../billing');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -69,6 +70,7 @@ const itemSchema = z.object({
 
 const createSchema = z.object({
   kind: z.enum(['rechnung', 'honorarvereinbarung']).default('rechnung'),
+  typeKey: z.string().max(40).nullable().optional(), // Rechnungsart (Einstellungen → Listen); bestimmt Grundart, Zahlungsziel, Vorschuss, Standardtext
   caseId: z.number().int().positive().nullable().optional(),
   clientName: z.string().trim().max(120).optional(),
   clientContact: z.string().trim().max(120).optional(),
@@ -111,6 +113,15 @@ router.post(
     const d = parseBody(createSchema, req, res);
     if (!d) return;
 
+    // Rechnungsart: Grundart, Zahlungsziel und Standardtext kommen aus der Art, wenn das Formular sie offenlässt
+    const type = d.typeKey ? billing.type(d.typeKey) : null;
+    if (d.typeKey && (!type || !type.active)) return res.status(400).json({ error: 'Diese Rechnungsart gibt es nicht (mehr).' });
+    if (type) {
+      d.kind = type.base;
+      if (d.dueDate === undefined && type.dueDays > 0) d.dueDate = new Date(Date.parse(`${berlinToday()}T12:00:00Z`) + type.dueDays * 864e5).toISOString().slice(0, 10);
+      if (!d.notes && type.note) d.notes = type.note;
+    }
+
     let c = null;
     if (d.caseId) {
       c = getCase(d.caseId);
@@ -146,6 +157,7 @@ router.post(
     }
     const items = d.items.map((it) => ({ ...it, total: it.quantity * it.unitPrice }));
     const t = computeTotals(items, d.discountPct, d.surchargePct, k ? k.discount_pct : 0, ms ? ms.discount_pct : 0);
+    if (type && type.advancePct > 0 && !(d.notes || '').includes('Vorschuss:')) d.notes = [d.notes, billing.advanceLine(type.advancePct, t.total)].filter(Boolean).join('\n\n');
     const clientUserId = ms ? ms.user_id : c ? c.client_id || null : null;
     const number = nextInvoiceNumber(d.kind);
 
@@ -191,7 +203,8 @@ router.post(
         t.total === 0 ? new Date().toISOString() : null
       );
 
-    const label = d.kind === 'rechnung' ? 'Rechnung' : 'Honorarvereinbarung';
+    if (type) db.prepare('UPDATE invoices SET type_key = ? WHERE id = ?').run(type.key, Number(info.lastInsertRowid));
+    const label = type ? type.name : d.kind === 'rechnung' ? 'Rechnung' : 'Honorarvereinbarung';
     const coopText = [
       ms ? `${ms.tier_name} ${ms.discount_pct} % (Wert ${money(t.subtotal)}, abgedeckt ${money(t.memberAmount)})` : '',
       k ? `Kooperationsrabatt ${k.name} ${k.discount_pct} % (${VIA_LABEL[via]})` : '',

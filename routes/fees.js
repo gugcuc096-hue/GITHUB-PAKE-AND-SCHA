@@ -4,7 +4,8 @@ const { z } = require('zod');
 const { db } = require('../db');
 const { requireAuth } = require('../auth');
 const { requirePerm } = require('../permissions');
-const { wrap, parseBody, idParam, FEE_CATEGORIES } = require('../helpers');
+const { wrap, parseBody, idParam } = require('../helpers');
+const billing = require('../billing');
 const { feeRow, logActivity } = require('../models');
 const money = (n) => `${Math.round(n).toLocaleString('de-DE')} $`;
 
@@ -13,8 +14,11 @@ const ORDER = 'ORDER BY sort_order ASC, id ASC';
 /* Öffentlich: Honorarordnung für Startseite, Tarifrechner und Rechnungs-Generator */
 const publicRouter = express.Router();
 publicRouter.get('/', (req, res) => {
-  const rows = db.prepare(`SELECT * FROM fees WHERE active = 1 ${ORDER}`).all();
-  res.json({ fees: rows.map(feeRow) });
+  // ausgeblendete Kategorien verschwinden samt ihren Leistungen (Website, Tarifrechner, Rechnungs-Generator)
+  const cats = billing.categories({ activeOnly: true });
+  const on = new Set(cats.map((c) => c.key));
+  const rows = db.prepare(`SELECT * FROM fees WHERE active = 1 ${ORDER}`).all().filter((f) => on.has(f.category));
+  res.json({ fees: rows.map(feeRow), categories: cats.map(({ key, name }) => ({ key, name })) });
 });
 
 /* Board of Partners: Honorarordnung pflegen */
@@ -22,7 +26,7 @@ const adminRouter = express.Router();
 adminRouter.use(requireAuth, requirePerm('fees.edit'));
 
 const schema = z.object({
-  category: z.enum(FEE_CATEGORIES),
+  category: billing.categoryKeySchema,
   name: z.string().trim().min(2).max(120),
   description: z.string().trim().max(400).optional(),
   price: z.number().int().min(0).max(1_000_000_000),
@@ -36,7 +40,7 @@ function load(id) {
 }
 
 adminRouter.get('/', (req, res) => {
-  res.json({ fees: db.prepare(`SELECT * FROM fees ${ORDER}`).all().map(feeRow) });
+  res.json({ fees: db.prepare(`SELECT * FROM fees ${ORDER}`).all().map(feeRow), categories: billing.categories() });
 });
 
 adminRouter.post(
