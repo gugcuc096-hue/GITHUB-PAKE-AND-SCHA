@@ -6,6 +6,8 @@ const { requireAuth, isStaff } = require('../auth');
 const { wrap, parseBody, idParam, isoDateTime, EVENT_TYPES, truncate } = require('../helpers');
 const { getCase, caseAccess, APPT_SELECT, getAppointment, apptVisible, apptRow, firmPlace } = require('../models');
 const features = require('../features');
+const eventKinds = require('../eventKinds');
+const kindLabel = (a) => (a.kind && eventKinds.nameOf(a.kind)) || EVENT_TYPES[a.type];
 const discord = require('../discord');
 const tickets = require('../tickets');
 const apptConfirm = require('../apptConfirm');
@@ -24,7 +26,7 @@ function ticketAppointment(a, title, { by, mention = 'client', note } = {}) {
     description: note,
     color: a.status === 'abgesagt' ? tickets.COLORS.slate : tickets.COLORS.blue,
     fields: [
-      { name: 'Art', value: EVENT_TYPES[a.type] || a.type },
+      { name: 'Art', value: kindLabel(a) || a.type },
       { name: a.type === 'frist' ? 'Fällig' : 'Wann', value: fmtDiscordTime(a.starts_at), inline: false },
       ...(a.location ? [{ name: 'Ort', value: a.location }] : []),
     ],
@@ -44,11 +46,12 @@ router.get('/', (req, res) => {
     : db
         .prepare(`${APPT_SELECT} WHERE a.client_visible = 1 AND (a.client_id = ? OR c.client_id = ?) ORDER BY a.starts_at ASC`)
         .all(u.id, u.id);
-  res.json({ events: rows.map((a) => apptRow(a, u)) });
+  res.json({ events: rows.map((a) => apptRow(a, u)), kinds: isStaff(u) ? eventKinds.list({ activeOnly: true }) : [] });
 });
 
 const createSchema = z.object({
   type: z.enum(Object.keys(EVENT_TYPES)).default('mandant'),
+  kind: z.string().max(60).nullable().optional(), // eigene Termin-/Fristenart (Einstellungen → Listen)
   title: z.string().trim().min(2).max(120),
   startsAt: isoDateTime,
   endsAt: isoDateTime.nullable().optional(),
@@ -101,7 +104,11 @@ router.post(
         }
         if (d.clientVisible === false) return res.status(400).json({ error: 'Ein Terminvorschlag muss für den Mandanten sichtbar sein.' });
       }
+      const kind = d.kind ? eventKinds.get(d.kind) : null;
+      if (d.kind && !kind) return res.status(400).json({ error: 'Diese Terminart gibt es nicht.' });
+      if (kind) d.type = kind.base;
       row = {
+        kind: kind ? kind.key : null,
         type: d.type,
         status: d.slots && d.slots.length ? 'angefragt' : 'bestaetigt',
         clientId: c ? c.client_id : null,
@@ -121,10 +128,10 @@ router.post(
     }
     const info = db
       .prepare(
-        `INSERT INTO appointments (case_id, client_id, type, title, starts_at, ends_at, location, note, status, assigned_to, created_by, client_visible, slots)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO appointments (case_id, client_id, type, title, starts_at, ends_at, location, note, status, assigned_to, created_by, client_visible, slots, kind)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .run(c ? c.id : null, row.clientId, row.type, d.title, first, endsAt, row.location, d.note || '', row.status, row.assignedTo, u.id, row.clientVisible, slotList && slotList.length > 1 ? JSON.stringify(slotList) : null);
+      .run(c ? c.id : null, row.clientId, row.type, d.title, first, endsAt, row.location, d.note || '', row.status, row.assignedTo, u.id, row.clientVisible, slotList && slotList.length > 1 ? JSON.stringify(slotList) : null, row.kind || null);
 
     const a = getAppointment(Number(info.lastInsertRowid));
     if (u.role === 'mandant') ticketAppointment(a, '📅 Terminanfrage des Mandanten', { by: u, mention: 'lawyers' });
@@ -144,7 +151,7 @@ router.post(
       });
     } else if (a.type === 'gericht' || a.type === 'frist') {
       discord.notify('calendar.created', {
-        title: `${TYPE_ICON[a.type]} ${EVENT_TYPES[a.type]}: ${truncate(a.title, 200)}`,
+        title: `${TYPE_ICON[a.type]} ${kindLabel(a)}: ${truncate(a.title, 200)}`,
         fields: [
           { name: a.type === 'frist' ? 'Fällig' : 'Beginn', value: fmtDiscordTime(a.starts_at), inline: false },
           { name: 'Akte', value: a.case_number || '—' },
@@ -189,6 +196,12 @@ router.patch(
       sets.push(`${col} = ?`);
       values.push(val);
     };
+    if (d.kind !== undefined) {
+      const k = d.kind ? eventKinds.get(d.kind) : null;
+      if (d.kind && !k) return res.status(400).json({ error: 'Diese Terminart gibt es nicht.' });
+      set('kind', k ? k.key : null);
+      if (k) d.type = k.base; // die Grundart folgt der gewählten Art
+    }
     if (d.type !== undefined) set('type', d.type);
     if (d.title !== undefined) set('title', d.title);
     if (d.startsAt !== undefined) {
@@ -301,9 +314,9 @@ function sendDueReminders() {
     .all(now.toISOString(), soon.toISOString());
   for (const a of due) {
     db.prepare('UPDATE appointments SET reminded = 1 WHERE id = ?').run(a.id);
-    ticketAppointment(a, `⏰ Erinnerung – ${EVENT_TYPES[a.type]} in weniger als 24 Stunden`);
+    ticketAppointment(a, `⏰ Erinnerung – ${kindLabel(a)} in weniger als 24 Stunden`);
     discord.notify('calendar.reminder', {
-      title: `⏰ Erinnerung – ${EVENT_TYPES[a.type]}: ${truncate(a.title, 200)}`,
+      title: `⏰ Erinnerung – ${kindLabel(a)}: ${truncate(a.title, 200)}`,
       color: discord.RED,
       fields: [
         { name: a.type === 'frist' ? 'Fällig' : 'Beginn', value: fmtDiscordTime(a.starts_at), inline: false },

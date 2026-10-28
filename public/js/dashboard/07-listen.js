@@ -9,6 +9,7 @@ const AREA_TONE = { gold: 'gold', sky: 'sky', emerald: 'emerald', amber: 'amber'
 
 async function loadLists() {
   st.lists = await api.get('/api/areas');
+  st.ekinds = await api.get('/api/event-kinds');
 }
 async function refreshAreas() {
   await loadLists();
@@ -18,7 +19,7 @@ async function refreshAreas() {
 
 function listsPanels() {
   if (!st.lists) return '<div class="panel panel-pad"><p class="text-sm text-muted">Wird geladen …</p></div>';
-  return areasPanel();
+  return `${areasPanel()}<div class="mt-4 lg:mt-5">${eventKindsPanel()}</div>`;
 }
 
 function areasPanel() {
@@ -43,7 +44,7 @@ function areaCard(a, i, n) {
         <button type="button" class="icon-btn sm" data-action="area-move" data-key="${esc(a.key)}" data-dir="1" aria-label="Nach unten" ${i === n - 1 ? 'disabled' : ''}>${icon('chevronDown', 'ico-sm')}</button>
         <button type="button" class="btn-outline btn-sm" data-action="area-edit" data-key="${esc(a.key)}">${icon('edit', 'ico-sm')}<span>Bearbeiten</span></button>
         <button type="button" class="btn-ghost btn-sm" data-action="area-toggle" data-key="${esc(a.key)}">${a.active ? 'Ausblenden' : 'Einblenden'}</button>
-        ${u.cases || u.packages ? '' : `<button type="button" class="icon-btn sm fn-danger" data-action="area-delete" data-key="${esc(a.key)}" data-name="${esc(a.name)}" aria-label="Löschen">${icon('trash', 'ico-sm')}</button>`}
+        ${u.cases || u.packages ? '<span class="icon-btn-ph" aria-hidden="true"></span>' : `<button type="button" class="icon-btn sm fn-danger" data-action="area-delete" data-key="${esc(a.key)}" data-name="${esc(a.name)}" aria-label="Löschen">${icon('trash', 'ico-sm')}</button>`}
       </div>
     </div>`;
 }
@@ -184,5 +185,112 @@ Object.assign(forms, {
       sel.innerHTML = areaOptions().map(([k, l]) => opt(k, l, saved && k === saved.key)).join('');
       sel.dispatchEvent(new Event('change', { bubbles: true }));
     } else renderView();
+  },
+});
+
+
+/* ================================================================
+   Termin- und Fristenarten (mit Rechenregel für den Fristenrechner)
+   ================================================================ */
+const EK_BASE = { mandant: 'Mandantengespräch', gericht: 'Gerichtstermin', frist: 'Frist', intern: 'Intern' };
+
+function eventKindsPanel() {
+  const list = st.ekinds.kinds;
+  return `<section class="panel panel-pad">
+      <div class="panel-head"><h2 class="panel-title">Termin- und Fristenarten</h2><button type="button" class="btn-gold btn-sm" data-action="ekind-new">${icon('plus', 'ico-sm')}<span>Neue Art</span></button></div>
+      <p class="text-sm text-muted mb-4">Eigene Arten wie „Berufung“ oder „Anhörung“ – mit Grundart, Dauer, Ort und einer <strong>Rechenregel</strong> („14 Tage ab Zustellung“). Im Kalender wählen Sie die Art, tragen das Ausgangsdatum ein, und das Fristende wird berechnet (fällt es auf ein Wochenende, gilt der nächste Werktag; Feiertage berücksichtigt der Rechner nicht).</p>
+      ${
+        list.length
+          ? `<div class="area-list">${list
+              .map(
+                (k, i) => `<div class="area-card ${k.active ? '' : 'is-off'}">
+          <span class="area-dot tone-${k.base === 'frist' ? 'red' : k.base === 'gericht' ? 'gold' : k.base === 'mandant' ? 'emerald' : 'sky'}" aria-hidden="true">${icon(k.base === 'frist' ? 'clock' : 'calendar', 'ico-sm')}</span>
+          <div class="area-main"><div class="area-name"><strong>${esc(k.name)}</strong>${k.active ? '' : badge('ausgeblendet', 'slate')}</div>
+            <div class="area-meta">${esc(EK_BASE[k.base])}${k.rule ? ` · ${esc(k.rule)}` : ''}${k.defaultMinutes ? ` · ${k.defaultMinutes} Min.` : ''}${k.usage ? ` · ${k.usage} Einträge` : ''}</div></div>
+          <div class="area-btns">
+            <button type="button" class="icon-btn sm" data-action="ekind-move" data-key="${esc(k.key)}" data-dir="-1" aria-label="Nach oben" ${i === 0 ? 'disabled' : ''}>${icon('chevronUp', 'ico-sm')}</button>
+            <button type="button" class="icon-btn sm" data-action="ekind-move" data-key="${esc(k.key)}" data-dir="1" aria-label="Nach unten" ${i === list.length - 1 ? 'disabled' : ''}>${icon('chevronDown', 'ico-sm')}</button>
+            <button type="button" class="btn-outline btn-sm" data-action="ekind-edit" data-key="${esc(k.key)}">${icon('edit', 'ico-sm')}<span>Bearbeiten</span></button>
+            <button type="button" class="btn-ghost btn-sm" data-action="ekind-toggle" data-key="${esc(k.key)}">${k.active ? 'Ausblenden' : 'Einblenden'}</button>
+            ${k.usage ? '<span class="icon-btn-ph" aria-hidden="true"></span>' : `<button type="button" class="icon-btn sm fn-danger" data-action="ekind-delete" data-key="${esc(k.key)}" data-name="${esc(k.name)}" aria-label="Löschen">${icon('trash', 'ico-sm')}</button>`}
+          </div></div>`
+              )
+              .join('')}</div>`
+          : empty('Noch keine eigenen Arten – es gelten die vier Grundarten.', 'calendar')
+      }
+    </section>`;
+}
+
+function ekindFormHtml(k) {
+  const U = st.ekinds.units;
+  return `<h2 class="modal-title">${k ? `Art: ${esc(k.name)}` : 'Neue Termin- oder Fristenart'}</h2>
+    <form data-form="ekind-save" ${k ? `data-key="${esc(k.key)}"` : ''} class="form-grid cols-2">
+      <div><label class="label" for="ekName">Name</label><input id="ekName" name="name" class="field" required minlength="2" maxlength="50" value="${esc(k ? k.name : '')}" placeholder="z. B. Berufung"></div>
+      <div><label class="label" for="ekBase">Grundart</label><select id="ekBase" name="base" class="field">${Object.entries(EK_BASE).map(([b, l]) => opt(b, l, (k ? k.base : 'frist') === b)).join('')}</select><p class="form-hint">Bestimmt Verhalten und Erinnerungen (Frist, Gerichtstermin …).</p></div>
+      <div><label class="label" for="ekMin">Dauer in Minuten (0 = offen)</label><input id="ekMin" type="number" name="defaultMinutes" min="0" max="1440" class="field" value="${k ? k.defaultMinutes : 0}"></div>
+      <div><label class="label" for="ekLoc">Ort (Vorbelegung)</label><input id="ekLoc" name="defaultLocation" class="field" maxlength="120" value="${esc(k ? k.defaultLocation : '')}" placeholder="z. B. District Court"></div>
+      <div class="span-2"><label class="label" for="ekVis">Für den Mandanten sichtbar</label><select id="ekVis" name="clientVisible" class="field">${opt('', 'Wie die Grundart', !k || k.clientVisible === null)}${opt('1', 'Ja, im Portal zeigen', k && k.clientVisible === true)}${opt('0', 'Nein, nur intern', k && k.clientVisible === false)}</select></div>
+      <div class="span-2"><div class="label">Rechenregel für den Fristenrechner</div>
+        <div class="rule-row"><span>Frist =</span><input type="number" name="ruleAmount" min="0" max="999" class="field" value="${k ? k.ruleAmount : 0}" aria-label="Anzahl"><select name="ruleUnit" class="field" aria-label="Einheit">${Object.entries(U).map(([u, l]) => opt(u, l, (k ? k.ruleUnit : 'tage') === u)).join('')}</select><span>ab</span><input name="ruleFrom" class="field" maxlength="40" value="${esc(k ? k.ruleFrom : '')}" placeholder="Zustellung" aria-label="ab welchem Ereignis"></div>
+        <p class="form-hint">0 = keine Regel. Beispiel: 14 Tage ab Zustellung, 1 Monat ab Verkündung, 5 Werktage ab Eingang.</p>
+        <label class="check"><input type="checkbox" name="weekendShift" ${!k || k.weekendShift ? 'checked' : ''}> Fällt das Ende auf Samstag oder Sonntag, gilt der nächste Werktag (§ 193 BGB)</label></div>
+      <label class="check span-2"><input type="checkbox" name="active" ${!k || k.active ? 'checked' : ''}> Eingeschaltet (im Kalender wählbar)</label>
+      <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>${k ? 'Speichern' : 'Anlegen'}</span></button><button type="button" class="btn-ghost btn-md" data-action="close-modal">Abbrechen</button></div>
+    </form>`;
+}
+const ekindBody = (f) => {
+  const fd = new FormData(f);
+  return {
+    name: val(fd, 'name'),
+    base: val(fd, 'base'),
+    defaultMinutes: Number(val(fd, 'defaultMinutes') || 0),
+    defaultLocation: val(fd, 'defaultLocation'),
+    clientVisible: val(fd, 'clientVisible') === '' ? null : val(fd, 'clientVisible') === '1',
+    ruleAmount: Number(val(fd, 'ruleAmount') || 0),
+    ruleUnit: val(fd, 'ruleUnit'),
+    ruleFrom: val(fd, 'ruleFrom'),
+    weekendShift: fd.has('weekendShift'),
+    active: fd.has('active'),
+  };
+};
+const ekindPayload = (k) => ({ name: k.name, base: k.base, defaultMinutes: k.defaultMinutes, defaultLocation: k.defaultLocation, clientVisible: k.clientVisible, ruleAmount: k.ruleAmount, ruleUnit: k.ruleUnit, ruleFrom: k.ruleFrom, weekendShift: k.weekendShift, active: k.active });
+
+Object.assign(actions, {
+  'ekind-new': () => openModal(ekindFormHtml(null), { wide: true }),
+  'ekind-edit': (el) => openModal(ekindFormHtml(st.ekinds.kinds.find((k) => k.key === el.dataset.key)), { wide: true }),
+  'ekind-toggle': async (el) => {
+    const k = st.ekinds.kinds.find((x) => x.key === el.dataset.key);
+    await api.put(`/api/event-kinds/${k.key}`, { ...ekindPayload(k), active: !k.active });
+    await loadLists();
+    toast(k.active ? `„${k.name}“ ausgeblendet.` : `„${k.name}“ eingeblendet.`);
+    renderView();
+  },
+  'ekind-move': async (el) => {
+    const keys = st.ekinds.kinds.map((k) => k.key);
+    const i = keys.indexOf(el.dataset.key);
+    const j = i + Number(el.dataset.dir);
+    if (j < 0 || j >= keys.length) return;
+    [keys[i], keys[j]] = [keys[j], keys[i]];
+    await api.put('/api/event-kinds/order', { keys });
+    await loadLists();
+    renderView();
+  },
+  'ekind-delete': async (el) => {
+    if (!(await askDelete('Art löschen?', `„${el.dataset.name}“ wird gelöscht (sie wird in keinem Eintrag verwendet).`))) return;
+    await api.del(`/api/event-kinds/${el.dataset.key}`);
+    await loadLists();
+    toast('Art gelöscht.');
+    renderView();
+  },
+});
+Object.assign(forms, {
+  'ekind-save': async (f) => {
+    const body = ekindBody(f);
+    if (f.dataset.key) await api.put(`/api/event-kinds/${f.dataset.key}`, body);
+    else await api.post('/api/event-kinds', body);
+    await loadLists();
+    toast(f.dataset.key ? 'Art gespeichert.' : 'Art angelegt.');
+    await modalBack();
+    renderView();
   },
 });

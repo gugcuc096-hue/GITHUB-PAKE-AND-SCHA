@@ -67,6 +67,8 @@ const PRIORITY = {
 const CASE_SORTS = { aktualisiert: 'Zuletzt geändert', prioritaet: 'Priorität', neueste: 'Neueste zuerst', aelteste: 'Älteste zuerst' };
 const SOURCES = { portal: 'Mandantenportal', web: 'Website-Formular', kanzlei: 'Kanzlei' };
 const EVENT_TYPES = { gericht: 'Gerichtstermin', frist: 'Frist', mandant: 'Mandantengespräch', intern: 'Intern' };
+/** Bezeichnung eines Kalendereintrags: eigene Art („Berufung“), sonst die Grundart. */
+const evLabel = (e) => e.typeLabel || EVENT_TYPES[e.type] || e.type;
 const EVENT_COLORS = { mandant: '#34d399', gericht: '#d4af37', frist: '#f87171', intern: '#7dd3fc' };
 const EVENT_STATUS = { angefragt: ['Angefragt', 'amber'], bestaetigt: ['Bestätigt', 'emerald'], abgesagt: ['Abgesagt', 'slate'], erledigt: ['Erledigt', 'slate'] };
 const INVOICE_STATUS = { offen: ['Offen', 'amber'], bezahlt: ['Bezahlt', 'emerald'], storniert: ['Storniert', 'slate'] };
@@ -708,7 +710,9 @@ const load = {
     st.clients = (await api.get('/api/clients')).clients;
   },
   async events() {
-    st.events = (await api.get('/api/calendar')).events;
+    const cal = await api.get('/api/calendar');
+    st.events = cal.events;
+    st.eventKinds = cal.kinds || [];
     st.events.forEach((e) => st.eventCache.set(e.id, e));
   },
   async invoices() {

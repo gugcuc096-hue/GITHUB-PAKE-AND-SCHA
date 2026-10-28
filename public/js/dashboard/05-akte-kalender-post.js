@@ -1495,6 +1495,20 @@ views.calendar = {
   },
 };
 
+/** Terminart (eigene Arten aus Einstellungen → Listen) und – wo es eine Rechenregel gibt – der Fristenrechner. */
+function eventKindBox(v, isNew) {
+  const kinds = st.eventKinds || [];
+  if (!kinds.length && !v.kind) return '';
+  const list = kinds.some((k) => k.key === v.kind) ? kinds : v.kind ? [...kinds, { key: v.kind, name: v.typeLabel || v.kind, base: v.type, ruleAmount: 0 }] : kinds;
+  return `<div class="span-2 kind-box"><label class="label" for="evKind">Terminart</label>
+      <select id="evKind" name="kind" class="field" data-event-kind><option value="">Standard (nach der Art oben)</option>${list.map((k) => `<option value="${esc(k.key)}" ${v.kind === k.key ? 'selected' : ''}>${esc(k.name)}${k.rule ? ` – ${esc(k.rule)}` : ''}</option>`).join('')}</select>
+      <div class="deadline-calc" id="evCalc" hidden>
+        <label class="label" for="evFrom" id="evFromLabel">Ausgangsdatum</label>
+        <input id="evFrom" type="date" class="field" data-event-from>
+        <p class="form-hint" id="evCalcOut" aria-live="polite"></p>
+      </div></div>`;
+}
+
 function eventForm(e, preset = {}) {
   const isNew = !e;
   const v = e || {};
@@ -1521,12 +1535,13 @@ function eventForm(e, preset = {}) {
 
   return `
       <h2 id="modalTitle" class="modal-title">${isNew ? 'Neuer Kalendereintrag' : esc(v.title)}</h2>
-      <p class="modal-sub">${isNew ? 'Gerichtstermine, Fristen, Mandantengespräche und interne Termine – mit Countdown im Dashboard und Discord-Erinnerung 24 h vorher.' : `${esc(EVENT_TYPES[v.type] || v.type)} · ${statusBadge(EVENT_STATUS, v.status)}${v.creatorName ? ' · angelegt von ' + esc(v.creatorName) : ''}${v.clientName ? ' · Mandant: ' + esc(v.clientName) : ''}`}</p>
+      <p class="modal-sub">${isNew ? 'Gerichtstermine, Fristen, Mandantengespräche und interne Termine – mit Countdown im Dashboard und Discord-Erinnerung 24 h vorher.' : `${esc(evLabel(v))} · ${statusBadge(EVENT_STATUS, v.status)}${v.creatorName ? ' · angelegt von ' + esc(v.creatorName) : ''}${v.clientName ? ' · Mandant: ' + esc(v.clientName) : ''}`}</p>
       ${!isNew && !['abgesagt', 'erledigt'].includes(v.status) ? `<div class="mb-4">${countdownHtml(v)}${fristBar(v)}</div>` : ''}
       <form data-form="event" data-id="${isNew ? '' : v.id}" class="form-grid cols-2">
         <div class="span-2"><span class="label">Art</span><div class="seg">${Object.entries(EVENT_TYPES)
         .map(([k, l]) => `<label class="seg-opt"><input type="radio" name="type" value="${k}" ${type === k ? 'checked' : ''}><span><i class="cal-dot" style="background:${EVENT_COLORS[k]}"></i>${esc(l)}</span></label>`)
         .join('')}</div></div>
+        ${eventKindBox(v, isNew)}
         <div class="span-2"><label class="label" for="evTitle">Titel</label><input id="evTitle" name="title" class="field" required minlength="2" maxlength="120" value="${esc(v.title || '')}" placeholder="z. B. Hauptverhandlung Strafsache Doe" autofocus></div>
         <div><label class="label" for="evStart">Beginn / Fälligkeit</label><input id="evStart" name="startsAt" type="datetime-local" class="field" required value="${start}"></div>
         <div><label class="label" for="evEnd">Ende (optional)</label><input id="evEnd" name="endsAt" type="datetime-local" class="field" value="${v.endsAt ? toLocalInput(v.endsAt) : ''}"></div>
@@ -1568,7 +1583,7 @@ function eventDetailClient(e) {
   const cell = (k, v) => `<div><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`;
   return `
       <h2 id="modalTitle" class="modal-title">${esc(e.title)}</h2>
-      <p class="modal-sub">${esc(EVENT_TYPES[e.type] || e.type)} · ${statusBadge(EVENT_STATUS, e.status)}</p>
+      <p class="modal-sub">${esc(evLabel(e))} · ${statusBadge(EVENT_STATUS, e.status)}</p>
       <div class="info-grid mb-4">${cell('Datum', fmtDay(e.startsAt))}${cell('Uhrzeit', fmtTime(e.startsAt) + ' Uhr')}${cell('Ort', e.location || '—')}${e.caseNumber ? cell('Akte', e.caseNumber) : ''}${e.assignedName ? cell('Ansprechpartner', e.assignedName) : ''}</div>
       ${!['abgesagt', 'erledigt'].includes(e.status) ? `<div class="mb-4">${countdownHtml(e)}${fristBar(e)}</div>` : ''}
       ${e.proposal && e.clientId === st.user.id ? `<div class="slot-pick mb-4"><div class="k mb-2">Bitte eine Zeit wählen</div><div class="flex flex-wrap gap-2">${e.slots.map((x) => `<button type="button" class="btn-gold btn-md" data-action="event-choose" data-id="${e.id}" data-at="${esc(x)}">${esc(fmtDay(x))}, ${esc(fmtTime(x))} Uhr</button>`).join('')}</div><p class="form-hint">Mit einem Klick bestätigt. Passt keine Zeit? Schreiben Sie der Kanzlei unter „Nachrichten“ in der Akte.</p></div>` : ''}
@@ -1727,3 +1742,51 @@ views.board = {
         ${st.board.length ? `<div class="board-grid">${st.board.map(noteCard).join('')}</div>` : `<div class="panel">${empty('Noch keine Notizen an der Pinnwand.', 'pin', nextStep('Notiz anheften', 'board-new'))}</div>`}`;
   },
 };
+
+
+/* ---------------------------------------------------------------- Terminart wählen & Fristenrechner */
+function eventKindApply(select) {
+  const form = select.closest('form');
+  const k = (st.eventKinds || []).find((x) => x.key === select.value);
+  const calc = form.querySelector('#evCalc');
+  if (!k) {
+    calc.hidden = true;
+    return;
+  }
+  const radio = form.querySelector(`input[name="type"][value="${k.base}"]`);
+  if (radio) radio.checked = true;
+  const title = form.elements.title;
+  if (!title.value.trim() || (st.eventKinds || []).some((x) => x.name === title.value.trim())) title.value = k.name;
+  if (k.defaultLocation) form.elements.location.value = k.defaultLocation;
+  if (k.clientVisible !== null && k.clientVisible !== undefined) form.elements.clientVisible.checked = k.clientVisible;
+  const start = form.elements.startsAt.value;
+  if (k.defaultMinutes && start) {
+    const end = new Date(new Date(start).getTime() + k.defaultMinutes * 60000);
+    form.elements.endsAt.value = toLocalInput(end.toISOString());
+  }
+  calc.hidden = !k.ruleAmount;
+  if (k.ruleAmount) {
+    form.querySelector('#evFromLabel').textContent = `${k.ruleFrom || 'Ausgangsdatum'} (${k.rule})`;
+    form.querySelector('#evCalcOut').textContent = 'Datum eintragen – das Fristende wird berechnet und als Fälligkeit übernommen.';
+    if (form.querySelector('#evFrom').value) eventKindCalc(form.querySelector('#evFrom'));
+  }
+}
+async function eventKindCalc(input) {
+  const form = input.closest('form');
+  const key = form.elements.kind.value;
+  const out = form.querySelector('#evCalcOut');
+  if (!key || !input.value) return;
+  try {
+    const r = await api.post(`/api/event-kinds/${encodeURIComponent(key)}/calc`, { from: input.value });
+    out.textContent = `${r.text} · ${r.rule}. Feiertage sind nicht berücksichtigt.`;
+    form.elements.startsAt.value = `${r.date}T${form.querySelector('input[name="type"]:checked')?.value === 'frist' ? '23:59' : '10:00'}`;
+  } catch (err) {
+    out.textContent = err.message;
+  }
+}
+document.addEventListener('change', (e) => {
+  const sel = e.target.closest && e.target.closest('select[data-event-kind]');
+  if (sel) return eventKindApply(sel);
+  const from = e.target.closest && e.target.closest('input[data-event-from]');
+  if (from) guard(() => eventKindCalc(from));
+});
