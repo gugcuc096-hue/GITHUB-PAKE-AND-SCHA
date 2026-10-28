@@ -96,7 +96,6 @@ app.post('/api/events/presence', requireAuth, live.presence); // wer hat die Akt
 /* ---------------------------------------------------------------- API */
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.use('/api/auth', require('./routes/auth'));
-app.use('/api/summary', require('./routes/summary').router); // Startseite: „Willkommen zurück“ mit dem, was ansteht
 app.use('/api/start', require('./routes/start').router); // Dashboard-Start: Konto + alle Zähler in einem Abruf
 // Jede Änderung an einer Akte (Notizen, Anhänge, Status, Verträge …) schreibt das Google Doc ihres Aktenauszugs neu –
 // ohne Knopf. Chat und „gelesen“ stehen nicht im Auszug.
@@ -144,6 +143,7 @@ app.use('/api/contract-templates', contractRoutes.templatesRouter);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/site', require('./routes/site'));
+app.use('/api/config', require('./routes/siteConfig').router); // Banner, Startseite, Beschriftungen, Mitteilungen, Export/Import
 app.use('/api/access', require('./routes/access').router); // Inhaber, Web-Admins, Rechte-Tabelle, Protokoll, Schalter
 app.use('/api/onboarding', require('./routes/onboarding'));
 app.use('/api/board', require('./routes/board'));
@@ -161,6 +161,7 @@ app.use('/api/discord', require('./routes/discord'));
 app.use('/api/tickets', require('./routes/tickets'));
 app.use('/api/bot', require('./routes/bot').router);
 app.use('/api/public', require('./routes/access').publicRouter);
+app.use('/api/public', require('./routes/siteConfig').publicRouter);
 app.use('/api/public', require('./routes/public'));
 app.use('/api/public', applications.publicRouter);
 app.use('/api/public', concernRoutes.publicRouter);

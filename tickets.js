@@ -683,7 +683,7 @@ async function ensure(caseId) {
         embeds: [
           embed({
             title: '👋 Willkommen im Ticket',
-            description: `<@${clientJoined.id}> ist dem Ticket beigetreten. Hier erscheinen alle Neuigkeiten zu Ihrer Akte **${c.case_number}** – Status, Termine, Verträge und Rechnungen.`,
+            description: require('./messageTemplates').render('receipt', { mandant: `<@${clientJoined.id}>`, aktenzeichen: c.case_number }),
             color: COLORS.green,
           }),
         ],

@@ -22,7 +22,7 @@ const PUBLIC = path.join(__dirname, 'public');
 const DASH_DIR = path.join(PUBLIC, 'js', 'dashboard');
 const YEAR = 'public, max-age=31536000, immutable';
 /** Nur für die Kanzlei (Mandanten laden sie nie): Teile, deren Ansichten Kanzlei/Board vorbehalten sind. */
-const STAFF_PARTS = new Set(['07-rechte-schalter.js', '07-team-einstellungen.js', '08-discord.js', '09-verwaltung.js', '13-kanzlei.js']);
+const STAFF_PARTS = new Set(['07-konfiguration.js', '07-rechte-schalter.js', '07-team-einstellungen.js', '08-discord.js', '09-verwaltung.js', '13-kanzlei.js']);
 const PROD = () => process.env.NODE_ENV === 'production';
 
 let esbuild = null;

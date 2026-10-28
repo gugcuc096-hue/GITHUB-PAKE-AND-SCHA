@@ -318,6 +318,7 @@
     av.title = me.displayName || 'Mein Profil';
     av.setAttribute('aria-label', 'Mein Profil');
     avatarInto(av, me);
+    prefetchDashboard();
     if (login) {
       login.classList.add('hidden');
       login.before(sw, av);
@@ -341,60 +342,8 @@
       el.appendChild(img);
     } else el.textContent = initials(u.displayName);
   }
-  const WELCOME_ICON = {
-    tasks: '<path d="M9 11l2 2 4-4M5 5h14v14H5z"/>',
-    calendar: '<path d="M7 3v3m10-3v3M4 9h16M5 5h14a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z"/>',
-    invoices: '<path d="M7 3h10v18l-2.5-1.5L12 21l-2.5-1.5L7 21zM10 8h4M10 12h4"/>',
-    mail: '<path d="M4 6h16v12H4zM4 7l8 6 8-6"/>',
-    chat: '<path d="M5 5h14v10H9l-4 4z"/>',
-    requests: '<path d="M8 12.5l5.5-5.5a3 3 0 014.2 4.2L10 19a5 5 0 01-7-7l7-7"/>',
-    contract: '<path d="M4 20l4-1 11-11-3-3L5 16zM14 6l3 3"/>',
-    next: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
-    ok: '<path d="M5 13l4 4L19 7"/>',
-  };
-  const welcomeIcon = (kind) => `<span class="wc-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${WELCOME_ICON[kind] || WELCOME_ICON[{ proposal: 'calendar', contract: 'contract', invoice: 'invoices' }[kind]] || WELCOME_ICON.next}</svg></span>`;
-
-  /** „Willkommen zurück“: Profilbild, was gerade ansteht (mit Direktlinks) und die zuletzt bearbeiteten Akten. */
-  async function renderWelcome() {
-    document.getElementById('welcomeStrip')?.remove();
-    if (!me) return;
-    let sum = null;
-    try {
-      sum = await api.get('/api/summary?today=' + new Date().toLocaleDateString('sv-SE'));
-    } catch {
-      sum = null;
-    }
-    if (!me) return; // inzwischen abgemeldet
-    const header = document.querySelector('header');
-    if (!header) return;
-    const items = sum && sum.items ? sum.items : [];
-    const chips = items.length
-      ? items.map((i) => `<a class="welcome-chip tone-${esc(i.tone || '')}" href="${esc(i.href)}">${welcomeIcon(i.kind)}<span>${esc(i.text)}</span></a>`).join('')
-      : `<span class="welcome-chip tone-ok">${welcomeIcon('ok')}<span>Alles erledigt – im Moment gibt es nichts zu tun</span></span>`;
-    const cases = sum && sum.cases && sum.cases.length ? `<div class="welcome-row"><span class="welcome-label">Zuletzt bearbeitet</span><div class="welcome-cases">${sum.cases.map((c) => `<a href="${esc(c.href)}"><b>${esc(c.caseNumber)}</b><span>${esc(c.title)}</span></a>`).join('')}</div></div>` : '';
-    const who = me.role === 'mandant' ? 'Mandantenkonto' : me.rank || (me.role === 'admin' ? 'Board of Partners' : 'Kanzlei');
-    const day = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
-    const duty = me.duty && me.duty.status && me.duty.status !== 'off' ? `<i class="av-dot on-${esc(me.duty.status)}" title="${esc({ dienst: 'Im Dienst', gericht: 'Im Gericht', pause: 'Pause' }[me.duty.status] || '')}"></i>` : '<i class="av-dot"></i>';
-    const strip = document.createElement('section');
-    strip.id = 'welcomeStrip';
-    strip.className = 'welcome-strip';
-    strip.setAttribute('aria-label', 'Willkommen zurück');
-    strip.innerHTML = `<div class="welcome-in">
-      <div class="welcome-id"><a class="welcome-avatar" href="/dashboard#profile" aria-label="Mein Profil"><span class="av-ini"></span>${duty}</a>
-        <div class="welcome-who"><span class="welcome-hi">Willkommen zurück, <strong>${esc((sum && sum.name) || (me.displayName || '').split(' ')[0])}</strong></span><span class="welcome-sub">${esc(who)} · ${esc(day)}</span></div></div>
-      <div class="welcome-chips">${chips}</div>
-      <a class="welcome-go" href="/dashboard">${me.role === 'mandant' ? 'Zu meinen Akten' : 'Zum Dashboard'} →</a></div>${cases}`;
-    const av = strip.querySelector('.welcome-avatar .av-ini');
-    if (me.avatarUrl) {
-      const img = document.createElement('img');
-      img.alt = '';
-      img.decoding = 'async';
-      img.src = me.avatarUrl;
-      img.addEventListener('error', () => img.replaceWith(Object.assign(document.createElement('span'), { className: 'av-ini', textContent: initials(me.displayName) })));
-      av.replaceWith(img);
-    } else av.textContent = initials(me.displayName);
-    header.after(strip);
-    // Das Dashboard schon im Hintergrund laden – der Wechsel dauert dann kaum noch (gleiche Versionsnummer wie diese Seite)
+  /** Das Dashboard schon im Hintergrund laden – der Wechsel dauert dann kaum noch (gleiche Versionsnummer wie diese Seite). */
+  function prefetchDashboard() {
     const v = new URL(document.querySelector('script[src*="/js/site.js"]')?.src || location.href, location.href).searchParams.get('v');
     if (v && !document.getElementById('dashPrefetch')) {
       const l = document.createElement('link');
@@ -439,7 +388,6 @@
     closeLogin();
     updateAuthNav();
     renderSwitch();
-    renderWelcome();
     showToast('Angemeldet', `Willkommen zurück, ${(me.displayName || '').split(' ')[0]}.`);
   }
   if (dlg) {
@@ -549,7 +497,6 @@
     .finally(() => {
       updateAuthNav();
       renderSwitch();
-      renderWelcome();
     });
 
   // Von einer Profilseite (/team/<name>): „Mandat anfragen“ → /?anwalt=<id> (Wunschanwalt) bzw. /?mandat=1 (ohne Konto)
@@ -587,9 +534,10 @@
     const box = document.getElementById('firmStats');
     if (!box) return;
     const cards = [];
-    if (firmStats.visible && firmStats.closed) cards.push([firmStats.closed.toLocaleString('de-DE'), 'Verfahren abgeschlossen']);
-    if (firmStats.visible && firmStats.successRate != null) cards.push([`${firmStats.successRate} %`, 'Erfolgsquote']);
-    if (firmStats.visible && firmStats.rating) cards.push([`${firmStats.rating.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ★`, `Ø aus ${firmStats.ratingCount} Bewertungen`]);
+    const kpi = window.PS.kpis || {}; // welche Kennzahlen öffentlich stehen (Dashboard → Texte & Banner → Startseite)
+    if (firmStats.visible && firmStats.closed && kpi.closed !== false) cards.push([firmStats.closed.toLocaleString('de-DE'), 'Verfahren abgeschlossen']);
+    if (firmStats.visible && firmStats.successRate != null && kpi.success !== false) cards.push([`${firmStats.successRate} %`, 'Erfolgsquote']);
+    if (firmStats.visible && firmStats.rating && kpi.rating !== false) cards.push([`${firmStats.rating.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ★`, `Ø aus ${firmStats.ratingCount} Bewertungen`]);
     box.classList.toggle('hidden', !cards.length);
     if (!cards.length) return;
     box.innerHTML = `
@@ -599,6 +547,7 @@
       ${firmStats.visible && firmStats.successRate != null ? '<p class="text-[0.7rem] text-center text-[var(--text-dim)] mt-3">Erfolgsquote: Freispruch, Einstellung, Strafmilderung, Vergleich oder gewonnen – reine Beratungen zählen nicht mit.</p>' : ''}`;
     window.PS.countUp(box, { whenVisible: true }); // Zahlen zählen hoch, sobald sie ins Bild scrollen
   }
+  window.addEventListener('ps:kpis', renderStats);
   window.PS.boot('stats', '/api/public/stats')
     .then((d) => {
       Object.assign(firmStats, {

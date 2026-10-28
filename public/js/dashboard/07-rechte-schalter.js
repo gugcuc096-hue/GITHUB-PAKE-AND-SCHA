@@ -19,7 +19,7 @@ const logValue = (v) => (v === null || v === undefined ? '—' : typeof v === 'o
 function accessPanels() {
   const a = st.access;
   if (!a) return `<div class="panel panel-pad"><p class="text-sm text-muted">Wird geladen …</p></div>`;
-  return `${webAdminPanel(a)}<div class="mt-4 lg:mt-5">${permMatrixPanel(a)}</div><div class="mt-4 lg:mt-5">${featuresPanel(a)}</div>${can('config.audit') ? `<div class="mt-4 lg:mt-5">${changeLogPanel()}</div>` : ''}`;
+  return `${webAdminPanel(a)}<div class="mt-4 lg:mt-5">${viewAsPanel()}</div><div class="mt-4 lg:mt-5">${permMatrixPanel(a)}</div><div class="mt-4 lg:mt-5">${featuresPanel(a)}</div>${can('config.audit') ? `<div class="mt-4 lg:mt-5">${changeLogPanel()}</div>` : ''}<div class="mt-4 lg:mt-5">${transferPanel()}</div>`;
 }
 
 function webAdminPanel(a) {

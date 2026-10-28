@@ -36,7 +36,7 @@ async function afterClose(caseId) {
       embeds: [
         tickets.embed({
           title: '⭐ Wie zufrieden waren Sie mit uns?',
-          description: `Ihre Akte **${c.case_number}** ist abgeschlossen. Über eine kurze Bewertung freuen wir uns sehr – das dauert nur eine Minute.\n\nSie entscheiden, ob Ihr Name, Ihre Initialen oder gar nichts angezeigt wird. Vor der Veröffentlichung auf der Website prüft das Board of Partners jede Bewertung.`,
+          description: require('./messageTemplates').render('review', { aktenzeichen: c.case_number }),
         }),
       ],
       components: url ? [{ type: 1, components: [{ type: 2, style: 5, label: 'Jetzt bewerten', url }] }] : undefined,

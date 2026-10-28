@@ -22,7 +22,7 @@
     (e) => {
       if (calm() || (e.pointerType === 'mouse' && e.button !== 0)) return;
       const btn = e.target.closest && e.target.closest(BTN);
-      if (!btn || btn.disabled || btn.classList.contains('is-done')) return;
+      if (!btn || btn.disabled || btn.classList.contains('ps-saved')) return;
       const r = btn.getBoundingClientRect();
       if (!r.width) return;
       let box = btn.querySelector(':scope > .ps-ripple-box');
@@ -48,10 +48,10 @@
   document.addEventListener('ps:form-ok', (e) => {
     if (calm()) return;
     const form = e.target && e.target.tagName === 'FORM' ? e.target : null;
-    const btn = form && form.querySelector('button[type="submit"]:not(.is-done)');
+    const btn = form && form.querySelector('button[type="submit"]:not(.ps-saved)');
     if (!btn || !btn.isConnected) return;
-    btn.classList.add('is-done');
-    setTimeout(() => btn.isConnected && btn.classList.remove('is-done'), 760);
+    btn.classList.add('ps-saved');
+    setTimeout(() => btn.isConnected && btn.classList.remove('ps-saved'), 760);
   });
 
   /* ---------------------------------------------------------------- Felder: Fehler wackeln */
