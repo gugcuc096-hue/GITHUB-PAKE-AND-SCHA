@@ -16,7 +16,8 @@ const { OUTCOMES, DUTY_STATUS } = require('./helpers');
 const MIN_CLOSED = 3; // abgeschlossene Akten, ab denen Zahlen erscheinen
 const MIN_RATED = 3; // Akten mit Ergebnis (Erfolg oder nicht) für die Erfolgsquote
 const MIN_REVIEWS = 3; // freigegebene Bewertungen für den Durchschnitt
-const AREA_LABEL = { strafrecht: 'Strafrecht', zivilrecht: 'Zivilrecht', verfassungsrecht: 'Verfassungsrecht', vertragsrecht: 'Vertragsrecht' };
+// Öffentliches Profil: alle Rechtsgebiete außer „Sonstiges“
+const AREA_LABEL = new Proxy({}, { get: (_, k) => (typeof k === 'string' && k !== 'sonstiges' && require('./areas').exists(k) ? require('./areas').name(k) : undefined) });
 
 
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

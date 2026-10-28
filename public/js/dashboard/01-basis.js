@@ -21,7 +21,27 @@ const ROLES = { mandant: 'Mandant', anwalt: 'Anwalt', admin: 'Board of Partners'
 const STEPS = ['Eingang', 'Akteneinsicht', 'Strategie', 'Verhandlung'];
 // Trennstellen (weicher Trennstrich) für die Kreise des Bearbeitungsstands – am Handy sonst zu eng
 const STEP_BREAKS = { Akteneinsicht: 'Akten\u00adeinsicht', Verhandlung: 'Ver\u00adhandlung', Abgeschlossen: 'Abge\u00adschlossen' };
+// Rechtsgebiete kommen aus Einstellungen → Listen → Rechtsgebiete (setAreas füllt sie beim Start): Name je Schlüssel, auch ausgeblendete
 const AREAS = { strafrecht: 'Strafrecht', zivilrecht: 'Zivilrecht', verfassungsrecht: 'Verfassungsrecht', vertragsrecht: 'Vertragsrecht', sonstiges: 'Sonstiges' };
+const AREA_META = { list: [], steps: {}, outcomes: {}, colors: {} };
+function setAreas(p) {
+  if (!p) return;
+  for (const k of Object.keys(AREAS)) delete AREAS[k];
+  Object.assign(AREAS, p.names);
+  Object.assign(AREA_META, { list: p.list || [], steps: p.steps || {}, outcomes: p.outcomes || {}, colors: p.colors || {} });
+}
+/** Auswahl für Formulare: eingeschaltete Rechtsgebiete, dazu das aktuelle, falls es ausgeblendet ist. */
+const areaOptions = (current = '') => {
+  const list = AREA_META.list.length ? AREA_META.list.map((a) => [a.key, a.name]) : Object.entries(AREAS);
+  return current && !list.some(([k]) => k === current) && AREAS[current] ? [...list, [current, `${AREAS[current]} (ausgeblendet)`]] : list;
+};
+/** Verfahrensschritte dieses Rechtsgebiets (Standard: Eingang, Akteneinsicht, Strategie, Verhandlung). */
+const stepsOf = (area) => AREA_META.steps[area] || STEPS;
+/** Ergebnisse, die bei diesem Rechtsgebiet zur Wahl stehen (leer eingestellt = alle); das bereits gewählte bleibt immer. */
+const outcomeEntries = (area, selected = '') => {
+  const only = AREA_META.outcomes[area];
+  return Object.entries(OUTCOMES).filter(([k]) => !only || only.includes(k) || k === selected);
+};
 const URGENCY = { normal: ['Normal', 'slate'], eilig: ['Eilig', 'amber'], notfall: ['Notfall', 'red'] };
 const CASE_STATUS = { offen: ['Offen', 'amber'], in_bearbeitung: ['In Bearbeitung', 'sky'], geschlossen: ['Abgeschlossen', 'slate'] };
 // Ergebnis beim Abschluss (nur Kanzlei, wie helpers.OUTCOMES): [Bezeichnung, Erfolg? true/false, null = zählt nicht, kurz]

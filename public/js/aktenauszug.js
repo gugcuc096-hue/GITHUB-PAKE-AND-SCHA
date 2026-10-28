@@ -111,7 +111,7 @@
     const facts = [
       ['Mandant', c.clientName],
       ['Gegenpartei', c.opponent || '—'],
-      ['Rechtsgebiet', AREAS[c.area] || c.area],
+      ['Rechtsgebiet', c.areaLabel || AREAS[c.area] || c.area],
       ['Dringlichkeit (Angabe Mandant)', URGENCY[c.urgency] || c.urgency],
       ['Status', c.statusLabel],
       ['Verfahrensstand', c.stepLabel],

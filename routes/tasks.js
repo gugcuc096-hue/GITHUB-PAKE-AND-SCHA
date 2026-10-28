@@ -114,7 +114,7 @@ router.post(
     if (!d) return;
     const c = getCase(d.caseId);
     if (!c) return res.status(404).json({ error: 'Akte nicht gefunden.' });
-    const template = CHECKLISTS[c.area] || CHECKLISTS.sonstiges;
+    const template = require('../areas').checklistOf(c.area);
     const existing = new Set(db.prepare('SELECT title FROM tasks WHERE case_id = ?').all(c.id).map((t) => t.title));
     const titles = template.filter((t) => !existing.has(t));
     const assigneeId = c.lawyer_id && activeStaff(c.lawyer_id) ? c.lawyer_id : req.user.id;

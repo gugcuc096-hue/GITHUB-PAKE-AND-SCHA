@@ -96,6 +96,8 @@ const actions = {
         </form>`);
   },
   'new-case': newCaseModal,
+  'nc-pick': (el) => ncPick({ name: el.dataset.name, email: el.dataset.email }),
+  'nc-unpick': () => ncPick(null),
   // Lange Listen: nächste Einträge (passiert beim Scrollen auch von selbst)
   'list-more': (el) => showMoreRows(el.dataset.id),
   'open-case': (el) => openCaseFrom(el),
@@ -125,7 +127,7 @@ const actions = {
     } finally {
       steps.forEach((b) => b.isConnected && (b.disabled = false));
     }
-    toast(`Bearbeitungsstand: ${STEPS[step]}`, 'ok', { duration: 6000, ...(was !== null && was !== step ? { action: undoPatch(id, { step: was }) } : {}) });
+    toast(`Bearbeitungsstand: ${stepsOf(st.caseInfo && st.caseInfo.id === id ? st.caseInfo.area : '')[step]}`, 'ok', { duration: 6000, ...(was !== null && was !== step ? { action: undoPatch(id, { step: was }) } : {}) });
     await reloadCase(id);
   },
   // Fünfter Kreis „Abgeschlossen“ im Bearbeitungsstand
@@ -134,9 +136,9 @@ const actions = {
   'case-reopen': async (el) => {
     const id = Number(el.dataset.id);
     const step = Number(el.dataset.step);
-    if (!(await ask(`Die Akte wird wieder geöffnet und steht dann auf „${STEPS[step]}“.`, { title: 'Akte wieder öffnen?', confirmText: 'Wieder öffnen' }))) return;
+    if (!(await ask(`Die Akte wird wieder geöffnet und steht dann auf „${stepsOf(st.caseInfo && st.caseInfo.id === id ? st.caseInfo.area : '')[step]}“.`, { title: 'Akte wieder öffnen?', confirmText: 'Wieder öffnen' }))) return;
     await api.patch('/api/cases/' + id, { status: 'in_bearbeitung', step });
-    toast(`Akte wieder geöffnet – ${STEPS[step]}`);
+    toast(`Akte wieder geöffnet – ${stepsOf(st.caseInfo && st.caseInfo.id === id ? st.caseInfo.area : '')[step]}`);
     await reloadCase(id);
   },
   'pt-toggle': () => {

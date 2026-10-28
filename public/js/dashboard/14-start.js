@@ -363,7 +363,7 @@ document.addEventListener('input', (e) => {
  * Felder in der Akte direkt ändern (siehe ie() in 05-akte-kalender-post.js): Klick oder Enter öffnet die Eingabe, Enter
  * bzw. Verlassen speichert, Esc verwirft. Danach „Rückgängig“. Die Akte wird nicht neu geladen.
  */
-const IE_OPTIONS = { area: () => Object.entries(AREAS) };
+const IE_OPTIONS = { area: (current) => areaOptions(current) };
 function ieShow(el, value) {
   el.dataset.value = value;
   const shown = el.dataset.ie === 'area' ? AREAS[value] || value : value;
@@ -389,7 +389,7 @@ function ieOpen(el) {
   let input;
   if (type === 'select') {
     input = document.createElement('select');
-    input.innerHTML = IE_OPTIONS[el.dataset.ie]().map(([k, l]) => opt(k, l, k === old)).join('');
+    input.innerHTML = IE_OPTIONS[el.dataset.ie](old).map(([k, l]) => opt(k, l, k === old)).join('');
   } else if (type === 'textarea') {
     input = document.createElement('textarea');
     input.rows = Math.min(10, Math.max(3, old.split('\n').length + 1));
@@ -1340,6 +1340,7 @@ document.addEventListener('ps:form-ok', () => buzz());
     const { me } = await load.start(); // Konto + Zähler + Dienststatus in einem Abruf
     st.user = me.user;
     st.features = me.features || null;
+    setAreas(me.areas);
     st.siteConfig = me.siteConfig || null;
     st.twoFactor = me.twoFactor;
     setRanks(me.ranks);

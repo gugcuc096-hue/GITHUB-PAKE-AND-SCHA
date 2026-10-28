@@ -443,7 +443,7 @@ function openModal(html, { wide = false, key = null, reopen = null, child = fals
   $('#modalCard').classList.toggle('wide', wide);
   modal.classList.add('open');
   // Aus einer Akten-Zeile geöffnet: Fenster wächst aus der Zeile hervor (nur beim ersten Öffnen, nicht beim Ersetzen)
-  if (!wasOpen && st.morphFrom) morphOpen(st.morphFrom);
+  if (!wasOpen && (st.morphFrom || triggerRect())) morphOpen(st.morphFrom || triggerRect());
   st.morphFrom = null;
   // Fensterwechsel (neues Fenster über dem alten, Zurück, Inhalt nach dem Laden): weich statt hart
   if (wasOpen) {
@@ -644,6 +644,24 @@ function morphClip(card, rect) {
   const r = card.getBoundingClientRect();
   const cut = (v, max) => Math.min(Math.max(0, v), Math.max(0, max - 48));
   return `inset(${cut(rect.top - r.top, r.height)}px ${cut(r.right - rect.right, r.width)}px ${cut(r.bottom - rect.bottom, r.height)}px ${cut(rect.left - r.left, r.width)}px round 14px)`;
+}
+/*
+ * Jedes Fenster wächst aus dem Knopf oder der Zeile hervor, die es geöffnet hat (nicht nur Akten): Der letzte Klick auf
+ * etwas mit data-action wird kurz gemerkt; öffnet sich danach ein Fenster, nimmt es dessen Rechteck als Ausgangspunkt.
+ */
+document.addEventListener(
+  'click',
+  (e) => {
+    const el = e.target.closest && e.target.closest('[data-action]');
+    st.trigger = el && !el.closest('#nav, #bottomNav, #modal, #sidebar') && !/^(close|modal-back|nav-)/.test(el.dataset.action) ? { rect: el.getBoundingClientRect(), at: Date.now() } : null;
+  },
+  true
+);
+function triggerRect() {
+  const t = st.trigger;
+  if (!t || Date.now() - t.at > 1500 || !morphOk()) return null;
+  const r = t.rect;
+  return r && r.width > 4 && r.height > 4 && r.bottom > 0 && r.top < window.innerHeight ? r : null;
 }
 function morphOpen(rect) {
   const modal = $('#modal');

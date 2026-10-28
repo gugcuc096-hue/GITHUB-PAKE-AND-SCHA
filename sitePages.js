@@ -96,6 +96,7 @@ const BOOT = {
     reviews: '/api/public/reviews',
     duty: '/api/public/on-duty',
     positions: '/api/public/positions',
+    areas: '/api/public/areas',
   },
   karriere: { session: '/api/auth/session', positions: '/api/public/positions' },
 };

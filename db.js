@@ -1295,6 +1295,7 @@ db.exec(`
 addColumn('cases', 'sentence_estimate', 'INTEGER');
 addColumn('cases', 'sentence_fine', 'INTEGER');
 addColumn('cases', 'sentence_reduced', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('cases', 'intake_answers', 'TEXT'); // Antworten auf die Zusatzfelder des Rechtsgebiets (JSON: { key: { label, value } })
 // Tatsächliches Strafmaß beim Abschluss (Vergleich mit der Einschätzung der Kanzlei, nur intern)
 addColumn('cases', 'sentence_actual_he', 'INTEGER');
 addColumn('cases', 'sentence_actual_fine', 'INTEGER');
