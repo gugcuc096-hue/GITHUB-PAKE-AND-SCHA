@@ -3591,15 +3591,19 @@ describe('Browser: Nachladen in der Akte, Listen virtuell zeichnen, weniger Live
         await page.locator('#content tr.more-rows').scrollIntoViewIfNeeded();
         await page.waitForTimeout(250);
       }
-      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-      await page.waitForFunction(() => document.querySelectorAll('#caseList tr.v-gap').length > 0, null, { timeout: 5000 });
+      await page.waitForFunction(() => {
+        window.scrollTo(0, document.documentElement.scrollHeight);
+        return document.querySelectorAll('#caseList tr.v-gap').length > 0;
+      }, null, { timeout: 15000, polling: 250 });
       const bottom = await page.evaluate(() => ({ rows: document.querySelectorAll('#caseList tr.row').length, gaps: document.querySelectorAll('#caseList tr.v-gap').length, height: document.documentElement.scrollHeight }));
       assert.ok(bottom.rows < 330, `weniger Zeilen im DOM (${bottom.rows})`);
       assert.ok(bottom.gaps >= 1);
       // Die Seite behält ihre Länge (Platzhalter = Höhe der Zeilen): zurück nach oben, alles wieder da
+      // Mitten in die Liste scrollen: der dortige Abschnitt wird wieder gezeichnet (steht eine Zeile an dieser Stelle?)
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight * 0.45));
+      await page.waitForFunction(() => !!document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2)?.closest('tr.row'), null, { timeout: 15000, polling: 200 });
       await page.evaluate(() => window.scrollTo(0, 0));
-      await page.waitForFunction(() => document.querySelectorAll('#caseList tr.v-gap').length === 0 || document.querySelectorAll('#caseList tr.row').length > 100, null, { timeout: 5000 });
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(500);
       const top = await page.evaluate(() => ({ height: document.documentElement.scrollHeight }));
       assert.ok(Math.abs(top.height - bottom.height) / bottom.height < 0.05, `Länge bleibt (${bottom.height} → ${top.height})`);
       // Suche arbeitet weiter über alle Akten, auch über die zusammengeklappten
