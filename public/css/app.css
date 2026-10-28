@@ -860,6 +860,16 @@ details.edit-box[open] > summary::after { content: '–'; }
 .if-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.4rem; }
 .if-row { border: 1px solid var(--line); border-radius: 10px; padding: 0.55rem 0.7rem; background: rgba(255, 255, 255, 0.02); }
 
+/* Übergabe aus dem FiveNet-Skript */
+.fn-oneclick { border: 1px solid var(--gold-hairline); background: var(--gold-soft); border-radius: 14px; padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.fn-oneclick-head { display: flex; align-items: center; gap: 0.5rem; color: var(--gold-light); }
+.fn-pick-list { display: flex; flex-direction: column; gap: 0.4rem; max-height: min(52vh, 26rem); overflow-y: auto; }
+.fn-pick { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; width: 100%; text-align: left; padding: 0.65rem 0.85rem; border: 1px solid var(--line); border-radius: 12px; background: rgba(255, 255, 255, 0.02); color: inherit; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+.fn-pick:hover, .fn-pick:focus-visible { border-color: var(--gold-hairline); background: var(--gold-soft); outline: none; }
+.fn-pick-name { min-width: 0; overflow-wrap: anywhere; }
+.fn-pick-client { flex: none; max-width: 40%; font-size: 0.8rem; color: var(--text-dim); overflow-wrap: anywhere; text-align: right; }
+@media (max-width: 480px) { .fn-pick { flex-direction: column; align-items: flex-start; gap: 0.15rem; } .fn-pick-client { max-width: 100%; text-align: left; } }
+
 /* Aufgaben & Wiedervorlagen */
 .task-list { display: flex; flex-direction: column; }
 .task-row { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.65rem 0.4rem; border-bottom: 1px solid var(--line); }

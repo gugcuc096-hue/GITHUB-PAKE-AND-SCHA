@@ -78,4 +78,13 @@ router.post(
   })
 );
 
-module.exports = { router };
+/** Benutzerskript zum Herunterladen/Installieren (enthält nur die Adressen – öffentlich abrufbar, damit Tampermonkey es laden kann). */
+function userscript(req, res) {
+  const inst = fivenet.instance();
+  res
+    .set('Cache-Control', 'no-cache')
+    .type('application/javascript; charset=utf-8')
+    .send(require('../fivenetUserscript').source({ kanzlei: `${req.protocol}://${req.get('host')}`, fivenet: inst.url }));
+}
+
+module.exports = { router, userscript };

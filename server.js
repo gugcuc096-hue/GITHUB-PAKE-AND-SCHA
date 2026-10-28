@@ -199,6 +199,7 @@ app.get(/^\/([a-z0-9-]+)(\.html)?$/i, (req, res, next) => {
   const q = req.originalUrl.indexOf('?');
   res.redirect(301, to + (q >= 0 ? req.originalUrl.slice(q) : ''));
 });
+app.get('/fivenet-import.user.js', require('./routes/fivenet').userscript);
 app.use(require('./seo').router); // robots.txt, sitemap.xml, „nicht indexieren“ für Internes
 app.get('/', sitePages.handler('index'));
 app.get('/karriere', sitePages.handler('karriere'));

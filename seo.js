@@ -10,7 +10,7 @@ const areas = require('./areas');
 const { getSetting } = require('./db');
 
 // Seiten und Schnittstellen, die nie in einer Suchmaschine auftauchen sollen
-const PRIVATE = /^\/(api|dashboard|login|registrieren|register|bewerbung|vertrag|rechnung|aktenauszug|offline|aufwachen|media|js\/dashboard)(\/|$|\?)/;
+const PRIVATE = /^\/(api|dashboard|login|registrieren|register|bewerbung|vertrag|rechnung|aktenauszug|offline|aufwachen|fivenet-import|media|js\/dashboard)(\/|\.|$|\?)/;
 const originOf = (req) => `${req.protocol}://${req.get('host')}`;
 const xml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 

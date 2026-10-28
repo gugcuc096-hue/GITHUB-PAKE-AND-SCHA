@@ -308,6 +308,8 @@ document.addEventListener('input', (e) => {
     st.gsQuery = t.value;
     clearTimeout(st.gsTimer);
     st.gsTimer = setTimeout(() => runSearch().catch(handleError), 200);
+  } else if (t.id === 'fnImportSearch') {
+    fnImportFilter(t.value);
   } else if (t.id === 'fnInput') {
     clearTimeout(st.fnTimer);
     st.fnTimer = setTimeout(() => checkFivenetInput(t), 300);
@@ -1371,9 +1373,10 @@ document.addEventListener('ps:form-ok', () => buzz());
   // Akte per Link ohne Seite (Discord „Im Dashboard öffnen“, /akte, Startseite): dahinter liegt die Aktenliste –
   // X führt dorthin statt zur Übersicht
   const hash = location.hash || (params.has('case') && !restoring ? '#cases' : '');
-  if (!restoring && (discordState || googleState || params.has('case') || params.has('event') || params.has('new'))) history.replaceState(null, '', location.pathname + hash);
+  if (!restoring && (discordState || googleState || params.has('case') || params.has('event') || params.has('new') || params.has('import'))) history.replaceState(null, '', location.pathname + hash);
   if (discordState && DISCORD_MSG[discordState]) toast(...DISCORD_MSG[discordState]);
   if (googleState && GOOGLE_MSG[googleState]) toast(...GOOGLE_MSG[googleState]);
+  if (params.get('import') === 'fivenet') toast('Das FiveNet-Dokument wird übernommen …');
   if (googleState) st.settingsTab = 'integrations'; // Google Docs stehen unter Einstellungen → Integrationen
 
   st.histPaused = true;

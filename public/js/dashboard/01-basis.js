@@ -345,6 +345,8 @@ const st = {
   caseInfo: null,
   fnCheckToken: 0,
   fnPending: { urls: [], blobs: [] },
+  fnPrefill: null, // Übergabe aus dem FiveNet-Skript: vorbelegte Angaben für das Formular
+  fnImport: null, // … und das übergebene Dokument, solange die Akte noch gewählt wird
 };
 
 const $ = (s, root = document) => root.querySelector(s);
