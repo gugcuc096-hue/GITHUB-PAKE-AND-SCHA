@@ -2,7 +2,8 @@
 const express = require('express');
 const { z } = require('zod');
 const { db } = require('../db');
-const { requireAuth, requireAdmin } = require('../auth');
+const { requireAuth } = require('../auth');
+const { requirePerm } = require('../permissions');
 const { wrap, parseBody, idParam, FEE_CATEGORIES } = require('../helpers');
 const { feeRow, logActivity } = require('../models');
 const money = (n) => `${Math.round(n).toLocaleString('de-DE')} $`;
@@ -18,7 +19,7 @@ publicRouter.get('/', (req, res) => {
 
 /* Board of Partners: Honorarordnung pflegen */
 const adminRouter = express.Router();
-adminRouter.use(requireAuth, requireAdmin);
+adminRouter.use(requireAuth, requirePerm('fees.edit'));
 
 const schema = z.object({
   category: z.enum(FEE_CATEGORIES),

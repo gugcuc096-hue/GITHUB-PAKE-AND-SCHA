@@ -2,6 +2,7 @@
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const { AsyncLocalStorage } = require('async_hooks');
 const { DatabaseSync } = require('node:sqlite');
 
 // Render: Ohne "Persistent Disk" ist das Dateisystem flüchtig -- die Datenbank
@@ -188,6 +189,22 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
+  );
+
+  -- Änderungsprotokoll der Konfiguration: wer hat was wann geändert (mit altem Wert zum Zurücksetzen)
+  CREATE TABLE IF NOT EXISTS config_log (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    at        TEXT NOT NULL DEFAULT (datetime('now')),
+    user_id   INTEGER,
+    user_name TEXT NOT NULL DEFAULT 'System',
+    area      TEXT NOT NULL,            -- settings | site_text | permissions | webadmin
+    key       TEXT NOT NULL DEFAULT '',
+    label     TEXT NOT NULL,
+    perm      TEXT NOT NULL DEFAULT '', -- Recht, das zum Zurücksetzen nötig ist
+    old_value TEXT,                     -- alter Wert (JSON) – null = es gab keinen
+    new_value TEXT,
+    revertible INTEGER NOT NULL DEFAULT 0,
+    reverted_at TEXT
   );
 
   -- Honorarordnung: Quelle für Startseite, Tarifrechner und Rechnungs-Generator.
@@ -580,6 +597,8 @@ db.exec(`
    Migrationen für bestehende Datenbanken
    ================================================================ */
 // Neue Spalten lassen sich per ALTER TABLE ergänzen.
+addColumn('users', 'is_owner', 'INTEGER NOT NULL DEFAULT 0'); // Inhaber: bestimmt Web-Admins und Rechte
+addColumn('users', 'web_admin', 'INTEGER NOT NULL DEFAULT 0'); // Web-Admin: pflegt Website, Listen, Vorlagen, Einstellungen
 addColumn('users', 'discord_id', 'TEXT');
 addColumn('users', 'discord_username', 'TEXT');
 addColumn('users', 'discord_avatar', 'TEXT');
@@ -1346,8 +1365,15 @@ function getSetting(key, fallback = null) {
   const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
   return row ? row.value : fallback;
 }
+/** Wer gerade ändert (pro Anfrage gesetzt) – damit Einstellungsänderungen im Änderungsprotokoll mit Namen stehen. */
+const actor = new AsyncLocalStorage();
+const settingHooks = [];
 function setSetting(key, value) {
-  db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, String(value));
+  const next = String(value);
+  const hooked = settingHooks.length && actor.getStore();
+  const prev = hooked ? getSetting(key, null) : null;
+  db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, next);
+  if (hooked && prev !== next) for (const h of settingHooks) h(key, prev, next, actor.getStore());
 }
 
 // Einmalig: offene Akten mit „Eilig“/„Notfall“ bekommen die passende Start-Priorität (Hoch/Kritisch) –
@@ -1480,4 +1506,6 @@ module.exports = {
   randomPin,
   getSetting,
   setSetting,
+  actor,
+  settingHooks,
 };

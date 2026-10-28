@@ -1434,6 +1434,24 @@ const COMMANDS = [
     ],
   },
   { name: 'imdienst', description: 'Wer von der Kanzlei ist gerade im Dienst?' },
+  {
+    name: 'webadmin',
+    description: 'Web-Admins verwalten (nur der Inhaber der Website)',
+    options: [
+      {
+        type: STR,
+        name: 'aktion',
+        description: 'Was soll passieren?',
+        required: true,
+        choices: [
+          { name: 'Web-Admin ernennen', value: 'ernennen' },
+          { name: 'Web-Admin entziehen', value: 'entziehen' },
+          { name: 'Web-Admins anzeigen', value: 'liste' },
+        ],
+      },
+      { type: USER, name: 'person', description: 'Wer? (nicht bei „anzeigen“)', required: false },
+    ],
+  },
   { name: 'termine', description: 'Deine nächsten Termine und Fristen' },
   { name: 'hilfe', description: 'Alle Befehle des Kanzlei-Bots' },
 ].map((c) => ({ type: 1, dm_permission: false, ...c }));

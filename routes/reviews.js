@@ -13,6 +13,7 @@ const { db } = require('../db');
 const { requireAuth } = require('../auth');
 const { wrap, parseBody, idParam, isBoard, truncate } = require('../helpers');
 const { logActivity } = require('../models');
+const features = require('../features');
 const discord = require('../discord');
 
 const AREA_LABEL = { strafrecht: 'Strafrecht', zivilrecht: 'Zivilrecht', verfassungsrecht: 'Verfassungsrecht', vertragsrecht: 'Vertragsrecht', sonstiges: 'Sonstiges' };
@@ -84,6 +85,7 @@ router.get('/', (req, res) => {
 /** Bewertung abgeben (Mandant, eigene abgeschlossene Akte, eine je Akte). */
 router.post(
   '/',
+  features.requireFeature('reviews'),
   wrap(async (req, res) => {
     const u = req.user;
     if (u.role !== 'mandant') return res.status(403).json({ error: 'Bewerten können Mandanten ihre eigenen Akten.' });
@@ -160,6 +162,7 @@ router.delete(
 /* ---------------------------------------------------------------- Öffentlich: freigegebene Bewertungen */
 const publicRouter = express.Router();
 publicRouter.get('/reviews', (req, res) => {
+  if (!features.on('reviews')) return res.json({ reviews: [] });
   const rows = db.prepare("SELECT * FROM reviews WHERE status = 'freigegeben' ORDER BY COALESCE(decided_at, created_at) DESC LIMIT 12").all();
   res.json({
     reviews: rows.map((r) => ({ rating: r.rating, body: r.body, name: publicName(r), area: AREA_LABEL[r.area] || '', date: r.created_at })),

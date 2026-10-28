@@ -124,7 +124,7 @@
 
   call('GET', '/api/auth/session')
     .then((r) => {
-      if (r.user && r.user.board) start();
+      if (r.user && (r.user.perms || []).includes('site.edit')) start();
     })
     .catch(() => {});
 })();

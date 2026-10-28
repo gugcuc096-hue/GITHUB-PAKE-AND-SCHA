@@ -8,6 +8,7 @@ const { requireAuth, requireAdmin, hashPassword, generateTempPassword } = requir
 const { wrap, parseBody, idParam, isoDateTime, deriveInitials, truncate, APPLICATION_STATUS, rankField, BOARD_RANKS, RANKS, isBoard, firmEmail, EMAIL_HINT } = require('../helpers');
 const { applicationRow, positionRow, logActivity, firmPlace } = require('../models');
 const discord = require('../discord');
+const features = require('../features');
 const personnel = require('./personnel');
 const tickets = require('../tickets');
 
@@ -83,6 +84,7 @@ const statusText = (a) => `Neuer Stand: **${APPLICATION_STATUS[a.status] || a.st
 const publicRouter = express.Router();
 
 publicRouter.get('/positions', (req, res) => {
+  if (!features.on('karriere')) return res.json({ positions: [] });
   const rows = db.prepare('SELECT * FROM positions WHERE active = 1 ORDER BY sort_order ASC, id ASC').all();
   res.json({ positions: rows.map(positionRow) });
 });
@@ -103,6 +105,7 @@ const applySchema = z.object({
 
 publicRouter.post(
   '/applications',
+  features.requireFeature('karriere'),
   limit(60 * 60 * 1000, 3, 'Sie haben bereits mehrere Bewerbungen gesendet. Bitte versuchen Sie es später erneut.', true),
   wrap(async (req, res) => {
     const d = parseBody(applySchema, req, res);
@@ -144,6 +147,7 @@ publicRouter.post(
 
 publicRouter.post(
   '/application-status',
+  features.requireFeature('karriere'),
   limit(15 * 60 * 1000, 15, 'Zu viele Versuche. Bitte in ein paar Minuten erneut versuchen.'),
   wrap(async (req, res) => {
     const d = parseBody(z.object({ number: z.string().trim().min(1).max(30), code: z.string().trim().min(1).max(10) }), req, res);
@@ -175,6 +179,7 @@ function byToken(token) {
 /** Bewerbungsnummer + Zugangscode → persönlicher Link (für alle, die nur die Nummer notiert haben). */
 publicRouter.post(
   '/application-access',
+  features.requireFeature('karriere'),
   limit(15 * 60 * 1000, 15, 'Zu viele Versuche. Bitte in ein paar Minuten erneut versuchen.'),
   wrap(async (req, res) => {
     const d = parseBody(z.object({ number: z.string().trim().min(1).max(30), code: z.string().trim().min(1).max(10) }), req, res);
@@ -191,6 +196,7 @@ publicRouter.post(
  */
 publicRouter.post(
   '/application-summary',
+  features.requireFeature('karriere'),
   portalLimiter,
   wrap(async (req, res) => {
     const d = parseBody(z.object({ tokens: z.array(tokenSchema).min(1).max(5) }), req, res);
@@ -217,6 +223,7 @@ publicRouter.post(
 /** Bewerberseite: Stand, Gesprächstermin, Nachrichten (after: nur neuere – zum Nachladen). */
 publicRouter.post(
   '/application-portal',
+  features.requireFeature('karriere'),
   portalLimiter,
   wrap(async (req, res) => {
     const d = parseBody(z.object({ token: tokenSchema, after: z.number().int().min(0).optional() }), req, res);
@@ -245,6 +252,7 @@ publicRouter.post(
 /** Nachricht des Bewerbers ans Board. */
 publicRouter.post(
   '/application-portal/messages',
+  features.requireFeature('karriere'),
   writeLimiter,
   wrap(async (req, res) => {
     const d = parseBody(z.object({ token: tokenSchema, body: z.string().trim().min(1).max(3000) }), req, res);

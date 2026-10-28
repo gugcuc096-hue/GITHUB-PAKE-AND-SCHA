@@ -31,7 +31,23 @@ directoryRouter.get('/', requireAuth, requireStaff, (req, res) => {
 
 /* Board of Partners */
 const router = express.Router();
-router.use(requireAuth, requireAdmin);
+const perms = require('../permissions');
+/*
+ * Konten und Protokoll: weiter nur Board of Partners (Admin). Einstellungen, Sicherung und Tests hängen an den Rechten
+ * der Konfiguration (Inhaber, Web-Admins, Rechte-Tabelle).
+ */
+const anyConfig = perms.requirePerm('settings.edit', 'site.edit', 'discord.edit', 'system.edit', 'templates.edit');
+router.use(requireAuth, (req, res, next) => {
+  if (req.path === '/settings') return req.method === 'GET' ? anyConfig(req, res, next) : next(); // PATCH prüft je Feld
+  if (/^\/weekly-report(\/|$)/.test(req.path)) return perms.requirePerm('settings.edit')(req, res, next);
+  if (/^\/discord(\/|$)/.test(req.path)) return perms.requirePerm('discord.edit')(req, res, next);
+  if (/^\/backups(\/|$)/.test(req.path)) return perms.requirePerm('system.edit')(req, res, next);
+  requireAdmin(req, res, next);
+});
+
+/** Recht je Einstellungsfeld des PATCH. */
+const FIELD_PERM = (key) =>
+  /^discord/.test(key) ? 'discord.edit' : key === 'fivenetUrl' ? 'system.edit' : /^(showDutyPublic|showSuccessPublic|lotm)/.test(key) ? 'site.edit' : 'settings.edit';
 
 function userRow(u) {
   return {
@@ -330,6 +346,8 @@ router.patch(
     });
     const d = parseBody(schema, req, res);
     if (!d) return;
+    const missing = Object.keys(d).find((k) => !perms.can(req.user, FIELD_PERM(k)));
+    if (missing) return res.status(403).json({ error: 'Dafür fehlt Ihnen das Recht – das vergibt der Inhaber unter Einstellungen → Rechte.' });
     if (d.fivenetUrl) {
       const parsed = fivenet.normalizeBaseUrl(d.fivenetUrl);
       if (!parsed.ok) return res.status(400).json({ error: parsed.error });

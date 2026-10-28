@@ -7,7 +7,8 @@
 const express = require('express');
 const crypto = require('crypto');
 const { z } = require('zod');
-const { requireAuth, requireAdmin } = require('../auth');
+const { requireAuth } = require('../auth');
+const { requirePerm } = require('../permissions');
 const { wrap, parseBody, RANKS, rankEnum } = require('../helpers');
 const { logActivity } = require('../models');
 const { db } = require('../db');
@@ -17,7 +18,7 @@ const dm = require('../botDm');
 const { idParam } = require('../helpers');
 
 const router = express.Router();
-router.use(requireAuth, requireAdmin);
+router.use(requireAuth, requirePerm('discord.edit'));
 
 const ID = /^\d{15,25}$/;
 const id = z.string().trim().regex(ID, 'Ungültige ID.');

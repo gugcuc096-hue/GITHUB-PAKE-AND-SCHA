@@ -15,6 +15,7 @@ const express = require('express');
 const { z } = require('zod');
 const { db, tx, getSetting, setSetting } = require('../db');
 const { requireAuth, requireStaff, requireAdmin, isStaff } = require('../auth');
+const { requirePerm } = require('../permissions');
 const { wrap, parseBody, idParam, truncate } = require('../helpers');
 const { getCase, caseAccess, caseLawyers, addSystemNote, logActivity } = require('../models');
 const discord = require('../discord');
@@ -303,7 +304,7 @@ function checkBody(body, res) {
 
 templatesRouter.post(
   '/',
-  requireAdmin,
+  requirePerm('templates.edit'),
   wrap(async (req, res) => {
     const d = parseBody(templateSchema, req, res);
     if (!d || !checkBody(d.body, res)) return;
@@ -318,7 +319,7 @@ templatesRouter.post(
 
 templatesRouter.patch(
   '/:tid',
-  requireAdmin,
+  requirePerm('templates.edit'),
   wrap(async (req, res) => {
     const tid = idParam(req, 'tid');
     const t = tid && db.prepare('SELECT * FROM contract_templates WHERE id = ?').get(tid);
@@ -337,7 +338,7 @@ templatesRouter.patch(
 /** Mitgelieferte Vorlage auf den ursprünglichen Text zurücksetzen. */
 templatesRouter.post(
   '/:tid/reset',
-  requireAdmin,
+  requirePerm('templates.edit'),
   wrap(async (req, res) => {
     const tid = idParam(req, 'tid');
     const t = tid && db.prepare('SELECT * FROM contract_templates WHERE id = ?').get(tid);
@@ -357,7 +358,7 @@ templatesRouter.post(
 
 templatesRouter.delete(
   '/:tid',
-  requireAdmin,
+  requirePerm('templates.edit'),
   wrap(async (req, res) => {
     const tid = idParam(req, 'tid');
     const t = tid && db.prepare('SELECT * FROM contract_templates WHERE id = ?').get(tid);
@@ -373,7 +374,7 @@ templatesRouter.delete(
 
 templatesRouter.put(
   '/header',
-  requireAdmin,
+  requirePerm('templates.edit'),
   wrap(async (req, res) => {
     const d = parseBody(z.object({ header: z.string().trim().max(300) }), req, res);
     if (!d) return;

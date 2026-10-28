@@ -128,7 +128,12 @@ function migrateJoinRoles() {
   saveJson('bot_welcome', { ...w, joinRoles: [] });
 }
 
-const anyRoleModule = () => rankSyncConfig().enabled || connectionsConfig().enabled || alwaysRoles().length > 0;
+/** Discord-Rolle „Web Admin“ (wird mit dem Dashboard abgeglichen wie die Rang-Rollen). */
+const webAdminRole = () => {
+  const id = getSetting('discord_webadmin_role', '');
+  return isId(id) ? id : '';
+};
+const anyRoleModule = () => rankSyncConfig().enabled || connectionsConfig().enabled || alwaysRoles().length > 0 || !!webAdminRole();
 const wanted = () =>
   tickets.hasToken() && isId(guildId()) && (anyRoleModule() || welcomeConfig().enabled || joinRolesConfig().enabled || botMessages.hasMessageJobs() || chatImport());
 
@@ -224,6 +229,13 @@ function desiredRoles(discordId, roles, { forceRemove = false } = {}) {
       else desired.delete(rs.clientOpen);
     }
   }
+  // Web-Admin: Rolle folgt dem Dashboard (nur bei verknüpftem Konto, sonst bleibt sie unberührt)
+  const wa = webAdminRole();
+  if (wa) {
+    const u = db.prepare('SELECT active, web_admin FROM users WHERE discord_id = ?').get(discordId);
+    if (u && u.active && u.web_admin) desired.add(wa);
+    else if (u || forceRemove) desired.delete(wa);
+  }
   // Standardrollen: vor den Role Connections (sie dürfen darauf aufbauen) und danach noch einmal – sie gelten immer
   for (const r of alwaysRoles()) desired.add(r);
   const rc = connectionsConfig();
@@ -305,6 +317,26 @@ function syncUser(userId, { previousDiscordId } = {}) {
   if (isId(previousDiscordId) && (!u || u.discord_id !== previousDiscordId)) {
     enqueue(() => applyMember(previousDiscordId, { forceRemove: true }), 'Rang-Sync');
   }
+}
+
+/**
+ * Legt die Discord-Rolle „Web Admin“ an (oder nimmt eine gleichnamige vorhandene), merkt sie sich und gleicht
+ * alle verknüpften Konten ab. Liefert { roleId, created }.
+ */
+async function ensureWebAdminRole() {
+  if (!tickets.hasToken() || !isId(guildId())) throw new Error('Der Discord-Bot ist noch nicht verbunden (Token und Server-ID fehlen).');
+  const g = guildId();
+  const roles = await tickets.rest('GET', `/guilds/${g}/roles`);
+  let role = roles.find((r) => String(r.name).toLowerCase() === 'web admin');
+  let created = false;
+  if (!role) {
+    role = await tickets.rest('POST', `/guilds/${g}/roles`, { name: 'Web Admin', color: 0xd4af37, hoist: false, mentionable: false }, { reason: REASON });
+    created = true;
+  }
+  setSetting('discord_webadmin_role', role.id);
+  refresh();
+  scan('Web-Admin-Rolle').catch(() => {});
+  return { roleId: role.id, created };
 }
 
 /** Akte geändert (Status, Mandant, neu, gelöscht) → Rolle „Mandant mit offener Akte“ des Mandanten angleichen. */
@@ -1043,6 +1075,8 @@ module.exports = {
   status,
   scan,
   syncUser,
+  ensureWebAdminRole,
+  webAdminRole,
   syncCaseClient,
   testWelcome,
   discordData,

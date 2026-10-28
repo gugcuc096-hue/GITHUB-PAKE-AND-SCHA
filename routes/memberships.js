@@ -10,6 +10,7 @@ const { db } = require('../db');
 const { requireAuth, requireStaff } = require('../auth');
 const { wrap, parseBody, idParam, isBoard, dateOnly } = require('../helpers');
 const { getCase, caseAccess, logActivity } = require('../models');
+const features = require('../features');
 const tickets = require('../tickets');
 const discord = require('../discord');
 const ms = require('../memberships');
@@ -321,6 +322,7 @@ const loadRequest = (id) => db.prepare(`${REQ_SELECT} WHERE r.id = ?`).get(id) |
 
 /** Mandant: Angebot, eigene Mitgliedschaft und eigene Anfragen (Portal „VIP & Lifetime“). */
 router.get('/offers', (req, res) => {
+  if (!features.on('vip')) return res.json({ tiers: [], membership: null, requests: [] });
   const m = ms.activeFor(req.user.id);
   const tier = m && m.tier_id ? db.prepare('SELECT benefits FROM membership_tiers WHERE id = ?').get(m.tier_id) : null;
   res.json({
@@ -332,6 +334,7 @@ router.get('/offers', (req, res) => {
 
 router.post(
   '/requests',
+  features.requireFeature('vip'),
   wrap(async (req, res) => {
     const u = req.user;
     if (u.role !== 'mandant') return res.status(403).json({ error: 'VIP und Lifetime können nur Mandantenkonten anfragen.' });
@@ -439,6 +442,7 @@ router.post(
 /* Öffentlich (Startseite): Angebot ohne Anmeldung */
 const publicRouter = express.Router();
 publicRouter.get('/memberships', (req, res) => {
+  if (!features.on('vip')) return res.json({ tiers: [] });
   res.json({ tiers: activeTiers().map(publicTier) });
 });
 

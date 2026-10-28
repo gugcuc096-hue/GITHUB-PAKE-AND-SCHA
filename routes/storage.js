@@ -14,7 +14,8 @@
 const express = require('express');
 const { z } = require('zod');
 const { db, getSetting, setSetting, tx } = require('../db');
-const { requireAuth, requireStaff, requireAdmin } = require('../auth');
+const { requireAuth, requireStaff } = require('../auth');
+const { requirePerm } = require('../permissions');
 const { wrap, parseBody, idParam, isBoard } = require('../helpers');
 const { logActivity } = require('../models');
 const { imageBody, saveImage, removeFile, itemImageUrl } = require('../uploads');
@@ -127,7 +128,7 @@ router.delete(
 );
 
 /* ---------------------------------------------------------------- Gegenstände (Einstellungen) */
-router.get('/items', requireAdmin, (req, res) => {
+router.get('/items', requirePerm('system.edit'), (req, res) => {
   const stock = new Map(db.prepare("SELECT item_id, SUM(amount) AS n FROM storage_entries WHERE kind = 'item' GROUP BY item_id").all().map((r) => [r.item_id, r.n]));
   res.json({
     items: db
@@ -141,7 +142,7 @@ router.get('/items', requireAdmin, (req, res) => {
 const itemSchema = z.object({ name: z.string().trim().min(1).max(60) });
 router.post(
   '/items',
-  requireAdmin,
+  requirePerm('system.edit'),
   wrap(async (req, res) => {
     const d = parseBody(itemSchema, req, res);
     if (!d) return;
@@ -156,7 +157,7 @@ router.post(
 
 router.patch(
   '/items/:id',
-  requireAdmin,
+  requirePerm('system.edit'),
   wrap(async (req, res) => {
     const id = idParam(req);
     const item = id && db.prepare('SELECT * FROM storage_items WHERE id = ? AND active = 1').get(id);
@@ -173,7 +174,7 @@ router.patch(
 
 router.post(
   '/items/:id/image',
-  requireAdmin,
+  requirePerm('system.edit'),
   imageBody,
   wrap(async (req, res) => {
     const id = idParam(req);
@@ -188,7 +189,7 @@ router.post(
 
 router.delete(
   '/items/:id',
-  requireAdmin,
+  requirePerm('system.edit'),
   wrap(async (req, res) => {
     const id = idParam(req);
     const item = id && db.prepare('SELECT * FROM storage_items WHERE id = ? AND active = 1').get(id);
@@ -204,7 +205,7 @@ router.delete(
   })
 );
 
-router.put('/settings', requireAdmin, (req, res) => {
+router.put('/settings', requirePerm('system.edit'), (req, res) => {
   setSetting('storage_black_all', req.body && req.body.blackAll ? '1' : '0');
   res.json({ blackAll: getSetting('storage_black_all', '0') === '1' });
 });

@@ -7,7 +7,9 @@
 const express = require('express');
 const { z } = require('zod');
 const { db } = require('../db');
-const { requireAuth, requireAdmin } = require('../auth');
+const { requireAuth } = require('../auth');
+const { requirePerm } = require('../permissions');
+const configLog = require('../configLog');
 const { wrap, parseBody, idParam, isBoard, truncate } = require('../helpers');
 const { logActivity } = require('../models');
 const ranks = require('../ranks');
@@ -29,7 +31,7 @@ router.get('/ranks', (req, res) => res.json({ ranks: ranks.list() }));
 
 router.post(
   '/ranks',
-  requireAdmin,
+  requirePerm('site.edit'),
   wrap(async (req, res) => {
     const d = parseBody(rankBody, req, res);
     if (!d) return;
@@ -41,7 +43,7 @@ router.post(
 
 router.patch(
   '/ranks/:id',
-  requireAdmin,
+  requirePerm('site.edit'),
   wrap(async (req, res) => {
     const id = idParam(req);
     const d = parseBody(rankBody.partial(), req, res);
@@ -56,7 +58,7 @@ router.patch(
 
 router.post(
   '/ranks/:id/move',
-  requireAdmin,
+  requirePerm('site.edit'),
   wrap(async (req, res) => {
     const d = parseBody(z.object({ dir: z.union([z.literal(-1), z.literal(1)]) }), req, res);
     if (!d) return;
@@ -67,7 +69,7 @@ router.post(
 
 router.delete(
   '/ranks/:id',
-  requireAdmin,
+  requirePerm('site.edit'),
   wrap(async (req, res) => {
     const r = ranks.remove(idParam(req));
     if (r.notFound) return res.status(404).json({ error: 'Rang nicht gefunden.' });
@@ -78,7 +80,7 @@ router.delete(
 );
 
 /* ---------------------------------------------------------------- Website-Texte */
-const boardOnly = (req, res, next) => (isBoard(req.user) ? next() : res.status(403).json({ error: 'Nur für das Board of Partners.' }));
+const boardOnly = requirePerm('site.edit'); // Website-Texte: Inhaber / Web-Admin
 const PAGE_LABEL = { index: 'Startseite', karriere: 'Karriere' };
 
 router.get('/texts', boardOnly, (req, res) => {
@@ -99,7 +101,11 @@ router.put(
     const original = sitePages.texts(d.page).get(d.key);
     if (original === undefined) return res.status(404).json({ error: 'Diesen Text gibt es auf der Seite nicht mehr – bitte neu laden.' });
     const text = d.text.replace(/\s+/g, ' ').trim();
+    const prev = db.prepare('SELECT original, text FROM site_texts WHERE page = ? AND key = ?').get(d.page, d.key);
+    const logText = (after) =>
+      configLog.add(req.user, { area: 'site_text', key: `${d.page}:${d.key}`, label: `Website-Text (${PAGE_LABEL[d.page]})`, perm: 'site.edit', before: prev ? { original: prev.original, text: prev.text } : null, after, revertible: true });
     if (!text || text === original) {
+      if (prev) logText(null);
       db.prepare('DELETE FROM site_texts WHERE page = ? AND key = ?').run(d.page, d.key);
       return res.json({ text: original, original, changed: false });
     }
@@ -107,6 +113,7 @@ router.put(
       `INSERT INTO site_texts (page, key, original, text, updated_by, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now'))
        ON CONFLICT(page, key) DO UPDATE SET original = excluded.original, text = excluded.text, updated_by = excluded.updated_by, updated_at = excluded.updated_at`
     ).run(d.page, d.key, original, text, req.user.id);
+    if (!prev || prev.text !== text) logText({ original, text });
     logActivity(req.user, 'Website-Text geändert', 'settings', null, `${PAGE_LABEL[d.page]}: „${truncate(original, 60)}“ → „${truncate(text, 60)}“`);
     res.json({ text, original, changed: true });
   })
@@ -117,8 +124,9 @@ router.delete(
   boardOnly,
   wrap(async (req, res) => {
     const { page, key } = req.params;
-    const row = db.prepare('SELECT original FROM site_texts WHERE page = ? AND key = ?').get(page, key);
+    const row = db.prepare('SELECT original, text FROM site_texts WHERE page = ? AND key = ?').get(page, key);
     if (!row) return res.status(404).json({ error: 'Der Text ist nicht geändert.' });
+    configLog.add(req.user, { area: 'site_text', key: `${page}:${key}`, label: `Website-Text (${PAGE_LABEL[page] || page}) zurückgesetzt`, perm: 'site.edit', before: { original: row.original, text: row.text }, after: null, revertible: true });
     db.prepare('DELETE FROM site_texts WHERE page = ? AND key = ?').run(page, key);
     logActivity(req.user, 'Website-Text zurückgesetzt', 'settings', null, `${PAGE_LABEL[page] || page}: „${truncate(row.original, 60)}“`);
     res.json({ text: row.original });

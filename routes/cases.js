@@ -42,6 +42,7 @@ const {
   taskRow,
   logActivity,
 } = require('../models');
+const features = require('../features');
 const discord = require('../discord');
 const tickets = require('../tickets');
 const reviewRequest = require('../reviewRequest');
@@ -1093,6 +1094,7 @@ router.put(
  */
 router.get(
   '/:id/join-link',
+  features.requireFeature('clientLink'),
   wrap(async (req, res) => {
     const id = idParam(req);
     const c = id && getCase(id);

@@ -9,6 +9,7 @@
  */
 const { db } = require('./db');
 const tickets = require('./tickets');
+const features = require('./features');
 
 function reviewUrl(caseId) {
   const base = tickets.siteBase();
@@ -17,6 +18,7 @@ function reviewUrl(caseId) {
 
 /** Nach dem Schließen aufrufen. Liefert true, wenn eine Direktnachricht verschickt wurde. */
 async function afterClose(caseId) {
+  if (!features.on('reviews')) return false;
   const c = db
     .prepare(
       `SELECT c.id, c.case_number, c.status, c.review_requested_at, u.id AS user_id, u.role, u.active, u.discord_id

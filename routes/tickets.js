@@ -6,7 +6,8 @@
 const express = require('express');
 const { z } = require('zod');
 const { db, setSetting } = require('../db');
-const { requireAuth, requireAdmin } = require('../auth');
+const { requireAuth } = require('../auth');
+const { requirePerm } = require('../permissions');
 const { wrap, parseBody, idParam, isBoard } = require('../helpers');
 const { getCase, caseAccess, logActivity } = require('../models');
 const tickets = require('../tickets');
@@ -14,7 +15,7 @@ const tickets = require('../tickets');
 const router = express.Router();
 router.use(requireAuth);
 
-router.get('/settings', requireAdmin, (req, res) => {
+router.get('/settings', requirePerm('discord.edit'), (req, res) => {
   res.json(tickets.status());
 });
 
@@ -22,7 +23,7 @@ const idField = z.union([z.string().trim().regex(/^\d{15,25}$/, 'Die ID besteht 
 
 router.patch(
   '/settings',
-  requireAdmin,
+  requirePerm('discord.edit'),
   wrap(async (req, res) => {
     const d = parseBody(
       z.object({
@@ -84,7 +85,7 @@ router.patch(
 
 router.post(
   '/test',
-  requireAdmin,
+  requirePerm('discord.edit'),
   wrap(async (req, res) => {
     res.json({ ...(await tickets.test()), status: tickets.status() });
   })
@@ -93,7 +94,7 @@ router.post(
 /** Tickets für alle offenen Akten ohne Kanal nachträglich anlegen. */
 router.post(
   '/backfill',
-  requireAdmin,
+  requirePerm('discord.edit'),
   wrap(async (req, res) => {
     if (!tickets.active() && !tickets.boardActive('application') && !tickets.boardActive('concern')) {
       return res.status(400).json({ error: 'Discord-Tickets sind noch nicht vollständig eingerichtet (Token, Server, Kategorie, eingeschaltet).' });
