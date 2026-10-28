@@ -1224,6 +1224,64 @@ function intakeAnswersHtml(c) {
   return `<div class="section"><h3 class="section-title">Angaben zum Mandat</h3><dl class="intake-answers">${rows.map((r) => `<div><dt>${esc(r.label)}</dt><dd>${esc(r.value)}</dd></div>`).join('')}</dl></div>`;
 }
 
+/* ---------------------------------------------------------------- Mandanten-Konto beim Tippen des Namens vorschlagen */
+let ncTimer = 0;
+let ncSeq = 0;
+function ncPick(account) {
+  const input = $('#ncName');
+  const box = $('#ncPicked');
+  if (!input || !box) return;
+  $('#ncEmail').value = account ? account.email : '';
+  box.hidden = !account;
+  box.innerHTML = account ? `${icon('link', 'ico-sm')}<span>Verknüpft mit dem Konto <strong>${esc(account.name)}</strong> · ${esc(account.email)}</span><button type="button" class="ie-link" data-action="nc-unpick">lösen</button>` : '';
+  if (account) input.value = account.name;
+  ncClose();
+}
+function ncClose() {
+  const list = $('#ncSuggest');
+  if (list) {
+    list.hidden = true;
+    list.innerHTML = '';
+  }
+  const input = $('#ncName');
+  if (input) input.setAttribute('aria-expanded', 'false');
+}
+document.addEventListener('input', (e) => {
+  const input = e.target.closest && e.target.closest('#ncName');
+  if (!input) return;
+  // Name geändert: eine frühere Verknüpfung gilt nicht mehr
+  if ($('#ncEmail') && $('#ncEmail').value) ncPick(null);
+  clearTimeout(ncTimer);
+  const q = input.value.trim();
+  if (q.length < 2) return ncClose();
+  const seq = ++ncSeq;
+  ncTimer = setTimeout(
+    () =>
+      guard(async () => {
+        const { accounts } = await api.get(`/api/cases/client-accounts?q=${encodeURIComponent(q)}`);
+        if (seq !== ncSeq || !$('#ncSuggest')) return;
+        const list = $('#ncSuggest');
+        if (!accounts.length) return ncClose();
+        list.innerHTML = accounts
+          .slice(0, 6)
+          .map((a) => `<li role="option"><button type="button" class="client-suggest-item" data-action="nc-pick" data-name="${esc(a.name)}" data-email="${esc(a.email)}"><strong>${esc(a.name)}</strong><span>${esc(a.email)}</span></button></li>`)
+          .join('');
+        list.hidden = false;
+        input.setAttribute('aria-expanded', 'true');
+      }),
+    180
+  );
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && $('#ncSuggest') && !$('#ncSuggest').hidden) {
+    e.stopPropagation();
+    ncClose();
+  }
+});
+document.addEventListener('click', (e) => {
+  if ($('#ncSuggest') && !e.target.closest('.client-suggest')) ncClose();
+});
+
 async function newCaseModal() {
   const staff = isStaff();
   if (staff) await load.lawyers();
@@ -1232,11 +1290,13 @@ async function newCaseModal() {
       <p class="modal-sub">${staff ? 'Mandanten ohne Website-Konto einfach per Name erfassen. Die Akte wird Ihnen direkt zugewiesen – weitere Anwälte können Sie unten hinzufügen.' : 'Schildern Sie Ihr Anliegen – ein Anwalt der Kanzlei meldet sich umgehend.'}</p>
       <form data-form="new-case" class="form-grid cols-2">
         ${staff ? `
-          <div><label class="label" for="ncName">Mandant (Name)</label><input id="ncName" name="clientName" class="field" maxlength="80" placeholder="z. B. John Doe" autofocus></div>
-          <div><label class="label" for="ncPhone">Telefon (im Spiel)</label><input id="ncPhone" name="clientPhone" class="field" maxlength="40" placeholder="555-0123"></div>
-          <div class="span-2"><label class="label" for="ncEmail">…oder Login-E-Mail eines registrierten Mandanten (optional)</label><input id="ncEmail" name="clientEmail" type="text" autocapitalize="none" spellcheck="false" class="field" placeholder="z. B. max.mustermann@pake-scha.ls – verknüpft die Akte mit dem Konto"></div>` : ''}
+          <div class="client-suggest"><label class="label" for="ncName">Mandant (Name)</label><input id="ncName" name="clientName" class="field" maxlength="80" placeholder="Name eintippen – passende Konten erscheinen" autocomplete="off" autofocus role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="ncSuggest">
+            <input type="hidden" name="clientEmail" id="ncEmail">
+            <ul class="client-suggest-list" id="ncSuggest" role="listbox" hidden></ul>
+            <div class="client-picked" id="ncPicked" hidden></div></div>
+          <div><label class="label" for="ncPhone">Telefon (im Spiel)</label><input id="ncPhone" name="clientPhone" class="field" maxlength="40" placeholder="555-0123"></div>` : ''}
         <div class="span-2"><label class="label" for="ncTitle">Titel</label><input id="ncTitle" name="title" class="field" required minlength="3" maxlength="120" placeholder="z. B. Festnahme am Legion Square" ${staff ? '' : 'autofocus'}></div>
-        <div><label class="label">Rechtsgebiet</label><select name="area" class="field" data-area-select>${areaOptions().map(([k, l]) => opt(k, l)).join('')}</select></div>
+        <div><label class="label">Rechtsgebiet${staff && can('settings.edit') ? ' <button type="button" class="ie-link" data-action="area-quick-new">+ neu</button>' : ''}</label><select name="area" class="field" data-area-select>${areaOptions().map(([k, l]) => opt(k, l)).join('')}</select></div>
         ${staff
           ? `<div><label class="label">Priorität</label><select name="priority" class="field">${Object.entries(PRIORITY).map(([k, [l]]) => opt(k, l, k === '2')).join('')}</select></div>`
           : `<div><label class="label">Dringlichkeit</label><select name="urgency" class="field">${Object.entries(URGENCY).map(([k, [l]]) => opt(k, l)).join('')}</select></div>`}

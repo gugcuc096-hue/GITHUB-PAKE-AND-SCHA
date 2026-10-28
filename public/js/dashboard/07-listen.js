@@ -131,6 +131,11 @@ function collectArea(f) {
 
 Object.assign(actions, {
   'area-new': () => openModal(areaFormHtml(null), { wide: true }),
+  // Aus „Neue Akte“ heraus: neues Rechtsgebiet anlegen und gleich im Formular wählen
+  'area-quick-new': async () => {
+    if (!st.lists) await loadLists();
+    openModal(areaFormHtml(null), { wide: true, child: true });
+  },
   'area-edit': (el) => openModal(areaFormHtml(st.lists.areas.find((a) => a.key === el.dataset.key)), { wide: true }),
   'area-steps-toggle': (el) => $('#arSteps').classList.toggle('hidden', el.checked),
   'area-field-add': (el) => $('#arFields').insertAdjacentHTML('beforeend', areaFieldRow()),
@@ -169,9 +174,15 @@ Object.assign(forms, {
     const body = collectArea(f);
     if (f.dataset.key) await api.put(`/api/areas/${f.dataset.key}`, body);
     else await api.post('/api/areas', body);
+    const saved = f.dataset.key ? null : (await api.get('/api/areas')).areas.find((a) => a.name === body.name);
     await refreshAreas();
     toast(f.dataset.key ? 'Rechtsgebiet gespeichert.' : 'Rechtsgebiet angelegt.');
     await modalBack();
-    renderView();
+    // Geöffnet aus dem Formular „Neue Akte“: Auswahl auffrischen und das neue Rechtsgebiet wählen
+    const sel = $('select[data-area-select]');
+    if (sel) {
+      sel.innerHTML = areaOptions().map(([k, l]) => opt(k, l, saved && k === saved.key)).join('');
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+    } else renderView();
   },
 });

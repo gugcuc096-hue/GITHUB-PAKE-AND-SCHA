@@ -96,6 +96,8 @@ const actions = {
         </form>`);
   },
   'new-case': newCaseModal,
+  'nc-pick': (el) => ncPick({ name: el.dataset.name, email: el.dataset.email }),
+  'nc-unpick': () => ncPick(null),
   // Lange Listen: nächste Einträge (passiert beim Scrollen auch von selbst)
   'list-more': (el) => showMoreRows(el.dataset.id),
   'open-case': (el) => openCaseFrom(el),
