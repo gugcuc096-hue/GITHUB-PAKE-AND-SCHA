@@ -933,15 +933,11 @@ async function reloadCase(id, { live = false, by = '' } = {}) {
     // Angefangene Nachricht und Chat-Position bleiben beim Neuzeichnen erhalten
     const draft = $('#modalBody .chat-input')?.value || '';
     const before = live ? liveSnap($('#modalBody')) : null; // Live-Änderung eines Kollegen: Geändertes leuchtet kurz auf
-    replaceModal(caseDetail(data));
-    if (draft && $('#modalBody .chat-input')) $('#modalBody .chat-input').value = draft;
-    initChat(data);
-    copilotInit(id);
-    if (before) liveFlash($('#modalBody'), before, by);
     const flip = flipSnapshot(); // Aufgaben gleiten beim Abhaken/Umsortieren an ihren neuen Platz
     replaceModal(caseDetail(data));
     if (draft && $('#modalBody .chat-input')) $('#modalBody .chat-input').value = draft;
     initChat(data);
+    copilotInit(id);
     if (before) liveFlash($('#modalBody'), before, by);
     flipPlay(flip);
   }
