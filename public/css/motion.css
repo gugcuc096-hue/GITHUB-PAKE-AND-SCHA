@@ -127,8 +127,14 @@ body.page-in { animation-duration: var(--m-page); }
 .site-switch > a:hover { color: #fff; background: rgba(255, 255, 255, 0.07); }
 .site-switch > a.is-active { color: #02050e; background: linear-gradient(135deg, #d4af37, #b8962e); }
 @media (max-width: 639px) { .site-switch-top { display: none; } }
-/* Angemeldet: der Umschalter in der Leiste oben ersetzt den zweiten „Dashboard“-Knopf in der Kopfzeile */
-@media (min-width: 640px) { html.ps-in [data-hdr-auth] { display: none !important; } }
+/* Kopfzeile der Website, angemeldet: Dashboard-Knopf mit Profilbild; für die Kanzlei ist der goldene Knopf „Dashboard“ */
+.hdr-dash { display: none !important; }
+html.ps-team .hdr-dash { display: inline-flex !important; }
+html.ps-team header [data-act="ticket"], html.ps-team #mobileMenu [data-act="menu ticket"] { display: none !important; }
+@media (min-width: 640px) { html.ps-team [data-hdr-auth] { display: none !important; } }
+@media (max-width: 639px) { html.ps-team .hdr-dash { display: none !important; } }
+.site-avatar.hdr-av { width: 24px; height: 24px; margin-left: -4px; font-size: 0.62rem; letter-spacing: 0; box-shadow: 0 0 0 1.5px rgba(212, 175, 55, 0.55); }
+.btn-gold .site-avatar.hdr-av { box-shadow: 0 0 0 1.5px rgba(2, 5, 14, 0.45); }
 .site-avatar { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; font-family: var(--font-display, Georgia, serif); font-weight: 700; font-size: 0.85rem; color: #02050e; background: linear-gradient(135deg, #f3e5ab, #d4af37); text-decoration: none; flex: none; transition: transform var(--m-micro) var(--m-ease); }
 .site-avatar:hover { transform: scale(1.06); }
 .site-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
@@ -142,10 +148,6 @@ html.ps-leaving body { opacity: 0; transform: scale(0.993); transition: opacity 
 #loginDialog .login-alt { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; margin-top: 1rem; font-size: 0.8rem; color: var(--text-dim, #8a96b3); }
 #loginDialog .login-alt a, #loginDialog .login-alt button { color: var(--gold-500, #d4af37); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; font: inherit; }
 
-/* In der schmalen Leiste über der Kopfzeile der Website */
-.topstrip .site-switch { padding: 2px; font-size: 0.66rem; }
-.topstrip .site-switch > a { min-height: 26px; padding: 0 0.7rem; }
-.topstrip .site-avatar { width: 26px; height: 26px; font-size: 0.7rem; }
 
 /* Banner (Website und Dashboard), Links im Kontaktbereich, Vorschau-Band */
 .site-banner { position: relative; z-index: 60; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.35rem 0.9rem; padding: 0.55rem 2.6rem 0.55rem 1rem; font-size: 0.85rem; line-height: 1.35; text-align: center; color: #02050e; background: linear-gradient(90deg, #b8962e, #f3e5ab 50%, #b8962e); animation: ps-banner-in var(--m-page, 0.3s) var(--m-ease, ease) both; transition: opacity 0.2s ease, transform 0.2s ease; }

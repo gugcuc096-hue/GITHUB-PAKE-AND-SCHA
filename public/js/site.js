@@ -355,35 +355,29 @@
       .toUpperCase();
   const goTo = (url) => (window.PS.go ? window.PS.go(url) : (location.href = url));
 
-  /** Umschalter „Website | Dashboard“ und Profilbild in der Kopfleiste – statt „Login“, sobald man angemeldet ist. */
+  /**
+   * Angemeldet: ein Weg ins Dashboard, in der Kopfzeile. Der Knopf zeigt das eigene Profilbild statt des Personen-Symbols;
+   * für die Kanzlei wird der goldene Knopf zu „Dashboard“ (sie reicht selbst keine Mandate ein), Mandanten behalten „Mandat“.
+   * Die schmale Leiste oben zeigt dann nur noch Eilnotdienst und Kanzleisitz.
+   */
   function renderSwitch() {
-    // In der schmalen Leiste über der Kopfzeile (dort stand „Mandantenportal →“) – in der Kopfzeile selbst ist kein Platz
-    const bar = document.querySelector('.topstrip .flex.items-center.gap-5');
-    if (!bar) return;
-    bar.querySelectorAll('.site-switch, .site-avatar').forEach((n) => n.remove());
-    // Angemeldet übernimmt der Umschalter oben die Rolle des Dashboard-Knopfs in der Kopfzeile (auf dem Handy bleibt der Knopf)
-    document.documentElement.classList.toggle('ps-in', !!me);
-    const login = bar.querySelector('[data-auth-link]');
-    if (!me) {
-      if (login) login.classList.remove('hidden');
-      return;
-    }
-    const sw = document.createElement('div');
-    sw.className = 'site-switch';
-    sw.setAttribute('role', 'group');
-    sw.setAttribute('aria-label', 'Bereich wechseln');
-    sw.innerHTML = '<a href="/" class="is-active" aria-current="page" data-nofade>Website</a><a href="/dashboard">Dashboard</a>';
-    const av = document.createElement('a');
-    av.className = 'site-avatar';
-    av.href = '/dashboard#profile';
-    av.title = me.displayName || 'Mein Profil';
-    av.setAttribute('aria-label', 'Mein Profil');
-    avatarInto(av, me);
-    prefetchDashboard();
-    if (login) {
-      login.classList.add('hidden');
-      login.before(sw, av);
-    } else bar.append(sw, av);
+    const root = document.documentElement;
+    root.classList.toggle('ps-in', !!me);
+    root.classList.toggle('ps-team', !!me && me.role !== 'mandant');
+    const top = document.querySelector('.topstrip [data-auth-link]');
+    if (top) top.classList.toggle('hidden', !!me);
+    document.querySelectorAll('header [data-auth-link], [data-hdr-dash]').forEach((a) => {
+      a.querySelectorAll('.hdr-av').forEach((n) => n.remove());
+      const ico = a.querySelector('svg');
+      if (ico) ico.classList.toggle('hidden', !!me);
+      if (!me) return;
+      const av = document.createElement('span');
+      av.className = 'site-avatar hdr-av';
+      av.setAttribute('aria-hidden', 'true');
+      avatarInto(av, me);
+      a.prepend(av);
+    });
+    if (me) prefetchDashboard();
   }
 
   /** Profilbild (eigenes Foto oder Discord-Bild) – ohne Bild die Initialen auf Gold. */

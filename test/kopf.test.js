@@ -1,7 +1,7 @@
 'use strict';
 /*
- * Kopfzeile der Website: angemeldet gibt es nur noch den Umschalter „Website | Dashboard“ oben (kein zweiter Dashboard-Knopf in
- * der Kopfzeile, am Handy bleibt der Knopf); der Menü-Indikator im Dashboard gleitet nicht mehr zwischen den Punkten.
+ * Kopfzeile der Website: angemeldet führt ein Knopf mit Profilbild ins Dashboard – für die Kanzlei der goldene statt „Mandat“,
+ * kein Umschalter in der Leiste oben, am Handy der Knopf mit Profilbild; der Menü-Indikator im Dashboard gleitet nicht mehr.
  */
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
@@ -48,9 +48,17 @@ describe('Kopfzeile und Menü-Indikator (Browser)', { skip: chromium ? false : '
         assert.match(ind, /^0s(, 0s)*$/, 'Indikator springt statt zu gleiten');
         await page.goto(`${srv.base}/`);
         await page.waitForFunction(() => document.documentElement.classList.contains('ps-in'), null, { timeout: 15000 });
+        await page.waitForFunction(() => document.documentElement.classList.contains('ps-team'));
         const shown = await page.$eval('[data-hdr-auth]', (e) => getComputedStyle(e).display !== 'none');
         assert.equal(shown, !hidden);
-        if (hidden) assert.equal(await page.locator('.site-switch').isVisible(), true, 'der Umschalter oben bleibt');
+        assert.equal(await page.$('.topstrip .site-switch'), null, 'kein Umschalter in der Leiste oben');
+        if (hidden) {
+          // Kanzlei am PC: der goldene Knopf heißt „Dashboard“ und trägt das Profilbild, „Mandat“ entfällt
+          assert.equal(await page.isVisible('[data-hdr-dash]'), true);
+          assert.match(await page.textContent('[data-hdr-dash]'), /Dashboard/);
+          assert.equal(await page.locator('[data-hdr-dash] .hdr-av').count(), 1);
+          assert.equal(await page.isVisible('header button[data-act="ticket"]'), false);
+        } else assert.equal(await page.locator('header [data-hdr-auth] .hdr-av').count(), 1, 'Handy: Profilbild im Knopf');
       } finally {
         await ctx.close();
       }

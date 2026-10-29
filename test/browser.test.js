@@ -3846,7 +3846,7 @@ describe('Browser: Startseite ↔ Dashboard – Anmelden im Dialog, Umschalter, 
     return d.toISOString();
   };
   for (const [label, device] of [['PC', DESKTOP], ['Handy', PHONE]]) {
-    it(`${label}: im Dialog anmelden (bleibt auf der Seite), Umschalter, Direktlink, Mandat im Dashboard`, async () => {
+    it(`${label}: im Dialog anmelden (bleibt auf der Seite), Dashboard-Knopf mit Profilbild, Direktlink, Mandat im Dashboard`, async () => {
       const srv = await startServer();
       const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
       try {
@@ -3868,7 +3868,7 @@ describe('Browser: Startseite ↔ Dashboard – Anmelden im Dialog, Umschalter, 
 
         // Besucher: Kanzleisitz kommt aus den Einstellungen, „Login“ öffnet den Dialog statt einer neuen Seite
         await page.waitForFunction(() => document.querySelector('[data-firm-seat]')?.textContent === 'Würfelpark, Los Santos');
-        assert.equal(await page.$('.topstrip .site-switch'), null);
+        assert.equal(await page.$('.hdr-av'), null, 'ohne Anmeldung kein Profilbild in der Kopfzeile');
         const loginBtn = device === PHONE ? '#menuToggle' : 'header [data-auth-link]';
         if (device === PHONE) {
           await page.click('#menuToggle');
@@ -3882,8 +3882,8 @@ describe('Browser: Startseite ↔ Dashboard – Anmelden im Dialog, Umschalter, 
         await page.waitForFunction(() => document.querySelector('#ldError').textContent.length > 3);
         await page.fill('#ldPassword', 'Mandanten-Passwort-5');
         await page.click('#ldSubmit');
-        await page.waitForSelector('.topstrip .site-switch', { timeout: 15000 }).catch(async (e) => {
-          const state = await page.evaluate(() => JSON.stringify({ error: document.querySelector('#ldError').textContent, dialogOpen: !document.querySelector('#loginDialog').className.includes('pointer-events-none'), path: location.pathname, strips: document.querySelectorAll('#welcomeStrip').length, switchNode: !!document.querySelector('.site-switch') }));
+        await page.waitForSelector('header [data-auth-link] .hdr-av', { state: 'attached', timeout: 15000 }).catch(async (e) => {
+          const state = await page.evaluate(() => JSON.stringify({ error: document.querySelector('#ldError').textContent, dialogOpen: !document.querySelector('#loginDialog').className.includes('pointer-events-none'), path: location.pathname, strips: document.querySelectorAll('#welcomeStrip').length, avatar: !!document.querySelector('.hdr-av') }));
           throw new Error(`${e.message} – Zustand: ${state} – Anmeldungen: ${JSON.stringify(loginCalls)}`);
         });
         assert.equal(new URL(page.url()).pathname, '/', 'nach dem Anmelden bleibt man auf der Seite');
@@ -3891,10 +3891,14 @@ describe('Browser: Startseite ↔ Dashboard – Anmelden im Dialog, Umschalter, 
 
         assert.equal(await page.$('#welcomeStrip'), null, 'kein Willkommens-Streifen mehr');
         if (device === PHONE) assert.ok((await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 1, 'Startseite passt aufs Handy');
-        // Umschalter und Profilbild in der Leiste über der Kopfzeile, die Kopfzeile selbst führt als „Dashboard“ weiter
-        assert.equal(await page.isVisible('.topstrip .site-switch'), true);
-        assert.equal(await page.$eval('.topstrip .site-switch a.is-active', (e) => e.textContent), 'Website');
-        assert.equal(await page.isVisible('.topstrip .site-avatar'), true);
+        // Ein Weg ins Dashboard: der Knopf in der Kopfzeile mit Profilbild; Mandanten behalten den goldenen „Mandat“-Knopf
+        assert.equal(await page.$('.topstrip .site-switch'), null, 'kein Umschalter in der Leiste oben');
+        if (device === DESKTOP) {
+          assert.equal(await page.isVisible('header [data-hdr-auth] .hdr-av'), true);
+          assert.match(await page.textContent('header [data-hdr-auth]'), /Dashboard/);
+          assert.equal(await page.isVisible('header [data-act="ticket"]'), true, 'Mandanten: „Mandat“ bleibt');
+          assert.equal(await page.isVisible('[data-hdr-dash]'), false);
+        }
         assert.equal(await page.isVisible('.topstrip [data-auth-link]'), false, 'kein „Mandantenportal →“ mehr');
 
         // Direktlink: der Terminvorschlag öffnet sich im Dashboard mit den Zeiten zur Auswahl
@@ -3907,7 +3911,7 @@ describe('Browser: Startseite ↔ Dashboard – Anmelden im Dialog, Umschalter, 
           await page.click('.site-switch-top a[href="/"]'); // zurück zur Website – mit sanftem Übergang
           await page.waitForURL((u) => u.pathname === '/');
         } else await page.goto(srv.base + '/');
-        await page.waitForSelector('.topstrip .site-switch');
+        await page.waitForSelector('header [data-auth-link] .hdr-av', { state: 'attached' });
 
         // „Mandat einreichen“: als angemeldeter Mandant im Dashboard (eine Quelle), nicht im Formular der Startseite
         await page.evaluate(() => window.scrollTo(0, 0));
