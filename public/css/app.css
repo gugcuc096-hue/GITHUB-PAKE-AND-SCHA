@@ -2612,7 +2612,19 @@ body.hint-edit .form-hint[data-hint-key]:hover { background: rgba(212, 175, 55, 
 .kmap:active { cursor: grabbing; }
 .kmap-tools { position: absolute; z-index: 3; top: 8px; right: 8px; display: flex; flex-direction: column; gap: 6px; }
 .kmap-tools .icon-btn { background: rgba(6, 15, 30, 0.85); border: 1px solid var(--gold-hairline); color: var(--text); }
-.kmap-3d { font: 700 11px system-ui, sans-serif; letter-spacing: 0.02em; }
+.kmap-modes { position: absolute; z-index: 3; top: 8px; left: 8px; display: flex; flex-wrap: wrap; gap: 6px; max-width: calc(100% - 64px); }
+.kmap-seg { display: inline-flex; padding: 2px; border-radius: 999px; background: rgba(6, 15, 30, 0.82); border: 1px solid var(--gold-hairline); backdrop-filter: blur(6px); }
+.kmap-mode { display: inline-flex; align-items: center; gap: 0.3rem; min-height: 30px; padding: 0 0.7rem; border: 0; border-radius: 999px; background: transparent; color: var(--text-muted); font: 600 0.74rem/1 system-ui, sans-serif; letter-spacing: 0.02em; cursor: pointer; }
+.kmap-mode:hover { color: #fff; }
+.kmap-mode.is-on { background: linear-gradient(135deg, #e6c25a, #b8912a); color: #02050e; }
+.kmap-modes > .kmap-mode { background: rgba(6, 15, 30, 0.82); border: 1px solid var(--gold-hairline); backdrop-filter: blur(6px); }
+.kmap-modes > .kmap-mode.is-on { background: linear-gradient(135deg, #e6c25a, #b8912a); color: #02050e; border-color: transparent; }
+.kmap-mode.is-busy { opacity: 0.6; cursor: progress; }
+.kmap-card { position: absolute; z-index: 2; transform: translate(-50%, -100%); display: grid; gap: 0.2rem; min-width: 150px; max-width: 240px; padding: 0.55rem 0.7rem; border-radius: 12px; background: rgba(6, 15, 30, 0.92); border: 1px solid var(--gold-hairline); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); font-size: 0.82rem; line-height: 1.35; pointer-events: none; }
+.kmap-card[hidden] { display: none; }
+.kmap-card::after { content: ''; position: absolute; left: 50%; bottom: -6px; width: 10px; height: 10px; background: inherit; border-right: 1px solid var(--gold-hairline); border-bottom: 1px solid var(--gold-hairline); transform: translateX(-50%) rotate(45deg); }
+.kmap-card-top { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+@media (max-width: 480px) { .kmap-mode { padding: 0 0.55rem; } .kmap-play span { display: none; } }
 .kmap-tools .icon-btn.is-on { background: var(--gold-soft); color: var(--gold-light); }
 @media (hover: hover) and (pointer: fine) { .kmap-touch { display: none; } }
 .kmap-time { display: flex; align-items: center; gap: 0.75rem; margin: 0 0 0.75rem; }
