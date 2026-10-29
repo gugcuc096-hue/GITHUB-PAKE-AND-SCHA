@@ -1,7 +1,7 @@
 'use strict';
 /*
  * Globale Suche im Dashboard (Strg + K): Akten, Mandanten, Rechnungen, Aufgaben, Termine, Kanzlei-Post,
- * Notizen & Chat der Akten, Kanzlei-Wiki und Strafgesetzbuch.
+ * Notizen & Chat der Akten, Kanzlei-Wiki, Strafgesetzbuch sowie (nur Kanzlei) Präzedenzfälle, Zeugen und Beweismittel.
  * Gesucht wird nur in dem, was die angemeldete Person auch sonst sehen darf:
  *  - Kanzlei: alle Akten, Mandantenkonten, Rechnungen, Aufgaben und Termine, eigene Post, Notizen (auch interne), Wiki, StGB
  *  - Mandanten: eigene Akten, eigene Rechnungen, freigegebene Termine, eigene Post, Chat der eigenen Akten (nie interne Notizen)
@@ -253,7 +253,37 @@ router.get('/', (req, res) => {
       .map((l, i) => ({ id: i + 1, para: l.para, title: l.title, chapter: l.chapterTitle }));
   }
 
-  res.json({ q, terms: [...hitWords], results: { cases, clients, notes, invoices, tasks, events, messages, wiki, penal } });
+  // Präzedenzfälle, Zeugen und Beweismittel (nur Kanzlei); „B7“ findet das Beweismittel B7 in allen Akten
+  let precedents = [];
+  let witnesses = [];
+  let evidence = [];
+  if (staff && terms.length) {
+    precedents = require('../precedents')
+      .search({ q, limit: LIMIT })
+      .map((r) => require('../precedents').row(r))
+      .map((p) => ({ id: p.id, title: p.title, areaLabel: p.areaLabel, outcomeLabel: p.outcomeLabel, preview: snippet(p.summary, terms) }));
+    witnesses = db
+      .prepare(
+        `SELECT p.id, p.case_id, p.name, p.contact, p.status, p.side, c.case_number, c.title AS case_title
+         FROM case_parties p JOIN cases c ON c.id = p.case_id
+         WHERE p.role = 'zeuge' AND (${L('p.name')} OR ${L('p.contact')} OR ${L('p.expected')} OR ${L('p.statement')})
+         ORDER BY p.id DESC LIMIT ${LIMIT}`
+      )
+      .all(like, like, like, like)
+      .map((r) => ({ id: r.id, caseId: r.case_id, name: r.name, contact: r.contact, status: require('../parties').STATUS[r.status] || '', side: r.side, caseNumber: r.case_number, caseTitle: r.case_title }));
+    const evNo = /^b(\d{1,3})$/i.exec(q);
+    evidence = db
+      .prepare(
+        `SELECT a.id, a.case_id, a.ev_no, a.caption, a.kind, a.source, a.description, c.case_number, c.title AS case_title
+         FROM case_attachments a JOIN cases c ON c.id = a.case_id
+         WHERE ${evNo ? 'a.ev_no = ?' : `(${L('a.caption')} OR ${L('a.description')} OR ${L('a.source')})`}
+         ORDER BY a.created_at DESC, a.id DESC LIMIT ${LIMIT}`
+      )
+      .all(...(evNo ? [Number(evNo[1])] : [like, like, like]))
+      .map((r) => ({ id: r.id, caseId: r.case_id, no: r.ev_no, caption: r.caption, kindLabel: require('../evidence').KINDS[r.kind] || '', source: r.source, caseNumber: r.case_number, caseTitle: r.case_title, preview: snippet(r.description, terms) }));
+  }
+
+  res.json({ q, terms: [...hitWords], results: { cases, clients, notes, invoices, tasks, events, messages, wiki, penal, precedents, witnesses, evidence } });
 });
 
 module.exports = router;
