@@ -125,6 +125,7 @@ app.use('/api/gsheets', externalRoutes.gsheetsRouter);
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/penal', require('./routes/penal').router); // Strafkatalog (StGB)
 app.use('/api/wiki', require('./routes/wiki').router); // Kanzlei-Wiki
+app.use('/api/discount-approvals', require('./routes/discountApprovals').router); // Rabatt-Freigabe durch das Board
 app.use('/api/retainers', require('./routes/retainers').router); // Dauermandate (Pauschalen mit automatischer Rechnung)
 app.use('/api/precedents', require('./routes/precedents').router); // Präzedenzfälle (Wiki-Reiter) und „Ähnliche Fälle“
 app.use('/api/snippets', require('./routes/snippets').router); // Textbausteine (Akten-Chat, Notizen)

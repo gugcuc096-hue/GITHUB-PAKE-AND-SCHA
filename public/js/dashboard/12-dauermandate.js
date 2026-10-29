@@ -80,8 +80,9 @@ async function refreshRetainers() {
 
 Object.assign(actions, {
   'inv-tab': async (el) => {
-    st.invTab = el.dataset.tab === 'dauer' ? 'dauer' : 'rechnungen';
+    st.invTab = ['dauer', 'freigaben'].includes(el.dataset.tab) ? el.dataset.tab : 'rechnungen';
     if (st.invTab === 'dauer') await loadRetainers();
+    if (st.invTab === 'freigaben') await loadApprovals();
     renderView();
   },
   'ret-new': async () => openModal(await retainerForm(null), { wide: true }),

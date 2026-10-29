@@ -589,6 +589,33 @@ describe('Mandantenportal: Discord-Konto, Zahlung melden, Unterschriften', () =>
       await waitFor(() => (stub().renames || []).find((x) => x.channel === '900000000000000777' && /^🟢 Im Dienst: \d+$/.test(x.name)), 'Kanal umbenannt');
     });
   });
+  describe('Rabatt-Freigabe per Discord-Knopf', () => {
+    it('Anfrage kommt als DM mit Genehmigen/Ablehnen ans Board; Klick entscheidet, die anfragende Person wird informiert', async () => {
+      const boardDiscord = '900000000000000170';
+      assert.match((await oauth(as.admin, '/api/discord/connect', boardDiscord)).cb.location, /discord=linked/);
+      assert.equal((await as.admin.post('/api/discount-approvals/settings', { pct: 20 })).status, 200);
+      const invoice = (extra = {}) => ({ caseId: state.caseId, items: [{ description: 'Beratung', quantity: 1, unitPrice: 10000 }], discountPct: 35, discountReason: 'Stammkunde seit Jahren', ...extra });
+      const asked = await as.anwalt.post('/api/invoices', invoice());
+      assert.equal(asked.status, 202, asked.text);
+      assert.equal(asked.json.needsApproval, true);
+      const id = asked.json.approval.id;
+      const dm = await waitFor(() => stub().dms.find((x) => x.to === boardDiscord && (x.components || []).some((row) => row.components.some((b) => b.custom_id === `disc:yes:${id}`))), 'DM an das Board');
+      assert.match(dm.embeds[0].description, /35 %/);
+      assert.match(dm.embeds[0].description, /Stammkunde seit Jahren/);
+      // wer kein Board ist (der Anwalt), darf nicht entscheiden
+      assert.match(text(await interact({ guild_id: undefined, type: 3, user: { id: MEMBERS.mo, username: 'mo' }, data: { custom_id: `disc:yes:${id}`, component_type: 2 } })), /nur das Board/);
+      assert.equal((await as.anwalt.post('/api/invoices', invoice({ approvalId: id }))).status, 409, 'noch nicht entschieden');
+      assert.match(text(await interact({ guild_id: undefined, type: 3, user: { id: boardDiscord, username: 'board' }, data: { custom_id: `disc:yes:${id}`, component_type: 2 } })), /genehmigt/);
+      await waitFor(() => stub().dms.find((x) => x.to === MEMBERS.mo && /Rabatt genehmigt/.test(x.embeds[0].title)), 'DM an die anfragende Person');
+      assert.match(text(await interact({ guild_id: undefined, type: 3, user: { id: boardDiscord, username: 'board' }, data: { custom_id: `disc:no:${id}`, component_type: 2 } })), /schon entschieden/);
+      // jetzt geht die Rechnung durch – einmal
+      const made = await as.anwalt.post('/api/invoices', invoice({ approvalId: id }));
+      assert.equal(made.status, 201, made.text);
+      assert.equal(made.json.invoice.discountPct, 35);
+      assert.equal((await as.anwalt.post('/api/invoices', invoice({ approvalId: id }))).status, 409, 'Freigabe ist verbraucht');
+      assert.equal((await as.admin.post('/api/discount-approvals/settings', { pct: 0 })).status, 200);
+    });
+  });
   describe('Deal-Rechner, Prozessticket, Ticket-Verlauf', () => {
     it('Angebot der Staatsanwaltschaft: DM mit Annehmen/Ablehnen – nur der Mandant, Antwort steht in der Akte', async () => {
       assert.equal((await as.anwalt.post(`/api/cases/${state.caseId}/deals`, { note: 'ohne Zahlen' })).status, 400, 'HE oder Geldstrafe nötig');

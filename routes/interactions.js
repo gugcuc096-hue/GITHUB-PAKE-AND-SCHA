@@ -267,6 +267,18 @@ router.post('/', express.raw({ type: '*/*', limit: '100kb' }), (req, res) => {
       const r = require('../deals').answer(Number(deal[2]), deal[1] === 'yes', { discordId, via: 'discord' });
       return res.json(r.error ? fail(r.error) : done(deal[1] === 'yes' ? 'Sie haben das Angebot angenommen. Ihre Kanzlei wird informiert.' : 'Sie haben das Angebot abgelehnt. Ihre Kanzlei wird informiert.', deal[1] === 'yes' ? 'Angenommen' : 'Abgelehnt'));
     }
+    // Rabatt-Freigabe: Genehmigen / Ablehnen in der Direktnachricht an das Board
+    const disc = /^disc:(yes|no):(\d+)$/.exec(String(body.data?.custom_id || ''));
+    if (body.type === 3 && disc) {
+      const boardUser = tickets.isId(discordId) ? db.prepare('SELECT * FROM users WHERE discord_id = ? AND active = 1').get(discordId) : null;
+      if (!boardUser) return res.json(fail(NOT_LINKED, 'Kein verknüpftes Konto'));
+      try {
+        const r = require('../discountApprovals').decide(Number(disc[2]), boardUser, disc[1] === 'yes', { via: 'discord' });
+        return res.json(done(disc[1] === 'yes' ? `Rabatt von ${r.request.discountPct} % genehmigt. ${r.request.requestedByName} wird informiert.` : `Rabatt abgelehnt. ${r.request.requestedByName} wird informiert.`, disc[1] === 'yes' ? 'Genehmigt' : 'Abgelehnt'));
+      } catch (err) {
+        return res.json(fail(err.message));
+      }
+    }
     const appt = /^appt:(yes|no):(\d+)$/.exec(String(body.data?.custom_id || ''));
     if (body.type === 3 && appt) {
       const r = require('../apptConfirm').answer(appt[1], Number(appt[2]), discordId);

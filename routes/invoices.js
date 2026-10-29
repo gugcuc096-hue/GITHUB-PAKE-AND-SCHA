@@ -11,6 +11,7 @@ const tickets = require('../tickets');
 const coop = require('../cooperations');
 const memberships = require('../memberships');
 const billing = require('../billing');
+const approvals = require('../discountApprovals');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -70,6 +71,8 @@ const itemSchema = z.object({
 
 const createSchema = z.object({
   kind: z.enum(['rechnung', 'honorarvereinbarung']).default('rechnung'),
+  approvalId: z.number().int().positive().optional(), // Freigabe des Boards für einen hohen Rabatt (siehe discountApprovals.js)
+  discountReason: z.string().trim().max(500).optional(),
   typeKey: z.string().max(40).nullable().optional(), // Rechnungsart (Einstellungen → Listen); bestimmt Grundart, Zahlungsziel, Vorschuss, Standardtext
   caseId: z.number().int().positive().nullable().optional(),
   clientName: z.string().trim().max(120).optional(),
@@ -130,6 +133,19 @@ router.post(
     const clientName = d.clientName || (c ? c.client_account_name || c.client_name : '');
     if (!clientName || clientName.length < 2) return res.status(400).json({ error: 'Bitte den Rechnungsempfänger angeben.' });
     const clientContact = d.clientContact || (c ? c.client_phone || c.client_account_phone || c.client_email || '' : '');
+
+    // Hoher Rabatt: ohne Freigabe geht erst eine Anfrage ans Board; mit genehmigter Freigabe läuft die Rechnung durch
+    let approval = null;
+    if (approvals.needsApproval(u, d.discountPct)) {
+      if (!d.approvalId) {
+        const subtotal = d.items.reduce((sum, it) => sum + it.quantity * it.unitPrice, 0);
+        const asked = approvals.request(u, { discountPct: d.discountPct, subtotal, caseId: c ? c.id : null, clientName, reason: d.discountReason });
+        return res.status(202).json({ needsApproval: true, approval: asked.request, thresholdPct: approvals.threshold() });
+      }
+      const chk = approvals.check(u, d.approvalId, d.discountPct);
+      if (!chk.ok) return res.status(chk.status).json({ error: chk.error });
+      approval = chk.request;
+    }
 
     // Kooperationsrabatt: Satz immer aus der Kooperation (nicht aus dem Formular); festhalten, wie er zustande kam
     let k = null;
@@ -204,6 +220,7 @@ router.post(
       );
 
     if (type) db.prepare('UPDATE invoices SET type_key = ? WHERE id = ?').run(type.key, Number(info.lastInsertRowid));
+    if (approval) approvals.markUsed(approval.id, Number(info.lastInsertRowid));
     const label = type ? type.name : d.kind === 'rechnung' ? 'Rechnung' : 'Honorarvereinbarung';
     const coopText = [
       ms ? `${ms.tier_name} ${ms.discount_pct} % (Wert ${money(t.subtotal)}, abgedeckt ${money(t.memberAmount)})` : '',

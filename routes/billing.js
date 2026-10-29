@@ -32,7 +32,7 @@ const guard = (fn) =>
 const areas = require('../areas');
 /** Standardgebühren und Rechnungsart je Rechtsgebiet (füllt neue Rechnungen vor). */
 const areaDefaults = () => Object.fromEntries(areas.list().filter((a) => a.defaultFees.length || a.defaultType).map((a) => [a.key, { fees: a.defaultFees, type: a.defaultType }]));
-const all = () => ({ categories: billing.categories(), types: billing.types(), bases: billing.BASES, areaDefaults: areaDefaults() });
+const all = () => ({ categories: billing.categories(), types: billing.types(), bases: billing.BASES, areaDefaults: areaDefaults(), discountApprovalPct: require('../discountApprovals').threshold() });
 const log = (req, what, label) => {
   configLog.add(req.user, { area: 'billing', key: what, label, perm: 'settings.edit' });
   logActivity(req.user, label, 'settings', null, '');
