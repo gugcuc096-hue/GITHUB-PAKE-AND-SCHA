@@ -543,9 +543,16 @@ function boardRow(n) {
 /* ================================================================
    Beweismittel, Bewerbungen, Dienstzeiten
    ================================================================ */
-function attachmentRow(a, caseId) {
+function attachmentRow(a, caseId, staff = false) {
+  const ev = require('./evidence');
   return {
     id: a.id,
+    no: a.ev_no,
+    kind: a.kind || 'foto',
+    kindLabel: ev.KINDS[a.kind] || ev.KINDS.foto,
+    obtainedAt: a.obtained_at || null,
+    // Einschätzung der Kanzlei (Lager, Stand, Herkunft, Beschreibung): nie für Mandanten
+    ...(staff ? { source: a.source || '', side: a.side || '', status: a.ev_status || 'gesichert', statusLabel: ev.STATUS[a.ev_status] || ev.STATUS.gesichert, description: a.description || '' } : {}),
     externalDocId: a.external_doc_id || null,
     caption: a.caption,
     internal: !!a.internal,

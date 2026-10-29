@@ -634,7 +634,7 @@ const actions = {
     if (!a) return;
     const caseId = st.modalCaseId;
     st.returnCase = caseId;
-    const no = linked ? a.no : index + 1;
+    const no = a.no;
     const canDelete = !linked && (a.uploaderId === st.user.id || isAdmin());
     // Großansicht wächst aus dem Vorschaubild hervor und kehrt beim Schließen dorthin zurück (13-bewegung.js)
     const from = flyOk() && el.classList.contains('att') ? el.getBoundingClientRect() : null;
@@ -643,12 +643,14 @@ const actions = {
       `<p class="text-xs uppercase tracking-[0.2em] text-gold mb-1">Beweismittel B${no}${linked ? ` · Akte ${esc(a.caseNumber)}` : ''}</p>
         <h2 class="modal-title">${esc(a.caption || 'Anhang')}</h2>
         <p class="modal-sub flex flex-wrap items-center gap-2">${esc(a.uploaderName)} <span class="stamp-mini is-in" title="Eingang">Eingang ${esc(fmtDate(a.createdAt))}</span>${a.internal ? '<span class="stamp-mini">Vertraulich</span>' : ''}</p>
+        ${evMetaLine(a) ? `<p class="modal-sub">${evMetaLine(a)}</p>` : ''}${evDetails(a)}
         <div class="lb-zoom${from ? ' is-flying' : ''}"><img class="lightbox-img" src="${esc(a.url)}" alt="${esc(a.caption)}"><div class="lb-lens" aria-hidden="true"></div></div>
         <p class="lb-hint">Zum Vergrößern mit der Maus über das Bild fahren – am Handy mit zwei Fingern oder doppelt tippen.</p>
         <div class="form-actions">
           <button class="btn-outline btn-md" data-action="back-to-case">${icon('chevronLeft', 'ico-sm')}<span>Zurück zur Akte</span></button>
           ${linked ? `<button class="btn-ghost btn-md" data-action="open-case" data-id="${a.caseId}">${icon('folder', 'ico-sm')}<span>Akte ${esc(a.caseNumber)} öffnen</span></button>` : ''}
           <a class="btn-ghost btn-md" href="${esc(a.url)}" download>${icon('download', 'ico-sm')}<span>Herunterladen</span></a>
+          ${!linked && isStaff() && st.caseInfo && st.caseInfo.canEdit ? `<button class="btn-ghost btn-md" data-action="ev-edit-box" data-id="${a.id}">${icon('edit', 'ico-sm')}<span>Beschreiben</span></button>` : ''}
           ${!linked && isStaff() ? `<button class="btn-ghost btn-md" data-action="redact-open" data-index="${index}">${icon('edit', 'ico-sm')}<span>Schwärzen</span></button>` : ''}
           ${canDelete ? `<button class="btn-danger btn-md" data-action="att-delete" data-id="${a.id}" data-case-id="${caseId}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>` : ''}
         </div>`,
@@ -665,7 +667,7 @@ const actions = {
     const r = redact;
     if (!r.boxes.length) throw new Error('Bitte zuerst mindestens eine Stelle schwärzen (mit der Maus bzw. dem Finger ein Rechteck ziehen).');
     const blob = await new Promise((res) => r.canvas.toBlob(res, 'image/jpeg', 0.9));
-    const caption = `${r.att.caption || `B${r.index + 1}`} (geschwärzt)`.slice(0, 200);
+    const caption = `${r.att.caption || `B${r.att.no}`} (geschwärzt)`.slice(0, 200);
     const internal = $('#redactInternal') && $('#redactInternal').checked ? '1' : '0';
     await api.upload(`/api/cases/${r.caseId}/attachments?caption=${encodeURIComponent(caption)}&internal=${internal}`, blob);
     toast('Geschwärzte Kopie gespeichert – das Original bleibt unverändert.');
