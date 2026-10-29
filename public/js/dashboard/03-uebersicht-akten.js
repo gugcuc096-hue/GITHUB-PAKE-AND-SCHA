@@ -803,6 +803,7 @@ function rememberCase(data) {
   // Beweise verknüpfter Akten (nur Kanzlei) – eine Liste für die Bildansicht
   st.linkedAttachments = (data.linkedEvidence || []).flatMap((k) => k.attachments.map((a) => ({ ...a, caseId: k.caseId, caseNumber: k.caseNumber })));
   st.caseDocs = data.externalDocs || [];
+  st.caseParties = data.parties || []; // Zeugen und andere Beteiligte (nur Kanzlei)
   st.caseContracts = data.contracts || [];
   st.caseTasks = data.tasks || [];
   st.caseInfo = data.case;

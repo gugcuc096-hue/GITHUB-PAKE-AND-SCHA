@@ -3299,8 +3299,8 @@ describe('Browser: Aufgeräumte Akte – Direktbearbeitung, Chips, Beteiligte, P
         // Interessenkonflikt: Gegenpartei „Paul Weber“ ist Mandant in der anderen Akte
         assert.match(await page.textContent('#modalBody .party-warn'), /Mandant/);
         // Beteiligte hinzufügen und entfernen
-        await page.fill('#modalBody form[data-form="party-add"] [name="name"]', 'Hans Zeuge');
-        await page.selectOption('#modalBody form[data-form="party-add"] [name="role"]', 'zeuge');
+        await page.fill('#modalBody form[data-form="party-add"] [name="name"]', 'Hans Anklage');
+        await page.selectOption('#modalBody form[data-form="party-add"] [name="role"]', 'staatsanwalt'); // Zeugen haben einen eigenen Abschnitt
         await page.click('#modalBody form[data-form="party-add"] button[type="submit"]');
         await page.waitForSelector('#modalBody .party-row');
         assert.equal((await a.get(`/api/cases/${c.id}`)).json.parties.length, 1);

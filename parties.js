@@ -8,9 +8,27 @@ const { db } = require('./db');
 
 const ROLES = { gegenpartei: 'Gegenpartei', zeuge: 'Zeuge', gericht: 'Gericht', staatsanwalt: 'Staatsanwaltschaft', sonstige: 'Sonstige' };
 
+// Zeugen: Lager (wem nützt die Aussage), Stand der Befragung
+const SIDES = { belastend: 'belastend', entlastend: 'entlastend', neutral: 'neutral' };
+const STATUS = { offen: 'Offen', kontaktiert: 'Kontaktiert', geladen: 'Geladen', ausgesagt: 'Ausgesagt', nicht_erreichbar: 'Nicht erreichbar' };
+
 const norm = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
 
-const row = (r) => ({ id: r.id, role: r.role, roleLabel: ROLES[r.role] || r.role, name: r.name, contact: r.contact, createdBy: r.created_by, createdAt: r.created_at });
+const row = (r) => ({
+  id: r.id,
+  role: r.role,
+  roleLabel: ROLES[r.role] || r.role,
+  name: r.name,
+  contact: r.contact,
+  createdBy: r.created_by,
+  createdAt: r.created_at,
+  side: r.side || '',
+  status: r.status || 'offen',
+  statusLabel: STATUS[r.status] || STATUS.offen,
+  summonAt: r.summon_at || null,
+  expected: r.expected || '',
+  statement: r.statement || '',
+});
 
 /** Alle anderen Akten, in denen dieser Name als Mandant vorkommt. */
 function asClient(name, exceptCaseId) {
@@ -46,10 +64,15 @@ function asOpponent(name, exceptCaseId) {
 
 /** Beteiligte einer Akte, je Beteiligtem mit Überschneidungen (Mandant in einer anderen Akte). */
 function listForCase(caseId) {
+  const contra = new Map();
+  for (const c of db.prepare('SELECT * FROM party_contradictions WHERE case_id = ? ORDER BY id ASC').all(caseId)) {
+    if (!contra.has(c.party_id)) contra.set(c.party_id, []);
+    contra.get(c.party_id).push({ id: c.id, text: c.text, ref: c.ref, createdBy: c.created_by, createdAt: c.created_at });
+  }
   return db
     .prepare('SELECT * FROM case_parties WHERE case_id = ? ORDER BY id ASC')
     .all(caseId)
-    .map((r) => ({ ...row(r), overlaps: ['gegenpartei', 'zeuge'].includes(r.role) ? asClient(r.name, caseId) : [] }));
+    .map((r) => ({ ...row(r), contradictions: contra.get(r.id) || [], overlaps: ['gegenpartei', 'zeuge'].includes(r.role) ? asClient(r.name, caseId) : [] }));
 }
 
 /** Die Gegenpartei aus dem Feld der Akte als Beteiligter gelesen: kommt sie anderswo als Mandant vor? */
@@ -62,4 +85,4 @@ function clientOverlaps(c, clientName) {
   return asOpponent(clientName || c.client_name, c.id);
 }
 
-module.exports = { ROLES, listForCase, opponentOverlaps, clientOverlaps, row };
+module.exports = { SIDES, STATUS, ROLES, listForCase, opponentOverlaps, clientOverlaps, row };
