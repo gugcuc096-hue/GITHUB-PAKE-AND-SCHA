@@ -1160,6 +1160,23 @@ db.exec(`
 `);
 addColumn('appointments', 'client_reminded', 'INTEGER NOT NULL DEFAULT 0');
 
+// Persönliche Einstellungen (Reihenfolge der Abschnitte einer Akte …) und Standardreihenfolge je Rechtsgebiet (vom Board)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS user_prefs (
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    key        TEXT NOT NULL,
+    value      TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (user_id, key)
+  );
+  CREATE TABLE IF NOT EXISTS case_section_defaults (
+    area       TEXT PRIMARY KEY,
+    value      TEXT NOT NULL,
+    updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
+
 // Einladungen von Kollegen zu einem Termin/Gespräch (Zusage/Absage je Person)
 db.exec(`
   CREATE TABLE IF NOT EXISTS appointment_invites (

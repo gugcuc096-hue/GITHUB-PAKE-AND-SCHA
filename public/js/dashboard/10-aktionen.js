@@ -1030,7 +1030,10 @@ const actions = {
     await reloadCase(id);
   },
   'scroll-to': (el) => {
-    $('#' + el.dataset.target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const target = $('#' + el.dataset.target);
+    const folded = target && target.closest('.sec-wrap.is-collapsed');
+    if (folded) folded.classList.add('is-open-tmp'); // eingeklappter Abschnitt klappt für den Sprung auf
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     if (el.closest('.case-jump')) {
       caseJumpPinned = el.dataset.target; // Reiter bleibt markiert, bis man selbst scrollt
       markCaseJump();

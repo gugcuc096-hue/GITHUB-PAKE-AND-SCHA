@@ -2579,6 +2579,36 @@ body.hint-edit .form-hint[data-hint-key]:hover { background: rgba(212, 175, 55, 
 .deadline-calc[hidden] { display: none; }
 .kind-box { padding-bottom: 0.2rem; }
 
+/* Ansicht der Akte anpassen: Abschnitte umsortieren, ausblenden, einklappen */
+.case-jump { display: flex; align-items: center; gap: 0.5rem; }
+.case-jump .case-jump-list { flex: 1; min-width: 0; }
+.case-jump .jump[hidden] { display: none; }
+.jump-edit { flex: none; white-space: nowrap; }
+.jump-edit.is-on { background: var(--gold-soft); color: var(--gold-light); }
+@media (max-width: 640px) { .jump-edit span { display: none; } }
+.sec-bar, .sec-editbar, .sec-folded { display: none; }
+.sec-wrap.is-hidden-sec { display: none; }
+.sec-wrap.is-collapsed:not(.is-open-tmp) > .sec-body { display: none; }
+.sec-wrap.is-collapsed:not(.is-open-tmp) > .sec-folded { display: flex; align-items: center; gap: 0.5rem; width: 100%; margin: 0.9rem 0; padding: 0.65rem 0.85rem; border: 1px solid var(--line); border-radius: 12px; background: rgba(255, 255, 255, 0.025); color: var(--text-muted); font: inherit; font-weight: 600; cursor: pointer; text-align: left; transition: background-color 0.15s ease, border-color 0.15s ease; }
+.sec-wrap.is-collapsed:not(.is-open-tmp) > .sec-folded:hover { background: rgba(255, 255, 255, 0.05); border-color: var(--gold-hairline); color: #fff; }
+.case-sections.is-editing .sec-body, .case-sections.is-editing .sec-folded { display: none !important; }
+.case-sections.is-editing .sec-wrap.is-hidden-sec { display: block; opacity: 0.55; }
+.case-sections.is-editing .sec-wrap.is-hidden-sec .sec-name { text-decoration: line-through; }
+.case-sections.is-editing .sec-editbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem 1rem; position: sticky; top: 0; z-index: 4; margin: 0.9rem 0; padding: 0.7rem 0.9rem; border: 1px solid var(--gold-hairline); border-radius: 14px; background: rgba(6, 15, 30, 0.94); backdrop-filter: blur(8px); }
+.sec-editinfo { display: grid; gap: 0.1rem; min-width: 0; }
+.sec-editbtns { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.case-sections.is-editing .sec-bar { display: flex; align-items: center; gap: 0.5rem; margin: 0.4rem 0; padding: 0.5rem 0.6rem; border: 1px solid var(--line); border-radius: 12px; background: rgba(255, 255, 255, 0.035); transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease; }
+.sec-grip { display: inline-grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 8px; background: transparent; color: var(--text-dim); cursor: grab; touch-action: none; flex: none; }
+.sec-grip:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }
+.sec-grip:active { cursor: grabbing; }
+.sec-name { flex: 1; min-width: 0; font-weight: 600; display: inline-flex; align-items: center; gap: 0.4rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sec-ctl { display: inline-flex; align-items: center; gap: 0.3rem; flex: none; }
+.sec-tog { padding: 0.25rem 0.6rem; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--text-dim); font: 600 0.72rem/1.2 system-ui, sans-serif; cursor: pointer; }
+.sec-tog:hover { color: #fff; }
+.sec-tog.is-on { border-color: var(--gold-hairline); background: var(--gold-soft); color: var(--gold-light); }
+.sec-wrap.is-dragging > .sec-bar { background: rgba(212, 175, 55, 0.14); border-color: var(--gold-hairline); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45); transform: scale(1.01); }
+@media (max-width: 560px) { .sec-tog { padding: 0.25rem 0.45rem; font-size: 0.68rem; } .sec-ctl { gap: 0.2rem; } }
+
 /* Einladungen von Kollegen zu Gesprächen und Terminen */
 .invite-box { border: 1px solid var(--line); border-radius: 12px; padding: 0.7rem 0.8rem 0.8rem; margin: 0; min-width: 0; }
 .invite-box legend { padding: 0 0.35rem; }

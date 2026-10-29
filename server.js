@@ -170,6 +170,7 @@ app.use('/api/invoices', require('./routes/invoices'));
 app.use('/api/fees', fees.publicRouter);
 app.use('/api/team', team.publicRouter);
 app.use('/api/directory', admin.directoryRouter);
+app.use('/api/prefs', require('./routes/prefs').router); // persönliche Ansicht der Akte (Reihenfolge der Abschnitte)
 app.use('/api/duty', dutyRoutes);
 app.use('/api/admin/team', team.adminRouter);
 app.use('/api/admin/fees', fees.adminRouter);

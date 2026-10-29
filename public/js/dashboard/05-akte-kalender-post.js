@@ -1132,10 +1132,28 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     ['secWork', 'Zeiten', 0, parts.work],
     ['secNotes', 'Verlauf', 0, true],
   ].filter((j) => j[3]);
-  const jumpBar = `<nav class="case-jump" aria-label="Abschnitte der Akte"><div class="case-jump-list">${jumps
-    .map(([id, label, n]) => `<button type="button" class="jump" data-action="scroll-to" data-target="${id}">${esc(label)}${n ? `<span class="jump-n">${n}</span>` : ''}</button>`)
-    .join('')}</div></nav>`;
+  const jumpBar = `<nav class="case-jump" aria-label="Abschnitte der Akte"><div class="case-jump-list">${caseSecSort(c, jumps, staff)
+    .map(([id, label, n]) => `<button type="button" class="jump" data-action="scroll-to" data-target="${id}" data-sec-jump="${caseSecKey(id)}"${caseSecIsHidden(c, id) ? ' hidden' : ''}>${esc(label)}${n ? `<span class="jump-n">${n}</span>` : ''}</button>`)
+    .join('')}</div>${staff ? `<button type="button" class="btn-ghost btn-sm jump-edit" data-action="sec-edit" title="Abschnitte umsortieren, ausblenden oder einklappen">${icon('grip', 'ico-sm')}<span>Ansicht anpassen</span></button>` : ''}</nav>`;
 
+  const notesHtml = `<div class="section" id="secNotes"><h3 class="section-title">${staff ? 'Verlauf & interne Notizen' : 'Verlauf'}</h3>
+        <p class="case-origin">Eröffnet ${esc(fmtDate(c.createdAt))}${staff ? ` · Eingang über ${esc(SOURCES[c.source] || c.source)}` : ''}</p>
+        ${logMore ? `<div class="log-more"><button type="button" class="btn-ghost btn-sm" data-action="log-older" data-case-id="${c.id}">${icon('chevronDown', 'ico-sm')}<span>${logMore} ältere ${logMore === 1 ? 'Eintrag' : 'Einträge'} laden</span></button></div>` : ''}
+        ${noteList}
+        ${staff
+        ? `<form data-form="add-note" data-id="${c.id}" class="mt-4 space-y-3">
+          <input type="hidden" name="internal" value="on">
+          <textarea name="body" rows="3" maxlength="4000" required class="field" placeholder="Notiz, Telefonat, Beweismittel, nächster Schritt … ( / für Textbausteine, @Name benachrichtigt Kollegen)" aria-label="Neue interne Notiz" data-snippets></textarea>
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <span class="text-xs text-dim">Interne Notizen sieht nur die Kanzlei – Nachrichten an den Mandanten oben unter „Nachrichten“.</span>
+            <button type="submit" class="btn-outline btn-md">${icon('send', 'ico-sm')}<span>Notiz speichern</span></button>
+          </div>
+        </form>`
+        : ''}
+      </div>`;
+  // Abschnitte der Akte: Reihenfolge, Ausblenden und Einklappen je Person (12-akte-ansicht.js); Mandanten sehen die feste Reihenfolge
+  const secMap = { charges: parts.charges, chat: parts.chat, events: eventsSection, witnesses: parts.witnesses, karte: parts.karte, contracts: parts.contracts, briefs: parts.briefs, external: parts.external, evidence: parts.evidence, requests: parts.requests, tasks: parts.tasks, invoices: parts.invoices, work: parts.work, notes: notesHtml };
+  const secMeta = Object.fromEntries(jumps.map(([id, label, n]) => [caseSecKey(id), { label, n }]));
   return `
       <div class="case-head case-cover mb-5" data-case-head="${c.id}">
         <span class="cover-tab" aria-hidden="true">${staff && c.priority >= 3 && !c.closed ? `<i class="cover-tab-dot p${c.priority}"></i>` : ''}Akte</span>
@@ -1170,34 +1188,8 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       ${c.publicNote ? `<div class="section"><h3 class="section-title">Statushinweis</h3><div class="banner banner-gold mb-0"><p class="text-sm whitespace-pre-wrap">${esc(c.publicNote)}</p></div></div>` : ''}`
       }
       ${staff ? precedentStrip(c, similar, precedentId) : ''}
-      ${parts.charges}
-      ${parts.chat}
-      ${eventsSection}
-      ${parts.witnesses}
-      ${parts.karte}
-      ${parts.contracts}
-      ${parts.briefs}
-      ${parts.external}
-      ${parts.evidence}
-      ${parts.requests}
-      ${parts.tasks}
-      ${parts.invoices}
-      ${parts.work}
-      <div class="section" id="secNotes"><h3 class="section-title">${staff ? 'Verlauf & interne Notizen' : 'Verlauf'}</h3>
-        <p class="case-origin">Eröffnet ${esc(fmtDate(c.createdAt))}${staff ? ` · Eingang über ${esc(SOURCES[c.source] || c.source)}` : ''}</p>
-        ${logMore ? `<div class="log-more"><button type="button" class="btn-ghost btn-sm" data-action="log-older" data-case-id="${c.id}">${icon('chevronDown', 'ico-sm')}<span>${logMore} ältere ${logMore === 1 ? 'Eintrag' : 'Einträge'} laden</span></button></div>` : ''}
-        ${noteList}
-        ${staff
-        ? `<form data-form="add-note" data-id="${c.id}" class="mt-4 space-y-3">
-          <input type="hidden" name="internal" value="on">
-          <textarea name="body" rows="3" maxlength="4000" required class="field" placeholder="Notiz, Telefonat, Beweismittel, nächster Schritt … ( / für Textbausteine, @Name benachrichtigt Kollegen)" aria-label="Neue interne Notiz" data-snippets></textarea>
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <span class="text-xs text-dim">Interne Notizen sieht nur die Kanzlei – Nachrichten an den Mandanten oben unter „Nachrichten“.</span>
-            <button type="submit" class="btn-outline btn-md">${icon('send', 'ico-sm')}<span>Notiz speichern</span></button>
-          </div>
-        </form>`
-        : ''}
-      </div>`;
+      ${caseSecHtml(c, secMap, secMeta, staff)}
+    `;
 }
 
 /** Zusatzfelder des Rechtsgebiets im Formular „Neue Akte / Mandat einreichen“ (Einstellungen → Listen → Rechtsgebiete). */

@@ -914,7 +914,7 @@ function takePrefetchedCase(id) {
 async function openCase(id) {
   // Dauert das Laden, öffnet sich die Akte sofort mit Platzhaltern
   const data = await withModalPlaceholder({ wide: true }, async () => {
-    await load.lawyers();
+    await Promise.all([load.lawyers(), typeof caseSecLoad === 'function' ? caseSecLoad() : null]); // Ansicht (Reihenfolge der Abschnitte) vor dem Zeichnen
     return takePrefetchedCase(id) || api.get(caseUrl(id));
   });
   if (!data) return;
