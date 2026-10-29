@@ -579,6 +579,7 @@ enhanceNumbers(document);
 
 document.addEventListener('change', (e) => {
   if (e.target.id === 'prUser' || e.target.id === 'prRank') updatePromotePreview();
+  if (e.target.id === 'tmUser') updateTerminateInfo();
   const t = e.target;
   // Häkchen und Auswahllisten mit data-change lösen direkt eine Aktion aus (z. B. Einarbeitung abhaken)
   if (t.dataset && t.dataset.change && actions[t.dataset.change]) {

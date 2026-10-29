@@ -1132,10 +1132,28 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     ['secWork', 'Zeiten', 0, parts.work],
     ['secNotes', 'Verlauf', 0, true],
   ].filter((j) => j[3]);
-  const jumpBar = `<nav class="case-jump" aria-label="Abschnitte der Akte"><div class="case-jump-list">${jumps
-    .map(([id, label, n]) => `<button type="button" class="jump" data-action="scroll-to" data-target="${id}">${esc(label)}${n ? `<span class="jump-n">${n}</span>` : ''}</button>`)
-    .join('')}</div></nav>`;
+  const jumpBar = `<nav class="case-jump" aria-label="Abschnitte der Akte"><div class="case-jump-list">${caseSecSort(c, jumps, staff)
+    .map(([id, label, n]) => `<button type="button" class="jump" data-action="scroll-to" data-target="${id}" data-sec-jump="${caseSecKey(id)}"${caseSecIsHidden(c, id) ? ' hidden' : ''}>${esc(label)}${n ? `<span class="jump-n">${n}</span>` : ''}</button>`)
+    .join('')}</div>${staff ? `<button type="button" class="btn-ghost btn-sm jump-edit" data-action="sec-edit" title="Abschnitte umsortieren, ausblenden oder einklappen">${icon('grip', 'ico-sm')}<span>Ansicht anpassen</span></button>` : ''}</nav>`;
 
+  const notesHtml = `<div class="section" id="secNotes"><h3 class="section-title">${staff ? 'Verlauf & interne Notizen' : 'Verlauf'}</h3>
+        <p class="case-origin">Eröffnet ${esc(fmtDate(c.createdAt))}${staff ? ` · Eingang über ${esc(SOURCES[c.source] || c.source)}` : ''}</p>
+        ${logMore ? `<div class="log-more"><button type="button" class="btn-ghost btn-sm" data-action="log-older" data-case-id="${c.id}">${icon('chevronDown', 'ico-sm')}<span>${logMore} ältere ${logMore === 1 ? 'Eintrag' : 'Einträge'} laden</span></button></div>` : ''}
+        ${noteList}
+        ${staff
+        ? `<form data-form="add-note" data-id="${c.id}" class="mt-4 space-y-3">
+          <input type="hidden" name="internal" value="on">
+          <textarea name="body" rows="3" maxlength="4000" required class="field" placeholder="Notiz, Telefonat, Beweismittel, nächster Schritt … ( / für Textbausteine, @Name benachrichtigt Kollegen)" aria-label="Neue interne Notiz" data-snippets></textarea>
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <span class="text-xs text-dim">Interne Notizen sieht nur die Kanzlei – Nachrichten an den Mandanten oben unter „Nachrichten“.</span>
+            <button type="submit" class="btn-outline btn-md">${icon('send', 'ico-sm')}<span>Notiz speichern</span></button>
+          </div>
+        </form>`
+        : ''}
+      </div>`;
+  // Abschnitte der Akte: Reihenfolge, Ausblenden und Einklappen je Person (12-akte-ansicht.js); Mandanten sehen die feste Reihenfolge
+  const secMap = { charges: parts.charges, chat: parts.chat, events: eventsSection, witnesses: parts.witnesses, karte: parts.karte, contracts: parts.contracts, briefs: parts.briefs, external: parts.external, evidence: parts.evidence, requests: parts.requests, tasks: parts.tasks, invoices: parts.invoices, work: parts.work, notes: notesHtml };
+  const secMeta = Object.fromEntries(jumps.map(([id, label, n]) => [caseSecKey(id), { label, n }]));
   return `
       <div class="case-head case-cover mb-5" data-case-head="${c.id}">
         <span class="cover-tab" aria-hidden="true">${staff && c.priority >= 3 && !c.closed ? `<i class="cover-tab-dot p${c.priority}"></i>` : ''}Akte</span>
@@ -1170,34 +1188,8 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       ${c.publicNote ? `<div class="section"><h3 class="section-title">Statushinweis</h3><div class="banner banner-gold mb-0"><p class="text-sm whitespace-pre-wrap">${esc(c.publicNote)}</p></div></div>` : ''}`
       }
       ${staff ? precedentStrip(c, similar, precedentId) : ''}
-      ${parts.charges}
-      ${parts.chat}
-      ${eventsSection}
-      ${parts.witnesses}
-      ${parts.karte}
-      ${parts.contracts}
-      ${parts.briefs}
-      ${parts.external}
-      ${parts.evidence}
-      ${parts.requests}
-      ${parts.tasks}
-      ${parts.invoices}
-      ${parts.work}
-      <div class="section" id="secNotes"><h3 class="section-title">${staff ? 'Verlauf & interne Notizen' : 'Verlauf'}</h3>
-        <p class="case-origin">Eröffnet ${esc(fmtDate(c.createdAt))}${staff ? ` · Eingang über ${esc(SOURCES[c.source] || c.source)}` : ''}</p>
-        ${logMore ? `<div class="log-more"><button type="button" class="btn-ghost btn-sm" data-action="log-older" data-case-id="${c.id}">${icon('chevronDown', 'ico-sm')}<span>${logMore} ältere ${logMore === 1 ? 'Eintrag' : 'Einträge'} laden</span></button></div>` : ''}
-        ${noteList}
-        ${staff
-        ? `<form data-form="add-note" data-id="${c.id}" class="mt-4 space-y-3">
-          <input type="hidden" name="internal" value="on">
-          <textarea name="body" rows="3" maxlength="4000" required class="field" placeholder="Notiz, Telefonat, Beweismittel, nächster Schritt … ( / für Textbausteine, @Name benachrichtigt Kollegen)" aria-label="Neue interne Notiz" data-snippets></textarea>
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <span class="text-xs text-dim">Interne Notizen sieht nur die Kanzlei – Nachrichten an den Mandanten oben unter „Nachrichten“.</span>
-            <button type="submit" class="btn-outline btn-md">${icon('send', 'ico-sm')}<span>Notiz speichern</span></button>
-          </div>
-        </form>`
-        : ''}
-      </div>`;
+      ${caseSecHtml(c, secMap, secMeta, staff)}
+    `;
 }
 
 /** Zusatzfelder des Rechtsgebiets im Formular „Neue Akte / Mandat einreichen“ (Einstellungen → Listen → Rechtsgebiete). */
@@ -1361,12 +1353,14 @@ function calendarStaff() {
   const selDate = new Date(`${st.cal.selected}T12:00:00`);
   const deadlines = st.events.filter((e) => e.type === 'frist' && e.status === 'bestaetigt').sort(byStart).slice(0, 8);
   const requests = st.events.filter((e) => e.status === 'angefragt').sort(byStart);
+  const invited = st.events.filter((e) => e.myInvite === 'offen' && !['abgesagt', 'erledigt'].includes(e.status) && (parseDate(e.startsAt) || 0) > Date.now()).sort(byStart);
 
   return `
       <div class="page-head">
         <div><h1 class="page-title">Kalender & Fristen</h1><p class="page-sub">Gerichtstermine, Mandantengespräche und Fristen des ganzen Teams – mit Live-Countdown.</p></div>
         <div class="page-actions"><button class="btn-gold btn-md" data-action="new-event" data-day="${st.cal.selected}">${icon('plus')}<span>Neuer Eintrag</span></button></div>
       </div>
+      ${invited.length ? `<section class="panel panel-pad mb-4 invite-panel"><div class="panel-head"><h2 class="panel-title">Einladungen an dich</h2>${badge(`${invited.length} offen`, 'gold')}</div>${invited.map(inviteRow).join('')}</section>` : ''}
       ${requests.length ? `<section class="panel panel-pad mb-4"><div class="panel-head"><h2 class="panel-title">Terminanfragen von Mandanten</h2>${badge(`${requests.length} offen`, 'amber')}</div>${requests.map((e) => eventRow(e)).join('')}</section>` : ''}
       <div class="cal-layout">
         <section class="panel panel-pad">
@@ -1587,6 +1581,37 @@ function eventKindBox(v, isNew) {
       </div></div>`;
 }
 
+const INVITE_STATUS = { offen: ['Offen', 'amber'], zugesagt: ['Zugesagt', 'emerald'], abgesagt: ['Abgesagt', 'red'] };
+/** Zeile „Einladung an dich“ mit Zusagen/Absagen. */
+function inviteRow(e) {
+  const by = e.creatorName ? ` von ${esc(e.creatorName)}` : '';
+  return `<div class="invite-row" data-invite-event="${e.id}"><button type="button" class="invite-main" data-action="open-event" data-id="${e.id}"><strong>${esc(e.title)}</strong>
+      <span class="text-xs text-dim">${esc(fmtDate(e.startsAt))} · ${esc(e.location || '—')}${by}</span></button>
+      <span class="invite-btns"><button type="button" class="btn-gold btn-sm" data-action="invite-respond" data-id="${e.id}" data-status="zugesagt">${icon('check', 'ico-sm')}<span>Zusagen</span></button>
+      <button type="button" class="btn-outline btn-sm" data-action="invite-respond" data-id="${e.id}" data-status="abgesagt"><span>Absagen</span></button></span></div>`;
+}
+/** Kollegen einladen (Auswahl) samt Antworten der bereits Eingeladenen; Zu-/Absage der eigenen Einladung. */
+function inviteBox(v, isNew) {
+  const mine = v.myInvite;
+  const mineBox = mine
+    ? `<div class="banner banner-gold span-2"><div>${icon('calendar')} <strong>Du bist eingeladen</strong> – ${statusBadge(INVITE_STATUS, mine)}</div>
+        <div class="flex gap-2 mt-2"><button type="button" class="btn-gold btn-sm" data-action="invite-respond" data-id="${v.id}" data-status="zugesagt">${icon('check', 'ico-sm')}<span>Zusagen</span></button>
+        <button type="button" class="btn-outline btn-sm" data-action="invite-respond" data-id="${v.id}" data-status="abgesagt"><span>Absagen</span></button></div></div>`
+    : '';
+  const invited = new Map((v.invites || []).map((i) => [i.userId, i]));
+  const people = (st.lawyers || []).filter((l) => l.id !== st.user.id && l.id !== (isNew ? st.user.id : v.assignedTo));
+  if (!people.length && !invited.size) return mineBox;
+  const chips = people
+    .map((l) => {
+      const i = invited.get(l.id);
+      return `<label class="invite-chip ${i ? 'is-on' : ''}"><input type="checkbox" name="inviteIds" value="${l.id}" ${i ? 'checked' : ''}>
+        <span class="avatar sm">${avatarImg(l.avatarUrl, l.displayName)}</span><span>${esc(l.displayName)}</span>${i ? `<span class="invite-state s-${i.status}" title="${esc(INVITE_STATUS[i.status][0])}"></span>` : ''}</label>`;
+    })
+    .join('');
+  return `${mineBox}<fieldset class="span-2 invite-box"><legend class="label">Kollegen einladen <span class="text-dim font-normal normal-case tracking-normal">(bekommen eine Nachricht, im Discord-Kanal für Einladungen erwähnt; antworten per Zu-/Absage)</span></legend>
+      <div class="invite-chips">${chips}</div></fieldset>`;
+}
+
 function eventForm(e, preset = {}) {
   const isNew = !e;
   const v = e || {};
@@ -1628,6 +1653,7 @@ function eventForm(e, preset = {}) {
         <div class="span-2"><label class="label">Ort</label><input name="location" class="field" maxlength="120" value="${esc(v.location ?? (type === 'frist' ? '' : 'Kanzlei Würfelpark'))}" placeholder="z. B. District Court, Saal 2"></div>
         <div class="span-2"><label class="label">Notiz</label><textarea name="note" rows="3" class="field" maxlength="1000" placeholder="Vorbereitung, Unterlagen, Hinweise …">${esc(v.note || preset.note || '')}</textarea></div>
         <label class="check span-2"><input type="checkbox" name="clientVisible" ${visible ? 'checked' : ''}> Für den Mandanten im Portal sichtbar</label>
+        ${inviteBox(v, isNew)}
         ${isNew && feature('slots') ? `<details class="span-2 slot-box"><summary>Terminvorschlag: Mandant wählt die Zeit</summary>
           <p class="form-hint">Nur für Mandantengespräche in einer Akte mit Mandanten-Konto. Oben steht die erste Zeit, hier bis zu zwei weitere – der Mandant tippt im Portal eine an, danach ist der Termin bestätigt.</p>
           <div class="form-grid cols-2"><div><label class="label" for="evSlot2">Zweite Zeit</label><input id="evSlot2" name="slot2" type="datetime-local" class="field"></div>

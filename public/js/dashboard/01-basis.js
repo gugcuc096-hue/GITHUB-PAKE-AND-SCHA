@@ -216,7 +216,7 @@ const VIEWS = {
   duty: { label: 'Dienstzeiten', icon: 'clock', staff: true, section: 'Kanzlei' },
   feedback: { label: '360°-Feedback', short: 'Feedback', icon: 'users', staff: true, section: 'Kanzlei' },
   lager: { label: 'Kanzlei-Lager', short: 'Lager', icon: 'box', staff: true, section: 'Kanzlei' },
-  personnel: { label: 'Beförderungen & Einstellungen', short: 'Personal', icon: 'star', staff: true, section: 'Kanzlei' },
+  personnel: { label: 'Personalprotokoll', short: 'Personal', icon: 'star', staff: true, section: 'Kanzlei' },
   // Board: eigene und eingegangene Anliegen sind ein Menüpunkt „Anliegen“ (Reiter „Eingang“ / „Meine Anliegen“)
   'concerns-board': { label: 'Eingegangene Anliegen', navLabel: 'Anliegen', short: 'Anliegen', icon: 'chat', board: true, section: 'Board of Partners' },
   resolutions: { label: 'Beschlüsse', icon: 'ballot', board: true, section: 'Board of Partners' },

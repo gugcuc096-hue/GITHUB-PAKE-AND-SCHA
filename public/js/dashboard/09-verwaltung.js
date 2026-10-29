@@ -715,7 +715,7 @@ views.applications = {
 };
 
 async function openApplication(id) {
-  const data = await api.get('/api/admin/applications/' + id);
+  const [data] = await Promise.all([api.get('/api/admin/applications/' + id), load.lawyers()]);
   openModal(appDetail(data), { wide: true, key: `app:${id}`, reopen: () => openApplication(id) });
   st.modalAppId = id;
   initAppChat();
@@ -802,7 +802,16 @@ async function pollAppChat() {
   }
 }
 
-function appDetail({ application: a, notes, hiredUser, ticket, ...chat }) {
+/** Kollegen zum Bewerbungsgespräch einladen (Auswahl). */
+function appInviteChips() {
+  const people = (st.lawyers || []).filter((l) => l.id !== st.user.id);
+  if (!people.length) return '';
+  return `<div class="span-2"><div class="label">Kollegen einladen <span class="text-dim font-normal normal-case tracking-normal">(optional)</span></div><div class="invite-chips">${people
+    .map((l) => `<label class="invite-chip"><input type="checkbox" name="inviteIds" value="${l.id}"><span class="avatar sm">${avatarImg(l.avatarUrl, l.displayName)}</span><span>${esc(l.displayName)}</span></label>`)
+    .join('')}</div></div>`;
+}
+
+function appDetail({ application: a, notes, hiredUser, ticket, existingUser, ...chat }) {
   const cell = (k, v) => `<div><div class="k">${esc(k)}</div><div class="v">${esc(v || '—')}</div></div>`;
   const qa = (q, text) => (text ? `<div class="qa"><div class="q">${esc(q)}</div><div class="a">${esc(text)}</div></div>` : '');
   return `
@@ -819,6 +828,7 @@ function appDetail({ application: a, notes, hiredUser, ticket, ...chat }) {
         .join('')}</span>
       </div>
       ${appTrack(a)}
+      ${existingUser ? `<div class="banner banner-gold">${icon('user')}<div>${existingUser.role === 'mandant' ? `Hat schon ein Konto (<strong>${esc(existingUser.email)}</strong>) – beim Einstellen wird dieses Konto zum Mitarbeiterkonto, es entsteht kein neues.` : `Hat bereits ein Mitarbeiterkonto (<strong>${esc(existingUser.email)}</strong>).`}</div></div>` : ''}
       ${hiredUser ? `<div class="banner banner-gold">${icon('check')}<div>Eingestellt – Login-Konto <strong>${esc(hiredUser.email)}</strong> wurde angelegt.</div></div>` : ''}
       <div class="info-grid mb-5">${cell('Alter', a.age ? String(a.age) : '')}${cell('Telefon', a.phone)}${cell('Discord', a.discord)}${cell('E-Mail', a.email)}${cell('Eingegangen', fmtDate(a.createdAt))}${cell('Gespräch', a.interviewAt ? fmtDate(a.interviewAt) : '')}</div>
       ${boardTicketLine('application', a.id, ticket)}
@@ -831,13 +841,14 @@ function appDetail({ application: a, notes, hiredUser, ticket, ...chat }) {
           <div class="q span-2">Zum Gespräch einladen</div>
           <div><label class="label">Termin</label><input name="startsAt" type="datetime-local" class="field" required value="${a.interviewAt ? toLocalInput(a.interviewAt) : ''}"></div>
           <div><label class="label">Ort</label><input name="location" class="field" maxlength="120" value="Kanzlei Würfelpark"></div>
+          ${appInviteChips()}
           <div class="span-2 flex flex-wrap items-center gap-3"><button type="submit" class="btn-outline btn-md">${icon('calendar', 'ico-sm')}<span>Gespräch planen</span></button>
           <p class="form-hint">Setzt den Stand auf „Gespräch“, trägt den Termin in den Team-Kalender ein und schickt dem Bewerber die Einladung als Nachricht.</p></div>
         </form>
       </div>
 
       <div class="form-actions section">
-        ${!hiredUser ? `<button class="btn-gold btn-md" data-action="app-hire" data-id="${a.id}">${icon('userAdd', 'ico-sm')}<span>Einstellen & Konto anlegen</span></button>` : ''}
+        ${!hiredUser && !(existingUser && existingUser.role !== 'mandant') ? `<button class="btn-gold btn-md" data-action="app-hire" data-id="${a.id}">${icon('userAdd', 'ico-sm')}<span>${existingUser ? 'Einstellen' : 'Einstellen & Konto anlegen'}</span></button>` : ''}
         ${a.status !== 'abgelehnt' && !hiredUser ? `<button class="btn-outline btn-md" data-action="app-status" data-id="${a.id}" data-status="abgelehnt">Absagen</button>` : ''}
         ${isAdmin() ? `<button class="btn-danger btn-md" data-action="app-delete" data-id="${a.id}" data-number="${esc(a.number)}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>` : ''}
       </div>
@@ -851,22 +862,22 @@ function appDetail({ application: a, notes, hiredUser, ticket, ...chat }) {
       </div>`;
 }
 
-function hireModal(a) {
+function hireModal(a, existingUser = null) {
   // Vorschlag aus der Stellenbezeichnung (z. B. „Associate / Rechtsanwalt (m/w/d)“ → Associate)
   const rank = a.positionTitle.replace(/\s*\(m\/w\/d\)\s*/i, '').replace('Initiativbewerbung', 'Junior Associate').split('/')[0].trim();
   openModal(`
       <h2 class="modal-title">${esc(a.name)} einstellen</h2>
-      <p class="modal-sub">Legt ein Login-Konto mit Einmal-Passwort an und auf Wunsch ein Profil im Bereich „Unser Team“ auf der Website.</p>
-      <form data-form="app-hire" data-id="${a.id}" class="form-grid cols-2">
-        <div class="span-2"><label class="label">E-Mail (Login)</label>${emailField('email', { value: emailLocalFromName(a.name), required: true, autofocus: true })}
-          <p class="form-hint">Vorschlag aus dem Namen – frei änderbar. Kontakt-E-Mail aus der Bewerbung: ${esc(a.email || '—')}</p></div>
+      <p class="modal-sub">${existingUser ? `Das bestehende Konto <strong>${esc(existingUser.email)}</strong> wird zum Mitarbeiterkonto – ohne neues Passwort. Auf Wunsch kommt ein Profil im Bereich „Unser Team“ dazu.` : 'Legt ein Login-Konto mit Einmal-Passwort an und auf Wunsch ein Profil im Bereich „Unser Team“ auf der Website.'}</p>
+      <form data-form="app-hire" data-id="${a.id}" ${existingUser ? 'data-existing="1"' : ''} ${a.__newAccount ? 'data-new-account="1"' : ''} class="form-grid cols-2">
+        ${existingUser ? '' : `<div class="span-2"><label class="label">E-Mail (Login)</label>${emailField('email', { value: emailLocalFromName(a.name), required: true, autofocus: true })}
+          <p class="form-hint">Vorschlag aus dem Namen – frei änderbar. Kontakt-E-Mail aus der Bewerbung: ${esc(a.email || '—')}</p></div>`}
         <div><label class="label">Rang</label>${rankSelect('rank', RANKS.includes(rank) && (isAdmin() || RANKS.indexOf(rank) >= RANKS.indexOf(st.user.rank)) ? rank : '', { emptyLabel: '— ohne Rang (z. B. Assistenz) —' })}
           ${isAdmin() ? '' : `<p class="form-hint">Sie können bis zu Ihrem eigenen Rang (${esc(st.user.rank || '—')}) einstellen.</p>`}</div>
         <div><label class="label">Rolle im Dashboard</label><select name="role" class="field">${opt('anwalt', 'Anwalt / Mitarbeiter', true)}${isAdmin() ? opt('admin', 'Board of Partners (Admin)') : ''}</select></div>
         <div class="span-2"><label class="label">Kurzbeschreibung für die Website (optional)</label><textarea name="description" rows="2" maxlength="400" class="field"></textarea></div>
         <label class="check span-2"><input type="checkbox" name="createProfile" checked> Team-Profil anlegen</label>
         <label class="check span-2"><input type="checkbox" name="visible" checked> Sofort auf der Website anzeigen</label>
-        <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Einstellen</span></button><button type="button" class="btn-ghost btn-md" data-action="app-back" data-id="${a.id}">Zurück</button></div>
+        <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Einstellen</span></button><button type="button" class="btn-ghost btn-md" data-action="app-back" data-id="${a.id}">Zurück</button>${existingUser ? `<button type="button" class="btn-ghost btn-md" data-action="app-hire-new" data-id="${a.id}" title="Falls das gefundene Konto zu einer anderen Person gehört">Anderes Konto – neues anlegen</button>` : ''}</div>
       </form>`);
 }
 

@@ -153,6 +153,32 @@ const forms = {
     await modalBack();
     await refreshBehind();
   },
+  'personnel-demote': async (f) => {
+    const fd = new FormData(f);
+    const userId = Number(val(fd, 'userId'));
+    const rank = val(fd, 'rank');
+    if (!userId || !rank) throw new Error('Bitte Teammitglied und neuen Rang wählen.');
+    const person = st.personnel.staff.find((s) => s.id === userId);
+    await api.post('/api/personnel/demote', { userId, rank, note: val(fd, 'note') || undefined });
+    toast(`Degradierung eingetragen – ${person ? person.name : 'das Teammitglied'} ist jetzt ${rank}.`);
+    st.lawyers = [];
+    st.contacts = null;
+    await modalBack();
+    await refreshBehind();
+  },
+  'personnel-terminate': async (f) => {
+    const fd = new FormData(f);
+    const userId = Number(val(fd, 'userId'));
+    if (!userId) throw new Error('Bitte ein Teammitglied wählen.');
+    if (fd.get('sure') !== 'on') throw new Error('Bitte bestätigen, dass die Kündigung gewollt ist.');
+    const person = st.personnel.staff.find((s) => s.id === userId);
+    const r = await api.post('/api/personnel/terminate', { userId, note: val(fd, 'note') || undefined });
+    toast(`Kündigung eingetragen – ${person ? person.name : 'das Konto'} ist gesperrt.${r.openCases ? ` ${r.openCases} offene Akten neu vergeben!` : ''}`);
+    st.lawyers = [];
+    st.contacts = null;
+    await modalBack();
+    await refreshBehind();
+  },
   'new-case': async (f) => {
     const fd = new FormData(f);
     const body = { title: val(fd, 'title'), area: val(fd, 'area'), urgency: val(fd, 'urgency') || 'normal', description: val(fd, 'description') };
@@ -323,6 +349,7 @@ const forms = {
       assignedTo: fd.get('assignedTo') ? Number(fd.get('assignedTo')) : null,
       clientVisible: fd.get('clientVisible') === 'on',
     };
+    if (f.querySelector('input[name="inviteIds"]')) body.inviteIds = fd.getAll('inviteIds').map(Number);
     const slots = ['slot2', 'slot3'].filter((k) => fd.get(k)).map((k) => new Date(fd.get(k)).toISOString());
     if (!id && slots.length) body.slots = slots;
     if (id) await api.patch('/api/calendar/' + id, body);
@@ -669,11 +696,13 @@ const forms = {
   'app-interview': async (f) => {
     const fd = new FormData(f);
     if (!fd.get('startsAt')) throw new Error('Bitte einen Termin wählen.');
+    const inviteIds = fd.getAll('inviteIds').map(Number);
     const data = await api.post(`/api/admin/applications/${f.dataset.id}/interview`, {
       startsAt: new Date(fd.get('startsAt')).toISOString(),
       location: val(fd, 'location'),
+      inviteIds: inviteIds.length ? inviteIds : undefined,
     });
-    toast('Gespräch geplant – der Termin steht im Kalender.');
+    toast(inviteIds.length ? `Gespräch geplant – ${inviteIds.length} ${inviteIds.length === 1 ? 'Kollege' : 'Kollegen'} eingeladen.` : 'Gespräch geplant – der Termin steht im Kalender.');
     await reloadApplication(data);
   },
   'app-note': async (f) => {
@@ -684,7 +713,8 @@ const forms = {
   'app-hire': async (f) => {
     const fd = new FormData(f);
     const res = await api.post(`/api/admin/applications/${f.dataset.id}/hire`, {
-      email: val(fd, 'email'),
+      email: f.dataset.existing ? undefined : val(fd, 'email'),
+      newAccount: f.dataset.newAccount ? true : undefined,
       rank: val(fd, 'rank'),
       role: val(fd, 'role'),
       description: val(fd, 'description'),
@@ -694,7 +724,11 @@ const forms = {
     st.lawyers = [];
     st.contacts = null;
     toast(`${res.application.name} wurde eingestellt.`);
-    showCredentials(res.credentials, res.application.name);
+    if (res.credentials) showCredentials(res.credentials, res.application.name);
+    else {
+      toast(`${res.application.name} nutzt das bisherige Konto – es hat jetzt Mitarbeiter-Rechte.`);
+      await modalBack();
+    }
     refreshBehind();
   },
   position: async (f) => {

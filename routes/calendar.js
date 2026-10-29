@@ -11,6 +11,7 @@ const kindLabel = (a) => (a.kind && eventKinds.nameOf(a.kind)) || EVENT_TYPES[a.
 const discord = require('../discord');
 const tickets = require('../tickets');
 const apptConfirm = require('../apptConfirm');
+const invites = require('../appointmentInvites');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -61,6 +62,7 @@ const createSchema = z.object({
   assignedTo: z.number().int().positive().nullable().optional(),
   clientVisible: z.boolean().optional(),
   slots: z.array(isoDateTime).max(2).optional(), // weitere Zeiten zur Auswahl für den Mandanten (Terminvorschlag)
+  inviteIds: z.array(z.number().int().positive()).max(30).optional(), // Kollegen, die zum Gespräch/Termin eingeladen werden
 });
 
 router.post(
@@ -134,6 +136,7 @@ router.post(
       .run(c ? c.id : null, row.clientId, row.type, d.title, first, endsAt, row.location, d.note || '', row.status, row.assignedTo, u.id, row.clientVisible, slotList && slotList.length > 1 ? JSON.stringify(slotList) : null, row.kind || null);
 
     const a = getAppointment(Number(info.lastInsertRowid));
+    if (u.role !== 'mandant' && d.inviteIds && d.inviteIds.length) invites.invite(a, d.inviteIds, u);
     if (u.role === 'mandant') ticketAppointment(a, '📅 Terminanfrage des Mandanten', { by: u, mention: 'lawyers' });
     else if (slotList && slotList.length > 1) {
       ticketAppointment(a, '📅 Terminvorschlag – bitte eine Zeit wählen', { by: u, note: `${slotList.map((x) => `• ${fmtDiscordTime(x)}`).join('\n')}\n\nSie wählen im Mandantenportal unter „Termine“ mit einem Klick.` });
@@ -232,7 +235,10 @@ router.patch(
         set('case_id', null);
       }
     }
-    if (!sets.length) return res.json({ event: apptRow(a, u) });
+    if (!sets.length) {
+      if (d.inviteIds !== undefined) invites.sync(a, d.inviteIds, u); // nur die Eingeladenen geändert
+      return res.json({ event: apptRow(getAppointment(a.id), u) });
+    }
 
     db.prepare(`UPDATE appointments SET ${sets.join(', ')} WHERE id = ?`).run(...values, a.id);
     const updated = getAppointment(a.id);
@@ -248,9 +254,27 @@ router.patch(
       if (label) ticketAppointment(updated, updated.type === 'frist' && updated.status === 'erledigt' ? '✔️ Frist erledigt' : label, { by: u });
     } else if (moved) ticketAppointment(updated, updated.type === 'frist' ? '⏳ Frist geändert' : '🔁 Termin verlegt', { by: u });
     if (becameVisible || moved) apptConfirm.askClient(a.id).catch(() => {}); // neu fragen – die alte Zusage gilt nicht mehr
+    if (moved) invites.moved(updated, u); // Eingeladene Kollegen: neue Zeit, bitte erneut antworten
+    if (d.inviteIds !== undefined) invites.sync(updated, d.inviteIds, u);
     const gdocs = require('../googleDocs');
     gdocs.touchExtract(updated.case_id);
     if (a.case_id !== updated.case_id) gdocs.touchExtract(a.case_id);
+    res.json({ event: apptRow(getAppointment(a.id), u) });
+  })
+);
+
+/** Eingeladener Kollege sagt zu oder ab (nur die eingeladene Person selbst). */
+router.patch(
+  '/:id/invite',
+  wrap(async (req, res) => {
+    const u = req.user;
+    const id = idParam(req);
+    const a = id && getAppointment(id);
+    if (!a || !isStaff(u) || !apptVisible(a, u)) return res.status(404).json({ error: 'Termin nicht gefunden.' });
+    const d = parseBody(z.object({ status: z.enum(['zugesagt', 'abgesagt']) }), req, res);
+    if (!d) return;
+    if (!invites.mine(a.id, u.id)) return res.status(404).json({ error: 'Sie sind zu diesem Termin nicht eingeladen.' });
+    invites.respond(a, u, d.status);
     res.json({ event: apptRow(getAppointment(a.id), u) });
   })
 );

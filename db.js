@@ -1160,6 +1160,37 @@ db.exec(`
 `);
 addColumn('appointments', 'client_reminded', 'INTEGER NOT NULL DEFAULT 0');
 
+// Persönliche Einstellungen (Reihenfolge der Abschnitte einer Akte …) und Standardreihenfolge je Rechtsgebiet (vom Board)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS user_prefs (
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    key        TEXT NOT NULL,
+    value      TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (user_id, key)
+  );
+  CREATE TABLE IF NOT EXISTS case_section_defaults (
+    area       TEXT PRIMARY KEY,
+    value      TEXT NOT NULL,
+    updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
+
+// Einladungen von Kollegen zu einem Termin/Gespräch (Zusage/Absage je Person)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS appointment_invites (
+    appointment_id INTEGER NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,
+    user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status         TEXT NOT NULL DEFAULT 'offen',        -- offen | zugesagt | abgesagt
+    invited_by     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    responded_at   TEXT,
+    PRIMARY KEY (appointment_id, user_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_appt_invites_user ON appointment_invites(user_id, status);
+`);
+
 /**
  * Fortlaufende Nummer pro Jahr, z. B. PS-2026-0007. Lücken durch Löschen führen nicht zu Dubletten.
  * also: weitere [Tabelle, Spalte], deren Nummern ebenfalls belegt sind (Akten im Papierkorb).

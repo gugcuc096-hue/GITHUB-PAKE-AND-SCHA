@@ -734,7 +734,7 @@ async function openConcern(id) {
 }
 
 /* ---------------------------------------------------------------- Beförderungen & Einstellungen */
-const PERSONNEL_TYPE = { einstellung: ['Einstellung', 'sky'], befoerderung: ['Beförderung', 'gold'], rueckstufung: ['Rückstufung', 'slate'], rangaenderung: ['Rangänderung', 'slate'] };
+const PERSONNEL_TYPE = { einstellung: ['Einstellung', 'sky'], befoerderung: ['Beförderung', 'gold'], rueckstufung: ['Degradierung', 'amber'], rangaenderung: ['Rangänderung', 'slate'], kuendigung: ['Kündigung', 'red'] };
 
 function personnelItem(e) {
   const p = st.personnel;
@@ -743,11 +743,15 @@ function personnelItem(e) {
       ? `ist neu im Team${e.newRank ? ` als <strong class="text-gold">${esc(e.newRank)}</strong>` : ''}`
       : e.type === 'befoerderung'
         ? `wurde befördert: ${esc(e.oldRank || 'ohne Rang')} → <strong class="text-gold">${esc(e.newRank)}</strong>`
-        : `Rang geändert: ${esc(e.oldRank || 'ohne Rang')} → <strong>${esc(e.newRank || 'ohne Rang')}</strong>`;
+        : e.type === 'rueckstufung'
+          ? `wurde degradiert: ${esc(e.oldRank || 'ohne Rang')} → <strong>${esc(e.newRank || 'ohne Rang')}</strong>`
+          : e.type === 'kuendigung'
+            ? `wurde gekündigt${e.oldRank ? ` (zuletzt <strong>${esc(e.oldRank)}</strong>)` : ''}`
+            : `Rang geändert: ${esc(e.oldRank || 'ohne Rang')} → <strong>${esc(e.newRank || 'ohne Rang')}</strong>`;
   return `<div class="list-row wrap pers-row">
       <span class="avatar">${avatarImg(e.avatarUrl, e.name)}</span>
       <div class="main"><div class="title"><span class="font-medium">${esc(e.name)}</span> <span class="text-muted">${text}</span></div>
-        <div class="meta">${esc(fmtDate(e.createdAt))} · ${e.type === 'einstellung' ? 'eingestellt' : e.type === 'befoerderung' ? 'befördert' : 'geändert'} von ${esc(e.byName)}</div>
+        <div class="meta">${esc(fmtDate(e.createdAt))} · ${e.type === 'einstellung' ? 'eingestellt' : e.type === 'befoerderung' ? 'befördert' : e.type === 'rueckstufung' ? 'degradiert' : e.type === 'kuendigung' ? 'gekündigt' : 'geändert'} von ${esc(e.byName)}</div>
         ${e.note ? `<div class="pers-note">${esc(e.note)}</div>` : ''}</div>
       <div class="flex items-center gap-2 shrink-0">${statusBadge(PERSONNEL_TYPE, e.type)}${p.canDelete ? `<button class="icon-btn sm" data-action="personnel-delete" data-id="${e.id}" aria-label="Eintrag entfernen">${icon('trash', 'ico-sm')}</button>` : ''}</div></div>`;
 }
@@ -764,12 +768,14 @@ views.personnel = {
     const n = (t) => recent.filter((e) => e.type === t).length;
     return `
         <div class="page-head">
-          <div><h1 class="page-title">Beförderungen &amp; Einstellungen</h1><p class="page-sub">Wer neu im Team ist und wer befördert wurde – für alle Mitarbeiter sichtbar. Befördern kann nur das Board of Partners.</p></div>
-          ${p.board ? `<div class="page-actions"><button class="btn-gold btn-md" data-action="personnel-promote">${icon('star')}<span>Befördern</span></button></div>` : ''}
+          <div><h1 class="page-title">Personalprotokoll</h1><p class="page-sub">Wer neu im Team ist, befördert, degradiert oder gekündigt wurde – für alle Mitarbeiter sichtbar. Das ändern kann nur das Board of Partners.</p></div>
+          ${p.board ? `<div class="page-actions"><button class="btn-gold btn-md" data-action="personnel-promote">${icon('star')}<span>Befördern</span></button><button class="btn-outline btn-md" data-action="personnel-demote"><span>Degradieren</span></button><button class="btn-danger btn-md" data-action="personnel-terminate"><span>Kündigen</span></button></div>` : ''}
         </div>
-        <div class="grid grid-cols-2 gap-3 md:gap-4 mb-4">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-4">
           <div class="panel kpi"><div class="kpi-label">${icon('star', 'ico-sm')}Beförderungen</div><div class="kpi-value">${n('befoerderung')}</div><div class="kpi-sub">in den letzten 30 Tagen</div></div>
           <div class="panel kpi"><div class="kpi-label">${icon('userAdd', 'ico-sm')}Einstellungen</div><div class="kpi-value">${n('einstellung')}</div><div class="kpi-sub">in den letzten 30 Tagen</div></div>
+          <div class="panel kpi"><div class="kpi-label">Degradierungen</div><div class="kpi-value">${n('rueckstufung')}</div><div class="kpi-sub">in den letzten 30 Tagen</div></div>
+          <div class="panel kpi"><div class="kpi-label">Kündigungen</div><div class="kpi-value">${n('kuendigung')}</div><div class="kpi-sub">in den letzten 30 Tagen</div></div>
         </div>
         ${onboardingPanel()}
         <div class="panel p-2 md:p-3">${p.events.length ? p.events.map(personnelItem).join('') : empty('Noch keine Einträge. Einstellungen und Beförderungen erscheinen hier automatisch.', 'star')}</div>`;
@@ -844,6 +850,44 @@ function promoteModal() {
         <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('star')}<span id="prSubmit">Befördern</span></button></div>
       </form>`);
 }
+/** Degradieren: Teammitglied wählen, niedrigeren Rang wählen. */
+function demoteModal() {
+  const p = st.personnel;
+  const people = (p.staff || []).filter((s) => s.editable && s.rank);
+  if (!people.length) return toast('Es gibt niemanden, den Sie degradieren können.', 'error');
+  openModal(`
+      <h2 class="modal-title">Degradieren</h2>
+      <p class="modal-sub">Neuer, niedrigerer Rang für ein Teammitglied. Das Team-Profil auf der Website folgt, die Degradierung steht im Personalprotokoll (für alle Mitarbeiter sichtbar) und – falls eingerichtet – im Discord.</p>
+      <form data-form="personnel-demote" class="form-grid">
+        <div><label class="label" for="prUser">Teammitglied</label><select id="prUser" name="userId" class="field" required><option value="" disabled selected>Bitte wählen …</option>${people.map((s) => opt(s.id, `${s.name} · ${s.rank}`)).join('')}</select></div>
+        <div><label class="label" for="prRank">Neuer Rang</label>${promoteRankSelect(p.maxRank)}</div>
+        <div id="prPreview" class="text-sm text-dim" aria-live="polite"></div>
+        <div><label class="label" for="prNote">Begründung <span class="text-dim font-normal normal-case tracking-normal">(optional, für alle Mitarbeiter sichtbar)</span></label><textarea id="prNote" name="note" rows="3" maxlength="500" class="field"></textarea></div>
+        <div class="form-actions"><button type="submit" class="btn-gold btn-md"><span id="prSubmit">Degradieren</span></button></div>
+      </form>`);
+}
+/** Kündigen: Person wählen, Hinweis auf offene Akten, bewusst bestätigen. */
+function terminateModal() {
+  const p = st.personnel;
+  const people = (p.staff || []).filter((s) => s.terminable);
+  if (!people.length) return toast('Es gibt niemanden, dem Sie kündigen können.', 'error');
+  openModal(`
+      <h2 class="modal-title">Kündigen</h2>
+      <p class="modal-sub">Das Konto wird gesperrt (Anmeldung und Sitzungen enden), das Team-Profil verschwindet von der Website, Discord-Rollen werden entzogen. Die Kündigung steht im Personalprotokoll. Akten bleiben bestehen und sind neu zu vergeben.</p>
+      <form data-form="personnel-terminate" class="form-grid">
+        <div><label class="label" for="tmUser">Teammitglied</label><select id="tmUser" name="userId" class="field" required><option value="" disabled selected>Bitte wählen …</option>${people.map((s) => opt(s.id, `${s.name} · ${s.rank || 'ohne Rang'}`)).join('')}</select></div>
+        <div id="tmCases" class="text-sm" aria-live="polite"></div>
+        <div><label class="label" for="tmNote">Begründung <span class="text-dim font-normal normal-case tracking-normal">(optional, für alle Mitarbeiter sichtbar)</span></label><textarea id="tmNote" name="note" rows="3" maxlength="500" class="field"></textarea></div>
+        <label class="check"><input type="checkbox" name="sure" required> Ich bin sicher: Diese Person verliert sofort den Zugang.</label>
+        <div class="form-actions"><button type="submit" class="btn-danger btn-md"><span>Kündigen</span></button></div>
+      </form>`);
+}
+function updateTerminateInfo() {
+  const u = st.personnel?.staff?.find((s) => s.id === Number($('#tmUser')?.value));
+  const box = $('#tmCases');
+  if (!box) return;
+  box.innerHTML = u && u.openCases ? `<div class="banner banner-gold mb-0">${icon('alert')}<div><strong>${u.openCases}</strong> offene ${u.openCases === 1 ? 'Akte' : 'Akten'} ${u.openCases === 1 ? 'ist' : 'sind'} auf ${esc(u.name)} eingetragen – bitte danach neu vergeben.</div></div>` : '';
+}
 /** Vorschau im Beförderungsdialog: „Associate → Senior Associate (Beförderung)“. */
 function updatePromotePreview() {
   const u = st.personnel?.staff?.find((s) => s.id === Number($('#prUser')?.value));
@@ -856,11 +900,15 @@ function updatePromotePreview() {
   }
   const a = RANKS.indexOf(u.rank || '');
   const b = RANKS.indexOf(rank);
-  const kind = u.rank === rank ? null : a >= 0 && b > a ? 'Rückstufung' : a >= 0 || b >= 0 ? 'Beförderung' : 'Rangänderung';
-  box.innerHTML = kind
-    ? `${esc(u.name)}: ${esc(u.rank || 'ohne Rang')} → <strong class="text-gold">${esc(rank)}</strong> ${statusBadge(PERSONNEL_TYPE, kind === 'Rückstufung' ? 'rueckstufung' : 'befoerderung')}`
-    : `${esc(u.name)} hat bereits diesen Rang.`;
-  $('#prSubmit').textContent = kind === 'Rückstufung' ? 'Rang ändern' : 'Befördern';
+  const demoting = !!$('form[data-form="personnel-demote"]');
+  const kind = u.rank === rank ? null : a >= 0 && b > a ? 'Degradierung' : a >= 0 || b >= 0 ? 'Beförderung' : 'Rangänderung';
+  const wrong = demoting && kind !== 'Degradierung';
+  box.innerHTML = !kind
+    ? `${esc(u.name)} hat bereits diesen Rang.`
+    : wrong
+      ? `<span class="text-red-300">${esc(rank)} ist nicht niedriger als ${esc(u.rank || 'der bisherige Rang')} – zum Befördern bitte „Befördern“ nutzen.</span>`
+      : `${esc(u.name)}: ${esc(u.rank || 'ohne Rang')} → <strong class="text-gold">${esc(rank)}</strong> ${statusBadge(PERSONNEL_TYPE, kind === 'Degradierung' ? 'rueckstufung' : 'befoerderung')}`;
+  $('#prSubmit').textContent = demoting ? 'Degradieren' : kind === 'Degradierung' ? 'Rang ändern' : 'Befördern';
 }
 
 /* ---------------------------------------------------------------- Gemeinsam (auch für Mandanten geladen)
