@@ -115,6 +115,7 @@ app.use('/api/task-packages', require('./routes/taskPackages').router); // Aufga
 app.use('/api/cases/:id/requests', require('./routes/docRequests').caseRouter); // fehlende Unterlagen der Akte
 app.use('/api/requests', require('./routes/docRequests').mineRouter);
 app.use('/api/cases/:id/parties', require('./routes/parties').router); // Beteiligte der Akte
+app.use('/api/cases/:id/copilot', require('./routes/copilot').router); // Co-Pilot der Akte (regelbasiert, ohne KI-Dienst)
 app.use('/api/cases/:id/charges', require('./routes/penal').caseRouter); // Anklagepunkte & Strafmaß-Rechner
 app.use('/api/cases/:id/fivenet', externalRoutes.caseRouter); // ältere Adresse, bleibt gültig
 app.use('/api/cases', require('./routes/cases'));
