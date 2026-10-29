@@ -1,6 +1,7 @@
 'use strict';
 /*
- * Co-Pilot der Akte: ein eingebauter, regelbasierter Assistent – ohne KI-Dienst, ohne Fremdanbindung, ohne Kosten.
+ * Eingebauter, regelbasierter Assistent für das Discord-Ticket (ticketAssistant.js) – ohne KI-Dienst, ohne Fremdanbindung, ohne Kosten.
+ * (Der Co-Pilot in der Akte ist entfernt; die Auswertung für die Kanzlei-Sicht ist hier noch vorhanden, wird aber nicht mehr aufgerufen.)
  * Er liest nur, was die Akte ohnehin enthält (dieselbe Antwort wie für die Aktenansicht, also mit denselben Rechten) und
  *  - fasst den Stand zusammen,
  *  - findet Lücken und Risiken (Fristen, überfällige Aufgaben, Zeugen ohne Aussage, Beweise ohne Lager, unbeantwortete
