@@ -942,6 +942,7 @@ async function reloadCase(id, { live = false, by = '' } = {}) {
     replaceModal(caseDetail(data));
     if (draft && $('#modalBody .chat-input')) $('#modalBody .chat-input').value = draft;
     initChat(data);
+    if (before) liveFlash($('#modalBody'), before, by);
     flipPlay(flip);
   }
   refreshBehind();
