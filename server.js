@@ -125,6 +125,7 @@ app.use('/api/gsheets', externalRoutes.gsheetsRouter);
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/penal', require('./routes/penal').router); // Strafkatalog (StGB)
 app.use('/api/wiki', require('./routes/wiki').router); // Kanzlei-Wiki
+app.use('/api/retainers', require('./routes/retainers').router); // Dauermandate (Pauschalen mit automatischer Rechnung)
 app.use('/api/precedents', require('./routes/precedents').router); // Präzedenzfälle (Wiki-Reiter) und „Ähnliche Fälle“
 app.use('/api/snippets', require('./routes/snippets').router); // Textbausteine (Akten-Chat, Notizen)
 app.use('/api/resolutions', require('./routes/resolutions').router); // Board-Beschlüsse
@@ -249,6 +250,12 @@ const reminderTimer = setInterval(() => {
     require('./memberships').sweep().catch((err) => console.warn('VIP-Ablauf fehlgeschlagen:', err.message));
     // Zahlungserinnerung für überfällige Rechnungen (einmal je Rechnung)
     require('./paymentReminders').sweep().catch((err) => console.warn('Zahlungserinnerungen fehlgeschlagen:', err.message));
+    // Dauermandate: fällige Zeiträume abrechnen
+    try {
+      require('./retainers').sweep();
+    } catch (err) {
+      console.warn('Dauermandate fehlgeschlagen:', err.message);
+    }
     // Fehlende Unterlagen: Mandant nach 3 Tagen einmal erinnern
     require('./docRequests').sweep().catch((err) => console.warn('Erinnerung an fehlende Unterlagen fehlgeschlagen:', err.message));
     // Liegengebliebene Akten: zuständigen Anwalt einmal je Ruhephase erinnern
