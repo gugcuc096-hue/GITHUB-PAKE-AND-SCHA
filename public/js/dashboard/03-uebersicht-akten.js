@@ -926,16 +926,18 @@ async function openCase(id) {
   copilotInit(id);
   animateTrack($('#modalBody .track'));
 }
-async function reloadCase(id) {
+async function reloadCase(id, { live = false, by = '' } = {}) {
   const data = await api.get(caseUrl(id));
   rememberCase(data);
   if (st.modalCaseId === id) {
     // Angefangene Nachricht und Chat-Position bleiben beim Neuzeichnen erhalten
     const draft = $('#modalBody .chat-input')?.value || '';
+    const before = live ? liveSnap($('#modalBody')) : null; // Live-Änderung eines Kollegen: Geändertes leuchtet kurz auf
     replaceModal(caseDetail(data));
     if (draft && $('#modalBody .chat-input')) $('#modalBody .chat-input').value = draft;
     initChat(data);
     copilotInit(id);
+    if (before) liveFlash($('#modalBody'), before, by);
   }
   refreshBehind();
 }

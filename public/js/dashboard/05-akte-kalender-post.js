@@ -412,7 +412,7 @@ async function setCasePriority(sel) {
   };
   show(priority);
   try {
-    await api.patch('/api/cases/' + id, { priority });
+    await casePatch(id, { priority }, { priority: was });
   } catch (err) {
     sel.value = sel.dataset.value;
     if (box.isConnected) show(Number(sel.dataset.value));
@@ -436,7 +436,7 @@ async function setCaseStatus(sel) {
   const undo = previewStage(v);
   const was = sel.dataset.value;
   try {
-    await api.patch('/api/cases/' + id, v.startsWith('step:') ? { status: 'in_bearbeitung', step: Number(v.slice(5)) } : { status: v });
+    await casePatch(id, v.startsWith('step:') ? { status: 'in_bearbeitung', step: Number(v.slice(5)) } : { status: v });
   } catch (err) {
     undo();
     throw notSaved(err);

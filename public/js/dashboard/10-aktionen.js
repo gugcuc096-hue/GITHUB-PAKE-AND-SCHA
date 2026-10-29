@@ -121,7 +121,7 @@ const actions = {
     const undo = previewStage(`step:${step}`); // Kreise springen sofort um
     const was = st.caseInfo && st.caseInfo.id === id ? st.caseInfo.step : null;
     try {
-      await api.patch('/api/cases/' + id, { step });
+      await casePatch(id, { step });
     } catch (err) {
       undo();
       throw notSaved(err);
@@ -1617,7 +1617,7 @@ const actions = {
     show(done);
     el.disabled = true;
     try {
-      await api.patch('/api/tasks/' + el.dataset.id, { done });
+      await guardedPatch('/api/tasks/' + el.dataset.id, { done }, { done: !done }, { reload: afterTaskChange });
     } catch (err) {
       if (el.isConnected) show(!done);
       throw notSaved(err);

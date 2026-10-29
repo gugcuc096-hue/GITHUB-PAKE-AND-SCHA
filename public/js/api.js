@@ -72,7 +72,7 @@
     try { data = await res.json(); } catch { /* leere Antwort */ }
     if (!res.ok) {
       // fields: Hinweise je Feld (Name → Text), damit das Formular sie direkt am Feld zeigen kann
-      throw Object.assign(new Error((data && data.error) || `Fehler ${res.status}`), { status: res.status, fields: (data && data.fields) || null });
+      throw Object.assign(new Error((data && data.error) || `Fehler ${res.status}`), { status: res.status, fields: (data && data.fields) || null, conflict: (data && data.conflict) || null });
     }
     // Erfolgreiche Änderung: Vorgeladenes (z. B. Akten beim Drüberfahren) ist damit veraltet
     if (method !== 'GET') document.dispatchEvent(new CustomEvent('ps:changed', { detail: { method, url } }));

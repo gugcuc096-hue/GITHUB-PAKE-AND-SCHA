@@ -144,6 +144,9 @@ router.patch(
     if (!t) return res.status(404).json({ error: 'Aufgabe nicht gefunden.' });
     const d = parseBody(updateSchema, req, res);
     if (!d) return;
+    // Gleichzeitiges Bearbeiten (siehe helpers.editConflicts): 409, wenn jemand die Aufgabe inzwischen anders geändert hat
+    const clash = require('../helpers').editConflicts(req.body && req.body.expect, d, { title: t.title, note: t.note, dueDate: t.due_date || '', assignedTo: t.assigned_to, done: !!t.done });
+    if (clash.length) return res.status(409).json({ error: 'Jemand hat diese Aufgabe inzwischen geändert.', conflict: clash });
 
     const sets = [];
     const values = [];

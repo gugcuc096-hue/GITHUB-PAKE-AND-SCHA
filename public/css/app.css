@@ -2616,3 +2616,9 @@ body.hint-edit .form-hint[data-hint-key]:hover { background: rgba(212, 175, 55, 
 .sys-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .sys-chip { padding: 0.2rem 0.6rem; border: 1px solid var(--line); border-radius: 999px; font-size: 0.82rem; color: var(--text-dim); }
 .sys-chip strong { color: var(--ink, #f1f5f9); }
+/* Live-Aktualisierung: Geändertes leuchtet kurz auf; Konflikt-Hinweis „Jemand war schneller“ nutzt den Bestätigungsdialog */
+@keyframes live-flash { 0% { background-color: rgba(212, 175, 55, 0.32); box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.55); } 100% { background-color: transparent; box-shadow: 0 0 0 2px rgba(212, 175, 55, 0); } }
+.live-flash { animation: live-flash 2.2s ease-out; border-radius: 10px; }
+.live-flash-static { outline: 2px solid rgba(212, 175, 55, 0.7); outline-offset: 2px; border-radius: 10px; }
+.live-by { margin: 0 0 0.5rem; padding: 0.3rem 0.7rem; width: fit-content; border: 1px solid var(--gold-hairline); border-radius: 999px; font-size: 0.8rem; color: var(--gold-light); background: rgba(212, 175, 55, 0.1); animation: live-by-in 0.3s ease-out; }
+@keyframes live-by-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }

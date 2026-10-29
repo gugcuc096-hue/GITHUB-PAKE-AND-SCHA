@@ -804,7 +804,8 @@ const forms = {
       assignedTo: val(fd, 'assignedTo') ? Number(val(fd, 'assignedTo')) : null,
     };
     if (id) {
-      await api.patch('/api/tasks/' + id, body);
+      const t = findTask(id);
+      await guardedPatch('/api/tasks/' + id, body, t ? { title: t.title, note: t.note, dueDate: t.dueDate || null, assignedTo: t.assignedTo } : undefined, { reload: afterTaskChange });
     } else {
       if (val(fd, 'caseId')) body.caseId = Number(val(fd, 'caseId'));
       await api.post('/api/tasks', body);

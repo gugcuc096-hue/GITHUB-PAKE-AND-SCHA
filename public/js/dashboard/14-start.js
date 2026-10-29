@@ -420,7 +420,7 @@ function ieOpen(el) {
     const id = Number(el.dataset.id);
     const key = el.dataset.ie;
     try {
-      await api.patch('/api/cases/' + id, { [key]: next });
+      await casePatch(id, { [key]: next }, { [key]: old });
     } catch (err) {
       el.classList.remove('is-saving');
       toast(err.message || 'Nicht gespeichert.', 'error');
@@ -849,7 +849,7 @@ const LIVE_VIEWS = {
   resolutions: ['resolutions'],
   storage: ['lager'],
 };
-const live = { es: null, ok: false, down: false, timers: new Map(), pendingView: false, pendingCase: null };
+const live = { es: null, ok: false, down: false, timers: new Map(), pendingView: false, pendingCase: null, flash: false };
 function liveLater(key, fn, ms = 300) {
   clearTimeout(live.timers.get(key));
   live.timers.set(key, setTimeout(() => (live.timers.delete(key), fn()), ms));
@@ -866,6 +866,7 @@ function liveView() {
     return;
   }
   live.pendingView = false;
+  live.flash = true; // Geändertes in der Liste leuchtet nach dem Neuzeichnen kurz auf (siehe refreshBehind, 12-live.js)
   refreshBehind();
 }
 // Akte vorladen beim Drüberfahren (kurz verweilen) bzw. sofort beim Antippen
@@ -956,7 +957,7 @@ function liveCase(ev) {
   if (open) pollChat(); // neue Nachrichten anhängen – stört auch beim Tippen nicht
   if (open && !ev.chat) {
     if (document.body.classList.contains('ps-dialog-open') || liveBusy($('#modalBody'))) live.pendingCase = ev.id;
-    else reloadCase(ev.id).catch(() => {}); // zeichnet auch die Seite dahinter neu
+    else reloadCase(ev.id, { live: true, by: ev.by }).catch(() => {}); // zeichnet auch die Seite dahinter neu
   }
   if (!open && LIVE_VIEWS.cases.includes(st.view)) liveView();
   liveLater('badges', refreshBadges, 800);

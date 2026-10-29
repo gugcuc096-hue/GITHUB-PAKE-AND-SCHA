@@ -286,7 +286,25 @@ function firmLocalFrom(text) {
     .replace(/[._-]+$/, '');
 }
 
+
+/**
+ * Gleichzeitiges Bearbeiten: expect = Werte, die der Client zuletzt sah; data = die Änderung; current = aktuelle Werte.
+ * Ein Feld ist ein Konflikt, wenn es in der Änderung steckt, inzwischen anders ist als erwartet und nicht schon auf den
+ * neuen Wert steht. Liefert [{ field, current }] (leer = alles in Ordnung bzw. kein „expect“ geschickt).
+ */
+function editConflicts(expect, data, current) {
+  if (!expect || typeof expect !== 'object' || Array.isArray(expect)) return [];
+  const same = (a, b) => String(a ?? '') === String(b ?? '');
+  const out = [];
+  for (const field of Object.keys(expect)) {
+    if (!(field in current) || data[field] === undefined) continue;
+    if (!same(current[field], expect[field]) && !same(current[field], data[field])) out.push({ field, current: current[field] ?? null });
+  }
+  return out;
+}
+
 module.exports = {
+  editConflicts,
   EMAIL_DOMAIN,
   EMAIL_HINT,
   firmEmail,
