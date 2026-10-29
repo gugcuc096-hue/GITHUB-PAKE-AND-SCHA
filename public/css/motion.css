@@ -73,13 +73,14 @@ select.field:focus { background-size: auto; }
 .task-row, .req-row, .party-row, .list-row, .tl-item { transition: background-color var(--m-micro) ease, opacity var(--m-panel) ease, transform var(--m-panel) var(--m-ease); }
 
 /* ---------------------------------------------------------------- 10. Seitenwechsel mit Richtung, gleitender Menü-Indikator */
-/* Seitlich nur ab Tablet-Breite: am Handy würde das Hineingleiten die Seite kurz breiter machen */
+/* Seitenwechsel blendet nur ein: die Seite „flog“ vorher 26 px von der Seite herein, und die Überschrift wirkte dabei
+   gegenüber dem Rest verschoben (Rückmeldung: „fliegt komisch rein“). Die Richtung (data-dir) bleibt für die Tests erhalten. */
 @media (min-width: 768px) {
   #content.view-in[data-dir="fwd"] > * { animation-name: ps-page-fwd; animation-duration: var(--m-page); }
   #content.view-in[data-dir="back"] > * { animation-name: ps-page-back; animation-duration: var(--m-page); }
 }
-@keyframes ps-page-fwd { from { opacity: 0; transform: translateX(26px); } to { opacity: 1; transform: none; } }
-@keyframes ps-page-back { from { opacity: 0; transform: translateX(-26px); } to { opacity: 1; transform: none; } }
+@keyframes ps-page-fwd { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ps-page-back { from { opacity: 0; } to { opacity: 1; } }
 .nav { position: relative; }
 .nav-ind { position: absolute; z-index: 0; left: 0; top: 0; width: 3px; height: 24px; border-radius: 3px; background: linear-gradient(180deg, var(--gold-light, #f3e5ab), var(--gold-500, #d4af37)); box-shadow: 0 0 12px rgba(212, 175, 55, 0.55); pointer-events: none; transition: transform var(--m-panel) var(--m-ease), height var(--m-panel) var(--m-ease), opacity var(--m-micro) ease; }
 .nav-ind.is-hidden { opacity: 0; }

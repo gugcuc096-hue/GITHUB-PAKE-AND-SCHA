@@ -204,4 +204,35 @@ describe('Ziehen im Kalender und Abhaken (Browser)', { skip: chromium ? false : 
       await ctx.close();
     }
   });
+  it('PC: Seitenwechsel im Menü blendet die Seite nur ein – nichts fliegt von der Seite herein', async () => {
+    const ctx = await browser.newContext({ viewport: { width: 1366, height: 900 }, locale: 'de-DE' });
+    const page = await ctx.newPage();
+    try {
+      await login(page);
+      await page.waitForSelector('#nav a.nav-item[href="#invoices"]');
+      const moved = await page.evaluate(
+        () =>
+          new Promise((resolve) => {
+            const seen = [];
+            const t0 = performance.now();
+            const tick = () => {
+              for (const el of document.querySelectorAll('#content, #content > *')) {
+                for (const a of el.getAnimations()) {
+                  const kf = a.effect && a.effect.getKeyframes ? a.effect.getKeyframes() : [];
+                  if (kf.some((k) => k.transform && k.transform !== 'none')) seen.push(a.animationName || 'waapi');
+                }
+              }
+              if (performance.now() - t0 < 700) requestAnimationFrame(tick);
+              else resolve(seen);
+            };
+            document.querySelector('#nav a.nav-item[href="#invoices"]').click();
+            tick();
+          })
+      );
+      assert.deepEqual(moved, [], 'keine Bewegungs-Animation beim Seitenwechsel');
+      await page.waitForSelector('#content .page-title');
+    } finally {
+      await ctx.close();
+    }
+  });
 });

@@ -409,7 +409,7 @@ function rankSelect(name, current, { id = '', required = false, emptyLabel = '�
 
 /* ---------------------------------------------------------------- Zuständige Anwälte (mehrere pro Akte) */
 /** Federführender Anwalt zuerst, dann die weiteren. */
-const caseTeam = (c) => [...(c.lawyerId ? [{ id: c.lawyerId, name: c.lawyerName || '—', lead: true }] : []), ...(c.coLawyers || []).map((l) => ({ ...l, lead: false }))];
+const caseTeam = (c) => [...(c.lawyerId ? [{ id: c.lawyerId, name: c.lawyerName || '—', avatarUrl: c.lawyerAvatarUrl || null, lead: true }] : []), ...(c.coLawyers || []).map((l) => ({ ...l, lead: false }))];
 /** Arbeitet der Benutzer an der Akte mit (federführend oder als weiterer Anwalt)? */
 const onCase = (c, uid = st.user.id) => c.lawyerId === uid || (c.coLawyers || []).some((l) => l.id === uid);
 // Dienststatus der zuständigen Anwälte in der Akte (c.lawyerDuty: { Anwalts-ID: Status }) – „Außer Dienst“ steht nicht da
@@ -446,7 +446,7 @@ function whoHtml(c, { duty = false } = {}) {
   if (!team.length) return '<span class="badge badge-amber">Unbesetzt</span>';
   const lead = team[0];
   const s = duty ? (c.lawyerDuty || {})[lead.id] : null;
-  return `<span class="who2" title="${esc(team.map((l) => l.name).join(', '))}"><span class="who2-av" aria-hidden="true">${esc(initials(lead.name))}</span><span class="who2-name">${esc(firstName(lead.name))}</span>${team.length > 1 ? `<span class="who2-more">+${team.length - 1}</span>` : ''}${DUTY_SHORT[s] ? `<span class="duty-tag s-${s}"><span class="duty-dot s-${s}"></span>${DUTY_SHORT[s]}</span>` : ''}</span>`;
+  return `<span class="who2" title="${esc(team.map((l) => l.name).join(', '))}"><span class="who2-av" aria-hidden="true">${avatarImg(lead.avatarUrl, lead.name)}</span><span class="who2-name">${esc(firstName(lead.name))}</span>${team.length > 1 ? `<span class="who2-more">+${team.length - 1}</span>` : ''}${DUTY_SHORT[s] ? `<span class="duty-tag s-${s}"><span class="duty-dot s-${s}"></span>${DUTY_SHORT[s]}</span>` : ''}</span>`;
 }
 
 /**
@@ -544,8 +544,17 @@ function initials(name) {
   return ((words[0]?.[0] || '') + (words.length > 1 ? words[words.length - 1][0] : '')).toUpperCase() || '?';
 }
 function avatarImg(url, name) {
-  return url ? `<img src="${esc(url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : esc(initials(name));
+  return url ? `<img src="${esc(url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-ini="${esc(initials(name))}">` : esc(initials(name));
 }
+// Fehlt ein Profilbild (Datei gelöscht, Discord-Bild geändert, kein Netz), erscheinen die Initialen statt eines kaputten Bild-Symbols
+document.addEventListener(
+  'error',
+  (e) => {
+    const img = e.target;
+    if (img && img.tagName === 'IMG' && img.dataset && img.dataset.ini) img.replaceWith(document.createTextNode(img.dataset.ini));
+  },
+  true
+);
 function avatarInner(u) {
   return avatarImg(u?.avatarUrl, u?.displayName);
 }

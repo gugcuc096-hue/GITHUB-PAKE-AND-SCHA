@@ -15,7 +15,7 @@
 const express = require('express');
 const { z } = require('zod');
 const { db } = require('../db');
-const { requireAuth, isStaff } = require('../auth');
+const { requireAuth, isStaff, userAvatarUrl } = require('../auth');
 const { wrap, parseBody, isBoard, truncate } = require('../helpers');
 const { CASE_SELECT, caseRow, INVOICE_SELECT, invoiceRow, logActivity } = require('../models');
 
@@ -33,7 +33,7 @@ const nameKey = (name) => `n:${norm(name)}`;
 function accounts() {
   const rows = db
     .prepare(
-      `SELECT id, display_name, email, phone, discord_id, discord_username, role, active, created_at FROM users
+      `SELECT id, display_name, email, phone, discord_id, discord_username, avatar, discord_avatar, role, active, created_at FROM users
         WHERE role = 'mandant' OR id IN (SELECT client_id FROM cases WHERE client_id IS NOT NULL)
            OR id IN (SELECT client_user_id FROM invoices WHERE client_user_id IS NOT NULL)`
     )
@@ -183,8 +183,8 @@ const inList = (ids) => ids.map(() => '?').join(',');
 /* ---------------------------------------------------------------- Liste */
 router.get('/', (req, res) => {
   const { index } = buildIndex();
-  const cases = new Map(db.prepare('SELECT id, status, updated_at FROM cases').all().map((c) => [c.id, c]));
-  const invoices = new Map(db.prepare('SELECT id, status, total, created_at, paid_at FROM invoices').all().map((i) => [i.id, i]));
+  const cases = new Map(db.prepare('SELECT id, status, created_at, updated_at FROM cases').all().map((c) => [c.id, c]));
+  const invoices = new Map(db.prepare('SELECT id, status, total, due_date, created_at, paid_at FROM invoices').all().map((i) => [i.id, i]));
   const flags = new Map(db.prepare('SELECT * FROM client_flags').all().map((f) => [f.client_key, f]));
   const memberships = new Map(
     db
@@ -202,8 +202,13 @@ router.get('/', (req, res) => {
     const dates = [e.account && e.account.created_at, ...cs.map((c) => c.updated_at), ...inv.map((i) => i.paid_at || i.created_at)].filter(Boolean);
     const f = aliasKeys(e).map((k) => flags.get(k)).find(Boolean);
     const m = e.userId ? memberships.get(e.userId) : null;
+    const today = new Date().toISOString().slice(0, 10);
+    const overdue = open.filter((i) => i.due_date && String(i.due_date).slice(0, 10) < today);
+    const oldest = open.map((i) => i.created_at).filter(Boolean).sort()[0];
+    const since = [e.account && e.account.created_at, ...cs.map((c) => c.created_at)].filter(Boolean).sort()[0];
     return {
       key: e.key,
+      avatarUrl: e.account ? userAvatarUrl(e.account) : null,
       name: (e.account && e.account.display_name) || e.name || '—',
       email: e.account ? e.account.email : null,
       hasAccount: !!e.userId,
@@ -211,6 +216,9 @@ router.get('/', (req, res) => {
       casesTotal: cs.length,
       openSum: open.reduce((s, i) => s + i.total, 0),
       openCount: open.length,
+      overdueCount: overdue.length,
+      openOldestDays: oldest ? Math.max(0, Math.floor((Date.now() - new Date(oldest).getTime()) / 864e5)) : null,
+      isNew: !!since && Date.now() - new Date(since).getTime() < 14 * 864e5,
       membership: m ? { name: m.tier_name, kind: m.kind } : null,
       flag: f ? { flag: f.flag, label: FLAGS[f.flag] } : null,
       lastActivity: dates.sort().pop() || null,

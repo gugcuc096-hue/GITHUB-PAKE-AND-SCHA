@@ -411,6 +411,8 @@ a:hover > .brand-logo { transform: scale(1.04); }
   font-family: var(--font-display); font-weight: 700; font-size: 0.95rem;
 }
 .avatar img { width: 100%; height: 100%; object-fit: cover; }
+.avatar.is-vip { box-shadow: 0 0 0 2px var(--navy-950, #050a18), 0 0 0 3.5px var(--gold-500); }
+.badge-money { font-family: var(--font-mono, ui-monospace, monospace); font-weight: 600; font-size: 0.8rem; }
 .avatar.lg { width: 64px; height: 64px; font-size: 1.4rem; }
 .avatar.xl { width: 84px; height: 84px; font-size: 1.8rem; }
 .avatar.slate { background: linear-gradient(135deg, #334155, #1e293b); color: #fff; }
@@ -2339,6 +2341,7 @@ tr:not(:hover) .star-btn:not(.on) { opacity: 0.25; }
 /* ---------------------------------------------------------------- Akte neu geordnet: Kopf, Details, Beteiligte, Phasen */
 /* Zuständige kompakt (Liste, Statuszeile): Kreis mit Initialen, Rufname, „+2“ */
 .who2 { display: inline-flex; align-items: center; gap: 0.45rem; min-width: 0; }
+.who2-av img { display: block; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
 .who2-av { position: relative; flex: none; display: inline-grid; place-items: center; width: 1.7rem; height: 1.7rem; border-radius: 50%; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.02em; color: #1a1305; background: linear-gradient(145deg, #e8c860, #b8962e); }
 .who2-av .duty-dot { position: absolute; right: -2px; bottom: -2px; width: 0.55rem; height: 0.55rem; border: 2px solid #0b1226; }
 .who2-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
