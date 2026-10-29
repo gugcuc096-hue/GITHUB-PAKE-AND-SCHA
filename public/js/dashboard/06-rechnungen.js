@@ -696,6 +696,21 @@ const CLIENT_FILTERS = [
   ['vip', 'VIP & Lifetime', (c) => !!c.membership],
 ];
 const clientFlagBadge = (f) => (f ? badge(f.label, CLIENT_FLAG_TONE[f.flag] || 'amber') : '');
+/** Offene Summe als Chip: rot bei Überfälligem, sonst bernsteinfarben; der Hinweistext nennt Anzahl und Alter. */
+function openSumChip(c) {
+  if (!c.openSum) return '<span class="text-dim">—</span>';
+  const tip = `${c.openCount} offen${c.overdueCount ? `, davon ${c.overdueCount} überfällig` : ''}${c.openOldestDays != null ? ` · älteste seit ${c.openOldestDays === 0 ? 'heute' : c.openOldestDays === 1 ? '1 Tag' : `${c.openOldestDays} Tagen`}` : ''}`;
+  return `<span class="badge badge-${c.overdueCount ? 'red' : 'amber'} badge-money" title="${esc(tip)}">${money(c.openSum)}</span>`;
+}
+/** Hinweise je Mandant: Vermerk, VIP/Lifetime, Überfälliges, neuer Mandant, Stammmandant – leer nur, wenn nichts auffällt. */
+function clientHints(c) {
+  const out = [clientFlagBadge(c.flag), memberBadge(c.membership)];
+  if (c.overdueCount) out.push(badge(`${c.overdueCount} überfällig`, 'red'));
+  if (c.isNew) out.push(badge('Neu', 'emerald'));
+  if (c.casesTotal >= 3) out.push(badge('Stammmandant', 'sky'));
+  const html = out.filter(Boolean).join('');
+  return html ? `<div class="flex flex-wrap gap-1.5">${html}</div>` : '<span class="text-dim">—</span>';
+}
 /** Link zur Kartei – z. B. der Name des Mandanten in der Akte oder in der Rechnungsliste. */
 const clientLink = (key, name, cls = '') => `<button type="button" class="link-btn client-link${cls ? ` ${cls}` : ''}" data-action="open-client" data-key="${esc(key)}" title="Mandantenkartei öffnen">${esc(name)}</button>`;
 
@@ -713,10 +728,10 @@ function clientTable() {
       <tbody>${lazyRows(
         rows,
         (c) => `<tr class="row" data-action="open-client" data-key="${esc(c.key)}">
-          <td class="td-main"><div class="font-medium">${esc(c.name)}</div><div class="text-xs text-dim">${c.hasAccount ? esc(c.email) : 'ohne Konto'}</div></td>
+          <td class="td-main"><div class="flex items-center gap-3"><span class="avatar sm${c.hasAccount ? '' : ' slate'}${c.membership ? ' is-vip' : ''}">${avatarImg(c.avatarUrl, c.name)}</span><div class="min-w-0"><div class="font-medium">${esc(c.name)}</div><div class="text-xs text-dim">${c.hasAccount ? esc(c.email) : 'ohne Konto'}</div></div></div></td>
           <td data-label="Akten"><span>${c.casesTotal ? `${c.casesOpen} laufend <span class="text-dim">· ${c.casesTotal} gesamt</span>` : '<span class="text-dim">keine</span>'}</span></td>
-          <td data-label="Offene Rechnungen" class="nowrap" style="text-align:right">${c.openSum ? `<span class="font-mono">${money(c.openSum)}</span>` : '<span class="text-dim">—</span>'}</td>
-          <td data-label="Hinweise">${c.flag || c.membership ? `<div class="flex flex-wrap gap-1.5">${clientFlagBadge(c.flag)}${memberBadge(c.membership)}</div>` : '<span class="text-dim">—</span>'}</td>
+          <td data-label="Offene Rechnungen" class="nowrap" style="text-align:right">${openSumChip(c)}</td>
+          <td data-label="Hinweise">${clientHints(c)}</td>
           <td data-label="Letzte Aktivität" class="nowrap text-muted">${esc(relDays(c.lastActivity))}</td></tr>`,
         5
       )}</tbody></table></div>`;

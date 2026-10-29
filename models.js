@@ -40,10 +40,10 @@ const parseJson = (v) => {
 const CASE_SELECT = `
   SELECT c.*,
          cu.display_name AS client_account_name, cu.email AS client_email, cu.phone AS client_account_phone, cu.discord_username AS client_discord,
-         lu.display_name AS lawyer_name, lu.discord_id AS lawyer_discord_id,
+         lu.display_name AS lawyer_name, lu.discord_id AS lawyer_discord_id, lu.avatar AS lawyer_avatar, lu.discord_avatar AS lawyer_discord_avatar,
          (SELECT group_concat(e.external_id, ' ') FROM case_external_docs e WHERE e.case_id = c.id) AS external_doc_ids,
-         (SELECT json_group_array(json_object('id', x.id, 'name', x.display_name, 'discordId', x.discord_id))
-            FROM (SELECT u2.id, u2.display_name, u2.discord_id FROM case_lawyers cl JOIN users u2 ON u2.id = cl.user_id
+         (SELECT json_group_array(json_object('id', x.id, 'name', x.display_name, 'discordId', x.discord_id, 'avatar', x.avatar, 'discordAvatar', x.discord_avatar))
+            FROM (SELECT u2.id, u2.display_name, u2.discord_id, u2.avatar, u2.discord_avatar FROM case_lawyers cl JOIN users u2 ON u2.id = cl.user_id
                   WHERE cl.case_id = c.id ORDER BY cl.added_at, u2.id) x) AS co_lawyers_json,
          -- VIP / Perma-Mandat des Mandanten (aktive Mitgliedschaft)
          (SELECT json_object('id', m.id, 'name', m.tier_name, 'kind', m.kind, 'discountPct', m.discount_pct, 'expiresAt', m.expires_at)
@@ -163,8 +163,10 @@ function caseRow(c, u) {
     courtRef: c.court_ref,
     lawyerId: c.lawyer_id,
     lawyerName: c.lawyer_name || null,
+    // Profilfoto (eigenes, sonst Discord) – die Spalte „Zuständig“ zeigt es statt der Initialen
+    lawyerAvatarUrl: c.lawyer_id ? userAvatarUrl({ avatar: c.lawyer_avatar, discord_id: c.lawyer_discord_id, discord_avatar: c.lawyer_discord_avatar }) : null,
     // Weitere zuständige Anwälte (Mitbearbeitung)
-    coLawyers: coLawyersOf(c).map((l) => ({ id: l.id, name: l.name })),
+    coLawyers: coLawyersOf(c).map((l) => ({ id: l.id, name: l.name, avatarUrl: userAvatarUrl({ avatar: l.avatar, discord_id: l.discordId, discord_avatar: l.discordAvatar }) })),
     status: c.status,
     statusLabel: CASE_STATUS[c.status] || c.status,
     step: c.step,
