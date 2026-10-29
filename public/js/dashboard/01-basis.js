@@ -213,6 +213,7 @@ const VIEWS = {
   wiki: { label: 'Kanzlei-Wiki', short: 'Wiki', icon: 'book', staff: true, section: 'Kanzlei' },
   concerns: { label: 'Anliegen ans Board', short: 'Anliegen', icon: 'chat', section: 'Kanzlei', staffSection: true },
   duty: { label: 'Dienstzeiten', icon: 'clock', staff: true, section: 'Kanzlei' },
+  feedback: { label: '360°-Feedback', short: 'Feedback', icon: 'users', staff: true, section: 'Kanzlei' },
   lager: { label: 'Kanzlei-Lager', short: 'Lager', icon: 'box', staff: true, section: 'Kanzlei' },
   personnel: { label: 'Beförderungen & Einstellungen', short: 'Personal', icon: 'star', staff: true, section: 'Kanzlei' },
   // Board: eigene und eingegangene Anliegen sind ein Menüpunkt „Anliegen“ (Reiter „Eingang“ / „Meine Anliegen“)
