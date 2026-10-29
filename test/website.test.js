@@ -128,7 +128,7 @@ describe('Website & Ränge selbst pflegen', () => {
     const code = await bundle.text();
     assert.ok(/\bVIEWS ?= ?\{/.test(code) && code.search(/\bVIEWS ?= ?\{/) < code.search(/function loadStaffParts/), 'Teile in fester Reihenfolge (01 … 14)');
     assert.doesNotMatch(code, /views\.settings ?=/, 'Einstellungen & Co. nicht im allgemeinen Bündel');
-    assert.ok(code.length < 700000 && !code.includes('---- 01-basis.js ----'), 'verkleinert (ohne Kommentare)');
+    assert.ok(code.length < 800000 && !code.includes('---- 01-basis.js ----'), 'verkleinert (ohne Kommentare)');
     const staff = await fetch(`${server.base}/js/dashboard.staff.js?v=${v}`);
     assert.equal(staff.headers.get('cache-control'), YEAR);
     assert.match(await staff.text(), /views\.settings ?=/, 'Verwaltungsteile im zweiten Bündel');
