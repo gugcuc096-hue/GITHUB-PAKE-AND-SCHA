@@ -370,6 +370,9 @@ function apptRow(a, u) {
     slots: a.status === 'angefragt' ? parseSlots(a.slots) : [],
     proposal: a.status === 'angefragt' && parseSlots(a.slots).length > 1,
     clientResponse: a.client_response || null, // Zusage per Discord-Knopf: zugesagt | passt_nicht
+    // Kollegen, die zu diesem Gespräch/Termin eingeladen sind, und die eigene Antwort darauf (nur Kanzlei)
+    invites: staff ? require('./appointmentInvites').list(a.id) : undefined,
+    myInvite: staff ? require('./appointmentInvites').mine(a.id, u.id) : undefined,
     createdAt: a.created_at,
   };
 }

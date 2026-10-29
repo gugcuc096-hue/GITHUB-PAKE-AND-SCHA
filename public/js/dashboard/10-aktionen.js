@@ -297,6 +297,15 @@ const actions = {
     }
   },
   'open-event': (el) => openEvent(Number(el.dataset.id), st.modalCaseId),
+  'invite-respond': async (el) => {
+    const id = Number(el.dataset.id);
+    await api.patch(`/api/calendar/${id}/invite`, { status: el.dataset.status });
+    toast(el.dataset.status === 'zugesagt' ? 'Zugesagt – danke!' : 'Abgesagt – die Einladenden sehen es.');
+    await load.events();
+    // Ist der Termin gerade geöffnet, zeigt er die neue Antwort
+    if ($(`#modalBody form[data-form="event"][data-id="${id}"]`) && st.eventCache.get(id)) replaceModal(eventForm(st.eventCache.get(id)));
+    renderView();
+  },
   'event-status': async (el) => {
     await api.patch('/api/calendar/' + el.dataset.id, { status: el.dataset.status });
     toast({ bestaetigt: 'Termin bestätigt.', abgesagt: 'Termin abgesagt.', erledigt: 'Frist als erledigt markiert.' }[el.dataset.status] || 'Gespeichert.');
@@ -1420,6 +1429,8 @@ const actions = {
   },
   // Beförderungen & Einstellungen
   'personnel-promote': () => promoteModal(),
+  'personnel-demote': () => demoteModal(),
+  'personnel-terminate': () => terminateModal(),
   'personnel-delete': async (el) => {
     if (!(await ask('Der Eintrag verschwindet aus dem Protokoll. Der aktuelle Rang bleibt unverändert.', { title: 'Eintrag entfernen?', confirmText: 'Entfernen', danger: true }))) return;
     await api.del('/api/personnel/' + el.dataset.id);
@@ -1764,7 +1775,11 @@ const actions = {
   },
   'app-hire': async (el) => {
     const data = await api.get('/api/admin/applications/' + el.dataset.id);
-    hireModal(data.application);
+    hireModal(data.application, data.existingUser && data.existingUser.role === 'mandant' ? data.existingUser : null);
+  },
+  'app-hire-new': async (el) => {
+    const data = await api.get('/api/admin/applications/' + el.dataset.id);
+    hireModal({ ...data.application, __newAccount: true }, null);
   },
   'app-delete': async (el) => {
     if (!(await askDelete(`Bewerbung ${el.dataset.number} löschen?`, 'Die Bewerbung und alle Notizen dazu werden endgültig gelöscht.', 'Endgültig löschen'))) return;

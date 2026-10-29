@@ -1,13 +1,14 @@
 'use strict';
 /*
- * Personalprotokoll: Beförderungen und Einstellungen – für alle Mitarbeiter sichtbar.
+ * Personalprotokoll: Einstellungen, Beförderungen, Degradierungen und Kündigungen – für alle Mitarbeiter sichtbar.
  *
  * Einträge entstehen automatisch:
  *  - Einstellung: Bewerber eingestellt, Mitarbeiterkonto angelegt, Mandantenkonto zum Mitarbeiter gemacht
- *  - Beförderung / Rückstufung / Rangänderung: „Befördern“ hier (nur Board of Partners) sowie
+ *  - Beförderung / Degradierung / Rangänderung: „Befördern“ und „Degradieren“ hier (nur Board of Partners) sowie
  *    Rangänderungen unter Benutzer bzw. Team (beides ebenfalls nur Board of Partners)
+ *  - Kündigung: „Kündigen“ hier (nur Board of Partners): das Konto wird gesperrt, das Team-Profil von der Website genommen
  *
- * Befördern darf nur das Board of Partners. Niemand ändert seinen eigenen Rang; Partner ohne
+ * Befördern, Degradieren und Kündigen darf nur das Board of Partners. Niemand ändert seinen eigenen Rang; Partner ohne
  * Board-Rolle (admin) befördern höchstens bis zum eigenen Rang und nur Kollegen unterhalb ihres Rangs.
  *
  * Discord: „personnel.changed“ – z. B. in einen eigenen Kanal „#beförderungen“.
@@ -15,13 +16,14 @@
 const express = require('express');
 const { z } = require('zod');
 const { db, tx } = require('../db');
-const { requireAuth, requireStaff, userAvatarUrl } = require('../auth');
+const { requireAuth, requireStaff, userAvatarUrl, destroyAllSessions } = require('../auth');
 const { wrap, parseBody, idParam, isBoard, RANKS, rankEnum, BOARD_RANKS, RANK_ORDER_SQL, truncate } = require('../helpers');
 const { logActivity } = require('../models');
 const discord = require('../discord');
 const tickets = require('../tickets');
 
-const TYPES = { einstellung: 'Einstellung', befoerderung: 'Beförderung', rueckstufung: 'Rückstufung', rangaenderung: 'Rangänderung' };
+const TYPES = { einstellung: 'Einstellung', befoerderung: 'Beförderung', rueckstufung: 'Degradierung', rangaenderung: 'Rangänderung', kuendigung: 'Kündigung' };
+const RED = 0xef4444;
 const SLATE = 0x64748b;
 const rankIndex = (r) => RANKS.indexOf(r || '');
 
@@ -44,10 +46,19 @@ function announce(e) {
     title = `👋 Neu im Team: ${e.name}`;
     description = `${e.name} verstärkt ab sofort Pake & Scha Legal Consulting${e.newRank ? ` als **${e.newRank}**` : ''}. Herzlich willkommen!`;
     fields.push({ name: 'Rang', value: e.newRank || '—' }, { name: 'Eingestellt von', value: e.byName || 'System' });
+  } else if (e.type === 'kuendigung') {
+    title = `Abschied: ${e.name}`;
+    description = `${e.name} gehört ab sofort nicht mehr zum Team von Pake & Scha${e.oldRank ? ` (zuletzt **${e.oldRank}**)` : ''}.`;
+    color = RED;
+    fields.push({ name: 'Zuletzt', value: e.oldRank || '—' }, { name: 'Gekündigt von', value: e.byName || 'System' });
   } else {
     if (e.type === 'befoerderung') {
       title = `🎉 Beförderung: ${e.name}`;
       description = `${e.name} ist ab sofort **${e.newRank}**. Herzlichen Glückwunsch!`;
+    } else if (e.type === 'rueckstufung') {
+      title = `Degradierung: ${e.name}`;
+      description = `${e.name} ist ab sofort ${e.newRank ? `**${e.newRank}**` : 'ohne Rang'}.`;
+      color = SLATE;
     } else {
       title = `Rangänderung: ${e.name}`;
       description = `${e.name} ist ab sofort ${e.newRank ? `**${e.newRank}**` : 'ohne Rang'}.`;
@@ -56,7 +67,7 @@ function announce(e) {
     fields.push(
       { name: 'Bisher', value: e.oldRank || '—' },
       { name: 'Neu', value: e.newRank || '—' },
-      { name: e.type === 'befoerderung' ? 'Befördert von' : 'Geändert von', value: e.byName || 'System' }
+      { name: e.type === 'befoerderung' ? 'Befördert von' : e.type === 'rueckstufung' ? 'Degradiert von' : 'Geändert von', value: e.byName || 'System' }
     );
   }
   if (e.note) fields.push({ name: e.type === 'einstellung' ? 'Notiz' : 'Begründung', value: truncate(e.note, 500), inline: false });
@@ -66,7 +77,7 @@ function announce(e) {
     color,
     fields,
     // Die betroffene Person wird erwähnt, wenn ihr Konto mit Discord verknüpft ist.
-    mentionIds: e.type !== 'rueckstufung' && person?.discord_id ? [person.discord_id] : [],
+    mentionIds: e.type !== 'rueckstufung' && e.type !== 'kuendigung' && person?.discord_id ? [person.discord_id] : [],
   });
 }
 
@@ -111,6 +122,18 @@ function promotionError(actor, target, newRank) {
   return null;
 }
 
+/** Offene Akten, in denen die Person federführend ist (nach einer Kündigung neu zu vergeben). */
+const openCasesOf = (userId) => db.prepare('SELECT COUNT(*) AS n FROM cases WHERE lawyer_id = ? AND closed_at IS NULL').get(userId).n;
+const activeAdminCount = () => db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'admin' AND active = 1").get().n;
+
+/** Wer darf diese Person kündigen? Liefert eine Fehlermeldung oder null. */
+function terminationError(actor, target) {
+  if (!isBoard(actor)) return 'Kündigungen kann nur das Board of Partners aussprechen.';
+  if (target.id === actor.id) return 'Sich selbst kann man nicht kündigen.';
+  if (target.role === 'admin' && target.active && activeAdminCount() <= 1) return 'Es muss mindestens ein aktiver Admin bestehen bleiben.';
+  return promotionError(actor, target, RANKS[RANKS.length - 1]);
+}
+
 function eventRow(e) {
   return {
     id: e.id,
@@ -148,7 +171,15 @@ router.get('/', (req, res) => {
     ? db
         .prepare(`SELECT id, display_name, role, rank FROM users WHERE active = 1 AND role IN ('anwalt', 'admin') ORDER BY ${RANK_ORDER_SQL()}, display_name`)
         .all()
-        .map((s) => ({ id: s.id, name: s.display_name, role: s.role, rank: s.rank || null, editable: !promotionError(u, s, u.role === 'admin' ? RANKS[0] : u.rank) }))
+        .map((s) => ({
+          id: s.id,
+          name: s.display_name,
+          role: s.role,
+          rank: s.rank || null,
+          editable: !promotionError(u, s, u.role === 'admin' ? RANKS[0] : u.rank),
+          terminable: !terminationError(u, s),
+          openCases: openCasesOf(s.id),
+        }))
     : undefined;
   res.json({
     events: rows.map(eventRow),
@@ -203,6 +234,65 @@ router.post(
     logActivity(u, TYPES[type], 'user', target.id, `${target.display_name}: ${target.rank || '—'} → ${d.rank}${d.note ? ` (${truncate(d.note, 120)})` : ''}`);
     tickets.syncBoardAll(); // wer ins Board kommt (oder es verlässt), sieht die Board-Tickets (nicht mehr)
     res.status(201).json({ success: true, id, type, typeLabel: TYPES[type] });
+  })
+);
+
+/** Degradieren – nur Board of Partners: der neue Rang muss niedriger sein als der bisherige. */
+router.post(
+  '/demote',
+  wrap(async (req, res) => {
+    const u = req.user;
+    if (!isBoard(u)) return res.status(403).json({ error: 'Degradierungen kann nur das Board of Partners vornehmen.' });
+    const d = parseBody(z.object({ userId: z.number().int().positive(), rank: rankEnum(), note: z.string().trim().max(500).optional() }), req, res);
+    if (!d) return;
+    const target = db.prepare("SELECT * FROM users WHERE id = ? AND active = 1 AND role IN ('anwalt', 'admin')").get(d.userId);
+    if (!target) return res.status(404).json({ error: 'Mitarbeiter nicht gefunden.' });
+    if (rankIndex(target.rank) < 0) return res.status(400).json({ error: `${target.display_name} hat keinen Rang – es gibt nichts zu degradieren.` });
+    if (rankIndex(d.rank) <= rankIndex(target.rank)) return res.status(400).json({ error: `${d.rank} ist nicht niedriger als der bisherige Rang (${target.rank}). Zum Befördern bitte „Befördern“ nutzen.` });
+    const err = promotionError(u, target, d.rank);
+    if (err) return res.status(403).json({ error: err });
+    let id;
+    tx(() => {
+      db.prepare('UPDATE users SET rank = ? WHERE id = ?').run(d.rank, target.id);
+      db.prepare(
+        `UPDATE team_members SET role_title = ?, tier = CASE WHEN ? THEN 'leitung' WHEN tier = 'leitung' THEN 'anwalt' ELSE tier END WHERE user_id = ?`
+      ).run(d.rank, BOARD_RANKS.includes(d.rank) ? 1 : 0, target.id);
+      id = record({ type: 'rueckstufung', userId: target.id, name: target.display_name, oldRank: target.rank, newRank: d.rank, note: d.note, by: u });
+    });
+    require('../discordBot').syncUser(target.id);
+    logActivity(u, TYPES.rueckstufung, 'user', target.id, `${target.display_name}: ${target.rank} → ${d.rank}${d.note ? ` (${truncate(d.note, 120)})` : ''}`);
+    tickets.syncBoardAll();
+    res.status(201).json({ success: true, id, type: 'rueckstufung', typeLabel: TYPES.rueckstufung });
+  })
+);
+
+/**
+ * Kündigen – nur Board of Partners: das Konto wird gesperrt (Anmeldung und Sitzungen enden, Dienst wird beendet), das
+ * Team-Profil verschwindet von der Website, die Discord-Rollen werden entzogen. Akten bleiben, wie sie sind – sie sind neu zu vergeben.
+ */
+router.post(
+  '/terminate',
+  wrap(async (req, res) => {
+    const u = req.user;
+    const d = parseBody(z.object({ userId: z.number().int().positive(), note: z.string().trim().max(500).optional() }), req, res);
+    if (!d) return;
+    const target = db.prepare("SELECT * FROM users WHERE id = ? AND active = 1 AND role IN ('anwalt', 'admin')").get(d.userId);
+    if (!target) return res.status(404).json({ error: 'Mitarbeiter nicht gefunden.' });
+    const err = terminationError(u, target);
+    if (err) return res.status(isBoard(u) && target.id !== u.id && err.startsWith('Es muss') ? 400 : 403).json({ error: err });
+    const openCases = openCasesOf(target.id);
+    let id;
+    tx(() => {
+      db.prepare('UPDATE users SET active = 0, duty_status = ?, duty_note = ?, duty_since = NULL WHERE id = ?').run('off', '', target.id);
+      db.prepare('UPDATE duty_sessions SET ended_at = ? WHERE user_id = ? AND ended_at IS NULL').run(new Date().toISOString(), target.id);
+      db.prepare('UPDATE team_members SET visible = 0 WHERE user_id = ?').run(target.id);
+      id = record({ type: 'kuendigung', userId: target.id, name: target.display_name, oldRank: target.rank, newRank: null, note: d.note, by: u });
+    });
+    destroyAllSessions(target.id);
+    require('../discordBot').syncUser(target.id);
+    logActivity(u, TYPES.kuendigung, 'user', target.id, `${target.display_name} (${target.rank || 'ohne Rang'})${openCases ? `, ${openCases} offene Akten` : ''}${d.note ? ` – ${truncate(d.note, 120)}` : ''}`);
+    tickets.syncBoardAll();
+    res.status(201).json({ success: true, id, type: 'kuendigung', typeLabel: TYPES.kuendigung, openCases });
   })
 );
 

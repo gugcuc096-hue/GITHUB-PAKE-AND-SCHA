@@ -2579,6 +2579,22 @@ body.hint-edit .form-hint[data-hint-key]:hover { background: rgba(212, 175, 55, 
 .deadline-calc[hidden] { display: none; }
 .kind-box { padding-bottom: 0.2rem; }
 
+/* Einladungen von Kollegen zu Gesprächen und Terminen */
+.invite-box { border: 1px solid var(--line); border-radius: 12px; padding: 0.7rem 0.8rem 0.8rem; margin: 0; min-width: 0; }
+.invite-box legend { padding: 0 0.35rem; }
+.invite-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.invite-chip { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0.65rem 0.25rem 0.3rem; border: 1px solid var(--line); border-radius: 999px; cursor: pointer; font-size: 0.84rem; background: rgba(255, 255, 255, 0.03); transition: background-color 0.15s ease, border-color 0.15s ease; }
+.invite-chip:hover { background: rgba(255, 255, 255, 0.07); }
+.invite-chip input { position: absolute; opacity: 0; pointer-events: none; }
+.invite-chip:has(input:checked), .invite-chip.is-on { border-color: var(--gold-hairline); background: var(--gold-soft); color: var(--gold-light); }
+.invite-chip:has(input:focus-visible) { outline: 2px solid var(--gold-500); outline-offset: 2px; }
+.invite-state { width: 8px; height: 8px; border-radius: 50%; background: #fbbf24; }
+.invite-state.s-zugesagt { background: #34d399; }
+.invite-state.s-abgesagt { background: #f87171; }
+.invite-panel .invite-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.5rem 0; border-top: 1px solid var(--line); }
+.invite-panel .invite-row:first-of-type { border-top: 0; }
+.invite-main { display: grid; gap: 0.1rem; text-align: left; background: none; border: 0; color: inherit; cursor: pointer; min-width: 0; }
+.invite-btns { display: inline-flex; gap: 0.4rem; }
 /* Systemzustand */
 .sys-checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
 .sys-checks li { display: flex; gap: 0.5rem; align-items: flex-start; font-size: 0.92rem; }

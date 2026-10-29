@@ -31,6 +31,7 @@ const EVENTS = {
   'calendar.created': 'Neuer Gerichtstermin / neue Frist',
   'calendar.reminder': 'Erinnerung 24 h vor Frist oder Gerichtstermin',
   'appointment.requested': 'Terminanfrage eines Mandanten',
+  'appointment.invite': 'Kollegen zu einem Gespräch/Termin eingeladen – Zusagen und Absagen (am besten eigener Kanal)',
   'invoice.created': 'Rechnung / Honorarvereinbarung erstellt',
   'message.broadcast': 'Rundschreiben an das Team',
   'application.created': 'Neue Bewerbung',

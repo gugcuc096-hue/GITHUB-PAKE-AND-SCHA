@@ -4,7 +4,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { z } = require('zod');
 const { db, tx, nextApplicationNumber, randomPin } = require('../db');
-const { requireAuth, requireAdmin, hashPassword, generateTempPassword } = require('../auth');
+const { requireAuth, requireAdmin, hashPassword, generateTempPassword, destroyAllSessions } = require('../auth');
 const { wrap, parseBody, idParam, isoDateTime, deriveInitials, truncate, APPLICATION_STATUS, rankField, BOARD_RANKS, RANKS, isBoard, firmEmail, EMAIL_HINT } = require('../helpers');
 const { applicationRow, positionRow, logActivity, firmPlace } = require('../models');
 const discord = require('../discord');
@@ -14,6 +14,7 @@ const tickets = require('../tickets');
 
 const stars = (n) => '★'.repeat(n) + '☆'.repeat(5 - n);
 const WELCOME = 'Herzlichen Glückwunsch – willkommen im Team von Pake & Scha! Ihre Zugangsdaten erhalten Sie direkt vom Board of Partners.';
+const WELCOME_EXISTING = 'Herzlichen Glückwunsch – willkommen im Team von Pake & Scha! Sie melden sich wie bisher mit Ihrem Konto an – es hat jetzt Mitarbeiter-Rechte.';
 
 // skipFailedRequests: Tippfehler im Formular (400) verbrauchen kein Kontingent.
 const limit = (windowMs, max, message, skipFailedRequests = false) =>
@@ -281,6 +282,23 @@ adminRouter.use(requireAuth, requireBoard);
 function load(id) {
   return db.prepare('SELECT * FROM applications WHERE id = ?').get(id) || null;
 }
+/**
+ * Hat die Person schon ein Konto (z. B. als Mandant)? Erkannt an der verknüpften Discord-Kennung, an der Kontakt-E-Mail
+ * der Bewerbung (wenn es die Login-Adresse ist) oder – bei Mandantenkonten – am gleichen Namen (nur wenn eindeutig).
+ * Dann wird beim Einstellen dieses Konto zum Mitarbeiterkonto, es entsteht kein zweites.
+ */
+function existingAccount(a) {
+  const cols = 'id, email, display_name, role, active';
+  let u = null;
+  if (tickets.isId(a.discord_user_id)) u = db.prepare(`SELECT ${cols} FROM users WHERE discord_id = ?`).get(a.discord_user_id);
+  const login = a.email ? firmEmail(a.email) : null;
+  if (!u && login) u = db.prepare(`SELECT ${cols} FROM users WHERE email = ?`).get(login);
+  if (!u) {
+    const same = db.prepare(`SELECT ${cols} FROM users WHERE role = 'mandant' AND active = 1 AND lower(display_name) = lower(?)`).all(String(a.name || '').trim());
+    if (same.length === 1) u = same[0];
+  }
+  return u ? { id: u.id, email: u.email, displayName: u.display_name, role: u.role, active: !!u.active } : null;
+}
 function detail(a) {
   const notes = db
     .prepare('SELECT * FROM application_notes WHERE application_id = ? ORDER BY created_at ASC, id ASC')
@@ -292,6 +310,7 @@ function detail(a) {
     notes,
     hiredUser: hired ? { id: hired.id, email: hired.email, displayName: hired.display_name } : null,
     ticket: tickets.boardTicketInfo('application', a),
+    existingUser: a.hired_user_id ? null : existingAccount(a),
     // Nachrichten mit dem Bewerber und sein persönlicher Link (nur fürs Board)
     messages: messagesOf(a.id),
     applicantRead: a.applicant_read_id,
@@ -413,16 +432,26 @@ adminRouter.post(
     const id = idParam(req);
     const a = id && load(id);
     if (!a) return res.status(404).json({ error: 'Bewerbung nicht gefunden.' });
-    const d = parseBody(z.object({ startsAt: isoDateTime, location: z.string().trim().max(120).optional(), publicNote: z.string().trim().max(1000).optional() }), req, res);
+    const d = parseBody(
+      z.object({
+        startsAt: isoDateTime,
+        location: z.string().trim().max(120).optional(),
+        publicNote: z.string().trim().max(1000).optional(),
+        inviteIds: z.array(z.number().int().positive()).max(30).optional(), // Kollegen zum Gespräch einladen
+      }),
+      req,
+      res
+    );
     if (!d) return;
     const startsAt = new Date(d.startsAt).toISOString();
     const location = d.location || `Kanzlei ${firmPlace()}`;
     const when = new Date(startsAt).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', dateStyle: 'full', timeStyle: 'short' });
     const invite = d.publicNote || `Wir laden Sie zum Bewerbungsgespräch ein: ${when} Uhr · Ort: ${location}. Bitte geben Sie uns hier kurz Bescheid, ob der Termin passt.`;
+    let apptId = null;
     tx(() => {
       db.prepare("UPDATE applications SET status = 'gespraech', interview_at = ?, updated_at = datetime('now') WHERE id = ?").run(startsAt, a.id);
       addMessage(a, { fromBoard: true, user: req.user, body: invite });
-      db.prepare(
+      apptId = Number(db.prepare(
         `INSERT INTO appointments (type, title, starts_at, location, note, status, assigned_to, created_by, client_visible)
          VALUES ('intern', ?, ?, ?, ?, 'bestaetigt', ?, ?, 0)`
       ).run(
@@ -432,8 +461,10 @@ adminRouter.post(
         `Bewerbung ${a.number} – ${a.position_title}\nDiscord: ${a.discord || '—'} · Telefon: ${a.phone || '—'}`,
         req.user.id,
         req.user.id
-      );
+      ).lastInsertRowid);
     });
+    // Kollegen zum Gespräch einladen (Zu-/Absage im Kalender, Hinweis im eigenen Discord-Kanal für Einladungen)
+    if (apptId && d.inviteIds && d.inviteIds.length) require('../appointmentInvites').invite(require('../models').getAppointment(apptId), d.inviteIds, req.user);
     logActivity(req.user, 'Bewerbungsgespräch geplant', 'application', a.id, `${a.number} (${a.name})`);
     dmApplicant({ ...a, status: 'gespraech' }, { title: '📅 Einladung zum Bewerbungsgespräch', description: invite });
     const ts = Math.floor(new Date(startsAt).getTime() / 1000);
@@ -450,7 +481,8 @@ adminRouter.post(
   })
 );
 
-// Einstellen: Login-Konto (Einmal-Passwort) + optional Team-Profil auf der Website.
+// Einstellen: Hat die Person schon ein Konto, wird dieses zum Mitarbeiterkonto (ohne neues Passwort); sonst Login-Konto
+// (Einmal-Passwort). In beiden Fällen optional ein Team-Profil auf der Website.
 adminRouter.post(
   '/:id/hire',
   wrap(async (req, res) => {
@@ -460,7 +492,8 @@ adminRouter.post(
     if (a.hired_user_id) return res.status(400).json({ error: 'Für diese Bewerbung wurde bereits ein Konto angelegt.' });
     const d = parseBody(
       z.object({
-        email: z.string().trim().min(1).max(120), // Teil vor dem @ oder Adresse mit @pake-scha.ls
+        newAccount: z.boolean().optional(), // trotz vorhandenem Mandantenkonto ein neues anlegen (falsche Zuordnung)
+        email: z.string().trim().min(1).max(120).optional(), // Teil vor dem @ oder Adresse mit @pake-scha.ls – nur für neue Konten
         role: z.enum(['anwalt', 'admin']),
         rank: rankField,
         createProfile: z.boolean().optional(),
@@ -471,6 +504,11 @@ adminRouter.post(
       res
     );
     if (!d) return;
+    const found = existingAccount(a);
+    if (found && found.role !== 'mandant') {
+      return res.status(409).json({ error: `Diese Person hat bereits ein Mitarbeiterkonto (${found.email}).` });
+    }
+    const existing = d.newAccount ? null : found;
     // Partner ohne Admin-Rolle: nur als Anwalt/Mitarbeiter und höchstens bis zum eigenen Rang (wie beim Befördern)
     if (req.user.role !== 'admin') {
       if (d.role === 'admin') return res.status(403).json({ error: 'Konten mit der Rolle „Board of Partners“ (Admin) kann nur ein Admin anlegen.' });
@@ -478,19 +516,30 @@ adminRouter.post(
         return res.status(403).json({ error: `Sie können höchstens bis zu Ihrem eigenen Rang (${req.user.rank}) einstellen.` });
       }
     }
-    const email = firmEmail(d.email);
-    if (!email) return res.status(400).json({ error: EMAIL_HINT });
-    if (db.prepare('SELECT id FROM users WHERE email = ?').get(email)) return res.status(409).json({ error: 'Diese E-Mail-Adresse ist bereits vergeben.' });
+    let email = existing ? existing.email : firmEmail(d.email || '');
+    if (!existing) {
+      if (!email) return res.status(400).json({ error: EMAIL_HINT });
+      if (db.prepare('SELECT id FROM users WHERE email = ?').get(email)) return res.status(409).json({ error: 'Diese E-Mail-Adresse ist bereits vergeben.' });
+    }
 
-    const password = generateTempPassword();
+    const password = existing ? null : generateTempPassword();
     let hiredId;
     tx(() => {
-      const info = db
-        .prepare('INSERT INTO users (email, password_hash, display_name, role, rank, phone, must_change_password) VALUES (?, ?, ?, ?, ?, ?, 1)')
-        .run(email, hashPassword(password), a.name, d.role, d.rank || null, a.phone || null);
-      const userId = Number(info.lastInsertRowid);
+      let userId;
+      if (existing) {
+        // bestehendes (Mandanten-)Konto wird zum Mitarbeiterkonto; Passwort und Verlauf bleiben
+        userId = existing.id;
+        db.prepare('UPDATE users SET role = ?, rank = ?, active = 1, phone = COALESCE(phone, ?) WHERE id = ?').run(d.role, d.rank || null, a.phone || null, userId);
+        destroyAllSessions(userId); // neue Rolle: beim nächsten Aufruf neu anmelden
+      } else {
+        const info = db
+          .prepare('INSERT INTO users (email, password_hash, display_name, role, rank, phone, must_change_password) VALUES (?, ?, ?, ?, ?, ?, 1)')
+          .run(email, hashPassword(password), a.name, d.role, d.rank || null, a.phone || null);
+        userId = Number(info.lastInsertRowid);
+      }
       hiredId = userId;
-      if (d.createProfile !== false) {
+      const hasProfile = db.prepare('SELECT id FROM team_members WHERE user_id = ?').get(userId);
+      if (d.createProfile !== false && !hasProfile) {
         const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order), 0) AS m FROM team_members').get().m;
         db.prepare(
           'INSERT INTO team_members (name, role_title, description, initials, tier, sort_order, user_id, visible) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
@@ -498,18 +547,20 @@ adminRouter.post(
       }
       db.prepare("UPDATE applications SET status = 'angenommen', hired_user_id = ?, updated_at = datetime('now') WHERE id = ?").run(userId, a.id);
       if (d.role === 'anwalt') require('../onboarding').start(userId, req.user.id); // Einarbeitung mit Checkliste
-      addMessage(a, { fromBoard: true, user: req.user, body: WELCOME });
+      addMessage(a, { fromBoard: true, user: req.user, body: existing ? WELCOME_EXISTING : WELCOME });
     });
-    dmApplicant({ ...a, status: 'angenommen' }, { title: '🎉 Willkommen bei Pake & Scha', description: WELCOME });
-    logActivity(req.user, 'Bewerber eingestellt', 'application', a.id, `${a.name} als ${d.rank || 'Mitarbeiter (ohne Rang)'}`);
+    if (existing) require('../discordBot').syncUser(hiredId); // neue Rolle/Rang → Discord-Rolle
+    dmApplicant({ ...a, status: 'angenommen' }, { title: '🎉 Willkommen bei Pake & Scha', description: existing ? WELCOME_EXISTING : WELCOME });
+    logActivity(req.user, 'Bewerber eingestellt', 'application', a.id, `${a.name} als ${d.rank || 'Mitarbeiter (ohne Rang)'}${existing ? ' (bestehendes Konto)' : ''}`);
     personnel.recordHire({ userId: hiredId, name: a.name, rank: d.rank || null, note: `Über Bewerbung ${a.number}`, by: req.user });
     tickets.boardPost('application', a.id, {
       title: `✅ ${a.name} eingestellt`,
-      description: `Konto angelegt${d.rank ? ` als **${d.rank}**` : ''}. Die Bewerbung ist abgeschlossen – der Kanal wandert ins Archiv.`,
+      description: `${existing ? 'Bestehendes Konto zum Mitarbeiterkonto gemacht' : 'Konto angelegt'}${d.rank ? ` als **${d.rank}**` : ''}. Die Bewerbung ist abgeschlossen – der Kanal wandert ins Archiv.`,
       color: tickets.COLORS.green,
       by: req.user.display_name,
     });
-    res.json({ ...detail(load(a.id)), credentials: { email, password } });
+    tickets.syncBoardAll();
+    res.json({ ...detail(load(a.id)), credentials: existing ? null : { email, password }, converted: !!existing });
   })
 );
 
