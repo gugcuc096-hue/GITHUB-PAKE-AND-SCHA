@@ -8,7 +8,7 @@
 'use strict';
 
 const CP_LEVEL = { rot: ['dringend', 'red'], gelb: ['beachten', 'amber'], info: ['Hinweis', 'slate'] };
-st.cp = { caseId: null, data: null, answer: null, draft: null, showAll: false, open: null };
+st.cp = { caseId: null, data: null, answer: null, draft: null, showAll: false, open: false };
 
 /** Abschnitt in der Akte: zuerst nur der Rahmen, die Inhalte holt copilotInit. */
 function copilotSection(c) {
@@ -16,7 +16,7 @@ function copilotSection(c) {
   return `<div class="section cp" id="secCopilot" data-case-id="${c.id}">
       <div class="section-head"><h3 class="section-title">${icon('info', 'ico-sm')} Co-Pilot <span class="text-xs text-dim font-normal sec-meta">liest nur diese Akte · ohne KI-Dienst</span></h3>
         <button type="button" class="btn-ghost btn-sm" data-action="cp-refresh">${icon('restore', 'ico-sm')}<span>Neu prüfen</span></button></div>
-      <div class="cp-body" id="cpBody"><p class="text-sm text-dim">Co-Pilot sieht die Akte durch …</p></div>
+      <div class="cp-body" id="cpBody"><div class="cp-top"><span class="cp-chip">Co-Pilot sieht die Akte durch …</span></div></div>
     </div>`;
 }
 
@@ -39,7 +39,8 @@ function renderCopilot() {
   const shown = st.cp.showAll ? d.gaps : d.gaps.slice(0, 5);
   const chips = ['rot', 'gelb', 'info'].filter(count).map((lv) => `<span class="cp-chip ${lv}">${count(lv)} ${CP_LEVEL[lv][0]}</span>`).join('');
   box.innerHTML = `
-      <div class="cp-top">${chips || '<span class="cp-chip ok">Keine Lücken gefunden</span>'}</div>
+      <div class="cp-top">${chips || '<span class="cp-chip ok">Keine Lücken gefunden</span>'}<button type="button" class="btn-ghost btn-sm cp-toggle" data-action="cp-open" aria-expanded="${st.cp.open}">${icon(st.cp.open ? 'chevronUp' : 'chevronDown', 'ico-sm')}<span>${st.cp.open ? 'Zuklappen' : 'Öffnen'}</span></button></div>
+      <div class="cp-more" ${st.cp.open ? '' : 'hidden'}>
       ${shown.length ? `<div class="cp-gaps">${cpLines(shown.map((g) => ({ text: g.text, ref: g.ref, level: g.level })))}</div>` : ''}
       ${d.gaps.length > 5 ? `<button type="button" class="btn-ghost btn-sm" data-action="cp-all">${st.cp.showAll ? 'Weniger anzeigen' : `Alle ${d.gaps.length} anzeigen`}</button>` : ''}
       <details class="cp-sum" ${st.cp.sumOpen ? 'open' : ''}><summary>Zusammenfassung der Akte</summary>${d.summary.map((s) => `<div class="cp-h">${esc(s.title)}</div>${cpLines(s.lines)}`).join('')}</details>
@@ -49,7 +50,8 @@ function renderCopilot() {
       <div class="cp-draftbar"><label class="label" for="cpDraftKind">Entwurf aus den Aktendaten</label>
         <div class="flex flex-wrap gap-2"><select id="cpDraftKind" class="field" style="max-width:320px">${d.drafts.map((x) => opt(x.id, x.label, (st.cp.draft && st.cp.draft.kind) === x.id)).join('')}</select>
         <button type="button" class="btn-outline btn-md" data-action="cp-draft">${icon('edit', 'ico-sm')}<span>Entwurf erstellen</span></button></div></div>
-      <div id="cpDraft">${st.cp.draft ? cpDraftHtml(st.cp.draft) : ''}</div>`;
+      <div id="cpDraft">${st.cp.draft ? cpDraftHtml(st.cp.draft) : ''}</div>
+      </div>`;
 }
 const cpAnswerHtml = (a) => `<div class="cp-card"><div class="cp-card-title">${esc(a.title)}</div>${cpLines(a.lines)}${
   a.unknown ? '' : ''
@@ -83,11 +85,17 @@ function cpFlash(el) {
 
 Object.assign(actions, {
   'cp-refresh': () => copilotInit(st.modalCaseId),
+  // Zugeklappt (Standard) bleibt die Akte ruhig: nur die Zeile mit den Zahlen, kein Springen beim Nachladen
+  'cp-open': () => {
+    st.cp.open = !st.cp.open;
+    renderCopilot();
+  },
   'cp-all': () => {
     st.cp.showAll = !st.cp.showAll;
     renderCopilot();
   },
   'cp-q': async (el) => {
+    st.cp.open = true;
     const f = $('form[data-form="cp-ask"]');
     if (f) f.elements.q.value = el.dataset.q;
     await forms['cp-ask'](f || { dataset: {}, elements: { q: { value: el.dataset.q } } });

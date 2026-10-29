@@ -181,6 +181,10 @@ describe('Co-Pilot in der Akte (Browser)', { skip: chromium ? false : 'Playwrigh
         }
         await page.waitForSelector('#cpBody .cp-top');
         assert.ok((await page.textContent('#cpBody .cp-top')).includes('dringend'));
+        // zugeklappt bleibt die Akte ruhig: nur die Zeile mit den Zahlen
+        assert.equal(await page.evaluate(() => document.querySelector('#cpBody .cp-more').hidden), true);
+        await page.click('#cpBody [data-action="cp-open"]');
+        await page.waitForFunction(() => !document.querySelector('#cpBody .cp-more').hidden);
         assert.ok((await page.textContent('#cpBody .cp-gaps')).includes('Akteneinsicht beantragen'));
         // Sprung zur Stelle: Zeuge wird hervorgehoben
         await page.click('#cpBody .cp-line:has-text("Fritz Falkenhagen") .cp-go');

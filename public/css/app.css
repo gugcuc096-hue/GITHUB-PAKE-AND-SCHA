@@ -2577,7 +2577,10 @@ body.hint-edit .form-hint[data-hint-key]:hover { background: rgba(212, 175, 55, 
 
 /* Co-Pilot in der Akte */
 .cp { border: 1px solid var(--gold-hairline); border-radius: 14px; padding: 0.9rem 1rem; background: linear-gradient(180deg, rgba(212, 175, 55, 0.05), transparent); }
-.cp-top { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.6rem; }
+.cp-top { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; min-height: 34px; }
+.cp-more { margin-top: 0.6rem; }
+.cp-more[hidden] { display: none; }
+.cp-toggle { margin-left: auto; }
 .cp-chip { padding: 0.12rem 0.6rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; border: 1px solid var(--line); }
 .cp-chip.rot { color: #fca5a5; border-color: rgba(248, 113, 113, 0.5); background: rgba(248, 113, 113, 0.1); }
 .cp-chip.gelb { color: #fcd34d; border-color: rgba(251, 191, 36, 0.5); background: rgba(251, 191, 36, 0.1); }
