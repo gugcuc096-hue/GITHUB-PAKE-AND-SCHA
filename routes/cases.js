@@ -2,11 +2,13 @@
 const crypto = require('crypto');
 const express = require('express');
 const { z } = require('zod');
+const evidence = require('../evidence');
 const { db, tx, nextCaseNumber, randomPin, getSetting } = require('../db');
 const { requireAuth, requireAdmin, isStaff, findUserByLogin } = require('../auth');
 const {
   wrap,
   parseBody,
+  isoDateTime,
   idParam,
   AREAS,
   URGENCIES,
@@ -513,7 +515,7 @@ function caseDetail(c, u, { lean = false, all = false } = {}) {
     notes: notes.map(noteRow),
     appointments: appointments.map((a) => apptRow(a, u)),
     invoices: invoices.map((i) => ({ ...invoiceRow(i), googleDoc: invoiceDocs.get(i.id) })),
-    attachments: attachments.map((a) => attachmentRow(a, c.id)),
+    attachments: attachments.map((a) => attachmentRow(a, c.id, staff)),
     externalDocs: externalDocsForCase(c.id, u),
     contracts: contracts.map((k) => ({ ...k, googleDoc: contractDocs.get(k.id) })),
     // Bearbeitungszeiten nur für das Board of Partners
@@ -586,7 +588,7 @@ function linkedEvidence(caseId) {
       attachments: db
         .prepare('SELECT * FROM case_attachments WHERE case_id = ? ORDER BY created_at ASC, id ASC')
         .all(k.id)
-        .map((a, i) => ({ ...attachmentRow(a, k.id), no: i + 1 })),
+        .map((a) => attachmentRow(a, k.id, true)),
     }))
     .filter((k) => k.attachments.length);
 }
@@ -1051,7 +1053,7 @@ router.post(
         byDiscordId: req.user.discord_id,
       });
     }
-    res.status(201).json({ attachment: attachmentRow(row, c.id) });
+    res.status(201).json({ attachment: attachmentRow(row, c.id, isStaff(req.user)) });
   })
 );
 
@@ -1089,11 +1091,11 @@ router.put(
     const a = attId && db.prepare('SELECT * FROM case_attachments WHERE id = ? AND case_id = ?').get(attId, c.id);
     if (!a || (a.internal && !isStaff(req.user))) return res.status(404).json({ error: 'Anhang nicht gefunden.' });
     if (!isStaff(req.user) && a.uploader_id !== req.user.id) return res.status(403).json({ error: 'Keine Berechtigung.' });
-    if (a.thumb) return res.json({ attachment: attachmentRow(a, c.id) });
+    if (a.thumb) return res.json({ attachment: attachmentRow(a, c.id, isStaff(req.user)) });
     const saved = saveImage(req, 'evidence');
     const done = db.prepare('UPDATE case_attachments SET thumb = ? WHERE id = ? AND thumb IS NULL').run(saved.file, a.id);
     if (!done.changes) removeFile('evidence', saved.file); // gleichzeitig schon angelegt
-    res.json({ attachment: attachmentRow(db.prepare('SELECT * FROM case_attachments WHERE id = ?').get(a.id), c.id) });
+    res.json({ attachment: attachmentRow(db.prepare('SELECT * FROM case_attachments WHERE id = ?').get(a.id), c.id, isStaff(req.user)) });
   })
 );
 
@@ -1131,6 +1133,48 @@ router.get(
     res.sendFile(evidencePath(a.thumb || a.file), (err) => {
       if (err && !res.headersSent) res.status(404).json({ error: 'Datei nicht gefunden.' });
     });
+  })
+);
+
+const evidenceBody = z.object({
+  caption: z.string().trim().max(200).optional(),
+  kind: z.enum(Object.keys(evidence.KINDS)).optional(),
+  source: z.string().trim().max(200).optional(),
+  obtainedAt: isoDateTime.nullable().optional(),
+  side: z.enum(['', ...Object.keys(evidence.SIDES)]).optional(),
+  status: z.enum(Object.keys(evidence.STATUS)).optional(),
+  description: z.string().trim().max(2000).optional(),
+});
+
+// Beweismittel beschreiben: Bezeichnung, Art, Herkunft, Zeitpunkt, Lager, Stand (nur zuständige Anwälte)
+router.patch(
+  '/:id/attachments/:attId',
+  wrap(async (req, res) => {
+    const id = idParam(req);
+    const attId = idParam(req, 'attId');
+    const c = id && getCase(id);
+    const access = c ? caseAccess(c, req.user) : null;
+    if (!c || !isStaff(req.user) || !access.canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
+    if (!access.canEdit) return res.status(403).json({ error: 'Beweismittel beschreiben nur die zuständigen Anwälte.' });
+    const a = attId && db.prepare('SELECT * FROM case_attachments WHERE id = ? AND case_id = ?').get(attId, c.id);
+    if (!a) return res.status(404).json({ error: 'Anhang nicht gefunden.' });
+    const d = parseBody(evidenceBody, req, res);
+    if (!d) return;
+    const when = d.obtainedAt === undefined ? a.obtained_at : d.obtainedAt ? new Date(d.obtainedAt).toISOString() : null;
+    db.prepare('UPDATE case_attachments SET caption = ?, kind = ?, source = ?, obtained_at = ?, side = ?, ev_status = ?, description = ? WHERE id = ?').run(
+      d.caption ?? a.caption,
+      d.kind ?? a.kind,
+      d.source ?? a.source,
+      when,
+      d.side ?? a.side,
+      d.status ?? a.ev_status,
+      d.description ?? a.description,
+      a.id
+    );
+    // Wichtige Wechsel stehen im Verlauf (nur Kanzlei)
+    if (d.status && d.status !== a.ev_status) addSystemNote(c.id, req.user, `Beweismittel B${a.ev_no}: ${evidence.STATUS[d.status]}`, true);
+    const row = db.prepare('SELECT * FROM case_attachments WHERE id = ?').get(a.id);
+    res.json({ attachment: attachmentRow(row, c.id, true) });
   })
 );
 

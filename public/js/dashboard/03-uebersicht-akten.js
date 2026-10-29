@@ -948,16 +948,18 @@ function attachmentsSection(c, attachments, linkedEvidence = []) {
     );
   return `<div class="section" id="secEvidence">
       <h3 class="section-title">Beweismittel & Anhänge <span class="text-xs text-dim font-normal sec-meta">${attachments.length} / 40</span></h3>
+      ${evidenceToolbar(attachments)}
       ${canUpload ? `<div class="flex flex-wrap items-center gap-3 mb-3">
           <input id="attCaption" class="field" style="max-width:340px" maxlength="200" placeholder="Beschreibung für neue Bilder (optional)" aria-label="Beschreibung für neue Bilder">
           ${staff ? '<label class="check"><input type="checkbox" id="attInternal" checked> Nur intern (für den Mandanten unsichtbar)</label>' : ''}
         </div>` : ''}
-      <div class="att-grid">
+      ${staff && evView() === 'liste' ? evidenceTable(c, attachments) : ''}
+      <div class="att-grid"${staff && evView() === 'liste' ? ' hidden' : ''}>
         ${attachments
         .map(
-          (a, i) => `<button type="button" class="att" data-action="att-open" data-index="${i}" aria-label="${esc(`B${i + 1}${a.caption ? ': ' + a.caption : ''}`)}">
-              <img src="${esc(a.thumbUrl || a.url)}" alt="${esc(a.caption)}" loading="lazy" decoding="async"><span class="ev-no">B${i + 1}</span>
-              <span class="tag">${a.internal ? '<span class="stamp-mini">Vertraulich</span>' : ''}${a.externalDocId ? badge(extOf(st.caseDocs.find((d) => d.id === a.externalDocId) || {}).name, 'sky') : ''}</span>${a.caption ? `<span class="cap">${esc(a.caption)}</span>` : ''}</button>`
+          (a, i) => `<button type="button" class="att" data-action="att-open" data-index="${i}" aria-label="${esc(`B${a.no}${a.caption ? ': ' + a.caption : ''}`)}">
+              <img src="${esc(a.thumbUrl || a.url)}" alt="${esc(a.caption)}" loading="lazy" decoding="async"><span class="ev-no">B${a.no}</span>
+              <span class="tag">${evChips(a)}${a.internal ? '<span class="stamp-mini">Vertraulich</span>' : ''}${a.externalDocId ? badge(extOf(st.caseDocs.find((d) => d.id === a.externalDocId) || {}).name, 'sky') : ''}</span>${a.caption ? `<span class="cap">${esc(a.caption)}</span>` : ''}</button>`
         )
         .join('')}
         ${canUpload && attachments.length < 40
@@ -988,13 +990,13 @@ function docPeekOpen(index, linked) {
   }
   box.dataset.index = String(index);
   box.dataset.linked = linked ? '1' : '';
-  const no = linked ? a.no : index + 1;
+  const no = a.no;
   box.innerHTML = `<div class="dp-head"><span class="dp-no">Beweismittel B${no}${linked ? ` · ${esc(a.caseNumber)}` : ''}</span>
       <span class="dp-nav"><button type="button" class="icon-btn sm" data-action="peek-step" data-dir="-1" aria-label="Vorheriges Bild" ${index <= 0 ? 'disabled' : ''}>${icon('chevronLeft', 'ico-sm')}</button><span>${index + 1} / ${list.length}</span><button type="button" class="icon-btn sm" data-action="peek-step" data-dir="1" aria-label="Nächstes Bild" ${index >= list.length - 1 ? 'disabled' : ''}>${icon('chevronRight', 'ico-sm')}</button></span>
       <button type="button" class="icon-btn sm" data-action="peek-close" aria-label="Vorschau schließen" title="Schließen (Esc)">${icon('x', 'ico-sm')}</button></div>
     <div class="dp-img"><img src="${esc(a.url)}" alt="${esc(a.caption)}"></div>
-    <div class="dp-meta"><strong>${esc(a.caption || 'Anhang')}</strong><span>${esc(a.uploaderName)} · ${esc(fmtDate(a.createdAt))}${a.internal ? ' · <span class="stamp-mini">Vertraulich</span>' : ''}</span></div>
-    <div class="dp-actions"><a class="btn-ghost btn-sm" href="${esc(a.url)}" download>${icon('download', 'ico-sm')}<span>Herunterladen</span></a>${!linked && isStaff() ? `<button type="button" class="btn-ghost btn-sm" data-action="redact-open" data-index="${index}">${icon('edit', 'ico-sm')}<span>Schwärzen</span></button>` : ''}</div>`;
+    <div class="dp-meta"><strong>${esc(a.caption || 'Anhang')}</strong><span>${esc(a.uploaderName)} · ${esc(fmtDate(a.createdAt))}${a.internal ? ' · <span class="stamp-mini">Vertraulich</span>' : ''}</span>${evMetaLine(a) ? `<span>${evMetaLine(a)}</span>` : ''}${evDetails(a)}</div>
+    <div class="dp-actions"><a class="btn-ghost btn-sm" href="${esc(a.url)}" download>${icon('download', 'ico-sm')}<span>Herunterladen</span></a>${!linked && isStaff() && st.caseInfo && st.caseInfo.canEdit ? `<button type="button" class="btn-ghost btn-sm" data-action="ev-edit" data-id="${a.id}">${icon('edit', 'ico-sm')}<span>Beschreiben</span></button>` : ''}${!linked && isStaff() ? `<button type="button" class="btn-ghost btn-sm" data-action="redact-open" data-index="${index}">${icon('edit', 'ico-sm')}<span>Schwärzen</span></button>` : ''}</div>`;
   $('#modal').classList.add('has-peek');
   $$('.att.is-peeked').forEach((b) => b.classList.remove('is-peeked'));
   $(`.att[${linked ? 'data-linked' : 'data-index'}="${index}"]`)?.classList.add('is-peeked');
@@ -1028,7 +1030,7 @@ async function redactOpen(index) {
   Object.assign(redact, { att: a, index, caseId, img, boxes: [], drag: null });
   st.returnCase = caseId;
   replaceModal(
-    `<p class="text-xs uppercase tracking-[0.2em] text-gold mb-1">Beweismittel B${index + 1}</p>
+    `<p class="text-xs uppercase tracking-[0.2em] text-gold mb-1">Beweismittel B${a.no}</p>
       <h2 class="modal-title">Schwärzen</h2>
       <p class="modal-sub">Mit der Maus bzw. dem Finger Rechtecke über Namen, Nummern oder Gesichter ziehen. Gespeichert wird eine Kopie – das Original bleibt unverändert.</p>
       <div class="redact-wrap"><canvas id="redactCanvas" class="redact-canvas" aria-label="Bild zum Schwärzen"></canvas></div>

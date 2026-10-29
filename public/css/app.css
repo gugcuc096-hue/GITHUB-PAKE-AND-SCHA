@@ -970,6 +970,17 @@ details.edit-box[open] > summary::after { content: '–'; }
 .wit-contra li { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; padding: 0.4rem 0.6rem; border-left: 2px solid #f87171; background: rgba(248, 113, 113, 0.06); border-radius: 0 8px 8px 0; font-size: 0.88rem; }
 .wit-contra-text { min-width: 0; overflow-wrap: anywhere; }
 .wit-ref { display: inline-block; margin-left: 0.3rem; padding: 0 0.4rem; border-radius: 999px; font-size: 0.72rem; font-family: var(--font-mono, monospace); color: var(--gold-light); border: 1px solid var(--gold-hairline); }
+
+/* Beweismittel: Umschalter, Beweisliste, Verweise „B7“ in Texten */
+.ev-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem; }
+.ev-toolbar .chip-row { margin: 0; }
+.ev-table td { vertical-align: top; }
+.ev-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin: 0.5rem 0 0.75rem; }
+.ev-meta p { flex-basis: 100%; margin: 0.25rem 0 0; font-size: 0.9rem; color: var(--ink-soft, #c9d1e3); white-space: pre-wrap; }
+.dp-meta .ev-meta { margin: 0.4rem 0 0; }
+.ev-ref { display: inline; padding: 0 0.35rem; border-radius: 6px; font: 600 0.78em/1.5 var(--font-mono, ui-monospace, monospace); color: var(--gold-light); background: rgba(212, 175, 55, 0.12); border: 1px solid var(--gold-hairline); cursor: pointer; }
+.ev-ref:hover, .ev-ref:focus-visible { background: rgba(212, 175, 55, 0.24); }
+.att .tag .badge { font-size: 0.55rem; padding: 0.05rem 0.35rem; }
 .wit-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
 .wit-actions .push { margin-left: auto; }
 .wit-contra-form { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; gap: 0.5rem; }

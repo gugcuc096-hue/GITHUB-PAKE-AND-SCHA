@@ -773,6 +773,27 @@ addColumn('case_external_docs', 'sort_order', 'INTEGER');
 addColumn('case_attachments', 'external_doc_id', 'INTEGER REFERENCES case_external_docs(id) ON DELETE SET NULL');
 addColumn('case_attachments', 'source_url', 'TEXT');
 addColumn('case_attachments', 'content_hash', 'TEXT');
+// Beweismittel: feste B-Nummer je Akte (wird nie neu vergeben), Art, Herkunft, Zeitpunkt, Lager, Stand, Beschreibung
+addColumn('case_attachments', 'ev_no', 'INTEGER');
+addColumn('case_attachments', 'kind', "TEXT NOT NULL DEFAULT 'foto'");
+addColumn('case_attachments', 'source', "TEXT NOT NULL DEFAULT ''");
+addColumn('case_attachments', 'obtained_at', 'TEXT');
+addColumn('case_attachments', 'side', "TEXT NOT NULL DEFAULT ''");
+addColumn('case_attachments', 'ev_status', "TEXT NOT NULL DEFAULT 'gesichert'");
+addColumn('case_attachments', 'description', "TEXT NOT NULL DEFAULT ''");
+addColumn('cases', 'evidence_seq', 'INTEGER NOT NULL DEFAULT 0');
+// bisherige Nummern bleiben (Reihenfolge des Hochladens = bisheriges B1, B2 …), neue zählen weiter
+db.exec(`
+  UPDATE case_attachments SET ev_no = (
+    SELECT COUNT(*) FROM case_attachments o
+     WHERE o.case_id = case_attachments.case_id AND (o.created_at < case_attachments.created_at OR (o.created_at = case_attachments.created_at AND o.id <= case_attachments.id))
+  ) WHERE ev_no IS NULL;
+  UPDATE cases SET evidence_seq = MAX(evidence_seq, COALESCE((SELECT MAX(ev_no) FROM case_attachments WHERE case_id = cases.id), 0));
+  CREATE TRIGGER IF NOT EXISTS case_attachments_no AFTER INSERT ON case_attachments WHEN NEW.ev_no IS NULL BEGIN
+    UPDATE cases SET evidence_seq = evidence_seq + 1 WHERE id = NEW.case_id;
+    UPDATE case_attachments SET ev_no = (SELECT evidence_seq FROM cases WHERE id = NEW.case_id) WHERE id = NEW.id;
+  END;
+`);
 // Anliegen ans Board: Vorgangsnummer + Pin (Statusabfrage auf der Website), Kontakt, Herkunft
 addColumn('concerns', 'reference', 'TEXT');
 addColumn('concerns', 'access_pin', 'TEXT');
