@@ -12,7 +12,9 @@
     "dev": "node --watch server.js",
     "seed:admin": "node scripts/seed-admin.js",
     "build:css": "node scripts/build-css.js",
-    "test": "node --test --test-concurrency=1 \"test/*.test.js\""
+    "test": "node --test --test-concurrency=1 \"test/*.test.js\"",
+    "postinstall": "node scripts/prepack.js",
+    "pack:assets": "node scripts/prepack.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

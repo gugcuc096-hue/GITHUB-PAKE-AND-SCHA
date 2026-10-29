@@ -16,13 +16,14 @@
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
+const util = require('util');
 const crypto = require('crypto');
 
 const PUBLIC = path.join(__dirname, 'public');
 const DASH_DIR = path.join(PUBLIC, 'js', 'dashboard');
 const YEAR = 'public, max-age=31536000, immutable';
 /** Nur für die Kanzlei (Mandanten laden sie nie): Teile, deren Ansichten Kanzlei/Board vorbehalten sind. */
-const STAFF_PARTS = new Set(['07-konfiguration.js', '07-listen.js', '07-rechte-schalter.js', '07-team-einstellungen.js', '08-discord.js', '09-verwaltung.js', '13-kanzlei.js']);
+const STAFF_PARTS = new Set(['07-konfiguration.js', '07-listen.js', '07-rechte-schalter.js', '07-team-einstellungen.js', '08-discord.js', '09-system.js', '09-verwaltung.js', '13-kanzlei.js']);
 const PROD = () => process.env.NODE_ENV === 'production';
 
 let esbuild = null;
@@ -67,10 +68,8 @@ const state = () => (cache && (PROD() || Date.now() - cache.at < 2000) ? cache :
 /** Nach einem Neubau des Tailwind-CSS beim Start: Versionsnummer neu berechnen. */
 const reset = () => (cache = null);
 
-/** Verkleinert (falls möglich) und komprimiert – je Fassung einmal. */
-function pack(key, text, type) {
-  const st = state();
-  if (st.packed.has(key)) return st.packed.get(key);
+/** Verkleinern (falls möglich): liefert Rohdaten, Typ und ETag – das Komprimieren folgt getrennt. */
+function minify(key, text, type) {
   let code = text;
   if (esbuild) {
     try {
@@ -83,15 +82,77 @@ function pack(key, text, type) {
     }
   }
   const raw = Buffer.from(code);
-  const quality = PROD() ? 11 : 4; // beim Entwickeln schnell, im Betrieb so klein wie möglich (einmal je Start)
-  const p = {
+  return {
     raw,
-    br: zlib.brotliCompressSync(raw, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: quality, [zlib.constants.BROTLI_PARAM_SIZE_HINT]: raw.length } }),
-    gz: zlib.gzipSync(raw, { level: 9 }),
     type: type === 'css' ? 'text/css; charset=utf-8' : 'application/javascript; charset=utf-8',
     etag: `"${crypto.createHash('sha1').update(raw).digest('base64url').slice(0, 20)}"`,
   };
+}
+const brotliOpts = (raw) => ({ params: { [zlib.constants.BROTLI_PARAM_QUALITY]: PROD() ? 11 : 4, [zlib.constants.BROTLI_PARAM_SIZE_HINT]: raw.length } }); // beim Entwickeln schnell, im Betrieb so klein wie möglich
+
+/*
+ * Fertig komprimierte Dateien liegen im Betrieb zusätzlich auf der Platte (.packed/<Version>/, angelegt bei „npm install“
+ * oder beim ersten Start). Nach einem Neustart – z. B. wenn der Server aus dem Ruhezustand aufwacht – werden sie nur
+ * gelesen, nicht neu gerechnet: Brotli auf höchster Stufe belegte sonst mehrere Sekunden lang den ganzen Server.
+ */
+const PACK_DIR = process.env.PACK_DIR || path.join(__dirname, '.packed');
+const diskFile = (version, key) => path.join(PACK_DIR, version, `${crypto.createHash('sha1').update(key).digest('hex')}.json`);
+function readDisk(version, key) {
+  if (!PROD()) return null;
+  try {
+    const d = JSON.parse(fs.readFileSync(diskFile(version, key), 'utf8'));
+    return { raw: Buffer.from(d.raw, 'base64'), br: Buffer.from(d.br, 'base64'), gz: Buffer.from(d.gz, 'base64'), type: d.type, etag: d.etag };
+  } catch {
+    return null;
+  }
+}
+function writeDisk(version, key, p) {
+  try {
+    const file = diskFile(version, key);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ raw: p.raw.toString('base64'), br: p.br.toString('base64'), gz: p.gz.toString('base64'), type: p.type, etag: p.etag }));
+  } catch {
+    /* Platte schreibgeschützt: dann eben nur im Arbeitsspeicher */
+  }
+}
+/** Andere Versionen auf der Platte entfernen – sie wächst nicht mit jedem Update. */
+function sweepDisk(version) {
+  try {
+    for (const d of fs.readdirSync(PACK_DIR)) if (d !== version) fs.rmSync(path.join(PACK_DIR, d), { recursive: true, force: true });
+  } catch {
+    /* gibt es nicht */
+  }
+}
+
+/** Verkleinert (falls möglich) und komprimiert – je Fassung einmal. */
+function pack(key, text, type) {
+  const st = state();
+  if (st.packed.has(key)) return st.packed.get(key);
+  const disk = readDisk(st.version, key);
+  if (disk) {
+    st.packed.set(key, disk);
+    return disk;
+  }
+  const m = minify(key, text, type);
+  const p = { ...m, br: zlib.brotliCompressSync(m.raw, brotliOpts(m.raw)), gz: zlib.gzipSync(m.raw, { level: 9 }) };
   st.packed.set(key, p);
+  return p;
+}
+/** Wie pack, aber das Komprimieren läuft im Hintergrund – der Server bleibt dabei ansprechbar. */
+async function packAsync(key, text, type) {
+  const st = state();
+  if (st.packed.has(key)) return st.packed.get(key);
+  const disk = readDisk(st.version, key);
+  if (disk) {
+    st.packed.set(key, disk);
+    return disk;
+  }
+  const m = minify(key, text, type);
+  const [br, gz] = await Promise.all([util.promisify(zlib.brotliCompress)(m.raw, brotliOpts(m.raw)), util.promisify(zlib.gzip)(m.raw, { level: 9 })]);
+  if (state() !== st) return null; // inzwischen neue Fassung (Entwickeln)
+  const p = st.packed.get(key) || { ...m, br, gz }; // hat eine Anfrage inzwischen selbst gepackt, gilt deren Ergebnis
+  st.packed.set(key, p);
+  writeDisk(st.version, key, p);
   return p;
 }
 
@@ -155,20 +216,28 @@ function staticAsset(req, res, next) {
   send(req, res, pack(req.path, fs.readFileSync(file, 'utf8'), m[3]));
 }
 
+/** Alles Auslieferbare verkleinern und komprimieren (nacheinander, im Hintergrund). Liefert die Zahl der Dateien. */
+async function packAll() {
+  const st = state();
+  const items = [
+    ['bundle', st.bundle, 'js'],
+    ['staff', st.staff, 'js'],
+  ];
+  for (const f of [...listFiles(path.join(PUBLIC, 'js')), ...listFiles(path.join(PUBLIC, 'css'))]) {
+    const rel = '/' + path.relative(PUBLIC, f).split(path.sep).join('/');
+    if (!rel.startsWith('/js/dashboard/')) items.push([rel, fs.readFileSync(f, 'utf8'), rel.endsWith('.css') ? 'css' : 'js']);
+  }
+  for (const [key, text, type] of items) {
+    await packAsync(key, text, type);
+    await new Promise((resolve) => setImmediate(resolve)); // zwischendurch Anfragen bedienen
+  }
+  sweepDisk(st.version);
+  return items.length;
+}
+
 /** Im Betrieb nach dem Start im Hintergrund vorbereiten, damit schon der erste Besucher nicht warten muss. */
 function warm() {
-  setImmediate(() => {
-    try {
-      pack('bundle', state().bundle, 'js');
-      pack('staff', state().staff, 'js');
-      for (const f of [...listFiles(path.join(PUBLIC, 'js')), ...listFiles(path.join(PUBLIC, 'css'))]) {
-        const rel = '/' + path.relative(PUBLIC, f).split(path.sep).join('/');
-        if (!rel.startsWith('/js/dashboard/')) pack(rel, fs.readFileSync(f, 'utf8'), rel.endsWith('.css') ? 'css' : 'js');
-      }
-    } catch (err) {
-      console.warn('Vorbereiten der Skripte fehlgeschlagen:', err.message);
-    }
-  });
+  setImmediate(() => packAll().catch((err) => console.warn('Vorbereiten der Skripte fehlgeschlagen:', err.message)));
 }
 
 /** Für express.static: Dateien mit der aktuellen Versionsnummer ein Jahr behalten. */
@@ -176,4 +245,4 @@ function setHeaders(res) {
   if (res.req && res.req.query && res.req.query.v === state().version) res.set('Cache-Control', YEAR);
 }
 
-module.exports = { rewrite, page, pages, bundle, staffBundle, staticAsset, warm, setHeaders, reset, version: () => state().version, STAFF_PARTS };
+module.exports = { rewrite, page, pages, bundle, staffBundle, staticAsset, warm, packAll, setHeaders, reset, version: () => state().version, STAFF_PARTS };

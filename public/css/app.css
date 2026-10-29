@@ -2607,3 +2607,12 @@ body.hint-edit .form-hint[data-hint-key]:hover { background: rgba(212, 175, 55, 
 @keyframes cp-flash { 0% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.7); } 100% { box-shadow: 0 0 0 14px rgba(212, 175, 55, 0); } }
 .cp-flash { animation: cp-flash 1.1s ease-out 2; border-radius: 12px; }
 @media (max-width: 640px) { .cp-ask { flex-direction: column; } }
+/* Systemzustand */
+.sys-checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.sys-checks li { display: flex; gap: 0.5rem; align-items: flex-start; font-size: 0.92rem; }
+.sys-checks li.ok .ico { color: #34d399; }
+.sys-checks li.bad .ico { color: #f87171; }
+.sys-slow { list-style: none; margin: 0.4rem 0 0; padding: 0; display: grid; gap: 0.3rem; font-size: 0.88rem; }
+.sys-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.sys-chip { padding: 0.2rem 0.6rem; border: 1px solid var(--line); border-radius: 999px; font-size: 0.82rem; color: var(--text-dim); }
+.sys-chip strong { color: var(--ink, #f1f5f9); }

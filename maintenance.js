@@ -32,6 +32,11 @@ function run() {
     }
   }
   db.exec('PRAGMA wal_checkpoint(TRUNCATE);');
+  try {
+    require('./health').runSelfTest(); // täglicher Selbsttest (Warnung ans Board, wenn etwas fehlt)
+  } catch (err) {
+    console.warn('Selbsttest fehlgeschlagen:', err.message);
+  }
   setSetting('maintenance_at', now);
   return { ...removed, vacuumed };
 }
