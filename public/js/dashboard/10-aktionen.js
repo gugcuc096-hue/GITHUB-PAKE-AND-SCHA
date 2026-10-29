@@ -1037,7 +1037,8 @@ const actions = {
     openModal(externalForm('fivenet', null, st.caseInfo));
     // Übergabe aus dem FiveNet-Skript: Bilder vormerken, Dokument-ID prüfen lassen
     if (st.fnPrefill) {
-      if (st.fnPrefill.imageUrls.length) addPendingImages({ urls: st.fnPrefill.imageUrls });
+      if (st.fnPrefill.imageUrls.length) addPendingImages({ urls: st.fnPrefill.imageUrls, meta: st.fnPrefill.imageMeta || {} });
+      st.fnPending.seq = st.fnPrefill.imageSeq || 0;
       const input = $('#fnInput');
       if (input && input.value) checkFivenetInput(input);
       st.fnPrefill = null;

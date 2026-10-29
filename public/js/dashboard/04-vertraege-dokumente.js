@@ -346,7 +346,8 @@ const EXT = {
 const extOf = (d) => EXT[d.provider] || EXT.fivenet;
 const extUrl = (caseId, linkId = null, suffix = '') => `/api/cases/${caseId}/external${linkId ? '/' + linkId : ''}${suffix}`;
 
-function externalDocCard(d, c, sortable = false) {
+// atts: die Anhänge der Akte (beim ersten Öffnen sind sie noch nicht in st.caseAttachments gemerkt)
+function externalDocCard(d, c, sortable = false, atts = st.caseAttachments) {
   const staff = isStaff();
   const p = extOf(d);
   const gd = !!p.google;
@@ -363,7 +364,7 @@ function externalDocCard(d, c, sortable = false) {
     .filter(Boolean)
     .map(esc)
     .join(' · ');
-  const images = st.caseAttachments.map((a, i) => ({ a, i })).filter(({ a }) => a.externalDocId === d.id);
+  const images = atts.map((a, i) => ({ a, i })).filter(({ a }) => a.externalDocId === d.id);
   const rows = sheet && d.contentText ? d.contentText.split('\n').filter(Boolean).length : 0;
   const content = d.contentText
     ? `<details class="fn-text"><summary>${icon(sheet ? 'table' : 'doc', 'ico-sm')}<span>${sheet ? 'Tabelle anzeigen' : 'Abschrift anzeigen'}</span><span class="text-dim text-xs">${sheet ? `${rows.toLocaleString('de-DE')} Zeile${rows === 1 ? '' : 'n'}` : `${d.contentText.length.toLocaleString('de-DE')} Zeichen`} · Stand ${esc(fmtDate(d.contentAt))}${d.contentByName ? ' · ' + esc(d.contentByName) : ''}</span></summary>
@@ -374,7 +375,7 @@ function externalDocCard(d, c, sortable = false) {
     : '';
   const gallery = images.length
     ? `<div class="att-grid fn-gallery">${images
-        .map(({ a, i }) => `<button type="button" class="att" data-action="att-open" data-index="${i}" aria-label="${esc(a.caption || 'Bild ansehen')}"><img src="${esc(a.thumbUrl || a.url)}" alt="${esc(a.caption)}" loading="lazy" decoding="async"></button>`)
+        .map(({ a, i }) => `<button type="button" class="att" data-action="att-open" data-index="${i}" aria-label="${esc(a.caption || 'Bild ansehen')}"><img src="${esc(a.thumbUrl || a.url)}" alt="${esc(a.caption)}" loading="lazy" decoding="async">${a.no ? `<span class="ev-no">B${a.no}</span>` : ''}</button>`)
         .join('')}</div>`
     : '';
   const also = staff && d.alsoIn && d.alsoIn.length
@@ -420,7 +421,7 @@ function sheetTable(text) {
       .join('')}</tbody></table></div>`;
 }
 
-function externalSection(c, docs) {
+function externalSection(c, docs, atts = st.caseAttachments) {
   const staff = isStaff();
   const sortable = staff && docs.length > 1;
   if (!staff && !docs.length) return '';
@@ -450,7 +451,7 @@ function externalSection(c, docs) {
                 <option value="title">Titel A–Z</option>
                 <option value="source">Nach Quelle</option>
               </select></div>` : ''}
-            <div class="stack"${sortable ? ` id="extList" data-case-id="${c.id}"` : ''}>${docs.map((d) => externalDocCard(d, c, sortable)).join('')}</div>
+            <div class="stack"${sortable ? ` id="extList" data-case-id="${c.id}"` : ''}>${docs.map((d) => externalDocCard(d, c, sortable, atts)).join('')}</div>
       ${!staff ? '<p class="form-hint">Öffnen im Original ist nur mit einer Berechtigung in FiveNet bzw. bei Google möglich.</p>' : ''}
     </div>`;
 }
@@ -622,11 +623,9 @@ async function loadGoogleDoc(value, { replace = false } = {}) {
     if (r.columnsCut) lines.push('<div class="fn-warn">Übernommen wurden nur die ersten 50 Spalten.</div>');
     if (!r.gid) lines.push('<div class="text-xs text-dim">Übernommen wurde das erste Tabellenblatt. Für ein anderes Blatt dieses in Google Sheets öffnen und die Adresse aus der Adresszeile einfügen.</div>');
   } else if (loaded) {
-    const { text, images } = parsePastedHtml(r.html);
-    const urls = images.map((src) => externalImageUrl('gdocs', src)).filter(Boolean);
+    st.fnPending = { urls: [], blobs: st.fnPending.blobs || [], marks: {}, seq: 0 };
+    const { text, urls } = takePastedImages('gdocs', parsePastedHtml(r.html));
     fillContent(text, replace);
-    st.fnPending.urls = [];
-    addPendingImages({ urls });
     lines.push(
       `<div class="fn-line">${icon('check', 'ico-sm')}<span>${name || 'Dokument '}geladen · ${text.length.toLocaleString('de-DE')} Zeichen · ${urls.length} Bild${urls.length === 1 ? '' : 'er'}${r.published ? ' · im Web veröffentlicht' : ''}</span>${openLink}</div>`
     );
@@ -705,7 +704,7 @@ function guessFivenetMeta(text, docTypes = []) {
   if (!out.title && lines[0]) {
     const first = lines[0];
     // eine Überschrift: kurz, kein Satz, keine „Feld: Wert“-Zeile, kein Listenpunkt/Bildmarker
-    if (first.length >= 3 && first.length <= 100 && !/[.!?]$/.test(first) && !/^[^:：]{1,30}[:：]/.test(first) && !/^(•|\[Bild\])/.test(first)) out.title = first;
+    if (first.length >= 3 && first.length <= 100 && !/[.!?]$/.test(first) && !/^[^:：]{1,30}[:：]/.test(first) && !/^(•|\[Bild)/.test(first)) out.title = first;
   }
   const id = String(text || '').match(/\bDOC\s*-\s*(\d{1,9})\b/i) || String(text || '').match(/\/documents\/(\d{1,9})\b/);
   out.documentId = id ? id[1] : '';
@@ -772,8 +771,15 @@ async function onFivenetMessage(e) {
   const id = String(data.documentId || '').match(/^\d{1,9}$/);
   if (!id) return toast('Aus FiveNet kam keine gültige Dokument-ID an.', 'error');
   const html = String(data.html || '').slice(0, 500000);
-  const parsed = html ? parsePastedHtml(html) : { text: String(data.text || '').slice(0, 60000), images: [] };
-  const text = parsed.text.slice(0, 60000);
+  const parsed = html ? parsePastedHtml(html) : { text: String(data.text || '').slice(0, 60000), images: [], items: [] };
+  let text = parsed.text.slice(0, 60000);
+  // Bilder des Dateispeichers merken (mit Marker-Nummer und Unterschrift); alle anderen Marker werden zu „[Bild]“
+  const imageMeta = {};
+  for (const it of parsed.items.slice(0, 200)) {
+    const u = externalImageUrl('fivenet', it.src);
+    if (u && Object.keys(imageMeta).length < FN_MAX_IMAGES && !imageMeta[u]) imageMeta[u] = { n: it.n, caption: it.caption };
+    else text = text.replace(`[Bild ${it.n}]`, '[Bild]');
+  }
   const guess = guessFivenetMeta(text, st.fivenet.docTypes || []);
   const clean = (v, n) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, n);
   fnImportPick({
@@ -783,7 +789,9 @@ async function onFivenetMessage(e) {
     docDate: guess.docDate,
     docAuthor: guess.docAuthor,
     contentText: text,
-    imageUrls: [...new Set(parsed.images.map((src) => externalImageUrl('fivenet', src)).filter(Boolean))].slice(0, FN_MAX_IMAGES),
+    imageUrls: Object.keys(imageMeta),
+    imageMeta,
+    imageSeq: parsed.items.length,
   });
 }
 window.addEventListener('message', onFivenetMessage);
@@ -839,7 +847,7 @@ function markHeadings(text) {
     .split('\n')
     .map((line) => {
       const l = line.trim();
-      if (!l || l.length > 80 || /^#|^•|^\[Bild\]|[.,;:!?]$/.test(l)) return line;
+      if (!l || l.length > 80 || /^#|^•|^\[Bild|[.,;:!?]$/.test(l)) return line;
       const letters = l.replace(/[^A-Za-zÄÖÜäöüß]/g, '');
       const caps = letters.length >= 4 && l === l.toUpperCase() && (letters.length >= 8 || /\s/.test(l)) && !/\d{3,}/.test(l);
       const para = /^§\s*\d+[a-z]?\s+\p{Lu}/u.test(l) && l.length <= 70;
@@ -848,15 +856,34 @@ function markHeadings(text) {
     .join('\n');
 }
 
-function parsePastedHtml(html) {
+/** Bildunterschrift aus dem Dokument: <figcaption>, sonst Alt-/Titeltext – aber keine Dateinamen oder Platzhalter. */
+function imageCaption(img) {
+  const fig = img.closest('figure');
+  const cap = fig && fig.querySelector('figcaption');
+  const clean = (t) => String(t || '').replace(/\s+/g, ' ').trim();
+  const usable = (t) => t.length >= 4 && !/\.(png|jpe?g|webp|gif|bmp)$/i.test(t) && !/^(bild|image|img|foto|screenshot)[\s_-]*\d*$/i.test(t) && !/^[\w-]{20,}$/.test(t);
+  for (const t of [cap && clean(cap.textContent), clean(img.getAttribute('alt')), clean(img.getAttribute('title'))]) if (t && usable(t)) return t.slice(0, 180);
+  return '';
+}
+
+/**
+ * Jedes Bild bekommt im Text einen nummerierten Marker „[Bild 3]“ (start = erste Nummer). Nach dem Speichern wird daraus
+ * „[Bild → B7]“ – der Verweis auf das übernommene Beweisbild. items: Adresse, Nummer und Unterschrift je Bild.
+ */
+function parsePastedHtml(html, start = 1) {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   doc.querySelectorAll('script, style, noscript, template, svg, button, input, select, textarea').forEach((n) => n.remove());
   const images = [];
+  const items = [];
   doc.querySelectorAll('img').forEach((img) => {
     const src = img.getAttribute('src');
-    if (src) images.push(src);
+    const n = start + items.length;
+    if (src) {
+      images.push(src);
+      items.push({ src, n, caption: imageCaption(img) });
+    }
     const marker = doc.createElement('p');
-    marker.textContent = '[Bild]';
+    marker.textContent = src ? `[Bild ${n}]` : '[Bild]';
     img.replaceWith(marker);
   });
   const out = [];
@@ -906,7 +933,7 @@ function parsePastedHtml(html) {
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
-  return { text: markHeadings(text), images };
+  return { text: markHeadings(text), images, items };
 }
 
 /**
@@ -950,12 +977,20 @@ function pendingCount() {
   return st.fnPending.urls.length + st.fnPending.blobs.length;
 }
 
-function addPendingImages({ urls = [], blobs = [] }) {
+/**
+ * meta: je Adresse { n, caption } aus dem eingefügten Dokument (Nummer des Markers im Text, Unterschrift); eingefügte
+ * Bilddateien tragen dasselbe als psMark. Ohne Marker (Dateiauswahl, Screenshot) gibt es nur das Bild.
+ */
+function addPendingImages({ urls = [], blobs = [], meta = {} }) {
   let dropped = 0;
+  const marks = (st.fnPending.marks = st.fnPending.marks || {});
   for (const u of urls) {
     if (st.fnPending.urls.includes(u)) continue;
     if (pendingCount() >= FN_MAX_IMAGES) dropped += 1;
-    else st.fnPending.urls.push(u);
+    else {
+      st.fnPending.urls.push(u);
+      if (meta[u]) marks[u] = meta[u];
+    }
   }
   for (const b of blobs) {
     if (pendingCount() >= FN_MAX_IMAGES) dropped += 1;
@@ -986,7 +1021,39 @@ function renderPending() {
 
 function resetPending() {
   (st.fnPending.previews || []).forEach((u) => URL.revokeObjectURL(u));
-  st.fnPending = { urls: [], blobs: [] };
+  st.fnPending = { urls: [], blobs: [], marks: {}, seq: 0 };
+}
+
+/**
+ * Bilder eines eingefügten Dokuments vormerken. Übernommen werden Bilder des Dateispeichers (Adresse) und eingebettete
+ * Bilddateien (data:); Marker von Bildern, die nicht übernommen werden können, werden im Text zu „[Bild]“.
+ * Liefert Text, Anzahl nicht übernehmbarer Bilder und die Adressen.
+ */
+function takePastedImages(provider, parsed) {
+  const meta = {};
+  const urls = [];
+  const blobs = [];
+  let external = 0;
+  let text = parsed.text;
+  for (const it of parsed.items) {
+    const blob = it.src.startsWith('data:') ? dataUrlToBlob(it.src) : null;
+    if (blob) {
+      blob.psMark = { n: it.n, caption: it.caption };
+      blobs.push(blob);
+      continue;
+    }
+    const u = externalImageUrl(provider, it.src);
+    if (u) {
+      urls.push(u);
+      meta[u] = { n: it.n, caption: it.caption };
+    } else {
+      external += 1;
+      text = text.replace(`[Bild ${it.n}]`, '[Bild]');
+    }
+  }
+  st.fnPending.seq = (st.fnPending.seq || 0) + parsed.items.length;
+  if (urls.length || blobs.length) addPendingImages({ urls, blobs, meta });
+  return { text, urls, external };
 }
 
 function insertAtCursor(el, text) {
@@ -1036,20 +1103,7 @@ function onExternalPaste(e, provider) {
     return;
   }
   if (html && inContent) {
-    const { text, images } = parsePastedHtml(html);
-    const urls = [];
-    const blobs = [];
-    let external = 0;
-    for (const src of images) {
-      const blob = src.startsWith('data:') ? dataUrlToBlob(src) : null;
-      if (blob) blobs.push(blob);
-      else {
-        const u = externalImageUrl(provider, src);
-        if (u) urls.push(u);
-        else external += 1;
-      }
-    }
-    if (urls.length || blobs.length) addPendingImages({ urls, blobs });
+    const { text, external } = takePastedImages(provider, parsePastedHtml(html, (st.fnPending.seq || 0) + 1));
     if (external) toast(`${external} Bild${external === 1 ? '' : 'er'} liegt nicht bei ${EXT[provider].name} – bitte als Screenshot einfügen.`, 'error');
     if (text) {
       e.preventDefault();
@@ -1071,15 +1125,25 @@ function onExternalPaste(e, provider) {
 async function importPendingImages(caseId, doc) {
   const pending = st.fnPending;
   const result = { ok: 0, failed: 0, skipped: 0, errors: [] };
-  if (!pending.urls.length && !pending.blobs.length) return result;
+  const hasMarkers = /\[Bild \d/.test(doc.contentText || '');
+  if (!pending.urls.length && !pending.blobs.length) {
+    // nur Marker ohne Bild (Bild wieder entfernt): zu „[Bild]“ machen
+    if (hasMarkers) await api.post(extUrl(caseId, doc.id, '/image-marks'), { marks: [] }).catch(() => {});
+    return result;
+  }
   toast('Bilder werden übernommen …');
+  const marks = pending.marks || {};
+  const linked = []; // { n, attachmentId } – Marker im Text → übernommenes Bild
   if (pending.urls.length) {
     try {
-      const r = await api.post(extUrl(caseId, doc.id, '/images'), { urls: pending.urls });
+      const captions = {};
+      for (const u of pending.urls) if (marks[u] && marks[u].caption) captions[u] = marks[u].caption;
+      const r = await api.post(extUrl(caseId, doc.id, '/images'), { urls: pending.urls, captions });
       result.ok += r.imported;
       result.skipped += r.skipped;
       result.failed += r.failed.length;
       result.errors.push(...r.failed.map((f) => f.error));
+      for (const m of r.map || []) if (marks[m.url]) linked.push({ n: marks[m.url].n, attachmentId: m.id });
     } catch (e) {
       result.failed += pending.urls.length;
       result.errors.push(e.message);
@@ -1089,7 +1153,9 @@ async function importPendingImages(caseId, doc) {
   for (const b of pending.blobs) {
     try {
       const blob = await resizeImage(b, { max: 1600 });
-      await api.upload(`/api/cases/${caseId}/attachments?caption=${encodeURIComponent(caption)}&internal=${doc.internal ? 1 : 0}&fivenetDoc=${doc.id}`, blob);
+      const own = b.psMark && b.psMark.caption ? b.psMark.caption : caption;
+      const up = await api.upload(`/api/cases/${caseId}/attachments?caption=${encodeURIComponent(own)}&internal=${doc.internal ? 1 : 0}&fivenetDoc=${doc.id}`, blob);
+      if (b.psMark && up && up.attachment) linked.push({ n: b.psMark.n, attachmentId: up.attachment.id });
       result.ok += 1;
     } catch (e) {
       result.failed += 1;
@@ -1097,6 +1163,14 @@ async function importPendingImages(caseId, doc) {
     }
   }
   resetPending();
+  // „[Bild 3]“ im Text → „[Bild → B7]“ (nicht übernommene oder entfernte Bilder → „[Bild]“)
+  if (hasMarkers) {
+    try {
+      await api.post(extUrl(caseId, doc.id, '/image-marks'), { marks: linked });
+    } catch {
+      /* der Text behält dann die nummerierten Marker – die Bilder sind trotzdem übernommen */
+    }
+  }
   return result;
 }
 
