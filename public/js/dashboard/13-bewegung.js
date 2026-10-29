@@ -249,22 +249,21 @@ async function landInRow(caseId) {
 }
 
 /* ================================================================
-   Kachel der Übersicht bzw. Menüpunkt: die Überschrift der neuen Seite fliegt von dort an ihren Platz – wie
-   Aktenzeichen und Titel beim Öffnen einer Akte. Die Seite selbst ist sofort da und bedienbar.
+   Kachel der Übersicht: die Überschrift der neuen Seite fliegt von dort an ihren Platz – wie Aktenzeichen und Titel
+   beim Öffnen einer Akte. Die Seite selbst ist sofort da und bedienbar. Bewusst nicht für die Menüpunkte links: dort
+   startete der Flug hinter der Seitenleiste, die Überschrift tauchte halbdurchsichtig an deren Kante auf und kreuzte
+   den Untertitel.
    ================================================================ */
 const heroOk = () => flyOk();
 document.addEventListener(
   'click',
   (e) => {
     if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-    const a = e.target.closest ? e.target.closest('#content a.kpi[href^="#"], #nav a.nav-item[href^="#"]') : null;
+    const a = e.target.closest ? e.target.closest('#content a.kpi[href^="#"]') : null;
     if (!a || !heroOk()) return;
     const view = decodeURIComponent(a.getAttribute('href').slice(1));
     if (!view || view === st.view) return;
-    // Menüpunkt: nur mit fester Seitenleiste (am Handy schließt das Menü ohnehin)
-    const nav = a.classList.contains('nav-item');
-    if (nav && !window.matchMedia('(min-width: 1024px)').matches) return;
-    st.heroFrom = { view, label: nav ? a.querySelector('span') || a : a.querySelector('.kpi-label') || a, tile: nav ? null : a };
+    st.heroFrom = { view, label: a.querySelector('.kpi-label') || a, tile: a };
   },
   true
 );

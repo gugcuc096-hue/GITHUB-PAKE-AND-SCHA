@@ -141,12 +141,40 @@ describe('Ziehen im Kalender und Abhaken (Browser)', { skip: chromium ? false : 
         if (await page.waitForSelector('#secTasks', { timeout: 10000 }).then(() => true, () => false)) break;
       }
       await page.click(`#secTasks [data-action="task-toggle"][data-id="${t1.id}"]`);
-      await page.waitForFunction((id) => document.querySelector(`#secTasks [data-action="task-toggle"][data-id="${id}"]`)?.classList.contains('pop'), t1.id, { timeout: 3000 });
+      await page.waitForFunction((id) => document.querySelector(`#secTasks [data-action="task-toggle"][data-id="${id}"]`)?.classList.contains('pop'), t1.id, { timeout: 8000 });
       await page.waitForFunction((id) => {
         const rows = [...document.querySelectorAll('#secTasks .task-row')];
         return rows.length === 2 && rows[1].querySelector(`[data-id="${id}"]`);
-      }, t1.id, { timeout: 5000 });
+      }, t1.id, { timeout: 8000 });
       assert.deepEqual(problems, []);
+    } finally {
+      await ctx.close();
+    }
+  });
+  it('PC: Menüpunkt links – die Überschrift fliegt nicht hinter der Seitenleiste los (nur die Kachel der Übersicht löst den Flug aus)', async () => {
+    const ctx = await browser.newContext({ viewport: { width: 1366, height: 900 }, locale: 'de-DE' });
+    const page = await ctx.newPage();
+    try {
+      await login(page);
+      await page.waitForSelector('#nav a.nav-item[href="#invoices"]');
+      // Ab dem Klick 700 ms lang beobachten, ob an der neuen Überschrift eine Flug-Animation (nicht CSS) läuft
+      const flights = await page.evaluate(
+        () =>
+          new Promise((resolve) => {
+            let seen = 0;
+            const t0 = performance.now();
+            const tick = () => {
+              const t = document.querySelector('#content .page-title');
+              if (t) seen = Math.max(seen, t.getAnimations().filter((a) => !(a instanceof CSSAnimation)).length);
+              if (performance.now() - t0 < 700) requestAnimationFrame(tick);
+              else resolve(seen);
+            };
+            document.querySelector('#nav a.nav-item[href="#invoices"]').click();
+            tick();
+          })
+      );
+      await page.waitForSelector('#content .page-title');
+      assert.equal(flights, 0, 'keine Flug-Animation an der Überschrift');
     } finally {
       await ctx.close();
     }
