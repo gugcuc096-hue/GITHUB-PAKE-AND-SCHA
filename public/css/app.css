@@ -870,6 +870,44 @@ details.edit-box[open] > summary::after { content: '–'; }
 .fn-pick-client { flex: none; max-width: 40%; font-size: 0.8rem; color: var(--text-dim); overflow-wrap: anywhere; text-align: right; }
 @media (max-width: 480px) { .fn-pick { flex-direction: column; align-items: flex-start; gap: 0.15rem; } .fn-pick-client { max-width: 100%; text-align: left; } }
 
+/* 360°-Feedback */
+.fb-list { display: grid; gap: 0.75rem; }
+.fb-card { border: 1px solid var(--line); border-radius: 14px; padding: 0.9rem 1.05rem; background: rgba(255, 255, 255, 0.02); display: flex; flex-direction: column; gap: 0.7rem; }
+.fb-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 0.4rem 1rem; }
+.fb-head > div { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.fb-sub { font-size: 0.82rem; color: var(--text-dim); }
+.fb-progress { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }
+.fb-bar { flex: 1 1 10rem; height: 6px; border-radius: 6px; background: rgba(212, 175, 55, 0.15); overflow: hidden; }
+.fb-bar i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, #e6c25a, #b8912a); }
+.fb-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.fb-people { display: grid; gap: 0.5rem; }
+.fb-person { border: 1px solid var(--line); border-radius: 12px; padding: 0.55rem 0.85rem; background: rgba(255, 255, 255, 0.02); }
+.fb-person > summary { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; cursor: pointer; font-weight: 500; }
+.fb-form { margin-top: 0.7rem; }
+.fb-rates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem 1rem; margin-bottom: 0.8rem; }
+@media (max-width: 560px) { .fb-rates { grid-template-columns: minmax(0, 1fr); } }
+.fb-rate { border: 0; padding: 0; margin: 0; min-width: 0; }
+.fb-rate legend { font-size: 0.78rem; color: var(--text-dim); margin-bottom: 0.3rem; padding: 0; }
+.fb-rate-row { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.fb-dot { position: relative; display: inline-flex; }
+.fb-dot input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+.fb-dot span { display: inline-flex; align-items: center; justify-content: center; width: 2.1rem; height: 2.1rem; border-radius: 10px; border: 1px solid var(--line); font-size: 0.9rem; color: var(--text-muted); transition: background 0.15s, border-color 0.15s, color 0.15s; }
+.fb-dot input:checked + span { background: var(--gold-soft); border-color: var(--gold-500); color: var(--gold-light); font-weight: 600; }
+.fb-dot input:focus-visible + span { outline: 2px solid var(--gold-500); outline-offset: 2px; }
+.fb-results { display: grid; gap: 0.9rem; }
+.fb-result { border: 1px solid var(--line); border-radius: 12px; padding: 0.8rem 1rem; }
+.fb-result header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem; margin-bottom: 0.5rem; }
+.fb-n { margin-left: auto; font-size: 0.78rem; color: var(--text-dim); }
+.fb-avgs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.4rem 1.2rem; margin-bottom: 0.6rem; }
+@media (max-width: 560px) { .fb-avgs { grid-template-columns: minmax(0, 1fr); } }
+.fb-avg { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; }
+.fb-avg-l { flex: 0 0 8rem; color: var(--text-muted); }
+.fb-meter { flex: 1; height: 6px; border-radius: 6px; background: rgba(212, 175, 55, 0.15); overflow: hidden; }
+.fb-meter i { display: block; height: 100%; background: linear-gradient(90deg, #e6c25a, #b8912a); }
+.fb-val { font-variant-numeric: tabular-nums; min-width: 2rem; text-align: right; }
+.fb-comments .k { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin: 0.5rem 0 0.2rem; }
+.fb-comments ul { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.25rem; font-size: 0.9rem; color: var(--text-muted); overflow-wrap: anywhere; }
+
 /* Rabatt-Freigabe */
 .appr-list { display: grid; gap: 0.7rem; }
 .appr-card { border: 1px solid var(--line); border-radius: 14px; padding: 0.85rem 1rem; background: rgba(255, 255, 255, 0.02); display: flex; flex-direction: column; gap: 0.5rem; }
