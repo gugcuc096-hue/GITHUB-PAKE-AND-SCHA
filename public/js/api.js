@@ -824,11 +824,11 @@
     spotEl = null;
   }
   /*
-   * In 3D zur Maus neigen sich die Teamkarten der Startseite, die Profilkarte eines Anwalts und die Karteikarte eines
-   * Mandanten – große Karten weniger stark. Nicht bei gedämpften Animationen und nicht, solange in der Karte ein Feld
-   * bearbeitet wird.
+   * In 3D zur Maus neigen sich die Teamkarten der Startseite und die Profilkarte eines Anwalts – große Karten weniger
+   * stark. Nicht bei gedämpften Animationen und nicht, solange in der Karte ein Feld bearbeitet wird. Die Karteikarte eines
+   * Mandanten neigt sich bewusst nicht: man liest und schreibt darin, das Wackeln stört (nur das Streiflicht bleibt).
    */
-  const TILT_SEL = '.team-card, .pf-card, .client-cover, .kpi'; // Kacheln der Übersicht nur ganz leicht (siehe tilt)
+  const TILT_SEL = '.team-card, .pf-card, .kpi'; // Kacheln der Übersicht nur ganz leicht (siehe tilt)
   let tiltEl = null;
   function tiltOff() {
     if (tiltEl) {
