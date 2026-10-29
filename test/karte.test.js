@@ -200,6 +200,29 @@ describe('Tatort-Karte (Browser)', { skip: chromium ? false : 'Playwright nicht 
         await page.mouse.click(at.x, at.y);
         await page.waitForFunction(() => /^\d{3,5}$/.test(document.getElementById('plPostal').value), null, { timeout: 5000 });
         assert.match(await page.textContent('#plHint'), /gefunden/);
+        // Kartenbild ist geladen und liegt unter den Postals
+        await page.waitForFunction(() => typeof kImg !== 'undefined' && kImg && kImg.naturalWidth === 2000, null, { timeout: 10000 });
+        // 3D: Gelände, Klick trifft einen Postal, zurück zu 2D (nur wenn der Browser WebGL kann)
+        await page.click('[data-action="kmap-3d"][data-id="kmapForm"]');
+        const has3d = await page.waitForFunction(() => kViews.get('kmapForm').m3 || document.querySelector('.toast, #toast') , null, { timeout: 20000 }).then(() => page.evaluate(() => !!kViews.get('kmapForm').m3));
+        if (has3d) {
+          await page.evaluate(() => {
+            const v = kViews.get('kmapForm');
+            v.m3.cam.tx = 150;
+            v.m3.cam.ty = -900;
+            v.m3.cam.dist = 2500;
+            v.m3.cam.yaw = 0.7;
+            v.m3.draw();
+          });
+          const hit = await page.evaluate(() => {
+            const v = kViews.get('kmapForm');
+            const g = v.m3.groundAt(v.W / 2, v.H / 2);
+            return g && Math.hypot(g.x - 150, g.y + 900) < 400;
+          });
+          assert.equal(hit, true, 'Strahl aus der Bildmitte trifft das Gelände nahe der Zielmitte');
+          await page.click('[data-action="kmap-3d"][data-id="kmapForm"]');
+          await page.waitForFunction(() => !kViews.get('kmapForm').m3);
+        }
         await page.click('[data-action="close-modal"]');
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth <= 1), true, 'kein seitliches Scrollen');
         assert.deepEqual(problems, []);

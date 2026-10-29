@@ -2638,11 +2638,13 @@ body.hint-edit .form-hint[data-hint-key]:hover { background: rgba(212, 175, 55, 
 .kmap-wrap { position: relative; height: 300px; margin: 0.75rem 0; border: 1px solid var(--gold-hairline); border-radius: 14px; overflow: hidden; background: #060f1e; }
 .kmap-wrap.is-big { height: min(72vh, 640px); }
 .kmap-wrap.kmap-form { height: 280px; margin-top: 0.25rem; }
-.kmap { display: block; width: 100%; height: 100%; cursor: grab; touch-action: pan-y; }
+.kmap { position: relative; z-index: 1; display: block; width: 100%; height: 100%; cursor: grab; touch-action: pan-y; }
+.kmap-gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .kmap.is-active { touch-action: none; }
 .kmap:active { cursor: grabbing; }
-.kmap-tools { position: absolute; top: 8px; right: 8px; display: flex; flex-direction: column; gap: 6px; }
+.kmap-tools { position: absolute; z-index: 3; top: 8px; right: 8px; display: flex; flex-direction: column; gap: 6px; }
 .kmap-tools .icon-btn { background: rgba(6, 15, 30, 0.85); border: 1px solid var(--gold-hairline); color: var(--text); }
+.kmap-3d { font: 700 11px system-ui, sans-serif; letter-spacing: 0.02em; }
 .kmap-tools .icon-btn.is-on { background: var(--gold-soft); color: var(--gold-light); }
 @media (hover: hover) and (pointer: fine) { .kmap-touch { display: none; } }
 .kmap-time { display: flex; align-items: center; gap: 0.75rem; margin: 0 0 0.75rem; }

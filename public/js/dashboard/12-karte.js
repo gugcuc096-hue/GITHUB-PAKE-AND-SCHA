@@ -2,7 +2,9 @@
  * Kanzlei-Dashboard – Tatort-Karte in der Akte: Orte (Tatort, Festnahme, Fundort, Fahrzeug …) mit der Postleitzahl der FiveM-Karte
  * von San Andreas, als Stecknadeln auf einer Karte, die aus den Postal-Koordinaten selbst gezeichnet wird (siehe places.js).
  * Ziehen verschiebt, Mausrad bzw. zwei Finger zoomen, ein Klick wählt den nächsten Postal – wie das Skript im Spiel. Ein Regler
- * zeigt den Ablauf nach Zeitpunkt. Nur die Kanzlei sieht die Orte. Die Karte ist eine eigene Zeichnung (kein Bild von Rockstar).
+ * zeigt den Ablauf nach Zeitpunkt. Nur die Kanzlei sieht die Orte. Als Untergrund dient das Kartenbild „GTA V Postal Code Map“
+ * (SiphonalGaming, Nummern und Titel retuschiert), ausgerichtet auf die Postal-Koordinaten; fehlt das Bild, leuchten die Postals selbst.
+ * Die 3D-Ansicht (Drehen und Kippen) steht in 12-karte3d.js.
  * Wird nach den vorherigen Teilen geladen (Reihenfolge siehe dashboard.html bzw. 01-basis.js).
  */
 'use strict';
@@ -31,6 +33,39 @@ const KMAP_LANDMARKS = [
   ['Mt. Chiliad', 450, 5600],
   ['Paleto Bay', -120, 6200],
 ];
+
+// Lage des Kartenbilds (2000 × 2000 px) in Spielkoordinaten – per Abgleich der 1.687 Postals mit den Straßen des Bildes ermittelt
+const KMAP_IMG = { src: '/img/karte-gta.webp', minX: -5743.6, maxX: 6674.9, minY: -4081.2, maxY: 8389.9 };
+let kImg = null; // geladenes Kartenbild (oder null, solange es lädt bzw. fehlt)
+let kImgState = '';
+let kWater = '#12a9d4'; // Farbe des Meeres am Bildrand – füllt alles um das Bild herum
+
+/** Kartenbild einmal laden; danach zeichnen sich alle offenen Karten neu. */
+function karteImage() {
+  if (kImgState) return;
+  kImgState = 'loading';
+  const im = new Image();
+  im.onload = () => {
+    kImg = im;
+    kImgState = 'ready';
+    try {
+      const c = document.createElement('canvas');
+      c.width = 1;
+      c.height = 1;
+      const cx = c.getContext('2d');
+      cx.drawImage(im, 0, 0, 40, 40, 0, 0, 1, 1);
+      const [r, g, b] = cx.getImageData(0, 0, 1, 1).data;
+      kWater = `rgb(${r},${g},${b})`;
+    } catch {
+      /* Standardfarbe bleibt */
+    }
+    kViews.forEach((v) => v.draw());
+  };
+  im.onerror = () => {
+    kImgState = 'failed';
+  };
+  im.src = KMAP_IMG.src;
+}
 
 let kPostals = null; // { list: [[code, x, y]], by: Map }
 let kGlow = null; // vorgezeichnete Leuchtfläche der Postals (Los Santos, Sandy Shores, Paleto …)
@@ -106,6 +141,7 @@ class KarteView {
     this.W = 0;
     this.H = 0;
     this.inset = 52; // rechts liegt die Werkzeugleiste – Nadeln sollen nicht darunter landen
+    this.m3 = null; // 3D-Ansicht (12-karte3d.js), solange eingeschaltet
     this.setActive(active);
     this.bind();
     this.ro = new ResizeObserver(() => this.resize());
@@ -129,6 +165,7 @@ class KarteView {
     this.cv.width = Math.round(r.width * d);
     this.cv.height = Math.round(r.height * d);
     this.dpr = d;
+    if (this.m3) this.m3.resize();
     if (first || !this.fitted) this.fit();
     else this.draw();
   }
@@ -140,6 +177,7 @@ class KarteView {
   /** Ausschnitt wählen: alle Nadeln (mit Rand, mindestens ein Stadtteil groß) – ohne Nadeln Los Santos. */
   fit() {
     if (!this.W) return;
+    if (this.m3) return this.m3.fit();
     let box = KMAP_CITY;
     if (this.pins.length) {
       const xs = this.pins.map((p) => p.x);
@@ -186,12 +224,14 @@ class KarteView {
     this.draw();
   }
   focus(x, y, s = 1.2) {
+    if (this.m3) return this.m3.focus(x, y, s);
     this.view.s = Math.max(this.minScale(), Math.min(4, Math.max(this.view.s, s)));
     this.view.cx = x + this.inset / 2 / this.view.s;
     this.view.cy = y;
     this.draw();
   }
   zoom(f, px = this.W / 2, py = this.H / 2) {
+    if (this.m3) return this.m3.zoomBy(f);
     const before = { x: this.wx(px), y: this.wy(py) };
     this.view.s = Math.max(this.minScale(), Math.min(4, this.view.s * f));
     this.view.cx += before.x - this.wx(px);
@@ -228,7 +268,15 @@ class KarteView {
       p.x = nx;
       p.y = ny;
       this.moved += Math.abs(dx) + Math.abs(dy);
-      if (this.ptr.size === 2) {
+      if (this.m3) {
+        if (this.ptr.size === 2) {
+          const now = this.pinchState();
+          if (this.pinch && this.pinch.d > 0) this.m3.zoomBy(now.d / this.pinch.d);
+          if (this.pinch) this.m3.pan(now.cx - this.pinch.cx, now.cy - this.pinch.cy);
+          this.pinch = now;
+          this.m3.draw();
+        } else if (this.moved > 4) this.m3.drag(dx, dy, e.shiftKey || (e.buttons & 2) === 2);
+      } else if (this.ptr.size === 2) {
         const now = this.pinchState();
         if (this.pinch && this.pinch.d > 0) this.zoom(now.d / this.pinch.d, now.cx, now.cy);
         this.view.cx -= (now.cx - this.pinch.cx) / this.view.s;
@@ -250,6 +298,9 @@ class KarteView {
     };
     cv.addEventListener('pointerup', up);
     cv.addEventListener('pointercancel', up);
+    cv.addEventListener('contextmenu', (e) => {
+      if (this.m3) e.preventDefault();
+    });
     cv.addEventListener('dblclick', (e) => {
       const r = cv.getBoundingClientRect();
       this.zoom(2, e.clientX - r.left, e.clientY - r.top);
@@ -262,6 +313,7 @@ class KarteView {
   }
 
   pinAt(px, py) {
+    if (this.m3) return this.m3.pinAt(px, py);
     let best = null;
     let bd = 16 * 16;
     for (const p of this.pins) {
@@ -282,27 +334,38 @@ class KarteView {
     const pin = this.pinAt(px, py);
     if (pin && this.onPin) return this.onPin(pin);
     if (!this.onPick || !kPostals) return;
-    const x = this.wx(px);
-    const y = this.wy(py);
+    const g = this.m3 ? this.m3.groundAt(px, py) : null;
+    if (this.m3 && !g) return;
+    const x = g ? g.x : this.wx(px);
+    const y = g ? g.y : this.wy(py);
     const p = karteNearest(x, y);
     if (p) this.onPick({ x: p[1], y: p[2], code: p[0] });
   }
 
   draw() {
     if (!this.W || !kPostals) return;
+    if (this.m3) return this.m3.draw();
     const x = this.ctx;
     const { s } = this.view;
     x.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     const bg = x.createLinearGradient(0, 0, 0, this.H);
     bg.addColorStop(0, '#060f1e');
     bg.addColorStop(1, '#0a1830');
-    x.fillStyle = bg;
+    x.fillStyle = kImg ? kWater : bg;
     x.fillRect(0, 0, this.W, this.H);
-    const g = karteGlow();
+    if (kImg) {
+      const I = KMAP_IMG;
+      x.imageSmoothingEnabled = true;
+      x.imageSmoothingQuality = 'high';
+      x.drawImage(kImg, this.sx(I.minX), this.sy(I.maxY), (I.maxX - I.minX) * s, (I.maxY - I.minY) * s);
+      x.fillStyle = 'rgba(6,15,30,.18)';
+      x.fillRect(0, 0, this.W, this.H);
+    }
+    const g = kImg ? null : karteGlow();
     if (g) x.drawImage(g, this.sx(KMAP_WORLD.minX), this.sy(KMAP_WORLD.maxY), (KMAP_WORLD.maxX - KMAP_WORLD.minX) * s, (KMAP_WORLD.maxY - KMAP_WORLD.minY) * s);
     // Postals
     const vis = [];
-    x.fillStyle = 'rgba(241,210,122,.75)';
+    x.fillStyle = kImg ? 'rgba(8,24,60,.7)' : 'rgba(241,210,122,.75)';
     const dot = Math.max(1, Math.min(2.4, s * 3));
     for (const p of kPostals.list) {
       const px = this.sx(p[1]);
@@ -313,24 +376,39 @@ class KarteView {
     }
     if (vis.length <= 150) {
       x.font = '600 10px ui-monospace, SFMono-Regular, Menlo, monospace';
-      x.fillStyle = 'rgba(203,213,225,.8)';
       x.textBaseline = 'middle';
-      for (const [code, px, py] of vis) x.fillText(code, px + 4, py - 6);
+      if (kImg) {
+        x.lineWidth = 3;
+        x.strokeStyle = 'rgba(255,255,255,.85)';
+        x.fillStyle = '#0b1d3a';
+        for (const [code, px, py] of vis) {
+          x.strokeText(code, px + 4, py - 6);
+          x.fillText(code, px + 4, py - 6);
+        }
+      } else {
+        x.fillStyle = 'rgba(203,213,225,.8)';
+        for (const [code, px, py] of vis) x.fillText(code, px + 4, py - 6);
+      }
     }
     // Orientierung
     if (s < 0.2) {
       x.font = '600 11px system-ui, sans-serif';
-      x.fillStyle = 'rgba(148,163,184,.85)';
       x.textBaseline = 'middle';
       x.textAlign = 'center';
-      for (const [name, lx, ly] of KMAP_LANDMARKS) x.fillText(name, this.sx(lx), this.sy(ly));
+      x.lineWidth = 3;
+      x.strokeStyle = kImg ? 'rgba(255,255,255,.9)' : 'rgba(6,15,30,.8)';
+      x.fillStyle = kImg ? '#0b1d3a' : 'rgba(148,163,184,.85)';
+      for (const [name, lx, ly] of KMAP_LANDMARKS) {
+        x.strokeText(name, this.sx(lx), this.sy(ly));
+        x.fillText(name, this.sx(lx), this.sy(ly));
+      }
       x.textAlign = 'start';
     }
     // gewählter Punkt
     if (this.sel) {
       const px = this.sx(this.sel.x);
       const py = this.sy(this.sel.y);
-      x.strokeStyle = '#f1d27a';
+      x.strokeStyle = kImg ? '#e11d48' : '#f1d27a';
       x.lineWidth = 2;
       x.beginPath();
       x.arc(px, py, 14, 0, 7);
@@ -391,6 +469,8 @@ class KarteView {
   }
 
   destroy() {
+    if (this.m3) this.m3.destroy();
+    this.m3 = null;
     this.ro.disconnect();
   }
 }
@@ -402,6 +482,7 @@ async function karteMount(id, opts) {
   if (kViews.has(id)) kViews.get(id).destroy();
   await karteLoadPostals();
   if (!cv.isConnected) return null;
+  karteImage();
   const v = new KarteView(cv, opts);
   kViews.set(id, v);
   return v;
@@ -421,6 +502,7 @@ function karteSection(c, places = []) {
           <button type="button" class="icon-btn sm" data-action="kmap-zoom" data-id="kmapMini" data-f="1.6" aria-label="Hineinzoomen">${icon('plus', 'ico-sm')}</button>
           <button type="button" class="icon-btn sm" data-action="kmap-zoom" data-id="kmapMini" data-f="0.625" aria-label="Herauszoomen"><span aria-hidden="true">−</span></button>
           <button type="button" class="icon-btn sm" data-action="kmap-fit" data-id="kmapMini" aria-label="Alle Orte zeigen" title="Alle Orte zeigen">${icon('pin', 'ico-sm')}</button>
+          <button type="button" class="icon-btn sm kmap-3d" data-action="kmap-3d" data-id="kmapMini" aria-label="3D-Ansicht ein- oder ausschalten" title="3D-Ansicht (drehen und kippen)"><span aria-hidden="true">3D</span></button>
           <button type="button" class="icon-btn sm" data-action="kmap-big" aria-label="Karte größer oder kleiner" title="Größer / kleiner">${icon('expand', 'ico-sm')}</button>
           <button type="button" class="icon-btn sm kmap-touch" data-action="kmap-touch" data-id="kmapMini" aria-label="Karte mit dem Finger bedienen" title="Karte mit dem Finger bedienen">${icon('grip', 'ico-sm')}</button>
         </div></div>
@@ -485,6 +567,7 @@ function placeForm(caseId, p) {
         <button type="button" class="icon-btn sm" data-action="kmap-zoom" data-id="kmapForm" data-f="1.6" aria-label="Hineinzoomen">${icon('plus', 'ico-sm')}</button>
         <button type="button" class="icon-btn sm" data-action="kmap-zoom" data-id="kmapForm" data-f="0.625" aria-label="Herauszoomen"><span aria-hidden="true">−</span></button>
         <button type="button" class="icon-btn sm" data-action="kmap-fit" data-id="kmapForm" aria-label="Los Santos zeigen" title="Los Santos zeigen">${icon('pin', 'ico-sm')}</button>
+        <button type="button" class="icon-btn sm kmap-3d" data-action="kmap-3d" data-id="kmapForm" aria-label="3D-Ansicht ein- oder ausschalten" title="3D-Ansicht (drehen und kippen)"><span aria-hidden="true">3D</span></button>
       </div></div>
     <form data-form="place-save" data-case-id="${caseId}" ${p ? `data-id="${p.id}"` : ''} class="form-grid cols-2">
       <div><label class="label" for="plKind">Art</label><select id="plKind" name="kind" class="field">${Object.entries(PLACE_KINDS).map(([k, [l]]) => opt(k, l, v.kind === k)).join('')}</select></div>
@@ -559,6 +642,18 @@ Object.assign(actions, {
     if (!w) return;
     w.classList.toggle('is-big');
     kViews.get('kmapMini')?.resize();
+  },
+  'kmap-3d': async (el) => {
+    const v = kViews.get(el.dataset.id);
+    if (!v) return;
+    const on = await karteSet3d(v, !v.m3);
+    el.classList.toggle('is-on', on);
+    el.setAttribute('aria-pressed', on ? 'true' : 'false');
+    if (on && window.matchMedia('(hover: none)').matches && !v.active) {
+      v.setActive(true);
+      document.querySelectorAll(`.kmap-touch[data-id="${el.dataset.id}"]`).forEach((b) => b.classList.add('is-on'));
+    }
+    if (on) toast('3D: Ziehen dreht und kippt, zwei Finger bzw. Mausrad zoomen. Das Relief ist aus dem Kartenbild geschätzt.');
   },
   'kmap-touch': (el) => {
     const v = kViews.get(el.dataset.id);
