@@ -86,6 +86,14 @@ describe('Ansicht der Akte (Browser)', { skip: chromium ? false : 'Playwright ni
       const problems = [];
       page.on('pageerror', (e) => problems.push(e.message));
       const order = () => page.$$eval('#caseSections > .sec-wrap', (w) => w.map((x) => x.dataset.sec));
+      // die erste Seitenansicht schließt beim Fertigwerden offene Fenster – dann die Akte noch einmal öffnen
+      const openAkte = async () => {
+        for (let versuch = 0; versuch < 3; versuch++) {
+          await page.evaluate((i) => openCase(i), id);
+          if (await page.waitForSelector('#caseSections', { timeout: 10000 }).then(() => true, () => false)) return;
+        }
+        await page.waitForSelector('#caseSections');
+      };
       try {
         await page.goto(`${srv.base}/login`);
         await page.fill('#email', TEAM.admin);
@@ -93,8 +101,7 @@ describe('Ansicht der Akte (Browser)', { skip: chromium ? false : 'Playwright ni
         await page.click('button[type=submit]');
         await page.waitForURL(/dashboard/);
         await page.waitForFunction(() => typeof openCase === 'function' && st.user && st.user.id);
-        await page.evaluate((i) => openCase(i), id);
-        await page.waitForSelector('#caseSections');
+        await openAkte();
         const base = await order();
         assert.ok(base.indexOf('witnesses') > base.indexOf('events'), 'Grundreihenfolge: Zeugen nach Terminen');
         // Anpassen: Zeugen zweimal nach oben, „Zeiten“ ausblenden, „Verlauf“ einklappen
@@ -122,8 +129,7 @@ describe('Ansicht der Akte (Browser)', { skip: chromium ? false : 'Playwright ni
         // Neu laden und öffnen: die Ansicht ist dieselbe
         await page.reload();
         await page.waitForFunction(() => typeof openCase === 'function' && st.user && st.user.id);
-        await page.evaluate((i) => openCase(i), id);
-        await page.waitForSelector('#caseSections');
+        await openAkte();
         assert.deepEqual(await order(), moved);
         assert.equal(await page.isVisible('#caseSections .sec-wrap[data-sec="work"]'), false);
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth <= 1), true, 'kein seitliches Scrollen');
