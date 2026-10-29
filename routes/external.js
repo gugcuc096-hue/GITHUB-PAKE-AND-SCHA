@@ -407,7 +407,15 @@ caseRouter.post(
     const link = loadLink(req, res, c, { manage: false });
     if (!link) return;
     const p = providerOf(link);
-    const d = parseBody(z.object({ urls: z.array(z.string().max(4000)).min(1).max(MAX_IMAGES_PER_IMPORT) }), req, res);
+    const d = parseBody(
+      z.object({
+        urls: z.array(z.string().max(4000)).min(1).max(MAX_IMAGES_PER_IMPORT),
+        // Bildunterschriften aus dem Dokument (Adresse → Text); ohne Angabe steht der Dokumentname als Beschriftung
+        captions: z.record(z.string().max(4000), z.string().max(400)).optional(),
+      }),
+      req,
+      res
+    );
     if (!d) return;
 
     const existing = db.prepare('SELECT source_url, content_hash FROM case_attachments WHERE external_doc_id = ?').all(link.id);
@@ -415,7 +423,12 @@ caseRouter.post(
     const knownHashes = new Set(existing.map((r) => r.content_hash).filter(Boolean));
     let free = MAX_ATTACHMENTS_PER_CASE - db.prepare('SELECT COUNT(*) AS n FROM case_attachments WHERE case_id = ?').get(c.id).n;
     const caption = truncate(`${p.noun} ${p.label(link.external_id, link.title)}`, 180);
-    const result = { imported: 0, skipped: 0, failed: [] };
+    const result = { imported: 0, skipped: 0, failed: [], map: [] };
+    // Beweismittel-Nummer eines (bereits vorhandenen oder neuen) Bildes dieses Dokuments – für die Marker im Text
+    const mark = (raw, where, value) => {
+      const row = db.prepare(`SELECT id, ev_no FROM case_attachments WHERE external_doc_id = ? AND ${where} = ?`).get(link.id, value);
+      if (row) result.map.push({ url: raw, id: row.id, no: row.ev_no });
+    };
 
     for (const raw of [...new Set(d.urls)]) {
       const url = p.imageUrl(raw, link);
@@ -425,6 +438,7 @@ caseRouter.post(
       }
       if (knownUrls.has(url)) {
         result.skipped += 1;
+        mark(raw, 'source_url', url);
         continue;
       }
       if (free <= 0) {
@@ -436,13 +450,18 @@ caseRouter.post(
         const hash = sha256(buf);
         if (knownHashes.has(hash)) {
           result.skipped += 1;
+          mark(raw, 'content_hash', hash);
           continue;
         }
         const saved = saveImageBuffer(buf, 'evidence');
-        db.prepare(
-          `INSERT INTO case_attachments (case_id, file, mime, size, caption, internal, uploader_id, uploader_name, external_doc_id, source_url, content_hash)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        ).run(c.id, saved.file, saved.mime, saved.size, caption, link.internal ? 1 : 0, req.user.id, req.user.display_name, link.id, url, hash);
+        const own = String((d.captions && d.captions[raw]) || '').replace(/\s+/g, ' ').trim();
+        const added = db
+          .prepare(
+            `INSERT INTO case_attachments (case_id, file, mime, size, caption, internal, uploader_id, uploader_name, external_doc_id, source_url, content_hash)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          )
+          .run(c.id, saved.file, saved.mime, saved.size, own ? truncate(own, 180) : caption, link.internal ? 1 : 0, req.user.id, req.user.display_name, link.id, url, hash);
+        mark(raw, 'id', Number(added.lastInsertRowid));
         knownUrls.add(url);
         knownHashes.add(hash);
         free -= 1;
@@ -464,6 +483,37 @@ caseRouter.post(
       });
     }
     res.json(result);
+  })
+);
+
+/**
+ * Marker „[Bild 3]“ in der Abschrift durch den Verweis auf das übernommene Bild ersetzen: „[Bild → B7]“. Der Browser meldet,
+ * welcher Marker zu welchem Anhang dieses Dokuments gehört; alle übrigen Marker werden zu „[Bild]“ (Bild nicht übernommen
+ * oder wieder entfernt). Nur der Text ändert sich – Stand und Verlauf der Abschrift bleiben unberührt.
+ */
+caseRouter.post(
+  '/:linkId/image-marks',
+  requireStaff,
+  wrap(async (req, res) => {
+    const c = loadCase(req, res);
+    if (!c) return;
+    const link = loadLink(req, res, c, { manage: false });
+    if (!link) return;
+    const d = parseBody(
+      z.object({ marks: z.array(z.object({ n: z.number().int().min(1).max(9999), attachmentId: z.number().int().positive().nullable() })).max(200) }),
+      req,
+      res
+    );
+    if (!d) return;
+    const byMark = new Map();
+    for (const m of d.marks) {
+      const a = m.attachmentId && db.prepare('SELECT ev_no FROM case_attachments WHERE id = ? AND case_id = ? AND external_doc_id = ?').get(m.attachmentId, c.id, link.id);
+      if (a && a.ev_no) byMark.set(m.n, a.ev_no);
+    }
+    const before = link.content_text || '';
+    const after = before.replace(/\[Bild (\d{1,4})\]/g, (_, n) => (byMark.has(Number(n)) ? `[Bild → B${byMark.get(Number(n))}]` : '[Bild]'));
+    if (after !== before) db.prepare('UPDATE case_external_docs SET content_text = ? WHERE id = ?').run(after, link.id);
+    res.json({ changed: after !== before, linked: byMark.size, contentText: after });
   })
 );
 

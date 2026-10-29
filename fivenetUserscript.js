@@ -11,7 +11,7 @@ function source({ kanzlei, fivenet }) {
   return `// ==UserScript==
 // @name         Pake & Scha – FiveNet-Dokument übernehmen
 // @namespace    ${kanzlei}
-// @version      1.0
+// @version      1.1
 // @description  Knopf auf FiveNet-Dokumenten: übergibt Titel, Text und Bilder an das offene Kanzlei-Dashboard (zur Bestätigung).
 // @match        ${fivenet}/*
 // @grant        none
@@ -41,6 +41,27 @@ function source({ kanzlei, fivenet }) {
     return best || document.body;
   }
 
+  // Bilder mit vollständiger Adresse mitgeben: FiveNet lädt sie oft erst beim Scrollen (data-src / srcset) und nutzt
+  // relative Adressen. Die Kopie verändert die Seite nicht; Bildunterschriften (alt, title, figcaption) bleiben erhalten.
+  function withImages(root, source) {
+    var live = source.querySelectorAll ? source.querySelectorAll('img') : [];
+    var copy = root.querySelectorAll('img');
+    for (var i = 0; i < copy.length; i++) {
+      var img = copy[i];
+      var orig = live.length === copy.length ? live[i] : null; // bei einer Auswahl passen die Listen nicht zusammen
+      var src = (orig && (orig.currentSrc || orig.src)) || img.getAttribute('src') || img.getAttribute('data-src') || img.getAttribute('data-original') || '';
+      if (!src) {
+        var set = img.getAttribute('srcset') || img.getAttribute('data-srcset') || '';
+        src = set.split(',')[0].trim().split(' ')[0];
+      }
+      if (src) {
+        try { src = new URL(src, location.href).href; } catch (err) { /* bleibt wie es ist */ }
+        img.setAttribute('src', src);
+      }
+    }
+    return root.innerHTML;
+  }
+
   function collect() {
     var sel = window.getSelection();
     var html = '';
@@ -48,12 +69,13 @@ function source({ kanzlei, fivenet }) {
     if (sel && !sel.isCollapsed && String(sel).trim().length > 20) {
       // Markierter Text hat Vorrang (falls die automatische Erkennung den falschen Bereich trifft)
       var box = document.createElement('div');
+      var range = sel.rangeCount ? sel.getRangeAt(0).commonAncestorContainer : document.body;
       for (var i = 0; i < sel.rangeCount; i++) box.appendChild(sel.getRangeAt(i).cloneContents());
-      html = box.innerHTML;
+      html = withImages(box, range.nodeType === 1 ? range : range.parentNode || document.body);
       text = String(sel);
     } else {
       var el = contentElement();
-      html = el.innerHTML;
+      html = withImages(el.cloneNode(true), el);
       text = el.innerText || '';
     }
     var h = document.querySelector('h1, h2');

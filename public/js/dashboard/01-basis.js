@@ -346,7 +346,7 @@ const st = {
   caseDocs: [],
   caseInfo: null,
   fnCheckToken: 0,
-  fnPending: { urls: [], blobs: [] },
+  fnPending: { urls: [], blobs: [], marks: {}, seq: 0 },
   fnPrefill: null, // Übergabe aus dem FiveNet-Skript: vorbelegte Angaben für das Formular
   fnImport: null, // … und das übergebene Dokument, solange die Akte noch gewählt wird
   precedents: null, // Präzedenzfälle (Wiki-Reiter) samt Schlagworten
