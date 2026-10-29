@@ -515,6 +515,9 @@ const GS_GROUPS = [
   ['messages', 'Kanzlei-Post', 'mail'],
   ['wiki', 'Kanzlei-Wiki', 'book'],
   ['penal', 'Strafgesetzbuch', 'scale'],
+  ['precedents', 'Präzedenzfälle', 'folder'],
+  ['witnesses', 'Zeugen', 'user'],
+  ['evidence', 'Beweismittel', 'image'],
 ];
 /**
  * Treffer hervorheben – der ganze Suchbegriff, seine einzelnen Wörter und die Wörter, die der Server trotz Tippfehler
@@ -584,23 +587,39 @@ function gsItem(type, x, q) {
     body = line(`<span class="font-mono text-gold">${esc(x.caseNumber)}</span> · ${esc(x.caseTitle)}`, [hl(x.preview, q), `${esc(x.author)}${x.internal ? ' (intern)' : ''}`, esc(fmtDate(x.createdAt))].join(' · '));
   else if (type === 'wiki') body = line(hl(x.title, q), [esc(x.category), hl(x.preview, q)].join(' · '));
   else if (type === 'penal') body = line(`<span class="text-gold">§ ${esc(x.para)}</span> · ${hl(x.title, q)}`, esc(x.chapter));
+  else if (type === 'precedents') body = line(hl(x.title, q), [esc(x.areaLabel || ''), esc(x.outcomeLabel || ''), hl(x.preview, q)].filter(Boolean).join(' · '));
+  else if (type === 'witnesses') body = line(`${hl(x.name, q)} <span class="text-dim">(Zeuge)</span>`, [esc(x.status), x.contact ? hl(x.contact, q) : '', `<span class="font-mono text-gold">${esc(x.caseNumber)}</span> ${esc(x.caseTitle)}`].filter(Boolean).join(' · '));
+  else if (type === 'evidence')
+    body = line(`<span class="font-mono text-gold">B${x.no}</span> · ${hl(x.caption || 'ohne Bezeichnung', q)}`, [`<span class="font-mono">${esc(x.caseNumber)}</span> ${esc(x.caseTitle)}`, esc(x.kindLabel), x.source ? hl(x.source, q) : '', hl(x.preview, q)].filter(Boolean).join(' · '));
   else if (type === 'messages')
     body = line(hl(x.subject || '(ohne Betreff)', q), [x.box === 'inbox' ? `von ${esc(x.senderName)}` : `an ${esc(x.recipientName)}`, esc(fmtDate(x.createdAt)), hl(x.preview, q)].filter(Boolean).join(' · '));
   return `<button type="button" class="gs-item" data-action="gs-open" data-type="${type}" data-id="${x.id}">${ico}${body}</button>`;
 }
+const GS_CMD_MODE = /^\s*>/;
 function renderSearchResults() {
   const box = $('#gsResults');
   if (!box) return;
-  const q = st.gsQuery.trim();
-  if (q.length < 2) {
-    box.innerHTML = `<p class="gs-hint">${isStaff() ? 'Aktenzeichen, Namen, Notizen, Rechnungen, Termine, Wiki oder Paragraphen – auch FiveNet- und Google-Links. Kleine Tippfehler sind kein Problem.' : 'Aktenzeichen, Rechnungsnummern, Termine, Nachrichten oder der Chat Ihrer Akten.'}</p>`;
+  const cmdMode = GS_CMD_MODE.test(st.gsQuery);
+  const q = st.gsQuery.replace(GS_CMD_MODE, '').trim();
+  const cmds = searchCommands(q, cmdMode);
+  const cmdHtml = cmds.length ? `<div class="gs-group">Befehle</div>${cmds.map(gsCmdItem).join('')}` : '';
+  if (cmdMode || q.length < 2) {
+    const hint = cmdMode
+      ? cmdHtml
+        ? ''
+        : '<p class="gs-hint">Kein passender Befehl.</p>'
+      : `<p class="gs-hint">${isStaff() ? 'Aktenzeichen, Namen, Notizen, Rechnungen, Termine, Wiki oder Paragraphen – auch FiveNet- und Google-Links. „B7“ findet Beweismittel, „>“ zeigt Befehle. Kleine Tippfehler sind kein Problem.' : 'Aktenzeichen, Rechnungsnummern, Termine, Nachrichten oder der Chat Ihrer Akten.'}</p>`;
+    box.innerHTML = `${cmdHtml}${cmdMode || q ? '' : recentCasesHtml()}${hint}`;
+    st.gsActive = 0;
+    markSearchActive();
     return;
   }
   const r = st.gsResults || {};
   const html = GS_GROUPS.filter(([k]) => (r[k] || []).length)
     .map(([k, label]) => `<div class="gs-group">${esc(label)}</div>${r[k].map((x) => gsItem(k, x, q)).join('')}`)
     .join('');
-  box.innerHTML = html || `<p class="gs-hint">${st.gsLoading ? 'Suche …' : `Keine Treffer für „${esc(q)}“.`}</p>`;
+  // Befehle stehen unter den Treffern, damit „Enter“ nach einem Aktenzeichen nie versehentlich einen Befehl auslöst
+  box.innerHTML = `${html}${cmdHtml}` || `<p class="gs-hint">${st.gsLoading ? 'Suche …' : `Keine Treffer für „${esc(q)}“.`}</p>`;
   st.gsActive = 0;
   markSearchActive();
 }
@@ -612,7 +631,7 @@ function markSearchActive() {
 async function runSearch() {
   const q = st.gsQuery.trim();
   const token = ++st.gsToken;
-  if (q.length < 2) {
+  if (q.length < 2 || GS_CMD_MODE.test(q)) {
     st.gsResults = null;
     renderSearchResults();
     return;
@@ -632,9 +651,9 @@ function openSearch() {
   st.gsQuery = st.gsQuery || '';
   openModal(`
       <h2 class="modal-title">Suchen</h2>
-      <label class="search mt-2">${icon('search')}<input id="gsInput" class="field" type="search" placeholder="${isStaff() ? 'Akten, Mandanten, Rechnungen, Termine …' : 'Akten, Rechnungen, Termine …'}" value="${esc(st.gsQuery)}" autocomplete="off" aria-label="Suchbegriff" autofocus></label>
+      <label class="search mt-2">${icon('search')}<input id="gsInput" class="field" type="search" placeholder="${isStaff() ? 'Suchen oder Befehl: Akten, Rechnungen, „Neue Akte“ …' : 'Suchen oder Befehl: Akten, Rechnungen, Termine …'}" value="${esc(st.gsQuery)}" autocomplete="off" aria-label="Suchbegriff" autofocus></label>
       <div id="gsResults" class="gs-results" role="listbox" aria-label="Suchergebnisse"></div>
-      <div class="gs-foot hidden md:flex"><span><kbd>↑</kbd> <kbd>↓</kbd> auswählen</span><span><kbd>Enter</kbd> öffnen</span><span><kbd>Esc</kbd> schließen</span><span><kbd>${KEY_MOD}</kbd> <kbd>K</kbd> Suche öffnen</span></div>`);
+      <div class="gs-foot hidden md:flex"><span><kbd>↑</kbd> <kbd>↓</kbd> auswählen</span><span><kbd>Enter</kbd> öffnen</span><span><kbd>Esc</kbd> schließen</span><span><kbd>&gt;</kbd> Befehle</span><span><kbd>${KEY_MOD}</kbd> <kbd>K</kbd> Suche öffnen</span></div>`);
   const input = $('#gsInput');
   input.focus();
   input.select();
@@ -650,6 +669,10 @@ async function openSearchResult(type, id) {
   if (type === 'cases') return modalInstead(() => openCase(id)).then(() => markInModal(q));
   if (type === 'notes') return modalInstead(() => openCase(x.caseId)).then(() => markInModal(q));
   if (type === 'wiki') return modalInstead(() => openWikiArticle(id));
+  if (type === 'precedents') return modalInstead(() => openPrecedent(id));
+  if (type === 'witnesses')
+    return modalInstead(() => openCase(x.caseId)).then(() => setTimeout(() => $(`#wit${id}`)?.scrollIntoView({ block: 'center', behavior: window.PS.motion.calm() ? 'auto' : 'smooth' }), 420));
+  if (type === 'evidence') return modalInstead(() => openCase(x.caseId)).then(() => actions['ev-open']({ dataset: { no: String(x.no) } }));
   if (type === 'penal') return modalInstead(() => openLaw(x.para));
   if (type === 'clients') return modalInstead(() => openClient(`u${id}`)); // Mandantenkartei
   if (type === 'invoices') {
@@ -807,6 +830,7 @@ function rememberCase(data) {
   st.caseContracts = data.contracts || [];
   st.caseTasks = data.tasks || [];
   st.caseInfo = data.case;
+  rememberRecent(data.case);
   st.caseCharges = data.charges || null; // Anklagepunkte (Kanzlei) – auch für den Verhandlungsmodus
   if (data.case) queueThumbs(data.case.id, st.caseAttachments);
 }

@@ -306,6 +306,7 @@ document.addEventListener('input', (e) => {
     t.style.height = `${next}px`;
   } else if (t.id === 'gsInput') {
     st.gsQuery = t.value;
+    if (GS_CMD_MODE.test(t.value) || t.value.trim().length < 2) renderSearchResults(); // Befehle und Startansicht sofort, ohne auf die Suche zu warten
     clearTimeout(st.gsTimer);
     st.gsTimer = setTimeout(() => runSearch().catch(handleError), 200);
   } else if (t.id === 'fnImportSearch') {
@@ -1506,7 +1507,7 @@ function shortcutsHelp() {
     .map(([k, v]) => row(['g', k], viewLabel(v)));
   openModal(`<h2 id="modalTitle" class="modal-title">Tastenkürzel</h2>
       <p class="modal-sub">Funktionieren überall im Dashboard, solange kein Eingabefeld aktiv ist.</p>
-      <div class="kbd-list">${row(['?'], 'Diese Übersicht')}${row(['/'], 'Suchen')}${row(['Strg', 'K'], 'Suchen (auch beim Tippen)')}${isStaff() ? row(['n'], 'Neue Akte') : ''}${row(['Esc'], 'Fenster schließen')}${go.join('')}</div>
+      <div class="kbd-list">${row(['?'], 'Diese Übersicht')}${row(['/'], 'Suchen')}${row(['Strg', 'K'], 'Suchen (auch beim Tippen)')}${row(['>'], 'In der Suche: nur Befehle')}${isStaff() ? row(['n'], 'Neue Akte') : ''}${row(['Esc'], 'Fenster schließen')}${go.join('')}</div>
       <div class="form-actions mt-4"><button type="button" class="btn-ghost btn-md" data-action="close-modal">Schließen</button></div>`);
 }
 document.addEventListener('keydown', (e) => {

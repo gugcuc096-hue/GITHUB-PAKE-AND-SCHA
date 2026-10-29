@@ -18,6 +18,7 @@ const actions = {
     if (unsavedInputs({ invoice: true }) && !(await askDiscard(true))) return;
     st.leaving = true; // keine zweite Rückfrage des Browsers
     window.PS.drafts.clearAll(); // Entwürfe gehören zu diesem Konto – nicht für den Nächsten am selben Gerät
+    forgetRecent(); // ebenso die Liste „Zuletzt geöffnet“
     setAppBadge(0); // Zahl auf dem App-Symbol gehört ebenfalls zu diesem Konto
     await api.post('/api/auth/logout');
     location.href = '/login';

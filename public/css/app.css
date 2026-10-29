@@ -436,6 +436,7 @@ a:hover > .brand-logo { transform: scale(1.04); }
 .gs-item { display: flex; align-items: center; gap: 0.75rem; width: 100%; padding: 0.6rem 0.6rem; border: 0; border-radius: 10px; background: none; color: inherit; text-align: left; cursor: pointer; }
 .gs-item > .ico { color: var(--text-dim); flex-shrink: 0; }
 .gs-item .main { display: block; min-width: 0; flex: 1; }
+.gs-tag { flex-shrink: 0; padding: 0.05rem 0.45rem; border: 1px solid var(--gold-hairline); border-radius: 999px; color: var(--gold-light); font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase; }
 .gs-item .title { display: block; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gs-item .meta { display: block; font-size: 0.75rem; color: var(--text-dim); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gs-item:hover, .gs-item.active { background: rgba(212, 175, 55, 0.09); }
