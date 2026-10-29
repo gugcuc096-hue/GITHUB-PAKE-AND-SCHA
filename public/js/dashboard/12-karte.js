@@ -19,6 +19,7 @@ const PLACE_KINDS = {
 };
 // Spielkoordinaten (x nach Osten, y nach Norden): ganze Karte und der Ausschnitt um Los Santos
 const KMAP_WORLD = { minX: -3600, maxX: 3900, minY: -3600, maxY: 6900 };
+const KMAP_SMAX = 1.2; // weiter heranzuzoomen macht das Kartenbild nur unscharf
 const KMAP_CITY = { minX: -2300, maxX: 1600, minY: -3300, maxY: 1500 };
 // Orientierungspunkte (ungefähre Lage) – nur beim Herauszoomen beschriftet
 const KMAP_LANDMARKS = [
@@ -111,6 +112,32 @@ function karteGlow() {
   return kGlow;
 }
 
+/** Postleitzahlen beschriften, ohne dass sich Nummern überlappen: von der Mitte nach außen, was frei ist, wird gesetzt. */
+function karteLabelFlow(x, items, cx, cy, onImage, max = 900) {
+  x.font = '700 11px ui-monospace, SFMono-Regular, Menlo, monospace';
+  x.textBaseline = 'middle';
+  x.textAlign = 'start';
+  x.lineJoin = 'round';
+  x.lineWidth = 3.5;
+  const taken = new Set();
+  let n = 0;
+  const sorted = items.slice().sort((a, b) => (a[1] - cx) ** 2 + (a[2] - cy) ** 2 - ((b[1] - cx) ** 2 + (b[2] - cy) ** 2));
+  for (const [code, px, py] of sorted) {
+    if (n >= max) break;
+    const lx = px + 5;
+    const ly = py - 8;
+    const keys = [];
+    for (let gx = Math.floor(lx / 14); gx <= Math.floor((lx + 30) / 14); gx++) for (let gy = Math.floor((ly - 6) / 13); gy <= Math.floor((ly + 6) / 13); gy++) keys.push(gx * 100003 + gy);
+    if (keys.some((k) => taken.has(k))) continue;
+    keys.forEach((k) => taken.add(k));
+    x.strokeStyle = onImage ? 'rgba(255,255,255,.92)' : 'rgba(6,15,30,.85)';
+    x.fillStyle = onImage ? '#0b1d3a' : 'rgba(226,232,240,.95)';
+    x.strokeText(code, lx, ly);
+    x.fillText(code, lx, ly);
+    n++;
+  }
+}
+
 /** Nächster Postal zu einer Position (wie das Skript im Spiel). */
 function karteNearest(x, y) {
   let best = null;
@@ -187,7 +214,7 @@ class KarteView {
     }
     const w = Math.max(box.maxX - box.minX, 500);
     const h = Math.max(box.maxY - box.minY, 500);
-    this.view.s = Math.max(this.minScale(), Math.min(4, Math.min((this.W - this.inset) / w, this.H / h)));
+    this.view.s = Math.max(this.minScale(), Math.min(KMAP_SMAX, Math.min((this.W - this.inset) / w, this.H / h)));
     this.view.cx = (box.minX + box.maxX) / 2 + this.inset / 2 / this.view.s;
     this.view.cy = (box.minY + box.maxY) / 2;
     this.fitted = true;
@@ -225,7 +252,7 @@ class KarteView {
   }
   focus(x, y, s = 1.2) {
     if (this.m3) return this.m3.focus(x, y, s);
-    this.view.s = Math.max(this.minScale(), Math.min(4, Math.max(this.view.s, s)));
+    this.view.s = Math.max(this.minScale(), Math.min(KMAP_SMAX, Math.max(this.view.s, s)));
     this.view.cx = x + this.inset / 2 / this.view.s;
     this.view.cy = y;
     this.draw();
@@ -233,7 +260,7 @@ class KarteView {
   zoom(f, px = this.W / 2, py = this.H / 2) {
     if (this.m3) return this.m3.zoomBy(f);
     const before = { x: this.wx(px), y: this.wy(py) };
-    this.view.s = Math.max(this.minScale(), Math.min(4, this.view.s * f));
+    this.view.s = Math.max(this.minScale(), Math.min(KMAP_SMAX, this.view.s * f));
     this.view.cx += before.x - this.wx(px);
     this.view.cy += before.y - this.wy(py);
     this.draw();
@@ -363,33 +390,25 @@ class KarteView {
     }
     const g = kImg ? null : karteGlow();
     if (g) x.drawImage(g, this.sx(KMAP_WORLD.minX), this.sy(KMAP_WORLD.maxY), (KMAP_WORLD.maxX - KMAP_WORLD.minX) * s, (KMAP_WORLD.maxY - KMAP_WORLD.minY) * s);
-    // Postals
+    // Postals: Punkte immer, Nummern überlappungsfrei, sobald genug Platz ist
     const vis = [];
-    x.fillStyle = kImg ? 'rgba(8,24,60,.7)' : 'rgba(241,210,122,.75)';
-    const dot = Math.max(1, Math.min(2.4, s * 3));
+    const r = Math.max(1.4, Math.min(3, s * 4));
+    x.fillStyle = kImg ? '#0b1d3a' : 'rgba(241,210,122,.75)';
+    x.strokeStyle = 'rgba(255,255,255,.9)';
+    x.lineWidth = 1;
     for (const p of kPostals.list) {
       const px = this.sx(p[1]);
       const py = this.sy(p[2]);
       if (px < -10 || py < -10 || px > this.W + 10 || py > this.H + 10) continue;
       vis.push([p[0], px, py]);
-      x.fillRect(px - dot / 2, py - dot / 2, dot, dot);
-    }
-    if (vis.length <= 150) {
-      x.font = '600 10px ui-monospace, SFMono-Regular, Menlo, monospace';
-      x.textBaseline = 'middle';
       if (kImg) {
-        x.lineWidth = 3;
-        x.strokeStyle = 'rgba(255,255,255,.85)';
-        x.fillStyle = '#0b1d3a';
-        for (const [code, px, py] of vis) {
-          x.strokeText(code, px + 4, py - 6);
-          x.fillText(code, px + 4, py - 6);
-        }
-      } else {
-        x.fillStyle = 'rgba(203,213,225,.8)';
-        for (const [code, px, py] of vis) x.fillText(code, px + 4, py - 6);
-      }
+        x.beginPath();
+        x.arc(px, py, r, 0, 7);
+        x.fill();
+        x.stroke();
+      } else x.fillRect(px - r / 2, py - r / 2, r, r);
     }
+    if (s >= 0.22 || vis.length <= 150) karteLabelFlow(x, vis, this.W / 2, this.H / 2, kImg);
     // Orientierung
     if (s < 0.2) {
       x.font = '600 11px system-ui, sans-serif';

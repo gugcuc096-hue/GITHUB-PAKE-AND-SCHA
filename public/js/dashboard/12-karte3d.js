@@ -10,6 +10,7 @@
 const K3_N = 384; // Gitterpunkte je Seite des Geländes
 const K3_MAX_H = 1100; // höchste Erhebung in Metern (bewusst überhöht, damit das Relief sichtbar ist)
 const K3_FOV = 0.8;
+const K3_FOG = [0.05, 0.33, 0.47]; // Dunst über dem Meer – Himmel und Ferne gehen darin auf
 let kTerrain = null; // { n, h: Float32Array } – gemeinsam für alle Karten
 
 const k3Clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -136,9 +137,8 @@ void main(){
   vec3 n=normalize(vNor);
   float d=max(dot(n,normalize(vec3(-0.5,-0.35,0.8))),0.0);
   c*=0.56+0.6*d;
-  c=mix(c,uFog,clamp(vDist*uFogK,0.0,0.88));
-  float edge=min(min(vUv.x,1.0-vUv.x),min(vUv.y,1.0-vUv.y));
-  c=mix(uFog,c,smoothstep(0.0,0.07,edge));
+  c=mix(c,uFog,clamp(vDist*uFogK,0.0,0.92));
+
   o=vec4(c,1.0);
 }`;
 
@@ -185,9 +185,9 @@ class Karte3D {
     // Gelände
     const n = kTerrain.n;
     const I = KMAP_IMG;
-    const pos = new Float32Array(n * n * 3);
-    const nor = new Float32Array(n * n * 3);
-    const uv = new Float32Array(n * n * 2);
+    const pos = new Float32Array((n * n + 4) * 3);
+    const nor = new Float32Array((n * n + 4) * 3);
+    const uv = new Float32Array((n * n + 4) * 2);
     const cw = (I.maxX - I.minX) / (n - 1);
     const ch = (I.maxY - I.minY) / (n - 1);
     const H = (i, j) => kTerrain.h[k3Clamp(j, 0, n - 1) * n + k3Clamp(i, 0, n - 1)];
@@ -208,7 +208,16 @@ class Karte3D {
         uv[k * 2 + 1] = j / (n - 1);
       }
     }
-    const idx = new Uint32Array((n - 1) * (n - 1) * 6);
+    // Meer rings um die Karte: eine große, flache Fläche, deren Textur am Rand ausläuft (Randfarbe = Wasser) – kein schwebendes Kartenstück
+    const SEA = 60000;
+    const sea = [[-SEA, -SEA], [SEA, -SEA], [SEA, SEA], [-SEA, SEA]];
+    sea.forEach(([sx, sy], q) => {
+      const k = n * n + q;
+      pos.set([sx, sy, -1.5], k * 3);
+      nor.set([0, 0, 1], k * 3);
+      uv.set([(sx - I.minX) / (I.maxX - I.minX), (I.maxY - sy) / (I.maxY - I.minY)], k * 2);
+    });
+    const idx = new Uint32Array((n - 1) * (n - 1) * 6 + 6);
     let q = 0;
     for (let j = 0; j < n - 1; j++) {
       for (let i = 0; i < n - 1; i++) {
@@ -220,6 +229,7 @@ class Karte3D {
         q += 6;
       }
     }
+    idx.set([n * n, n * n + 1, n * n + 2, n * n, n * n + 2, n * n + 3], q);
     this.count = idx.length;
     this.vao = ctx.createVertexArray();
     ctx.bindVertexArray(this.vao);
@@ -240,7 +250,17 @@ class Karte3D {
     // Kartenbild als Oberfläche
     const tex = ctx.createTexture();
     ctx.bindTexture(ctx.TEXTURE_2D, tex);
-    ctx.texImage2D(ctx.TEXTURE_2D, 0, ctx.RGBA, ctx.RGBA, ctx.UNSIGNED_BYTE, kImg);
+    let src = kImg;
+    const maxTex = ctx.getParameter(ctx.MAX_TEXTURE_SIZE);
+    if (kImg.naturalWidth > maxTex) {
+      // kleinere Grafikkarten (Handys): Bild auf die erlaubte Größe verkleinern
+      const sm = document.createElement('canvas');
+      sm.width = maxTex;
+      sm.height = maxTex;
+      sm.getContext('2d').drawImage(kImg, 0, 0, maxTex, maxTex);
+      src = sm;
+    }
+    ctx.texImage2D(ctx.TEXTURE_2D, 0, ctx.RGBA, ctx.RGBA, ctx.UNSIGNED_BYTE, src);
     ctx.generateMipmap(ctx.TEXTURE_2D);
     ctx.texParameteri(ctx.TEXTURE_2D, ctx.TEXTURE_MIN_FILTER, ctx.LINEAR_MIPMAP_LINEAR);
     ctx.texParameteri(ctx.TEXTURE_2D, ctx.TEXTURE_MAG_FILTER, ctx.LINEAR);
@@ -278,7 +298,7 @@ class Karte3D {
   toFlat() {
     const v = this.host.view;
     const c = this.cam;
-    v.s = k3Clamp(this.host.H / (c.dist * 2 * Math.tan(K3_FOV / 2)), this.host.minScale(), 4);
+    v.s = k3Clamp(this.host.H / (c.dist * 2 * Math.tan(K3_FOV / 2)), this.host.minScale(), KMAP_SMAX);
     v.cx = c.tx + this.host.inset / 2 / v.s;
     v.cy = c.ty;
   }
@@ -434,11 +454,11 @@ class Karte3D {
     this.matrices();
     const gl = this.gl;
     gl.viewport(0, 0, this.glc.width, this.glc.height);
-    gl.clearColor(0.039, 0.094, 0.188, 1);
+    gl.clearColor(K3_FOG[0], K3_FOG[1], K3_FOG[2], 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.useProgram(this.pr);
     gl.uniformMatrix4fv(this.uVP, false, this.vp);
-    gl.uniform3f(this.uFog, 0.039, 0.094, 0.188);
+    gl.uniform3f(this.uFog, K3_FOG[0], K3_FOG[1], K3_FOG[2]);
     gl.uniform1f(this.uFogK, 0.5 / (this.cam.dist * 3));
     gl.bindVertexArray(this.vao);
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
@@ -466,6 +486,27 @@ class Karte3D {
         x.strokeText(name, p.x, p.y);
         x.fillText(name, p.x, p.y);
       }
+    }
+    // Postleitzahlen rund um die Kartenmitte, sobald man nah genug dran ist
+    if (c.dist < 3600 && kPostals) {
+      const reach = Math.max(700, c.dist * 1.1);
+      const items = [];
+      for (const [code, px, py] of kPostals.list) {
+        if (Math.abs(px - c.tx) > reach || Math.abs(py - c.ty) > reach) continue;
+        const q = this.project(px, py, karte3dHeight(px, py));
+        if (q && q.x > 0 && q.y > 0 && q.x < h.W && q.y < h.H) items.push([code, q.x, q.y]);
+      }
+      x.fillStyle = '#0b1d3a';
+      x.strokeStyle = 'rgba(255,255,255,.9)';
+      x.lineWidth = 1;
+      for (const [, qx, qy] of items) {
+        x.beginPath();
+        x.arc(qx, qy, 2.2, 0, 7);
+        x.fill();
+        x.stroke();
+      }
+      karteLabelFlow(x, items, h.W / 2, h.H / 2, true, 160);
+      x.textAlign = 'center';
     }
     if (h.sel) {
       const z = karte3dHeight(h.sel.x, h.sel.y);

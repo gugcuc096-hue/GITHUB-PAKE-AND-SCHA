@@ -924,7 +924,6 @@ async function openCase(id) {
   st.modalCaseId = id;
   if (typeof liveSync === 'function') liveSync(); // Mandanten verbinden sich erst, wenn eine Akte offen ist
   initChat(data);
-  copilotInit(id);
   karteInit();
   animateTrack($('#modalBody .track'));
 }
@@ -939,8 +938,7 @@ async function reloadCase(id, { live = false, by = '' } = {}) {
     replaceModal(caseDetail(data));
     if (draft && $('#modalBody .chat-input')) $('#modalBody .chat-input').value = draft;
     initChat(data);
-    copilotInit(id);
-    karteInit();
+      karteInit();
     if (before) liveFlash($('#modalBody'), before, by);
     flipPlay(flip);
   }

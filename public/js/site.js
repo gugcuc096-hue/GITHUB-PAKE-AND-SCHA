@@ -361,6 +361,8 @@
     const bar = document.querySelector('.topstrip .flex.items-center.gap-5');
     if (!bar) return;
     bar.querySelectorAll('.site-switch, .site-avatar').forEach((n) => n.remove());
+    // Angemeldet übernimmt der Umschalter oben die Rolle des Dashboard-Knopfs in der Kopfzeile (auf dem Handy bleibt der Knopf)
+    document.documentElement.classList.toggle('ps-in', !!me);
     const login = bar.querySelector('[data-auth-link]');
     if (!me) {
       if (login) login.classList.remove('hidden');
