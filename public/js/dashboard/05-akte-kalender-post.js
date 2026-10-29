@@ -877,7 +877,7 @@ function routingHtml(routing) {
     .join('')}</div>`;
 }
 
-function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, transcripts = [], clientSuggestions, review, chat, charges, deals = [], links = [], linkedEvidence = [], routing = [], parties = [], overlaps = {}, requests = [], similar = [], precedentId = null, logMore = 0 }) {
+function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, transcripts = [], clientSuggestions, review, chat, charges, deals = [], links = [], linkedEvidence = [], routing = [], parties = [], places = [], overlaps = {}, requests = [], similar = [], precedentId = null, logMore = 0 }) {
   const staff = isStaff();
   const admin = isAdmin();
   const me = st.user.id;
@@ -1103,6 +1103,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     charges: staff ? chargesSection(c, charges, deals) : dealClientCard(c, deals),
     chat: chatSection(c, chat, ticket),
     witnesses: witnessesSection(c, parties),
+    karte: karteSection(c, places),
     contracts: contractsSection(c, contractList),
     briefs: briefsSection(c, briefList),
     external: externalSection(c, externalDocs, attachments),
@@ -1121,6 +1122,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     ['secChat', 'Nachrichten', chat ? chat.messages.length : 0, parts.chat],
     ['secEvents', 'Termine', appointments.length, true],
     ['secWitnesses', 'Zeugen', parties.filter((p) => p.role === 'zeuge').length, parts.witnesses],
+    ['secKarte', 'Karte', places.length, parts.karte],
     ['secContracts', 'Verträge', contractList.length, parts.contracts],
     ['secBriefs', 'Schriftsätze', briefList.length, parts.briefs],
     ['secExternal', 'Dokumente', externalDocs.length, parts.external],
@@ -1174,6 +1176,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       ${parts.chat}
       ${eventsSection}
       ${parts.witnesses}
+      ${parts.karte}
       ${parts.contracts}
       ${parts.briefs}
       ${parts.external}

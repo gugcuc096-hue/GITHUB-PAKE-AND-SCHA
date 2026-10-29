@@ -1361,6 +1361,24 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_party_contradictions_case ON party_contradictions(case_id);
 `);
 
+// Tatort-Karte: Orte einer Akte (Tatort, Festnahme, Fundort …) mit Postleitzahl und Position auf der FiveM-Karte (nur Kanzlei)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS case_places (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id     INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    postal      TEXT NOT NULL,
+    x           REAL NOT NULL,
+    y           REAL NOT NULL,
+    kind        TEXT NOT NULL DEFAULT 'tatort',
+    label       TEXT NOT NULL DEFAULT '',
+    note        TEXT NOT NULL DEFAULT '',
+    happened_at TEXT,
+    created_by  TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_case_places_case ON case_places(case_id);
+`);
+
 // Verknüpfte Akten (z. B. ein Vorfall, mehrere Festgenommene) – je Paar eine Zeile, a_id < b_id
 db.exec(`
   CREATE TABLE IF NOT EXISTS case_links (
