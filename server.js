@@ -58,6 +58,14 @@ app.use(
     referrerPolicy: { policy: 'same-origin' },
   })
 );
+// Übergabe aus FiveNet („→ An Pake & Scha senden“ bzw. Lesezeichen): Das Kanzlei-Fenster wird vom FiveNet-Tab geöffnet und
+// muss dessen Nachrichten empfangen und bestätigen können. Helmets Standard „same-origin“ (Cross-Origin-Opener-Policy) trennt
+// diese Verbindung – das Fenster blieb leer. Deshalb nur für diese Einstiegsadresse (und die Anmeldeseite davor) gelockert.
+app.use((req, res, next) => {
+  const fromFivenet = (req.path === '/dashboard' && req.query.import === 'fivenet') || (req.path === '/login' && /(^|[?&])import=fivenet\b/.test(String(req.query.next || '')));
+  if (fromFivenet) res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
+  next();
+});
 // Discord-Button-Klicks (Ticket-Panel): brauchen den unveränderten Rohtext für die Signaturprüfung –
 // deshalb vor express.json().
 app.use('/api/discord/interactions', require('./routes/interactions'));

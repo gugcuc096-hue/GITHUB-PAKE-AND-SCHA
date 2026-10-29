@@ -33,6 +33,21 @@ describe('FiveNet-Skript (API)', () => {
     assert.doesNotThrow(() => new Function(r.text.split('==/UserScript==')[1]), 'Skriptkörper ist gültig');
     assert.doesNotMatch(r.text, /password|passwort|cookie/i, 'kein Zugriff auf Zugangsdaten');
   });
+
+  it('Lesezeichen (ohne Erweiterung): nur für die Kanzlei, trägt die Kanzlei-Adresse und ist gültiges JavaScript', async () => {
+    assert.equal((await client(srv.base).get('/api/fivenet/status')).status, 401, 'ohne Anmeldung nicht abrufbar');
+    const a = client(srv.base);
+    await a.login(TEAM.admin);
+    const st = await a.get('/api/fivenet/status');
+    assert.equal(st.status, 200);
+    const url = st.json.bookmarklet;
+    assert.ok(url.startsWith('javascript:'));
+    const code = decodeURIComponent(url.slice('javascript:'.length));
+    assert.ok(code.includes(`var KANZLEI = ${JSON.stringify(srv.base)}`));
+    assert.ok(!code.includes('\n'), 'eine Zeile');
+    assert.doesNotThrow(() => new Function(code));
+    assert.doesNotMatch(code, /password|passwort|cookie/i);
+  });
 });
 
 describe('FiveNet-Übernahme im Dashboard (Browser)', { skip: chromium ? false : 'Playwright nicht installiert' }, () => {
@@ -220,6 +235,54 @@ describe('FiveNet-Übernahme im Dashboard (Browser)', { skip: chromium ? false :
     assert.ok(sizes[0][1] > body * 1.4 && sizes[1][1] > body, `Überschriften größer als der Text: ${JSON.stringify(sizes)} vs ${body}`);
     // Kopieren: ohne Markierungen
     assert.ok(!(await page.evaluate((t) => PS.transcriptPlain(t), '## Sachverhalt\nText')).includes('#'));
+    await ctx.close();
+  });
+  it('Profil: Skript kopieren und Lesezeichen anbieten (falls Tampermonkey nichts anzeigt) – das Lesezeichen sendet ein FiveNet-Dokument ans Dashboard', async () => {
+    const ctx = await browser.newContext({ viewport: { width: 1366, height: 900 }, locale: 'de-DE', permissions: ['clipboard-read', 'clipboard-write'] });
+    const page = await ctx.newPage();
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(e.message));
+    await login(page);
+    await page.waitForFunction(() => typeof fivenetProfilePanel === 'function');
+    await page.evaluate(() => go('profile'));
+    await page.waitForSelector('.fn-oneclick');
+    // Hinweise zur Erweiterung und Weg ohne Erweiterung stehen da
+    const panel = await page.textContent('.fn-oneclick');
+    assert.match(panel, /Benutzerskripte zulassen/);
+    assert.match(panel, /Skript kopieren/);
+    assert.match(await page.getAttribute('.fn-bookmarklet a[data-action="fn-bm-hint"]', 'href'), /^javascript:/);
+    // „Skript kopieren“ legt das Benutzerskript in die Zwischenablage
+    await page.click('[data-action="fn-script-copy"]');
+    await page.waitForFunction(() => navigator.clipboard.readText().then((t) => t.startsWith('// ==UserScript==')), null, { timeout: 5000 });
+    // „Adresse kopieren“ legt das Lesezeichen ab; ein Klick auf den Ziehknopf tut nichts außer einem Hinweis
+    await page.click('[data-action="fn-bm-copy"]');
+    await page.waitForFunction(() => navigator.clipboard.readText().then((t) => t.startsWith('javascript:')), null, { timeout: 5000 });
+    const bookmarklet = await page.evaluate(() => navigator.clipboard.readText());
+    await page.click('[data-action="fn-bm-hint"]');
+    assert.ok((await page.textContent('#toasts, .ps-toast, [role="status"]').catch(() => '')) !== null);
+    assert.equal(page.url().startsWith('javascript:'), false);
+
+    // Das Lesezeichen auf einer (nachgebildeten) FiveNet-Seite ausführen: das Dashboard öffnet sich mit der Akten-Auswahl
+    await ctx.route('https://fivenet.modernv.net/**', (route) =>
+      route.fulfill({ contentType: 'text/html; charset=utf-8', body: '<!doctype html><title>FiveNet</title><main><h1>Haftbefehl Doe</h1><p>Erstellt von: Staatsanwaltschaft</p><p>Der Beschuldigte wurde angehört.</p><img src="/api/filestore/abc" alt="Foto Tatort"></main>' })
+    );
+    const fake = await ctx.newPage();
+    await fake.goto('https://fivenet.modernv.net/documents/4802');
+    const popup = ctx.waitForEvent('page');
+    await fake.evaluate((code) => {
+      // wie ein Klick auf das Lesezeichen: die Adresse „javascript:…“ wird als Skript ausgeführt
+      window.eval(decodeURIComponent(code.slice('javascript:'.length)));
+    }, bookmarklet);
+    const dash = await popup;
+    await dash.waitForSelector('#fnImportList .fn-pick', { timeout: 15000 });
+    assert.match(await dash.textContent('#modalBody'), /Dokument\s*4802/);
+    assert.match(await dash.textContent('#modalBody'), /Haftbefehl Doe/);
+    // Auf einer Seite ohne Dokument: nur ein Hinweis, kein Fenster
+    const other = await ctx.newPage();
+    await other.goto('https://fivenet.modernv.net/overview');
+    await other.evaluate((code) => window.eval(decodeURIComponent(code.slice('javascript:'.length))), bookmarklet);
+    await other.waitForFunction(() => document.body.innerText.includes('Bitte zuerst ein FiveNet-Dokument öffnen'));
+    assert.deepEqual(problems, []);
     await ctx.close();
   });
 });

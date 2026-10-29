@@ -258,10 +258,14 @@ function fivenetProfilePanel() {
       <div class="fn-oneclick mt-4"><div class="fn-oneclick-head">${icon('link', 'ico-sm')}<strong>Ein-Klick-Übernahme (empfohlen)</strong></div>
         <p class="text-sm text-muted">Ein kleines Browser-Skript (Tampermonkey o. Ä.) setzt in FiveNet-Dokumenten den Knopf <strong>„→ An Pake &amp; Scha senden“</strong>. Ein Klick übergibt Titel, Text und Bilder an dieses Dashboard – dort wählen Sie die Akte und bestätigen. Das Skript läuft nur in <em>Ihrem</em> Browser, liest nur, was Sie dort sehen (wie Markieren und Kopieren), und kennt kein Passwort. Markierter Text hat Vorrang vor dem ganzen Dokument.</p>
         <ol class="text-sm text-muted list-decimal pl-5 space-y-1">
-          <li>Erweiterung <strong>Tampermonkey</strong> (oder Violentmonkey) im Browser installieren.</li>
-          <li><a class="link-btn" href="/fivenet-import.user.js">Skript installieren ↓</a> – Tampermonkey fragt nach der Installation.</li>
+          <li>Erweiterung <strong>Tampermonkey</strong> (oder Violentmonkey) im Browser installieren: <a class="link-btn" href="https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo" target="_blank" rel="noopener noreferrer">Chrome, Brave, Edge ↗</a> · <a class="link-btn" href="https://addons.mozilla.org/firefox/addon/tampermonkey/" target="_blank" rel="noopener noreferrer">Firefox ↗</a>. <strong>Chrome, Brave und Edge:</strong> danach in den Erweiterungs-Einstellungen von Tampermonkey („Details“) <em>„Benutzerskripte zulassen“</em> einschalten – sonst passiert beim Installieren nichts.</li>
+          <li><a class="link-btn" href="/fivenet-import.user.js">Skript installieren ↓</a> – Tampermonkey fragt nach der Installation. Erscheint stattdessen nur Text: <button type="button" class="link-btn" data-action="fn-script-copy">Skript kopieren</button> → Tampermonkey-Symbol → „Neues Skript erstellen“ → alles ersetzen → einfügen → Strg+S.</li>
           <li>FiveNet-Dokument öffnen → Knopf unten rechts → im Kanzlei-Fenster Akte wählen → prüfen → „Mit Akte verknüpfen“.</li>
-        </ol></div>
+        </ol>
+        <div class="fn-bookmarklet mt-3"><p class="text-sm text-muted"><strong>Ohne Erweiterung – als Lesezeichen:</strong> diesen Knopf mit der Maus in die Lesezeichenleiste ziehen (Strg+Umschalt+B blendet sie ein). Auf einem geöffneten FiveNet-Dokument darauf klicken – dasselbe wie der Knopf unten rechts, in jedem Browser.</p>
+          <p class="mt-2 flex flex-wrap items-center gap-2"><a class="btn-outline btn-sm" data-action="fn-bm-hint" href="${esc(fn.bookmarklet || '')}" draggable="true" title="In die Lesezeichenleiste ziehen">${icon('link', 'ico-sm')}<span>→ An Pake &amp; Scha senden</span></a>
+            <button type="button" class="btn-ghost btn-sm" data-action="fn-bm-copy">${icon('copy', 'ico-sm')}<span>Adresse kopieren</span></button>
+            <span class="text-xs text-dim">Zum Ziehen nicht anklicken. Alternativ: Lesezeichen anlegen und die kopierte Adresse als URL einfügen.</span></p></div></div>
       <p class="text-sm text-muted mt-4"><strong>Oder von Hand:</strong></p>
       <ol class="text-sm text-muted list-decimal pl-5 mt-1 space-y-1">
         <li>Ohne Skript: In FiveNet den Charakter wählen, der das Dokument sehen darf.</li>
