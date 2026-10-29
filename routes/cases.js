@@ -545,6 +545,9 @@ function caseDetail(c, u, { lean = false, all = false } = {}) {
       ? { estimateHe: c.sentence_estimate ?? null, estimateFine: c.sentence_fine ?? null, actualHe: c.sentence_actual_he ?? null, actualFine: c.sentence_actual_fine ?? null }
       : undefined,
     parties: staff ? require('../parties').listForCase(c.id) : undefined,
+    // Kanzlei: ähnliche Präzedenzfälle (gleiche Paragraphen/Rechtsgebiet) und der Eintrag zu dieser Akte
+    similar: staff ? require('../precedents').similarFor(c) : undefined,
+    precedentId: staff ? ((db.prepare('SELECT id FROM precedents WHERE case_id = ?').get(c.id) || {}).id ?? null) : undefined,
     overlaps: staff
       ? (() => {
           const p = require('../parties');

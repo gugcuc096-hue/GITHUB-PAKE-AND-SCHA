@@ -338,7 +338,8 @@ describe('Mandantenportal: Discord-Konto, Zahlung melden, Unterschriften', () =>
       assert.equal(r.status, 200, r.text);
       assert.equal(r.json.invoice.paymentReport, null);
       assert.equal(await reports(), 0);
-      assert.ok(!fs.existsSync(path.join(server.dir, 'uploads', 'evidence', state.proofFile)), 'Screenshot gelöscht');
+      // Der Server löscht die Datei im Hintergrund – kurz abwarten statt sofort prüfen
+      await waitFor(() => !fs.existsSync(path.join(server.dir, 'uploads', 'evidence', state.proofFile)), 'Screenshot gelöscht');
       const msg = await waitFor(() => ticketMsg('⚠️ Zahlung noch nicht eingegangen'), 'Ticket-Nachricht');
       assert.match(msg.embeds[0].description, /nichts eingegangen/);
       const notes = (await as.mandant.get(`/api/cases/${state.caseId}`)).json.notes;

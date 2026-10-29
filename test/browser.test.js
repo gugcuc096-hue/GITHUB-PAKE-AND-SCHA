@@ -820,6 +820,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.waitForFunction((t) => Object.keys(localStorage).some((k) => k.startsWith('ps.draft:') && (localStorage.getItem(k) || '').includes(t)), `Angefangene Anfrage (${label})`);
         await page.reload();
         await page.locator('[data-act="ticket"]:visible').first().click();
+        // der Entwurf wird eingesetzt, sobald die Seite fertig gestartet ist – auf langsamen Rechnern etwas später
+        await page.waitForFunction((t) => document.getElementById('tkDesc').value === t, `Angefangene Anfrage (${label})`, { timeout: 5000 }).catch(() => {});
         assert.equal(await page.inputValue('#tkDesc'), `Angefangene Anfrage (${label})`);
         assert.deepEqual(problems, []);
       } finally {

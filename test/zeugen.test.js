@@ -134,7 +134,11 @@ describe('Zeugenverwaltung in der Akte (Browser)', { skip: chromium ? false : 'P
       await page.click('button[type=submit]');
       await page.waitForURL(/dashboard/);
       await page.waitForFunction(() => st.user && st.user.id, null, { timeout: 15000 });
-      await page.evaluate((id) => openCase(id), caseId);
+      // die erste Seitenansicht schließt beim Fertigwerden offene Fenster – dann die Akte noch einmal öffnen
+      for (let versuch = 0; versuch < 3; versuch++) {
+        await page.evaluate((id) => openCase(id), caseId);
+        if (await page.waitForSelector('#secWitnesses', { timeout: 10000 }).then(() => true, () => false)) break;
+      }
       await page.waitForSelector('#secWitnesses');
       const nm = `Zeuge ${name}`;
       await page.click('[data-action="wit-add"]');

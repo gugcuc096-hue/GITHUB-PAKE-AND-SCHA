@@ -347,6 +347,11 @@ const st = {
   fnPending: { urls: [], blobs: [] },
   fnPrefill: null, // Übergabe aus dem FiveNet-Skript: vorbelegte Angaben für das Formular
   fnImport: null, // … und das übergebene Dokument, solange die Akte noch gewählt wird
+  precedents: null, // Präzedenzfälle (Wiki-Reiter) samt Schlagworten
+  precQ: '',
+  precArea: '',
+  precOutcome: '',
+  precTag: '',
 };
 
 const $ = (s, root = document) => root.querySelector(s);
