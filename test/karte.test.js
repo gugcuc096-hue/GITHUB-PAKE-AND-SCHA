@@ -177,6 +177,14 @@ describe('Tatort-Karte (Browser)', { skip: chromium ? false : 'Playwright nicht 
         });
         await page.mouse.click(pos.x, pos.y);
         await page.waitForSelector(`#secKarte .place-row.is-on[data-place="${pos.id}"]`, { timeout: 5000 });
+        // Infokarte an der Nadel; Untergrund umschalten (Satellit ↔ Karte), Ablauf-Knopf ab zwei Orten
+        await page.waitForSelector('#kmapWrap .kmap-card:not([hidden])', { timeout: 5000 });
+        assert.match(await page.textContent('#kmapWrap .kmap-card'), /Tankstelle/);
+        assert.equal(await page.locator('#secKarte [data-action="kmap-play"]').count(), 1);
+        await page.click('#secKarte [data-action="kmap-style"][data-style="karte"]');
+        await page.waitForFunction(() => karteBase() && karteBase().style === 'karte', null, { timeout: 15000 });
+        await page.click('#secKarte [data-action="kmap-style"][data-style="sat"]');
+        await page.waitForFunction(() => karteBase() && karteBase().style === 'sat', null, { timeout: 15000 });
         // Hinzufügen per Postleitzahl
         await page.click('[data-action="place-add"]');
         await page.waitForSelector('#kmapForm');
@@ -201,7 +209,7 @@ describe('Tatort-Karte (Browser)', { skip: chromium ? false : 'Playwright nicht 
         await page.waitForFunction(() => /^\d{3,5}$/.test(document.getElementById('plPostal').value), null, { timeout: 5000 });
         assert.match(await page.textContent('#plHint'), /gefunden/);
         // Kartenbild ist geladen und liegt unter den Postals
-        await page.waitForFunction(() => typeof kImg !== 'undefined' && kImg && kImg.naturalWidth >= 2000, null, { timeout: 10000 });
+        await page.waitForFunction(() => karteBase() && karteBase().img.naturalWidth >= 2000, null, { timeout: 15000 });
         // 3D: Gelände, Klick trifft einen Postal, zurück zu 2D (nur wenn der Browser WebGL kann)
         const has3d = await page.evaluate(() => karteSet3d(kViews.get('kmapForm'), true));
         if (has3d) {
