@@ -125,6 +125,7 @@ app.use('/api/gsheets', externalRoutes.gsheetsRouter);
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/penal', require('./routes/penal').router); // Strafkatalog (StGB)
 app.use('/api/wiki', require('./routes/wiki').router); // Kanzlei-Wiki
+app.use('/api/precedents', require('./routes/precedents').router); // Präzedenzfälle (Wiki-Reiter) und „Ähnliche Fälle“
 app.use('/api/snippets', require('./routes/snippets').router); // Textbausteine (Akten-Chat, Notizen)
 app.use('/api/resolutions', require('./routes/resolutions').router); // Board-Beschlüsse
 app.use('/api/search', require('./routes/search'));

@@ -877,7 +877,7 @@ function routingHtml(routing) {
     .join('')}</div>`;
 }
 
-function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, transcripts = [], clientSuggestions, review, chat, charges, deals = [], links = [], linkedEvidence = [], routing = [], parties = [], overlaps = {}, requests = [], logMore = 0 }) {
+function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, transcripts = [], clientSuggestions, review, chat, charges, deals = [], links = [], linkedEvidence = [], routing = [], parties = [], overlaps = {}, requests = [], similar = [], precedentId = null, logMore = 0 }) {
   const staff = isStaff();
   const admin = isAdmin();
   const me = st.user.id;
@@ -1167,6 +1167,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
           : `${intakeAnswersHtml(c)}${c.description ? `<div class="section"><h3 class="section-title">Sachverhalt</h3><p class="text-sm whitespace-pre-wrap text-muted">${esc(c.description)}</p></div>` : emptySection('', 'Sachverhalt', 'noch nicht beschrieben')}
       ${c.publicNote ? `<div class="section"><h3 class="section-title">Statushinweis</h3><div class="banner banner-gold mb-0"><p class="text-sm whitespace-pre-wrap">${esc(c.publicNote)}</p></div></div>` : ''}`
       }
+      ${staff ? precedentStrip(c, similar, precedentId) : ''}
       ${parts.charges}
       ${parts.chat}
       ${eventsSection}
