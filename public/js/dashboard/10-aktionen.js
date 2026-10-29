@@ -1615,6 +1615,11 @@ const actions = {
       el.dataset.done = on ? '1' : '0';
     };
     show(done);
+    if (done && !window.PS.motion.calm()) {
+      el.classList.remove('pop');
+      void el.offsetWidth;
+      el.classList.add('pop'); // Haken federt kurz auf
+    }
     el.disabled = true;
     try {
       await guardedPatch('/api/tasks/' + el.dataset.id, { done }, { done: !done }, { reload: afterTaskChange });

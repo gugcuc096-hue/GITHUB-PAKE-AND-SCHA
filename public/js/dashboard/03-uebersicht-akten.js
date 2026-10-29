@@ -938,6 +938,11 @@ async function reloadCase(id, { live = false, by = '' } = {}) {
     initChat(data);
     copilotInit(id);
     if (before) liveFlash($('#modalBody'), before, by);
+    const flip = flipSnapshot(); // Aufgaben gleiten beim Abhaken/Umsortieren an ihren neuen Platz
+    replaceModal(caseDetail(data));
+    if (draft && $('#modalBody .chat-input')) $('#modalBody .chat-input').value = draft;
+    initChat(data);
+    flipPlay(flip);
   }
   refreshBehind();
 }

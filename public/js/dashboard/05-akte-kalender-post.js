@@ -1395,40 +1395,106 @@ function calendarStaff() {
 }
 
 /*
- * Kalender (PC): einen Eintrag mit der Maus auf einen anderen Tag ziehen – die Uhrzeit bleibt, der Eintrag rastet am
- * neuen Tag weich ein. Der Mandant erfährt die Verlegung wie sonst auch (Ticket bzw. Discord-Nachricht).
+ * Kalender: einen Eintrag auf einen anderen Tag ziehen – die Uhrzeit bleibt. Am PC mit der Maus, am Handy erst gedrückt
+ * halten (kurz, es vibriert): Dann hebt sich der Eintrag ab, folgt dem Finger und schwingt dabei wie ein Pendel mit
+ * (stärker bei schnellem Ziehen). Er rastet am neuen Tag weich ein; lässt man ihn über keinem Tag los, federt er zurück an
+ * seinen Platz. Der Mandant erfährt die Verlegung wie sonst auch (Ticket bzw. Discord-Nachricht).
  */
-const calDrag = { ev: null, chip: null, ghost: null, over: null, x: 0, y: 0, moved: false };
+const calDrag = { ev: null, chip: null, ghost: null, over: null, x: 0, y: 0, moved: false, touch: false, lifted: false, timer: 0, lastX: 0, lastT: 0, tilt: 0, settle: 0 };
+const CAL_SPRING = 'cubic-bezier(0.34, 1.56, 0.64, 1)'; // schwingt kurz über das Ziel hinaus
+const calReset = () => {
+  clearTimeout(calDrag.timer);
+  clearTimeout(calDrag.settle);
+  Object.assign(calDrag, { ev: null, chip: null, ghost: null, over: null, moved: false, touch: false, lifted: false, tilt: 0 });
+};
+function calGhost(x, y) {
+  // kleine Karte mit Uhrzeit und Titel (am Handy wird eine Zeile der Tagesübersicht gehalten, nicht der kleine Eintrag im Raster)
+  const e = st.events.find((v) => v.id === calDrag.ev);
+  calDrag.ghost = document.createElement('span');
+  calDrag.ghost.className = `cal-ev cal-ghost t-${e ? e.type : 'intern'}`;
+  calDrag.ghost.textContent = e ? `${fmtTime(e.startsAt)} ${e.title}` : calDrag.chip.textContent.trim();
+  document.body.appendChild(calDrag.ghost);
+  document.body.classList.add('cal-dragging');
+  calDrag.lastX = x;
+  calDrag.lastT = performance.now();
+  calPlace(x, y);
+  // Abheben: kurz größer mit Schatten
+  if (!window.PS.motion.calm() && calDrag.ghost.animate) calDrag.ghost.animate([{ transform: 'scale(0.9) rotate(0deg)', opacity: 0.7 }, { transform: 'scale(1.06) rotate(-2deg)', opacity: 1 }], { duration: 180, easing: CAL_SPRING });
+}
+function calPlace(x, y) {
+  const g = calDrag.ghost;
+  g.style.left = `${x + (calDrag.touch ? -40 : 10)}px`;
+  g.style.top = `${y + (calDrag.touch ? -48 : 10)}px`; // am Finger: darüber, damit er den Eintrag nicht verdeckt
+  // Pendel: Neigung folgt der Geschwindigkeit nach links/rechts und beruhigt sich, wenn man anhält
+  const now = performance.now();
+  const vx = (x - calDrag.lastX) / Math.max(1, now - calDrag.lastT);
+  calDrag.lastX = x;
+  calDrag.lastT = now;
+  calDrag.tilt = Math.max(-16, Math.min(16, calDrag.tilt * 0.65 + vx * 7));
+  g.style.transform = `rotate(${calDrag.tilt.toFixed(1)}deg) scale(1.06)`;
+  clearTimeout(calDrag.settle);
+  calDrag.settle = setTimeout(() => calDrag.ghost && (calDrag.ghost.style.transform = 'rotate(-2deg) scale(1.06)'), 90);
+}
+function calLift(x, y) {
+  if (!calDrag.ev || calDrag.moved) return;
+  calDrag.lifted = true;
+  calDrag.moved = true;
+  if (navigator.vibrate) navigator.vibrate(12);
+  calGhost(x, y);
+}
 document.addEventListener('pointerdown', (e) => {
-  if (e.button !== 0 || e.pointerType !== 'mouse' || st.view !== 'calendar' || !isStaff()) return;
-  const chip = e.target.closest && e.target.closest('#content .cal-ev[data-ev]');
-  if (chip) Object.assign(calDrag, { ev: Number(chip.dataset.ev), chip, x: e.clientX, y: e.clientY, moved: false });
+  if (e.button !== 0 || st.view !== 'calendar' || !isStaff()) return;
+  const touch = e.pointerType !== 'mouse';
+  // Maus: Eintrag im Raster · Handy: Eintrag im Raster (breite Ansicht) oder Zeile der Tagesübersicht, gedrückt gehalten
+  const chip = e.target.closest && e.target.closest(touch ? '#content .cal-ev[data-ev], #content #dayAgenda [data-action="open-event"][data-id]' : '#content .cal-ev[data-ev]');
+  if (!chip) return;
+  calReset();
+  Object.assign(calDrag, { ev: Number(chip.dataset.ev || chip.dataset.id), chip, x: e.clientX, y: e.clientY, moved: false, touch });
+  if (touch) calDrag.timer = setTimeout(() => calLift(calDrag.x, calDrag.y), 380); // erst gedrückt halten, sonst wischt man nur
 });
 document.addEventListener('pointermove', (e) => {
   if (!calDrag.ev) return;
+  if (calDrag.touch && !calDrag.lifted) {
+    if (Math.hypot(e.clientX - calDrag.x, e.clientY - calDrag.y) > 10) calReset(); // es wird gescrollt oder gewischt, nicht gezogen
+    else {
+      calDrag.x = e.clientX;
+      calDrag.y = e.clientY;
+    }
+    return;
+  }
   if (!calDrag.moved) {
     if (Math.hypot(e.clientX - calDrag.x, e.clientY - calDrag.y) < 6) return;
     calDrag.moved = true;
-    calDrag.ghost = calDrag.chip.cloneNode(true);
-    calDrag.ghost.classList.add('cal-ghost');
-    document.body.appendChild(calDrag.ghost);
-    document.body.classList.add('cal-dragging');
+    calGhost(e.clientX, e.clientY);
   }
-  calDrag.ghost.style.left = `${e.clientX + 10}px`;
-  calDrag.ghost.style.top = `${e.clientY + 10}px`;
+  calPlace(e.clientX, e.clientY);
   const day = document.elementFromPoint(e.clientX, e.clientY)?.closest('#content .cal-day[data-day]') || null;
   if (day === calDrag.over) return;
   calDrag.over?.classList.remove('drop-target');
   calDrag.over = day;
   day?.classList.add('drop-target');
 });
-document.addEventListener('pointerup', async () => {
-  const { ev, moved, over, ghost } = calDrag;
-  Object.assign(calDrag, { ev: null, chip: null, ghost: null, over: null, moved: false });
+// Beim gedrückten Halten am Handy nicht mitscrollen und kein Kontextmenü
+document.addEventListener('touchmove', (e) => calDrag.lifted && e.cancelable && e.preventDefault(), { passive: false });
+document.addEventListener('contextmenu', (e) => calDrag.touch && calDrag.ev && e.preventDefault());
+
+/** Eintrag zum Zielort schweben lassen (Tag gefunden) bzw. zurückfedern (nirgends losgelassen) und entfernen. */
+function calGhostEnd(ghost, target) {
+  if (!ghost) return;
+  if (window.PS.motion.calm() || !ghost.animate || !target) return ghost.remove();
+  const r = target.getBoundingClientRect();
+  const g = ghost.getBoundingClientRect();
+  const dx = r.left + r.width / 2 - (g.left + g.width / 2);
+  const dy = r.top + r.height / 2 - (g.top + g.height / 2);
+  const to = target.matches('.cal-day') ? { transform: `translate(${dx}px, ${dy}px) scale(0.5) rotate(0deg)`, opacity: 0 } : { transform: `translate(${dx}px, ${dy}px) rotate(0deg)`, opacity: 0.9 };
+  ghost.animate([{ transform: ghost.style.transform || 'none', opacity: 1 }, to], { duration: target.matches('.cal-day') ? 200 : 380, easing: target.matches('.cal-day') ? 'ease-in' : CAL_SPRING, fill: 'forwards' }).finished.catch(() => {}).then(() => ghost.remove());
+}
+async function calDrop(cancelled) {
+  const { ev, moved, over, ghost, chip } = calDrag;
+  calReset();
   if (!ev || !moved) return;
-  ghost.remove();
-  over?.classList.remove('drop-target');
   document.body.classList.remove('cal-dragging');
+  over?.classList.remove('drop-target');
   // Der Klick nach dem Loslassen wählt keinen Tag aus
   const eat = (c) => {
     c.stopPropagation();
@@ -1438,7 +1504,9 @@ document.addEventListener('pointerup', async () => {
   setTimeout(() => window.removeEventListener('click', eat, true), 0);
   const e = st.events.find((x) => x.id === ev);
   const from = e && parseDate(e.startsAt);
-  if (!over || !from || dayKey(from) === over.dataset.day) return;
+  const back = !over || cancelled || !from || dayKey(from) === over.dataset.day;
+  calGhostEnd(ghost, back ? (chip && chip.isConnected ? chip : null) : over); // zurück an den alten Platz oder in den neuen Tag
+  if (back) return;
   const [y, m, d] = over.dataset.day.split('-').map(Number);
   const to = new Date(from);
   to.setFullYear(y, m - 1, d);
@@ -1452,7 +1520,9 @@ document.addEventListener('pointerup', async () => {
     await refreshBehind();
     st.cal.landed = null;
   });
-});
+}
+document.addEventListener('pointerup', () => calDrop(false));
+document.addEventListener('pointercancel', () => calDrop(true));
 
 /** Monatswechsel: der neue Monat gleitet von der Seite herein, aus der man kommt. */
 function calSlide(dir) {

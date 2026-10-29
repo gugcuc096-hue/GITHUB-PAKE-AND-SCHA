@@ -1466,7 +1466,7 @@ function markChangedBadges(root) {
  * neue Stelle (FLIP), neue Zeilen blenden ein. Nur wenn höchstens 60 Zeilen sichtbar sind und ohne „Bewegung reduzieren“.
  */
 // Aktenliste (auch im Auswahlmodus), Rechnungen, Mandanten, Lager-Gegenstände und Aufgaben
-const FLIP_SEL = '#caseList tr[data-id], #content tr[data-inv], #clientList tr[data-key], #storageGrid .lager-item[data-item], #content .task-row[data-id]';
+const FLIP_SEL = '#caseList tr[data-id], #content tr[data-inv], #clientList tr[data-key], #storageGrid .lager-item[data-item], #content .task-row[data-id], #modalBody .task-row[data-id]';
 /** Liste neu zeichnen und dabei weich umsortieren (Suche beim Tippen). */
 function flipFill(el, html) {
   if (!el) return;
