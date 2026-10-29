@@ -827,6 +827,7 @@ function rememberCase(data) {
   st.linkedAttachments = (data.linkedEvidence || []).flatMap((k) => k.attachments.map((a) => ({ ...a, caseId: k.caseId, caseNumber: k.caseNumber })));
   st.caseDocs = data.externalDocs || [];
   st.caseParties = data.parties || []; // Zeugen und andere Beteiligte (nur Kanzlei)
+  st.casePlaces = data.places || []; // Orte der Tatort-Karte (nur Kanzlei)
   st.caseContracts = data.contracts || [];
   st.caseTasks = data.tasks || [];
   st.caseInfo = data.case;
@@ -924,6 +925,7 @@ async function openCase(id) {
   if (typeof liveSync === 'function') liveSync(); // Mandanten verbinden sich erst, wenn eine Akte offen ist
   initChat(data);
   copilotInit(id);
+  karteInit();
   animateTrack($('#modalBody .track'));
 }
 async function reloadCase(id, { live = false, by = '' } = {}) {
@@ -938,6 +940,7 @@ async function reloadCase(id, { live = false, by = '' } = {}) {
     if (draft && $('#modalBody .chat-input')) $('#modalBody .chat-input').value = draft;
     initChat(data);
     copilotInit(id);
+    karteInit();
     if (before) liveFlash($('#modalBody'), before, by);
     flipPlay(flip);
   }

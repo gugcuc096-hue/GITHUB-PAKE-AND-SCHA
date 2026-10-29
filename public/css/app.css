@@ -2633,3 +2633,29 @@ body.hint-edit .form-hint[data-hint-key]:hover { background: rgba(212, 175, 55, 
 .offline-bar { position: fixed; left: 50%; bottom: calc(12px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 70; max-width: min(94vw, 560px); padding: 0.45rem 0.9rem; border-radius: 999px; border: 1px solid var(--gold-hairline); background: rgba(8, 14, 32, 0.96); color: var(--gold-light); font-size: 0.82rem; font-weight: 600; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5); text-align: center; }
 .offline-bar[hidden] { display: none; }
 @media (max-width: 1023px) { .offline-bar { bottom: calc(76px + env(safe-area-inset-bottom)); } }
+
+/* ---------------------------------------------------------------- Tatort-Karte (12-karte.js) */
+.kmap-wrap { position: relative; height: 300px; margin: 0.75rem 0; border: 1px solid var(--gold-hairline); border-radius: 14px; overflow: hidden; background: #060f1e; }
+.kmap-wrap.is-big { height: min(72vh, 640px); }
+.kmap-wrap.kmap-form { height: 280px; margin-top: 0.25rem; }
+.kmap { display: block; width: 100%; height: 100%; cursor: grab; touch-action: pan-y; }
+.kmap.is-active { touch-action: none; }
+.kmap:active { cursor: grabbing; }
+.kmap-tools { position: absolute; top: 8px; right: 8px; display: flex; flex-direction: column; gap: 6px; }
+.kmap-tools .icon-btn { background: rgba(6, 15, 30, 0.85); border: 1px solid var(--gold-hairline); color: var(--text); }
+.kmap-tools .icon-btn.is-on { background: var(--gold-soft); color: var(--gold-light); }
+@media (hover: hover) and (pointer: fine) { .kmap-touch { display: none; } }
+.kmap-time { display: flex; align-items: center; gap: 0.75rem; margin: 0 0 0.75rem; }
+.kmap-time input[type="range"] { flex: 1; accent-color: var(--gold-500, #d4af37); }
+.kmap-time output { min-width: 7.5rem; text-align: right; color: var(--text-muted); }
+.place-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.place-row { display: flex; align-items: stretch; gap: 0.25rem; border: 1px solid var(--glass-border); border-radius: 12px; background: rgba(255, 255, 255, 0.02); transition: opacity 0.2s ease, border-color 0.2s ease; }
+.place-row.is-on { border-color: var(--gold-hairline); background: var(--gold-soft); }
+.place-row.is-later { opacity: 0.4; }
+.place-main { flex: 1; min-width: 0; display: flex; gap: 0.65rem; align-items: flex-start; padding: 0.55rem 0.7rem; text-align: left; color: inherit; background: none; border: 0; cursor: pointer; }
+.place-no { flex: none; display: inline-grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; font-size: 0.72rem; font-weight: 700; color: #06101f; margin-top: 0.1rem; }
+.place-body { min-width: 0; display: grid; gap: 0.2rem; }
+.place-top { display: flex; flex-wrap: wrap; gap: 0.4rem 0.6rem; align-items: center; }
+.place-label { font-weight: 600; }
+.place-note { font-size: 0.85rem; color: var(--text-muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.place-actions { display: flex; align-items: center; gap: 0.2rem; padding-right: 0.4rem; }
