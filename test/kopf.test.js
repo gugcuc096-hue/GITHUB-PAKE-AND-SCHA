@@ -40,7 +40,11 @@ describe('Kopfzeile und Menü-Indikator (Browser)', { skip: chromium ? false : '
         await page.click('button[type=submit]');
         await page.waitForURL(/dashboard/);
         await page.waitForSelector('#nav a.nav-item.active');
-        const ind = await page.$eval('.nav-ind', (e) => getComputedStyle(e).transitionDuration);
+        // das Menü zeichnet sich nach dem Start noch einmal neu – auf den fertigen Indikator warten
+        const ind = await (await page.waitForFunction(() => {
+          const e = document.querySelector('#nav .nav-ind');
+          return e && e.isConnected ? getComputedStyle(e).transitionDuration : '';
+        })).jsonValue();
         assert.match(ind, /^0s(, 0s)*$/, 'Indikator springt statt zu gleiten');
         await page.goto(`${srv.base}/`);
         await page.waitForFunction(() => document.documentElement.classList.contains('ps-in'), null, { timeout: 15000 });
