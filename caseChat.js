@@ -161,6 +161,14 @@ function importFromDiscord(d) {
   const id = Number(info.lastInsertRowid);
   if (author.id) markRead(c.id, author.id, id); // eigene Nachricht gilt als gelesen
   require('./live').caseChanged(c.id, { chat: true }); // erscheint sofort im offenen Chat auf der Website
+  // Einfache Fragen des Mandanten beantwortet der Assistent im Ticket (nur wenn das Board ihn eingeschaltet hat)
+  if (author.role === 'mandant') {
+    try {
+      require('./ticketAssistant').onClientMessage(c, d);
+    } catch (err) {
+      console.warn('Assistent im Ticket fehlgeschlagen:', err.message);
+    }
+  }
   const images = (d.attachments || []).filter((a) => a && /^image\/(jpeg|png|webp)$/.test(String(a.content_type || '')));
   if (images.length) keepImages(c, author, id, images).catch((err) => console.warn('Bilder aus dem Ticket nicht gesichert:', err.message));
   return messages(c.id, id - 1)[0] || null;

@@ -220,16 +220,16 @@ function summary(d, now = new Date(), audience = 'staff') {
 
 /* ---------------------------------------------------------------- Fragen */
 const INTENTS = [
-  { id: 'stand', label: 'Wie ist der Stand?', words: ['stand', 'status', 'zusammenfass', 'ueberblick', 'uebersicht', 'wie laeuft', 'worum', 'kurz'] },
-  { id: 'termine', label: 'Wann ist der nächste Termin?', words: ['termin', 'frist', 'verhandlung', 'wann', 'gericht', 'kalender', 'datum'] },
-  { id: 'aufgaben', label: 'Was ist noch offen?', words: ['aufgabe', 'todo', 'erledigen', 'offen', 'zu tun', 'ausstehend', 'fehlt noch', 'unterlage'] },
+  { id: 'stand', label: 'Wie ist der Stand?', words: ['stand', 'status', 'zusammenfass', 'ueberblick', 'uebersicht', 'wie laeuft'], weak: ['worum', 'kurz'] },
+  { id: 'termine', label: 'Wann ist der nächste Termin?', words: ['termin', 'frist', 'verhandlung', 'ladung'], weak: ['wann', 'gericht', 'kalender', 'datum'] },
+  { id: 'aufgaben', label: 'Was ist noch offen?', words: ['aufgabe', 'todo', 'erledigen', 'ausstehend', 'fehlt noch', 'unterlage'], weak: ['offen', 'zu tun'] },
   { id: 'zeugen', label: 'Wie stehen die Zeugen?', words: ['zeug', 'aussage', 'befragung', 'ladung', 'geladen'] },
   { id: 'beweise', label: 'Welche Beweismittel gibt es?', words: ['beweis', 'bild', 'foto', 'screenshot', 'bodycam', 'anlage'] },
   { id: 'anklage', label: 'Was wird vorgeworfen, welches Strafmaß droht?', words: ['anklage', 'strafma', 'vorwurf', 'paragraph', 'haft', 'geldstrafe', 'deal', 'angebot', 'strafe'] },
-  { id: 'geld', label: 'Wie sieht es mit Rechnungen aus?', words: ['rechnung', 'kosten', 'honorar', 'bezahl', 'zahlung', 'betrag', 'geld', 'preis'] },
-  { id: 'mandant', label: 'Was gibt es Neues vom Mandanten?', words: ['mandant', 'nachricht', 'chat', 'antwort', 'kontakt', 'erreich', 'geschrieben'] },
+  { id: 'geld', label: 'Wie sieht es mit Rechnungen aus?', words: ['rechnung', 'kosten', 'honorar', 'bezahl', 'zahlung', 'betrag'], weak: ['geld', 'preis'] },
+  { id: 'mandant', label: 'Was gibt es Neues vom Mandanten?', words: ['mandant', 'nachricht', 'chat', 'geschrieben'], weak: ['antwort', 'kontakt', 'erreich'] },
   { id: 'risiken', label: 'Wo gibt es Lücken oder Risiken?', words: ['risik', 'luecke', 'problem', 'warn', 'achtung', 'widerspruch', 'vorhalt', 'unstimmig', 'fehler', 'uebersehen', 'dringend'] },
-  { id: 'naechste', label: 'Was sollte ich als Nächstes tun?', words: ['naechst', 'empfehl', 'schritt', 'prioritaet', 'anfangen', 'soll'] },
+  { id: 'naechste', label: 'Was sollte ich als Nächstes tun?', words: ['naechst', 'empfehl', 'schritt', 'prioritaet', 'anfangen'], weak: ['soll'] },
   { id: 'aehnlich', label: 'Gibt es ähnliche Fälle?', words: ['aehnlich', 'praezedenz', 'urteil', 'vergleichbar', 'frueher'] },
   { id: 'zustaendig', label: 'Wer ist zuständig?', words: ['zustaendig', 'anwalt', 'verantwortlich', 'ansprech', 'bearbeitet'] },
 ];
@@ -240,10 +240,11 @@ function pickIntent(question, audience = 'staff') {
   let best = null;
   for (const it of INTENTS) {
     if (audience === 'client' && !CLIENT_INTENTS.includes(it.id)) continue;
-    const score = it.words.reduce((s, w) => s + (q.includes(w) ? (w.length > 4 ? 2 : 1) : 0), 0);
+    const score = it.words.filter((w) => q.includes(w)).length * 2 + (it.weak || []).filter((w) => q.includes(w)).length;
     if (score && (!best || score > best.score)) best = { it, score };
   }
-  return best ? best.it : null;
+  // Mandanten bekommen nur bei einem klaren Stichwort eine Antwort („Chancen vor Gericht“ ist keine Terminfrage)
+  return best && (audience !== 'client' || best.score >= 2) ? best.it : null;
 }
 
 const lines = (...xs) => xs.flat().filter(Boolean).map((x) => (typeof x === 'string' ? { text: x } : x));
