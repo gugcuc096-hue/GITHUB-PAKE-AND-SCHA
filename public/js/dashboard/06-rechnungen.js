@@ -98,6 +98,7 @@ views.invoices = {
   async load() {
     await load.invoices();
     if (isStaff() && st.invTab === 'dauer') await loadRetainers();
+    if (isStaff()) await loadApprovals().catch(() => {});
   },
   render() {
     const staff = isStaff();
@@ -108,10 +109,11 @@ views.invoices = {
     const rows = st.invoices.filter((i) => match(i, f));
     const sum = (s) => st.invoices.filter((i) => match(i, s)).reduce((a, i) => a + i.total, 0);
     const count = (s) => st.invoices.filter((i) => match(i, s)).length;
-    const tab = staff && st.invTab === 'dauer' ? 'dauer' : 'rechnungen';
+    const tab = staff && st.invTab === 'dauer' ? 'dauer' : staff && st.invTab === 'freigaben' ? 'freigaben' : 'rechnungen';
     const tabs = staff
-      ? `<div class="chip-row mb-4" role="tablist" aria-label="Bereiche der Rechnungen"><button type="button" class="chip ${tab === 'rechnungen' ? 'active' : ''}" role="tab" aria-selected="${tab === 'rechnungen'}" data-action="inv-tab" data-tab="rechnungen">${icon('receipt', 'ico-sm')}<span>Rechnungen</span></button><button type="button" class="chip ${tab === 'dauer' ? 'active' : ''}" role="tab" aria-selected="${tab === 'dauer'}" data-action="inv-tab" data-tab="dauer">${icon('clock', 'ico-sm')}<span>Dauermandate</span></button></div>`
+      ? `<div class="chip-row mb-4" role="tablist" aria-label="Bereiche der Rechnungen"><button type="button" class="chip ${tab === 'rechnungen' ? 'active' : ''}" role="tab" aria-selected="${tab === 'rechnungen'}" data-action="inv-tab" data-tab="rechnungen">${icon('receipt', 'ico-sm')}<span>Rechnungen</span></button><button type="button" class="chip ${tab === 'dauer' ? 'active' : ''}" role="tab" aria-selected="${tab === 'dauer'}" data-action="inv-tab" data-tab="dauer">${icon('clock', 'ico-sm')}<span>Dauermandate</span></button><button type="button" class="chip ${tab === 'freigaben' ? 'active' : ''}" role="tab" aria-selected="${tab === 'freigaben'}" data-action="inv-tab" data-tab="freigaben">${icon('check', 'ico-sm')}<span>Freigaben</span>${st.approvals && st.approvals.pending ? `<span class="chip-count">${st.approvals.pending}</span>` : ''}</button></div>`
       : '';
+    if (tab === 'freigaben') return `<div class="page-head"><div><h1 class="page-title">Rabatt-Freigaben</h1><p class="page-sub">Hohe Rabatte entscheidet das Board.</p></div></div>${tabs}${approvalsPanel()}`;
     if (tab === 'dauer')
       return `<div class="page-head"><div><h1 class="page-title">Dauermandate</h1><p class="page-sub">Pauschalen mit automatischer Rechnung.</p></div>${isBoard() ? `<div class="page-actions"><button class="btn-gold btn-md" data-action="ret-new">${icon('plus')}<span>Neues Dauermandat</span></button></div>` : ''}</div>${tabs}${retainersPanel()}`;
     return `
@@ -485,6 +487,7 @@ views['invoice-new'] = {
     st.memberList = members.memberships;
     st.invoiceTypes = bill ? bill.types.filter((t) => t.active) : [];
     st.areaDefaults = bill ? bill.areaDefaults : {};
+    st.discountThreshold = bill ? bill.discountApprovalPct || 0 : 0;
     if (!st.draft) {
       // Seite neu geladen: die zuletzt angefangene Rechnung wieder aufnehmen
       const last = window.PS.drafts.store.get(window.PS.drafts.key('invoice|last'));
@@ -553,7 +556,7 @@ views['invoice-new'] = {
                 <div class="span-2" id="invMember" style="display:contents">${memberBoxHtml()}</div>
                 <div class="span-2" id="invCoop" style="display:contents">${coopBoxHtml()}</div>
                 <div><label class="label">Rabatt in %</label><input name="discountPct" type="number" inputmode="decimal" min="0" max="100" step="0.5" class="field" value="${esc(d.discountPct)}">
-                  <div class="chip-row mt-2"><button type="button" class="chip" data-action="inv-preset" data-field="discountPct" data-value="10">Mandatsbündel 10 %</button><button type="button" class="chip" data-action="inv-preset" data-field="discountPct" data-value="0">Kein Rabatt</button></div></div>
+                  <div class="chip-row mt-2"><button type="button" class="chip" data-action="inv-preset" data-field="discountPct" data-value="10">Mandatsbündel 10 %</button><button type="button" class="chip" data-action="inv-preset" data-field="discountPct" data-value="0">Kein Rabatt</button></div>${discountApprovalBox(d)}</div>
                 <div><label class="label">Zuschlag in %</label><input name="surchargePct" type="number" inputmode="decimal" min="0" max="100" step="0.5" class="field" value="${esc(d.surchargePct)}">
                   <div class="chip-row mt-2"><button type="button" class="chip" data-action="inv-preset" data-field="surchargePct" data-value="15">Priorisiert +15 %</button><button type="button" class="chip" data-action="inv-preset" data-field="surchargePct" data-value="0">Kein Zuschlag</button></div></div>
                 <div><label class="label">Zahlbar bis</label><input name="dueDate" type="date" class="field" value="${esc(d.dueDate || '')}"></div>
@@ -583,6 +586,16 @@ function typeChooser(d) {
   return `<div class="mb-4"><label class="label" for="invType">Rechnungsart</label><select id="invType" name="typeKey" class="field">${types.map((x) => opt(x.key, x.name, x.key === (d.typeKey || d.kind))).join('')}</select>${info ? `<p class="form-hint">${esc(info)}</p>` : ''}</div>`;
 }
 
+/** Rabatt über dem Schwellwert: Hinweis, Begründung für das Board und Stand der Freigabe. */
+function discountApprovalBox(d) {
+  const limit = st.discountThreshold || 0;
+  if (!limit || isBoard() || !(Number(d.discountPct) > limit)) return '';
+  const a = d.approval;
+  const state = a ? `<div class="mt-2">${badge(a.statusLabel || 'Wartet auf Freigabe', a.status === 'genehmigt' ? 'emerald' : a.status === 'abgelehnt' ? 'red' : 'amber')} <button type="button" class="link-btn text-sm" data-action="disc-refresh" data-id="${a.id}">Stand prüfen</button></div>` : '';
+  return `<div class="banner banner-gold mt-2 mb-0">${icon('shield')}<div><strong>Ab ${esc(String(limit))} % braucht der Rabatt die Freigabe des Boards.</strong> Beim Erstellen geht die Anfrage ans Board (per Discord und im Dashboard); danach erstellen Sie die Rechnung wie gewohnt.
+      <input name="discountReason" class="field mt-2" maxlength="500" placeholder="Begründung für das Board (optional)" aria-label="Begründung für das Board" value="${esc(d.discountReason || '')}">${state}</div></div>`;
+}
+
 function onInvoiceInput(t) {
   const d = st.draft;
   if (!d) return;
@@ -605,11 +618,23 @@ function onInvoiceInput(t) {
       const q = $(`.inv-fee-qty[data-fee="${it.feeId}"]`);
       if (q && t.value !== '') q.value = t.value;
     }
-  } else if (['clientName', 'clientContact', 'subject', 'notes', 'dueDate'].includes(t.name)) {
+  } else if (['clientName', 'clientContact', 'subject', 'notes', 'dueDate', 'discountReason'].includes(t.name)) {
     d[t.name] = t.value;
     if (t.name === 'notes') d.notesFromType = false;
   } else if (t.name === 'discountPct' || t.name === 'surchargePct') {
+    const crossed = t.name === 'discountPct' && st.discountThreshold && !isBoard() && Number(d.discountPct) > st.discountThreshold !== Number(t.value || 0) > st.discountThreshold;
     d[t.name] = t.value === '' ? 0 : Number(t.value);
+    if (t.name === 'discountPct' && d.approval && d.discountPct > d.approval.discountPct) {
+      d.approvalId = null; // höher als genehmigt: neue Anfrage nötig
+      d.approval = null;
+    }
+    if (crossed) {
+      const box = t.closest('div');
+      if (box) {
+        box.querySelectorAll('.banner').forEach((b) => b.remove());
+        box.insertAdjacentHTML('beforeend', discountApprovalBox(d));
+      }
+    }
   }
   updateInvoiceSummary();
 }

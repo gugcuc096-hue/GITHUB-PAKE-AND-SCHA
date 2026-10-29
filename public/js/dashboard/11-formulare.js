@@ -381,7 +381,17 @@ const forms = {
       membershipId: draftMember(d) ? d.memberId : null,
       dueDate: d.dueDate || null,
       notes: d.notes.trim(),
+      ...(d.approvalId ? { approvalId: d.approvalId } : {}),
+      ...((d.discountReason || '').trim() ? { discountReason: d.discountReason.trim() } : {}),
     });
+    // Rabatt über dem Schwellwert: die Anfrage ging ans Board – die Rechnung wird erst nach der Freigabe erstellt
+    if (res.needsApproval) {
+      d.approvalId = res.approval.id;
+      d.approval = res.approval;
+      toast('Der Rabatt braucht die Freigabe des Boards – die Anfrage ist raus. Sie bekommen Bescheid und erstellen die Rechnung danach wie gewohnt.');
+      renderView();
+      return;
+    }
     forgetInvoiceDraft(d.caseId);
     st.draft = null;
     const inv = res.invoice;

@@ -9,8 +9,8 @@ const { db, getSetting, setSetting, settingHooks } = require('./db');
 /** Einstellungen, die der Mensch ändert – Schlüssel → Bezeichnung und nötiges Recht. Alles andere (Zeitstempel, Merker) bleibt draußen. */
 const SETTINGS = [
   { re: /^(firm_address|firm_payment_info|firm_contact|firm_seat)$/, perm: 'settings.edit', label: { firm_address: 'Anschrift', firm_payment_info: 'Zahlungshinweis', firm_contact: 'Kontakt', firm_seat: 'Kanzleisitz' } },
-  { re: /^(invoice_reminder_days|case_idle_days|cleanup_days|weekly_report|onboarding_template|show_duty_public|show_success_public|lotm_mode|lotm_member)$/, perm: 'settings.edit', label: {
-    invoice_reminder_days: 'Zahlungserinnerung (Tage)', case_idle_days: 'Liegengebliebene Akten (Tage)', cleanup_days: 'Automatisch aufräumen (Tage)', weekly_report: 'Wochenbericht',
+  { re: /^(invoice_reminder_days|discount_approval_pct|case_idle_days|cleanup_days|weekly_report|onboarding_template|show_duty_public|show_success_public|lotm_mode|lotm_member)$/, perm: 'settings.edit', label: {
+    invoice_reminder_days: 'Zahlungserinnerung (Tage)', discount_approval_pct: 'Rabatt ab … % braucht Freigabe', case_idle_days: 'Liegengebliebene Akten (Tage)', cleanup_days: 'Automatisch aufräumen (Tage)', weekly_report: 'Wochenbericht',
     onboarding_template: 'Einarbeitungs-Checkliste', show_duty_public: 'Dienst öffentlich zeigen', show_success_public: 'Erfolge öffentlich zeigen', lotm_mode: 'Anwalt des Monats: Modus', lotm_member: 'Anwalt des Monats: Person' } },
   { re: /^feature_[a-z_]+$/, perm: 'settings.edit', label: null },
   { re: /^(discord_events|discord_ping_events|discord_ping_role|discord_event_roles|discord_ticket_events)$/, perm: 'discord.edit', label: null },
