@@ -179,4 +179,29 @@ describe('Ziehen im Kalender und Abhaken (Browser)', { skip: chromium ? false : 
       await ctx.close();
     }
   });
+  it('PC: Karteikarte eines Mandanten neigt sich nicht zur Maus (man liest und schreibt darin)', async () => {
+    const a = client(srv.base);
+    await a.login(TEAM.admin);
+    await a.post('/api/cases', { title: 'Kartei ohne Wackeln', area: 'zivilrecht', clientName: 'Paula Ruhig' });
+    const ctx = await browser.newContext({ viewport: { width: 1366, height: 900 }, locale: 'de-DE' });
+    const page = await ctx.newPage();
+    try {
+      await login(page);
+      await page.goto(`${srv.base}/dashboard#clients`);
+      await page.waitForFunction(() => (document.querySelector('#clientList') || {}).textContent?.includes('Paula Ruhig'), null, { timeout: 15000 });
+      for (let versuch = 0; versuch < 3; versuch++) {
+        await page.click('#clientList [data-action]').catch(() => {});
+        if (await page.waitForSelector('#modalBody .client-cover', { timeout: 5000 }).then(() => true, () => false)) break;
+      }
+      await page.waitForSelector('#modalBody .client-cover');
+      const box = await page.locator('#modalBody .client-cover').boundingBox();
+      await page.mouse.move(box.x + box.width * 0.85, box.y + 20);
+      await page.mouse.move(box.x + box.width * 0.9, box.y + 30, { steps: 4 });
+      await page.waitForTimeout(300);
+      assert.equal(await page.$eval('#modalBody .client-cover', (c) => c.style.transform), '', 'keine Neigung');
+      assert.equal(await page.$eval('#modalBody .client-cover', (c) => c.classList.contains('ps-tilt')), false);
+    } finally {
+      await ctx.close();
+    }
+  });
 });
