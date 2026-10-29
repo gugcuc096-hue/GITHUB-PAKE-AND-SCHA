@@ -203,8 +203,7 @@ describe('Tatort-Karte (Browser)', { skip: chromium ? false : 'Playwright nicht 
         // Kartenbild ist geladen und liegt unter den Postals
         await page.waitForFunction(() => typeof kImg !== 'undefined' && kImg && kImg.naturalWidth === 2000, null, { timeout: 10000 });
         // 3D: Gelände, Klick trifft einen Postal, zurück zu 2D (nur wenn der Browser WebGL kann)
-        await page.click('[data-action="kmap-3d"][data-id="kmapForm"]');
-        const has3d = await page.waitForFunction(() => kViews.get('kmapForm').m3 || document.querySelector('.toast, #toast') , null, { timeout: 20000 }).then(() => page.evaluate(() => !!kViews.get('kmapForm').m3));
+        const has3d = await page.evaluate(() => karteSet3d(kViews.get('kmapForm'), true));
         if (has3d) {
           await page.evaluate(() => {
             const v = kViews.get('kmapForm');
@@ -222,6 +221,7 @@ describe('Tatort-Karte (Browser)', { skip: chromium ? false : 'Playwright nicht 
           assert.equal(hit, true, 'Strahl aus der Bildmitte trifft das Gelände nahe der Zielmitte');
           await page.click('[data-action="kmap-3d"][data-id="kmapForm"]');
           await page.waitForFunction(() => !kViews.get('kmapForm').m3);
+          assert.equal(await page.evaluate(() => kViews.get('kmapForm').W > 0), true, 'Karte zeigt wieder 2D');
         }
         await page.click('[data-action="close-modal"]');
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth <= 1), true, 'kein seitliches Scrollen');
