@@ -33,6 +33,8 @@ router.get('/status', (req, res) => {
     docTypes: [...new Set([...used, ...fivenet.DOC_TYPES])],
     lastViewedAs: last ? last.viewed_as : '',
     stats: { links: counts.n, documents: counts.docs },
+    // Lesezeichen („javascript:“-Adresse) als Weg ohne Erweiterung – nur für die Kanzlei, enthält nur die Adresse der Kanzlei
+    bookmarklet: require('../fivenetUserscript').bookmarklet({ kanzlei: `${req.protocol}://${req.get('host')}` }),
   });
 });
 
