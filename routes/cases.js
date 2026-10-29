@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const express = require('express');
 const { z } = require('zod');
 const evidence = require('../evidence');
+const { editConflicts } = require('../helpers');
 const { db, tx, nextCaseNumber, randomPin, getSetting } = require('../db');
 const { requireAuth, requireAdmin, isStaff, findUserByLogin } = require('../auth');
 const {
@@ -682,6 +683,25 @@ router.patch(
 
     const d = parseBody(updateSchema, req, res);
     if (!d) return;
+
+    // Gleichzeitiges Bearbeiten: Das Dashboard schickt mit „expect“ die Werte, die es zuletzt sah. Hat inzwischen jemand anderes
+    // eines dieser Felder geändert (und nicht auf denselben Wert), antwortet der Server mit 409 – nichts wird überschrieben.
+    const clash = editConflicts(req.body && req.body.expect, d, {
+      title: c.title,
+      area: c.area,
+      urgency: c.urgency,
+      description: c.description,
+      clientName: c.client_name,
+      clientPhone: c.client_phone,
+      opponent: c.opponent,
+      courtRef: c.court_ref,
+      step: c.step,
+      publicNote: c.public_note,
+      status: c.status,
+      priority: c.priority || 2,
+      lawyerId: c.lawyer_id,
+    });
+    if (clash.length) return res.status(409).json({ error: 'Jemand hat diese Akte inzwischen geändert.', conflict: clash });
 
     const sets = [];
     const values = [];

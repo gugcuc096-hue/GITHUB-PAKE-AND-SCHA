@@ -1054,9 +1054,13 @@ async function returnToView(view) {
 }
 /** Lädt die Daten der aktuellen Ansicht neu, ohne einen offenen Dialog zu schließen. */
 async function refreshBehind() {
+  const flash = live.flash;
+  live.flash = false;
   try {
+    const before = flash ? liveSnap($('#content')) : null;
     if (views[st.view].load) await views[st.view].load();
     renderView();
+    if (before) liveFlash($('#content'), before, '');
   } catch (e) {
     handleError(e);
   }

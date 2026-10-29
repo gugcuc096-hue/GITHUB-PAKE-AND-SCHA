@@ -1,182 +1,219 @@
 'use strict';
 /*
- * Live-Aktualisierung (Server-Sent Events, GET /api/events): wer bekommt welche Meldung?
- * Gemeldet wird nur „Akte X / Bereich Y geändert“ – Mandanten nur zu eigenen Akten, Bereiche nur die Kanzlei,
- * der Tab, der die Änderung gemacht hat, nicht noch einmal.
+ * Gemeinsames Arbeiten: Konflikte beim gleichzeitigen Bearbeiten (409 statt stilles Überschreiben), Name der ändernden Person
+ * im Live-Ereignis (nur für die Kanzlei) und das kurze Aufleuchten von Änderungen eines Kollegen im Dashboard.
  */
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const { startServer, client, TEAM } = require('./helpers');
+const { startServer, client, TEAM, PASSWORD } = require('./helpers');
 
-describe('Live-Aktualisierung', () => {
-  let server;
-  const as = {};
-  const ids = {};
-  const streams = [];
+let chromium = null;
+try {
+  ({ chromium } = require('playwright'));
+} catch {
+  /* optional */
+}
 
-  /** Live-Verbindung öffnen und alle Meldungen sammeln. */
-  async function listen(who, tab) {
-    const ctrl = new AbortController();
-    const res = await fetch(`${server.base}/api/events?tab=${tab}`, { headers: { Cookie: who.cookie(), Accept: 'text/event-stream' }, signal: ctrl.signal });
-    const s = { status: res.status, events: [], close: () => ctrl.abort() };
-    streams.push(s);
-    if (res.status !== 200) return s;
-    assert.match(res.headers.get('content-type'), /text\/event-stream/);
-    (async () => {
-      const dec = new TextDecoder();
-      let buf = '';
-      try {
-        for await (const chunk of res.body) {
-          buf += dec.decode(chunk, { stream: true });
-          let i;
-          while ((i = buf.indexOf('\n\n')) >= 0) {
-            const block = buf.slice(0, i);
-            buf = buf.slice(i + 2);
-            const line = block.split('\n').find((l) => l.startsWith('data: '));
-            if (!line) continue;
-            const ev = JSON.parse(line.slice(6));
-            if (ev.k === 'hello') s.hello = ev; // Fassung des Servers (für den Update-Hinweis) – keine Änderungsmeldung
-            else s.events.push(ev);
-          }
+/** Live-Verbindung (/api/events) öffnen und die Ereignisse sammeln. */
+async function listen(base, cookie) {
+  const ctl = new AbortController();
+  const events = [];
+  const res = await fetch(`${base}/api/events?tab=test-${Math.random()}`, { headers: { Cookie: cookie, Accept: 'text/event-stream' }, signal: ctl.signal });
+  (async () => {
+    const dec = new TextDecoder();
+    let buf = '';
+    try {
+      for await (const chunk of res.body) {
+        buf += dec.decode(chunk);
+        for (;;) {
+          const i = buf.indexOf('\n\n');
+          if (i < 0) break;
+          const block = buf.slice(0, i);
+          buf = buf.slice(i + 2);
+          const m = /^data: (.*)$/m.exec(block);
+          if (m) events.push(JSON.parse(m[1]));
         }
-      } catch {
-        /* geschlossen */
       }
-    })();
-    return s;
-  }
-  const settle = () => new Promise((r) => setTimeout(r, 250));
-
-  before(async () => {
-    server = await startServer();
-    as.anwalt = client(server.base);
-    as.anwalt.me = await as.anwalt.login(TEAM.anwalt);
-    as.partner = client(server.base);
-    as.partner.me = await as.partner.login(TEAM.partner);
-    as.mandant = client(server.base);
-    as.fremd = client(server.base);
-    for (const [c, name, email] of [
-      [as.mandant, 'Lena Live', 'lena.live'],
-      [as.fremd, 'Fritz Fremd', 'fritz.fremd'],
-    ]) {
-      assert.equal((await c.post('/api/auth/register', { displayName: name, email, password: 'Mandanten-Passwort-1' })).status, 201);
-      await c.login(email, 'Mandanten-Passwort-1');
+    } catch {
+      /* geschlossen */
     }
-    ids.own = (await as.anwalt.post('/api/cases', { title: 'Live-Akte', area: 'zivilrecht', clientEmail: 'lena.live' })).json.case.id;
-    ids.other = (await as.anwalt.post('/api/cases', { title: 'Fremde Akte', area: 'zivilrecht', clientEmail: 'fritz.fremd' })).json.case.id;
+  })();
+  return { events, close: () => ctl.abort() };
+}
+const until = async (fn, ms = 4000) => {
+  const t0 = Date.now();
+  while (Date.now() - t0 < ms) {
+    const v = fn();
+    if (v) return v;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  return fn();
+};
+
+describe('Gleichzeitiges Bearbeiten (API)', () => {
+  let srv;
+  let admin;
+  let partner;
+  let kase;
+  before(async () => {
+    srv = await startServer();
+    admin = client(srv.base);
+    partner = client(srv.base);
+    await admin.login(TEAM.admin);
+    await partner.login(TEAM.partner);
+    kase = (await admin.post('/api/cases', { title: 'Mietstreit Davis', area: 'zivilrecht', clientName: 'Paul Davis', publicNote: 'Alter Hinweis' })).json.case;
+    await admin.patch(`/api/cases/${kase.id}`, { publicNote: 'Alter Hinweis', lawyerId: null }); // Ausgangslage
+  });
+  after(() => srv.stop());
+
+  it('Akte: Änderung an einem Feld, das ein Kollege inzwischen geändert hat, wird mit 409 abgewiesen – nichts wird überschrieben', async () => {
+    assert.equal((await partner.patch(`/api/cases/${kase.id}`, { publicNote: 'Neuer Hinweis von Michael' })).status, 200);
+    const r = await admin.patch(`/api/cases/${kase.id}`, { publicNote: 'Mein Hinweis', expect: { publicNote: 'Alter Hinweis' } });
+    assert.equal(r.status, 409, r.text);
+    assert.deepEqual(r.json.conflict, [{ field: 'publicNote', current: 'Neuer Hinweis von Michael' }]);
+    assert.equal((await admin.get(`/api/cases/${kase.id}`)).json.case.publicNote, 'Neuer Hinweis von Michael', 'unverändert');
+  });
+
+  it('kein Konflikt: ohne „expect“, bei unverändertem Feld, bei gleichem neuen Wert und bei anderen Feldern', async () => {
+    const note = (await admin.get(`/api/cases/${kase.id}`)).json.case.publicNote;
+    // anderes Feld geändert als das erwartete → kein Konflikt
+    assert.equal((await admin.patch(`/api/cases/${kase.id}`, { opponent: 'Gegner A', expect: { opponent: '' } })).status, 200);
+    // unverändertes Feld
+    assert.equal((await admin.patch(`/api/cases/${kase.id}`, { opponent: 'Gegner B', expect: { opponent: 'Gegner A' } })).status, 200);
+    // Kollege hat bereits denselben neuen Wert gesetzt
+    await partner.patch(`/api/cases/${kase.id}`, { courtRef: 'AZ-1' });
+    assert.equal((await admin.patch(`/api/cases/${kase.id}`, { courtRef: 'AZ-1', expect: { courtRef: '' } })).status, 200);
+    // bewusst überschreiben: ohne „expect“
+    assert.equal((await admin.patch(`/api/cases/${kase.id}`, { publicNote: 'Überschrieben' })).status, 200);
+    assert.equal((await admin.get(`/api/cases/${kase.id}`)).json.case.publicNote, 'Überschrieben');
+    assert.notEqual(note, 'Überschrieben');
+    // Felder, die nicht Teil der Änderung sind, zählen nicht
+    await partner.patch(`/api/cases/${kase.id}`, { title: 'Titel von Michael' });
+    assert.equal((await admin.patch(`/api/cases/${kase.id}`, { opponent: 'Gegner C', expect: { title: 'Mietstreit Davis' } })).status, 200);
+  });
+
+  it('Aufgabe: gleiche Regel – Titel und „erledigt“', async () => {
+    const t = (await admin.post('/api/tasks', { title: 'Akte prüfen', caseId: kase.id })).json.task;
+    assert.ok(t, 'Aufgabe angelegt');
+    await partner.patch(`/api/tasks/${t.id}`, { title: 'Akte genau prüfen' });
+    const r = await admin.patch(`/api/tasks/${t.id}`, { title: 'Mein Titel', expect: { title: 'Akte prüfen' } });
+    assert.equal(r.status, 409, r.text);
+    assert.equal(r.json.conflict[0].current, 'Akte genau prüfen');
+    // Kollege hat sie schon erledigt: wer „erledigt“ setzt, bekommt keinen Konflikt
+    await partner.patch(`/api/tasks/${t.id}`, { done: true });
+    assert.equal((await admin.patch(`/api/tasks/${t.id}`, { done: true, expect: { done: false } })).status, 200);
+  });
+});
+
+describe('Live-Ereignis: wer hat geändert', () => {
+  let srv;
+  let admin;
+  let partner;
+  let mandant;
+  let kase;
+  before(async () => {
+    srv = await startServer();
+    admin = client(srv.base);
+    partner = client(srv.base);
+    mandant = client(srv.base);
+    await admin.login(TEAM.admin);
+    await partner.login(TEAM.partner);
+    await mandant.post('/api/auth/register', { displayName: 'Lena Live', email: 'lena.live', password: 'Mandanten-Passwort-5' });
+    await mandant.login('lena.live', 'Mandanten-Passwort-5');
+    kase = (await admin.post('/api/cases', { title: 'Live-Akte', area: 'zivilrecht', clientEmail: 'lena.live' })).json.case;
+  });
+  after(() => srv.stop());
+
+  it('die Kanzlei sieht den Namen der ändernden Person, der Mandant nie', async () => {
+    const staff = await listen(srv.base, admin.cookie());
+    const client_ = await listen(srv.base, mandant.cookie());
+    await until(() => staff.events.length && client_.events.length); // „hello“
+    await partner.patch(`/api/cases/${kase.id}`, { description: 'Neuer Sachverhalt' });
+    const s = await until(() => staff.events.find((e) => e.k === 'case' && e.id === kase.id));
+    const m = await until(() => client_.events.find((e) => e.k === 'case' && e.id === kase.id));
+    staff.close();
+    client_.close();
+    assert.equal(s.by, 'Michael Scha', JSON.stringify(s));
+    assert.ok(m && !('by' in m), `Mandant: ${JSON.stringify(m)}`);
+  });
+});
+
+describe('Gemeinsames Arbeiten im Dashboard (Browser)', { skip: chromium ? false : 'Playwright nicht installiert' }, () => {
+  let srv;
+  let browser;
+  before(async () => {
+    srv = await startServer();
+    browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
   });
   after(async () => {
-    for (const s of streams) s.close();
-    if (server) await server.stop();
+    if (browser) await browser.close();
+    if (srv) await srv.stop();
   });
 
-  it('ohne Anmeldung keine Live-Verbindung', async () => {
-    const res = await fetch(`${server.base}/api/events`);
-    assert.equal(res.status, 401);
-  });
+  for (const [name, device] of [
+    ['PC', { viewport: { width: 1366, height: 900 } }],
+    ['Handy', { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true }],
+  ]) {
+    it(`${name}: Änderung eines Kollegen leuchtet auf („… hat die Akte aktualisiert“); „Jemand war schneller“ beim gleichzeitigen Bearbeiten`, async () => {
+      const admin = client(srv.base);
+      const partner = client(srv.base);
+      await admin.login(TEAM.admin);
+      await partner.login(TEAM.partner);
+      const kase = (await admin.post('/api/cases', { title: `Verkehrskontrolle ${name}`, area: 'strafrecht', clientName: 'John Doe' })).json.case;
+      const ctx = await browser.newContext({ ...device, locale: 'de-DE' });
+      const page = await ctx.newPage();
+      const problems = [];
+      page.on('pageerror', (e) => problems.push(e.message));
+      try {
+        await page.goto(`${srv.base}/login`);
+        await page.fill('#email', TEAM.admin);
+        await page.fill('#password', PASSWORD);
+        await page.click('button[type=submit]');
+        await page.waitForURL(/dashboard/);
+        await page.waitForFunction(() => st.user && st.user.id, null, { timeout: 15000 });
+        for (let versuch = 0; versuch < 3; versuch++) {
+          await page.evaluate((id) => openCase(id), kase.id);
+          if (await page.waitForSelector('#secChat', { timeout: 10000 }).then(() => true, () => false)) break;
+        }
+        await page.waitForFunction(() => st.here !== undefined && document.querySelector('#secChat'), null, { timeout: 8000 });
+        await page.waitForTimeout(800); // Live-Verbindung steht
+        // 1) Kollege legt einen Zeugen an → Abschnitt Zeugen leuchtet auf, Hinweis nennt den Namen
+        assert.equal((await partner.post(`/api/cases/${kase.id}/parties`, { role: 'zeuge', name: 'Fritz Falkenhagen' })).status, 201);
+        await page.waitForFunction(() => document.querySelector('.live-flash, .live-flash-static'), null, { timeout: 8000 });
+        await page.waitForFunction(() => document.querySelector('#liveBy')?.textContent.includes('Michael Scha'), null, { timeout: 4000 });
+        assert.ok((await page.textContent('#secWitnesses')).includes('Fritz Falkenhagen'));
 
-  it('beim Verbinden meldet der Server seine Fassung (Grundlage des Hinweises „Neue Version“)', async () => {
-    const s = await listen(as.anwalt, 'h1');
-    await settle();
-    assert.match(s.hello?.v || '', /^[0-9a-f]{8,}$/);
-    assert.equal(s.events.length, 0, 'die Fassung ist keine Änderungsmeldung');
-    s.close();
-  });
-
-  it('Mandant: nur eigene Akten; Kanzlei: Akte und Bereich; der ändernde Tab nicht', async () => {
-    const mandant = await listen(as.mandant, 'm1');
-    const fremd = await listen(as.fremd, 'f1');
-    const anwaltSelf = await listen(as.anwalt, 'a-self');
-    const anwaltOther = await listen(as.anwalt, 'a-other');
-    await settle();
-    const r = await as.anwalt.post(`/api/cases/${ids.own}/notes`, { body: 'Termin steht fest.' }, { 'X-PS-Tab': 'a-self' });
-    assert.equal(r.status, 201, r.text);
-    await settle();
-    assert.deepEqual(mandant.events, [{ k: 'case', id: ids.own, chat: false }], 'eigene Akte, keine Bereichsmeldung');
-    assert.deepEqual(fremd.events, [], 'fremde Akte: nichts');
-    assert.deepEqual(anwaltSelf.events, [], 'eigener Tab: nichts');
-    assert.deepEqual(anwaltOther.events, [{ k: 'case', id: ids.own, chat: false }, { k: 'area', a: 'cases' }], 'anderer Tab derselben Person');
-    // Gelesen-Markierung: nur „Chat“ – die Akte muss nicht neu gezeichnet werden
-    const n = anwaltOther.events.length;
-    assert.equal((await as.mandant.post(`/api/cases/${ids.own}/chat/read`, { lastId: r.json.id })).status, 200);
-    await settle();
-    assert.deepEqual(anwaltOther.events.slice(n), [{ k: 'case', id: ids.own, chat: true }], 'gelesen: nur die Akte, keine Liste');
-    // Änderung an der fremden Akte erreicht den Mandanten nicht
-    mandant.events.length = 0;
-    await as.anwalt.patch(`/api/cases/${ids.other}`, { title: 'Fremde Akte (neu)' });
-    await settle();
-    assert.deepEqual(mandant.events, []);
-    assert.equal(fremd.events.length, 1);
-    // Fehlgeschlagene Änderungen melden nichts
-    const before = anwaltOther.events.length;
-    await as.mandant.patch(`/api/cases/${ids.other}`, { title: 'Hack' });
-    await settle();
-    assert.equal(anwaltOther.events.length, before);
-  });
-
-  it('Wer ist gerade hier? Präsenz nur unter Kollegen, „schreibt gerade“ an die anderen in der Akte', async () => {
-    const presence = (who, tab, body) => who.post('/api/events/presence', body, { 'X-PS-Tab': tab });
-    // ohne Anmeldung bzw. ohne Live-Verbindung: nichts
-    assert.equal((await client(server.base).post('/api/events/presence', { caseId: ids.own })).status, 401);
-    assert.deepEqual((await presence(as.anwalt, 'p-none', { caseId: ids.own })).json, { ok: false, users: [] });
-    const anwalt = await listen(as.anwalt, 'p-a');
-    const partner = await listen(as.partner, 'p-p');
-    const mandant = await listen(as.mandant, 'p-m');
-    const fremd = await listen(as.fremd, 'p-f');
-    await settle();
-    // fremde Akte: nicht erlaubt
-    assert.equal((await presence(as.fremd, 'p-f', { caseId: ids.own })).status, 404);
-    const a = await presence(as.anwalt, 'p-a', { caseId: ids.own });
-    assert.equal(a.status, 200, a.text);
-    assert.deepEqual(a.json.users.map((u) => u.id), [as.anwalt.me.id]);
-    const p = await presence(as.partner, 'p-p', { caseId: ids.own });
-    assert.deepEqual(p.json.users.map((u) => u.id).sort(), [as.anwalt.me.id, as.partner.me.id].sort());
-    // Mandant öffnet die Akte: taucht nicht in der Präsenz auf und bekommt keine Liste
-    const m = await presence(as.mandant, 'p-m', { caseId: ids.own });
-    assert.deepEqual(m.json, { ok: true, users: [] });
-    await settle();
-    const last = (s) => s.events.filter((e) => e.k === 'presence').pop();
-    assert.deepEqual(last(anwalt).users.map((u) => u.name).sort(), [as.anwalt.me.displayName, as.partner.me.displayName].sort());
-    assert.equal(mandant.events.filter((e) => e.k === 'presence').length, 0, 'Mandanten sehen keine Präsenz');
-    assert.equal(fremd.events.length, 0);
-    // Tippen: Kollege sieht den Namen, der Mandant nur „Die Kanzlei“, der Tippende selbst nichts
-    await presence(as.anwalt, 'p-a', { caseId: ids.own, typing: true });
-    await settle();
-    assert.deepEqual(partner.events.filter((e) => e.k === 'typing'), [{ k: 'typing', id: ids.own, name: as.anwalt.me.displayName }]);
-    assert.deepEqual(mandant.events.filter((e) => e.k === 'typing'), [{ k: 'typing', id: ids.own, name: 'Die Kanzlei' }]);
-    assert.equal(anwalt.events.filter((e) => e.k === 'typing').length, 0);
-    // Mandant tippt: die Kanzlei sieht seinen Namen
-    await presence(as.mandant, 'p-m', { caseId: ids.own, typing: true });
-    await settle();
-    assert.deepEqual(anwalt.events.filter((e) => e.k === 'typing').pop(), { k: 'typing', id: ids.own, name: 'Lena Live' });
-    // Akte geschlossen bzw. Tab zu: die anderen sehen es sofort
-    await presence(as.partner, 'p-p', { caseId: null });
-    await settle();
-    assert.deepEqual(last(anwalt).users.map((u) => u.id), [as.anwalt.me.id]);
-    await presence(as.partner, 'p-p', { caseId: ids.own });
-    await settle();
-    assert.equal(last(anwalt).users.length, 2);
-    partner.close();
-    await settle();
-    assert.deepEqual(last(anwalt).users.map((u) => u.id), [as.anwalt.me.id], 'Verbindung weg = nicht mehr da');
-  });
-
-  it('Eingänge über die öffentlichen Seiten erreichen nur die Kanzlei – Abfragen melden nichts', async () => {
-    const kanzlei = await listen(as.anwalt, 'a-public');
-    const mandant = await listen(as.mandant, 'm-public');
-    await settle();
-    const guest = client(server.base);
-    const web = await guest.post('/api/public/cases', { name: 'Gina Gast', area: 'zivilrecht', description: 'Anfrage über die Website zum Live-Test.' });
-    assert.equal(web.status, 201, web.text);
-    const app = await guest.post('/api/public/applications', { positionId: null, name: 'Ben Bewerber', discord: 'ben.bewerber', motivation: 'Ich möchte bei Pake & Scha anfangen und bringe Erfahrung aus der Rechtsberatung mit.', accept: true });
-    assert.equal(app.status, 201, app.text);
-    await settle();
-    assert.deepEqual(kanzlei.events, [{ k: 'area', a: 'cases' }, { k: 'area', a: 'applications' }]);
-    // Antwort des Bewerbers auf seiner Seite: die Kanzlei sieht sie im offenen Fenster sofort
-    assert.equal((await guest.post('/api/public/application-portal/messages', { token: app.json.token, body: 'Passt mir gut.' })).status, 201);
-    assert.equal((await guest.post('/api/public/application-portal', { token: app.json.token })).status, 200);
-    await settle();
-    assert.deepEqual(kanzlei.events.slice(2), [{ k: 'area', a: 'applications' }], 'Lesen der Bewerberseite meldet nichts');
-    assert.deepEqual(mandant.events, [], 'Mandanten bekommen davon nichts');
-  });
+        // 2) Ich bearbeite den Statushinweis (Feld bleibt offen) – der Kollege ändert ihn inzwischen
+        await page.click('[data-ie="publicNote"]');
+        await page.waitForSelector('textarea.ie-input, .ie-input');
+        await page.fill('.ie-input', 'Mein Hinweis');
+        await partner.patch(`/api/cases/${kase.id}`, { publicNote: 'Hinweis von Michael' });
+        await page.waitForTimeout(700);
+        await page.keyboard.press('Control+Enter');
+        await page.waitForSelector('text=Jemand war schneller', { timeout: 8000 });
+        const dialog = await page.textContent('body');
+        assert.ok(dialog.includes('Jemand war schneller') && dialog.includes('Hinweis von Michael'), `Dialog nennt den neuen Stand: ${dialog.slice(Math.max(0, dialog.indexOf('Jemand war schneller') - 50), dialog.indexOf('Jemand war schneller') + 400)}`);
+        // Neuen Stand behalten → nichts wird überschrieben
+        await page.click('text=Neuen Stand behalten');
+        await page.waitForFunction(() => !document.body.textContent.includes('Jemand war schneller'));
+        assert.equal((await admin.get(`/api/cases/${kase.id}`)).json.case.publicNote, 'Hinweis von Michael');
+        // noch einmal, diesmal meine Änderung durchsetzen
+        await page.waitForFunction(() => document.querySelector('[data-ie="publicNote"]')?.textContent.includes('Hinweis von Michael'), null, { timeout: 8000 });
+        await page.click('[data-ie="publicNote"]');
+        await page.fill('.ie-input', 'Mein Hinweis');
+        await partner.patch(`/api/cases/${kase.id}`, { publicNote: 'Schon wieder Michael' });
+        await page.waitForTimeout(700);
+        await page.keyboard.press('Control+Enter');
+        await page.waitForSelector('text=Jemand war schneller');
+        await page.click('text=Meine Änderung speichern');
+        await page.waitForFunction(() => !document.body.textContent.includes('Jemand war schneller'));
+        await until(() => true);
+        const final = (await admin.get(`/api/cases/${kase.id}`)).json.case.publicNote;
+        assert.equal(final, 'Mein Hinweis');
+        assert.deepEqual(problems, []);
+      } finally {
+        await ctx.close();
+      }
+    });
+  }
 });

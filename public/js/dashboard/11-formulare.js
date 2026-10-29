@@ -298,6 +298,11 @@ const forms = {
     const fd = new FormData(f);
     const id = Number(f.dataset.id);
     const r = await api.post(`/api/cases/${id}/notes`, { body: val(fd, 'body'), internal: fd.get('internal') === 'on' });
+    if (r.queued) {
+      // Offline-Modus: die Notiz wartet auf die Verbindung (offline.js zeigt den Hinweis); der Text bleibt nicht im Feld stehen
+      f.reset();
+      return;
+    }
     const m = r.mentioned || [];
     toast(m.length ? `Gespeichert – ${m.map((u) => `${u.name} (${u.via === 'dm' ? 'Discord-DM' : 'Kanzlei-Post'})`).join(', ')} benachrichtigt.` : 'Eintrag gespeichert.');
     await reloadCase(id);
@@ -804,7 +809,8 @@ const forms = {
       assignedTo: val(fd, 'assignedTo') ? Number(val(fd, 'assignedTo')) : null,
     };
     if (id) {
-      await api.patch('/api/tasks/' + id, body);
+      const t = findTask(id);
+      await guardedPatch('/api/tasks/' + id, body, t ? { title: t.title, note: t.note, dueDate: t.dueDate || null, assignedTo: t.assignedTo } : undefined, { reload: afterTaskChange });
     } else {
       if (val(fd, 'caseId')) body.caseId = Number(val(fd, 'caseId'));
       await api.post('/api/tasks', body);

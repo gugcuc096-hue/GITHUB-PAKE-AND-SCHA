@@ -26,6 +26,7 @@ const app = express();
 // Render/Nginx/Cloudflare sitzen als Reverse Proxy davor (wichtig für "secure"-Cookies und Rate-Limits).
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
+app.use(require('./health').timing); // misst jede API-Anfrage (Systemzustand im Dashboard)
 
 app.use(
   helmet({
@@ -166,6 +167,7 @@ app.use('/api/admin/fees', fees.adminRouter);
 app.use('/api/admin/applications', applications.adminRouter);
 app.use('/api/admin/positions', applications.positionsRouter);
 app.use('/api/admin', admin.router);
+app.use('/api/system', require('./routes/system'));
 app.use('/api/discord', require('./routes/discord'));
 app.use('/api/tickets', require('./routes/tickets'));
 app.use('/api/bot', require('./routes/bot').router);
@@ -238,6 +240,12 @@ app.use((err, req, res, next) => {
 
 /* ---------------------------------------------------------------- Start */
 runBootstrap();
+try {
+  const made = require('./health').ensureIndexes(); // Indizes für alle Fremdschlüssel (schnelle Abfragen auch bei vielen Daten)
+  if (made) console.log(`Datenbank: ${made} fehlende Indizes angelegt.`);
+} catch (err) {
+  console.warn('Indizes prüfen fehlgeschlagen:', err.message);
+}
 require('./permissions').ensureOwner();
 require('./ranks').init(); // Ränge aus der Datenbank (beim ersten Start: die bisherigen sechs)
 require('./penal').init(); // Strafgesetzbuch & Strafkatalog (beim ersten Start aus seeds/stgb.json)
@@ -299,6 +307,15 @@ app.listen(PORT, () => {
   setTimeout(() => require('./tickets').registerCommands().catch((err) => console.warn('Discord-Befehle nicht angemeldet:', err.message)), 3000).unref();
   // Kanzlei-Bot: dauerhafte Verbindung für Rang-Sync, Role Connections und Willkommensnachrichten (nur wenn eingeschaltet)
   setTimeout(() => require('./discordBot').start(), 4000).unref();
+  require('./health').markReady();
+  // Kurzer Selbsttest kurz nach dem Start (Ergebnis im Dashboard unter „Systemzustand“, bei Problemen Warnung ans Board)
+  setTimeout(() => {
+    try {
+      require('./health').runSelfTest();
+    } catch (err) {
+      console.warn('Selbsttest fehlgeschlagen:', err.message);
+    }
+  }, 8000).unref();
   console.log(`Pake & Scha Server läuft unter http://localhost:${PORT}`);
   console.log(`Datenbank: ${DB_PATH}`);
   if (process.env.RENDER && !process.env.DB_PATH) {

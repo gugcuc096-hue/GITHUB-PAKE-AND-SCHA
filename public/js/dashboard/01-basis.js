@@ -230,6 +230,7 @@ const VIEWS = {
   cooperations: { label: 'Kooperationen', icon: 'tag', board: true, section: 'Board of Partners' },
   fees: { label: 'Honorarordnung', icon: 'scale', perm: ['fees.edit'], section: 'Verwaltung' },
   audit: { label: 'Protokoll', icon: 'list', admin: true, section: 'Board of Partners' },
+  system: { label: 'Systemzustand', short: 'System', icon: 'chart', perm: ['system.edit'], section: 'Verwaltung' },
   settings: { label: 'Einstellungen', icon: 'cog', perm: CONFIG_PERMS, section: 'Verwaltung' },
   profile: { label: 'Mein Profil', short: 'Profil', icon: 'user', section: 'Konto' },
   'invoice-new': { label: 'Neues Dokument', icon: 'receipt', staff: true, hidden: true },

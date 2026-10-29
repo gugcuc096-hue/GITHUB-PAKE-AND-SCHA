@@ -3,7 +3,8 @@
  * Live-Aktualisierung des Dashboards (Server-Sent Events, GET /api/events).
  *
  * Geschickt wird nur, DASS sich etwas geändert hat – nie Inhalte:
- *   { k: 'case', id, chat }  Akte geändert (chat = nur Nachrichten/Gelesen) – nur an Personen, die die Akte sehen dürfen
+ *   { k: 'case', id, chat, by }  Akte geändert (chat = nur Nachrichten/Gelesen) – nur an Personen, die die Akte sehen dürfen;
+ *                            by = Name der ändernden Person, nur für die Kanzlei
  *   { k: 'area', a }         Bereich geändert (Aufgaben, Kalender, Post …) – nur an die Kanzlei
  *   { k: 'presence', id, users }  wer aus der Kanzlei die Akte gerade offen hat – nur an die Kanzlei in dieser Akte
  *   { k: 'typing', id, name }     jemand schreibt im Akten-Chat – an alle anderen, die die Akte gerade offen haben
@@ -39,7 +40,10 @@ const userById = (id) => db.prepare('SELECT * FROM users WHERE id = ? AND active
 
 function send(event, { exceptTab = '' } = {}) {
   if (!clients.size) return;
-  const data = `data: ${JSON.stringify(event)}\n\n`;
+  // „by“ (wer hat geändert) bekommt nur die Kanzlei – Mandanten erfahren nie, wer intern woran gearbeitet hat
+  const { by, ...plain } = event;
+  const dataStaff = `data: ${JSON.stringify(event)}\n\n`;
+  const data = `data: ${JSON.stringify(plain)}\n\n`;
   const { getCase, caseAccess } = require('./models');
   const c = event.k === 'case' ? getCase(event.id) : null;
   if (event.k === 'case' && !c) return;
@@ -52,15 +56,15 @@ function send(event, { exceptTab = '' } = {}) {
     // Akte: wer sie sehen darf; alles andere: nur die Kanzlei
     if (event.k === 'case' ? !caseAccess(c, u).canView : !isStaff(u)) continue;
     try {
-      cl.res.write(data);
+      cl.res.write(by && isStaff(u) ? dataStaff : data);
     } catch {
       clients.delete(cl);
     }
   }
 }
 
-const caseChanged = (id, { chat = false, exceptTab } = {}) => Number(id) > 0 && send({ k: 'case', id: Number(id), chat: !!chat }, { exceptTab });
-const areaChanged = (area, { exceptTab } = {}) => area && send({ k: 'area', a: String(area) }, { exceptTab });
+const caseChanged = (id, { chat = false, exceptTab, by } = {}) => Number(id) > 0 && send({ k: 'case', id: Number(id), chat: !!chat, ...(by ? { by } : {}) }, { exceptTab });
+const areaChanged = (area, { exceptTab, by } = {}) => area && send({ k: 'area', a: String(area), ...(by ? { by } : {}) }, { exceptTab });
 
 /** Bereich einer API-Adresse: /api/admin/applications → applications, sonst der erste Teil. */
 function areaOf(path) {
@@ -86,6 +90,7 @@ function middleware(req, res, next) {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
   const path = req.path; // relativ zu /api
   const tab = String(req.get('x-ps-tab') || '').slice(0, 40);
+  const by = req.user ? req.user.display_name : undefined; // wer ändert (steht nur für die Kanzlei im Ereignis)
   res.on('finish', () => {
     if (res.statusCode >= 400) return;
     require('./routes/start').invalidate(); // Zähler der Navigation neu berechnen
@@ -99,16 +104,16 @@ function middleware(req, res, next) {
       const area = areaOf(path);
       const m = path.match(/^\/(cases|contracts|invoices)\/(\d+)(\/[^/]+)?/);
       // Nur „gelesen“ im Chat: betrifft die Akte, aber keine Listen der ganzen Kanzlei
-      if (m && m[1] === 'cases' && /^\/chat/.test(m[3] || '')) return caseChanged(m[2], { chat: true, exceptTab: tab });
-      if (m && m[1] === 'cases') caseChanged(m[2], { exceptTab: tab });
+      if (m && m[1] === 'cases' && /^\/chat/.test(m[3] || '')) return caseChanged(m[2], { chat: true, exceptTab: tab, by });
+      if (m && m[1] === 'cases') caseChanged(m[2], { exceptTab: tab, by });
       else if (m && m[1] === 'contracts') {
         const k = db.prepare('SELECT case_id FROM case_contracts WHERE id = ?').get(Number(m[2]));
-        if (k) caseChanged(k.case_id, { exceptTab: tab });
+        if (k) caseChanged(k.case_id, { exceptTab: tab, by });
       } else if (m && m[1] === 'invoices') {
         const inv = db.prepare('SELECT case_id FROM invoices WHERE id = ?').get(Number(m[2]));
-        if (inv && inv.case_id) caseChanged(inv.case_id, { exceptTab: tab });
+        if (inv && inv.case_id) caseChanged(inv.case_id, { exceptTab: tab, by });
       }
-      if (!AREA_SKIP.has(area)) areaChanged(area, { exceptTab: tab });
+      if (!AREA_SKIP.has(area)) areaChanged(area, { exceptTab: tab, by });
     } catch (err) {
       console.warn('Live-Aktualisierung:', err.message);
     }

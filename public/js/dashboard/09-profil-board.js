@@ -41,6 +41,21 @@ function twoFactorPanel(tf) {
   return `<section class="panel panel-pad" id="secTwoFactor">${head}${body}${devices}</section>`;
 }
 
+/** Offline-Modus (nur dieses Gerät): freiwillig, Daten bleiben im Browser dieses Geräts und werden beim Abmelden gelöscht. */
+function offlinePanel() {
+  const o = window.PS.offline;
+  if (!o) return '';
+  const on = o.enabled();
+  const s = st.offlineStats || { entries: 0, queued: 0, oldest: null };
+  return `<section class="panel panel-pad" id="offlinePanel">
+      <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('download')} Offline-Modus (dieses Gerät)</h2>${on ? badge('An', 'emerald') : badge('Aus', 'slate')}</div>
+      <p class="text-sm text-muted">Bei schlechtem Empfang weiterarbeiten: Zuletzt gesehene Akten, Aufgaben, Termine und Rechnungen bleiben auf diesem Gerät lesbar. Eine interne Notiz in der Akte und das Abhaken einer Aufgabe werden gesendet, sobald die Verbindung wieder da ist. Die Daten liegen unverschlüsselt im Browser – nur auf eigenen Geräten einschalten. Beim Abmelden werden sie gelöscht.</p>
+      ${on ? `<p class="text-xs text-dim mt-2">Im Zwischenspeicher: ${s.entries} ${s.entries === 1 ? 'Ansicht' : 'Ansichten'}${s.oldest ? ` (ältester Stand ${esc(fmtDate(new Date(s.oldest).toISOString()))})` : ''} · ${s.queued} ${s.queued === 1 ? 'Änderung wartet' : 'Änderungen warten'} auf die Verbindung</p>` : ''}
+      <div class="form-actions mt-3"><button type="button" class="${on ? 'btn-outline' : 'btn-gold'} btn-md" data-action="offline-toggle" data-on="${on ? '0' : '1'}">${icon(on ? 'x' : 'check', 'ico-sm')}<span>${on ? 'Offline-Modus ausschalten' : 'Offline-Modus einschalten'}</span></button>
+        ${on ? `<button type="button" class="btn-ghost btn-md" data-action="offline-clear">${icon('trash', 'ico-sm')}<span>Zwischenspeicher leeren</span></button>` : ''}</div>
+    </section>`;
+}
+
 views.profile = {
   async load() {
     const [me, ds, coops, names, member, sessions] = await Promise.all([
@@ -53,6 +68,7 @@ views.profile = {
       load.fivenet(),
     ]);
     st.otherSessions = sessions.others;
+    st.offlineStats = window.PS.offline ? await window.PS.offline.stats() : null;
     st.twoFactor = me.twoFactor;
     st.myCoops = coops ? coops.matches : [];
     st.myNameRequests = names.requests;
@@ -107,6 +123,7 @@ views.profile = {
             <div class="form-actions mt-3"><button type="button" class="btn-outline btn-md" data-action="logout-others" ${st.otherSessions ? '' : 'disabled'}>${icon('logout', 'ico-sm')}<span>Auf allen anderen Geräten abmelden</span></button></div>
           </section>
           ${motionPanel()}
+          ${offlinePanel()}
           ${twoFactorPanel(st.twoFactor)}
           <section class="panel panel-pad">
             <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${DISCORD_ICON} Discord</h2>${u.discord ? badge('Verbunden', 'emerald') : ''}</div>

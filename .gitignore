@@ -8,3 +8,4 @@ data/uploads/
 data/backups/
 data/restore.db*
 data/*.before-restore-*
+.packed/

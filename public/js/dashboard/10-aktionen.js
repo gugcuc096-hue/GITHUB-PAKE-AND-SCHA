@@ -19,6 +19,7 @@ const actions = {
     st.leaving = true; // keine zweite Rückfrage des Browsers
     window.PS.drafts.clearAll(); // Entwürfe gehören zu diesem Konto – nicht für den Nächsten am selben Gerät
     forgetRecent(); // ebenso die Liste „Zuletzt geöffnet“
+    if (window.PS.offline) await window.PS.offline.clear(); // ebenso der Offline-Zwischenspeicher
     setAppBadge(0); // Zahl auf dem App-Symbol gehört ebenfalls zu diesem Konto
     await api.post('/api/auth/logout');
     location.href = '/login';
@@ -121,7 +122,7 @@ const actions = {
     const undo = previewStage(`step:${step}`); // Kreise springen sofort um
     const was = st.caseInfo && st.caseInfo.id === id ? st.caseInfo.step : null;
     try {
-      await api.patch('/api/cases/' + id, { step });
+      await casePatch(id, { step });
     } catch (err) {
       undo();
       throw notSaved(err);
@@ -1615,9 +1616,14 @@ const actions = {
       el.dataset.done = on ? '1' : '0';
     };
     show(done);
+    if (done && !window.PS.motion.calm()) {
+      el.classList.remove('pop');
+      void el.offsetWidth;
+      el.classList.add('pop'); // Haken federt kurz auf
+    }
     el.disabled = true;
     try {
-      await api.patch('/api/tasks/' + el.dataset.id, { done });
+      await guardedPatch('/api/tasks/' + el.dataset.id, { done }, { done: !done }, { reload: afterTaskChange });
     } catch (err) {
       if (el.isConnected) show(!done);
       throw notSaved(err);
