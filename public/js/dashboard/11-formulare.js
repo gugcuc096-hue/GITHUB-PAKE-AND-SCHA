@@ -298,6 +298,11 @@ const forms = {
     const fd = new FormData(f);
     const id = Number(f.dataset.id);
     const r = await api.post(`/api/cases/${id}/notes`, { body: val(fd, 'body'), internal: fd.get('internal') === 'on' });
+    if (r.queued) {
+      // Offline-Modus: die Notiz wartet auf die Verbindung (offline.js zeigt den Hinweis); der Text bleibt nicht im Feld stehen
+      f.reset();
+      return;
+    }
     const m = r.mentioned || [];
     toast(m.length ? `Gespeichert – ${m.map((u) => `${u.name} (${u.via === 'dm' ? 'Discord-DM' : 'Kanzlei-Post'})`).join(', ')} benachrichtigt.` : 'Eintrag gespeichert.');
     await reloadCase(id);

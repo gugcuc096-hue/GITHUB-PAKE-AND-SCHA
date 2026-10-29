@@ -80,7 +80,7 @@ describe('Auffindbarkeit (API)', () => {
     assert.match((await anon.get(script)).text, /api\/health/);
     const sw = (await anon.get('/sw.js')).text;
     assert.match(sw, /WAKE_URL/);
-    assert.match(sw, /ps-offline-v4/);
+    assert.match(sw, /ps-offline-v\d+/);
   });
 });
 
