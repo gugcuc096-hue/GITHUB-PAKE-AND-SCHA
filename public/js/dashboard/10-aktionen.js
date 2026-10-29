@@ -1031,6 +1031,22 @@ const actions = {
     await load.fivenet();
     resetPending();
     openModal(externalForm('fivenet', null, st.caseInfo));
+    // Übergabe aus dem FiveNet-Skript: Bilder vormerken, Dokument-ID prüfen lassen
+    if (st.fnPrefill) {
+      if (st.fnPrefill.imageUrls.length) addPendingImages({ urls: st.fnPrefill.imageUrls });
+      const input = $('#fnInput');
+      if (input && input.value) checkFivenetInput(input);
+      st.fnPrefill = null;
+    }
+  },
+  // Übergabe aus dem FiveNet-Skript: gewählte Akte öffnen, dann das vorbelegte Formular
+  'fn-import-case': async (el) => {
+    const pre = st.fnImport;
+    if (!pre) return;
+    st.fnImport = null;
+    await openCase(Number(el.dataset.id));
+    st.fnPrefill = pre;
+    await actions['fn-add']();
   },
   'tpl-new': () => openModal(templateForm(null), { wide: true }),
   'tpl-edit': (el) => {
@@ -1549,7 +1565,7 @@ const actions = {
   'fn-copy-text': async (el) => {
     const d = st.caseDocs.find((x) => x.id === Number(el.dataset.id));
     if (!d) return;
-    const ok = await copy(d.contentText);
+    const ok = await copy(PS.transcriptPlain(d.contentText));
     toast(ok ? 'Abschrift kopiert.' : 'Kopieren nicht möglich.', ok ? 'ok' : 'error');
   },
   'fn-delete': async (el) => {

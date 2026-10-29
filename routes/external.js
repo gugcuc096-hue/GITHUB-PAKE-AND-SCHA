@@ -491,7 +491,7 @@ caseRouter.get(
     ].filter(Boolean);
     res.set('Content-Type', 'text/plain; charset=utf-8');
     res.set('Content-Disposition', `attachment; filename="${p.fileName(link.external_id)}.txt"`);
-    const body = p.formatText ? p.formatText(link.content_text) : link.content_text;
+    const body = p.formatText ? p.formatText(link.content_text) : require('../transcript').plain(link.content_text);
     res.send(`${head.join('\r\n')}\r\n\r\n${body.replace(/\r?\n/g, '\r\n')}\r\n`);
   })
 );

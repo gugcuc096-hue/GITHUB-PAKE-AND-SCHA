@@ -255,8 +255,16 @@ function fivenetProfilePanel() {
         ${fn.lastViewedAs ? row('Zuletzt angegeben', `„${esc(fn.lastViewedAs)}“ <span class="text-xs">(eigene Angabe)</span>`, false) : ''}
       </div>
       <div class="banner banner-amber mt-4 mb-0">${icon('shield')}<div><strong>Niemals das FiveNet-Passwort eingeben.</strong> Die Kanzlei-Plattform fragt nie danach. Eine Verbindung über Passwort oder Sitzungs-Cookies wäre unsicher und ist bewusst nicht vorgesehen.</div></div>
-      <ol class="text-sm text-muted list-decimal pl-5 mt-4 space-y-1">
-        <li>In FiveNet den Charakter wählen, der das Dokument sehen darf.</li>
+      <div class="fn-oneclick mt-4"><div class="fn-oneclick-head">${icon('link', 'ico-sm')}<strong>Ein-Klick-Übernahme (empfohlen)</strong></div>
+        <p class="text-sm text-muted">Ein kleines Browser-Skript (Tampermonkey o. Ä.) setzt in FiveNet-Dokumenten den Knopf <strong>„→ An Pake &amp; Scha senden“</strong>. Ein Klick übergibt Titel, Text und Bilder an dieses Dashboard – dort wählen Sie die Akte und bestätigen. Das Skript läuft nur in <em>Ihrem</em> Browser, liest nur, was Sie dort sehen (wie Markieren und Kopieren), und kennt kein Passwort. Markierter Text hat Vorrang vor dem ganzen Dokument.</p>
+        <ol class="text-sm text-muted list-decimal pl-5 space-y-1">
+          <li>Erweiterung <strong>Tampermonkey</strong> (oder Violentmonkey) im Browser installieren.</li>
+          <li><a class="link-btn" href="/fivenet-import.user.js">Skript installieren ↓</a> – Tampermonkey fragt nach der Installation.</li>
+          <li>FiveNet-Dokument öffnen → Knopf unten rechts → im Kanzlei-Fenster Akte wählen → prüfen → „Mit Akte verknüpfen“.</li>
+        </ol></div>
+      <p class="text-sm text-muted mt-4"><strong>Oder von Hand:</strong></p>
+      <ol class="text-sm text-muted list-decimal pl-5 mt-1 space-y-1">
+        <li>Ohne Skript: In FiveNet den Charakter wählen, der das Dokument sehen darf.</li>
         <li>Dokument öffnen und die Adresse aus der Adresszeile kopieren.</li>
         <li>In der Akte „FiveNet-Dokument hinzufügen“ – die Dokument-ID wird automatisch erkannt.</li>
         <li>Optional: den Dokumentinhalt in FiveNet markieren, Strg+C, im Feld „Inhalt aus FiveNet“ Strg+V – Text wird zur Abschrift, Bilder werden als Anhang übernommen.</li>

@@ -83,7 +83,7 @@ function contractForm(c, { templates, defaults, k = null }) {
       const on = !!sel && !isMain;
       const birth = sel ? sel.birth : st.contractBirths[l.id] || '';
       return `<label class="svc co-row"><input type="checkbox" class="co-check" value="${l.id}" ${on ? 'checked' : ''} ${isMain ? 'disabled' : ''}>
-          <span class="svc-name">${esc(l.name)}${rankOf(l.id) ? ` <span class="text-dim">· ${esc(rankOf(l.id))}</span>` : ''} <span class="co-main text-dim" ${isMain ? '' : 'hidden'}>(erster Anwalt)</span></span>
+          <span class="fn-pick-name">${esc(l.name)}${rankOf(l.id) ? ` <span class="text-dim">· ${esc(rankOf(l.id))}</span>` : ''} <span class="co-main text-dim" ${isMain ? '' : 'hidden'}>(erster Anwalt)</span></span>
           <input class="field co-birth" maxlength="40" placeholder="Geb. (IC) TT.MM.JJJJ" value="${esc(birth)}" aria-label="Geburtsdatum ${esc(l.name)}" ${on ? '' : 'disabled'}></label>`;
     })
     .join('');
@@ -109,7 +109,7 @@ function contractForm(c, { templates, defaults, k = null }) {
           const x = sel || f; // gespeicherte Leistung behält ihren Preis
           const list = x.listPrice > x.price ? x.listPrice : null;
           return `<label class="svc"><input type="checkbox" class="svc-check" data-name="${esc(f.name)}" data-price="${x.price}" ${list ? `data-list-price="${list}" data-discount="${esc(x.discount || '')}"` : ''} ${sel ? 'checked' : ''}>
-              <span class="svc-name">${esc(f.name)}</span>
+              <span class="fn-pick-name">${esc(f.name)}</span>
               <input type="number" class="field svc-qty" min="1" max="99" value="${sel ? sel.qty : 1}" aria-label="Menge ${esc(f.name)}" ${sel ? '' : 'disabled'}>
               <span class="svc-price">${list ? `<s class="svc-list-price">${esc(money(list))}</s> ` : ''}${esc(money(x.price))}</span></label>`;
         })
@@ -367,7 +367,7 @@ function externalDocCard(d, c, sortable = false) {
   const rows = sheet && d.contentText ? d.contentText.split('\n').filter(Boolean).length : 0;
   const content = d.contentText
     ? `<details class="fn-text"><summary>${icon(sheet ? 'table' : 'doc', 'ico-sm')}<span>${sheet ? 'Tabelle anzeigen' : 'Abschrift anzeigen'}</span><span class="text-dim text-xs">${sheet ? `${rows.toLocaleString('de-DE')} Zeile${rows === 1 ? '' : 'n'}` : `${d.contentText.length.toLocaleString('de-DE')} Zeichen`} · Stand ${esc(fmtDate(d.contentAt))}${d.contentByName ? ' · ' + esc(d.contentByName) : ''}</span></summary>
-          ${sheet ? sheetTable(d.contentText) : `<div class="fn-pre">${esc(d.contentText)}</div>`}
+          ${sheet ? sheetTable(d.contentText) : `<div class="fn-pre">${PS.transcriptHtml(d.contentText)}</div>`}
           <div class="fn-actions"><button type="button" class="btn-ghost btn-sm" data-action="fn-copy-text" data-id="${d.id}">${icon('copy', 'ico-sm')}<span>${sheet ? 'Tabelle kopieren (für Excel/Sheets)' : 'Text kopieren'}</span></button>
             <a class="btn-ghost btn-sm" href="${extUrl(c.id, d.id, '/text')}" download>${icon('download', 'ico-sm')}<span>Als Textdatei</span></a></div>
           <p class="form-hint">Abschrift – maßgeblich ist das Original in ${esc(p.name)}; spätere Änderungen dort sind hier erst nach „Aktualisieren“ enthalten.</p></details>`
@@ -474,13 +474,14 @@ function externalForm(provider, d, c) {
   const gd = !!p.google;
   const sheet = provider === 'gsheets';
   const editing = !!d;
-  const v = d || { title: '', docType: '', docDate: '', docAuthor: '', summary: '', viewedAs: gd ? '' : fn.lastViewedAs || '', internal: true };
+  const pre = !d && !gd && st.fnPrefill ? st.fnPrefill : null; // Übergabe aus dem FiveNet-Skript
+  const v = d || { title: pre ? pre.title : '', docType: pre ? pre.docType : '', docDate: pre ? pre.docDate : '', docAuthor: pre ? pre.docAuthor : '', summary: '', contentText: pre ? pre.contentText : '', viewedAs: gd ? '' : fn.lastViewedAs || '', internal: true };
   const inputBox = gd
     ? `<div class="span-2"><label class="label" for="gdInput">${sheet ? 'Link zur Google-Sheets-Tabelle' : 'Link zum Google-Docs-Dokument'}</label>
           <input id="gdInput" name="input" class="field font-mono text-sm" required maxlength="600" autocomplete="off" spellcheck="false" autofocus placeholder="https://docs.google.com/${sheet ? 'spreadsheets' : 'document'}/d/…/edit">
           <div id="gdCheck" class="fn-check" aria-live="polite"><span class="text-dim">${esc(googleIdleHint(provider))}</span></div></div>`
     : `<div class="span-2"><label class="label" for="fnInput">Link zum FiveNet-Dokument</label>
-          <input id="fnInput" name="input" class="field font-mono text-sm" required maxlength="500" autocomplete="off" spellcheck="false" autofocus placeholder="${esc(fn.instance.url)}/documents/1234">
+          <input id="fnInput" name="input" class="field font-mono text-sm" required maxlength="500" autocomplete="off" spellcheck="false" autofocus placeholder="${esc(fn.instance.url)}/documents/1234" value="${esc(pre ? `${fn.instance.url}/documents/${pre.documentId}` : '')}">
           <div id="fnCheck" class="fn-check" aria-live="polite"><span class="text-dim">Adresse aus FiveNet einfügen – die Dokument-ID wird automatisch erkannt.</span></div></div>`;
   const known = editing
     ? `<div class="span-2"><div class="label">${esc(p.noun)}</div><div class="fn-check ok"><div class="fn-line">${icon('check', 'ico-sm')}<span>${gd ? esc(d.host) : `Dokument-ID <strong>${esc(d.documentId)}</strong> · ${esc(d.host)}`}</span><a class="link-btn push" href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">In ${esc(p.name)} öffnen ↗</a></div></div>
@@ -514,7 +515,7 @@ function externalForm(provider, d, c) {
         </div>
         <label class="check span-2"><input type="checkbox" name="clientVisible" ${v.internal ? '' : 'checked'}> Für den Mandanten sichtbar (sonst nur intern) – gilt auch für Abschrift und Bilder</label>
         ${editing || gd ? '' : `<label class="check span-2 fn-attest"><input type="checkbox" name="attest" required> Ich habe dieses Dokument in FiveNet mit meinem eigenen Charakter geöffnet und darf es einsehen und für die Akte übernehmen.</label>
-          <div class="span-2 banner banner-gold mb-0">${icon('shield')}<div>FiveNet bietet externen Anwendungen keine Schnittstelle (kein OAuth2). Die Kanzlei ruft das Dokument deshalb nicht selbst ab und fragt nie nach Ihrem FiveNet-Passwort. Übernommen wird nur, was Sie hier einfügen – Bilder daraus lädt der Server direkt aus dem FiveNet-Dateispeicher.</div></div>`}
+          <div class="span-2 banner banner-gold mb-0">${icon('shield')}<div>FiveNet bietet externen Anwendungen keine Schnittstelle (kein OAuth2). Die Kanzlei ruft das Dokument deshalb nicht selbst ab und fragt nie nach Ihrem FiveNet-Passwort. Übernommen wird nur, was Sie hier einfügen oder per Browser-Skript übergeben – Bilder daraus lädt der Server direkt aus dem FiveNet-Dateispeicher. Beim Einfügen erkennt die Kanzlei Titel, Art, Verfasser und Datum selbst. Skript zur Ein-Klick-Übernahme: Mein Profil → FiveNet-Verbindung.</div></div>`}
         ${gd && !editing ? `<div class="span-2 banner banner-gold mb-0">${icon('shield')}<div>Die Kanzlei nutzt kein Google-Konto und fragt nie nach Passwörtern. Geladen werden nur ${sheet ? 'Tabellen' : 'Dokumente'}, die per Link freigegeben oder im Web veröffentlicht sind – genau so, wie sie jeder mit dem Link sehen kann.${sheet ? ' Übernommen wird das Tabellenblatt aus dem Link (sonst das erste Blatt).' : ''}</div></div>` : ''}
         <div class="span-2 form-actions">
           <button type="submit" class="btn-gold btn-md">${icon(editing ? 'check' : 'link', 'ico-sm')}<span>${editing ? 'Speichern' : 'Mit Akte verknüpfen'}</span></button>
@@ -655,6 +656,162 @@ function fivenetBody(f) {
   };
 }
 
+/* ---------------------------------------------------------------- FiveNet: Angaben aus dem Text erkennen */
+const FN_MONTHS = ['januar', 'februar', 'märz', 'april', 'mai', 'juni', 'juli', 'august', 'september', 'oktober', 'november', 'dezember'];
+
+/** Erstes gültiges Datum im Text (2026-10-05, 5.10.2026 oder 5. Oktober 2026) als JJJJ-MM-TT – sonst ''. */
+function parseGermanDate(text) {
+  const t = String(text || '');
+  const ok = (y, m, d) => {
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    return y >= 1990 && y <= 2100 && dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d ? `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}` : '';
+  };
+  const found = [];
+  for (const m of t.matchAll(/\b(\d{4})-(\d{2})-(\d{2})\b/g)) found.push([m.index, ok(+m[1], +m[2], +m[3])]);
+  for (const m of t.matchAll(/\b(\d{1,2})\.\s?(\d{1,2})\.\s?(\d{4})\b/g)) found.push([m.index, ok(+m[3], +m[2], +m[1])]);
+  for (const m of t.matchAll(/\b(\d{1,2})\.\s*([A-Za-zÄÖÜäöü]+)\s+(\d{4})\b/g)) {
+    const mi = FN_MONTHS.indexOf(m[2].toLowerCase()) + 1;
+    if (mi) found.push([m.index, ok(+m[3], mi, +m[1])]);
+  }
+  const first = found.filter((f) => f[1]).sort((a, b) => a[0] - b[0])[0];
+  return first ? first[1] : '';
+}
+
+/**
+ * Titel, Dokumentart, Verfasser und Datum aus dem eingefügten Text raten: Zeilen wie „Erstellt von: …“, „Kategorie: …“
+ * bzw. „Datum: …“, sonst ein bekanntes Dokumentart-Wort in den ersten Zeilen, das erste Datum und die erste kurze Zeile
+ * als Titel. Es sind nur Vorschläge – sie landen in leeren Feldern und werden zur Prüfung gemeldet.
+ */
+function guessFivenetMeta(text, docTypes = []) {
+  const lines = String(text || '').split('\n').map((l) => l.trim().replace(/^#{2,3} /, '')).filter(Boolean).slice(0, 60);
+  const label = (re) => {
+    for (const l of lines) {
+      const m = l.match(re);
+      if (m && m[1].trim()) return m[1].trim();
+    }
+    return '';
+  };
+  const out = {
+    title: label(/^(?:titel|title|betreff)\s*[:：]\s*(.{3,200})$/i),
+    docType: label(/^(?:kategorie|dokumentart|dokumenttyp|art|typ|category)\s*[:：]\s*(.{2,60})$/i),
+    docAuthor: label(/^(?:erstellt von|verfasser(?:in)?|autor(?:in)?|ersteller(?:in)?|created by|author)\s*[:：]\s*(.{2,120})$/i),
+    docDate: '',
+  };
+  out.docDate = parseGermanDate(label(/^(?:erstellt am|erstellt|datum|date|created(?: at)?)\s*[:：]\s*(.{6,40})$/i)) || parseGermanDate(lines.join('\n'));
+  if (!out.docType) {
+    const head = lines.slice(0, 6).join(' ').toLowerCase();
+    out.docType = docTypes.find((t) => t && head.includes(t.toLowerCase())) || '';
+  }
+  if (!out.title && lines[0]) {
+    const first = lines[0];
+    // eine Überschrift: kurz, kein Satz, keine „Feld: Wert“-Zeile, kein Listenpunkt/Bildmarker
+    if (first.length >= 3 && first.length <= 100 && !/[.!?]$/.test(first) && !/^[^:：]{1,30}[:：]/.test(first) && !/^(•|\[Bild\])/.test(first)) out.title = first;
+  }
+  const id = String(text || '').match(/\bDOC\s*-\s*(\d{1,9})\b/i) || String(text || '').match(/\/documents\/(\d{1,9})\b/);
+  out.documentId = id ? id[1] : '';
+  return out;
+}
+
+/** Erkannte Angaben in leere Felder des Dialogs eintragen. Liefert die Namen der gefüllten Felder. */
+function applyFivenetGuess(root, text) {
+  const g = guessFivenetMeta(text, (st.fivenet && st.fivenet.docTypes) || []);
+  const filled = [];
+  const put = (sel, value, name) => {
+    const el = root.querySelector(sel);
+    if (!el || !value || el.value.trim()) return;
+    el.value = value;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    filled.push(name);
+  };
+  put('#fnTitle', g.title, 'Titel');
+  put('#fnDocType', g.docType, 'Dokumentart');
+  put('input[name="docDate"]', g.docDate, 'Datum');
+  put('input[name="docAuthor"]', g.docAuthor, 'Verfasser');
+  const link = root.querySelector('#fnInput');
+  if (link && g.documentId && !link.value.trim()) {
+    link.value = g.documentId; // die Prüfung erkennt reine Zahlen
+    link.dispatchEvent(new Event('input', { bubbles: true }));
+    filled.push('Dokument-ID');
+  }
+  return filled;
+}
+
+/* ---------------------------------------------------------------- FiveNet: Übergabe aus dem Browser-Skript */
+/**
+ * Das Benutzerskript (Einstellungen → Integrationen / Mein Profil) schickt Titel, Text und Bilder des gerade geöffneten
+ * FiveNet-Dokuments per postMessage. Angenommen wird nur von der konfigurierten FiveNet-Adresse und nur für Kanzlei-
+ * Mitarbeitende; gelesen wird mit DOMParser (kein Skript, kein Bildabruf), Bilder nur aus dem FiveNet-Dateispeicher.
+ * Nichts wird gespeichert, bevor die Person eine Akte gewählt und das Formular bestätigt hat.
+ */
+const fnSeenNonces = new Set();
+async function onFivenetMessage(e) {
+  const data = e.data;
+  if (!data || typeof data !== 'object' || data.type !== 'ps-fivenet-doc' || data.v !== 1) return;
+  try {
+    if (!isStaff()) return;
+  } catch {
+    return; // Dashboard noch nicht fertig geladen – das Skript bietet es gleich noch einmal an
+  }
+  await load.fivenet().catch(() => {});
+  const base = st.fivenet && st.fivenet.instance && st.fivenet.instance.url;
+  let origin = '';
+  try {
+    origin = new URL(base).origin;
+  } catch {
+    return;
+  }
+  if (e.origin !== origin || !e.source) return;
+  const nonce = String(data.nonce || '').slice(0, 80);
+  try {
+    e.source.postMessage({ type: 'ps-ack', nonce }, e.origin);
+  } catch {
+    /* Fenster schon zu */
+  }
+  if (!nonce || fnSeenNonces.has(nonce)) return;
+  fnSeenNonces.add(nonce);
+  const id = String(data.documentId || '').match(/^\d{1,9}$/);
+  if (!id) return toast('Aus FiveNet kam keine gültige Dokument-ID an.', 'error');
+  const html = String(data.html || '').slice(0, 500000);
+  const parsed = html ? parsePastedHtml(html) : { text: String(data.text || '').slice(0, 60000), images: [] };
+  const text = parsed.text.slice(0, 60000);
+  const guess = guessFivenetMeta(text, st.fivenet.docTypes || []);
+  const clean = (v, n) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, n);
+  fnImportPick({
+    documentId: id[0],
+    title: clean(data.title, 300) || guess.title,
+    docType: guess.docType,
+    docDate: guess.docDate,
+    docAuthor: guess.docAuthor,
+    contentText: text,
+    imageUrls: [...new Set(parsed.images.map((src) => externalImageUrl('fivenet', src)).filter(Boolean))].slice(0, FN_MAX_IMAGES),
+  });
+}
+window.addEventListener('message', onFivenetMessage);
+
+/** Schritt 1 der Übergabe: Akte wählen (zuletzt bearbeitete oben, mit Suche). */
+async function fnImportPick(prefill) {
+  await load.cases();
+  st.fnImport = prefill;
+  const open = st.cases.filter((c) => !c.closed);
+  openModal(`
+      <h2 class="modal-title">FiveNet-Dokument übernehmen</h2>
+      <p class="modal-sub">Dokument <strong>${esc(prefill.documentId)}</strong>${prefill.title ? ` – ${esc(prefill.title)}` : ''} · ${prefill.contentText ? `${prefill.contentText.length.toLocaleString('de-DE')} Zeichen Text` : 'ohne Text'}${prefill.imageUrls.length ? ` · ${prefill.imageUrls.length} Bild${prefill.imageUrls.length === 1 ? '' : 'er'}` : ''}. In welche Akte soll es?</p>
+      <input id="fnImportSearch" type="search" class="field" placeholder="Aktenzeichen, Titel oder Mandant …" autocomplete="off" aria-label="Akte suchen" autofocus>
+      <div id="fnImportList" class="fn-pick-list mt-3" role="listbox" aria-label="Akten">${fnImportList(open, '')}</div>`);
+}
+const fnImportList = (cases, q) => {
+  const rows = cases
+    .filter((c) => !q || [c.caseNumber, c.title, c.clientName].join(' ').toLowerCase().includes(q))
+    .slice(0, 30);
+  return rows.length
+    ? rows.map((c) => `<button type="button" class="fn-pick" data-action="fn-import-case" data-id="${c.id}"><span class="fn-pick-name"><span class="font-mono text-gold">${esc(c.caseNumber)}</span> · ${esc(c.title)}</span><span class="fn-pick-client">${esc(c.clientName === '—' ? '' : c.clientName)}</span></button>`).join('')
+    : '<p class="text-sm text-dim py-2">Keine passende Akte gefunden.</p>';
+};
+function fnImportFilter(value) {
+  const box = $('#fnImportList');
+  if (box) box.innerHTML = fnImportList(st.cases.filter((c) => !c.closed), String(value || '').trim().toLowerCase());
+}
+
 /* ---------------------------------------------------------------- FiveNet: Inhalt übernehmen (Einfügen) */
 const FN_BLOCK = new Set(['P', 'DIV', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER', 'ASIDE', 'MAIN', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'LI', 'TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR', 'BLOCKQUOTE', 'PRE', 'FIGURE', 'FIGCAPTION', 'DL', 'DT', 'DD']);
 const FN_IMAGE_PATHS = ['/api/filestore/', '/api/image_proxy/'];
@@ -664,6 +821,33 @@ const FN_MAX_IMAGES = 10;
  * Wandelt kopiertes HTML aus FiveNet in lesbaren Text und sammelt die Bildadressen.
  * DOMParser lädt keine Bilder und führt keine Skripte aus; übernommen werden nur Textknoten.
  */
+/** Ein Absatz, der nur aus einem kurzen Fettdruck ohne Satzzeichen am Ende besteht, ist meist eine Zwischenüberschrift. */
+function boldOnly(n) {
+  const kids = [...n.childNodes].filter((c) => !(c.nodeType === 3 && !c.nodeValue.trim()));
+  if (kids.length !== 1 || kids[0].nodeType !== 1 || !/^(STRONG|B)$/.test(kids[0].tagName)) return false;
+  const t = kids[0].textContent.replace(/\s+/g, ' ').trim();
+  return t.length >= 3 && t.length <= 80 && !/[.,;!?:]$/.test(t);
+}
+
+/**
+ * Überschriften, die im Text selbst stehen (ohne HTML-Auszeichnung): Zeilen nur in GROSSBUCHSTABEN („SACHVERHALT“,
+ * „BEWEISMITTEL UND ZEUGEN“) und „§ 3 Pflichten des Mandanten“ – jeweils kurz und ohne Satzzeichen am Ende. Bereits
+ * markierte Zeilen bleiben unverändert; „DOC - 74412“ oder ein einzelnes Kürzel zählen nicht.
+ */
+function markHeadings(text) {
+  return String(text || '')
+    .split('\n')
+    .map((line) => {
+      const l = line.trim();
+      if (!l || l.length > 80 || /^#|^•|^\[Bild\]|[.,;:!?]$/.test(l)) return line;
+      const letters = l.replace(/[^A-Za-zÄÖÜäöüß]/g, '');
+      const caps = letters.length >= 4 && l === l.toUpperCase() && (letters.length >= 8 || /\s/.test(l)) && !/\d{3,}/.test(l);
+      const para = /^§\s*\d+[a-z]?\s+\p{Lu}/u.test(l) && l.length <= 70;
+      return caps || para ? `### ${l}` : line;
+    })
+    .join('\n');
+}
+
 function parsePastedHtml(html) {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   doc.querySelectorAll('script, style, noscript, template, svg, button, input, select, textarea').forEach((n) => n.remove());
@@ -695,6 +879,13 @@ function parsePastedHtml(html) {
       }
       const cell = tag === 'TD' || tag === 'TH';
       const block = FN_BLOCK.has(tag) && !inCell;
+      // Zwischenüberschriften: <h1>/<h2> groß („## “), <h3>–<h6> und Absätze nur aus Fettdruck kleiner („### “)
+      const level = inCell ? 0 : /^H[12]$/.test(tag) ? 2 : /^H[3-6]$/.test(tag) ? 3 : (tag === 'P' || tag === 'DIV') && boldOnly(n) ? 3 : 0;
+      if (level) {
+        const t = n.textContent.replace(/\s+/g, ' ').trim();
+        if (t) out.push(`\n${'#'.repeat(level)} ${t}\n`);
+        continue;
+      }
       // Listenpunkte und Tabellenzeilen ohne Leerzeile untereinander, Absätze mit Leerzeile.
       const tight = tag === 'LI' || tag === 'TR' || tag === 'DT' || tag === 'DD';
       if (block) out.push('\n');
@@ -715,7 +906,7 @@ function parsePastedHtml(html) {
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
-  return { text, images };
+  return { text: markHeadings(text), images };
 }
 
 /**
@@ -863,6 +1054,10 @@ function onExternalPaste(e, provider) {
     if (text) {
       e.preventDefault();
       insertAtCursor(e.target, text);
+      if (provider === 'fivenet') {
+        const filled = applyFivenetGuess(e.target.closest('form'), text);
+        if (filled.length) toast(`Aus dem Text erkannt: ${filled.join(', ')} – bitte prüfen.`);
+      }
     }
     return;
   }
