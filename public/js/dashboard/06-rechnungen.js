@@ -97,6 +97,7 @@ function invoiceTable(rows) {
 views.invoices = {
   async load() {
     await load.invoices();
+    if (isStaff() && st.invTab === 'dauer') await loadRetainers();
   },
   render() {
     const staff = isStaff();
@@ -107,13 +108,19 @@ views.invoices = {
     const rows = st.invoices.filter((i) => match(i, f));
     const sum = (s) => st.invoices.filter((i) => match(i, s)).reduce((a, i) => a + i.total, 0);
     const count = (s) => st.invoices.filter((i) => match(i, s)).length;
+    const tab = staff && st.invTab === 'dauer' ? 'dauer' : 'rechnungen';
+    const tabs = staff
+      ? `<div class="chip-row mb-4" role="tablist" aria-label="Bereiche der Rechnungen"><button type="button" class="chip ${tab === 'rechnungen' ? 'active' : ''}" role="tab" aria-selected="${tab === 'rechnungen'}" data-action="inv-tab" data-tab="rechnungen">${icon('receipt', 'ico-sm')}<span>Rechnungen</span></button><button type="button" class="chip ${tab === 'dauer' ? 'active' : ''}" role="tab" aria-selected="${tab === 'dauer'}" data-action="inv-tab" data-tab="dauer">${icon('clock', 'ico-sm')}<span>Dauermandate</span></button></div>`
+      : '';
+    if (tab === 'dauer')
+      return `<div class="page-head"><div><h1 class="page-title">Dauermandate</h1><p class="page-sub">Pauschalen mit automatischer Rechnung.</p></div>${isBoard() ? `<div class="page-actions"><button class="btn-gold btn-md" data-action="ret-new">${icon('plus')}<span>Neues Dauermandat</span></button></div>` : ''}</div>${tabs}${retainersPanel()}`;
     return `
         <div class="page-head">
           <div><h1 class="page-title">${staff ? 'Rechnungen & Honorare' : 'Meine Rechnungen'}</h1>
             <p class="page-sub">${staff ? 'Offizielle Rechnungen und Honorarvereinbarungen – jede mit eigenem Google Doc.' : 'Rechnungen und Honorarvereinbarungen zu Ihren Mandaten.'}</p></div>
           ${staff ? `<div class="page-actions"><button class="btn-gold btn-md" data-action="new-invoice">${icon('plus')}<span>Neues Dokument</span></button></div>` : ''}
         </div>
-        ${staff ? `<div class="kpi-grid kpi-grid-3">
+        ${tabs}${staff ? `<div class="kpi-grid kpi-grid-3">
           <div class="panel kpi"><div class="kpi-label">${icon('clock', 'ico-sm')}Offene Forderungen</div><div class="kpi-value">${money(sum('offen'))}</div><div class="kpi-sub">${count('offen')} offen</div></div>
           <div class="panel kpi"><div class="kpi-label">${icon('alert', 'ico-sm')}Überfällig</div><div class="kpi-value">${money(sum('ueberfaellig'))}</div><div class="kpi-sub">${count('ueberfaellig')} überfällig</div></div>
           <div class="panel kpi"><div class="kpi-label">${icon('check', 'ico-sm')}Bezahlt</div><div class="kpi-value">${money(sum('bezahlt'))}</div><div class="kpi-sub">${nWord(count('bezahlt'), 'Dokument', 'Dokumente')}</div></div>
