@@ -92,18 +92,21 @@ describe('Tatort-Karte (API)', () => {
 describe('Tatort-Karte (Browser)', { skip: chromium ? false : 'Playwright nicht installiert' }, () => {
   let srv;
   let browser;
-  let caseId;
   before(async () => {
     srv = await startServer();
     browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+  });
+  /** Jede Prüfung bekommt ihre eigene Akte mit drei Orten (eine Prüfung legt selbst weitere an). */
+  const seed = async (title) => {
     const a = client(srv.base);
     await a.login(TEAM.admin);
-    caseId = (await a.post('/api/cases', { title: 'Überfall Little Seoul', area: 'strafrecht', clientName: 'Karl Karte' })).json.case.id;
-    const add = (b) => a.post(`/api/cases/${caseId}/places`, b);
+    const id = (await a.post('/api/cases', { title, area: 'strafrecht', clientName: 'Karl Karte' })).json.case.id;
+    const add = (b) => a.post(`/api/cases/${id}/places`, b);
     await add({ postal: '8054', kind: 'tatort', label: 'Tankstelle', happenedAt: T(20) });
     await add({ postal: '7094', kind: 'zeuge', label: 'Zeuge am Straßenrand', note: 'laut B1', happenedAt: T(19) });
     await add({ postal: '8000', kind: 'festnahme', label: 'Fluchtauto gestoppt', happenedAt: T(21) });
-  });
+    return id;
+  };
   after(async () => {
     if (browser) await browser.close();
     if (srv) await srv.stop();
@@ -117,7 +120,7 @@ describe('Tatort-Karte (Browser)', { skip: chromium ? false : 'Playwright nicht 
     await page.waitForURL(/dashboard/);
     await page.waitForFunction(() => st.user && st.user.id && typeof fivenetProfilePanel === 'function');
   };
-  const open = async (page) => {
+  const open = async (page, caseId) => {
     for (let i = 0; i < 3; i++) {
       await page.evaluate((id) => openCase(id), caseId);
       if (await page.waitForSelector('#secKarte #kmapMini', { timeout: 10000 }).then(() => true, () => false)) break;
@@ -136,7 +139,7 @@ describe('Tatort-Karte (Browser)', { skip: chromium ? false : 'Playwright nicht 
       page.on('pageerror', (e) => problems.push(e.message));
       try {
         await login(page);
-        await open(page);
+        await open(page, await seed(`Überfall Little Seoul (${name})`));
         // Liste nach Zeitpunkt: 19 Uhr, 20 Uhr, 21 Uhr
         const labels = await page.$$eval('#secKarte .place-label', (n) => n.map((x) => x.textContent));
         assert.deepEqual(labels, ['Zeuge am Straßenrand', 'Tankstelle', 'Fluchtauto gestoppt']);

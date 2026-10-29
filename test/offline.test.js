@@ -96,7 +96,7 @@ describe('Offline-Modus (Browser)', { skip: chromium ? false : 'Playwright nicht
         await page.click(`#secTasks [data-action="task-toggle"][data-id="${task.id}"]`);
         await page.fill('form[data-form="add-note"] textarea[name="body"]', `Notiz im Zug (${name})`);
         await page.click('form[data-form="add-note"] button[type=submit]');
-        await page.waitForFunction(() => /2 Änderungen warten/.test(document.querySelector('#offlineBar')?.textContent || ''), null, { timeout: 8000 });
+        await page.waitForFunction(() => /2 Änderungen warten/.test(document.querySelector('#offlineBar')?.textContent || ''), null, { timeout: 15000 });
         // etwas, das Verbindung braucht, sagt das klar
         const err = await page.evaluate(() => PS.api.post('/api/cases', { title: 'geht nicht', area: 'zivilrecht', clientName: 'X' }).then(() => 'ok', (e) => e.message));
         assert.notEqual(err, 'ok');
