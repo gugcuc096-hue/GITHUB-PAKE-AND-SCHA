@@ -272,6 +272,11 @@ function calculateTotal() {
     }
 
     document.getElementById('totalAmount').textContent = total.toLocaleString('de-DE') + ' $';
+    // Rabatt und Summe laufen weich zum neuen Betrag (statt zu springen)
+    if (window.PS && window.PS.countUp) {
+        window.PS.countUp(document.getElementById('totalAmount').parentElement, { ms: 700 });
+        window.PS.countUp(document.getElementById('discountAmount').parentElement, { ms: 500 });
+    }
 }
 
 /* ---------- FAQ Accordion ---------- */

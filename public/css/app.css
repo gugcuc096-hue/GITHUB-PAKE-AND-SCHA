@@ -164,7 +164,7 @@ input[type="datetime-local"].field, input[type="date"].field { color-scheme: dar
   .case-quick .more-pop { left: 0; right: 0; min-width: 0; }
 }
 .check { display: flex; align-items: flex-start; gap: 0.6rem; font-size: 0.875rem; color: var(--text-muted); cursor: pointer; line-height: 1.4; }
-.check input { width: 18px; height: 18px; margin-top: 1px; accent-color: var(--gold-500); flex-shrink: 0; }
+.check input { margin-top: 0; flex-shrink: 0; }
 .seg { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .seg-opt { position: relative; cursor: pointer; }
 .seg-opt input { position: absolute; opacity: 0; pointer-events: none; }
@@ -1774,12 +1774,14 @@ input.field[aria-expanded="true"] { border-color: var(--gold-500); box-shadow: 0
 .chg-k { font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); }
 .chg-big { font-family: var(--font-display); font-size: 1.6rem; font-weight: 600; line-height: 1.2; color: var(--gold-500); margin-top: 0.25rem; }
 .chg-sub { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem; }
-.chg-est-row { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.4rem; }
-.chg-est { flex: 1 1 8.5rem; min-width: 0; display: flex; align-items: center; gap: 0.4rem; }
-.chg-est .field { min-width: 0; padding: 0.45rem 0.4rem; font-size: 1rem; }
-.chg-est > span:not(.num-step) { flex: none; font-size: 0.8rem; color: var(--text-dim); }
-.chg-est .num-step { flex: 1 1 0; width: auto; }
-.chg-reduced { margin-top: 0.6rem; font-size: 0.8rem; }
+.chg-est-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; margin-top: 0.5rem; }
+.chg-est { min-width: 0; display: flex; flex-direction: column; align-items: stretch; gap: 0.3rem; }
+.chg-est-k { display: flex; align-items: baseline; justify-content: center; gap: 0.4rem; font-size: 0.78rem; color: var(--text-muted); }
+.chg-est-k b { font: 700 0.68rem/1 'JetBrains Mono', ui-monospace, monospace; letter-spacing: 0.08em; color: var(--gold-500); padding: 0.2rem 0.4rem; border-radius: 6px; background: var(--gold-soft); }
+.chg-est .field { min-width: 0; }
+.chg-reduced { margin-top: 0.7rem; padding: 0.6rem 0.8rem; align-items: center; font-size: 0.82rem; border: 1px solid var(--glass-border); border-radius: 12px; background: rgba(255, 255, 255, 0.02); transition: border-color 0.2s, background 0.2s; }
+.chg-reduced:hover { border-color: rgba(255, 255, 255, 0.22); }
+.chg-reduced:has(input:checked) { border-color: var(--gold-hairline); background: var(--gold-soft); color: var(--text-main); }
 @media (max-width: 767px) { .chg-sum { grid-template-columns: 1fr 1fr; } .chg-est-cell { grid-column: 1 / -1; } }
 .chg-mitig { display: flex; align-items: center; gap: 0.45rem; margin: 0.7rem 0 0; font-size: 0.8rem; color: var(--gold-light); }
 .chg-list { display: grid; gap: 0.5rem; margin-top: 0.9rem; }
@@ -1794,11 +1796,12 @@ input.field[aria-expanded="true"] { border-color: var(--gold-500); box-shadow: 0
 .chg-flag:hover { color: var(--text-main); border-color: rgba(255, 255, 255, 0.25); }
 .chg-flag.on { border-color: var(--gold-hairline); background: rgba(212, 175, 55, 0.12); color: var(--gold-light); }
 .chg-count { font-size: 0.85rem; font-weight: 600; color: var(--text-muted); }
-.stepper { display: inline-flex; align-items: center; border: 1px solid var(--glass-border); border-radius: 999px; overflow: hidden; }
-.stepper button { width: 32px; height: 32px; border: 0; background: transparent; color: var(--text-muted); font-size: 1rem; cursor: pointer; }
-.stepper button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); color: #fff; }
-.stepper button:disabled { opacity: 0.35; cursor: default; }
-.stepper span { min-width: 2.3rem; text-align: center; font-size: 0.82rem; font-weight: 600; }
+.stepper { display: inline-flex; align-items: center; gap: 0.15rem; padding: 0.18rem; border: 1px solid var(--glass-border); border-radius: 999px; background: linear-gradient(180deg, rgba(4, 8, 20, 0.95), rgba(15, 23, 42, 0.7)); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5); }
+.stepper button { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border-radius: 50%; border: 1px solid rgba(212, 175, 55, 0.35); background: linear-gradient(180deg, rgba(212, 175, 55, 0.24), rgba(212, 175, 55, 0.07)); color: var(--gold-light); font-size: 1rem; line-height: 1; cursor: pointer; box-shadow: inset 0 1px 0 rgba(255, 244, 196, 0.25); transition: background 0.18s, color 0.18s, transform 0.14s; }
+.stepper button:hover:not(:disabled) { background: linear-gradient(180deg, #e8c862, #c9a227); color: #06101f; }
+.stepper button:active:not(:disabled) { transform: scale(0.88); }
+.stepper button:disabled { opacity: 0.32; cursor: default; }
+.stepper span { min-width: 2.3rem; text-align: center; font: 600 0.85rem/1 'JetBrains Mono', ui-monospace, monospace; }
 @media (max-width: 639px) { .chg-side { width: 100%; justify-content: flex-start; } }
 
 /* Tatbestand auswählen */
@@ -2291,12 +2294,35 @@ button.copy-az:hover { text-decoration: underline dotted rgba(212, 175, 55, 0.6)
 .inline-ico { display: inline-block; vertical-align: -2px; color: #8b9cf7; }
 .case-origin { font-size: 0.75rem; color: var(--text-dim); margin: -0.25rem 0 0.75rem; }
 
-/* Merkliste: Stern vor dem Titel (gemerkt = gefüllt, Gold) */
-.star-btn { display: inline-grid; place-items: center; width: 26px; height: 26px; margin-right: 0.3rem; vertical-align: -6px; border: 0; border-radius: 6px; background: transparent; color: var(--text-dim); cursor: pointer; opacity: 0.55; transition: color 0.15s, opacity 0.15s; }
-.star-btn:hover, .star-btn:focus-visible { opacity: 1; color: var(--gold-light); }
+/* Merkliste: Pinnadel vor dem Titel – gelöst liegt sie schräg und blass, angepinnt steckt sie gold und gerade; die Zeile trägt ein goldenes Band */
+.star-btn { display: inline-grid; place-items: center; width: 26px; height: 26px; margin-right: 0.3rem; vertical-align: -6px; border: 0; border-radius: 8px; background: transparent; color: var(--text-dim); cursor: pointer; opacity: 0.55; transition: color 0.18s, opacity 0.18s, background 0.18s; }
+.star-btn svg { transform: rotate(38deg); transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.3s; }
+.star-btn:hover, .star-btn:focus-visible { opacity: 1; color: var(--gold-light); background: rgba(212, 175, 55, 0.1); }
+.star-btn:hover svg { transform: rotate(18deg); }
 .star-btn.on { opacity: 1; color: var(--gold-500); }
-.star-btn.on svg { fill: currentColor; }
+.star-btn.on svg { fill: currentColor; fill-opacity: 0.9; transform: rotate(0); filter: drop-shadow(0 0 5px rgba(212, 175, 55, 0.55)); }
+.star-btn.is-driving svg { animation: pin-drive 0.55s cubic-bezier(0.34, 1.4, 0.64, 1); }
+@keyframes pin-drive { 0% { transform: translateY(-9px) rotate(42deg); opacity: 0.4; } 62% { transform: translateY(1.5px) rotate(0); opacity: 1; } 100% { transform: none; } }
 tr:not(:hover) .star-btn:not(.on) { opacity: 0.25; }
+/* Band und Hintergrund der angepinnten Zeile; beim Anpinnen/Lösen läuft ein kurzer Glanz über die Zeile */
+tr.is-pinned > td:first-child, .list-row.is-pinned { box-shadow: inset 3px 0 0 var(--gold-500); }
+tr.is-pinned > td, .list-row.is-pinned { background-color: rgba(212, 175, 55, 0.045); }
+tr.is-flying { position: relative; z-index: 2; }
+/* Handy: die Zeile ist eine Karte – Band und Glanz gehören der ganzen Karte, nicht der ersten Zelle */
+@media (max-width: 767px) {
+  .tbl-cards tr.is-pinned { box-shadow: inset 3px 0 0 var(--gold-500); border-color: var(--gold-hairline); background-color: rgba(212, 175, 55, 0.07); }
+  .tbl-cards tr.is-pinned > td, .tbl-cards tr.is-pinned > td:first-child { box-shadow: none; background-color: transparent; }
+  .tbl-cards tr.pin-land > td, .tbl-cards tr.pin-drop > td { animation: none; }
+  .tbl-cards tr.pin-land { animation: pin-land-card 1.2s ease-out; }
+  .tbl-cards tr.pin-drop { animation: pin-drop-card 0.9s ease-out; }
+}
+@keyframes pin-land-card { 0% { background-color: rgba(243, 229, 171, 0.3); } 100% { background-color: rgba(212, 175, 55, 0.07); } }
+@keyframes pin-drop-card { 0% { background-color: rgba(255, 255, 255, 0.12); } 100% { background-color: rgba(15, 23, 42, 0.55); } }
+
+tr.pin-land > td, .list-row.pin-land { animation: pin-land 1.2s ease-out; }
+tr.pin-drop > td, .list-row.pin-drop { animation: pin-drop 0.9s ease-out; }
+@keyframes pin-land { 0% { background-color: rgba(243, 229, 171, 0.34); } 100% { background-color: rgba(212, 175, 55, 0.045); } }
+@keyframes pin-drop { 0% { background-color: rgba(255, 255, 255, 0.14); } 100% { background-color: transparent; } }
 .case-num-row .star-btn { margin-left: 0.4rem; margin-right: 0; vertical-align: middle; }
 
 /* Angepinnte interne Notizen oben in der Akte */

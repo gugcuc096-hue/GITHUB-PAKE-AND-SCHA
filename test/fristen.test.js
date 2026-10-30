@@ -106,9 +106,14 @@ describe('Fristenrechner im Kalender (Browser)', { skip: chromium ? false : 'Pla
       await page.waitForURL(/dashboard/);
       await page.evaluate(() => (location.hash = '#calendar'));
       await page.waitForSelector('[data-action="event-new"], [data-action="new-event"]', { timeout: 15000 });
-      await page.click('[data-action="event-new"], [data-action="new-event"]');
-      await page.waitForSelector('select[data-event-kind]');
-      await page.selectOption('select[data-event-kind]', 'berufung');
+      // die erste Seitenansicht schließt beim Fertigwerden offene Fenster – dann das Formular noch einmal öffnen
+      for (let versuch = 0; versuch < 3; versuch++) {
+        await page.click('[data-action="event-new"], [data-action="new-event"]');
+        await page.waitForSelector('select[data-event-kind]');
+        await page.selectOption('select[data-event-kind]', 'berufung');
+        if (await page.waitForSelector('#evCalc:not([hidden])', { timeout: 6000 }).then(() => true, () => false)) break;
+        await page.evaluate(() => closeModal && closeModal());
+      }
       await page.waitForSelector('#evCalc:not([hidden])');
       assert.equal(await page.inputValue('#evTitle'), 'Berufung');
       assert.equal(await page.isChecked('input[name="type"][value="frist"]'), true);

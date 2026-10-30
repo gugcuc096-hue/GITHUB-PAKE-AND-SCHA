@@ -369,7 +369,7 @@ function growBars(root) {
     const kind = kindOf(el);
     if (kind === 'case') {
       const c = st.cases.find((x) => x.id === Number(el.dataset.id));
-      if (dir < 0) return c ? { text: c.starred ? 'Nicht mehr merken' : 'Merken', ico: 'star' } : null;
+      if (dir < 0) return c ? { text: c.starred ? 'Lösen' : 'Anpinnen', ico: 'tack' } : null;
       return c && c.chatUnread ? { text: 'Als gelesen', ico: 'check' } : { text: 'Nichts Neues', ico: 'check', idle: true };
     }
     if (dir > 0) return { text: el.classList.contains('is-done') ? 'Wieder öffnen' : 'Erledigt', ico: 'check' };

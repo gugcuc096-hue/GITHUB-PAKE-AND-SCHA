@@ -66,8 +66,8 @@ function chargesSection(c, data, deals = []) {
     )
     .join('');
   const est = edit
-    ? `<label class="chg-est"><input type="number" min="0" max="999" inputmode="numeric" class="field" value="${estimate.he ?? ''}" placeholder="—" data-change="sentence-set" data-case-id="${c.id}" data-key="he" aria-label="Einschätzung in Hafteinheiten"><span>HE</span></label>
-       <label class="chg-est"><input type="number" min="0" step="1000" inputmode="numeric" class="field" value="${estimate.fine ?? ''}" placeholder="—" data-change="sentence-set" data-case-id="${c.id}" data-key="fine" aria-label="Einschätzung Geldstrafe in Dollar"><span>$</span></label>`
+    ? `<label class="chg-est"><span class="chg-est-k">Haftstrafe <b>HE</b></span><input type="number" min="0" max="999" inputmode="numeric" class="field" value="${estimate.he ?? ''}" placeholder="—" data-change="sentence-set" data-case-id="${c.id}" data-key="he" aria-label="Einschätzung in Hafteinheiten"></label>
+       <label class="chg-est"><span class="chg-est-k">Geldstrafe <b>$</b></span><input type="number" min="0" step="1000" inputmode="numeric" class="field" value="${estimate.fine ?? ''}" placeholder="—" data-change="sentence-set" data-case-id="${c.id}" data-key="fine" aria-label="Einschätzung Geldstrafe in Dollar"></label>`
     : `<div class="chg-big">${estimate.he != null ? `${estimate.he} HE` : '—'}</div><div class="chg-sub">${estimate.fine != null ? usd(estimate.fine) : ''}</div>`;
   const mitig = s.mitigations.length ? `<p class="chg-mitig">${icon('info', 'ico-sm')}<span>Milderung möglich: ${s.mitigations.map(esc).join(' · ')}</span></p>` : '';
   return `<div class="section" id="secCharges">

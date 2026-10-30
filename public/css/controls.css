@@ -4,29 +4,65 @@
  */
 :root { --ctl-gold: var(--gold-500, #d4af37); --ctl-line: var(--glass-border, rgba(148, 163, 184, 0.18)); }
 
-input[type="checkbox"] {
-  appearance: none; -webkit-appearance: none; flex: none;
-  width: 1.05rem; height: 1.05rem; margin: 0;
-  border: 1px solid rgba(212, 175, 55, 0.55); border-radius: 5px;
-  background: rgba(3, 7, 18, 0.7); cursor: pointer; transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+/* Auswahlkästchen und -punkte: eingelassen, beim Anhaken füllt sich Gold mit Haken (federt kurz) */
+input[type="checkbox"], input[type="radio"] {
+  appearance: none; -webkit-appearance: none; flex: none; position: relative;
+  width: 1.3rem; height: 1.3rem; margin: 0; cursor: pointer;
+  border: 1.5px solid rgba(212, 175, 55, 0.5); border-radius: 7px;
+  background: linear-gradient(180deg, rgba(4, 8, 20, 0.95), rgba(15, 23, 42, 0.75));
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.55), 0 1px 0 rgba(255, 255, 255, 0.05);
+  background-repeat: no-repeat; background-position: center;
+  transition: background-color 0.18s, border-color 0.18s, box-shadow 0.2s, transform 0.18s;
 }
-input[type="checkbox"]:hover { border-color: var(--ctl-gold); }
-input[type="checkbox"]:checked { background: var(--ctl-gold); border-color: var(--ctl-gold); box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.14); }
-input[type="checkbox"]:focus-visible { outline: 2px solid var(--ctl-gold); outline-offset: 2px; }
-input[type="checkbox"]:disabled { opacity: 0.4; cursor: default; }
+input[type="radio"] { border-radius: 50%; }
+input[type="checkbox"]:hover, input[type="radio"]:hover { border-color: var(--ctl-gold); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.55), 0 0 0 4px rgba(212, 175, 55, 0.1); }
+input[type="checkbox"]:active, input[type="radio"]:active { transform: scale(0.9); }
+input[type="checkbox"]:checked {
+  border-color: #e8c862;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M4.6 10.4l3.5 3.5 7.3-7.8' fill='none' stroke='%2306101f' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"), linear-gradient(180deg, #efce62, #c9a227);
+  background-size: 76% 76%, 100% 100%;
+  box-shadow: inset 0 1px 0 rgba(255, 246, 200, 0.65), 0 0 0 3px rgba(212, 175, 55, 0.16), 0 5px 14px -5px rgba(212, 175, 55, 0.7);
+  animation: ctl-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+input[type="radio"]:checked {
+  border-color: #e8c862;
+  background-image: radial-gradient(circle, #06101f 0 22%, transparent 24%), linear-gradient(180deg, #efce62, #c9a227);
+  box-shadow: inset 0 1px 0 rgba(255, 246, 200, 0.65), 0 0 0 3px rgba(212, 175, 55, 0.16), 0 5px 14px -5px rgba(212, 175, 55, 0.7);
+  animation: ctl-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outline: 2px solid var(--ctl-gold); outline-offset: 3px; }
+input[type="checkbox"]:disabled, input[type="radio"]:disabled { opacity: 0.4; cursor: default; }
+@keyframes ctl-pop { 0% { transform: scale(0.78); } 100% { transform: none; } }
 
-/* Zahlenfelder: Systempfeile aus, eigene Tasten über .num-step (siehe Dashboard) */
+/* Zahlenfelder: Systempfeile aus, eigene runde Tasten − / + in einer eingelassenen Pille (siehe Dashboard, enhanceNumbers) */
 input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-.num-step { display: flex; align-items: stretch; width: 100%; min-width: 0; border: 1px solid var(--ctl-line); border-radius: 12px; overflow: hidden; background: rgba(3, 7, 18, 0.7); transition: border-color 0.15s, box-shadow 0.15s; }
-.num-step:focus-within { border-color: var(--ctl-gold); box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.14); }
-.num-step > input { flex: 1; min-width: 0; border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; text-align: center; font-family: 'JetBrains Mono', ui-monospace, monospace; }
+.num-step {
+  display: flex; align-items: center; gap: 0.2rem; width: 100%; min-width: 0; padding: 0.22rem;
+  border: 1px solid var(--ctl-line); border-radius: 999px;
+  background: linear-gradient(180deg, rgba(4, 8, 20, 0.95), rgba(15, 23, 42, 0.7));
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+.num-step:hover { border-color: rgba(255, 255, 255, 0.2); }
+.num-step:focus-within { border-color: var(--ctl-gold); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45), 0 0 0 3px rgba(212, 175, 55, 0.18), 0 0 22px -6px rgba(212, 175, 55, 0.4); }
+.num-step > input { flex: 1; min-width: 0; height: 2.1rem; padding: 0 0.15rem !important; border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; text-align: center; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 1.02rem; font-weight: 600; font-variant-numeric: tabular-nums; min-height: 0 !important; }
 .num-step > input:focus { outline: none; }
-.num-btn { flex: none; width: 2.1rem; border: 0; background: rgba(212, 175, 55, 0.06); color: var(--ctl-gold); font-size: 1.05rem; line-height: 1; cursor: pointer; transition: background 0.15s; }
-.num-btn:hover:not(:disabled) { background: rgba(212, 175, 55, 0.16); }
-.num-btn:disabled { opacity: 0.35; cursor: default; }
-.num-step.is-compact .num-btn { width: 1.7rem; font-size: 0.95rem; }
+.num-btn {
+  flex: none; display: grid; place-items: center; width: 2.1rem; height: 2.1rem; padding: 0; border-radius: 50%;
+  border: 1px solid rgba(212, 175, 55, 0.4); color: var(--gold-light, #f3e5ab); font-size: 1.2rem; line-height: 1; cursor: pointer;
+  background: linear-gradient(180deg, rgba(212, 175, 55, 0.26), rgba(212, 175, 55, 0.08));
+  box-shadow: inset 0 1px 0 rgba(255, 244, 196, 0.28), 0 2px 6px -2px rgba(0, 0, 0, 0.6);
+  transition: background 0.18s, color 0.18s, transform 0.14s, box-shadow 0.18s;
+}
+.num-btn:hover:not(:disabled) { background: linear-gradient(180deg, #e8c862, #c9a227); color: #06101f; box-shadow: inset 0 1px 0 rgba(255, 246, 200, 0.7), 0 6px 14px -6px rgba(212, 175, 55, 0.8); }
+.num-btn:active:not(:disabled) { transform: scale(0.88); }
+.num-btn:disabled { opacity: 0.32; cursor: default; box-shadow: none; }
+.num-btn:focus-visible { outline: 2px solid var(--ctl-gold); outline-offset: 2px; }
+.num-step.is-compact { padding: 0.18rem; }
+.num-step.is-compact > input { height: 1.8rem; font-size: 0.95rem; }
+.num-step.is-compact .num-btn { width: 1.8rem; height: 1.8rem; font-size: 1.05rem; }
 
 /* Auswahlkarten (Tarifrechner auf der Startseite) */
 .calc-opt {
@@ -34,12 +70,15 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; marg
   padding: 0.85rem 1rem; border-radius: 14px; border: 1px solid var(--ctl-line);
   background: rgba(15, 23, 42, 0.45); cursor: pointer; transition: border-color 0.2s, background 0.2s;
 }
-.calc-opt:hover { border-color: rgba(212, 175, 55, 0.4); background: rgba(15, 23, 42, 0.75); }
-.calc-opt:has(input:checked) { border-color: var(--ctl-gold); background: rgba(212, 175, 55, 0.07); }
+.calc-opt { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04); transition: border-color 0.2s, background 0.2s, box-shadow 0.25s, transform 0.2s; }
+.calc-opt:hover { border-color: rgba(212, 175, 55, 0.4); background: rgba(15, 23, 42, 0.75); transform: translateY(-1px); }
+.calc-opt:active { transform: scale(0.992); }
+.calc-opt:has(input:checked) { border-color: var(--ctl-gold); background: linear-gradient(90deg, rgba(212, 175, 55, 0.16), rgba(212, 175, 55, 0.04) 70%); box-shadow: inset 3px 0 0 var(--ctl-gold), 0 10px 26px -16px rgba(212, 175, 55, 0.65); }
+.calc-opt:has(input:checked) .calc-opt-price { color: var(--gold-light, #f3e5ab); font-weight: 700; }
 .calc-opt:has(input:focus-visible) { box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.2); }
 .calc-opt-main { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
 .calc-opt-name { font-size: 0.9rem; font-weight: 500; color: #fff; }
 .calc-opt-sub { display: block; margin-top: 0.15rem; font-size: 0.72rem; color: rgba(252, 211, 77, 0.8); }
-.calc-opt-price { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.78rem; color: var(--ctl-gold); white-space: nowrap; }
+.calc-opt-price { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.78rem; color: var(--ctl-gold); white-space: nowrap; transition: color 0.2s; }
 .calc-opt.is-priority { border-color: rgba(245, 158, 11, 0.25); background: rgba(245, 158, 11, 0.05); }
 .calc-opt.is-priority:has(input:checked) { border-color: #f59e0b; background: rgba(245, 158, 11, 0.1); }

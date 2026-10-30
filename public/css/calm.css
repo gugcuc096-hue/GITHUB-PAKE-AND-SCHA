@@ -64,3 +64,8 @@ html.ps-leaving body { transform: none !important; transition-duration: 90ms !im
 .site-avatar:hover { transform: none !important; }
 @keyframes ps-banner-in { from { opacity: 0; } to { opacity: 1; } }
 .site-banner.is-leaving, .site-links a:hover { transform: none !important; }
+/* Anpinnen: Nadel steckt ohne Fallbewegung, die Zeile blendet nur kurz auf */
+.star-btn svg { transition: none !important; }
+.star-btn.is-driving svg { animation: none !important; }
+@keyframes pin-land { 0% { background-color: rgba(243, 229, 171, 0.2); } 100% { background-color: rgba(212, 175, 55, 0.045); } }
+@keyframes pin-land-card { 0% { background-color: rgba(243, 229, 171, 0.2); } 100% { background-color: rgba(212, 175, 55, 0.07); } }

@@ -41,14 +41,14 @@ function caseLevelText(c) {
 /** Badge neben der Akte: Kanzlei sieht nur die Priorität, der Mandant seine Dringlichkeit. */
 const caseLevelBadge = (c) => (isStaff() ? priorityBadge(c) : c.urgency !== 'normal' && URGENCY[c.urgency] ? badge(...URGENCY[c.urgency]) : '');
 
-/** Stern der Merkliste (je Person): gemerkte Akten stehen oben in Aktenliste und Übersicht. */
+/** Pinnadel der Merkliste (je Person): angepinnte Akten stehen oben in Aktenliste und Übersicht, mit goldenem Band. */
 function starBtn(c) {
   const on = !!c.starred;
-  return `<button type="button" class="star-btn${on ? ' on' : ''}" data-action="case-star" data-id="${c.id}" aria-pressed="${on}" title="${on ? 'Aus der Merkliste nehmen' : 'Merken – steht dann oben'}" aria-label="${on ? 'Aus der Merkliste nehmen' : 'Akte merken'}">${icon('star', 'ico-sm')}</button>`;
+  return `<button type="button" class="star-btn${on ? ' on' : ''}" data-action="case-star" data-id="${c.id}" aria-pressed="${on}" title="${on ? 'Lösen – nicht mehr oben' : 'Anpinnen – steht dann oben'}" aria-label="${on ? 'Akte lösen' : 'Akte anpinnen'}">${icon('tack', 'ico-sm')}</button>`;
 }
 
 function caseListRow(c, extra = '', cls = '') {
-  return `<div class="list-row${cls ? ` ${cls}` : ''}" data-action="open-case" data-id="${c.id}" role="button" tabindex="0">
+  return `<div class="list-row${c.starred ? ' is-pinned' : ''}${cls ? ` ${cls}` : ''}" data-action="open-case" data-id="${c.id}" role="button" tabindex="0">
       <div class="main"><div class="title">${c.starred ? starBtn(c) : ''}${esc(c.title)}</div>
         <div class="meta"><span class="font-mono text-gold">${esc(c.caseNumber)}</span> · ${esc(c.clientName)}${caseLevelText(c)}</div></div>
       <div class="flex items-center gap-2 shrink-0">${extra || stageBadge(c)}</div></div>`;
@@ -488,7 +488,7 @@ function caseTable() {
       <thead><tr>${selecting ? `<th class="th-check"><button type="button" class="sel-all" data-action="case-select-all" aria-label="Alle sichtbaren Akten auswählen">${rows.length && rows.every((c) => st.caseSel.has(c.id)) ? 'Keine' : 'Alle'}</button></th>` : ''}<th>Akte</th>${staff ? '<th>Mandant</th>' : ''}<th>Zuständig</th>${staff ? '<th>Priorität</th>' : ''}<th>Status</th><th>Letzte Aktivität</th></tr></thead>
       <tbody>${lazyRows(
         rows,
-        (c) => `<tr class="row${c.idleDays ? ' row-idle' : ''}${selecting && st.caseSel.has(c.id) ? ' is-picked' : ''}" data-action="${selecting ? 'case-pick' : 'open-case'}" data-id="${c.id}"${selecting ? ` aria-selected="${st.caseSel.has(c.id)}"` : ''}>
+        (c) => `<tr class="row${c.idleDays ? ' row-idle' : ''}${staff && c.starred ? ' is-pinned' : ''}${selecting && st.caseSel.has(c.id) ? ' is-picked' : ''}" data-action="${selecting ? 'case-pick' : 'open-case'}" data-id="${c.id}"${selecting ? ` aria-selected="${st.caseSel.has(c.id)}"` : ''}>
           ${selecting ? `<td class="td-check"><span class="pick-box" aria-hidden="true">${icon('check', 'ico-sm')}</span></td>` : ''}<td class="td-main"><div class="case-meta"><span class="font-mono text-gold text-xs">${esc(c.caseNumber)}</span><span class="case-dot" aria-hidden="true">·</span><span>${esc(AREAS[c.area] || c.area)}</span>${staff ? '' : caseLevelBadge(c)}</div>
             <div class="font-medium case-title-line" title="${esc(c.title)}">${staff ? starBtn(c) : ''}<span class="case-title-text">${esc(c.title)}</span>${c.chatUnread ? ` <span class="chat-new" title="Neue Nachrichten">${icon('chat', 'ico-sm')}${c.chatUnread}</span>` : ''}</div></td>
           ${staff ? `<td data-label="Mandant">${esc(c.clientName)}${c.membership ? `<div class="mt-1">${memberBadge(c.membership)}</div>` : ''}</td>` : ''}
