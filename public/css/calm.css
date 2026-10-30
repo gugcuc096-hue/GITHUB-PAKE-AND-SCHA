@@ -75,6 +75,5 @@ html.ps-leaving body { transform: none !important; transition-duration: 90ms !im
 :is(details.edit-box, details.cc-birth, details.fn-text)::details-content { transition: none !important; }
 /* Saison-Deko (season.css) und Aktionen: stehendes Bild statt Bewegung */
 .ps-season, .ps-season *, .live-dot, .calc-promo-badge { animation: none !important; }
-.ps-season-canvas { display: none !important; }
 .sb-aurora i, .site-banner.is-promo::after, .sb-ticket { animation: none !important; }
 .promo-dock { transition: opacity 0.2s ease !important; }
