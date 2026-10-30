@@ -612,6 +612,12 @@ class Karte3D {
       }
       karteDrawRoute(x, segs);
     }
+    const proj3 = (wx, wy) => {
+      const q = this.project(wx, wy, karte3dHeight(wx, wy) + 4);
+      return q ? [q.x, q.y] : null;
+    };
+    if (h.sight) karteDrawSight(x, h.pins, proj3, h.dim);
+    if (h.look && h.sel && kHasLook(h.look)) karteDrawCone(x, proj3, { ...h.look, x: h.sel.x, y: h.sel.y }, '#f1d27a');
     // Nadeln von hinten nach vorn; beim Einschalten fallen sie kurz herein
     const drop = k3Clamp((now - this.dropAt) / 700, 0, 1);
     let card = null;

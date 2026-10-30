@@ -1409,6 +1409,10 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_case_places_case ON case_places(case_id);
 `);
+// Blickrichtung (Grad, 0 = Norden, 90 = Osten), Sichtweite (m) und Sichtfeld (Grad) – für die Sichtlinien der Tatort-Karte
+addColumn('case_places', 'look_dir', 'INTEGER');
+addColumn('case_places', 'look_range', 'INTEGER NOT NULL DEFAULT 80');
+addColumn('case_places', 'look_fov', 'INTEGER NOT NULL DEFAULT 70');
 
 // Verknüpfte Akten (z. B. ein Vorfall, mehrere Festgenommene) – je Paar eine Zeile, a_id < b_id
 db.exec(`

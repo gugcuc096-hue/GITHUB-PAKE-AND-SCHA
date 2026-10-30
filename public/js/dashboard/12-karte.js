@@ -230,6 +230,103 @@ function karteDrawPin(x, px, py, p, i, { dim = false, hl = false, t = 0, lift = 
   return { x: px, y: hy };
 }
 
+/* ---------------------------------------------------------------- Sichtlinien: Blickrichtung, Sichtfeld, Zeuge → Tatort */
+const KMAP_COMPASS = [['N', 0], ['NO', 45], ['O', 90], ['SO', 135], ['S', 180], ['SW', 225], ['W', 270], ['NW', 315]];
+const kDirName = (deg) => KMAP_COMPASS[Math.round((((deg % 360) + 360) % 360) / 45) % 8][0];
+const kBearing = (a, b) => ((Math.atan2(b.x - a.x, b.y - a.y) * 180) / Math.PI + 360) % 360; // 0 = Norden, 90 = Osten
+const kHasLook = (p) => p.lookDir !== null && p.lookDir !== undefined;
+const SIGHT_VERDICT = {
+  ok: ['im Sichtfeld', '#6ee7b7'],
+  turn: ['außerhalb des Sichtfelds', '#f87171'],
+  far: ['zu weit entfernt', '#f87171'],
+  none: ['keine Blickrichtung erfasst', '#cbd5e1'],
+};
+
+/** Jeder Zeuge (Art „Zeuge gesehen“) zu jedem Tatort: Luftlinie in Metern und – mit Blickrichtung – ob der Tatort im Sichtfeld lag. */
+function karteSightLines(places) {
+  const out = [];
+  const scenes = places.filter((p) => p.kind === 'tatort');
+  for (const from of places.filter((p) => p.kind === 'zeuge')) {
+    for (const to of scenes) {
+      const dist = Math.hypot(to.x - from.x, to.y - from.y);
+      let verdict = 'none';
+      if (kHasLook(from)) {
+        const diff = Math.abs((((kBearing(from, to) - from.lookDir + 540) % 360) + 360) % 360 - 180);
+        verdict = dist > (from.lookRange || 80) ? 'far' : diff <= (from.lookFov || 70) / 2 ? 'ok' : 'turn';
+      }
+      out.push({ from, to, dist, verdict });
+    }
+  }
+  return out;
+}
+
+/** Sichtkegel eines Ortes als Fläche: proj(x, y) → [px, py] oder null. */
+function karteDrawCone(x, proj, p, color, dim = false) {
+  const range = p.lookRange || 80;
+  const fov = p.lookFov || 70;
+  const a0 = p.lookDir - fov / 2;
+  const apex = proj(p.x, p.y);
+  if (!apex) return;
+  const pts = [apex];
+  for (let k = 0; k <= 14; k++) {
+    const a = ((a0 + (fov * k) / 14) * Math.PI) / 180;
+    const q = proj(p.x + Math.sin(a) * range, p.y + Math.cos(a) * range);
+    if (q) pts.push(q);
+  }
+  if (pts.length < 3) return;
+  x.save();
+  x.globalAlpha = dim ? 0.2 : 1;
+  x.beginPath();
+  pts.forEach(([a, b], k) => (k ? x.lineTo(a, b) : x.moveTo(a, b)));
+  x.closePath();
+  x.fillStyle = color;
+  x.globalAlpha *= 0.26;
+  x.fill();
+  x.globalAlpha = dim ? 0.2 : 0.85;
+  x.strokeStyle = color;
+  x.lineWidth = 1.6;
+  x.stroke();
+  x.restore();
+}
+
+/** Sichtkegel und Sichtlinien aller Nadeln. */
+function karteDrawSight(x, pins, proj, dim) {
+  for (const p of pins) if (kHasLook(p)) karteDrawCone(x, proj, p, (PLACE_KINDS[p.kind] || PLACE_KINDS.sonstiges)[2], dim.has(p.id));
+  x.save();
+  x.font = '700 11px system-ui, sans-serif';
+  x.textAlign = 'center';
+  x.textBaseline = 'middle';
+  for (const l of karteSightLines(pins)) {
+    const a = proj(l.from.x, l.from.y);
+    const b = proj(l.to.x, l.to.y);
+    if (!a || !b) continue;
+    const color = SIGHT_VERDICT[l.verdict][1];
+    x.globalAlpha = dim.has(l.from.id) || dim.has(l.to.id) ? 0.2 : 1;
+    x.beginPath();
+    x.moveTo(a[0], a[1]);
+    x.lineTo(b[0], b[1]);
+    x.strokeStyle = color;
+    x.lineWidth = 2;
+    x.setLineDash([3, 6]);
+    x.stroke();
+    x.setLineDash([]);
+    const mx = (a[0] + b[0]) / 2;
+    const my = (a[1] + b[1]) / 2;
+    const label = `${Math.round(l.dist)} m`;
+    const w = x.measureText(label).width + 12;
+    x.fillStyle = 'rgba(6,15,30,.85)';
+    x.beginPath();
+    x.roundRect ? x.roundRect(mx - w / 2, my - 9, w, 18, 9) : x.rect(mx - w / 2, my - 9, w, 18);
+    x.fill();
+    x.strokeStyle = color;
+    x.lineWidth = 1;
+    x.stroke();
+    x.fillStyle = '#fff';
+    x.fillText(label, mx, my + 0.5);
+  }
+  x.restore();
+}
+
 /** Tatweg: die Orte in zeitlicher Reihenfolge als leuchtende Linie mit Pfeilen (spätere Orte blass). */
 function karteDrawRoute(x, segs) {
   x.save();
@@ -367,6 +464,8 @@ class KarteView {
     this.sel = null; // { x, y, code } – gewählter Punkt
     this.hl = null; // hervorgehobene Nadel (ID)
     this.dim = new Set(); // ausgeblendete Nadeln (Zeitregler)
+    this.sight = false; // Sichtkegel und Sichtlinien zeigen
+    this.look = null; // Vorschau im Formular: { lookDir, lookRange, lookFov } am gewählten Punkt
     this.view = { cx: 0, cy: 0, s: 0.1 };
     this.ptr = new Map();
     this.moved = 0;
@@ -454,6 +553,14 @@ class KarteView {
   }
   setDim(ids) {
     this.dim = new Set(ids);
+    this.draw();
+  }
+  setSight(on) {
+    this.sight = !!on;
+    this.draw();
+  }
+  setLook(look) {
+    this.look = look;
     this.draw();
   }
   focus(x, y, s = 1.2) {
@@ -652,11 +759,14 @@ class KarteView {
       x.lineTo(px, py + 22);
       x.stroke();
     }
-    // Tatweg und Nadeln
+    // Tatweg, Sicht und Nadeln
     if (this.pins.length > 1) {
       const pts = this.pins.map((p) => [this.sx(p.x), this.sy(p.y)]);
       karteDrawRoute(x, pts.slice(1).map((b, k) => ({ pts: [pts[k], b], dim: this.dim.has(this.pins[k + 1].id) })));
     }
+    const proj2 = (wx, wy) => [this.sx(wx), this.sy(wy)];
+    if (this.sight) karteDrawSight(x, this.pins, proj2, this.dim);
+    if (this.look && this.sel && kHasLook(this.look)) karteDrawCone(x, proj2, { ...this.look, x: this.sel.x, y: this.sel.y }, '#f1d27a');
     let card = null;
     const t = performance.now() / 1000;
     this.pins.forEach((p, i) => {
@@ -738,14 +848,38 @@ const placePins = () =>
     x: p.x,
     y: p.y,
     kind: p.kind,
+    lookDir: p.lookDir,
+    lookRange: p.lookRange,
+    lookFov: p.lookFov,
     info: `<span class="kmap-card-top">${badge((PLACE_KINDS[p.kind] || PLACE_KINDS.sonstiges)[0], (PLACE_KINDS[p.kind] || PLACE_KINDS.sonstiges)[1])}<span class="font-mono text-gold">Postal ${esc(p.postal)}</span></span>${p.label ? `<strong>${esc(p.label)}</strong>` : ''}${p.happenedAt ? `<span class="text-xs text-dim">${esc(fmtDate(p.happenedAt))}</span>` : ''}`,
   }));
+
+let kSightOn = false; // Sichtkegel/Sichtlinien zeigen (gilt, solange die Seite offen ist)
+
+/** Text zu den Sichtlinien: wer blickt wohin, und konnte der Zeuge den Tatort sehen? */
+function karteSightList(places) {
+  const looks = places.filter(kHasLook);
+  const lines = karteSightLines(places);
+  if (!looks.length && !lines.length) return '';
+  const no = (p) => places.indexOf(p) + 1;
+  const name = (p) => `${no(p)} ${p.label ? esc(p.label) : esc((PLACE_KINDS[p.kind] || PLACE_KINDS.sonstiges)[0])}`;
+  return `<ul class="kmap-sight-list">${lines
+    .map((l) => {
+      const [text, color] = SIGHT_VERDICT[l.verdict];
+      const extra = l.verdict === 'far' ? ` (Sichtweite ${l.from.lookRange} m)` : '';
+      return `<li><span class="ksl-dot" style="background:${color}"></span><span><strong>${name(l.from)}</strong> → <strong>${name(l.to)}</strong>: ${Math.round(l.dist)} m Luftlinie – <em>${text}</em>${extra}</span></li>`;
+    })
+    .join('')}${looks
+    .map((p) => `<li><span class="ksl-dot" style="background:${(PLACE_KINDS[p.kind] || PLACE_KINDS.sonstiges)[2]}"></span><span><strong>${name(p)}</strong> blickt nach ${kDirName(p.lookDir)} (${p.lookDir}°), Sichtweite ${p.lookRange} m, Sichtfeld ${p.lookFov}°</span></li>`)
+    .join('')}</ul>`;
+}
 
 function karteSection(c, places = []) {
   if (!isStaff()) return '';
   if (!places.length && !c.canEdit) return '';
   const add = c.canEdit ? `<button type="button" class="btn-outline btn-sm" data-action="place-add" data-case-id="${c.id}">${icon('plus', 'ico-sm')}<span>Ort hinzufügen</span></button>` : '';
   const timed = places.filter((p) => p.happenedAt).length;
+  const sight = places.some(kHasLook) || karteSightLines(places).length > 0;
   return `<div class="section" id="secKarte"><div class="section-head"><h3 class="section-title">Tatort-Karte <span class="text-xs text-dim font-normal sec-meta">${places.length ? `${places.length} Ort${places.length === 1 ? '' : 'e'}` : 'noch keine'}</span></h3>${add}</div>
       <div class="kmap-wrap" id="kmapWrap"><canvas id="kmapMini" class="kmap" aria-label="Karte der Orte dieser Akte"></canvas>
         <div class="kmap-tools" role="group" aria-label="Karte">
@@ -753,8 +887,10 @@ function karteSection(c, places = []) {
           <button type="button" class="icon-btn sm" data-action="kmap-zoom" data-id="kmapMini" data-f="0.625" aria-label="Herauszoomen"><span aria-hidden="true">−</span></button>
           <button type="button" class="icon-btn sm" data-action="kmap-fit" data-id="kmapMini" aria-label="Alle Orte zeigen" title="Alle Orte zeigen">${icon('pin', 'ico-sm')}</button>
           <button type="button" class="icon-btn sm" data-action="kmap-big" aria-label="Karte größer oder kleiner" title="Größer / kleiner">${icon('expand', 'ico-sm')}</button>
+          <button type="button" class="icon-btn sm" data-action="kmap-export" aria-label="Karte als Bild speichern" title="Als Bild speichern (mit Legende)">${icon('download', 'ico-sm')}</button>
           <button type="button" class="icon-btn sm kmap-touch" data-action="kmap-touch" data-id="kmapMini" aria-label="Karte mit dem Finger bedienen" title="Karte mit dem Finger bedienen">${icon('grip', 'ico-sm')}</button>
-        </div>${karteModes('kmapMini', places.length > 1)}</div>
+        </div>${karteModes('kmapMini', places.length > 1, sight)}</div>
+      <div class="kmap-sight-box" id="kmapSightBox"${kSightOn ? '' : ' hidden'}>${karteSightList(places)}</div>
       ${timed > 1 ? `<label class="kmap-time"><span class="text-xs text-dim">Ablauf</span><input type="range" id="kmapTime" min="1" max="${places.length}" value="${places.length}" aria-label="Orte bis zu einem Zeitpunkt zeigen"><output id="kmapTimeOut" class="text-xs font-mono"></output></label>` : ''}
       ${
         places.length
@@ -765,12 +901,14 @@ function karteSection(c, places = []) {
 }
 
 /** Leiste oben links: Untergrund (Satellit/Karte), 3D und – ab zwei Orten – den Ablauf abspielen. */
-function karteModes(id, play) {
+function karteModes(id, play, sight = false) {
   const seg = Object.entries(KMAP_LAYERS)
     .map(([k, L]) => `<button type="button" class="kmap-mode${kStyle === k ? ' is-on' : ''}" data-action="kmap-style" data-style="${k}" data-id="${id}" aria-pressed="${kStyle === k}">${L.label}</button>`)
     .join('');
   return `<div class="kmap-modes" role="group" aria-label="Darstellung"><span class="kmap-seg">${seg}</span><button type="button" class="kmap-mode kmap-3d" data-action="kmap-3d" data-id="${id}" aria-pressed="false" title="3D-Ansicht (drehen und kippen)">3D</button>${
-    play ? `<button type="button" class="kmap-mode kmap-play" data-action="kmap-play" data-id="${id}" title="Ablauf abspielen: Ort für Ort mit Tatweg">${icon('play', 'ico-sm')}<span>Ablauf</span></button>` : ''
+    play ? `<button type="button" class="kmap-mode kmap-play" data-action="kmap-play" data-id="${id}" title="Ablauf als Film abspielen: Ort für Ort mit Tatweg und Untertiteln">${icon('play', 'ico-sm')}<span>Film</span></button>` : ''
+  }${
+    sight ? `<button type="button" class="kmap-mode kmap-sight${kSightOn ? ' is-on' : ''}" data-action="kmap-sight" data-id="${id}" aria-pressed="${kSightOn}" title="Sichtkegel und Sichtlinien Zeuge → Tatort zeigen">${icon('eye', 'ico-sm')}<span>Sicht</span></button>` : ''
   }</div>`;
 }
 
@@ -789,6 +927,7 @@ async function karteInit() {
   const pins = placePins();
   const v = await karteMount('kmapMini', { pins, onPin: (p) => placeFocus(p.id) });
   if (!v) return;
+  if (kSightOn) v.setSight(true);
   const range = document.getElementById('kmapTime');
   if (range) {
     const out = document.getElementById('kmapTimeOut');
@@ -805,7 +944,37 @@ async function karteInit() {
   }
 }
 
-/** Ablauf abspielen: Ort für Ort in zeitlicher Reihenfolge anfliegen, der Zeitregler läuft mit; ein zweiter Klick hält an. */
+/** „+4 Min.“ / „+2 Std. 10 Min.“ zwischen zwei Zeitpunkten. */
+function karteGap(from, to) {
+  const m = Math.round((new Date(to) - new Date(from)) / 60000);
+  if (!Number.isFinite(m) || m < 0) return '';
+  if (m < 1) return 'kurz danach';
+  if (m < 60) return `+${m} Min.`;
+  if (m < 1440) return `+${Math.floor(m / 60)} Std.${m % 60 ? ` ${m % 60} Min.` : ''}`;
+  return `+${Math.floor(m / 1440)} Tg.`;
+}
+
+/** Untertitel im Film: Schritt, Art, Beschriftung, Zeit (mit Abstand zum vorigen Schritt), Notiz, Fortschrittsbalken. */
+function karteCaption(wrap, places, i) {
+  let el = wrap.querySelector('.kmap-cap');
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'kmap-cap';
+    el.setAttribute('aria-live', 'polite');
+    wrap.appendChild(el);
+  }
+  const p = places[i];
+  const [label, tone] = PLACE_KINDS[p.kind] || PLACE_KINDS.sonstiges;
+  const prev = places[i - 1];
+  const gap = prev && prev.happenedAt && p.happenedAt ? karteGap(prev.happenedAt, p.happenedAt) : '';
+  const note = p.note && p.note.length > 170 ? `${p.note.slice(0, 170)} …` : p.note;
+  el.innerHTML = `<div class="kmap-cap-top"><span class="kmap-cap-step">${i + 1} / ${places.length}</span>${badge(label, tone)}${p.label ? `<strong>${esc(p.label)}</strong>` : ''}<span class="kmap-cap-time">${p.happenedAt ? esc(fmtDate(p.happenedAt)) : `Postal ${esc(p.postal)}`}${gap ? ` · ${esc(gap)}` : ''}</span></div>${note ? `<div class="kmap-cap-note">${esc(note)}</div>` : ''}<div class="kmap-cap-bar"><i style="width:${Math.round(((i + 1) / places.length) * 100)}%"></i></div>`;
+  el.classList.remove('is-in');
+  void el.offsetWidth;
+  el.classList.add('is-in');
+}
+
+/** Ablauf als Film: Karte groß, Ort für Ort in zeitlicher Reihenfolge anfliegen, Untertitel dazu, der Zeitregler läuft mit; ein zweiter Klick hält an. */
 let kPlay = null;
 async function kartePlay(el) {
   if (kPlay) {
@@ -817,23 +986,139 @@ async function kartePlay(el) {
   if (!v || places.length < 2) return;
   const run = (kPlay = { stop: false });
   el.classList.add('is-on');
-  const range = document.getElementById('kmapTime');
+  const wasBig = !!document.getElementById('kmapWrap')?.classList.contains('is-big');
+  if (!wasBig) {
+    const w = document.getElementById('kmapWrap');
+    if (w) {
+      w.classList.add('is-big');
+      v.resize();
+      w.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  }
+  // Ändert jemand währenddessen die Akte, zeichnet sie sich neu – der Film sucht Karte und Regler jedes Mal frisch
+  const fresh = () => ({ wrap: document.getElementById('kmapWrap'), view: kViews.get(el.dataset.id), range: document.getElementById('kmapTime') });
   try {
-    for (let i = 0; i < places.length && !run.stop && v.cv.isConnected; i++) {
+    for (let i = 0; i < places.length && !run.stop; i++) {
+      const { wrap, view, range } = fresh();
+      if (!wrap || !view || !view.cv.isConnected) break;
+      if (!wrap.classList.contains('is-big')) {
+        wrap.classList.add('is-big');
+        view.resize();
+      }
       if (range) {
         range.value = String(i + 1);
         range.dispatchEvent(new Event('input', { bubbles: true }));
       }
       placeFocus(places[i].id);
-      await new Promise((r) => setTimeout(r, v.m3 ? 2600 : 1800));
+      karteCaption(wrap, places, i);
+      const read = Math.min(2600, (places[i].note || '').length * 22);
+      await new Promise((r) => setTimeout(r, (view.m3 ? 2600 : 1800) + read));
     }
   } finally {
+    const { wrap, view, range } = fresh();
     if (range && !run.stop) {
       range.value = range.max;
       range.dispatchEvent(new Event('input', { bubbles: true }));
     }
+    if (wrap) {
+      wrap.querySelector('.kmap-cap')?.remove();
+      if (!wasBig && view && view.cv.isConnected) {
+        wrap.classList.remove('is-big');
+        view.resize();
+      }
+    }
     kPlay = null;
     el.classList.remove('is-on');
+  }
+}
+
+/** Karte als Bild speichern: Kopf mit Aktenzeichen, die Karte (mit Nadeln, Tatweg, Sicht) und eine Legende. */
+async function karteExport(el) {
+  const v = kViews.get('kmapMini');
+  const places = st.casePlaces || [];
+  if (!v || !v.cv.isConnected) return;
+  el.classList.add('is-busy');
+  try {
+    if (v.m3) v.m3.draw();
+    else v.draw();
+    const d = v.dpr || 1;
+    const W = v.cv.width;
+    const H = v.cv.height;
+    const c = (st.cases || []).find((x) => x.id === st.modalCaseId) || {};
+    const rows = places.slice(0, 16).map((p, i) => ({ i, p }));
+    const sightRows = kSightOn ? karteSightLines(places).slice(0, 6) : [];
+    const pad = Math.round(16 * d);
+    const head = Math.round(58 * d);
+    const row = Math.round(21 * d);
+    const foot = pad * 2 + (rows.length + sightRows.length) * row + (places.length > rows.length ? row : 0);
+    const out = document.createElement('canvas');
+    out.width = W;
+    out.height = head + H + foot;
+    const x = out.getContext('2d');
+    x.fillStyle = '#060f1e';
+    x.fillRect(0, 0, out.width, out.height);
+    // Kopf
+    x.textBaseline = 'alphabetic';
+    x.fillStyle = '#f1d27a';
+    x.font = `600 ${Math.round(22 * d)}px "Cormorant Garamond", Georgia, serif`;
+    x.fillText('Tatort-Rekonstruktion', pad, Math.round(30 * d));
+    x.fillStyle = '#cbd5e1';
+    x.font = `${Math.round(12 * d)}px system-ui, sans-serif`;
+    x.fillText(`${c.caseNumber ? `${c.caseNumber} · ` : ''}Stand ${new Date().toLocaleDateString('de-DE')} · Pake & Scha, intern`, pad, Math.round(48 * d));
+    // Karte
+    if (v.m3) {
+      const gl = v.cv.parentElement.querySelector('.kmap-gl');
+      if (gl) x.drawImage(gl, 0, head, W, H);
+    }
+    x.drawImage(v.cv, 0, head, W, H);
+    // Legende
+    let y = head + H + pad + Math.round(14 * d);
+    x.font = `${Math.round(13 * d)}px system-ui, sans-serif`;
+    for (const { i, p } of rows) {
+      const [label, , color] = PLACE_KINDS[p.kind] || PLACE_KINDS.sonstiges;
+      x.fillStyle = color;
+      x.beginPath();
+      x.arc(pad + 9 * d, y - 4.5 * d, 9 * d, 0, 7);
+      x.fill();
+      x.fillStyle = '#06101f';
+      x.font = `800 ${Math.round(11 * d)}px system-ui, sans-serif`;
+      x.textAlign = 'center';
+      x.fillText(String(i + 1), pad + 9 * d, y - 0.5 * d);
+      x.textAlign = 'start';
+      x.fillStyle = '#e2e8f0';
+      x.font = `${Math.round(13 * d)}px system-ui, sans-serif`;
+      const text = `${label} · Postal ${p.postal}${p.happenedAt ? ` · ${fmtDate(p.happenedAt)}` : ''}${p.label ? ` – ${p.label}` : ''}`;
+      x.fillText(text.length > 120 ? `${text.slice(0, 118)} …` : text, pad + 26 * d, y);
+      y += row;
+    }
+    if (places.length > rows.length) {
+      x.fillStyle = '#94a3b8';
+      x.fillText(`… und ${places.length - rows.length} weitere Orte`, pad + 26 * d, y);
+      y += row;
+    }
+    for (const l of sightRows) {
+      const [text, color] = SIGHT_VERDICT[l.verdict];
+      x.fillStyle = color;
+      x.fillRect(pad + 2 * d, y - 9 * d, 14 * d, 3 * d);
+      x.fillStyle = '#e2e8f0';
+      x.fillText(`Sicht ${places.indexOf(l.from) + 1} → ${places.indexOf(l.to) + 1}: ${Math.round(l.dist)} m, ${text}`, pad + 26 * d, y);
+      y += row;
+    }
+    const blob = await new Promise((res) => out.toBlob(res, 'image/png'));
+    if (!blob) throw new Error('Das Bild konnte nicht erstellt werden.');
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Tatort-Rekonstruktion${c.caseNumber ? `-${c.caseNumber}` : ''}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    toast('Karte als Bild gespeichert.');
+  } catch (err) {
+    toast(err.message || 'Das Bild konnte nicht erstellt werden.', 'error');
+  } finally {
+    el.classList.remove('is-busy');
   }
 }
 
@@ -866,6 +1151,12 @@ function placeForm(caseId, p) {
       <div class="span-2"><label class="label" for="plLabel">Beschriftung</label><input id="plLabel" name="label" class="field" maxlength="80" value="${esc(v.label)}" placeholder="z. B. Tankstelle Little Seoul, Fluchtweg nach Norden"></div>
       <div><label class="label" for="plWhen">Zeitpunkt (optional)</label><input id="plWhen" name="happenedAt" type="datetime-local" class="field" value="${v.happenedAt ? esc(toLocalInput(v.happenedAt)) : ''}"></div>
       <div></div>
+      <div class="span-2 look-box"><span class="label">Blickrichtung (optional) – für die Sichtlinien</span>
+        <div class="look-row"><input id="plDir" name="lookDir" type="number" min="0" max="359" step="1" class="field look-num" inputmode="numeric" placeholder="Grad" aria-label="Blickrichtung in Grad (0 = Norden, 90 = Osten)" value="${v.lookDir === null || v.lookDir === undefined ? '' : v.lookDir}">
+          <span class="look-chips" role="group" aria-label="Himmelsrichtung">${KMAP_COMPASS.map(([n, deg]) => `<button type="button" class="chip" data-action="look-dir" data-deg="${deg}">${n}</button>`).join('')}<button type="button" class="chip" data-action="look-clear" aria-label="Blickrichtung entfernen">${icon('x', 'ico-sm')}</button></span></div>
+        <div class="look-row look-row2"><label class="look-lbl">Sichtweite (m)<input id="plRange" name="lookRange" type="number" min="5" max="500" step="5" class="field look-num" value="${v.lookRange || 80}"></label>
+          <label class="look-lbl">Sichtfeld (°)<input id="plFov" name="lookFov" type="number" min="10" max="180" step="5" class="field look-num" value="${v.lookFov || 70}"></label></div>
+        <p class="form-hint">0° = Norden, 90° = Osten. Mit Zeuge und Tatort zeigt die Karte, ob der Tatort im Sichtfeld lag.</p></div>
       <div class="span-2"><label class="label" for="plNote">Notiz</label><textarea id="plNote" name="note" rows="3" maxlength="1000" class="field" placeholder="Was geschah hier? Beweise wie B7 werden anklickbar.">${esc(v.note)}</textarea></div>
       <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>${p ? 'Speichern' : 'Hinzufügen'}</span></button><button type="button" class="btn-ghost btn-md" data-action="close-modal">Abbrechen</button></div>
     </form>`;
@@ -895,6 +1186,14 @@ async function placeFormInit(p) {
   });
   if (!v) return;
   if (p) v.setSelection({ x: p.x, y: p.y, code: p.postal });
+  // Vorschau des Sichtkegels am gewählten Punkt
+  const look = () => {
+    const dir = document.getElementById('plDir');
+    const deg = dir && dir.value !== '' ? Number(dir.value) : null;
+    v.setLook(deg === null || !Number.isFinite(deg) ? null : { lookDir: ((Math.round(deg) % 360) + 360) % 360, lookRange: Number(document.getElementById('plRange').value) || 80, lookFov: Number(document.getElementById('plFov').value) || 70 });
+  };
+  ['plDir', 'plRange', 'plFov'].forEach((id) => document.getElementById(id)?.addEventListener('input', look));
+  look();
   input.addEventListener('input', () => {
     delete input.dataset.x;
     delete input.dataset.y;
@@ -948,6 +1247,27 @@ Object.assign(actions, {
     kViews.forEach((v) => (v.m3 ? v.m3.retexture() : v.draw()));
   },
   'kmap-play': (el) => kartePlay(el),
+  'kmap-export': (el) => karteExport(el),
+  'kmap-sight': (el) => {
+    kSightOn = !kSightOn;
+    el.classList.toggle('is-on', kSightOn);
+    el.setAttribute('aria-pressed', String(kSightOn));
+    kViews.get(el.dataset.id)?.setSight(kSightOn);
+    const box = document.getElementById('kmapSightBox');
+    if (box) box.hidden = !kSightOn;
+  },
+  'look-dir': (el) => {
+    const input = document.getElementById('plDir');
+    if (!input) return;
+    input.value = el.dataset.deg;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  },
+  'look-clear': () => {
+    const input = document.getElementById('plDir');
+    if (!input) return;
+    input.value = '';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  },
   'kmap-3d': async (el) => {
     const v = kViews.get(el.dataset.id);
     if (!v) return;
@@ -983,6 +1303,9 @@ Object.assign(forms, {
       label: val(fd, 'label'),
       note: val(fd, 'note'),
       happenedAt: when ? new Date(when).toISOString() : null,
+      lookDir: val(fd, 'lookDir') === '' ? null : Math.round(Number(val(fd, 'lookDir'))) % 360,
+      lookRange: Math.round(Number(val(fd, 'lookRange'))) || 80,
+      lookFov: Math.round(Number(val(fd, 'lookFov'))) || 70,
     };
     // genauer Punkt aus dem Klick auf die Karte, sonst die Mitte des Postals
     if (input && input.dataset.x) Object.assign(body, { x: Number(input.dataset.x), y: Number(input.dataset.y) });

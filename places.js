@@ -47,6 +47,9 @@ const row = (r) => ({
   label: r.label,
   note: r.note,
   happenedAt: r.happened_at || null,
+  lookDir: r.look_dir === null || r.look_dir === undefined ? null : r.look_dir,
+  lookRange: r.look_range || 80,
+  lookFov: r.look_fov || 70,
   createdBy: r.created_by,
   createdAt: r.created_at,
 });
