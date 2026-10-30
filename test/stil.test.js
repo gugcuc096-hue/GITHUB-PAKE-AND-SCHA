@@ -194,6 +194,35 @@ describe('Rabattaktionen, Aktenzeichen und Stil (API)', () => {
     assert.doesNotMatch(html, /data-season=/);
   });
 
+  it('Kanzleifarbe überall: Logo (SVG und PNG), Browserleiste, Discord-Farbe, Word-Farbe', async () => {
+    const brand = require('../brand');
+    const svg0 = await (await fetch(`${srv.base}/img/logo.svg`)).text();
+    assert.match(svg0, /stroke="#caa32f"/, 'Standard: Originalfarbe');
+    const png0 = Buffer.from(await (await fetch(`${srv.base}/img/logo.png`)).arrayBuffer());
+    await owner.put('/api/config/style/draft', { preset: 'eigen', accent: '#34d399', glass: 50, radius: 50, font: 'klassisch', motion: 'normal', season: 'aus', seasonDash: true });
+    await owner.post('/api/config/style/publish', {});
+    const svg = await (await fetch(`${srv.base}/img/logo.svg`)).text();
+    assert.doesNotMatch(svg, /#caa32f/);
+    assert.match(svg, /stroke="#31c891"/, 'Logo in der Akzentfarbe');
+    const res = await fetch(`${srv.base}/img/logo.png`);
+    assert.equal(res.headers.get('content-type'), 'image/png');
+    const png = Buffer.from(await res.arrayBuffer());
+    assert.equal(png.subarray(1, 4).toString(), 'PNG');
+    assert.notDeepEqual(png, png0);
+    assert.equal(png.readUInt32BE(16), png0.readUInt32BE(16), 'gleiche Größe');
+    const etag = res.headers.get('etag');
+    assert.equal((await fetch(`${srv.base}/img/logo.png`, { headers: { 'If-None-Match': etag } })).status, 304);
+    assert.match(await (await fetch(`${srv.base}/`)).text(), /<meta name="theme-color" content="#2db584">/);
+    // Discord: Gold wird zur Kanzleifarbe, andere Farben bleiben (der Server läuft in einem eigenen Prozess – Farbe hier übergeben)
+    const out = require('../discord').brandColors({ embeds: [{ color: 0xd4af37 }, { color: 0xef4444 }] }, { isDefault: false, int: 0x34d399 });
+    assert.deepEqual(out.embeds.map((e) => e.color), [0x34d399, 0xef4444]);
+    assert.equal(brand.docx('#2db584'), '2DB584');
+    await owner.put('/api/config/style/draft', { preset: 'gold', accent: '#d4af37', glass: 50, radius: 50, font: 'klassisch', motion: 'normal', season: 'aus', seasonDash: true });
+    await owner.post('/api/config/style/publish', {});
+    assert.match(await (await fetch(`${srv.base}/img/logo.svg`)).text(), /#caa32f/);
+    assert.deepEqual(require('../discord').brandColors({ embeds: [{ color: 0xd4af37 }] }, { isDefault: true }).embeds[0].color, 0xd4af37);
+  });
+
   it('Banner: Symbol und Countdown bis Tagesende', async () => {
     const day = plus(today(), 2);
     await owner.put('/api/config/banner/draft', { enabled: true, text: 'Wartung am Wochenende', tone: 'night', icon: '⚖️', countdown: true, link: '', linkLabel: '', from: '', to: day, audience: ['public', 'mandant', 'staff'], dismissible: true });
@@ -276,6 +305,31 @@ describe('Stil, Saison und Aktionen im Browser', { skip: chromium ? false : 'Pla
         const sum = await page.evaluate(() => [...document.querySelectorAll('.calc-check:checked:not(#priorityAddon)')].reduce((s, c) => s + Number(c.value), 0));
         await page.waitForFunction((v) => document.getElementById('totalAmount').textContent.replace(/\D/g, '') === String(v), Math.round(sum - Math.round(sum * 0.1) - Math.round(sum * 0.2)), { timeout: 4000 });
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'kein seitlicher Überlauf');
+        // Aktion geht mit: weggescrollt → schwebende Leiste unten, wieder oben → weg
+        assert.match(await page.textContent('#promoBanner .sb-title'), /Gruselwoche/);
+        await page.evaluate(() => window.scrollTo(0, 1800));
+        await page.waitForSelector('#promoBannerDock.is-on', { timeout: 5000 });
+        const dock = await page.evaluate(() => {
+          const r = document.getElementById('promoBannerDock').getBoundingClientRect();
+          return { inside: r.left >= 0 && r.right <= innerWidth + 1 && r.bottom <= innerHeight, x: !!document.querySelector('#promoBannerDock .pd-x') && document.querySelector('#promoBannerDock .pd-x').getBoundingClientRect().right <= innerWidth };
+        });
+        assert.ok(dock.inside && dock.x, 'Leiste ganz im Bild, Schließen erreichbar');
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await page.waitForSelector('#promoBannerDock:not(.is-on)', { state: 'attached', timeout: 5000 });
+        // Schrift der Überschriften: Elegant = Schmuckschrift kursiv, Modern = Inter
+        const fonts = await page.evaluate(() => {
+          const h = document.querySelector('h1.font-serif, h2.font-serif, .font-serif');
+          const read = (f) => {
+            document.documentElement.dataset.font = f;
+            const cs = getComputedStyle(h);
+            return `${cs.fontStyle}|${cs.fontFamily}`;
+          };
+          const out = { elegant: read('elegant'), modern: read('modern') };
+          delete document.documentElement.dataset.font;
+          return out;
+        });
+        assert.match(fonts.elegant, /^italic\|.*Cormorant/);
+        assert.match(fonts.modern, /^normal\|.*Inter/);
         // Banner wegklicken: bleibt weg
         await page.click('#promoBanner .site-banner-x');
         await page.waitForFunction(() => !document.getElementById('promoBanner'));

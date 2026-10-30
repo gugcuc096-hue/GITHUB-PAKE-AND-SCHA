@@ -265,6 +265,7 @@ function calculateTotal() {
     const promoRow = document.getElementById('promoRow');
     if (promoRow) {
         promoRow.classList.toggle('hidden', !promoAmount);
+        promoRow.className = promoRow.className.replace(/\s*occ-\w+/g, '') + (promo ? ` occ-${promo.occasion}` : '');
         if (promo) document.getElementById('promoLabel').textContent = `${promo.icon} ${promo.name} (${String(promo.pct).replace('.', ',')} %)`;
         document.getElementById('promoAmount').textContent = '− ' + promoAmount.toLocaleString('de-DE') + ' $';
     }

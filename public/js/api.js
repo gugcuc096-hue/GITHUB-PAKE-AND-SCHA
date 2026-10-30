@@ -788,16 +788,16 @@
    */
   const FX_CSS = `.ps-spot-rel{position:relative}.ps-spot{isolation:isolate}
 .ps-spot::after,.ps-spot::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .35s ease}
-.ps-spot::after{z-index:-1;background:radial-gradient(420px circle at var(--mx,50%) var(--my,50%),rgba(212,175,55,.11),transparent 62%)}
-.ps-spot::before{padding:1px;background:radial-gradient(260px circle at var(--mx,50%) var(--my,50%),rgba(240,208,110,.95),rgba(212,175,55,.25) 45%,transparent 72%);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+.ps-spot::after{z-index:-1;background:radial-gradient(420px circle at var(--mx,50%) var(--my,50%),rgba(var(--accent-rgb,212,175,55),.11),transparent 62%)}
+.ps-spot::before{padding:1px;background:radial-gradient(260px circle at var(--mx,50%) var(--my,50%),rgba(var(--accent-light-rgb,243,229,171),.95),rgba(var(--accent-rgb,212,175,55),.25) 45%,transparent 72%);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
 .ps-spot.ps-spot-on::after,.ps-spot.ps-spot-on::before{opacity:1}
-.gold-shine{background:linear-gradient(110deg,var(--gold-500,#d4af37) 0 41%,#fff7d6 50%,var(--gold-500,#d4af37) 59% 100%) 0 0/250% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;padding:0 .14em;margin:0 -.14em;-webkit-box-decoration-break:clone;box-decoration-break:clone;animation:ps-shine 2.2s ease-in-out .5s both}
+.gold-shine{background:linear-gradient(110deg,var(--gold-500,#d4af37) 0 41%,color-mix(in srgb,var(--gold-500,#d4af37),#fff 80%) 50%,var(--gold-500,#d4af37) 59% 100%) 0 0/250% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;padding:0 .14em;margin:0 -.14em;-webkit-box-decoration-break:clone;box-decoration-break:clone;animation:ps-shine 2.2s ease-in-out .5s both}
 @keyframes ps-shine{from{background-position:100% 0}to{background-position:0 0}}
-.lotm-badge{display:inline-flex;align-items:center;padding:.32rem .85rem;border-radius:999px;font-size:.62rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;line-height:1.2;color:#1a1405;background:linear-gradient(110deg,#b8902a 0%,#f3d77a 45%,#d4af37 60%,#9c7a20 100%) 0 0/220% 100%;box-shadow:0 6px 22px rgba(212,175,55,.35),inset 0 1px 0 rgba(255,255,255,.45);white-space:nowrap}
+.lotm-badge{display:inline-flex;align-items:center;padding:.32rem .85rem;border-radius:999px;font-size:.62rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;line-height:1.2;color:#1a1405;background:linear-gradient(110deg,color-mix(in srgb,var(--gold-500,#d4af37),#000 14%) 0%,color-mix(in srgb,var(--gold-500,#d4af37),#fff 40%) 45%,var(--gold-500,#d4af37) 60%,color-mix(in srgb,var(--gold-500,#d4af37),#000 28%) 100%) 0 0/220% 100%;box-shadow:0 6px 22px rgba(var(--accent-rgb,212,175,55),.35),inset 0 1px 0 rgba(255,255,255,.45);white-space:nowrap}
 .pf-head .lotm-badge{margin-left:.5rem;vertical-align:middle}
 @media (max-width:479px){.pf-head .lotm-badge{margin:.5rem 0 0}}
 .lotm-on-card{position:absolute;top:-.85rem;left:50%;transform:translateX(-50%);z-index:2}
-.team-card.is-lotm{position:relative;overflow:visible;border-color:rgba(212,175,55,.55);box-shadow:0 0 0 1px rgba(212,175,55,.25),0 18px 60px rgba(212,175,55,.14)}
+.team-card.is-lotm{position:relative;overflow:visible;border-color:rgba(var(--accent-rgb,212,175,55),.55);box-shadow:0 0 0 1px rgba(var(--accent-rgb,212,175,55),.25),0 18px 60px rgba(var(--accent-rgb,212,175,55),.14)}
 .ps-tilt{will-change:transform;transition:transform .14s ease-out,box-shadow .35s ease,border-color .35s ease!important}
 .ps-tilt:not(.ps-tilt-on){transition:transform .7s cubic-bezier(.16,1,.3,1),box-shadow .35s ease,border-color .35s ease!important}
 [data-roll]{font-variant-numeric:lining-nums tabular-nums}

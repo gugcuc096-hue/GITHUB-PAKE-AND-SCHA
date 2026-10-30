@@ -82,6 +82,11 @@ function inject(html, page) {
     .join(' ');
   let out = html;
   if (attrs) out = out.replace(/<html\b/, `<html ${attrs}`);
+  // Farbe der Browserleiste und des Streifens in Discord-Link-Vorschauen
+  if (style.accent.toLowerCase() !== DEFAULTS.accent) {
+    const v = vars(style).vars;
+    out = out.replace(/(<meta name="theme-color" content=")#(?:b8962e|d4af37)"/i, `$1${v['--gold-600']}"`);
+  }
   const rules = css(style);
   const tags = [rules ? `<style id="psTheme">${rules}</style>` : '', DOCS.has(page) ? '' : '<script src="/js/season.js" defer></script>'].filter(Boolean).join('\n    ');
   if (tags) out = out.replace('</head>', `    ${require('./assets').rewrite(tags)}\n</head>`);

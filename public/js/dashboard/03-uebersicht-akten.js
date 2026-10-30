@@ -1138,7 +1138,7 @@ function redactDraw() {
   if (drag) {
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
     ctx.fillRect(drag.x, drag.y, drag.w, drag.h);
-    ctx.strokeStyle = '#d4af37';
+    ctx.strokeStyle = accentPaint();
     ctx.lineWidth = Math.max(2, cv.width / 400);
     ctx.strokeRect(drag.x, drag.y, drag.w, drag.h);
   }

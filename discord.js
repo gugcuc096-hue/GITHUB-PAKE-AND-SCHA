@@ -209,11 +209,18 @@ function buildPayload({ title, description, fields = [], color = GOLD, mentionId
   };
 }
 
+/** Gold in Einbettungen → Kanzleifarbe (Einstellungen → Stil & Saison); bei der Standardfarbe unverändert. */
+function brandColors(payload, a = require('./brand').accent()) {
+  if (!payload || !Array.isArray(payload.embeds)) return payload;
+  if (a.isDefault) return payload;
+  return { ...payload, embeds: payload.embeds.map((e) => (e && e.color === GOLD ? { ...e, color: a.int } : e)) };
+}
+
 async function postWebhook(url, payload) {
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(brandColors(payload)),
     signal: AbortSignal.timeout(8000),
   });
   if (!res.ok) {
@@ -378,6 +385,7 @@ async function fetchDiscordUser(cfg, code) {
 
 module.exports = {
   GOLD,
+  brandColors,
   RED,
   EVENTS,
   isValidWebhookUrl,

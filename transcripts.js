@@ -30,13 +30,14 @@ function messageHtml(m) {
 }
 
 function pageHtml(c, channelName, messages) {
+  const brand = require('./brand').accent(); // Kanzleifarbe (Einstellungen → Stil & Saison)
   return `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Ticket-Verlauf ${esc(c.case_number)}</title><style>
 body{margin:0;background:#050a18;color:#e5e7eb;font:15px/1.55 system-ui,sans-serif}main{max-width:820px;margin:0 auto;padding:28px 18px}
-h1{font:600 22px/1.3 Georgia,serif;color:#f3e5ab;margin:0 0 4px}.sub{color:#94a3b8;font-size:13px;margin-bottom:22px}
+h1{font:600 22px/1.3 Georgia,serif;color:${brand.light};margin:0 0 4px}.sub{color:#94a3b8;font-size:13px;margin-bottom:22px}
 .msg{padding:10px 0;border-top:1px solid rgba(255,255,255,.07)}.head{display:flex;gap:10px;align-items:baseline}.name{font-weight:600;color:#fff}
-.bot .name{color:#d4af37}.time{color:#64748b;font-size:12px}.text{white-space:pre-wrap;word-break:break-word}.dim{color:#64748b}
-.embed{margin-top:6px;padding:8px 12px;border-left:3px solid #d4af37;background:rgba(255,255,255,.04);border-radius:6px}.et{font-weight:600}
+.bot .name{color:${brand.hex}}.time{color:#64748b;font-size:12px}.text{white-space:pre-wrap;word-break:break-word}.dim{color:#64748b}
+.embed{margin-top:6px;padding:8px 12px;border-left:3px solid ${brand.hex};background:rgba(255,255,255,.04);border-radius:6px}.et{font-weight:600}
 .f{font-size:13px;color:#cbd5e1}.att a{color:#93c5fd}</style></head><body><main>
 <h1>Ticket-Verlauf · ${esc(c.case_number)}</h1><div class="sub">${esc(c.title)} · Kanal #${esc(channelName || '')} · ${messages.length} Nachrichten · gesichert ${esc(when(new Date().toISOString()))}</div>
 ${messages.map(messageHtml).join('\n')}

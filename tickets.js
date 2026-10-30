@@ -170,7 +170,7 @@ async function rest(method, path, body, opts = {}) {
   const res = await fetch(API + path, {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : JSON.stringify(discord.brandColors(body)), // Gold → Kanzleifarbe
     signal: AbortSignal.timeout(12000),
   });
   if (res.status === 429 && attempt < 3 && !opts.noRetry) {

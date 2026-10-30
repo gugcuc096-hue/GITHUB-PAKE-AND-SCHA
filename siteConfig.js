@@ -236,7 +236,8 @@ function promoBanner(user, promo) {
   const id = `promo-${promo.id}-${promo.to}`;
   const pct = String(promo.pct).replace('.', ',');
   const text = promo.message || `${promo.name}: ${pct} % auf alle Leistungen – automatisch auf jeder Rechnung.`;
-  return { id, promo: true, text, tone: 'promo', occasion: promo.occasion, icon: promo.icon, pct: promo.pct, endsAt: promo.endsAt, link: who === 'staff' ? '' : '/#rechner', linkLabel: 'Jetzt berechnen', dismissible: true };
+  const sub = promo.message || `${pct} % auf alle Leistungen – wird automatisch abgezogen.`;
+  return { id, promo: true, text, title: promo.name, sub, tone: 'promo', occasion: promo.occasion, icon: promo.icon, pct: promo.pct, endsAt: promo.endsAt, link: who === 'staff' ? '' : '/#rechner', linkLabel: 'Jetzt berechnen', dismissible: true };
 }
 
 /** Beschriftungen, wie sie die Oberfläche braucht. */

@@ -99,7 +99,10 @@ function cfgStyle() {
   const s = cfgWork('style');
   const preset = (k, p) => `<button type="button" class="style-preset ${s.preset === k ? 'is-on' : ''}" data-action="style-preset" data-preset="${k}" style="--sw:${p.accent}">
       <span class="sp-swatch"><i></i><i></i><i></i></span><span class="sp-name">${esc(p.label)}</span></button>`;
-  const seg = (name, map, cur) => `<div class="seg" role="radiogroup">${Object.entries(map).map(([k, l]) => `<label class="seg-opt"><input type="radio" name="${name}" value="${k}" ${cur === k ? 'checked' : ''}><span>${esc(l)}</span></label>`).join('')}</div>`;
+  const seg = (name, map, cur) =>
+    `<div class="seg${name === 'font' ? ' seg-fonts' : ''}" role="radiogroup">${Object.entries(map)
+      .map(([k, l]) => `<label class="seg-opt"><input type="radio" name="${name}" value="${k}" ${cur === k ? 'checked' : ''}><span${name === 'font' ? ` class="font-try font-try-${k}"` : ''}>${esc(l)}</span></label>`)
+      .join('')}</div>`;
   setTimeout(() => stylePreview(styleCollect($('form[data-form="cfg-style"]'))), 0);
   return `<section class="panel panel-pad">
       <div class="panel-head"><h2 class="panel-title">Stil &amp; Saison</h2></div>
@@ -274,7 +277,7 @@ function promoPreview() {
   const o = st.promos.occasions.find((x) => x.key === p.occasion) || { icon: '🏷️' };
   const pct = String(p.pct || 0).replace('.', ',');
   PS.siteConfig.banner(
-    { id: 'promo-preview', promo: true, tone: 'promo', occasion: p.occasion, icon: o.icon, pct: p.pct || 0, text: p.message || `${p.name || 'Aktion'}: ${pct} % auf alle Leistungen – automatisch auf jeder Rechnung.`, endsAt: p.endsOn ? new Date(`${p.endsOn}T23:59:59`).toISOString() : null, link: '#', linkLabel: 'Jetzt berechnen', dismissible: false },
+    { id: 'promo-preview', promo: true, tone: 'promo', occasion: p.occasion, icon: o.icon, pct: p.pct || 0, title: p.name || 'Aktion', sub: p.message || `${pct} % auf alle Leistungen – wird automatisch abgezogen.`, text: p.message || '', endsAt: p.endsOn ? new Date(`${p.endsOn}T23:59:59`).toISOString() : null, link: '#', linkLabel: 'Jetzt berechnen', dismissible: false },
     host,
     { before: false, id: 'promoPreviewBanner' }
   );

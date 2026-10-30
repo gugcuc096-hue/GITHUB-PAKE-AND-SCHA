@@ -199,7 +199,8 @@
   else startNav();
 
   /* ---------------------------------------------------------------- Konfetti in Gold */
-  const COLORS = ['#d4af37', '#f3e5ab', '#b8962e', '#fff3c4', '#e8c85a'];
+  // in der Kanzleifarbe (Einstellungen → Stil & Saison): Grundton, hell, dunkel und zwei Mischungen
+  const COLORS = ['var(--gold-500)', 'var(--gold-light)', 'var(--gold-600)', 'color-mix(in srgb, var(--gold-500), #fff 75%)', 'color-mix(in srgb, var(--gold-500), #fff 20%)'];
   function confetti(x, y, { count = 36 } = {}) {
     if (!canAnimate()) return;
     const box = document.createElement('div');

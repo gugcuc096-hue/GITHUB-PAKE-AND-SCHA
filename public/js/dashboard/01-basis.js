@@ -69,7 +69,15 @@ const SOURCES = { portal: 'Mandantenportal', web: 'Website-Formular', kanzlei: '
 const EVENT_TYPES = { gericht: 'Gerichtstermin', frist: 'Frist', mandant: 'Mandantengespräch', intern: 'Intern' };
 /** Bezeichnung eines Kalendereintrags: eigene Art („Berufung“), sonst die Grundart. */
 const evLabel = (e) => e.typeLabel || EVENT_TYPES[e.type] || e.type;
-const EVENT_COLORS = { mandant: '#34d399', gericht: '#d4af37', frist: '#f87171', intern: '#7dd3fc' };
+/** Kanzleifarbe für Leinwände (Karte, Schwärzen): folgt der Akzentfarbe (Einstellungen → Stil & Saison); bei Gold wie bisher. */
+function accentPaint(kind = 'base', alpha = 1) {
+  const v = getComputedStyle(document.documentElement).getPropertyValue('--gold-500').trim().toLowerCase();
+  const hex = /^#[0-9a-f]{6}$/.test(v) ? v : '#d4af37';
+  let rgb = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  if (kind === 'light') rgb = hex === '#d4af37' ? [241, 210, 122] : rgb.map((c) => Math.round(c + (255 - c) * 0.35));
+  return alpha < 1 ? `rgba(${rgb.join(',')},${alpha})` : `rgb(${rgb.join(',')})`;
+}
+const EVENT_COLORS = { mandant: '#34d399', gericht: 'var(--gold-500)', frist: '#f87171', intern: '#7dd3fc' };
 const EVENT_STATUS = { angefragt: ['Angefragt', 'amber'], bestaetigt: ['Bestätigt', 'emerald'], abgesagt: ['Abgesagt', 'slate'], erledigt: ['Erledigt', 'slate'] };
 const INVOICE_STATUS = { offen: ['Offen', 'amber'], bezahlt: ['Bezahlt', 'emerald'], storniert: ['Storniert', 'slate'] };
 const INVOICE_KIND = { rechnung: 'Rechnung', honorarvereinbarung: 'Honorarvereinbarung' };
@@ -93,7 +101,7 @@ function setRanks(groups) {
   Object.assign(RANK_GROUPS, groups);
   RANKS.splice(0, RANKS.length, ...Object.values(groups).flat());
 }
-const NOTE_COLORS = { gold: '#d4af37', blue: '#60a5fa', green: '#34d399', red: '#f87171', slate: '#94a3b8' };
+const NOTE_COLORS = { gold: 'var(--gold-500)', blue: '#60a5fa', green: '#34d399', red: '#f87171', slate: '#94a3b8' };
 const DISCORD_MSG = {
   linked: ['Discord-Konto erfolgreich verbunden.', 'ok'],
   taken: ['Dieses Discord-Konto ist bereits mit einem anderen Website-Konto verbunden.', 'error'],
