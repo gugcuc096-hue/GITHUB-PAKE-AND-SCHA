@@ -167,3 +167,19 @@ html.ps-leaving body { opacity: 0; transform: scale(0.993); transition: opacity 
 .site-links a:hover { background: rgba(212, 175, 55, 0.14); transform: translateY(-1px); }
 .site-preview { position: sticky; top: 0; z-index: 90; padding: 0.5rem 1rem; text-align: center; font-size: 0.8rem; color: #02050e; background: #fbbf24; }
 .site-preview a { color: inherit; font-weight: 700; text-decoration: underline; margin-left: 0.5rem; }
+
+/* ---------------------------------------------------------------- 11. Überall: gemeinsame weiche Übergänge */
+/* Farben, Rahmen, Schatten und Deckkraft wechseln überall weich (Grundwert ohne Gewicht: eigene Übergänge einzelner Teile gehen vor) */
+:where(a, button, summary, label, input, select, textarea, .chip, .badge, .panel, .chg-row, .place-row, .tl-item, .att, .case-chip, .nav-item, .field, [role="button"]) {
+  transition-property: color, background-color, border-color, box-shadow, opacity, filter;
+  transition-duration: var(--m-micro);
+  transition-timing-function: ease;
+}
+.tbl td { transition: background-color var(--m-micro) ease, border-color var(--m-micro) ease; }
+.tbl tr.row { transition: opacity var(--m-panel) ease; }
+/* Aufklappbare Bereiche (nicht die Menüs, deren Auswahl über den Rand hinausragt) gleiten auf und zu */
+@supports (selector(::details-content)) {
+  :root { interpolate-size: allow-keywords; }
+  :is(details.edit-box, details.cc-birth, details.fn-text)::details-content { block-size: 0; overflow: clip; transition: block-size var(--m-panel) var(--m-ease), content-visibility var(--m-panel) allow-discrete; }
+  :is(details.edit-box, details.cc-birth, details.fn-text)[open]::details-content { block-size: auto; }
+}

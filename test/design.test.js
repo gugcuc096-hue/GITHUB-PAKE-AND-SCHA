@@ -35,6 +35,24 @@ describe('Designsystem Tiefe, Glas, Licht', () => {
     assert.match(joined, /\.modal/);
   });
 
+  it('Glas auf allen schwebenden Ebenen (Hinweise, Menüs, Leisten, Reiter, Karten-Auflagen, Fenster am PC) – auch mit Rückfall', () => {
+    const blocks = [...css.matchAll(/([^{}]+)\{([^{}]*backdrop-filter[^{}]*)\}/g)].map((m) => m[1]);
+    const joined = blocks.join(' ');
+    for (const sel of ['.ps-toast', '.pop', '.more-pop', '.bulk-bar', '.sys-bar', '.kmap-card', '.kmap-cap', '.case-jump', '.modal-card', '.fn-table thead th']) assert.ok(joined.includes(sel), `${sel} fehlt`);
+    const off = css.slice(css.indexOf('prefers-reduced-transparency'));
+    for (const sel of ['.ps-toast', '.pop', '.case-jump', '.modal-card']) assert.ok(off.includes(sel), `${sel}: kein Rückfall bei „Transparenz reduzieren“`);
+  });
+
+  it('Bewegung überall: gemeinsame Übergänge und aufklappbare Bereiche gleiten (mit Ruhe-Fassung)', () => {
+    const motion = fs.readFileSync(path.join(PUBLIC, 'css', 'motion.css'), 'utf8');
+    const calm = fs.readFileSync(path.join(PUBLIC, 'css', 'calm.css'), 'utf8');
+    assert.match(motion, /:where\(a, button, summary[^)]*\) \{\s*transition-property: color, background-color/);
+    assert.match(motion, /::details-content \{ block-size: 0/);
+    assert.match(calm, /::details-content \{ transition: none !important; \}/);
+    // Menüs mit überstehender Auswahl dürfen nicht abgeschnitten werden
+    assert.doesNotMatch(motion, /details\.more-menu[^{]*::details-content/);
+  });
+
   it('Rückfälle: ohne Weichzeichner, bei „Transparenz reduzieren“ und im Kontrastmodus', () => {
     assert.match(css, /@supports not/);
     assert.match(css, /prefers-reduced-transparency: reduce/);
