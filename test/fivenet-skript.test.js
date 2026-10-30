@@ -73,6 +73,8 @@ describe('FiveNet-Übernahme im Dashboard (Browser)', { skip: chromium ? false :
     await page.click('button[type=submit]');
     await page.waitForURL(/dashboard/);
     await page.waitForSelector('#modalBack, [data-action="nav-group"], nav', { state: 'attached' });
+    // die erste Seitenansicht schließt beim Fertigwerden offene Fenster – erst abwarten, dann Akten öffnen
+    await page.waitForFunction(() => typeof st !== 'undefined' && st.user && st.user.id && !st.histPaused && document.querySelector('#content')?.children.length > 0 && !document.querySelector('#content .skeleton'));
   };
 
   it('Erkennung: Datum in drei Schreibweisen, „Feld: Wert“-Zeilen, Titel nur aus echten Überschriften', async () => {
