@@ -56,15 +56,20 @@ function css(style) {
   return `:root:root { ${body} } @media (max-width: 767px) { :root:root { --glass-blur: ${v.mobileBlur}; } }`;
 }
 
+// Dokumente bleiben schlicht (Druck); Warte- und Offline-Seite bekommen gar nichts eingesetzt (eigenständig, aus dem Service Worker)
+const DOCS = new Set(['invoice', 'vertrag', 'aktenauszug']);
+const BARE = new Set(['offline', 'aufwachen']);
+
 /** Saison für diese Seite ('' = keine). Im Dashboard nur, wenn „auch im Dashboard“ an ist. */
 function seasonFor(page, style = siteConfig.get('style')) {
   if (page === 'dashboard' && !style.seasonDash) return '';
-  if (['invoice', 'vertrag', 'aktenauszug', 'offline', 'aufwachen'].includes(page)) return ''; // Dokumente bleiben schlicht (Druck)
+  if (DOCS.has(page) || BARE.has(page)) return '';
   return promotions.season(style.season);
 }
 
 /** In eine ausgelieferte HTML-Seite einsetzen. */
 function inject(html, page) {
+  if (BARE.has(page)) return html;
   let style;
   try {
     style = siteConfig.get('style');
@@ -78,8 +83,8 @@ function inject(html, page) {
   let out = html;
   if (attrs) out = out.replace(/<html\b/, `<html ${attrs}`);
   const rules = css(style);
-  const tags = [rules ? `<style id="psTheme">${rules}</style>` : '', '<script src="/js/season.js" defer></script>'].filter(Boolean).join('\n    ');
-  out = out.replace('</head>', `    ${require('./assets').rewrite(tags)}\n</head>`);
+  const tags = [rules ? `<style id="psTheme">${rules}</style>` : '', DOCS.has(page) ? '' : '<script src="/js/season.js" defer></script>'].filter(Boolean).join('\n    ');
+  if (tags) out = out.replace('</head>', `    ${require('./assets').rewrite(tags)}\n</head>`);
   // Kanzlei-weit „ruhig“: die gedämpfte Bewegung gilt für alle, die selbst nichts eingestellt haben
   if (style.motion === 'ruhig') out = out.replace(/(<link[^>]*data-calm[^>]*media=")[^"]*"|(<link[^>]*media=")[^"]*("[^>]*data-calm)/g, (m, a, b, c) => (a ? `${a}all"` : `${b}all${c}`));
   return out;
