@@ -1404,7 +1404,34 @@ document.addEventListener('ps:form-ok', () => buzz());
   if (st.user.needsName) askInitialName();
   liveSync();
   replayUndoDeletes(); // beim letzten Verlassen nicht mehr durchgekommene Löschungen nachholen
+  warmViews();
 })();
+
+/**
+ * Die Hauptseiten im Menü im Leerlauf nacheinander vorladen: Der erste Klick darauf zeigt sie sofort (wie eine schon
+ * besuchte Seite) und frischt im Hintergrund auf. Nicht bei „Datensparmodus“, langsamer Leitung oder verstecktem Tab.
+ */
+function warmViews() {
+  const conn = navigator.connection || {};
+  if (conn.saveData || /(^|-)2g$/.test(conn.effectiveType || '')) return;
+  const seen = st.seenViews || (st.seenViews = new Set());
+  const queue = ['cases', 'tasks', 'calendar', 'invoices', 'mail', 'clients'];
+  const next = async () => {
+    const view = queue.shift();
+    if (!view) return;
+    if (document.hidden) return setTimeout(() => queue.unshift(view) && next(), 4000);
+    if (view !== st.view && !seen.has(view) && views[view] && views[view].load && allowed(view) && !INSTANT_SKIP.has(view)) {
+      try {
+        await views[view].load();
+        seen.add(view);
+      } catch {
+        /* wird beim Klick normal geladen */
+      }
+    }
+    setTimeout(next, 500);
+  };
+  (window.requestIdleCallback || ((fn) => setTimeout(fn, 1)))(() => setTimeout(next, 2500), { timeout: 5000 });
+}
 
 /**
  * Verwaltungsteile (Team, Einstellungen, Discord, Statistik, Wiki, Lager …) gibt es nur für die Kanzlei – Mandanten
