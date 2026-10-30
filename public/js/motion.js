@@ -260,4 +260,116 @@
     e.preventDefault();
     go(u.pathname + u.search + u.hash);
   });
+
+  /* ---------------------------------------------------------------- Überall: weiche Bewegung für alles, was erscheint */
+  // Nur mit der Einzel-Eigenschaft „translate“ (kollidiert nicht mit transform von Wischen, Ziehen oder Gleiten der Zeilen).
+  const CAN = () => !calm() && typeof Element.prototype.animate === 'function';
+  const EASE = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
+  const NO_FLOW = 'script, style, option, optgroup, template, [data-no-flow], .ps-toast-root, .nav-ind, .ps-ripple-box, .kmap, .kmap-gl, .swipe-hint';
+  const fadeUp = (el, y = 8, ms = 240) => el.animate([{ opacity: 0, translate: `0 ${y}px` }, { opacity: 1, translate: '0 0' }], { duration: ms, easing: EASE });
+
+  // 1. Etwas wird eingeblendet (hidden entfernt: Hinweise, Kästchen, Felder, Vorschauen …): es gleitet kurz ein
+  let flowOn = false;
+  new MutationObserver((list) => {
+    if (!flowOn || !CAN()) return;
+    for (const m of list) {
+      const el = m.target;
+      if (m.oldValue === null || el.hidden || !el.isConnected || el.matches(NO_FLOW)) continue;
+      const r = el.getBoundingClientRect();
+      if (!r.width && !r.height) continue;
+      fadeUp(el, 6, 240);
+    }
+  }).observe(document.body, { attributes: true, attributeFilter: ['hidden'], attributeOldValue: true, subtree: true });
+  setTimeout(() => (flowOn = true), 900); // nicht beim ersten Aufbau der Seite
+
+  // 2. Bilder blenden ein, sobald sie geladen sind (statt plötzlich zu erscheinen)
+  document.addEventListener(
+    'load',
+    (e) => {
+      const img = e.target;
+      if (!img || img.tagName !== 'IMG' || !flowOn || !CAN() || img.closest('[data-no-flow], .brand, .site-avatar, .hdr-av')) return;
+      const r = img.getBoundingClientRect();
+      if (r.bottom < 0 || r.top > innerHeight) return;
+      img.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 320, easing: 'ease-out' });
+    },
+    true
+  );
+
+  // 3. Lange Seiten und Akten: Bereiche unterhalb des sichtbaren Teils blenden beim Hinscrollen ein (nur solche, die beim
+  //    Zeichnen noch nicht im Bild waren – was man schon sieht, bleibt ruhig)
+  const REVEAL = '#content > .panel, #content > section, #content .kpi-grid, #content .chg-sum, #modalBody .section, #modalBody > .panel';
+  const seen = new WeakSet();
+  const io =
+    'IntersectionObserver' in window
+      ? new IntersectionObserver(
+          (entries) => {
+            for (const en of entries) {
+              if (!en.isIntersecting) continue;
+              io.unobserve(en.target);
+              const el = en.target;
+              el.style.opacity = '';
+              el.style.translate = '';
+              setTimeout(() => (el.style.transition = ''), 620);
+            }
+          },
+          { rootMargin: '0px 0px -4% 0px', threshold: 0.01 }
+        )
+      : null;
+  let scanQueued = false;
+  function scan() {
+    scanQueued = false;
+    if (!io || !CAN()) return;
+    document.querySelectorAll(REVEAL).forEach((el) => {
+      if (seen.has(el)) return;
+      seen.add(el);
+      const r = el.getBoundingClientRect();
+      if (!r.height || r.top < innerHeight * 0.94 || el.matches(NO_FLOW) || el.closest('.sec-wrap.is-hidden-sec')) return;
+      el.style.transition = 'opacity 520ms cubic-bezier(0.2, 0.8, 0.2, 1), translate 520ms cubic-bezier(0.2, 0.8, 0.2, 1)';
+      el.style.opacity = '0';
+      el.style.translate = '0 18px';
+      io.observe(el);
+    });
+  }
+  const queueScan = () => {
+    if (scanQueued) return;
+    scanQueued = true;
+    requestAnimationFrame(scan);
+  };
+  const scanObs = new MutationObserver(queueScan);
+  const startScan = () => {
+    ['#content', '#modalBody'].forEach((sel) => {
+      const root = document.querySelector(sel);
+      if (root) scanObs.observe(root, { childList: true, subtree: sel === '#modalBody' });
+    });
+    queueScan();
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startScan);
+  else startScan();
+
+  // 4. Reiter und Umschalter („Rechnungen / Dauermandate“, Einstellungen …): der neue Inhalt blendet überlappend ein
+  let tabAt = 0;
+  document.addEventListener(
+    'click',
+    (e) => {
+      if (e.target.closest && e.target.closest('[role="tab"], [data-action$="-tab"]')) tabAt = Date.now();
+    },
+    true
+  );
+  const tabObs = new MutationObserver((list) => {
+    if (!tabAt || Date.now() - tabAt > 1800 || !CAN()) return;
+    tabAt = 0;
+    const box = list[0].target;
+    fadeUp(box, 10, 280);
+  });
+  const startTabs = () => ['#content', '#modalBody'].forEach((sel) => document.querySelector(sel) && tabObs.observe(document.querySelector(sel), { childList: true }));
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startTabs);
+  else startTabs();
+
+  // 5. Zahlenfelder: der Wert federt beim Drücken von − / +
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('.num-btn');
+    if (!b || !CAN()) return;
+    const input = b.parentElement && b.parentElement.querySelector('input');
+    if (input) requestAnimationFrame(() => input.animate([{ scale: 1.22 }, { scale: 1 }], { duration: 260, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' }));
+  });
 })();
