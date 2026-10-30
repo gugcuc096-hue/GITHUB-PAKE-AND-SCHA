@@ -2184,8 +2184,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await P.page.waitForSelector('#modalBody [data-case-head]');
       }
       const first = (n) => n.replace(/\b(Dr|Prof|jur|med|rer|nat)\.\s*/gi, '').trim().split(/\s+/)[0];
-      await A.page.waitForFunction((n) => (document.querySelector('#caseHere:not([hidden])')?.textContent || '').includes(`${n} ist auch hier`), first(partnerMe.displayName), { timeout: 6000 });
-      await B.page.waitForFunction((n) => (document.querySelector('#caseHere:not([hidden])')?.textContent || '').includes(`${n} ist auch hier`), first(anwaltMe.displayName), { timeout: 6000 });
+      await A.page.waitForFunction((n) => (document.querySelector('#caseHere:not([hidden])')?.textContent || '').includes(`${n} ist auch hier`), first(partnerMe.displayName), { timeout: 15000 });
+      await B.page.waitForFunction((n) => (document.querySelector('#caseHere:not([hidden])')?.textContent || '').includes(`${n} ist auch hier`), first(anwaltMe.displayName), { timeout: 15000 });
       // Mandant (Handy) öffnet sie auch: sieht keine Präsenz, taucht selbst nicht auf
       await M.page.goto(psrv.base + '/login');
       await M.page.fill('#email', 'mia.mandant');

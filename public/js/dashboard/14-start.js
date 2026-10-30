@@ -943,6 +943,7 @@ document.addEventListener('pointerover', (e) => {
   if (!el || el === peek.el || el.closest('#caseList, #modal')) return; // Aktenliste zeigt alles selbst, im Fenster stört sie
   hidePeek();
   peek.el = el;
+  peek.y = window.scrollY;
   peek.timer = setTimeout(() => showPeek(el), 450);
 });
 document.addEventListener('pointerout', (e) => {
@@ -950,7 +951,16 @@ document.addEventListener('pointerout', (e) => {
   if (e.target.closest && e.target.closest('[data-action="open-case"][data-id]') === peek.el) hidePeek();
 });
 document.addEventListener('pointerdown', hidePeek, true);
-window.addEventListener('scroll', hidePeek, { capture: true, passive: true });
+// Nur ein echtes Scrollen blendet die Karte aus – ein Scroll-Ereignis ohne Verschiebung der Seite (z. B. durch Layout-Änderungen
+// oder das Zurechtrücken der Zeile beim Hover) nicht
+window.addEventListener(
+  'scroll',
+  (e) => {
+    if (e.target === document && peek.el && Math.abs(window.scrollY - (peek.y ?? window.scrollY)) < 2) return;
+    hidePeek();
+  },
+  { capture: true, passive: true }
+);
 
 function liveCase(ev) {
   casePrefetch.delete(ev.id);
