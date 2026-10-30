@@ -727,7 +727,7 @@ async function openConcern(id) {
     const row = list?.concerns.find((x) => x.id === d.concern.id);
     if (row && row.unseen) {
       row.unseen = false;
-      if (st.view === view) $('#content').innerHTML = views[view].render();
+      if (st.view === view) renderView(); // hinter dem offenen Fenster erst beim Schließen zeichnen
     }
   }
   if (d.concern.mine) load.concernCount().then(renderNav).catch(() => {});
