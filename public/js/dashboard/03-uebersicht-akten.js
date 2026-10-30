@@ -1020,6 +1020,7 @@ function docPeekOpen(index, linked) {
     box.setAttribute('aria-label', 'Vorschau');
     document.body.appendChild(box);
   }
+  if (!fresh && box.getAnimations) box.getAnimations().forEach((x) => x.finish()); // Blättern während des Herausfliegens: gleich an den Platz
   box.dataset.index = String(index);
   box.dataset.linked = linked ? '1' : '';
   const no = a.no;
