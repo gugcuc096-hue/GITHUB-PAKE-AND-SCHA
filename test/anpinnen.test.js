@@ -66,7 +66,15 @@ describe('Anpinnen (Browser)', { skip: chromium ? false : 'Playwright nicht inst
         assert.equal(answered, false, 'die Zeile ist gewandert, bevor der Server geantwortet hat');
         assert.equal(await page.evaluate((id) => document.querySelector(`#caseList tr[data-id="${id}"]`).getAnimations().length > 0, last), true, 'sie gleitet (Animation läuft)');
         assert.equal(await page.evaluate((id) => document.querySelector(`#caseList tr[data-id="${id}"]`).classList.contains('is-pinned'), last), true, 'trägt das Band');
-        assert.notEqual(await page.evaluate((id) => getComputedStyle(document.querySelector(`#caseList tr[data-id="${id}"] td`)).boxShadow, last), 'none', 'goldenes Band');
+        // das Band sitzt am PC an der ersten Zelle, am Handy (Karten) an der ganzen Karte
+        assert.equal(
+          await page.evaluate((id) => {
+            const tr = document.querySelector(`#caseList tr[data-id="${id}"]`);
+            return [tr, tr.querySelector('td')].some((el) => getComputedStyle(el).boxShadow !== 'none');
+          }, last),
+          true,
+          'goldenes Band'
+        );
         assert.equal(await page.getAttribute(btn, 'aria-pressed'), 'true');
         await page.waitForTimeout(1000);
         assert.equal((await a.get('/api/cases')).json.cases.find((c) => c.id === last).starred, true, 'gespeichert');
