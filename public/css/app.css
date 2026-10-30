@@ -2687,3 +2687,29 @@ body.hint-edit .form-hint[data-hint-key]:hover { background: rgba(212, 175, 55, 
 .place-label { font-weight: 600; }
 .place-note { font-size: 0.85rem; color: var(--text-muted); white-space: pre-wrap; overflow-wrap: anywhere; }
 .place-actions { display: flex; align-items: center; gap: 0.2rem; padding-right: 0.4rem; }
+
+/* ---------------------------------------------------------------- Tatort-Rekonstruktion: Sicht, Film, Formularfelder */
+.kmap-sight { gap: 0.3rem; }
+.kmap-sight-box { margin: 0 0 0.75rem; padding: 0.6rem 0.8rem; border: 1px solid var(--glass-border); border-radius: 12px; background: rgba(255, 255, 255, 0.02); }
+.kmap-sight-box[hidden] { display: none; }
+.kmap-sight-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; font-size: 0.85rem; color: var(--text-muted); }
+.kmap-sight-list li { display: flex; gap: 0.55rem; align-items: baseline; }
+.kmap-sight-list strong { color: var(--text-main); font-weight: 600; }
+.kmap-sight-list em { font-style: normal; color: #fff; }
+.ksl-dot { flex: none; width: 0.6rem; height: 0.6rem; border-radius: 50%; transform: translateY(0.05rem); box-shadow: 0 0 10px -1px currentColor; }
+.kmap-cap { position: absolute; z-index: 3; left: 8px; right: 8px; bottom: 30px; display: grid; gap: 0.3rem; padding: 0.6rem 0.8rem 0.7rem; border-radius: 14px; background: rgba(6, 15, 30, 0.9); border: 1px solid var(--gold-hairline); box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5); pointer-events: none; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.kmap-cap.is-in { animation: kmap-cap-in 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes kmap-cap-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.kmap-cap-top { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.6rem; font-size: 0.9rem; }
+.kmap-cap-step { font: 700 0.72rem/1 'JetBrains Mono', monospace; color: var(--gold-500); padding: 0.2rem 0.45rem; border-radius: 6px; background: var(--gold-soft); }
+.kmap-cap-time { margin-left: auto; font-size: 0.78rem; color: var(--text-dim); }
+.kmap-cap-note { font-size: 0.82rem; color: var(--text-muted); line-height: 1.4; }
+.kmap-cap-bar { height: 3px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+.kmap-cap-bar > i { display: block; height: 100%; background: linear-gradient(90deg, #b8962e, #f1d27a); transition: width 0.5s ease; }
+.look-box { display: grid; gap: 0.5rem; }
+.look-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.look-num { width: 6.5rem; flex: none; }
+.look-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.look-chips .chip { padding: 0.35rem 0.65rem; min-height: 36px; }
+.look-lbl { display: grid; gap: 0.25rem; font-size: 0.8rem; color: var(--text-muted); }
+@media (max-width: 480px) { .kmap-cap { bottom: 28px; padding: 0.5rem 0.65rem 0.6rem; } .kmap-cap-note { display: none; } }

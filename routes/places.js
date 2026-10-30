@@ -2,7 +2,7 @@
 /*
  * Orte einer Akte (Tatort-Karte, nur Kanzlei; ändern dürfen die zuständigen Anwälte):
  *  GET    /api/places/postals          alle Postleitzahlen [[code, x, y], …] (für die Karte)
- *  POST   /api/cases/:id/places        { postal? | x, y, kind, label?, note?, happenedAt? }
+ *  POST   /api/cases/:id/places        { postal? | x, y, kind, label?, note?, happenedAt?, lookDir? (0–359°, null = keine), lookRange? (m), lookFov? (°) }
  *  PATCH  /api/cases/:id/places/:pid   dieselben Felder
  *  DELETE /api/cases/:id/places/:pid
  * Jede Antwort der Akte-Adressen liefert die vollständige Liste { places }.
@@ -50,6 +50,9 @@ const fields = {
   label: z.string().trim().max(80).optional(),
   note: z.string().trim().max(1000).optional(),
   happenedAt: isoDateTime.nullable().optional(),
+  lookDir: z.number().int().min(0).max(359).nullable().optional(),
+  lookRange: z.number().int().min(5).max(500).optional(),
+  lookFov: z.number().int().min(10).max(180).optional(),
 };
 const createBody = z.object(fields);
 const patchBody = z.object(fields).partial();
@@ -84,7 +87,9 @@ router.post(
     if (db.prepare('SELECT COUNT(*) AS n FROM case_places WHERE case_id = ?').get(c.id).n >= 60) return res.status(400).json({ error: 'Höchstens 60 Orte je Akte.' });
     const pos = position(d, res);
     if (!pos) return;
-    db.prepare('INSERT INTO case_places (case_id, postal, x, y, kind, label, note, happened_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+    db.prepare(
+      'INSERT INTO case_places (case_id, postal, x, y, kind, label, note, happened_at, created_by, look_dir, look_range, look_fov) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(
       c.id,
       pos.postal,
       pos.x,
@@ -93,7 +98,10 @@ router.post(
       d.label || '',
       d.note || '',
       when(d.happenedAt),
-      req.user.display_name
+      req.user.display_name,
+      d.lookDir === undefined ? null : d.lookDir,
+      d.lookRange || 80,
+      d.lookFov || 70
     );
     addSystemNote(c.id, req.user, `Ort erfasst: ${places.KINDS[d.kind]}, Postal ${pos.postal}${d.label ? ` – ${d.label}` : ''}.`, true);
     res.status(201).json({ places: places.listForCase(c.id) });
@@ -127,6 +135,9 @@ router.patch(
     if (d.label !== undefined) set('label', d.label);
     if (d.note !== undefined) set('note', d.note);
     if (d.happenedAt !== undefined) set('happened_at', when(d.happenedAt));
+    if (d.lookDir !== undefined) set('look_dir', d.lookDir);
+    if (d.lookRange !== undefined) set('look_range', d.lookRange);
+    if (d.lookFov !== undefined) set('look_fov', d.lookFov);
     if (sets.length) db.prepare(`UPDATE case_places SET ${sets.join(', ')} WHERE id = ?`).run(...values, pid);
     res.json({ places: places.listForCase(c.id) });
   })
