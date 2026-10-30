@@ -573,7 +573,7 @@ function closeCaseHtml(data) {
         ${
           sent && sent.estimateHe != null
             ? `<div><div class="label">Tatsächliches Strafmaß <span class="text-dim font-normal normal-case tracking-normal">– optional, für den Vergleich mit eurer Einschätzung (${esc(String(sent.estimateHe))} HE${sent.estimateFine ? ` · ${esc(money(sent.estimateFine))}` : ''})</span></div>
-          <div class="chg-est"><span class="num-step"><input type="number" name="actualHe" min="0" max="100000" class="field" placeholder="HE" value="${sent.actualHe ?? ''}" aria-label="Tatsächliche Haftstrafe in Hafteinheiten"></span><span>HE</span><span class="num-step"><input type="number" name="actualFine" min="0" max="100000000" class="field" placeholder="$" value="${sent.actualFine ?? ''}" aria-label="Tatsächliche Geldstrafe"></span><span>$</span></div>
+          <div class="chg-est-row"><label class="chg-est"><span class="chg-est-k">Haftstrafe <b>HE</b></span><input type="number" name="actualHe" min="0" max="100000" class="field" placeholder="—" value="${sent.actualHe ?? ''}" aria-label="Tatsächliche Haftstrafe in Hafteinheiten"></label><label class="chg-est"><span class="chg-est-k">Geldstrafe <b>$</b></span><input type="number" name="actualFine" min="0" max="100000000" class="field" placeholder="—" value="${sent.actualFine ?? ''}" aria-label="Tatsächliche Geldstrafe"></label></div>
           <p class="form-hint">Nur intern – die Statistik zeigt, wie gut die Einschätzung getroffen hat.</p></div>`
             : ''
         }

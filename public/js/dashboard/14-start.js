@@ -542,7 +542,7 @@ function enhanceNumbers(scope) {
   for (const input of fields) {
     input.dataset.stepper = '1';
     const wrap = document.createElement('span');
-    wrap.className = `num-step${input.closest('.chg-est, .svc, .inv-fee-row') || input.classList.contains('svc-qty') ? ' is-compact' : ''}`;
+    wrap.className = `num-step${input.closest('.svc, .inv-fee-row') || input.classList.contains('svc-qty') ? ' is-compact' : ''}`;
     const btn = (label, dir) => {
       const b = document.createElement('button');
       b.type = 'button';
@@ -1071,26 +1071,52 @@ actions['note-pin'] = async (el) => {
   await reloadCase(caseId);
 };
 
-/** Merkliste: Stern sofort umschalten, gespeichert wird im Hintergrund (bei Fehler zurück). */
+/**
+ * Anpinnen (Merkliste): Die Nadel schaltet sofort um, die Zeile gleitet ohne Neuladen an ihren neuen Platz (die Liste
+ * zeichnet sich gleich neu, die Antwort des Servers wird nicht abgewartet), ein kurzer Glanz zeigt, wohin sie wanderte.
+ * Gespeichert wird im Hintergrund; bei einem Fehler gleitet sie zurück.
+ */
 actions['case-star'] = async (el) => {
   const id = Number(el.dataset.id);
   const c = st.cases.find((x) => x.id === id);
   const on = el.getAttribute('aria-pressed') !== 'true';
+  const listView = () => ['cases', 'overview'].includes(st.view) && !$('#modal.open');
   const apply = (v) => {
     if (c) c.starred = v;
     $$(`[data-action="case-star"][data-id="${id}"]`).forEach((b) => {
       b.classList.toggle('on', v);
       b.setAttribute('aria-pressed', String(v));
-      b.title = v ? 'Aus der Merkliste nehmen' : 'Merken – steht dann oben';
+      b.title = v ? 'Lösen – nicht mehr oben' : 'Anpinnen – steht dann oben';
+      b.setAttribute('aria-label', v ? 'Akte lösen' : 'Akte anpinnen');
+      if (v && !window.PS.motion.calm()) {
+        b.classList.remove('is-driving');
+        void b.offsetWidth;
+        b.classList.add('is-driving');
+      }
     });
   };
+  const move = (land) => {
+    if (!listView()) return;
+    flipFocusKey = `open-case:${id}`;
+    flipWide = true;
+    renderView();
+    flipWide = false;
+    flipFocusKey = null;
+    const row = $(`#content [data-action="open-case"][data-id="${id}"], #content [data-action="case-pick"][data-id="${id}"]`);
+    if (!row) return;
+    row.classList.add(land);
+    setTimeout(() => row.isConnected && row.classList.remove(land), 1300);
+    const r = row.getBoundingClientRect();
+    if (r.top < 70 || r.bottom > innerHeight - 70) row.scrollIntoView({ block: 'center', behavior: window.PS.motion.calm() ? 'auto' : 'smooth' });
+  };
   apply(on);
+  move(on ? 'pin-land' : 'pin-drop');
   try {
     await api.put(`/api/cases/${id}/star`, { on });
-    toast(on ? 'Gemerkt – die Akte steht jetzt oben.' : 'Aus der Merkliste genommen.');
-    if (['cases', 'overview'].includes(st.view) && !$('#modal.open')) renderView();
+    toast(on ? 'Angepinnt – die Akte steht jetzt oben.' : 'Gelöst – die Akte steht wieder an ihrem Platz.');
   } catch (err) {
     apply(!on);
+    move(on ? 'pin-drop' : 'pin-land');
     toast(err.message, 'error');
   }
 };
@@ -1502,22 +1528,31 @@ function flipFill(el, html) {
   el.innerHTML = html;
   flipPlay(before);
 }
+let flipFocusKey = null; // diese Zeile gleitet langsamer und mit Feder (Anpinnen)
+let flipWide = false; // beim Anpinnen auch die Zeilen der Übersicht („Zuletzt bearbeitet“) mitnehmen
+const flipSel = () => (flipWide ? `${FLIP_SEL}, #content .list-row[data-action="open-case"][data-id]` : FLIP_SEL);
 function flipSnapshot() {
   if (window.PS.motion.calm() || typeof Element.prototype.animate !== 'function') return null;
-  const rows = $$(FLIP_SEL);
+  const rows = $$(flipSel());
   if (!rows.length || rows.length > 60) return null;
   return new Map(rows.map((r) => [rowKey(r), r.getBoundingClientRect().top]));
 }
 function flipPlay(before) {
   if (!before) return;
-  for (const row of $$(FLIP_SEL)) {
+  for (const row of $$(flipSel())) {
     const was = before.get(rowKey(row));
     if (was === undefined) {
       row.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: 'ease-out' });
       continue;
     }
     const dy = was - row.getBoundingClientRect().top;
-    if (Math.abs(dy) > 2) row.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: 320, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+    if (Math.abs(dy) <= 2) continue;
+    const focus = flipFocusKey && rowKey(row) === flipFocusKey;
+    const anim = row.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], focus ? { duration: 620, easing: 'cubic-bezier(0.34, 1.3, 0.5, 1)' } : { duration: 360, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+    if (focus) {
+      row.classList.add('is-flying'); // fährt über die anderen Zeilen hinweg
+      anim.finished.then(() => row.classList.remove('is-flying'), () => row.classList.remove('is-flying'));
+    }
   }
 }
 
