@@ -168,6 +168,7 @@ function newDraft(caseId = null) {
     items: [],
     discountPct: 0,
     surchargePct: 0,
+    promo: true, // laufende Rabattaktion abziehen (lässt sich für diese Rechnung abwählen)
     coopId: null, // Kooperation (Rabatt-Satz kommt aus der Kooperation)
     coopAuto: false, // automatisch aus der Erkennung gesetzt
     memberId: null, // VIP / Lifetime (Rabatt-Satz kommt aus der Mitgliedschaft)
@@ -193,6 +194,9 @@ function clampPct(n) {
 }
 const draftCoop = (d) => (d.coopId ? (st.coopList || []).find((k) => k.id === d.coopId && k.valid) || null : null);
 const draftMember = (d) => (d.memberId ? (st.memberList || []).find((m) => m.id === d.memberId) || null : null);
+/** Rabattaktion für alle, die heute läuft (Einstellungen → Rabattaktionen) – oder null. */
+const runningPromo = () => (st.siteConfig && st.siteConfig.promo) || null;
+const draftPromo = (d) => (d.promo !== false ? runningPromo() : null);
 /** Wie auf dem Server: Kooperationsrabatt und Rabatt auf die Zwischensumme, danach der Zuschlag. */
 function draftTotals(d) {
   const subtotal = d.items.reduce((s, it) => s + (Math.max(1, Math.round(Number(it.quantity) || 1))) * Math.max(0, Math.round(Number(it.unitPrice) || 0)), 0);
@@ -206,6 +210,8 @@ function draftTotals(d) {
   }
   const cp = k ? k.discountPct : 0;
   const mp = m ? m.discountPct : 0;
+  const pr = draftPromo(d);
+  const pp = pr ? pr.pct : 0;
   const dp = clampPct(d.discountPct);
   const sp = clampPct(d.surchargePct);
   let rest = subtotal;
@@ -216,9 +222,17 @@ function draftTotals(d) {
   };
   const member = take(mp);
   const coop = take(cp);
+  const promo = take(pp);
   const discount = take(dp);
   const surcharge = Math.round((rest * sp) / 100);
-  return { subtotal, member, memberName: m ? m.name : '', mp, coop, coopName: k ? k.name : '', cp, coopDropped, discount, surcharge, total: rest + surcharge, dp, sp };
+  return { subtotal, member, memberName: m ? m.name : '', mp, coop, coopName: k ? k.name : '', cp, coopDropped, promo, promoName: pr ? `${pr.icon} ${pr.name}` : '', pp, discount, surcharge, total: rest + surcharge, dp, sp };
+}
+/** Läuft eine Rabattaktion: Hinweis mit Haken „anwenden“ (Standard: an). */
+function promoBoxHtml(d) {
+  const p = runningPromo();
+  if (!p) return '';
+  return `<div class="span-2 inv-promo occ-${esc(p.occasion)}"><span class="promo-icon" aria-hidden="true">${esc(p.icon)}</span><div><strong>${esc(p.name)}</strong> läuft – <strong>${fmtPct(p.pct)} %</strong> für alle<div class="text-xs text-dim">bis ${esc(fmtDateOnly(p.to))} · wird automatisch abgezogen</div></div>
+      <label class="check"><input type="checkbox" name="promo" ${d.promo !== false ? 'checked' : ''}> anwenden</label></div>`;
 }
 function itemRowHtml(it, i) {
   return `<div class="item-row">
@@ -351,6 +365,7 @@ function summaryFiguresHtml() {
       <div class="sum-row"><span class="text-muted">Zwischensumme</span><span class="v" data-count="inv:sub">${money(t.subtotal)}</span></div>
       ${t.mp ? `<div class="sum-row" style="color:#fcd34d"><span>${esc(t.memberName)} (${fmtPct(t.mp)} %)</span><span class="v" data-count="inv:member">− ${money(t.member)}</span></div>` : ''}
       ${t.cp ? `<div class="sum-row" style="color:#6ee7b7"><span>Kooperation ${esc(t.coopName)} (${fmtPct(t.cp)} %)</span><span class="v" data-count="inv:coop">− ${money(t.coop)}</span></div>` : ''}
+      ${t.pp ? `<div class="sum-row is-promo"><span>${esc(t.promoName)} (${fmtPct(t.pp)} %)</span><span class="v" data-count="inv:promo">− ${money(t.promo)}</span></div>` : ''}
       ${t.dp ? `<div class="sum-row" style="color:#6ee7b7"><span>Rabatt (${fmtPct(t.dp)} %)</span><span class="v" data-count="inv:discount">− ${money(t.discount)}</span></div>` : ''}
       ${t.sp ? `<div class="sum-row" style="color:#fcd34d"><span>Zuschlag (${fmtPct(t.sp)} %)</span><span class="v" data-count="inv:surcharge">+ ${money(t.surcharge)}</span></div>` : ''}
       <div class="sum-row sum-total"><span class="font-semibold">Gesamtbetrag</span><span class="v" data-count="inv:total">${money(t.total)}</span></div>
@@ -555,6 +570,7 @@ views['invoice-new'] = {
               <div class="form-grid cols-2">
                 <div class="span-2" id="invMember" style="display:contents">${memberBoxHtml()}</div>
                 <div class="span-2" id="invCoop" style="display:contents">${coopBoxHtml()}</div>
+                ${promoBoxHtml(d)}
                 <div><label class="label">Rabatt in %</label><input name="discountPct" type="number" inputmode="decimal" min="0" max="100" step="0.5" class="field" value="${esc(d.discountPct)}">
                   <div class="chip-row mt-2"><button type="button" class="chip" data-action="inv-preset" data-field="discountPct" data-value="10">Mandatsbündel 10 %</button><button type="button" class="chip" data-action="inv-preset" data-field="discountPct" data-value="0">Kein Rabatt</button></div>${discountApprovalBox(d)}</div>
                 <div><label class="label">Zuschlag in %</label><input name="surchargePct" type="number" inputmode="decimal" min="0" max="100" step="0.5" class="field" value="${esc(d.surchargePct)}">
@@ -621,6 +637,8 @@ function onInvoiceInput(t) {
   } else if (['clientName', 'clientContact', 'subject', 'notes', 'dueDate', 'discountReason'].includes(t.name)) {
     d[t.name] = t.value;
     if (t.name === 'notes') d.notesFromType = false;
+  } else if (t.name === 'promo') {
+    d.promo = t.checked;
   } else if (t.name === 'discountPct' || t.name === 'surchargePct') {
     const crossed = t.name === 'discountPct' && st.discountThreshold && !isBoard() && Number(d.discountPct) > st.discountThreshold !== Number(t.value || 0) > st.discountThreshold;
     d[t.name] = t.value === '' ? 0 : Number(t.value);

@@ -259,12 +259,24 @@ function calculateTotal() {
     document.getElementById('discountRow').classList.toggle('hidden', !bundleEligible);
     document.getElementById('discountAmount').textContent = '− ' + discount.toLocaleString('de-DE') + ' $';
 
-    let total = subtotal - discount;
+    // Rabattaktion für alle (z. B. Halloween): kommt mit der Konfiguration (siteconfig.js → PS.promo), wie auf der Rechnung
+    const promo = window.PS && window.PS.promo;
+    const promoAmount = promo && subtotal ? Math.min(subtotal - discount, Math.round((subtotal * promo.pct) / 100)) : 0;
+    const promoRow = document.getElementById('promoRow');
+    if (promoRow) {
+        promoRow.classList.toggle('hidden', !promoAmount);
+        if (promo) document.getElementById('promoLabel').textContent = `${promo.icon} ${promo.name} (${String(promo.pct).replace('.', ',')} %)`;
+        document.getElementById('promoAmount').textContent = '− ' + promoAmount.toLocaleString('de-DE') + ' $';
+    }
+
+    let total = subtotal - discount - promoAmount;
     const noteEl = document.getElementById('totalNote');
     if (priorityChecked && total > 0) {
         const surcharge = Math.round(total * 0.15);
         total += surcharge;
         noteEl.textContent = 'inkl. Zuschlag priorisierte Bearbeitung (+' + surcharge.toLocaleString('de-DE') + ' $)';
+    } else if (promoAmount) {
+        noteEl.textContent = `${promo.name} automatisch angewendet`;
     } else if (bundleEligible) {
         noteEl.textContent = 'Mandatsbündel-Rabatt automatisch angewendet';
     } else {
@@ -276,8 +288,25 @@ function calculateTotal() {
     if (window.PS && window.PS.countUp) {
         window.PS.countUp(document.getElementById('totalAmount').parentElement, { ms: 700 });
         window.PS.countUp(document.getElementById('discountAmount').parentElement, { ms: 500 });
+        if (promoRow) window.PS.countUp(promoRow, { ms: 500 });
     }
 }
+
+/* ---------- Rabattaktion: Plakette im Rechner, Summe neu rechnen ---------- */
+window.addEventListener('ps:promo', () => {
+    const promo = window.PS && window.PS.promo;
+    const head = document.getElementById('promoRow')?.closest('.glass-card')?.querySelector('h3');
+    document.getElementById('calcPromoBadge')?.remove();
+    if (promo && head) {
+        const b = document.createElement('span');
+        b.id = 'calcPromoBadge';
+        b.className = `calc-promo-badge occ-${promo.occasion}`;
+        b.textContent = `${promo.icon} −${String(promo.pct).replace('.', ',')} %`;
+        b.title = `${promo.name} – automatisch abgezogen`;
+        head.appendChild(b);
+    }
+    calculateTotal();
+});
 
 /* ---------- FAQ Accordion ---------- */
 function toggleFaq(item) {

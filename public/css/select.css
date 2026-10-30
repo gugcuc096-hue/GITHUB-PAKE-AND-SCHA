@@ -15,10 +15,10 @@
     align-items: center;
   }
   /* Eigener Gold-Pfeil (Hintergrundbild) bei .field und in der Aktenleiste – sonst der eingebaute, in Gold */
-  select::picker-icon { color: #d4af37; transition: rotate 0.2s ease; }
+  select::picker-icon { color: var(--gold-500); transition: rotate 0.2s ease; }
   select:open::picker-icon { rotate: 180deg; }
   select.field::picker-icon, .prop-v select::picker-icon { display: none; }
-  select.field:open { border-color: var(--gold-500, #d4af37); box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15); }
+  select.field:open { border-color: var(--gold-500, #d4af37); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15); }
 
   :is(select.field, select)::picker(select) {
     margin-block: 6px;
@@ -27,12 +27,12 @@
     max-height: min(22rem, 60vh);
     overflow-y: auto;
     background: #0b1530;
-    border: 1px solid rgba(212, 175, 55, 0.35);
+    border: 1px solid rgba(var(--accent-rgb), 0.35);
     border-radius: 12px;
     box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
     color: #e2e8f0;
     scrollbar-width: thin;
-    scrollbar-color: rgba(212, 175, 55, 0.35) transparent;
+    scrollbar-color: rgba(var(--accent-rgb), 0.35) transparent;
     opacity: 0;
     translate: 0 -4px;
     transition: opacity 0.15s ease, translate 0.15s ease, overlay 0.15s allow-discrete, display 0.15s allow-discrete;
@@ -59,9 +59,9 @@
     cursor: pointer;
   }
   :is(select.field, select) option:hover,
-  :is(select.field, select) option:focus-visible { background: rgba(212, 175, 55, 0.12); color: #fff; outline: none; }
-  :is(select.field, select) option:checked { color: #f3e5ab; font-weight: 600; background: rgba(212, 175, 55, 0.07); }
-  :is(select.field, select) option::checkmark { order: 1; margin-left: auto; content: '✓'; color: #d4af37; font-weight: 700; }
+  :is(select.field, select) option:focus-visible { background: rgba(var(--accent-rgb), 0.12); color: #fff; outline: none; }
+  :is(select.field, select) option:checked { color: var(--gold-light); font-weight: 600; background: rgba(var(--accent-rgb), 0.07); }
+  :is(select.field, select) option::checkmark { order: 1; margin-left: auto; content: '✓'; color: var(--gold-500); font-weight: 700; }
   :is(select.field, select) option:disabled { opacity: 0.45; cursor: default; }
   :is(select.field, select) option:disabled:hover { background: transparent; color: #cbd5e1; }
 
@@ -79,9 +79,9 @@
 }
 
 /* Häkchen und Auswahlpunkte überall in Gold (statt Browser-Blau), Datei-Knopf im Kanzlei-Stil */
-input[type="checkbox"], input[type="radio"] { accent-color: #d4af37; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--gold-500); }
 input[type="file"]::file-selector-button {
-  margin-right: 0.75rem; padding: 0.45rem 0.9rem; border-radius: 9px; border: 1px solid rgba(212, 175, 55, 0.45);
-  background: rgba(212, 175, 55, 0.08); color: #f3e5ab; font: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+  margin-right: 0.75rem; padding: 0.45rem 0.9rem; border-radius: 9px; border: 1px solid rgba(var(--accent-rgb), 0.45);
+  background: rgba(var(--accent-rgb), 0.08); color: var(--gold-light); font: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer;
 }
-input[type="file"]::file-selector-button:hover { background: rgba(212, 175, 55, 0.16); }
+input[type="file"]::file-selector-button:hover { background: rgba(var(--accent-rgb), 0.16); }

@@ -443,6 +443,11 @@ function openModal(html, { wide = false, key = null, reopen = null, child = fals
   $('#modalCard').classList.toggle('wide', wide);
   modal.classList.add('open');
   // Aus einer Akten-Zeile geöffnet: Fenster wächst aus der Zeile hervor (nur beim ersten Öffnen, nicht beim Ersetzen)
+  if (!wasOpen) {
+    // Ursprung merken: beim Schließen zieht sich das Fenster dorthin zurück (morphRow)
+    const t = st.trigger && Date.now() - st.trigger.at < 1500 ? st.trigger.el : null;
+    st.modalOrigin = t ? { el: t, sel: t.dataset.id ? `#content [data-action="${t.dataset.action}"][data-id="${t.dataset.id}"]` : null } : null;
+  }
   if (!wasOpen && (st.morphFrom || triggerRect())) morphOpen(st.morphFrom || triggerRect());
   st.morphFrom = null;
   // Fensterwechsel (neues Fenster über dem alten, Zurück, Inhalt nach dem Laden): weich statt hart
@@ -653,7 +658,7 @@ document.addEventListener(
   'click',
   (e) => {
     const el = e.target.closest && e.target.closest('[data-action]');
-    st.trigger = el && !el.closest('#nav, #bottomNav, #modal, #sidebar') && !/^(close|modal-back|nav-)/.test(el.dataset.action) ? { rect: el.getBoundingClientRect(), at: Date.now() } : null;
+    st.trigger = el && !el.closest('#nav, #bottomNav, #modal, #sidebar') && !/^(close|modal-back|nav-)/.test(el.dataset.action) ? { rect: el.getBoundingClientRect(), at: Date.now(), el } : null;
   },
   true
 );
@@ -687,9 +692,17 @@ function morphOpen(rect) {
     });
   });
 }
-/** Zeile der offenen Akte in der Liste dahinter – nur, wenn sie zu sehen ist. */
+/**
+ * Wohin sich das Fenster beim Schließen zurückzieht: die Zeile der offenen Akte – sonst der Knopf, die Karte oder Zeile,
+ * aus der es hervorgewachsen ist (überall, nicht nur bei Akten). Nur, wenn sie noch da und zu sehen ist.
+ */
 function morphRow() {
-  const row = st.modalCaseId && document.querySelector(`#content [data-action="open-case"][data-id="${st.modalCaseId}"]`);
+  let row = st.modalCaseId && document.querySelector(`#content [data-action="open-case"][data-id="${st.modalCaseId}"]`);
+  const o = st.modalOrigin;
+  if (!row && o) {
+    row = o.el && o.el.isConnected ? o.el : o.sel ? document.querySelector(o.sel) : null;
+    if (row && row.closest('#modal, .modal-ghost')) row = null;
+  }
   if (!row || !morphOk()) return null;
   const r = row.getBoundingClientRect();
   return r.height && r.bottom > 0 && r.top < window.innerHeight ? r : null;
@@ -752,7 +765,7 @@ function closeModal({ morph = false } = {}) {
   const modal = $('#modal');
   if (!modal.classList.contains('open')) return;
   window.PS.readBarOff();
-  docPeekClose();
+  docPeekClose({ fly: false });
   scheduleHistory();
   fadeOutModal(modal, { morph });
   modal.classList.remove('open', 'morphing');
@@ -762,6 +775,7 @@ function closeModal({ morph = false } = {}) {
   st.modalAppId = null;
   st.modalConcernId = null;
   st.returnCase = null;
+  st.modalOrigin = null;
   // Die Seite dahinter wurde zurückgestellt (siehe renderView): jetzt einmal weich nachzeichnen
   if (st.behindDirty) {
     const token = st.navToken;

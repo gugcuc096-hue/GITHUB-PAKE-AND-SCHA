@@ -1012,6 +1012,7 @@ function docPeekOpen(index, linked) {
   const a = list[index];
   if (!a) return;
   let box = $('#docPeek');
+  const fresh = !box;
   if (!box) {
     box = document.createElement('aside');
     box.id = 'docPeek';
@@ -1019,23 +1020,47 @@ function docPeekOpen(index, linked) {
     box.setAttribute('aria-label', 'Vorschau');
     document.body.appendChild(box);
   }
+  if (!fresh && box.getAnimations) box.getAnimations().forEach((x) => x.finish()); // Blättern während des Herausfliegens: gleich an den Platz
   box.dataset.index = String(index);
   box.dataset.linked = linked ? '1' : '';
   const no = a.no;
   box.innerHTML = `<div class="dp-head"><span class="dp-no">Beweismittel B${no}${linked ? ` · ${esc(a.caseNumber)}` : ''}</span>
-      <span class="dp-nav"><button type="button" class="icon-btn sm" data-action="peek-step" data-dir="-1" aria-label="Vorheriges Bild" ${index <= 0 ? 'disabled' : ''}>${icon('chevronLeft', 'ico-sm')}</button><span>${index + 1} / ${list.length}</span><button type="button" class="icon-btn sm" data-action="peek-step" data-dir="1" aria-label="Nächstes Bild" ${index >= list.length - 1 ? 'disabled' : ''}>${icon('chevronRight', 'ico-sm')}</button></span>
+      <span class="dp-nav"><button type="button" class="icon-btn sm" data-action="peek-step" data-dir="-1" aria-label="Vorheriges Bild" ${index <= 0 ? 'disabled' : ''}>${icon('chevronLeft', 'ico-sm')}</button><span class="dp-count" aria-label="Bild ${index + 1} von ${list.length}">${index + 1}<i> / </i>${list.length}</span><button type="button" class="icon-btn sm" data-action="peek-step" data-dir="1" aria-label="Nächstes Bild" ${index >= list.length - 1 ? 'disabled' : ''}>${icon('chevronRight', 'ico-sm')}</button></span>
       <button type="button" class="icon-btn sm" data-action="peek-close" aria-label="Vorschau schließen" title="Schließen (Esc)">${icon('x', 'ico-sm')}</button></div>
     <div class="dp-img"><img src="${esc(a.url)}" alt="${esc(a.caption)}"></div>
     <div class="dp-meta"><strong>${esc(a.caption || 'Anhang')}</strong><span>${esc(a.uploaderName)} · ${esc(fmtDate(a.createdAt))}${a.internal ? ' · <span class="stamp-mini">Vertraulich</span>' : ''}</span>${evMetaLine(a) ? `<span>${evMetaLine(a)}</span>` : ''}${evDetails(a)}</div>
     <div class="dp-actions"><a class="btn-ghost btn-sm" href="${esc(a.url)}" download>${icon('download', 'ico-sm')}<span>Herunterladen</span></a>${!linked && isStaff() && st.caseInfo && st.caseInfo.canEdit ? `<button type="button" class="btn-ghost btn-sm" data-action="ev-edit" data-id="${a.id}">${icon('edit', 'ico-sm')}<span>Beschreiben</span></button>` : ''}${!linked && isStaff() ? `<button type="button" class="btn-ghost btn-sm" data-action="redact-open" data-index="${index}">${icon('edit', 'ico-sm')}<span>Schwärzen</span></button>` : ''}</div>`;
   $('#modal').classList.add('has-peek');
   $$('.att.is-peeked').forEach((b) => b.classList.remove('is-peeked'));
-  $(`.att[${linked ? 'data-linked' : 'data-index'}="${index}"]`)?.classList.add('is-peeked');
+  const thumb = $(`.att[${linked ? 'data-linked' : 'data-index'}="${index}"]`);
+  thumb?.classList.add('is-peeked');
+  // Die Vorschau wächst aus dem Vorschaubild heraus (und zieht sich beim Schließen dorthin zurück)
+  if (fresh && thumb && typeof box.animate === 'function' && !window.PS.motion.calm()) peekFly(box, thumb, false);
 }
-function docPeekClose() {
-  $('#docPeek')?.remove();
+/** Vorschau ↔ Vorschaubild: gleitet und skaliert zwischen beiden Rechtecken. */
+function peekFly(box, thumb, back) {
+  const from = thumb.getBoundingClientRect();
+  const to = box.getBoundingClientRect();
+  if (!from.width || !to.width || from.bottom < 0 || from.top > innerHeight) return null;
+  const t = `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${from.width / to.width}, ${from.height / to.height})`;
+  box.classList.add('is-flying');
+  const kf = [
+    { transformOrigin: '0 0', transform: t, opacity: 0.35, borderRadius: '10px' },
+    { transformOrigin: '0 0', transform: 'none', opacity: 1, borderRadius: '18px' },
+  ];
+  return box.animate(back ? kf.reverse() : kf, { duration: back ? 260 : 340, easing: back ? 'cubic-bezier(0.4, 0, 0.2, 1)' : 'cubic-bezier(0.2, 0.8, 0.2, 1)', fill: back ? 'forwards' : 'none' });
+}
+function docPeekClose({ fly = true } = {}) {
+  const box = $('#docPeek');
+  const thumb = $('.att.is-peeked');
   $('#modal')?.classList.remove('has-peek');
   $$('.att.is-peeked').forEach((b) => b.classList.remove('is-peeked'));
+  if (!box) return;
+  box.removeAttribute('id'); // eine neue Vorschau darf sofort aufgehen
+  box.inert = true;
+  const anim = fly && thumb && typeof box.animate === 'function' && !window.PS.motion.calm() && $('#modal.open') ? peekFly(box, thumb, true) : null;
+  if (anim) anim.finished.then(() => box.remove(), () => box.remove());
+  else box.remove();
 }
 
 /*

@@ -53,7 +53,7 @@ function configPanels() {
   const tabs = cfgVisibleTabs();
   if (!tabs.length) return `<div class="panel panel-pad">${empty('Dafür fehlt Ihnen das Recht.', 'shield')}</div>`;
   const tab = tabs.some(([k]) => k === st.cfgTab) ? st.cfgTab : tabs[0][0];
-  const nav = `<div class="chip-row mb-4" role="tablist" aria-label="Bereiche">${tabs.map(([k, label]) => `<button type="button" class="chip ${tab === k ? 'active' : ''}" role="tab" aria-selected="${tab === k}" data-action="cfg-tab" data-tab="${k}"><span>${esc(label)}${st.cfg.config[k].draft ? ' •' : ''}</span></button>`).join('')}</div>`;
+  const nav = `<div class="chip-row mb-4" role="tablist" aria-label="Bereiche">${tabs.map(([k, label]) => `<button type="button" class="chip ${tab === k ? 'active' : ''}" role="tab" aria-selected="${tab === k}" data-action="cfg-tab" data-tab="${k}"><span>${esc(label)}${st.cfg.config[k] && st.cfg.config[k].draft ? ' •' : ''}</span></button>`).join('')}</div>`;
   const body = { banner: cfgBanner, home: cfgHome, labels: cfgLabels, messages: cfgMessages }[tab]();
   return `${nav}${body}`;
 }
@@ -403,7 +403,11 @@ async function refreshSiteConfig() {
   st.siteConfig = me.siteConfig;
   if (window.PS.siteConfig && st.siteConfig) {
     PS.siteConfig.setLabels(st.siteConfig.labels);
-    PS.siteConfig.banner(st.siteConfig.banner, $('#content'), { className: 'dash-banner' });
+    PS.siteConfig.banners(st.siteConfig, $('#content'), { className: 'dash-banner' });
+    if (PS.theme) {
+      PS.theme.apply(st.siteConfig.style);
+      PS.theme.season(st.siteConfig.style && st.siteConfig.style.seasonDash === false ? '' : st.siteConfig.season);
+    }
   }
 }
 

@@ -1414,6 +1414,30 @@ addColumn('case_places', 'look_dir', 'INTEGER');
 addColumn('case_places', 'look_range', 'INTEGER NOT NULL DEFAULT 80');
 addColumn('case_places', 'look_fov', 'INTEGER NOT NULL DEFAULT 70');
 
+/* ---------------------------------------------------------------- Rabattaktionen (promotions.js) */
+db.exec(`
+  -- Aktionen für alle (z. B. Halloween −15 %): gelten im Zeitraum automatisch auf jeder neuen Rechnung
+  CREATE TABLE IF NOT EXISTS promotions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL,
+    pct         REAL NOT NULL,
+    occasion    TEXT NOT NULL DEFAULT '',
+    starts_on   TEXT NOT NULL,
+    ends_on     TEXT NOT NULL,
+    yearly      INTEGER NOT NULL DEFAULT 0,
+    announce    INTEGER NOT NULL DEFAULT 1,
+    message     TEXT NOT NULL DEFAULT '',
+    active      INTEGER NOT NULL DEFAULT 1,
+    created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT
+  );
+`);
+addColumn('invoices', 'promo_id', 'INTEGER');
+addColumn('invoices', 'promo_name', "TEXT NOT NULL DEFAULT ''");
+addColumn('invoices', 'promo_pct', 'REAL NOT NULL DEFAULT 0');
+addColumn('invoices', 'promo_amount', 'INTEGER NOT NULL DEFAULT 0');
+
 // Verknüpfte Akten (z. B. ein Vorfall, mehrere Festgenommene) – je Paar eine Zeile, a_id < b_id
 db.exec(`
   CREATE TABLE IF NOT EXISTS case_links (

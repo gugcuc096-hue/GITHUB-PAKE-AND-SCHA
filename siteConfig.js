@@ -45,6 +45,21 @@ const TERMS = {
 /** Texte der Benachrichtigungen (Standardtexte stehen in messageTemplates.js). */
 const MESSAGE_KEYS = ['payment', 'docs', 'appointment', 'review', 'receipt'];
 
+/** Stil-Vorlagen (Einstellungen → Konfiguration → Stil & Saison): Akzentfarbe, Glas, Rundung, Schrift. */
+const PRESETS = {
+  gold: { label: 'Klassisch Gold', accent: '#d4af37', glass: 50, radius: 50, font: 'klassisch' },
+  nacht: { label: 'Nacht-Blau', accent: '#7cc4fa', glass: 65, radius: 60, font: 'modern' },
+  smaragd: { label: 'Smaragd', accent: '#34d399', glass: 55, radius: 50, font: 'klassisch' },
+  bordeaux: { label: 'Bordeaux', accent: '#e8a0b4', glass: 45, radius: 40, font: 'elegant' },
+  platin: { label: 'Platin', accent: '#d9dee8', glass: 70, radius: 30, font: 'modern' },
+};
+/** Schriftpaare: Überschrift / Text. */
+const FONTS = {
+  klassisch: { label: 'Klassisch (Cormorant + Inter)' },
+  modern: { label: 'Modern (Inter überall)' },
+  elegant: { label: 'Elegant (Cormorant kursiv)' },
+};
+
 const url = z
   .string()
   .trim()
@@ -59,7 +74,9 @@ const SPECS = {
     schema: z.object({
       enabled: z.boolean(),
       text: z.string().trim().max(240),
-      tone: z.enum(['gold', 'sky', 'amber', 'red', 'green']),
+      tone: z.enum(['gold', 'sky', 'amber', 'red', 'green', 'glass', 'night']),
+      icon: z.string().trim().max(8).default(''), // Emoji vor dem Text, z. B. 🎃
+      countdown: z.boolean().default(false), // Countdown bis zum Ende (Datum „bis“)
       link: url,
       linkLabel: z.string().trim().max(40),
       from: day,
@@ -67,7 +84,37 @@ const SPECS = {
       audience: z.array(z.enum(['public', 'mandant', 'staff'])).max(3),
       dismissible: z.boolean(),
     }),
-    defaults: { enabled: false, text: '', tone: 'gold', link: '', linkLabel: '', from: '', to: '', audience: ['public', 'mandant', 'staff'], dismissible: true },
+    defaults: { enabled: false, text: '', tone: 'gold', icon: '', countdown: false, link: '', linkLabel: '', from: '', to: '', audience: ['public', 'mandant', 'staff'], dismissible: true },
+  },
+  style: {
+    perm: 'site.edit',
+    label: 'Stil & Saison',
+    schema: z.object({
+      preset: z.enum(Object.keys(PRESETS).concat('eigen')),
+      accent: z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, 'Farbe als #RRGGBB.'),
+      glass: z.number().int().min(0).max(100),
+      radius: z.number().int().min(0).max(100),
+      font: z.enum(Object.keys(FONTS)),
+      motion: z.enum(['voll', 'normal', 'ruhig']),
+      season: z.enum(['auto', 'aus', ...Object.keys(require('./promotions').SEASONS)]),
+      seasonDash: z.boolean(),
+    }),
+    defaults: { preset: 'gold', accent: '#d4af37', glass: 50, radius: 50, font: 'klassisch', motion: 'normal', season: 'auto', seasonDash: true },
+  },
+  numbering: {
+    perm: 'settings.edit',
+    label: 'Aktenzeichen',
+    schema: z.object({
+      pattern: z
+        .string()
+        .trim()
+        .min(3)
+        .max(40)
+        .refine((v) => (v.match(/\{NR\}/g) || []).length === 1, 'Das Muster braucht genau einmal {NR} (die laufende Nummer).')
+        .refine((v) => /^([A-Za-z0-9/._-]|\{(JJJJ|JJ|MM|NR|BEREICH|KUERZEL)\})+$/.test(v), 'Erlaubt sind Buchstaben, Ziffern, - / . _ und die Platzhalter {JJJJ} {JJ} {MM} {NR} {BEREICH} {KUERZEL}.'),
+      digits: z.number().int().min(2).max(6),
+    }),
+    defaults: { pattern: 'PS-{JJJJ}-{NR}', digits: 4 },
   },
   home: {
     perm: 'site.edit',
@@ -179,7 +226,17 @@ function activeBanner(user, source = get('banner')) {
   if (!b.audience.includes(audienceOf(user))) return null;
   // Kennung: ändert sich der Text, erscheint ein weggeklicktes Banner wieder
   const id = require('crypto').createHash('sha1').update(`${b.text}|${b.link}|${b.tone}`).digest('hex').slice(0, 10);
-  return { id, text: b.text, tone: b.tone, link: b.link, linkLabel: b.linkLabel, dismissible: b.dismissible };
+  const endsAt = b.countdown && b.to ? require('./promotions').berlinEndOfDay(b.to) : null;
+  return { id, text: b.text, tone: b.tone, icon: b.icon || '', endsAt, link: b.link, linkLabel: b.linkLabel, dismissible: b.dismissible };
+}
+/** Aktionsbanner: kündigt eine laufende Rabattaktion mit Countdown an (für alle außer der Kanzlei selbst). */
+function promoBanner(user, promo) {
+  if (!promo || !promo.announce) return null;
+  const who = audienceOf(user);
+  const id = `promo-${promo.id}-${promo.to}`;
+  const pct = String(promo.pct).replace('.', ',');
+  const text = promo.message || `${promo.name}: ${pct} % auf alle Leistungen – automatisch auf jeder Rechnung.`;
+  return { id, promo: true, text, tone: 'promo', occasion: promo.occasion, icon: promo.icon, pct: promo.pct, endsAt: promo.endsAt, link: who === 'staff' ? '' : '/#rechner', linkLabel: 'Jetzt berechnen', dismissible: true };
 }
 
 /** Beschriftungen, wie sie die Oberfläche braucht. */
@@ -190,7 +247,9 @@ function labelsPayload(source = get('labels')) {
 /** Alles, was Website und Dashboard beim Start brauchen (öffentlich, nach Person gefiltert). */
 function publicPayload(user, { draft = false } = {}) {
   const pick = (k) => (draft ? getForEdit(k) : get(k));
-  return { banner: activeBanner(user, pick('banner')), home: pick('home'), labels: labelsPayload(pick('labels')), draft };
+  const promo = require('./promotions').publicCurrent();
+  const style = pick('style');
+  return { banner: activeBanner(user, pick('banner')), promo, promoBanner: promoBanner(user, promo), home: pick('home'), labels: labelsPayload(pick('labels')), style, season: require('./promotions').season(style.season), draft };
 }
 
-module.exports = { SPECS, KEYS, SECTIONS, SECTION_IDS, TERMS, MESSAGE_KEYS, get, getDraft, hasDraft, getForEdit, saveDraft, discardDraft, publish, setPublished, activeBanner, labelsPayload, publicPayload };
+module.exports = { PRESETS, FONTS, SPECS, KEYS, SECTIONS, SECTION_IDS, TERMS, MESSAGE_KEYS, get, getDraft, hasDraft, getForEdit, saveDraft, discardDraft, publish, setPublished, activeBanner, labelsPayload, publicPayload };

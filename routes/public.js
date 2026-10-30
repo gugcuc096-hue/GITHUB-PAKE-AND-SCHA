@@ -2,7 +2,8 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { z } = require('zod');
-const { db, tx, nextCaseNumber, randomPin, getSetting } = require('../db');
+const { db, tx, randomPin, getSetting } = require('../db');
+const { nextCaseNumber } = require('../numbering');
 const { wrap, parseBody, AREAS, URGENCIES, URGENCY_LABEL, PRIORITY_DISCORD, PRIORITY_FROM_URGENCY, OUTCOMES, truncate } = require('../helpers');
 const { addSystemNote, getCase, onDutyMembers, syncCaseWork } = require('../models');
 const discord = require('../discord');
@@ -118,7 +119,7 @@ router.post(
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'web', ?)`
         )
         // Start-Priorität aus der Dringlichkeit, die der Mandant angibt (die Kanzlei passt sie danach an)
-        .run(nextCaseNumber(), pin, title, d.area, d.urgency, PRIORITY_FROM_URGENCY[d.urgency] || 2, d.description, account ? account.id : null, account ? '' : d.name, d.phone || '', lawyer ? lawyer.id : null, lawyer ? 'in_bearbeitung' : 'offen', Object.keys(checked.answers).length ? JSON.stringify(checked.answers) : null);
+        .run(nextCaseNumber({ area: d.area, lawyerId: lawyer ? lawyer.id : null }), pin, title, d.area, d.urgency, PRIORITY_FROM_URGENCY[d.urgency] || 2, d.description, account ? account.id : null, account ? '' : d.name, d.phone || '', lawyer ? lawyer.id : null, lawyer ? 'in_bearbeitung' : 'offen', Object.keys(checked.answers).length ? JSON.stringify(checked.answers) : null);
       const newId = Number(info.lastInsertRowid);
       addSystemNote(newId, null, `Mandatsanfrage über das Website-Formular eingegangen${lawyer ? ` – gewünscht: ${lawyer.display_name}` : ''}.`);
       if (lawyer) syncCaseWork(newId);

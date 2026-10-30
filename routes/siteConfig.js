@@ -42,6 +42,14 @@ router.get('/', (req, res) => {
   res.json({ config: out, sections: siteConfig.SECTIONS, terms: siteConfig.TERMS, messages: messages.catalog() });
 });
 
+/** Aktenzeichen-Muster ausprobieren: nächstes Zeichen ohne es zu vergeben (?pattern=…&digits=4). */
+router.get('/numbering/preview', (req, res) => {
+  if (!mayEdit(req.user, 'numbering')) return res.status(403).json({ error: 'Dafür fehlt Ihnen das Recht.' });
+  const r = siteConfig.SPECS.numbering.schema.safeParse({ pattern: String(req.query.pattern || ''), digits: Number(req.query.digits || 4) });
+  if (!r.success) return res.status(400).json({ error: problems(r.error) });
+  res.json({ next: require('../numbering').preview(r.data) });
+});
+
 router.put(
   '/:key/draft',
   wrap(async (req, res) => {

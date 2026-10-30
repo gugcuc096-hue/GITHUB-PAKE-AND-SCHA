@@ -7,7 +7,7 @@
     <meta name="robots" content="noindex">
     <title>Einen Moment bitte | Pake &amp; Scha</title>
     <style>
-        :root { color-scheme: dark; }
+        :root { color-scheme: dark; --gold-500: #d4af37; --accent-rgb: 212, 175, 55; }
         @font-face { font-family: 'Cormorant Garamond'; font-weight: 300 700; font-display: swap; src: url('/fonts/cormorant-garamond-latin-wght-normal.woff2') format('woff2'); }
         body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box;
                background: #02050e; color: #cbd5e1; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; text-align: center; }
@@ -15,8 +15,8 @@
         img { width: 72px; height: 72px; border-radius: 16px; margin-bottom: 20px; }
         h1 { font-family: 'Cormorant Garamond', Georgia, "Times New Roman", serif; font-variant-numeric: lining-nums; font-weight: 600; color: #fff; font-size: 28px; margin: 0 0 10px; }
         p { margin: 0 0 22px; line-height: 1.55; }
-        .bar { height: 3px; width: 160px; margin: 0 auto; border-radius: 3px; background: rgba(212, 175, 55, 0.18); overflow: hidden; }
-        .bar::after { content: ''; display: block; height: 100%; width: 40%; border-radius: 3px; background: linear-gradient(90deg, #e6c25a, #b8912a); animation: slide 1.6s ease-in-out infinite; }
+        .bar { height: 3px; width: 160px; margin: 0 auto; border-radius: 3px; background: rgba(var(--accent-rgb), 0.18); overflow: hidden; }
+        .bar::after { content: ''; display: block; height: 100%; width: 40%; border-radius: 3px; background: linear-gradient(90deg, color-mix(in srgb, var(--gold-500), #fff 15%), color-mix(in srgb, var(--gold-500), #000 15%)); animation: slide 1.6s ease-in-out infinite; }
         @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(260%); } }
         @media (prefers-reduced-motion: reduce) { .bar::after { animation: none; width: 100%; opacity: 0.5; } }
     </style>

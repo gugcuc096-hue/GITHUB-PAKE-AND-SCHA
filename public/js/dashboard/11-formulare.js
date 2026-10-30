@@ -409,6 +409,7 @@ const forms = {
       items,
       discountPct: clampPct(d.discountPct),
       surchargePct: clampPct(d.surchargePct),
+      promo: d.promo !== false,
       cooperationId: draftCoop(d) ? d.coopId : null,
       membershipId: draftMember(d) ? d.memberId : null,
       dueDate: d.dueDate || null,

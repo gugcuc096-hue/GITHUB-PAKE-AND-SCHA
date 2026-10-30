@@ -15,17 +15,17 @@
         body { margin: 0; background: #02050e; color: var(--ink); font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; font-variant-numeric: lining-nums; }
         .toolbar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; justify-content: flex-end; padding: 0.75rem 1rem; background: rgba(2, 5, 14, 0.95); border-bottom: 1px solid rgba(255, 255, 255, 0.12); color: #f8fafc; }
         .toolbar .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-        .btn { display: inline-flex; align-items: center; gap: 0.4rem; border-radius: 999px; padding: 0.6rem 1.1rem; font: 600 0.85rem 'Inter', sans-serif; cursor: pointer; text-decoration: none; border: 1px solid rgba(212, 175, 55, 0.45); color: #f8fafc; background: rgba(255, 255, 255, 0.05); }
-        .btn.gold { background: linear-gradient(135deg, #d4af37, #b8962e); color: #02050e; border: 0; }
+        .btn { display: inline-flex; align-items: center; gap: 0.4rem; border-radius: 999px; padding: 0.6rem 1.1rem; font: 600 0.85rem 'Inter', sans-serif; cursor: pointer; text-decoration: none; border: 1px solid rgba(var(--accent-rgb), 0.45); color: #f8fafc; background: rgba(255, 255, 255, 0.05); }
+        .btn.gold { background: linear-gradient(135deg, var(--gold-500), var(--gold-600)); color: #02050e; border: 0; }
         .btn.danger { border-color: rgba(248, 113, 113, 0.5); color: #fecaca; }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .wrap { padding: 1.5rem 0.75rem 3rem; }
         .message { max-width: 560px; margin: 4rem auto; text-align: center; color: #cbd5e1; font-size: 0.95rem; }
-        .message a { color: #d4af37; }
+        .message a { color: var(--gold-500); }
 
         /* Status- und Unterschriftsleiste (nicht im Druck) */
-        .panel { max-width: 216mm; margin: 0 auto 1.25rem; padding: 1rem 1.1rem; border-radius: 14px; border: 1px solid rgba(212, 175, 55, 0.35); background: rgba(15, 23, 42, 0.85); color: #e2e8f0; font-size: 0.88rem; line-height: 1.5; }
-        .panel h2 { margin: 0 0 0.35rem; font: 600 1rem 'Inter', sans-serif; color: #f3e5ab; }
+        .panel { max-width: 216mm; margin: 0 auto 1.25rem; padding: 1rem 1.1rem; border-radius: 14px; border: 1px solid rgba(var(--accent-rgb), 0.35); background: rgba(15, 23, 42, 0.85); color: #e2e8f0; font-size: 0.88rem; line-height: 1.5; }
+        .panel h2 { margin: 0 0 0.35rem; font: 600 1rem 'Inter', sans-serif; color: var(--gold-light); }
         .panel .row { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin-top: 0.7rem; }
         .panel input[type=text] { flex: 1 1 16rem; min-width: 0; padding: 0.6rem 0.8rem; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(2, 5, 14, 0.6); color: #fff; font: 500 0.95rem 'Inter', sans-serif; }
         .panel label.agree { display: flex; gap: 0.5rem; align-items: flex-start; margin-top: 0.6rem; color: #cbd5e1; }
@@ -78,13 +78,13 @@
         .k-srole { font: 400 9pt 'Roboto Serif', serif; color: var(--muted); }
         .k-snote { font: 400 8pt 'Inter', sans-serif; color: #888; margin-top: 1.5mm; }
         /* Bestätigungsdialog (wie im Dashboard, aus app.css übernommen) */
-        :root { --gold-500: #d4af37; --gold-hairline: rgba(212, 175, 55, 0.35); --text-main: #f8fafc; --text-muted: #cbd5e1; }
+        :root { --gold-500: #d4af37; --gold-hairline: rgba(var(--accent-rgb), 0.35); --text-main: #f8fafc; --text-muted: #cbd5e1; }
         .ps-dialog-root { position: fixed; inset: 0; z-index: 85; display: flex; align-items: center; justify-content: center; padding: 1rem; background: rgba(2, 5, 14, 0.72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); opacity: 0; transition: opacity 0.16s ease; }
         .ps-dialog-root.open { opacity: 1; }
         .ps-dialog { width: 100%; max-width: 440px; text-align: center; padding: 1.75rem 1.5rem 1.4rem; border-radius: 22px; border: 1px solid var(--gold-hairline); border-top: 2px solid var(--gold-500); background: linear-gradient(180deg, rgba(14, 22, 46, 0.98), rgba(6, 11, 25, 0.98)); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.03) inset; transform: translateY(8px) scale(0.98); transition: transform 0.16s ease; }
         .ps-dialog-root.open .ps-dialog { transform: none; }
         .ps-dialog.is-danger { border-top-color: #ef4444; }
-        .ps-dialog-mark { width: 56px; height: 56px; margin: 0 auto 0.9rem; border-radius: 16px; overflow: hidden; border: 1px solid var(--gold-hairline); box-shadow: 0 8px 24px rgba(212, 175, 55, 0.15); }
+        .ps-dialog-mark { width: 56px; height: 56px; margin: 0 auto 0.9rem; border-radius: 16px; overflow: hidden; border: 1px solid var(--gold-hairline); box-shadow: 0 8px 24px rgba(var(--accent-rgb), 0.15); }
         .ps-dialog-mark img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .ps-dialog-title { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 1.6rem; font-weight: 600; line-height: 1.2; color: var(--text-main); }
         .ps-dialog-text { margin-top: 0.6rem; font-size: 0.92rem; line-height: 1.55; color: var(--text-muted); white-space: pre-line; word-break: break-word; }
@@ -93,7 +93,7 @@
         @media (max-width: 480px) { .ps-dialog-actions > * { flex: 1 1 100%; } }
         body.ps-dialog-open { overflow: hidden; }
         .ps-dialog button { border-radius: 999px; padding: 0.65rem 1.2rem; font: 600 0.88rem 'Inter', sans-serif; cursor: pointer; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.05); color: #f8fafc; }
-        .ps-dialog .btn-gold { background: linear-gradient(135deg, #d4af37, #b8962e); color: #02050e; border: 0; }
+        .ps-dialog .btn-gold { background: linear-gradient(135deg, var(--gold-500), var(--gold-600)); color: #02050e; border: 0; }
         .ps-dialog .btn-danger { background: #b91c1c; border: 0; color: #fff; }
         .preview-note { max-width: 216mm; margin: 0 auto 1rem; color: #fcd34d; font-size: 0.85rem; }
 

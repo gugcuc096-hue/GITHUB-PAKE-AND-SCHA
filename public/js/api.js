@@ -11,6 +11,8 @@
    * dessen media-Attribut wird hier gesetzt; Animationen per Skript fragen motion.calm().
    */
   const MOTION_KEY = 'ps.motion';
+  // Kanzlei-weit „ruhig“ (Einstellungen → Stil & Saison, theme.js): gilt, solange jemand selbst „auto“ hat
+  const siteCalm = () => document.documentElement.dataset.siteMotion === 'ruhig';
   const motion = {
     get() {
       try {
@@ -31,14 +33,14 @@
     },
     apply() {
       const v = motion.get();
-      const media = v === 'on' ? 'not all' : v === 'off' ? 'all' : '(prefers-reduced-motion: reduce)';
+      const media = v === 'on' ? 'not all' : v === 'off' || siteCalm() ? 'all' : '(prefers-reduced-motion: reduce)';
       document.querySelectorAll('link[data-calm]').forEach((l) => l.media !== media && (l.media = media));
       document.documentElement.dataset.motion = v;
     },
     /** Gedämpft (keine Bewegung)? */
     calm() {
       const v = motion.get();
-      return v === 'off' || (v !== 'on' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      return v === 'off' || (v !== 'on' && (siteCalm() || window.matchMedia('(prefers-reduced-motion: reduce)').matches));
     },
     /** Meldet das System selbst „Bewegung reduzieren“? */
     systemCalm: () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,

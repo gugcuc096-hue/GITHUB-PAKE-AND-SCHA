@@ -16,6 +16,7 @@ function motionPanel() {
         window.PS.motion.systemCalm() ? ' Ihr System ist auf <strong>„Bewegung reduzieren“</strong> gestellt (Windows: Einstellungen → Barrierefreiheit → Visuelle Effekte → Animationseffekte) – bei „Wie System“ sind die Animationen deshalb gedämpft.' : ''
       }</p>
       <div class="chip-row mt-3">${opt('auto', 'Wie System')}${opt('on', 'Immer an')}${opt('off', 'Aus')}</div>
+      ${window.PS.season ? `<label class="check mt-4"><input type="checkbox" data-season-toggle ${window.PS.season.isOff() ? '' : 'checked'}> Saison-Deko auf diesem Gerät zeigen <span class="text-dim">(Schnee, Halloween, Feuerwerk …)</span></label>` : ''}
     </section>`;
 }
 

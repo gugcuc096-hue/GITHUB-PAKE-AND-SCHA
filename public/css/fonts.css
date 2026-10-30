@@ -3,6 +3,9 @@
  * Quelle: Fontsource 5.3 (gleiche Google-Schriften), Lizenz SIL Open Font License 1.1 – siehe /fonts/licenses/.
  * Nur Latein und Latein-erweitert; der Browser lädt eine Datei erst, wenn ein Zeichen daraus gebraucht wird.
  */
+/* Akzentfarbe als Zahlen für rgba(var(--accent-rgb), …) – theme.js überschreibt sie, wenn die Kanzlei eine andere Farbe wählt */
+:root { --gold-500: #d4af37; --gold-600: #b8962e; --gold-light: #f3e5ab; --accent-rgb: 212, 175, 55; --accent-light-rgb: 243, 229, 171; --accent-dark-rgb: 184, 150, 46; }
+
 @font-face {
   font-family: 'Inter';
   font-style: normal;
