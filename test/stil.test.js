@@ -385,11 +385,11 @@ describe('Stil, Saison und Aktionen im Browser', { skip: chromium ? false : 'Pla
         const nav = document.querySelector('#docPeek .dp-nav').getBoundingClientRect();
         return { h: c.height, text: document.querySelector('#docPeek .dp-count').textContent, navH: nav.height };
       });
-      assert.equal(box.text, '2/2');
+      assert.equal(box.text, '2 / 2');
       assert.ok(box.h < 26, `Zähler einzeilig (${box.h}px)`);
       assert.ok(box.navH < 44, `Leiste einzeilig (${box.navH}px)`);
       await page.click('#docPeek [data-action="peek-step"][data-dir="-1"]');
-      await page.waitForFunction(() => document.querySelector('#docPeek .dp-count')?.textContent === '1/2');
+      await page.waitForFunction(() => document.querySelector('#docPeek .dp-count')?.textContent === '1 / 2');
       await page.click('#docPeek [data-action="peek-close"]');
       await page.waitForFunction(() => !document.getElementById('docPeek'));
       assert.deepEqual(problems, []);
