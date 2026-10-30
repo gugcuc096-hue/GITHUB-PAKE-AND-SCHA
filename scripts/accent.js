@@ -23,7 +23,8 @@ const DEEP = 'color-mix(in srgb, var(--gold-500), #000 15%)';
 const SHADES = [
   [/(?<![\\\w-])#(e6c25a|e8c862|e8c766|e8c860|e6c76a|efce62|e3c250|f1d27a)\b/gi, LIGHT],
   [/(?<![\\\w-])#(f3dc8a|f6e08f|f3dc8c)\b/gi, PALE],
-  [/(?<![\\\w-])#(b8912a|b08f2c|c9a227)\b/gi, DEEP],
+  [/(?<![\\\w-])#(b8912a|b08f2c|c9a227|b8975a)\b/gi, DEEP],
+  [/(?<![\\\w-])#(8f7322|8a6d1f)\b/gi, 'color-mix(in srgb, var(--gold-500), #000 35%)'],
 ];
 const RGB = [
   [/rgba\(\s*212\s*,\s*175\s*,\s*55\s*,\s*/g, 'rgba(var(--accent-rgb), '],

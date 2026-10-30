@@ -229,6 +229,9 @@ app.get('/team/:slug', require('./profiles').handler);
 const assets = require('./assets');
 app.get('/js/dashboard.bundle.js', assets.bundle);
 app.get('/js/dashboard.staff.js', assets.staffBundle);
+// Logo in der Kanzleifarbe (Einstellungen → Stil & Saison; brand.js)
+app.get('/img/logo.svg', require('./brand').logoHandler('svg'));
+app.get('/img/logo.png', require('./brand').logoHandler('png'));
 app.use(assets.staticAsset); // übrige Skripte und CSS: verkleinert, Brotli/gzip
 app.use(assets.pages);
 app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'], setHeaders: assets.setHeaders }));

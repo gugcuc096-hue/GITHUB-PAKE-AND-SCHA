@@ -21,16 +21,16 @@
     .gdoc .gdoc-g::after { content: ''; position: absolute; left: 22%; right: 22%; top: 38%; height: 34%; border-top: 2px solid #fff; border-bottom: 2px solid #fff; }
     .gdoc .gdoc-warn { color: #fcd34d; font-size: 0.78rem; max-width: 22rem; }
     .ps-toast-root { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 90; display: flex; flex-direction: column; gap: 0.6rem; max-width: calc(100vw - 2rem); font-family: 'Inter', system-ui, sans-serif; }
-    .ps-toast { background: rgba(6, 11, 25, 0.97); color: #f8fafc; border: 1px solid rgba(212, 175, 55, 0.35); border-left: 3px solid #d4af37; border-radius: 12px; padding: 0.8rem 1.1rem; max-width: 360px; font-size: 0.875rem; box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6); }
+    .ps-toast { background: rgba(6, 11, 25, 0.97); color: #f8fafc; border: 1px solid rgba(var(--accent-rgb, 212, 175, 55), 0.35); border-left: 3px solid var(--gold-500); border-radius: 12px; padding: 0.8rem 1.1rem; max-width: 360px; font-size: 0.875rem; box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6); }
     .ps-toast.error { border-left-color: #ef4444; }
     /* Bestätigungsdialog (wie in vertrag.html bzw. app.css) – Rechnung und Aktenauszug haben ihn sonst nicht */
-    :root { --gold-500: #d4af37; --gold-hairline: rgba(212, 175, 55, 0.35); --text-main: #f8fafc; --text-muted: #cbd5e1; }
+    :root { --gold-hairline: rgba(var(--accent-rgb, 212, 175, 55), 0.35); --text-main: #f8fafc; --text-muted: #cbd5e1; }
     .ps-dialog-root { position: fixed; inset: 0; z-index: 85; display: flex; align-items: center; justify-content: center; padding: 1rem; background: rgba(2, 5, 14, 0.72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); opacity: 0; transition: opacity 0.16s ease; }
     .ps-dialog-root.open { opacity: 1; }
     .ps-dialog { width: 100%; max-width: 440px; text-align: center; padding: 1.75rem 1.5rem 1.4rem; border-radius: 22px; border: 1px solid var(--gold-hairline); border-top: 2px solid var(--gold-500); background: linear-gradient(180deg, rgba(14, 22, 46, 0.98), rgba(6, 11, 25, 0.98)); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.03) inset; transform: translateY(8px) scale(0.98); transition: transform 0.16s ease; }
     .ps-dialog-root.open .ps-dialog { transform: none; }
     .ps-dialog.is-danger { border-top-color: #ef4444; }
-    .ps-dialog-mark { width: 56px; height: 56px; margin: 0 auto 0.9rem; border-radius: 16px; overflow: hidden; border: 1px solid var(--gold-hairline); box-shadow: 0 8px 24px rgba(212, 175, 55, 0.15); }
+    .ps-dialog-mark { width: 56px; height: 56px; margin: 0 auto 0.9rem; border-radius: 16px; overflow: hidden; border: 1px solid var(--gold-hairline); box-shadow: 0 8px 24px rgba(var(--accent-rgb, 212, 175, 55), 0.15); }
     .ps-dialog-mark img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .ps-dialog-title { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 1.6rem; font-weight: 600; line-height: 1.2; color: var(--text-main); }
     .ps-dialog-text { margin-top: 0.6rem; font-size: 0.92rem; line-height: 1.55; color: var(--text-muted); white-space: pre-line; word-break: break-word; }
@@ -39,7 +39,7 @@
     @media (max-width: 480px) { .ps-dialog-actions > * { flex: 1 1 100%; } }
     body.ps-dialog-open { overflow: hidden; }
     .ps-dialog button { border-radius: 999px; padding: 0.65rem 1.2rem; font: 600 0.88rem 'Inter', sans-serif; cursor: pointer; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.05); color: #f8fafc; }
-    .ps-dialog .btn-gold { background: linear-gradient(135deg, #d4af37, #b8962e); color: #02050e; border: 0; }
+    .ps-dialog .btn-gold { background: linear-gradient(135deg, var(--gold-500, #d4af37), var(--gold-600, #b8962e)); color: #02050e; border: 0; }
     .ps-dialog .btn-danger { background: #b91c1c; border: 0; color: #fff; }
     @media print { .gdoc, .ps-toast-root { display: none !important; } }`;
   document.head.appendChild(style);

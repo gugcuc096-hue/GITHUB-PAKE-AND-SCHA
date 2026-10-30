@@ -340,11 +340,11 @@ function karteDrawRoute(x, segs) {
       pts.forEach(([a, b], k) => (k ? x.lineTo(a, b) : x.moveTo(a, b)));
     };
     path();
-    x.strokeStyle = 'rgba(241,210,122,.28)';
+    x.strokeStyle = accentPaint('light', 0.28);
     x.lineWidth = 9;
     x.stroke();
     path();
-    x.strokeStyle = '#f1d27a';
+    x.strokeStyle = accentPaint('light');
     x.lineWidth = 2.6;
     x.setLineDash([10, 7]);
     x.stroke();
@@ -356,7 +356,7 @@ function karteDrawRoute(x, segs) {
     const ang = Math.atan2(by2 - ay, bx2 - ax);
     const cx = (ax + bx2) / 2;
     const cy = (ay + by2) / 2;
-    x.fillStyle = '#f1d27a';
+    x.fillStyle = accentPaint('light');
     x.strokeStyle = '#06101f';
     x.lineWidth = 1.5;
     x.beginPath();
@@ -743,7 +743,7 @@ class KarteView {
     if (this.sel) {
       const px = this.sx(this.sel.x);
       const py = this.sy(this.sel.y);
-      x.strokeStyle = kImg ? '#e11d48' : '#f1d27a';
+      x.strokeStyle = kImg ? '#e11d48' : accentPaint('light');
       x.lineWidth = 2;
       x.beginPath();
       x.arc(px, py, 14, 0, 7);
@@ -766,7 +766,7 @@ class KarteView {
     }
     const proj2 = (wx, wy) => [this.sx(wx), this.sy(wy)];
     if (this.sight) karteDrawSight(x, this.pins, proj2, this.dim);
-    if (this.look && this.sel && kHasLook(this.look)) karteDrawCone(x, proj2, { ...this.look, x: this.sel.x, y: this.sel.y }, '#f1d27a');
+    if (this.look && this.sel && kHasLook(this.look)) karteDrawCone(x, proj2, { ...this.look, x: this.sel.x, y: this.sel.y }, accentPaint('light'));
     let card = null;
     const t = performance.now() / 1000;
     this.pins.forEach((p, i) => {
@@ -1059,7 +1059,7 @@ async function karteExport(el) {
     x.fillRect(0, 0, out.width, out.height);
     // Kopf
     x.textBaseline = 'alphabetic';
-    x.fillStyle = '#f1d27a';
+    x.fillStyle = accentPaint('light');
     x.font = `600 ${Math.round(22 * d)}px "Cormorant Garamond", Georgia, serif`;
     x.fillText('Tatort-Rekonstruktion', pad, Math.round(30 * d));
     x.fillStyle = '#cbd5e1';

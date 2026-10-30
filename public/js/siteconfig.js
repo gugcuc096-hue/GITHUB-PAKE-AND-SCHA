@@ -109,13 +109,14 @@
   // Glasleiste mit Symbol, Text, Countdown und Knopf. Eine laufende Rabattaktion bekommt ihr eigenes Banner
   // (Plakette „−15 %“, Farben des Anlasses) über dem normalen Banner.
   const pad2 = (n) => String(n).padStart(2, '0');
+  // Countdown in Kästchen: Tage · Std · Min · Sek (Tage nur, solange noch welche übrig sind)
   function countdownHtml(ms) {
     const s = Math.max(0, Math.floor(ms / 1000));
     const d = Math.floor(s / 86400);
-    const parts = [d ? `<b>${d}</b><i>T</i>` : '', `<b>${pad2(Math.floor((s % 86400) / 3600))}</b><i>:</i><b>${pad2(Math.floor((s % 3600) / 60))}</b><i>:</i><b>${pad2(s % 60)}</b>`];
-    return parts.join('');
+    const unit = (v, label) => `<span class="cd-u"><b>${v}</b><i>${label}</i></span>`;
+    return [d ? unit(d, d === 1 ? 'Tag' : 'Tage') : '', unit(pad2(Math.floor((s % 86400) / 3600)), 'Std'), unit(pad2(Math.floor((s % 3600) / 60)), 'Min'), unit(pad2(s % 60), 'Sek')].join('');
   }
-  function tickCountdown(el, endsAt) {
+  function tickCountdown(el, endsAt, onEnd) {
     const box = el.querySelector('.sb-count');
     if (!box) return;
     const end = Date.parse(endsAt);
@@ -125,6 +126,7 @@
       if (left <= 0) {
         clearInterval(timer);
         el.classList.add('is-leaving');
+        if (onEnd) onEnd();
         return setTimeout(() => el.remove(), 220);
       }
       const html = countdownHtml(left);
@@ -138,8 +140,17 @@
     const timer = setInterval(step, 1000);
     step();
   }
-  function banner(b, host, { before = true, className = '', id = 'siteBanner' } = {}) {
+  const pctText = (p) => String(p).replace('.', ',');
+  const hide = (b) => {
+    try {
+      sessionStorage.setItem(`ps-banner-${b.id}`, '1');
+    } catch {
+      /* egal */
+    }
+  };
+  function banner(b, host, { before = true, className = '', id = 'siteBanner', dock = false } = {}) {
     document.getElementById(id)?.remove();
+    document.getElementById(`${id}Dock`)?.remove();
     if (!b || !host) return;
     let hidden = false;
     try {
@@ -154,31 +165,72 @@
     el.setAttribute('role', 'status');
     const ext = b.link && /^https?:/i.test(b.link);
     const link = b.link ? `<a class="site-banner-link sb-cta" href="${esc(b.link)}"${ext ? ' target="_blank" rel="noopener"' : ''}>${esc(b.linkLabel || 'Mehr erfahren')}<span aria-hidden="true">→</span></a>` : '';
-    const pct = b.promo ? `<span class="sb-pct" aria-label="${esc(String(b.pct).replace('.', ','))} Prozent Rabatt">−${esc(String(b.pct).replace('.', ','))}&nbsp;%</span>` : '';
     const count = b.endsAt ? `<span class="sb-count" title="Endet am ${esc(new Date(b.endsAt).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' }))}" aria-label="Endet in"></span>` : '';
-    el.innerHTML = `<span class="sb-shine" aria-hidden="true"></span>${b.icon ? `<span class="sb-icon" aria-hidden="true">${esc(b.icon)}</span>` : ''}${pct}<span class="site-banner-text">${esc(b.text)}</span>${count}${link}${
-      b.dismissible ? '<button type="button" class="site-banner-x" aria-label="Hinweis schließen">×</button>' : ''
-    }`;
+    const x = b.dismissible ? '<button type="button" class="site-banner-x" aria-label="Hinweis schließen">×</button>' : '';
+    if (b.promo) {
+      // Aktion: Polarlicht in den Farben des Anlasses, Ticket mit Prozent, Titel + Zeile, Countdown in Kästchen, Knopf
+      el.innerHTML = `<span class="sb-aurora" aria-hidden="true"><i></i><i></i></span><span class="sb-shine" aria-hidden="true"></span>
+        <span class="sb-lead">${b.icon ? `<span class="sb-icon" aria-hidden="true">${esc(b.icon)}</span>` : ''}<span class="sb-ticket"><b class="sb-pct" aria-label="${esc(pctText(b.pct))} Prozent Rabatt">−${esc(pctText(b.pct))}&nbsp;%</b><small>auf alles</small></span>
+        <span class="sb-copy"><strong class="sb-title">${esc(b.title || 'Aktion')}</strong><span class="site-banner-text">${esc(b.sub || b.text)}</span></span></span>
+        <span class="sb-tail">${count}${link}</span>${x}`;
+    } else {
+      el.innerHTML = `<span class="sb-shine" aria-hidden="true"></span>${b.icon ? `<span class="sb-icon" aria-hidden="true">${esc(b.icon)}</span>` : ''}<span class="site-banner-text">${esc(b.text)}</span>${count}${link}${x}`;
+    }
+    let pill = null;
     el.querySelector('.site-banner-x')?.addEventListener('click', () => {
-      try {
-        sessionStorage.setItem(`ps-banner-${b.id}`, '1');
-      } catch {
-        /* egal */
-      }
+      hide(b);
       el.classList.add('is-leaving');
+      if (pill) pill.remove();
       setTimeout(() => el.remove(), 220);
     });
     if (before) host.before(el);
     else host.prepend(el);
-    if (b.endsAt) tickCountdown(el, b.endsAt);
+    if (b.endsAt) tickCountdown(el, b.endsAt, () => pill && pill.remove());
+    if (dock && b.promo) pill = promoDock(el, b, id);
     labels(el);
     return el;
   }
-  /** Normales Banner und Aktionsbanner zusammen (das Aktionsbanner steht oben). */
+
+  /*
+   * Aktion „geht mit“: Ist das Aktionsbanner aus dem Bild gescrollt, schwebt unten eine kleine Glas-Pille mit Symbol,
+   * Prozent, Countdown und Knopf – sie verschwindet wieder, sobald das Banner zu sehen ist (oder weggeklickt wurde).
+   */
+  function promoDock(el, b, id) {
+    if (typeof IntersectionObserver !== 'function') return null;
+    const pill = document.createElement('div');
+    pill.id = `${id}Dock`;
+    pill.className = `promo-dock occ-${b.occasion}`;
+    pill.setAttribute('role', 'region');
+    pill.setAttribute('aria-label', `Aktion: ${b.title || ''}`);
+    const href = b.link || '';
+    pill.innerHTML = `<span class="pd-glow" aria-hidden="true"></span>${b.icon ? `<span class="pd-icon" aria-hidden="true">${esc(b.icon)}</span>` : ''}<span class="pd-pct">−${esc(pctText(b.pct))}&nbsp;%</span>
+      <span class="pd-title">${esc(b.title || '')}</span>${b.endsAt ? '<span class="sb-count pd-count" aria-label="Endet in"></span>' : ''}
+      ${href ? `<a class="pd-cta" href="${esc(href)}" aria-label="${esc(b.linkLabel || 'Mehr erfahren')}"><em class="pd-l">${esc(b.linkLabel || 'Ansehen')}</em><span aria-hidden="true">→</span></a>` : ''}
+      <button type="button" class="pd-x" aria-label="Aktion ausblenden">×</button>`;
+    document.body.appendChild(pill);
+    if (b.endsAt) tickCountdown(pill, b.endsAt);
+    pill.querySelector('.pd-x').addEventListener('click', () => {
+      hide(b);
+      pill.classList.remove('is-on');
+      setTimeout(() => pill.remove(), 400);
+      el.remove();
+    });
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (!pill.isConnected || !el.isConnected) return io.disconnect();
+        // nur, wenn das Banner nach oben weggescrollt ist (nicht, solange es noch gar nicht im Bild war)
+        pill.classList.toggle('is-on', !e.isIntersecting && e.boundingClientRect.bottom < 0);
+      },
+      { threshold: 0 }
+    );
+    io.observe(el);
+    return pill;
+  }
+  /** Normales Banner und Aktionsbanner zusammen (das Aktionsbanner steht oben und geht beim Scrollen mit). */
   function banners(cfg, host, opts = {}) {
     if (!cfg) return;
     banner(cfg.banner, host, { ...opts, id: 'siteBanner' });
-    const promo = banner(cfg.promoBanner, host, { ...opts, id: 'promoBanner' });
+    const promo = banner(cfg.promoBanner, host, { ...opts, id: 'promoBanner', dock: true });
     const plain = document.getElementById('siteBanner');
     if (promo && plain) plain.before(promo);
   }

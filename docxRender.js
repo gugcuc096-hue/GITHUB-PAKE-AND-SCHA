@@ -12,7 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const D = require('docx');
 
-const LOGO = fs.readFileSync(path.join(__dirname, 'public', 'img', 'logo.png'));
+const brand = require('./brand'); // Logo und Akzentfarbe in der Kanzleifarbe (Einstellungen → Stil & Saison)
 const TZ = 'Europe/Berlin';
 
 /* ---------------------------------------------------------------- Einheiten */
@@ -134,7 +134,7 @@ function table(rows, widths, o = {}) {
 }
 
 function logo(heightPx = 60) {
-  return new D.ImageRun({ type: 'png', data: LOGO, transformation: { width: Math.round((heightPx * 275) / 512), height: heightPx } });
+  return new D.ImageRun({ type: 'png', data: brand.logoPng(), transformation: { width: Math.round((heightPx * 275) / 512), height: heightPx } });
 }
 
 async function pack(doc) {
@@ -146,7 +146,7 @@ async function pack(doc) {
    ================================================================ */
 const INK = '0F172A';
 const MUTED = '55607A';
-const GOLD = 'B8962E';
+const gold = () => brand.docx(brand.accent().dark); // Standard: B8962E
 const HAIR = 'E5E1D3';
 
 function firmHead(firm, contentWidth) {
@@ -159,7 +159,7 @@ function firmHead(firm, contentWidth) {
         cell(
           [
             para('Pake & Scha', { font: 'Cormorant Garamond', size: rem(1.6), bold: true, color: INK, line: 1.1 }),
-            para('LEGAL CONSULTING & ADVOCACY', { font: 'Inter', size: rem(0.62), color: GOLD, before: 1.5 }),
+            para('LEGAL CONSULTING & ADVOCACY', { font: 'Inter', size: rem(0.62), color: gold(), before: 1.5 }),
           ],
           { width: contentWidth - addrW - logoW, valign: D.VerticalAlign.CENTER, pl: rem(0.85) * 0.75, pb: rem(1.25), borders: { bottom: line(0.75, HAIR) } }
         ),
@@ -237,7 +237,7 @@ async function invoiceDocx(inv, firm) {
   body.push(spacer(rem(1.75)), table([titleCells], [W - labelW - valueW - stampW, ...(stamp ? [stampW] : []), labelW, valueW]), spacer(rem(1.25)));
 
   // Parteien
-  const label = (t) => para(t.toUpperCase(), { font: 'Inter', size: rem(0.64), bold: true, color: GOLD, after: rem(0.35) });
+  const label = (t) => para(t.toUpperCase(), { font: 'Inter', size: rem(0.64), bold: true, color: gold(), after: rem(0.35) });
   // Name fett, darunter weitere Zeilen (Kontakt bzw. Rang und Kanzlei)
   const party = (name, rest) =>
     para([...runs(name, { font: 'Inter', size: rem(1), bold: true, color: INK }), ...runs(rest.map((t) => `\n${t}`).join(''), { font: 'Inter', size: rem(0.9), color: INK }).slice(1)], { line: 1.5, font: 'Inter' });
@@ -260,7 +260,7 @@ async function invoiceDocx(inv, firm) {
     body.push(
       para([...runs(`${hv ? 'Gegenstand der Vereinbarung' : 'Betreff'}: `, { font: 'Inter', size: rem(0.9), bold: true, color: INK }), ...runs(inv.subject, { font: 'Inter', size: rem(0.9), color: INK })], {
         fill: 'FAF8F1',
-        border: { left: { style: D.BorderStyle.SINGLE, size: eighths(2.25), color: GOLD, space: 8 } },
+        border: { left: { style: D.BorderStyle.SINGLE, size: eighths(2.25), color: gold(), space: 8 } },
         indent: { left: tw(rem(0.9)), right: tw(rem(0.9)) },
         before: 0,
         after: rem(1.25),
@@ -327,7 +327,7 @@ async function invoiceDocx(inv, firm) {
   if (inv.promoAmount) totals.push(totRow(`${inv.promoName} (${pct(inv.promoPct)} %)`, `− ${money(inv.promoAmount)}`));
   if (inv.discountAmount) totals.push(totRow(`Rabatt (${pct(inv.discountPct)} %)`, `− ${money(inv.discountAmount)}`));
   if (inv.surchargeAmount) totals.push(totRow(`Zuschlag (${pct(inv.surchargePct)} %)`, `+ ${money(inv.surchargeAmount)}`));
-  totals.push(totRow(hv ? 'Vereinbartes Honorar' : 'Gesamtbetrag', money(inv.total), { size: rem(1.15), bold: true, color: GOLD, pt: rem(0.6), borders: { top: line(1.125, INK) } }));
+  totals.push(totRow(hv ? 'Vereinbartes Honorar' : 'Gesamtbetrag', money(inv.total), { size: rem(1.15), bold: true, color: gold(), pt: rem(0.6), borders: { top: line(1.125, INK) } }));
   if (inv.memberAmount && !inv.total) {
     totals.push([
       cell(para(`Vollständig abgedeckt durch ${inv.membershipName}`, { font: 'Inter', size: rem(0.8), italic: true, color: INK, align: D.AlignmentType.RIGHT }), { span: 2, width: totW, pt: rem(0.3) }),
@@ -383,7 +383,7 @@ async function invoiceDocx(inv, firm) {
    Verträge & Schriftsätze (vertrag.html + public/js/contract-render.js)
    Die Zeilenregeln unten entsprechen contract-render.js – bei Änderungen dort bitte hier mitziehen.
    ================================================================ */
-const K_GOLD = 'B8975A';
+const kGold = () => (brand.accent().isDefault ? 'B8975A' : brand.docx(brand.accent().dark));
 const K_INK = '000000';
 const K_MUTED = '666666';
 const K_SOFT = '1A1A1A';
@@ -601,7 +601,7 @@ function contractHeader(headerText, W) {
       table(
         [
           [
-            cell(para('PAKE & SCHA\nLEGAL CONSULTING', { font: 'Tinos', size: 13, bold: true, color: K_GOLD, line: 1.15 }), { width: W - addrW, valign: D.VerticalAlign.BOTTOM, pb: 3.75, borders: bottom }),
+            cell(para('PAKE & SCHA\nLEGAL CONSULTING', { font: 'Tinos', size: 13, bold: true, color: kGold(), line: 1.15 }), { width: W - addrW, valign: D.VerticalAlign.BOTTOM, pb: 3.75, borders: bottom }),
             cell(para(headerText || '', { font: 'Tinos', size: 10, bold: true, color: K_MUTED, line: 1.35 }), { width: addrW, valign: D.VerticalAlign.BOTTOM, pb: 3.75, borders: bottom }),
           ],
         ],
@@ -626,9 +626,9 @@ async function contractDocx(k, c, headerText, opts = {}) {
     const P = (runsFn, o, top, bottom) => ({ top, bottom, make: (before, pageBreak) => [para(runsFn(), { ...o, before, after: 0, pageBreakBefore: pageBreak })] });
     switch (b.type) {
       case 'title':
-        return [P(() => inl(b.text, { font: 'Tinos', size: 30, bold: true, color: K_GOLD }), { align: D.AlignmentType.CENTER, line: 1.2, font: 'Tinos', mark: 30, keepNext: true }, 24, 10)];
+        return [P(() => inl(b.text, { font: 'Tinos', size: 30, bold: true, color: kGold() }), { align: D.AlignmentType.CENTER, line: 1.2, font: 'Tinos', mark: 30, keepNext: true }, 24, 10)];
       case 'section':
-        return [P(() => inl(b.text, { font: 'Tinos', size: 17, bold: true, color: K_GOLD }), { align: D.AlignmentType.CENTER, line: 1.3, font: 'Tinos', mark: 17, keepNext: true }, 8, 7)];
+        return [P(() => inl(b.text, { font: 'Tinos', size: 17, bold: true, color: kGold() }), { align: D.AlignmentType.CENTER, line: 1.3, font: 'Tinos', mark: 17, keepNext: true }, 8, 7)];
       case 'para':
         return [P(() => inl(b.text, { font: 'Tinos', size: 11, bold: true, color: K_SOFT }), { line: 1.4, font: 'Tinos', mark: 11, keepNext: true }, 7, 3)];
       case 'p': {
@@ -871,7 +871,7 @@ async function extractDocx(data, firm, options = {}) {
   const fact = (f) =>
     f
       ? [
-          para(f[0].toUpperCase(), { font: 'Inter', size: rem(0.64), bold: true, color: GOLD }),
+          para(f[0].toUpperCase(), { font: 'Inter', size: rem(0.64), bold: true, color: gold() }),
           typeof f[1] === 'object' && f[1] ? para([link(f[1].url, { text: f[1].text, size: rem(0.86) })], { before: rem(0.1) }) : para(String(f[1] ?? ''), { font: 'Inter', size: rem(0.86), color: INK, line: 1.45, before: rem(0.1) }),
         ]
       : [para('')];
@@ -885,7 +885,7 @@ async function extractDocx(data, firm, options = {}) {
       para([...runs('Hinweis der Kanzlei: ', { font: 'Inter', size: rem(0.88), bold: true, color: INK }), ...runs(c.publicNote, { font: 'Inter', size: rem(0.88), color: INK })], {
         before: rem(0.9),
         fill: 'FAF8F1',
-        border: { left: { style: D.BorderStyle.SINGLE, size: eighths(2.25), color: GOLD, space: 8 } },
+        border: { left: { style: D.BorderStyle.SINGLE, size: eighths(2.25), color: gold(), space: 8 } },
         indent: { left: tw(rem(0.9)), right: tw(rem(0.9)) },
         line: 1.9,
         font: 'Inter',

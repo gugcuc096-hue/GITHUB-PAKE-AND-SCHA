@@ -81,11 +81,13 @@
   function loop(step) {
     let raf = 0;
     let last = performance.now();
+    // höchstens ~30 Bilder pro Sekunde: reicht für Schnee & Co. und schont den Rechner
     const tick = (now) => {
+      raf = requestAnimationFrame(tick);
+      if (now - last < 31) return;
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       if (!document.hidden) step(dt, now / 1000);
-      raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
@@ -146,13 +148,15 @@
           ctx.fill();
         } else if (kind === 'ember') {
           const flick = 0.55 + 0.45 * Math.sin(t * 7 + p.phase);
-          ctx.fillStyle = `hsla(${p.hue}, 100%, 60%, ${a * flick})`;
-          ctx.shadowColor = `hsla(${p.hue}, 100%, 55%, 0.9)`;
-          ctx.shadowBlur = 8 * p.z;
+          // Schein als weicher Hof (statt shadowBlur – das kostet ohne Grafikkarte viel)
+          ctx.fillStyle = `hsla(${p.hue}, 100%, 55%, ${a * flick * 0.18})`;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r * 3.2, 0, 6.283);
+          ctx.fill();
+          ctx.fillStyle = `hsla(${p.hue}, 100%, 62%, ${a * flick})`;
           ctx.beginPath();
           ctx.arc(p.x, p.y, p.r, 0, 6.283);
           ctx.fill();
-          ctx.shadowBlur = 0;
         } else if (kind === 'heart') {
           ctx.fillStyle = `hsla(${p.hue}, 85%, 68%, ${a * 0.55})`;
           ctx.save();

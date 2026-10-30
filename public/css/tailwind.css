@@ -1026,7 +1026,7 @@ video {
   --tw-gradient-to: rgb(71 85 105 / 0) var(--tw-gradient-to-position);
   --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
 }.to-\[\#8f7322\] {
-  --tw-gradient-to: #8f7322 var(--tw-gradient-to-position);
+  --tw-gradient-to: color-mix(in srgb, var(--gold-500), #000 35%) var(--tw-gradient-to-position);
 }.to-slate-800 {
   --tw-gradient-to: #1e293b var(--tw-gradient-to-position);
 }.object-cover {

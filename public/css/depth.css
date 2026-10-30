@@ -223,6 +223,14 @@ p, .modal-sub, .empty { text-wrap: pretty; }
   .is-lit { --lit: 1; }
 }
 
+/* ---------------------------------------------------------------- Schrift der Überschriften (Stil & Saison) */
+/* Modern: Inter statt der Schmuckschrift – auch auf der Website (dort heißen die Überschriften .font-serif).
+   Elegant: Schmuckschrift kursiv mit etwas mehr Luft. Klassisch: wie gehabt. */
+:root[data-font="modern"] { --font-display: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+:root[data-font="modern"] :is(.font-serif, .page-title, .panel-title, .modal-title, .topbar-title, .quiet-title, .brand-name, .sec-title, h1, h2) { font-family: var(--font-body) !important; font-style: normal; letter-spacing: -0.025em; font-weight: 650; }
+:root[data-font="elegant"] :is(.font-serif, .page-title, .panel-title, .modal-title, .topbar-title, .quiet-title, .brand-name) { font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif !important; font-style: italic; letter-spacing: 0.005em; }
+:root[data-font="elegant"] :is(h1, h2).font-serif { font-weight: 500; }
+
 /* ---------------------------------------------------------------- Rückfälle */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .glass-nav, .topbar, .sidebar, .bottom-nav, .modal, .ps-toast, .pop, .more-pop, .dp, .bulk-bar, .sys-bar, .kmap-card, .kmap-cap, .case-jump, .modal-card, .doc-peek { background-color: #080f22; }
