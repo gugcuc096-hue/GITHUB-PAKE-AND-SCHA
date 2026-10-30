@@ -106,6 +106,7 @@ const actions = {
   // Mein Profil → Animationen (je Gerät)
   'motion-set': (el) => {
     window.PS.motion.set(el.dataset.value);
+    window.PS.season && window.PS.season.refresh();
     renderView();
     toast({ on: 'Animationen sind auf diesem Gerät jetzt immer an.', off: 'Animationen sind auf diesem Gerät aus.' }[el.dataset.value] || 'Animationen folgen jetzt der Einstellung des Systems.');
   },
@@ -1822,3 +1823,10 @@ const actions = {
     toast('Discord-Verbindung getrennt.');
   },
 };
+
+/* Mein Profil → Animationen: Saison-Deko auf diesem Gerät an/aus (Kästchen: über „change“, nicht als Klick-Aktion) */
+document.addEventListener('change', (e) => {
+  if (!e.target.matches || !e.target.matches('[data-season-toggle]') || !window.PS.season) return;
+  window.PS.season.off(!e.target.checked);
+  toast(e.target.checked ? 'Saison-Deko ist auf diesem Gerät an.' : 'Saison-Deko ist auf diesem Gerät aus.');
+});

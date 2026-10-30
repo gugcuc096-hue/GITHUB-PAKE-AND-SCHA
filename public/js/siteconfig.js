@@ -106,8 +106,40 @@
   }
 
   /* ---------------------------------------------------------------- Banner */
-  function banner(b, host, { before = true, className = '' } = {}) {
-    document.getElementById('siteBanner')?.remove();
+  // Glasleiste mit Symbol, Text, Countdown und Knopf. Eine laufende Rabattaktion bekommt ihr eigenes Banner
+  // (Plakette „−15 %“, Farben des Anlasses) über dem normalen Banner.
+  const pad2 = (n) => String(n).padStart(2, '0');
+  function countdownHtml(ms) {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    const d = Math.floor(s / 86400);
+    const parts = [d ? `<b>${d}</b><i>T</i>` : '', `<b>${pad2(Math.floor((s % 86400) / 3600))}</b><i>:</i><b>${pad2(Math.floor((s % 3600) / 60))}</b><i>:</i><b>${pad2(s % 60)}</b>`];
+    return parts.join('');
+  }
+  function tickCountdown(el, endsAt) {
+    const box = el.querySelector('.sb-count');
+    if (!box) return;
+    const end = Date.parse(endsAt);
+    const step = () => {
+      if (!el.isConnected) return clearInterval(timer);
+      const left = end - Date.now();
+      if (left <= 0) {
+        clearInterval(timer);
+        el.classList.add('is-leaving');
+        return setTimeout(() => el.remove(), 220);
+      }
+      const html = countdownHtml(left);
+      if (box.dataset.html === html) return;
+      // Ziffern, die sich ändern, kippen kurz (die anderen bleiben ruhig)
+      const old = [...box.querySelectorAll('b')].map((b) => b.textContent);
+      box.innerHTML = html;
+      box.dataset.html = html;
+      box.querySelectorAll('b').forEach((b, i) => old[i] !== undefined && old[i] !== b.textContent && b.classList.add('flip'));
+    };
+    const timer = setInterval(step, 1000);
+    step();
+  }
+  function banner(b, host, { before = true, className = '', id = 'siteBanner' } = {}) {
+    document.getElementById(id)?.remove();
     if (!b || !host) return;
     let hidden = false;
     try {
@@ -117,11 +149,16 @@
     }
     if (hidden) return;
     const el = document.createElement('div');
-    el.id = 'siteBanner';
-    el.className = `site-banner tone-${b.tone} ${className}`.trim();
+    el.id = id;
+    el.className = `site-banner tone-${b.tone}${b.promo ? ` is-promo occ-${b.occasion}` : ''}${b.endsAt ? ' has-count' : ''} ${className}`.trim();
     el.setAttribute('role', 'status');
-    const link = b.link ? `<a class="site-banner-link" href="${esc(b.link)}"${/^https?:/i.test(b.link) ? ' target="_blank" rel="noopener"' : ''}>${esc(b.linkLabel || 'Mehr erfahren')} →</a>` : '';
-    el.innerHTML = `<span class="site-banner-text">${esc(b.text)}</span>${link}${b.dismissible ? '<button type="button" class="site-banner-x" aria-label="Hinweis schließen">×</button>' : ''}`;
+    const ext = b.link && /^https?:/i.test(b.link);
+    const link = b.link ? `<a class="site-banner-link sb-cta" href="${esc(b.link)}"${ext ? ' target="_blank" rel="noopener"' : ''}>${esc(b.linkLabel || 'Mehr erfahren')}<span aria-hidden="true">→</span></a>` : '';
+    const pct = b.promo ? `<span class="sb-pct" aria-label="${esc(String(b.pct).replace('.', ','))} Prozent Rabatt">−${esc(String(b.pct).replace('.', ','))}&nbsp;%</span>` : '';
+    const count = b.endsAt ? `<span class="sb-count" title="Endet am ${esc(new Date(b.endsAt).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' }))}" aria-label="Endet in"></span>` : '';
+    el.innerHTML = `<span class="sb-shine" aria-hidden="true"></span>${b.icon ? `<span class="sb-icon" aria-hidden="true">${esc(b.icon)}</span>` : ''}${pct}<span class="site-banner-text">${esc(b.text)}</span>${count}${link}${
+      b.dismissible ? '<button type="button" class="site-banner-x" aria-label="Hinweis schließen">×</button>' : ''
+    }`;
     el.querySelector('.site-banner-x')?.addEventListener('click', () => {
       try {
         sessionStorage.setItem(`ps-banner-${b.id}`, '1');
@@ -133,8 +170,81 @@
     });
     if (before) host.before(el);
     else host.prepend(el);
+    if (b.endsAt) tickCountdown(el, b.endsAt);
     labels(el);
+    return el;
   }
+  /** Normales Banner und Aktionsbanner zusammen (das Aktionsbanner steht oben). */
+  function banners(cfg, host, opts = {}) {
+    if (!cfg) return;
+    banner(cfg.banner, host, { ...opts, id: 'siteBanner' });
+    const promo = banner(cfg.promoBanner, host, { ...opts, id: 'promoBanner' });
+    const plain = document.getElementById('siteBanner');
+    if (promo && plain) plain.before(promo);
+  }
+
+  /* ---------------------------------------------------------------- Stil: Akzentfarbe, Glas, Rundung, Schrift */
+  // Gleiche Rechnung wie theme.js auf dem Server – für die Vorschau beim Schieben der Regler und für Seiten aus dem
+  // Zwischenspeicher. Setzt die Variablen als Inline-Stil auf <html>.
+  const THEME_DEFAULTS = { accent: '#d4af37', glass: 50, radius: 50, font: 'klassisch', motion: 'normal' };
+  function themeVars(style) {
+    const s = { ...THEME_DEFAULTS, ...style };
+    const hex = /^#[0-9a-f]{6}$/i.test(s.accent) ? s.accent : THEME_DEFAULTS.accent;
+    const acc = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    const mix = (b, t) => acc.map((v, i) => Math.round(v + (b[i] - v) * t));
+    const toHex = (rgb) => `#${rgb.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+    const light = mix([255, 255, 255], 0.6);
+    const dark = mix([0, 0, 0], 0.14);
+    const g = Number(s.glass);
+    const blur = Math.round(8 + g * 0.28);
+    const sat = (1.15 + g * 0.006).toFixed(2);
+    const mobile = window.matchMedia('(max-width: 767px)').matches;
+    const v = {
+      '--gold-500': toHex(acc),
+      '--gold-600': toHex(dark),
+      '--gold-light': toHex(light),
+      '--accent-rgb': acc.join(', '),
+      '--accent-light-rgb': light.join(', '),
+      '--accent-dark-rgb': dark.join(', '),
+      '--gold-hairline': `rgba(${acc.join(', ')}, 0.35)`,
+      '--gold-soft': `rgba(${acc.join(', ')}, 0.1)`,
+      '--gold-glow': `rgba(${acc.join(', ')}, 0.25)`,
+      '--lit-gold': `rgba(${acc.join(', ')}, 0.16)`,
+      '--glass-blur': `blur(${mobile ? Math.round(blur * 0.73) : blur}px) saturate(${sat})`,
+      '--glass-fill': `rgba(9, 16, 36, ${(0.9 - g * 0.004).toFixed(3)})`,
+      '--glass-fill-strong': `rgba(8, 14, 32, ${(0.95 - g * 0.0026).toFixed(3)})`,
+      '--panel-alpha': (0.9 - g * 0.0032).toFixed(3),
+      '--radius': `${Math.round(4 + Number(s.radius) * 0.28)}px`,
+    };
+    if (s.font === 'modern') v['--font-display'] = "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+    return v;
+  }
+  let themed = [];
+  function applyTheme(style, { force = false } = {}) {
+    const root = document.documentElement;
+    themed.forEach((k) => root.style.removeProperty(k));
+    themed = [];
+    if (!style) return;
+    const s = { ...THEME_DEFAULTS, ...style };
+    const plain = s.accent.toLowerCase() === THEME_DEFAULTS.accent && +s.glass === 50 && +s.radius === 50 && s.font === 'klassisch';
+    // Der Server setzt den Stil schon beim Ausliefern ein (<style id="psTheme">); hier zieht die Seite nach, wenn er sich
+    // seitdem geändert hat (gerade veröffentlicht, Vorschau, Seite aus dem Zwischenspeicher)
+    if (plain && !force) document.getElementById('psTheme')?.remove();
+    else {
+      for (const [k, val] of Object.entries(themeVars(s))) {
+        root.style.setProperty(k, val);
+        themed.push(k);
+      }
+    }
+    if (s.font !== 'klassisch') root.dataset.font = s.font;
+    else delete root.dataset.font;
+  }
+  /** Saison aus der Konfiguration (falls die Seite aus dem Zwischenspeicher kam und noch die alte zeigt). */
+  function applySeason(season) {
+    if (season === undefined || !PS.season) return;
+    if ((document.documentElement.dataset.season || '') !== (season || '')) PS.season.set(season || '');
+  }
+  PS.theme = { vars: themeVars, apply: applyTheme, season: applySeason };
 
   /* ---------------------------------------------------------------- Startseite */
   const FEATURE_SECTION = { vip: 'vip', stimmen: 'reviews', karriere: 'karriere' };
@@ -195,8 +305,12 @@
   function apply(cfg, { page = 'site', features = {}, preview = false } = {}) {
     if (!cfg) return;
     setLabels(cfg.labels);
+    applyTheme(cfg.style, { force: !!preview });
+    applySeason(cfg.season);
+    PS.promo = cfg.promo || null;
+    window.dispatchEvent(new CustomEvent('ps:promo'));
     if (page === 'site') {
-      banner(cfg.banner, document.querySelector('.topstrip') || document.body.firstElementChild);
+      banners(cfg, document.querySelector('.topstrip') || document.body.firstElementChild);
       if (document.getElementById('start')) applyHome(cfg.home, features);
       if (preview) {
         const r = document.createElement('div');
@@ -214,7 +328,7 @@
     if (editing) hintsIn(document.body);
   }
 
-  PS.siteConfig = { apply, labels, banner, observe, setLabels, hintsIn, setHintMode, isOn: () => labelsOn };
+  PS.siteConfig = { apply, labels, banner, banners, observe, setLabels, hintsIn, setHintMode, isOn: () => labelsOn };
 
   /* Website und Karriere laden sich selbst; das Dashboard ruft apply() mit der Konfiguration aus /api/auth/me auf */
   if (document.querySelector('#start, #careerPage, body[data-page="karriere"]') || location.pathname.startsWith('/karriere')) {

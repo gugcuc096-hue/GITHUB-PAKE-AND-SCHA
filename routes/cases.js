@@ -4,7 +4,8 @@ const express = require('express');
 const { z } = require('zod');
 const evidence = require('../evidence');
 const { editConflicts } = require('../helpers');
-const { db, tx, nextCaseNumber, randomPin, getSetting } = require('../db');
+const { db, tx, randomPin, getSetting } = require('../db');
+const { nextCaseNumber } = require('../numbering');
 const { requireAuth, requireAdmin, isStaff, findUserByLogin } = require('../auth');
 const {
   wrap,
@@ -276,7 +277,7 @@ router.post(
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .run(
-          nextCaseNumber(),
+          nextCaseNumber({ area: d.area, lawyerId }),
           randomPin(),
           d.title,
           d.area,

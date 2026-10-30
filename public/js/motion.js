@@ -372,4 +372,39 @@
     const input = b.parentElement && b.parentElement.querySelector('input');
     if (input) requestAnimationFrame(() => input.animate([{ scale: 1.22 }, { scale: 1 }], { duration: 260, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' }));
   });
+
+  /* ---------------------------------------------------------------- Glas: Glanz folgt der Maus (depth.css → .is-lit) */
+  // Nur mit Maus; ein Bild pro Frame; die Fläche unter dem Zeiger bekommt --mx/--my, beim Verlassen klingt der Glanz aus.
+  if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    const LIT = '.panel, .kpi, .glass-card, .modal-card';
+    let lit = null;
+    let ev = null;
+    let queued = false;
+    const paint = () => {
+      queued = false;
+      const el = ev && ev.target && ev.target.closest ? ev.target.closest(LIT) : null;
+      if (el !== lit) {
+        if (lit) lit.classList.remove('is-lit');
+        lit = el;
+      }
+      if (!el || calm()) return;
+      const r = el.getBoundingClientRect();
+      el.style.setProperty('--mx', `${Math.round(ev.clientX - r.left)}px`);
+      el.style.setProperty('--my', `${Math.round(ev.clientY - r.top)}px`);
+      el.classList.add('is-lit');
+    };
+    document.addEventListener(
+      'pointermove',
+      (e) => {
+        if (e.pointerType !== 'mouse') return;
+        ev = e;
+        if (!queued) {
+          queued = true;
+          requestAnimationFrame(paint);
+        }
+      },
+      { passive: true }
+    );
+    document.documentElement.addEventListener('pointerleave', () => lit && lit.classList.remove('is-lit')); // Maus verlässt das Fenster
+  }
 })();

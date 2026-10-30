@@ -324,6 +324,7 @@ async function invoiceDocx(inv, firm) {
   const totals = [totRow('Zwischensumme', money(inv.subtotal))];
   if (inv.memberAmount) totals.push(totRow(`${inv.membershipName} (${pct(inv.memberPct)} %)`, `− ${money(inv.memberAmount)}`));
   if (inv.coopAmount) totals.push(totRow(`Kooperationsrabatt ${inv.cooperationName} (${pct(inv.coopPct)} %)`, `− ${money(inv.coopAmount)}`));
+  if (inv.promoAmount) totals.push(totRow(`${inv.promoName} (${pct(inv.promoPct)} %)`, `− ${money(inv.promoAmount)}`));
   if (inv.discountAmount) totals.push(totRow(`Rabatt (${pct(inv.discountPct)} %)`, `− ${money(inv.discountAmount)}`));
   if (inv.surchargeAmount) totals.push(totRow(`Zuschlag (${pct(inv.surchargePct)} %)`, `+ ${money(inv.surchargeAmount)}`));
   totals.push(totRow(hv ? 'Vereinbartes Honorar' : 'Gesamtbetrag', money(inv.total), { size: rem(1.15), bold: true, color: GOLD, pt: rem(0.6), borders: { top: line(1.125, INK) } }));

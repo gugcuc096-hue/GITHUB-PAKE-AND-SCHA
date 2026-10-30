@@ -1394,7 +1394,11 @@ document.addEventListener('ps:form-ok', () => buzz());
   // Banner, Beschriftungen und Hinweise aus Einstellungen → Texte & Banner
   if (window.PS.siteConfig && st.siteConfig) {
     PS.siteConfig.setLabels(st.siteConfig.labels);
-    PS.siteConfig.banner(st.siteConfig.banner, $('#content'), { className: 'dash-banner' });
+    PS.siteConfig.banners(st.siteConfig, $('#content'), { className: 'dash-banner' });
+    if (PS.theme) {
+      PS.theme.apply(st.siteConfig.style);
+      PS.theme.season(st.siteConfig.style && st.siteConfig.style.seasonDash === false ? '' : st.siteConfig.season);
+    }
     PS.siteConfig.observe($('#content'), $('#modalBody'), $('#nav'), $('#bottomNav'));
     PS.siteConfig.labels(document.body);
   }

@@ -30,7 +30,8 @@ async function buildTailwind() {
     }),
     autoprefixer({ remove: false }),
   ]).process('@tailwind base;@tailwind components;@tailwind utilities;', { from: undefined });
-  const next = HEADER + css;
+  // festes Gold → Variablen, damit die Akzentfarbe einstellbar bleibt (scripts/accent.js)
+  const next = HEADER + require('./accent').accentize(css);
   const prev = fs.existsSync(OUT) ? fs.readFileSync(OUT, 'utf8') : '';
   if (prev !== next) fs.writeFileSync(OUT, next);
   return { changed: prev !== next, bytes: Buffer.byteLength(next) };

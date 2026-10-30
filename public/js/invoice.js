@@ -46,6 +46,7 @@
                 <div><span>Zwischensumme</span><span class="num">${money(inv.subtotal)}</span></div>
                 ${inv.memberAmount ? `<div><span>${esc(inv.membershipName)} (${pct(inv.memberPct)} %)</span><span class="num">− ${money(inv.memberAmount)}</span></div>` : ''}
                 ${inv.coopAmount ? `<div><span>Kooperationsrabatt ${esc(inv.cooperationName)} (${pct(inv.coopPct)} %)</span><span class="num">− ${money(inv.coopAmount)}</span></div>` : ''}
+                ${inv.promoAmount ? `<div><span>${esc(inv.promoName)} (${pct(inv.promoPct)} %)</span><span class="num">− ${money(inv.promoAmount)}</span></div>` : ''}
                 ${inv.discountAmount ? `<div><span>Rabatt (${pct(inv.discountPct)} %)</span><span class="num">− ${money(inv.discountAmount)}</span></div>` : ''}
                 ${inv.surchargeAmount ? `<div><span>Zuschlag (${pct(inv.surchargePct)} %)</span><span class="num">+ ${money(inv.surchargeAmount)}</span></div>` : ''}
                 <div class="grand"><span>${hv ? 'Vereinbartes Honorar' : 'Gesamtbetrag'}</span><span>${money(inv.total)}</span></div>

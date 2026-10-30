@@ -23,7 +23,7 @@ const PUBLIC = path.join(__dirname, 'public');
 const DASH_DIR = path.join(PUBLIC, 'js', 'dashboard');
 const YEAR = 'public, max-age=31536000, immutable';
 /** Nur für die Kanzlei (Mandanten laden sie nie): Teile, deren Ansichten Kanzlei/Board vorbehalten sind. */
-const STAFF_PARTS = new Set(['07-konfiguration.js', '07-listen.js', '07-rechte-schalter.js', '07-team-einstellungen.js', '08-discord.js', '09-system.js', '09-verwaltung.js', '13-kanzlei.js']);
+const STAFF_PARTS = new Set(['07-konfiguration.js', '07-listen.js', '07-rechte-schalter.js', '07-stil.js', '07-team-einstellungen.js', '08-discord.js', '09-system.js', '09-verwaltung.js', '13-kanzlei.js']);
 const PROD = () => process.env.NODE_ENV === 'production';
 
 let esbuild = null;
@@ -196,10 +196,11 @@ const ALIAS = { rechnung: 'invoice' };
 function pages(req, res, next) {
   if (req.method !== 'GET' && req.method !== 'HEAD') return next();
   const m = req.path.match(/^\/([a-z0-9-]+)$/i);
-  const html = m && page(`${ALIAS[m[1]] || m[1]}.html`);
+  const name = m && (ALIAS[m[1]] || m[1]);
+  const html = name && page(`${name}.html`);
   if (!html) return next();
   res.set('Cache-Control', 'no-cache');
-  res.type('html').send(html);
+  res.type('html').send(require('./theme').inject(html, name)); // Stil & Saison (theme.js)
 }
 
 /** /js/dashboard.bundle.js (alle) und /js/dashboard.staff.js (nur Kanzlei – enthält keine Daten, nur Programmcode). */

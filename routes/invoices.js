@@ -12,6 +12,7 @@ const coop = require('../cooperations');
 const memberships = require('../memberships');
 const billing = require('../billing');
 const approvals = require('../discountApprovals');
+const promotions = require('../promotions');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -83,16 +84,17 @@ const createSchema = z.object({
   cooperationId: z.number().int().positive().nullable().optional(),
   membershipId: z.number().int().positive().nullable().optional(), // VIP / Lifetime
   surchargePct: z.number().min(0).max(100).default(0),
+  promo: z.boolean().default(true), // laufende Rabattaktion abziehen (promotions.js); false = diesmal ohne
   dueDate: dateOnly.nullable().optional(),
   notes: z.string().trim().max(3000).optional(),
 });
 
 /**
  * Berechnung wie im Tarifrechner der Startseite: erst Rabatte, dann Zuschlag.
- * VIP-/Lifetime-Rabatt, Kooperationsrabatt und sonstiger Rabatt beziehen sich auf die Zwischensumme
+ * VIP-/Lifetime-Rabatt, Kooperationsrabatt, Aktionsrabatt und sonstiger Rabatt beziehen sich auf die Zwischensumme
  * (zusammen höchstens 100 %); der Zuschlag auf den Betrag danach.
  */
-function computeTotals(items, discountPct, surchargePct, coopPct = 0, memberPct = 0) {
+function computeTotals(items, discountPct, surchargePct, coopPct = 0, memberPct = 0, promoPct = 0) {
   const subtotal = items.reduce((sum, it) => sum + it.quantity * it.unitPrice, 0);
   let rest = subtotal;
   const take = (pct) => {
@@ -102,9 +104,10 @@ function computeTotals(items, discountPct, surchargePct, coopPct = 0, memberPct 
   };
   const memberAmount = take(memberPct);
   const coopAmount = take(coopPct);
+  const promoAmount = take(promoPct);
   const discountAmount = take(discountPct);
   const surchargeAmount = Math.round((rest * surchargePct) / 100);
-  return { subtotal, memberAmount, coopAmount, discountAmount, surchargeAmount, total: rest + surchargeAmount };
+  return { subtotal, memberAmount, coopAmount, promoAmount, discountAmount, surchargeAmount, total: rest + surchargeAmount };
 }
 const VIA_LABEL = { discord: 'Discord-Rolle erkannt', konto: 'Konto zugeordnet', manuell: 'von Hand gewählt' };
 
@@ -171,8 +174,10 @@ router.post(
       if (ms.discount_pct >= k.discount_pct) k = null;
       else ms = null;
     }
+    // Rabattaktion für alle (z. B. Halloween): läuft sie heute, zieht die Rechnung sie automatisch ab
+    const promo = d.promo ? promotions.current() : null;
     const items = d.items.map((it) => ({ ...it, total: it.quantity * it.unitPrice }));
-    const t = computeTotals(items, d.discountPct, d.surchargePct, k ? k.discount_pct : 0, ms ? ms.discount_pct : 0);
+    const t = computeTotals(items, d.discountPct, d.surchargePct, k ? k.discount_pct : 0, ms ? ms.discount_pct : 0, promo ? promo.pct : 0);
     if (type && type.advancePct > 0 && !(d.notes || '').includes('Vorschuss:')) d.notes = [d.notes, billing.advanceLine(type.advancePct, t.total)].filter(Boolean).join('\n\n');
     const clientUserId = ms ? ms.user_id : c ? c.client_id || null : null;
     const number = nextInvoiceNumber(d.kind);
@@ -220,11 +225,13 @@ router.post(
       );
 
     if (type) db.prepare('UPDATE invoices SET type_key = ? WHERE id = ?').run(type.key, Number(info.lastInsertRowid));
+    if (promo && t.promoAmount) db.prepare('UPDATE invoices SET promo_id = ?, promo_name = ?, promo_pct = ?, promo_amount = ? WHERE id = ?').run(promo.id, promo.name, promo.pct, t.promoAmount, Number(info.lastInsertRowid));
     if (approval) approvals.markUsed(approval.id, Number(info.lastInsertRowid));
     const label = type ? type.name : d.kind === 'rechnung' ? 'Rechnung' : 'Honorarvereinbarung';
     const coopText = [
       ms ? `${ms.tier_name} ${ms.discount_pct} % (Wert ${money(t.subtotal)}, abgedeckt ${money(t.memberAmount)})` : '',
       k ? `Kooperationsrabatt ${k.name} ${k.discount_pct} % (${VIA_LABEL[via]})` : '',
+      promo && t.promoAmount ? `${promo.icon} ${promo.name} ${promo.pct} %` : '',
     ]
       .filter(Boolean)
       .join(' · ');
@@ -238,6 +245,7 @@ router.post(
         { name: 'Betrag', value: money(t.total) },
         ...(ms ? [{ name: ms.tier_name, value: `${ms.discount_pct} % (− ${money(t.memberAmount)}, Wert der Leistungen ${money(t.subtotal)})` }] : []),
         ...(k ? [{ name: 'Kooperationsrabatt', value: `${k.name} · ${k.discount_pct} % (− ${money(t.coopAmount)}, ${VIA_LABEL[via]})` }] : []),
+        ...(promo && t.promoAmount ? [{ name: 'Rabattaktion', value: `${promo.icon} ${promo.name} · ${promo.pct} % (− ${money(t.promoAmount)})` }] : []),
         { name: 'Akte', value: c ? c.case_number : '—' },
         { name: 'Erstellt von', value: u.display_name },
       ],
@@ -252,6 +260,7 @@ router.post(
           { name: 'Betrag', value: money(t.total) },
           ...(ms ? [{ name: ms.tier_name, value: t.total === 0 ? 'vollständig abgedeckt' : `${ms.discount_pct} %` }] : []),
           ...(k ? [{ name: 'Kooperationsrabatt', value: `${k.name} · ${k.discount_pct} %` }] : []),
+          ...(promo && t.promoAmount ? [{ name: 'Rabattaktion', value: `${promo.icon} ${promo.name} · ${promo.pct} %` }] : []),
           ...(d.dueDate ? [{ name: 'Fällig am', value: new Date(`${d.dueDate}T12:00:00`).toLocaleDateString('de-DE') }] : []),
         ],
         mention: 'client',

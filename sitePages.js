@@ -104,7 +104,7 @@ const BOOT = {
 function handler(page) {
   return async (req, res, next) => {
     try {
-      let html = require('./assets').rewrite(render(page, `${req.protocol}://${req.get('host')}`));
+      let html = require('./theme').inject(require('./assets').rewrite(render(page, `${req.protocol}://${req.get('host')}`)), page);
       if (BOOT[page]) {
         const data = await collect(req, BOOT[page]);
         html = html.replace(/<body[^>]*>/, (tag) => `${tag}\n<script type="application/json" id="psBoot">${jsonForHtml(data)}</script>`);
@@ -128,7 +128,8 @@ function previewHandler(file) {
       if (!previewRaw[file] || process.env.NODE_ENV !== 'production') previewRaw[file] = fs.readFileSync(path.join(__dirname, 'public', file), 'utf8');
       const origin = `${req.protocol}://${req.get('host')}`;
       res.set('Cache-Control', 'no-cache');
-      res.type('html').send(require('./assets').rewrite(previewRaw[file].replace(/(content=")\/img\/og-image\.png"/g, `$1${origin}/img/og-image.png"`)));
+      const html = require('./assets').rewrite(previewRaw[file].replace(/(content=")\/img\/og-image\.png"/g, `$1${origin}/img/og-image.png"`));
+      res.type('html').send(require('./theme').inject(html, file.replace(/\.html$/, '')));
     } catch (err) {
       next(err);
     }

@@ -162,6 +162,7 @@ app.use('/api/site', require('./routes/site'));
 app.use('/api/event-kinds', require('./routes/eventKinds').router); // Termin- und Fristenarten mit Fristenrechner
 app.use('/api/billing', require('./routes/billing').router); // Gebührenkategorien und Rechnungsarten
 app.use('/api/areas', require('./routes/areas').router); // Rechtsgebiete als Daten (Einstellungen → Listen)
+app.use('/api/promotions', require('./routes/promotions').router); // Rabattaktionen für alle (Halloween, Weihnachten …)
 app.use('/api/config', require('./routes/siteConfig').router); // Banner, Startseite, Beschriftungen, Mitteilungen, Export/Import
 app.use('/api/access', require('./routes/access').router); // Inhaber, Web-Admins, Rechte-Tabelle, Protokoll, Schalter
 app.use('/api/onboarding', require('./routes/onboarding'));
@@ -234,7 +235,7 @@ app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'], s
 // Unbekannte Adresse: eigene Seite im Kanzlei-Design (nur für Seitenaufrufe, die ausdrücklich text/html wollen; Bilder, Skripte, API bekommen nur 404)
 app.use((req, res) => {
   res.status(404);
-  if (req.method === 'GET' && /text\/html/.test(req.get('accept') || '')) return res.set('Cache-Control', 'no-cache').type('html').send(assets.page('404.html'));
+  if (req.method === 'GET' && /text\/html/.test(req.get('accept') || '')) return res.set('Cache-Control', 'no-cache').type('html').send(require('./theme').inject(assets.page('404.html'), '404'));
   res.end();
 });
 
