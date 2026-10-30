@@ -377,7 +377,8 @@
   /* ---------------------------------------------------------------- Glas: Glanz folgt der Maus (depth.css → .is-lit) */
   // Nur mit Maus; ein Bild pro Frame; die Fläche unter dem Zeiger bekommt --mx/--my, beim Verlassen klingt der Glanz aus.
   if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
-    const LIT = '.panel, .kpi, .glass-card, .modal-card';
+    // Flächen mit eigenem Spotlight (api.js, .ps-spot) setzen --mx/--my selbst – die bleiben unberührt
+    const LIT = ':is(.panel, .kpi, .glass-card, .modal-card):not(.ps-spot)';
     let lit = null;
     let ev = null;
     let queued = false;
