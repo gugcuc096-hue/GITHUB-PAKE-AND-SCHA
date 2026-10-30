@@ -980,7 +980,7 @@ async function handleUpload(input) {
   }
 
   if (kind === 'avatar') {
-    const blob = await resizeImage(files[0], { max: 512, square: true, webp: true });
+    const blob = await resizeImage(files[0], { max: 256, square: true, webp: true });
     const res = await api.upload('/api/auth/avatar', blob);
     st.user = res.user;
     renderUser();
@@ -988,7 +988,7 @@ async function handleUpload(input) {
     toast('Profilbild aktualisiert.');
   } else if (kind === 'team') {
     const id = Number(input.dataset.id);
-    const blob = await resizeImage(files[0], { max: 640, square: true });
+    const blob = await resizeImage(files[0], { max: 480, square: true });
     const res = await api.upload(`/api/admin/team/${id}/photo`, blob);
     const m = res.member;
     const photo = $('#tmPhoto');

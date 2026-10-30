@@ -1,0 +1,173 @@
+/*
+ * Tiefe, Glas, Licht – die gemeinsame Schicht über app.css (Dashboard, Anmeldung, Bewerbung, Karriere).
+ * Ein Licht kommt von oben links: Flächen haben oben eine helle Kante, unten einen weichen Schatten, Kennzahlen und
+ * Menüpunkte leuchten dezent in Gold. Die Höhen sind fünf feste Stufen (--sh-1 … --sh-4), damit überall dasselbe gilt:
+ *   1 = Karten und Listen · 2 = Panels · 3 = angehoben (Hover, Menüs) · 4 = Fenster
+ * Glas gibt es nur dort, wo Inhalt dahinter durchscheint (Kopfzeile, Menü, Fenster-Hintergrund) – nicht auf jeder Karte,
+ * das hält das Scrollen am Handy flüssig. Ohne Weichzeichner (ältere Browser, „Transparenz reduzieren“) werden die Flächen
+ * deckend. Wird nach app.css geladen.
+ */
+:root {
+  --lit-edge: rgba(255, 255, 255, 0.1);        /* helle Kante oben */
+  --lit-edge-soft: rgba(255, 255, 255, 0.04);
+  --lit-gold: rgba(212, 175, 55, 0.16);        /* goldenes Licht */
+  --sh-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 14px -8px rgba(0, 0, 0, 0.5);
+  --sh-2: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 24px -10px rgba(0, 0, 0, 0.55), 0 24px 48px -28px rgba(0, 0, 0, 0.5);
+  --sh-3: 0 2px 4px rgba(0, 0, 0, 0.35), 0 16px 32px -12px rgba(0, 0, 0, 0.6), 0 32px 64px -32px rgba(0, 0, 0, 0.55);
+  --sh-4: 0 4px 8px rgba(0, 0, 0, 0.4), 0 28px 56px -16px rgba(0, 0, 0, 0.7), 0 56px 96px -40px rgba(0, 0, 0, 0.6);
+  --glass-blur: blur(22px) saturate(1.45);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ---------------------------------------------------------------- Licht im Hintergrund */
+.ambient-bg {
+  background:
+    radial-gradient(ellipse 70% 45% at 12% -8%, rgba(212, 175, 55, 0.045), transparent 70%),
+    radial-gradient(ellipse 80% 60% at 50% -12%, #0d1a3a 0%, var(--navy-950) 78%),
+    linear-gradient(to right, rgba(255, 255, 255, 0.012) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.012) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 50px 50px, 50px 50px;
+}
+
+/* ---------------------------------------------------------------- Flächen */
+.panel {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 120px),
+    rgba(10, 18, 40, 0.74);
+  border-color: rgba(255, 255, 255, 0.09);
+  box-shadow: var(--sh-2), inset 0 1px 0 var(--lit-edge);
+}
+.glass-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0) 140px), var(--navy-800);
+  box-shadow: var(--sh-3), inset 0 1px 0 var(--lit-edge);
+}
+.card-gold { border-top-color: var(--gold-500); box-shadow: var(--sh-2), inset 0 1px 0 rgba(243, 229, 171, 0.35), 0 -10px 26px -18px rgba(212, 175, 55, 0.55); }
+
+/* Kennzahlen: leuchten oben rechts golden, heben sich beim Überfahren */
+.kpi {
+  background:
+    radial-gradient(120% 90% at 100% 0%, var(--lit-gold), transparent 55%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 90px),
+    rgba(10, 18, 40, 0.74);
+  transition: transform 0.28s var(--ease-out), box-shadow 0.28s var(--ease-out), border-color 0.28s ease;
+}
+.kpi-value { text-shadow: 0 0 28px rgba(212, 175, 55, 0.28); font-variant-numeric: lining-nums tabular-nums; }
+@media (hover: hover) and (pointer: fine) {
+  .kpi:hover { transform: translateY(-2px); border-color: rgba(212, 175, 55, 0.28); box-shadow: var(--sh-3), inset 0 1px 0 rgba(243, 229, 171, 0.2); }
+  .panel:is(a, button, [role="button"], [data-action]):hover { border-color: rgba(212, 175, 55, 0.28); box-shadow: var(--sh-3), inset 0 1px 0 rgba(243, 229, 171, 0.16); }
+}
+
+/* Listen: die Zeile unter dem Finger/der Maus bekommt Licht von links */
+.list-row { transition: background 0.2s ease, box-shadow 0.2s ease; }
+.list-row:hover { background: linear-gradient(90deg, rgba(212, 175, 55, 0.09), rgba(212, 175, 55, 0.02) 60%, transparent); box-shadow: inset 2px 0 0 rgba(212, 175, 55, 0.55); }
+.list-row.wrap:hover { background: transparent; box-shadow: none; }
+
+/* ---------------------------------------------------------------- Glas: Kopfzeile, Menü, Fenster */
+.glass-nav, .topbar { backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
+.glass-nav { background: linear-gradient(180deg, rgba(8, 14, 32, 0.92), rgba(2, 5, 14, 0.88)); box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 30px -18px rgba(0, 0, 0, 0.8); }
+.sidebar {
+  background: linear-gradient(180deg, rgba(10, 18, 42, 0.97), rgba(3, 6, 16, 0.98) 55%);
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04);
+}
+.sidebar.open { box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.05), 24px 0 64px rgba(0, 0, 0, 0.65); }
+.bottom-nav {
+  background: linear-gradient(180deg, rgba(10, 18, 42, 0.94), rgba(3, 6, 16, 0.97));
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.06), 0 -14px 32px -18px rgba(0, 0, 0, 0.8);
+}
+.bn-item.active::before { box-shadow: 0 0 14px 1px rgba(212, 175, 55, 0.6); }
+.bn-item.active .ico, .bn-item.active svg { filter: drop-shadow(0 0 6px rgba(212, 175, 55, 0.5)); }
+
+.nav-item { transition: background 0.2s ease, color 0.2s ease, box-shadow 0.25s ease; }
+.nav-item:hover { background: linear-gradient(90deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.015)); }
+.nav-item.active {
+  background: linear-gradient(90deg, rgba(212, 175, 55, 0.2), rgba(212, 175, 55, 0.04) 70%, transparent);
+  box-shadow: inset 2px 0 0 var(--gold-500), inset 0 1px 0 rgba(243, 229, 171, 0.1), 0 0 26px -10px rgba(212, 175, 55, 0.5);
+}
+.nav-item.active .ico { filter: drop-shadow(0 0 6px rgba(212, 175, 55, 0.45)); }
+.nav-count { box-shadow: 0 0 12px -2px rgba(212, 175, 55, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.4); }
+
+.modal { background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(8, 14, 32, 0.72), rgba(0, 0, 0, 0.8)); backdrop-filter: blur(10px) saturate(1.2); -webkit-backdrop-filter: blur(10px) saturate(1.2); }
+.modal-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0) 160px),
+    rgba(8, 14, 32, 0.985);
+  border-color: rgba(255, 255, 255, 0.1);
+  border-top-color: var(--gold-500);
+  box-shadow: var(--sh-4), inset 0 1px 0 rgba(243, 229, 171, 0.25), 0 -1px 30px -12px rgba(212, 175, 55, 0.45);
+}
+.modal-close { box-shadow: var(--sh-1), inset 0 1px 0 var(--lit-edge); }
+
+/* ---------------------------------------------------------------- Knöpfe: Wölbung, Licht, Druck */
+.btn-gold {
+  background: linear-gradient(180deg, #e3c250 0%, #d4af37 48%, #b8962e 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 244, 196, 0.55), inset 0 -1px 0 rgba(0, 0, 0, 0.18), 0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 22px -8px rgba(212, 175, 55, 0.55);
+}
+.btn-gold:hover { box-shadow: inset 0 1px 0 rgba(255, 244, 196, 0.65), inset 0 -1px 0 rgba(0, 0, 0, 0.18), 0 1px 2px rgba(0, 0, 0, 0.35), 0 12px 30px -8px rgba(212, 175, 55, 0.7); }
+.btn-gold:active { transform: translateY(0); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.25), 0 2px 8px -4px rgba(212, 175, 55, 0.5); filter: brightness(0.97); }
+.btn-outline { background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), var(--sh-1); }
+.btn-outline:hover { background: linear-gradient(180deg, rgba(212, 175, 55, 0.2), rgba(212, 175, 55, 0.08)); box-shadow: inset 0 1px 0 rgba(243, 229, 171, 0.2), 0 8px 20px -10px rgba(212, 175, 55, 0.45); }
+.btn-outline:active, .btn-danger:active, .btn-ghost:active { transform: translateY(0.5px); }
+.btn-danger { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05); }
+.icon-btn { background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.015)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07); }
+.icon-btn:hover { box-shadow: inset 0 1px 0 rgba(243, 229, 171, 0.2), 0 6px 16px -8px rgba(212, 175, 55, 0.5); }
+
+/* Tastaturfokus: Goldring mit Abstand und weichem Schein – überall gleich */
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--gold-500); outline-offset: 2px; box-shadow: 0 0 0 5px rgba(212, 175, 55, 0.16);
+}
+.field:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.25); }
+
+/* ---------------------------------------------------------------- Felder: leicht eingelassen */
+.field {
+  background: linear-gradient(180deg, rgba(5, 10, 24, 0.9), rgba(15, 23, 42, 0.8));
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.field:hover:not(:focus):not(:disabled) { border-color: rgba(255, 255, 255, 0.22); }
+.field:focus { box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35), 0 0 0 3px rgba(212, 175, 55, 0.2), 0 0 24px -6px rgba(212, 175, 55, 0.35); }
+.field::placeholder { color: rgba(148, 163, 184, 0.7); }
+
+/* ---------------------------------------------------------------- Chips, Marken */
+.chip { background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05); transition: all 0.2s var(--ease-out); }
+.chip:hover { transform: translateY(-1px); }
+.chip.active { background: linear-gradient(180deg, rgba(212, 175, 55, 0.26), rgba(212, 175, 55, 0.1)); box-shadow: inset 0 1px 0 rgba(243, 229, 171, 0.25), 0 6px 18px -10px rgba(212, 175, 55, 0.6); }
+.badge, .countdown { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07); }
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  .badge, .countdown { box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 22%, transparent); }
+}
+
+/* ---------------------------------------------------------------- Überschriften und Zahlen */
+h1, h2, .page-title, .modal-title { letter-spacing: -0.012em; text-rendering: optimizeLegibility; }
+.panel-title, .quiet-title, .topbar-title { letter-spacing: -0.006em; text-rendering: optimizeLegibility; }
+p, .modal-sub, .empty { text-wrap: pretty; }
+.font-mono, .badge-money, table td, table th { font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------------------- Leere Zustände */
+.empty {
+  position: relative; border: 1px dashed rgba(212, 175, 55, 0.2); border-radius: 16px; margin: 0.25rem 0;
+  background: radial-gradient(60% 70% at 50% 0%, rgba(212, 175, 55, 0.08), transparent 75%);
+}
+.empty .ico-lg {
+  box-sizing: content-box; padding: 0.7rem; width: 28px; height: 28px; border-radius: 50%; opacity: 1;
+  background: radial-gradient(circle at 50% 30%, rgba(212, 175, 55, 0.2), rgba(212, 175, 55, 0.05));
+  box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.3), 0 0 32px -6px rgba(212, 175, 55, 0.45);
+}
+.empty-line .ico-sm { filter: drop-shadow(0 0 6px rgba(212, 175, 55, 0.35)); }
+.skeleton { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03); }
+
+/* ---------------------------------------------------------------- Rückfälle */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-nav, .topbar, .sidebar, .bottom-nav, .modal { background-color: #040814; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .glass-nav, .topbar, .sidebar, .bottom-nav, .modal { backdrop-filter: none; -webkit-backdrop-filter: none; background: #040814; }
+}
+@media (forced-colors: active) {
+  .panel, .kpi, .modal-card, .btn-gold, .btn-outline, .field, .chip { box-shadow: none; }
+}
+/* Am Handy sparen: weniger und kleinere Schatten, kein Hochheben beim Tippen */
+@media (max-width: 767px) {
+  :root { --sh-2: 0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 18px -10px rgba(0, 0, 0, 0.55); --sh-3: var(--sh-2); --glass-blur: blur(16px) saturate(1.3); }
+  .kpi:hover, .chip:hover { transform: none; }
+}
