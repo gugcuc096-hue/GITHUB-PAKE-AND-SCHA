@@ -1851,8 +1851,9 @@ views.board = {
 /* ---------------------------------------------------------------- Terminart wählen & Fristenrechner */
 function eventKindApply(select) {
   const form = select.closest('form');
+  const calc = form && form.querySelector('#evCalc');
+  if (!calc) return; // Kopie eines gerade schließenden Fensters (ohne ids) – nichts zu tun
   const k = (st.eventKinds || []).find((x) => x.key === select.value);
-  const calc = form.querySelector('#evCalc');
   if (!k) {
     calc.hidden = true;
     return;
