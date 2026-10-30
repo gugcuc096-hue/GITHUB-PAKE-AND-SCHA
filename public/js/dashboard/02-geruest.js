@@ -762,6 +762,13 @@ function closeModal({ morph = false } = {}) {
   st.modalAppId = null;
   st.modalConcernId = null;
   st.returnCase = null;
+  // Die Seite dahinter wurde zurückgestellt (siehe renderView): jetzt einmal weich nachzeichnen
+  if (st.behindDirty) {
+    const token = st.navToken;
+    setTimeout(() => {
+      if (st.behindDirty && token === st.navToken && !$('#modal.open') && views[st.view]) renderView();
+    }, 0);
+  }
 }
 /** Neues Fenster an die Stelle des aktuellen setzen (z. B. Suchergebnis statt Suche) – ohne Rückweg dorthin. */
 async function modalInstead(fn) {
@@ -1007,7 +1014,18 @@ function playIn(el, cls) {
   void el.offsetWidth; // Animation neu starten
   el.classList.add(cls);
 }
-function renderView() {
+/*
+ * Solange ein Fenster (z. B. eine Akte) offen ist, bleibt die Seite dahinter ruhig: Sie wird nicht bei jeder Änderung im
+ * Fenster neu gezeichnet (das sah man durch den abgedunkelten Hintergrund als Neuladen). Stattdessen wird das Neuzeichnen
+ * vorgemerkt und beim Schließen des Fensters einmal nachgeholt – dann gleiten die Zeilen weich an ihren neuen Platz.
+ * { force: true } zeichnet trotzdem sofort (z. B. wenn das Fenster nichts mit der Seite dahinter zu tun hat).
+ */
+function renderView({ force = false } = {}) {
+  if (!force && $('#modal.open')) {
+    st.behindDirty = true;
+    return;
+  }
+  st.behindDirty = false;
   const before = flipSnapshot(); // Positionen der Zeilen vor dem Neuzeichnen (weiches Umsortieren)
   document.body.toggleAttribute('data-readbar', st.view === 'wiki'); // Lesefortschritt in langen Wiki-Artikeln
   window.PS.readBarOff();
@@ -1059,6 +1077,10 @@ async function refreshBehind() {
   try {
     const before = flash ? liveSnap($('#content')) : null;
     if (views[st.view].load) await views[st.view].load();
+    if ($('#modal.open')) {
+      st.behindDirty = true; // die Daten sind frisch, gezeichnet wird beim Schließen des Fensters
+      return;
+    }
     renderView();
     if (before) liveFlash($('#content'), before, '');
   } catch (e) {
