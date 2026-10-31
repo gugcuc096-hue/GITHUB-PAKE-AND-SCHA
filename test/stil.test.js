@@ -480,7 +480,8 @@ describe('Stil, Saison und Aktionen im Browser', { skip: chromium ? false : 'Pla
           });
           const b = btn.getBoundingClientRect();
           const top = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
-          return { z: cs.zIndex, pos: cs.position, events: cs.pointerEvents, painted, hit: !!top && !top.closest('.ps-season'), scenes: document.querySelectorAll('.ps-scene').length };
+          const fx = scene.querySelector('.ps-fx');
+          return { z: cs.zIndex, pos: cs.position, events: cs.pointerEvents, painted, hit: !!top && !top.closest('.ps-season'), scenes: document.querySelectorAll('.ps-scene').length, fxW: fx.width, w: innerWidth };
         });
         assert.equal(r.z, '-1', `${name}: hinter allem`);
         assert.equal(r.pos, 'fixed', `${name}: fest`);
@@ -488,6 +489,7 @@ describe('Stil, Saison und Aktionen im Browser', { skip: chromium ? false : 'Pla
         assert.ok(r.painted > 20, `${name}: Landschaft gezeichnet`);
         assert.ok(r.hit, `${name}: Knopf liegt über der Szene`);
         assert.equal(r.scenes, 1, `${name}: genau eine Szene`);
+        assert.equal(r.fxW, r.w, `${name}: Bewegungsebene in einfacher Auflösung (schont schwache Geräte)`);
       }
       await page.evaluate(() => PS.season.set('none'));
       assert.equal(await page.$('.ps-season'), null, 'aus');

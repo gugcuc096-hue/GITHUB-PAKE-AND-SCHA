@@ -49,8 +49,34 @@
     };
   }
   const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+  /** Weicher Lichtschein. Kleine Scheine kommen aus einem einmal gezeichneten Bild je Farbe (Verläufe pro Bild sind teuer). */
+  const sprites = new Map();
+  function sprite(c) {
+    const key = c.join();
+    let sp = sprites.get(key);
+    if (!sp) {
+      if (sprites.size > 48) sprites.clear();
+      sp = document.createElement('canvas');
+      sp.width = sp.height = 64;
+      const g = sp.getContext('2d');
+      const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+      gr.addColorStop(0, rgba(c, 1));
+      gr.addColorStop(1, rgba(c, 0));
+      g.fillStyle = gr;
+      g.fillRect(0, 0, 64, 64);
+      sprites.set(key, sp);
+    }
+    return sp;
+  }
   function glow(ctx, x, y, r, c, a = 1) {
-    if (r <= 0) return;
+    if (r <= 0 || a <= 0) return;
+    if (r < 80) {
+      const ga = ctx.globalAlpha;
+      ctx.globalAlpha = ga * Math.min(1, a);
+      ctx.drawImage(sprite(c), x - r, y - r, r * 2, r * 2);
+      ctx.globalAlpha = ga;
+      return;
+    }
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
     g.addColorStop(0, rgba(c, a));
     g.addColorStop(1, rgba(c, 0));
@@ -169,8 +195,9 @@
     document.querySelectorAll('.ps-season').forEach((n) => n.remove());
     root.classList.remove('has-season');
   }
-  function fit(c) {
-    const dpr = Math.min(1.5, window.devicePixelRatio || 1);
+  /** Leinwand auf Fenstergröße; die Bewegungsebene in einfacher Auflösung (spart auf hochauflösenden Bildschirmen viel). */
+  function fit(c, sharp = true) {
+    const dpr = sharp ? Math.min(1.5, window.devicePixelRatio || 1) : 1;
     const w = window.innerWidth;
     const h = window.innerHeight;
     c.width = Math.round(w * dpr);
@@ -200,7 +227,7 @@
       A.ctx.clearRect(0, 0, A.w, A.h);
       S.scenery(A.ctx, A.w, A.h, s);
       if (fx) {
-        B = fit(fx);
+        B = fit(fx, false);
         if (S.init) S.init(s);
       }
     };
@@ -214,14 +241,28 @@
     let raf = 0;
     let last = performance.now();
     let alive = true;
+    // Website ~30, Dashboard ~24 Bilder pro Sekunde. Drossel: kommt das Gerät nicht mit (Zeichnen dauert lange oder die
+    // ganze Seite ruckelt), erst halb so oft zeichnen, dann nur noch das stehende Bild – die Seite selbst hat Vorrang.
+    let every = isDash ? 41 : 31;
+    let prev = 0;
+    let busy = 0;
+    let gap = 0;
+    let seen = 0;
     if (fx && S.step) {
       const tick = (now) => {
         if (!alive) return;
         raf = requestAnimationFrame(tick);
-        if (now - last < 31) return; // höchstens ~30 Bilder pro Sekunde
+        if (document.hidden) {
+          prev = 0;
+          last = now;
+          return;
+        }
+        if (prev) gap = gap ? gap * 0.95 + (now - prev) * 0.05 : now - prev;
+        prev = now;
+        if (now - last < every) return;
         const dt = Math.min(0.05, (now - last) / 1000);
         last = now;
-        if (document.hidden) return;
+        const t0 = performance.now();
         if (S.trails) {
           B.ctx.globalCompositeOperation = 'destination-out';
           B.ctx.fillStyle = `rgba(0,0,0,${S.trails})`;
@@ -229,6 +270,20 @@
           B.ctx.globalCompositeOperation = 'source-over';
         } else B.ctx.clearRect(0, 0, B.w, B.h);
         S.step(B.ctx, dt, now / 1000, s);
+        const cost = performance.now() - t0;
+        busy = seen++ ? busy * 0.9 + cost * 0.1 : cost;
+        if (seen > 40 && (busy > 9 || gap > 45)) {
+          seen = 0;
+          busy = 0;
+          gap = 0;
+          if (every < 60) every = 66;
+          else {
+            alive = false; // nur noch Himmel und Landschaft
+            cancelAnimationFrame(raf);
+            B.ctx.clearRect(0, 0, B.w, B.h);
+            el.classList.add('is-still');
+          }
+        }
       };
       raf = requestAnimationFrame(tick);
     }
@@ -474,14 +529,15 @@
         ctx.fillStyle = `rgba(190,170,255,${0.16 * a})`;
         ctx.fillRect(0, 0, s.w, s.h);
         if (s.bolt.age < 0.22) {
-          ctx.strokeStyle = `rgba(235,225,255,${a})`;
-          ctx.lineWidth = 2.2;
-          ctx.shadowColor = 'rgba(180,150,255,0.9)';
-          ctx.shadowBlur = 14;
           ctx.beginPath();
           s.bolt.pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+          ctx.lineJoin = 'round';
+          ctx.strokeStyle = `rgba(180,150,255,${0.25 * a})`;
+          ctx.lineWidth = 9;
           ctx.stroke();
-          ctx.shadowBlur = 0;
+          ctx.strokeStyle = `rgba(235,225,255,${a})`;
+          ctx.lineWidth = 2.2;
+          ctx.stroke();
         }
         if (a <= 0) s.bolt = null;
       }
@@ -547,6 +603,7 @@
   /* ---------------------------------------------------------------- Weihnachten */
   SCENES.weihnachten = {
     lights: ['#ef4444', '#facc15', '#22c55e', '#38bdf8', '#f472b6'],
+    extra: '<div class="ps-aurora"><i></i><i></i><i></i></div>',
     scenery(ctx, w, h, s) {
       const r = rng(77);
       const u = s.u;
@@ -634,22 +691,7 @@
       s.nextShoot = rnd(5, 12);
     },
     step(ctx, dt, t, s) {
-      // Polarlicht: drei Vorhänge, die sich langsam wiegen
-      ctx.globalCompositeOperation = 'lighter';
-      const bands = [[[52, 211, 153], 0.2, 0.0018, 0.6], [[45, 212, 191], 0.26, 0.0024, -0.4], [[129, 140, 248], 0.17, 0.0013, 0.3]];
-      for (const [c, base, kx, sp] of bands) {
-        for (let x = 0; x < s.w; x += 7) {
-          const y = s.top + s.h * base + Math.sin(x * kx + t * sp) * s.h * 0.05 + Math.sin(x * kx * 2.7 - t * sp * 0.7) * s.h * 0.02;
-          const a = (0.08 + 0.06 * Math.sin(x * kx * 3 + t * 0.8)) * (s.dash ? 0.6 : 1);
-          const g = ctx.createLinearGradient(0, y, 0, y + s.h * 0.22);
-          g.addColorStop(0, rgba(c, 0));
-          g.addColorStop(0.25, rgba(c, a));
-          g.addColorStop(1, rgba(c, 0));
-          ctx.fillStyle = g;
-          ctx.fillRect(x, y, 7, s.h * 0.22);
-        }
-      }
-      ctx.globalCompositeOperation = 'source-over';
+      // (Polarlicht: .ps-aurora in season.css – bewegt der Browser selbst)
       for (const st of s.stars) {
         ctx.fillStyle = `rgba(255,255,255,${0.35 + 0.45 * Math.abs(Math.sin(t * 1.3 + st.ph))})`;
         ctx.fillRect(st.x, st.y, st.r, st.r);
@@ -1106,7 +1148,7 @@
 
   /* ---------------------------------------------------------------- Ostern & Frühling */
   SCENES.ostern = {
-    extra: '<div class="ps-rays"><i></i><i></i><i></i></div>',
+    extra: '<div class="ps-rays"></div>',
     scenery(ctx, w, h, s) {
       const r = rng(404);
       const u = s.u;

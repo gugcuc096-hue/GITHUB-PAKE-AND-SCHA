@@ -14,7 +14,7 @@
 .ps-scene.is-dash .ps-sky { opacity: 0.55; }
 .ps-scene.is-dash .ps-scenery { opacity: 0.5; }
 .ps-scene.is-dash .ps-fx { opacity: 0.6; }
-.ps-scene.is-dash .ps-fog, .ps-scene.is-dash .ps-rays { opacity: 0.4; }
+.ps-scene.is-dash .ps-fog, .ps-scene.is-dash .ps-rays, .ps-scene.is-dash .ps-aurora { opacity: 0.4; }
 
 /* Flächen werden während einer Saison etwas deckender – die Szene scheint nicht durch Felder */
 html.has-season { --navy-800: rgba(10, 18, 40, 0.92); }
@@ -34,16 +34,22 @@ html.has-season .btn-outline:not(:hover), html.has-season .tab-btn:not(.active) 
 
 /* Halloween: Nebelbänke ziehen über den Boden */
 .ps-fog { overflow: hidden; }
-.ps-fog i { position: absolute; left: -50%; right: -50%; bottom: -6vh; height: 30vh; background: radial-gradient(ellipse 30% 55% at 30% 70%, rgba(203, 190, 230, 0.12), transparent 70%), radial-gradient(ellipse 34% 50% at 72% 80%, rgba(167, 139, 250, 0.1), transparent 70%); filter: blur(8px); animation: ps-fog 40s linear infinite alternate; }
+.ps-fog i { position: absolute; left: -50%; right: -50%; bottom: -6vh; height: 30vh; background: radial-gradient(ellipse 30% 55% at 30% 70%, rgba(203, 190, 230, 0.12), transparent 70%), radial-gradient(ellipse 34% 50% at 72% 80%, rgba(167, 139, 250, 0.1), transparent 70%); animation: ps-fog 40s linear infinite alternate; }
 .ps-fog i + i { bottom: -12vh; animation-duration: 56s; animation-direction: alternate-reverse; }
 @keyframes ps-fog { from { transform: translateX(-12%); } to { transform: translateX(12%); } }
 
-/* Ostern: Sonnenstrahlen von rechts */
-.ps-rays { overflow: hidden; }
-.ps-rays i { position: absolute; right: -20vw; bottom: -10vh; width: 120vw; height: 140vh; transform-origin: 80% 100%; background: linear-gradient(90deg, transparent 40%, rgba(255, 236, 190, 0.07) 48%, transparent 56%); animation: ps-ray 16s ease-in-out infinite alternate; }
-.ps-rays i:nth-child(2) { rotate: -12deg; animation-duration: 21s; }
-.ps-rays i:nth-child(3) { rotate: -24deg; animation-duration: 27s; opacity: 0.7; }
-@keyframes ps-ray { from { transform: rotate(-6deg); opacity: 0.6; } to { transform: rotate(6deg); opacity: 1; } }
+/* Weihnachten: Nordlicht – drei Vorhänge, die der Browser selbst wiegt (kostet beim Zeichnen nichts) */
+.ps-aurora { overflow: hidden; }
+.ps-aurora i { position: absolute; left: -15%; width: 130%; top: 12%; height: 30vh; border-radius: 50% 50% 0 0 / 70% 70% 0 0; background: repeating-linear-gradient(90deg, rgba(52, 211, 153, 0) 0, rgba(52, 211, 153, 0.34) 1.6vw, rgba(52, 211, 153, 0.08) 3.1vw, rgba(52, 211, 153, 0.3) 4.4vw, rgba(52, 211, 153, 0) 6vw); -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 22%, rgba(0, 0, 0, 0.35) 60%, transparent 100%); mask-image: linear-gradient(180deg, transparent 0%, #000 22%, rgba(0, 0, 0, 0.35) 60%, transparent 100%); opacity: 0.5; transform: skewX(-8deg); animation: ps-aurora 19s ease-in-out infinite alternate; }
+.ps-aurora i:nth-child(2) { top: 19%; height: 24vh; background: repeating-linear-gradient(90deg, rgba(45, 212, 191, 0) 0, rgba(45, 212, 191, 0.3) 2.2vw, rgba(45, 212, 191, 0.06) 3.4vw, rgba(45, 212, 191, 0.26) 5vw, rgba(45, 212, 191, 0) 7vw); animation-duration: 26s; animation-direction: alternate-reverse; opacity: 0.42; }
+.ps-aurora i:nth-child(3) { top: 8%; height: 20vh; left: -5%; width: 90%; background: repeating-linear-gradient(90deg, rgba(129, 140, 248, 0) 0, rgba(129, 140, 248, 0.28) 1.8vw, rgba(129, 140, 248, 0) 4vw); animation-duration: 31s; opacity: 0.34; }
+@keyframes ps-aurora { 0% { translate: -3% 0; opacity: 0.3; } 50% { opacity: 0.62; } 100% { translate: 3% 0; opacity: 0.4; } }
+.ps-scene.is-dash .ps-aurora i, .ps-scene.is-dash .ps-fog i { animation: none; }
+
+/* Ostern: Sonnenstrahlen fächern von der Sonne aus – eine Ebene, nur die Helligkeit atmet (im Dashboard steht sie still) */
+.ps-rays { background: conic-gradient(from 270deg at 62% 80%, transparent 0deg 8deg, rgba(255, 236, 190, 0.09) 12deg, transparent 16deg 25deg, rgba(255, 236, 190, 0.07) 30deg, transparent 35deg 47deg, rgba(255, 236, 190, 0.06) 52deg, transparent 57deg 74deg, rgba(255, 236, 190, 0.05) 80deg, transparent 86deg 98deg, rgba(255, 236, 190, 0.07) 104deg, transparent 110deg 125deg, rgba(255, 236, 190, 0.08) 131deg, transparent 137deg 160deg, rgba(255, 236, 190, 0.06) 166deg, transparent 172deg 360deg); -webkit-mask-image: linear-gradient(180deg, #000 30%, transparent 82%); mask-image: linear-gradient(180deg, #000 30%, transparent 82%); animation: ps-ray 9s ease-in-out infinite alternate; }
+.ps-scene.is-dash .ps-rays { animation: none; }
+@keyframes ps-ray { from { opacity: 0.45; } to { opacity: 1; } }
 
 /* Lichterkette in der Kopfzeile: bleibt innerhalb der Leiste */
 .ps-lights { position: absolute; left: 0; right: 0; bottom: 0; height: 12px; overflow: hidden; z-index: 1; }
@@ -52,4 +58,4 @@ html.has-season .btn-outline:not(:hover), html.has-season .tab-btn:not(.active) 
 @keyframes ps-twinkle { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
 @media print { .ps-season { display: none !important; } }
-@media (prefers-reduced-transparency: reduce) { .ps-fog, .ps-rays { display: none; } }
+@media (prefers-reduced-transparency: reduce) { .ps-fog, .ps-rays, .ps-aurora { display: none; } }
