@@ -10,7 +10,7 @@ const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { startServer, client, TEAM, PASSWORD } = require('./helpers');
+const { startServer, client, TEAM, PASSWORD, pickTab } = require('./helpers');
 
 let chromium = null;
 try {
@@ -352,7 +352,7 @@ describe('Stil, Saison und Aktionen im Browser', { skip: chromium ? false : 'Pla
       await login(page);
       await page.evaluate(() => (location.href = '/dashboard?tab=texte#settings'));
       await page.waitForSelector('[data-action="cfg-tab"][data-tab="style"]', { timeout: 15000 });
-      await page.click('[data-action="cfg-tab"][data-tab="style"]');
+      await pickTab(page, '[data-action="cfg-tab"][data-tab="style"]');
       await page.waitForSelector('form[data-form="cfg-style"]');
       await page.click('[data-action="style-preset"][data-preset="smaragd"]');
       await page.waitForFunction(() => getComputedStyle(document.documentElement).getPropertyValue('--gold-500').trim() === '#34d399');
@@ -369,10 +369,10 @@ describe('Stil, Saison und Aktionen im Browser', { skip: chromium ? false : 'Pla
       await page.click('[data-action="season-try"][data-season="weihnachten"]');
       await page.waitForFunction(() => document.documentElement.dataset.season === 'weihnachten' && document.querySelector('.topbar .ps-lights .bulb') && document.querySelector('.ps-scene.is-dash .ps-fx'));
       // Anderer Bereich: Vorschau endet, Stil wie veröffentlicht
-      await page.click('[data-action="cfg-tab"][data-tab="banner"]');
+      await pickTab(page, '[data-action="cfg-tab"][data-tab="banner"]');
       await page.waitForFunction(() => getComputedStyle(document.documentElement).getPropertyValue('--gold-500').trim() !== '#34d399');
       // Wieder hin, veröffentlichen
-      await page.click('[data-action="cfg-tab"][data-tab="style"]');
+      await pickTab(page, '[data-action="cfg-tab"][data-tab="style"]');
       await page.click('[data-action="style-preset"][data-preset="smaragd"]');
       await Promise.all([page.waitForResponse((r) => r.url().includes('/api/config/style/publish') && r.ok()), page.click('[data-action="cfg-publish"][data-key="style"]')]);
       const site = await ctx.newPage();
@@ -396,7 +396,7 @@ describe('Stil, Saison und Aktionen im Browser', { skip: chromium ? false : 'Pla
       await login(page);
       await page.evaluate(() => (location.href = '/dashboard?tab=texte#settings'));
       await page.waitForSelector('[data-action="cfg-tab"][data-tab="promos"]', { timeout: 15000 });
-      await page.click('[data-action="cfg-tab"][data-tab="promos"]');
+      await pickTab(page, '[data-action="cfg-tab"][data-tab="promos"]');
       await page.waitForSelector('.promo-card.is-running');
       await page.click('.panel-head [data-action="promo-new"]');
       await page.waitForSelector('form[data-form="promo-save"]');

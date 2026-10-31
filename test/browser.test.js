@@ -486,7 +486,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await settle();
 
         // Verwenden → Per DM an Rolle: Empfänger anzeigen, senden, Fortschritt
-        await page.click('[data-action="msg-tab"][data-tab="use"]');
+        await pickTab(page, '[data-action="msg-tab"][data-tab="use"]');
         await pickTab(page, '[data-action="msg-use-tab"][data-tab="dm"]');
         await settle();
         assert.match(await page.textContent('#msgUse'), /in Direktnachrichten pingt das niemanden/);
@@ -1016,12 +1016,12 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.evaluate(() => (location.hash = '#concerns-board'));
         await settle();
         assert.ok((await page.textContent('#content')).includes('Rückruf zu meiner Akte'), 'Eingang zeigt das Anliegen');
-        await page.click('#content .settings-tabs a[href="#concerns"]');
+        await pickTab(page, '#content .settings-tabs a[href="#concerns"]');
         await settle();
         assert.equal(await page.evaluate(() => location.hash), '#concerns');
         assert.match(await page.textContent('#content .page-title'), /Meine Anliegen/);
         assert.ok(await page.$('#nav a[href="#concerns-board"].active'), 'Menüpunkt bleibt markiert');
-        await page.click('#content .settings-tabs a[href="#concerns-board"]');
+        await pickTab(page, '#content .settings-tabs a[href="#concerns-board"]');
         await settle();
         assert.equal(await page.evaluate(() => location.hash), '#concerns-board');
 
@@ -1029,7 +1029,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.evaluate((id) => openCase(id), kase.id);
         await page.waitForSelector('#modalBody .case-jump');
         assert.match(await page.textContent('#modalBody .case-jump [data-target="secInvoices"]'), /Rechnungen\s*1/);
-        await page.click('#modalBody .case-jump [data-target="secInvoices"]');
+        await pickTab(page, '#modalBody .case-jump [data-target="secInvoices"]');
         // weich gescrollt – warten, bis der Abschnitt angekommen ist
         await page.waitForFunction(() => {
           const sec = document.getElementById('secInvoices').getBoundingClientRect().top;
@@ -1079,7 +1079,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         assert.deepEqual(await page.$$eval('#content .settings-tabs .chip', (els) => els.map((e) => e.textContent.trim())), ['Kanzlei & Rechnungen', 'Website & Ränge', 'Discord', 'Integrationen', 'Lager', 'System', 'Listen', 'Texte & Banner', 'Rechte & Schalter']);
         assert.ok(await page.$('#content form[data-form="settings-firm"]'));
         // Website & Ränge: Bearbeiten-Links, Ränge mit Knöpfen, Rang-Dialog
-        await page.click('#content .settings-tabs [data-tab="site"]');
+        await pickTab(page, '#content .settings-tabs [data-tab="site"]');
         await settle();
         assert.equal(await page.locator('#content a[href="/?bearbeiten"]').count(), 1);
         assert.equal(await page.locator('#content [data-action="rank-edit"][data-id]').count(), 6, 'sechs Ränge');
@@ -1089,13 +1089,13 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         assert.equal(await page.inputValue('form[data-form="rank"] input[name="name"]'), 'Founding Partner');
         await page.keyboard.press('Escape');
         await settle();
-        await page.click('#content .settings-tabs [data-tab="integrations"]');
+        await pickTab(page, '#content .settings-tabs [data-tab="integrations"]');
         await settle();
         assert.match(await page.textContent('#content'), /FiveNet[\s\S]*Google Docs/);
-        await page.click('#content .settings-tabs [data-tab="system"]');
+        await pickTab(page, '#content .settings-tabs [data-tab="system"]');
         await settle();
         assert.match(await page.textContent('#content'), /Datensicherung[\s\S]*Notfall/);
-        await page.click('#content .settings-tabs [data-tab="bot"]');
+        await pickTab(page, '#content .settings-tabs [data-tab="bot"]');
         await settle();
         await page.click('#content .bot-nav-item[data-module="webhook"]');
         await settle();
@@ -2606,7 +2606,7 @@ describe('Browser: Board-Menü gebündelt, Hover-Karte, Kalender ziehen, Vorlage
       await page.click('#nav a[data-hub="inbox"]');
       await page.waitForSelector('#content .hub-tabs');
       assert.deepEqual(await page.$$eval('#content .hub-tabs a', (as) => as.map((x) => x.getAttribute('href'))), ['#concerns-board', '#applications', '#name-requests', '#reviews', '#resolutions']);
-      await page.click('#content .hub-tabs a[href="#applications"]');
+      await pickTab(page, '#content .hub-tabs a[href="#applications"]');
       await page.waitForFunction(() => location.hash === '#applications' && document.querySelector('#content .hub-tabs a.active')?.getAttribute('href') === '#applications');
       assert.equal(await page.getAttribute('#nav a[data-hub="inbox"]', 'aria-current'), 'page', 'Menüpunkt bleibt markiert');
 

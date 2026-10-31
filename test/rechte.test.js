@@ -5,7 +5,7 @@
  */
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const { startServer, client, TEAM } = require('./helpers');
+const { startServer, client, TEAM, pickTab } = require('./helpers');
 
 describe('Rechte der Konfiguration', () => {
   let srv;
@@ -196,7 +196,7 @@ describe('Rechte & Schalter im Dashboard', { skip: chromium ? false : 'Playwrigh
     await page.evaluate(() => (location.href = '/dashboard?tab=general#settings'));
     await page.waitForSelector('[data-form="settings-firm"]', { timeout: 15000 });
     // Reiter „Rechte & Schalter“: Rechte-Tabelle nur lesbar, kein Ernennen
-    await page.click('[data-action="settings-tab"][data-tab="access"]');
+    await pickTab(page, '[data-action="settings-tab"][data-tab="access"]');
     await page.waitForSelector('.perm-table');
     assert.equal(await page.locator('form[data-form="perm-matrix"]').count(), 0);
     assert.equal(await page.locator('form[data-form="webadmin-add"]').count(), 0);
