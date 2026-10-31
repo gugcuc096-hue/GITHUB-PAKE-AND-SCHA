@@ -2577,12 +2577,19 @@ describe('Browser: Board-Menü gebündelt, Hover-Karte, Kalender ziehen, Vorlage
       const a = client(srv.base);
       await a.login(TEAM.admin);
       const c = (await a.post('/api/cases', { title: 'Raub am Juweliergeschäft', area: 'strafrecht', clientName: 'Vito Russo', lawyerId: null })).json.case;
-      const day = new Date();
+      // Tag und Uhrzeit in Berliner Zeit wie im Browser – sonst rutscht der Termin am Monatsende (Test in UTC) in den nächsten Tag
+      const berlin = (d) => Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Berlin', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(d).filter((p) => p.type !== 'literal').map((p) => [p.type, Number(p.value)]));
+      const atBerlin = (y, m, d, h, min) => {
+        const guess = Date.UTC(y, m - 1, d, h, min);
+        const p = berlin(new Date(guess));
+        return new Date(guess - (Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute) - guess));
+      };
       // in der Zukunft, aber im selben Monat (am Monatsende bleiben nur wenige Tage; am letzten Tag spät am Abend)
-      const lastDay = new Date(day.getFullYear(), day.getMonth() + 1, 0).getDate();
-      const ahead = Math.min(3, lastDay - day.getDate());
-      day.setDate(day.getDate() + ahead);
-      day.setHours(ahead ? 18 : 23, ahead ? 0 : 30, 0, 0);
+      const now = berlin(new Date());
+      const lastDay = new Date(Date.UTC(now.year, now.month, 0)).getUTCDate();
+      const ahead = Math.min(3, lastDay - now.day);
+      const hour = ahead ? 18 : 23;
+      const day = atBerlin(now.year, now.month, now.day + ahead, hour, ahead ? 0 : 30);
       const ev = (await a.post('/api/calendar', { type: 'intern', title: 'Akteneinsicht vorbereiten', startsAt: day.toISOString(), caseId: c.id })).json.event;
       const inv = (await a.post('/api/invoices', { caseId: c.id, items: [{ description: 'Erstberatung', quantity: 1, unitPrice: 15000 }] })).json.invoice;
 
@@ -2618,9 +2625,9 @@ describe('Browser: Board-Menü gebündelt, Hover-Karte, Kalender ziehen, Vorlage
       await page.click('#nav a[href="#calendar"]');
       const chip = page.locator(`#content .cal-ev[data-ev="${ev.id}"]`);
       await chip.waitFor();
-      const target = new Date(day);
-      target.setDate(day.getDate() + (day.getDate() > 20 ? -1 : 1));
-      const key = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(target.getDate()).padStart(2, '0')}`;
+      const evDay = now.day + ahead;
+      const targetDay = evDay + (evDay > 20 ? -1 : 1);
+      const key = `${now.year}-${String(now.month).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;
       const from = await chip.boundingBox();
       const to = await page.locator(`#content .cal-day[data-day="${key}"]`).boundingBox();
       await page.mouse.move(from.x + 10, from.y + 5);
@@ -2631,8 +2638,9 @@ describe('Browser: Board-Menü gebündelt, Hover-Karte, Kalender ziehen, Vorlage
       await page.mouse.up();
       await page.waitForSelector('.ps-toast >> text=verschoben');
       const moved = (await a.get('/api/calendar')).json.events.find((e) => e.id === ev.id);
-      assert.equal(new Date(moved.startsAt).getDate(), target.getDate(), 'neuer Tag');
-      assert.equal(new Date(moved.startsAt).getHours(), 18, 'Uhrzeit bleibt');
+      const landed = berlin(new Date(moved.startsAt));
+      assert.equal(landed.day, targetDay, 'neuer Tag');
+      assert.equal(landed.hour, hour, 'Uhrzeit bleibt');
 
       // Rechnung als bezahlt: nur die Meldung, kein Stempel über der Seite
       await page.click('#nav a[href="#invoices"]');
