@@ -1,5 +1,5 @@
 /*
- * Kanzlei-Dashboard – Einstellungen: Texte & Banner (Banner, Startseite, Beschriftungen, Mitteilungen – jeweils Entwurf →
+ * Kanzlei-Dashboard – Einstellungen: Website und Mitteilungen (Banner, Startseite, Beschriftungen, Mitteilungen – jeweils Entwurf →
  * Veröffentlichen), Export/Import aller Einstellungen und „Als Rang ansehen“.
  * Wird nach den vorherigen Teilen geladen (Reihenfolge siehe dashboard.html).
  */
@@ -262,9 +262,12 @@ function viewAsBand() {
 
 /* ---------------------------------------------------------------- Aktionen */
 Object.assign(actions, {
+  // Konfigurations-Bereiche sind eigene Einträge in der Leiste der Einstellungen
   'cfg-tab': (el) => {
-    st.cfgTab = el.dataset.tab;
+    st.cfgTab = st.settingsTab = el.dataset.tab;
+    if (st.view === 'settings') history.replaceState(history.state, '', `${location.pathname}?tab=${st.settingsTab}#settings`);
     renderView();
+    if ($('.set-main')) playIn($('.set-main'), 'swap-in');
   },
   'cfg-publish': async (el) => {
     const key = el.dataset.key;
@@ -438,7 +441,7 @@ document.addEventListener('click', (e) => {
       await api.put('/api/config/labels/draft', next);
       hint.textContent = text || old;
       hint.dataset.hintDone = text;
-      toast('Hinweis im Entwurf gespeichert – unter Einstellungen → Texte & Banner → Beschriftungen veröffentlichen.', 'info', { duration: 6000 });
+      toast('Hinweis im Entwurf gespeichert – unter Einstellungen → Website → Beschriftungen veröffentlichen.', 'info', { duration: 6000 });
       if (st.cfg) await loadConfig();
     });
   });

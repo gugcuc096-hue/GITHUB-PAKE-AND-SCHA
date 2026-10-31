@@ -210,16 +210,21 @@ const DISCORD_ICON =
 /** Wer irgendein Konfigurations-Recht hat, sieht „Einstellungen“. */
 const CONFIG_PERMS = ['settings.edit', 'site.edit', 'discord.edit', 'system.edit', 'templates.edit', 'config.audit'];
 const VIEWS = {
+  // Menü in vier Bereichen – jede Seite hat genau einen Weg (navHidden: nicht im Menü, sondern unten bzw. in den Einstellungen)
+  // Arbeit (ohne Überschrift)
   overview: { label: 'Übersicht', icon: 'home' },
   cases: { label: 'Akten', clientLabel: 'Meine Akten', icon: 'folder' },
-  clients: { label: 'Mandanten', icon: 'idCard', staff: true },
   tasks: { label: 'Aufgaben', icon: 'tasks', staff: true },
   calendar: { label: 'Kalender & Fristen', short: 'Kalender', clientLabel: 'Termine', icon: 'calendar' },
-  invoices: { label: 'Rechnungen', icon: 'receipt' },
-  'vip-angebot': { label: 'VIP & Lifetime', short: 'VIP', icon: 'crown', client: true, feature: 'vip' },
   mail: { label: 'Kanzlei-Post', short: 'Post', icon: 'mail' },
-  // Menügruppen (Überschrift „section“): Kanzlei und Board of Partners lassen sich auf- und zuklappen; Seiten eines
-  // Bündels (NAV_HUBS) sind ein Menüpunkt mit Reitern oben
+  // Mandanten & Geld (Überschrift nur für die Kanzlei – Mandanten sehen Rechnungen und VIP einfach weiter oben)
+  clients: { label: 'Mandanten', icon: 'idCard', staff: true, section: 'Mandanten & Geld', staffSection: true },
+  invoices: { label: 'Rechnungen', icon: 'receipt', section: 'Mandanten & Geld', staffSection: true },
+  'vip-angebot': { label: 'VIP & Lifetime', short: 'VIP', icon: 'crown', client: true, feature: 'vip' },
+  vip: { label: 'VIP & Lifetime', short: 'VIP', icon: 'crown', board: true, feature: 'vip', section: 'Mandanten & Geld' },
+  cooperations: { label: 'Kooperationen', icon: 'tag', board: true, section: 'Mandanten & Geld' },
+  fees: { label: 'Honorarordnung', icon: 'scale', perm: ['fees.edit'], section: 'Mandanten & Geld' },
+  // Kanzlei: lässt sich auf- und zuklappen
   board: { label: 'Pinnwand', icon: 'pin', staff: true, section: 'Kanzlei' },
   wiki: { label: 'Kanzlei-Wiki', short: 'Wiki', icon: 'book', staff: true, section: 'Kanzlei' },
   concerns: { label: 'Anliegen ans Board', short: 'Anliegen', icon: 'chat', section: 'Kanzlei', staffSection: true },
@@ -227,7 +232,7 @@ const VIEWS = {
   feedback: { label: '360°-Feedback', short: 'Feedback', icon: 'users', staff: true, section: 'Kanzlei' },
   lager: { label: 'Kanzlei-Lager', short: 'Lager', icon: 'box', staff: true, section: 'Kanzlei' },
   personnel: { label: 'Personalprotokoll', short: 'Personal', icon: 'star', staff: true, section: 'Kanzlei' },
-  // Board: eigene und eingegangene Anliegen sind ein Menüpunkt „Anliegen“ (Reiter „Eingang“ / „Meine Anliegen“)
+  // Board of Partners: Eingang, Team und Statistik (je ein Menüpunkt mit Reitern, NAV_HUBS)
   'concerns-board': { label: 'Eingegangene Anliegen', navLabel: 'Anliegen', short: 'Anliegen', icon: 'chat', board: true, section: 'Board of Partners' },
   resolutions: { label: 'Beschlüsse', icon: 'ballot', board: true, section: 'Board of Partners' },
   applications: { label: 'Bewerbungen', icon: 'userAdd', board: true, section: 'Board of Partners' },
@@ -237,13 +242,11 @@ const VIEWS = {
   users: { label: 'Benutzer', icon: 'key', admin: true, section: 'Board of Partners' },
   stats: { label: 'Kanzlei-Statistik', short: 'Statistik', icon: 'chart', board: true, section: 'Board of Partners' },
   work: { label: 'Kanzlei-Statistik', short: 'Statistik', icon: 'briefcase', board: true, hidden: true }, // Reiter „Aktenbearbeitung“ der Kanzlei-Statistik
-  vip: { label: 'VIP & Lifetime', short: 'VIP', icon: 'crown', board: true, feature: 'vip', section: 'Board of Partners' },
-  cooperations: { label: 'Kooperationen', icon: 'tag', board: true, section: 'Board of Partners' },
-  fees: { label: 'Honorarordnung', icon: 'scale', perm: ['fees.edit'], section: 'Verwaltung' },
   audit: { label: 'Protokoll', icon: 'list', admin: true, section: 'Board of Partners' },
-  system: { label: 'Systemzustand', short: 'System', icon: 'chart', perm: ['system.edit'], section: 'Verwaltung' },
-  settings: { label: 'Einstellungen', icon: 'cog', perm: CONFIG_PERMS, section: 'Verwaltung' },
-  profile: { label: 'Mein Profil', short: 'Profil', icon: 'user', section: 'Konto' },
+  // unten im Menü (Zahnrad) bzw. in den Einstellungen
+  settings: { label: 'Einstellungen', icon: 'cog', perm: CONFIG_PERMS, navHidden: true },
+  system: { label: 'Systemzustand', short: 'System', icon: 'chart', perm: ['system.edit'], navHidden: true }, // Einstellungen → Rechte & System
+  profile: { label: 'Mein Profil', short: 'Profil', icon: 'user', navHidden: true },
   'invoice-new': { label: 'Neues Dokument', icon: 'receipt', staff: true, hidden: true },
 };
 

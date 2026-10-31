@@ -1072,12 +1072,13 @@ const actions = {
     if (x) openModal(templateForm(x), { wide: true });
   },
   'settings-tab': async (el) => {
-    st.settingsTab = el.dataset.tab;
+    st.settingsTab = SETTINGS_LEGACY[el.dataset.tab] || el.dataset.tab;
     history.replaceState(history.state, '', `${location.pathname}?tab=${st.settingsTab}#settings`);
     if (st.settingsTab === 'bot' && st.bot && !st.botDiscord) await loadBotDiscord();
+    if (st.settingsTab === 'health') st.system = await api.get('/api/system');
     renderView();
-    // Inhalt unter den Reitern weich wechseln
-    for (let n = $('.settings-tabs') && $('.settings-tabs').nextElementSibling; n; n = n.nextElementSibling) playIn(n, 'swap-in');
+    // Inhalt neben der Leiste weich wechseln
+    if ($('.set-main')) playIn($('.set-main'), 'swap-in');
   },
   'bot-module': async (el) => {
     st.botModule = el.dataset.module;

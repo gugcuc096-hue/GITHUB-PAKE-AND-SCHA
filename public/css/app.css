@@ -384,6 +384,8 @@ a:hover > .brand-logo { transform: scale(1.04); }
 .brand-name { font-family: var(--font-display); font-size: 1.2rem; font-weight: 600; line-height: 1.1; }
 .brand-sub { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.2em; color: var(--gold-500); }
 .nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+/* Menü unten: Einstellungen und Mein Profil (Linie darüber, kein eigener Bereich) */
+.nav-foot { margin-top: 0.75rem; padding-top: 0.6rem; border-top: 1px solid var(--line); }
 .nav-section { font-size: 0.64rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-dim); padding: 1rem 0.85rem 0.35rem; }
 .nav-item {
   display: flex; align-items: center; gap: 0.75rem; padding: 0.62rem 0.85rem; border-radius: 12px; color: var(--text-muted);
@@ -2850,4 +2852,27 @@ body.hint-edit .form-hint[data-hint-key]:hover { background: rgba(var(--accent-r
 @media (max-width: 699px) {
   .case-jump { min-height: 3.2rem; align-items: center; }
   .case-jump .tabrow-pick select { min-height: 0; height: 2.5rem; padding-block: 0; }
+}
+
+/* Einstellungen: Leiste links mit Gruppen und Suche (am Handy und Tablet: Suche + Auswahlliste) */
+.set-layout { display: grid; grid-template-columns: 15.5rem minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+.set-side { position: sticky; top: 5.25rem; display: flex; flex-direction: column; gap: 0.75rem; }
+.set-search .field { padding-left: 2.4rem; }
+.set-nav { display: flex; flex-direction: column; gap: 0.15rem; max-height: calc(100vh - 11rem); overflow-y: auto; scrollbar-width: thin; padding-right: 0.25rem; }
+.set-nav-group + .set-nav-group { margin-top: 0.6rem; }
+.set-nav-head { font-size: 0.64rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-dim); padding: 0.4rem 0.75rem 0.3rem; }
+.set-nav-item { display: flex; align-items: center; gap: 0.6rem; width: 100%; padding: 0.55rem 0.75rem; border: 0; border-radius: 10px; background: none; color: var(--text-muted); font: inherit; font-size: 0.875rem; text-align: left; text-decoration: none; cursor: pointer; transition: background 0.15s ease, color 0.15s ease; }
+.set-nav-item:hover { background: rgba(255, 255, 255, 0.05); color: #fff; }
+.set-nav-item.active { color: var(--gold-light); background: var(--gold-soft); box-shadow: inset 2px 0 0 var(--gold-500); }
+.set-nav-item .ico-sm { flex: none; opacity: 0.85; }
+.set-nav-item .set-go { margin-left: auto; opacity: 0.5; }
+.set-draft { margin-left: auto; color: var(--gold-500); font-weight: 700; }
+.set-pick { display: none; }
+.set-main { min-width: 0; }
+@media (max-width: 1023px) {
+  .set-layout { grid-template-columns: 1fr; gap: 1rem; }
+  .set-side { position: static; }
+  .set-nav { display: none; }
+  .set-pick { display: block; }
+  .set-nav.is-searching { display: flex; max-height: none; padding: 0.4rem; border: 1px solid var(--glass-border); border-radius: 14px; background: rgba(8, 14, 32, 0.96); }
 }

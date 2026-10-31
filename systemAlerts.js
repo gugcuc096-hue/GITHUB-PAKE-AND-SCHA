@@ -101,7 +101,7 @@ function checkBot() {
 function backupFailed(err) {
   raise('backup', {
     title: 'Datensicherung fehlgeschlagen',
-    description: `Die tägliche Sicherung der Datenbank hat nicht geklappt: ${clean(err && err.message)}. Der Server versucht es stündlich erneut. Einstellungen → System → Datensicherung → „Jetzt sichern“.`,
+    description: `Die tägliche Sicherung der Datenbank hat nicht geklappt: ${clean(err && err.message)}. Der Server versucht es stündlich erneut. Einstellungen → Rechte & System → Sicherung & Notfall → „Jetzt sichern“.`,
   });
 }
 function backupOk() {

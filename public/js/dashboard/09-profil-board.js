@@ -999,7 +999,7 @@ async function handleUpload(input) {
     toast('Foto gespeichert – live auf der Website.');
     await refreshBehind();
   } else if (kind === 'storage-item') {
-    // Bild eines Lager-Gegenstands (Einstellungen → Lager)
+    // Bild eines Lager-Gegenstands (Lager → Gegenstände verwalten)
     await api.upload(`/api/storage/items/${input.dataset.id}/image`, await resizeImage(files[0], { max: 480, webp: true }));
     toast('Bild gespeichert.');
     await reloadStorageAdmin();

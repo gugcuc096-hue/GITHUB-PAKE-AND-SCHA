@@ -304,7 +304,7 @@ function googleDocsPanel(g) {
   }
   return `<section class="panel panel-pad mt-4 lg:mt-5">
       <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${icon('doc')} Google Docs</h2>${status}</div>
-      <p class="text-sm text-muted">Jede Rechnung, jeder Vertrag und jeder Schriftsatz bekommt <strong>automatisch ein Google Doc</strong> – im Layout der Druckansicht, im Google Drive der Kanzlei und für <strong>jeden mit dem Link lesbar</strong>; Aktenauszüge auf Wunsch über die Druckansicht. Unterschriften, Zahlungen und Änderungen übernimmt der Server automatisch; der Link bleibt gleich. Im Dashboard öffnet der Knopf eines fertigen Dokuments direkt das Google Doc. Außerdem legt der Server jede Nacht eine Kopie der Datensicherung in einem eigenen, <strong>nicht freigegebenen</strong> Ordner ab (Einstellungen → System).</p>
+      <p class="text-sm text-muted">Jede Rechnung, jeder Vertrag und jeder Schriftsatz bekommt <strong>automatisch ein Google Doc</strong> – im Layout der Druckansicht, im Google Drive der Kanzlei und für <strong>jeden mit dem Link lesbar</strong>; Aktenauszüge auf Wunsch über die Druckansicht. Unterschriften, Zahlungen und Änderungen übernimmt der Server automatisch; der Link bleibt gleich. Im Dashboard öffnet der Knopf eines fertigen Dokuments direkt das Google Doc. Außerdem legt der Server jede Nacht eine Kopie der Datensicherung in einem eigenen, <strong>nicht freigegebenen</strong> Ordner ab (Einstellungen → Rechte & System → Sicherung &amp; Notfall).</p>
       ${body}
     </section>`;
 }
@@ -439,7 +439,7 @@ function discordOAuthCheck(d) {
 views.settings = {
   async load() {
     const q = new URLSearchParams(location.search).get('tab');
-    if (SETTINGS_TABS.some(([k]) => k === q)) st.settingsTab = q;
+    if (q && (SETTINGS_LEGACY[q] || SETTINGS_SECTIONS.some((x) => x.key === q))) st.settingsTab = SETTINGS_LEGACY[q] || q;
     const modul = new URLSearchParams(location.search).get('modul');
     if (BOT_MODULES.some(([k]) => k === modul)) st.botModule = modul;
     if (modul) history.replaceState(history.state, '', `${location.pathname}?tab=${st.settingsTab || 'general'}#settings`);
@@ -455,7 +455,6 @@ views.settings = {
       need('system.edit', () => load.fivenet(true)),
       need('site.edit', () => api.get('/api/site/ranks').then((x) => (st.siteRanks = x.ranks), () => (st.siteRanks = []))),
       need('site.edit', () => api.get('/api/site/texts').then((x) => (st.siteTexts = x.texts), () => (st.siteTexts = []))),
-      need('system.edit', () => api.get('/api/storage/items').then((x) => (st.storageAdmin = x), () => (st.storageAdmin = null))),
       loadAccess().catch(() => (st.access = null)),
       can('settings.edit') ? loadLists().catch(() => (st.lists = null)) : Promise.resolve(),
       canAny(['site.edit', 'settings.edit']) ? loadConfig().catch(() => (st.cfg = null)) : Promise.resolve(),
@@ -468,24 +467,22 @@ views.settings = {
     st.bot = bot;
     if (st.settingsTab === 'bot' && bot && !st.botDiscord) await loadBotDiscord();
     if (st.settingsTab === 'bot' && bot) await loadBotMessages().catch(() => {});
+    if (st.settingsTab === 'health' && can('system.edit')) st.system = await api.get('/api/system').catch(() => null);
   },
   render() {
     const s = st.settings;
-    const tabs = SETTINGS_TABS.filter(([k]) => canAny(TAB_PERMS[k]));
-    const tab = tabs.some(([k]) => k === st.settingsTab) ? st.settingsTab : tabs.length ? tabs[0][0] : 'access';
-    const head = `<div class="page-head"><div><h1 class="page-title">Einstellungen</h1><p class="page-sub">Kanzlei &amp; Rechnungen, Website, Discord, Integrationen, Lager und System. Vertrags- und Schriftsatz-Vorlagen stehen im Kanzlei-Wiki.</p></div></div>
-        <div class="chip-row settings-tabs" role="tablist" aria-label="Bereiche der Einstellungen">${SETTINGS_TABS.map(
-          ([k, label, ic]) => `<button type="button" class="chip ${tab === k ? 'active' : ''}" role="tab" aria-selected="${tab === k}" data-action="settings-tab" data-tab="${k}">${ic === 'discord' ? DISCORD_ICON : icon(ic, 'ico-sm')}<span>${esc(label)}</span></button>`
-        ).join('')}</div>`;
-    if (tab === 'access') return head + accessPanels();
-    if (tab === 'texte') return head + configPanels();
-    if (tab === 'listen') return head + listsPanels();
-    if (tab === 'bot') return head + botSettings();
-    if (tab === 'integrations') return `${head}${fivenetSettingsPanel(s)}${googleDocsPanel(st.google)}`;
-    if (tab === 'lager') return head + storageSettingsPanel();
-    if (tab === 'system') return `${head}${backupPanel()}<div class="mt-4 lg:mt-5">${emergencyPanel()}</div>`;
-    if (tab === 'site') return `${head}${websitePanel(s)}<div class="mt-4 lg:mt-5">${lotmPanel(s)}</div><div class="mt-4 lg:mt-5">${siteTextsPanel()}</div><div class="mt-4 lg:mt-5">${ranksPanel()}</div>`;
-    return `${head}
+    const list = settingsVisible();
+    const key = settingsCurrent(list);
+    const sec = list.find((x) => x.key === key);
+    const head = `<div class="page-head"><div><h1 class="page-title">Einstellungen</h1><p class="page-sub">Alles an einem Ort – Bereich wählen oder nach einer Einstellung suchen. Vertrags- und Schriftsatz-Vorlagen stehen im Kanzlei-Wiki.</p></div></div>`;
+    if (!sec) return `${head}<div class="panel panel-pad">${empty('Dafür fehlt Ihnen das Recht.', 'shield')}</div>`;
+    return `${head}<div class="set-layout">${settingsSide(list, key)}<div class="set-main" data-set-section="${key}">${settingsBody(key, s)}</div></div>`;
+  },
+};
+
+/** Kanzleidaten & Rechnungen (Einstellungen → Kanzlei). */
+function settingsGeneral(s) {
+  return `
         <section class="panel panel-pad">
           <div class="panel-head"><h2 class="panel-title">Kanzleidaten & Erinnerungen</h2></div>
           <form data-form="settings-firm" class="form-grid cols-2">
@@ -506,33 +503,131 @@ views.settings = {
             <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button></div>
           </form>
         </section>`;
-  },
-};
+}
 
 /* Einstellungen in Reitern – „bot“ ist der Discord-Reiter (Webhook, Login, Tickets und Bot-Module; alte Links ?tab=bot gelten weiter) */
-const SETTINGS_TABS = [
-  ['general', 'Kanzlei & Rechnungen', 'receipt'],
-  ['site', 'Website & Ränge', 'globe'],
-  ['bot', 'Discord', 'discord'],
-  ['integrations', 'Integrationen', 'link'],
-  ['lager', 'Lager', 'box'],
-  ['system', 'System', 'shield'],
-  ['listen', 'Listen', 'tag'],
-  ['texte', 'Texte & Banner', 'edit'],
-  ['access', 'Rechte & Schalter', 'key'],
-];
-/** Welches Recht einen Reiter öffnet (irgendeines der genannten). */
-const TAB_PERMS = {
-  general: ['settings.edit'],
-  site: ['site.edit'],
-  bot: ['discord.edit'],
-  integrations: ['system.edit'],
-  lager: ['system.edit'],
-  system: ['system.edit'],
-  listen: ['settings.edit'],
-  texte: ['site.edit', 'settings.edit'],
-  access: CONFIG_PERMS,
-};
+/*
+ * Einstellungen: eine Seite mit Leiste links (am Handy eine Auswahlliste mit Gruppen) und Suche. Jeder Bereich steht
+ * genau einmal hier – die früheren Unterreiter von „Texte & Banner“ sind eigene Bereiche, das Lager wird auf seiner Seite
+ * verwaltet, Honorarordnung und VIP sind Verweise auf ihre Seiten.
+ * [Schlüssel, Bezeichnung, Gruppe, Symbol, Rechte (eines genügt), Suchbegriffe]
+ */
+const SETTINGS_SECTIONS = [
+  ['general', 'Kanzleidaten & Rechnungen', 'Kanzlei', 'receipt', ['settings.edit'], 'Kanzleisitz Anschrift Briefkopf Zahlungshinweis Kontakt Zahlungserinnerung Wochenbericht Aufräumen Einarbeitung Checkliste liegengeblieben'],
+  ['numbering', 'Aktenzeichen', 'Kanzlei', 'folder', 'cfg', 'Muster Nummern Kürzel Bereich'],
+  ['listen', 'Listen', 'Kanzlei', 'tag', ['settings.edit'], 'Rechtsgebiete Terminarten Fristenarten Rechnungsarten Gebühren Mandatsformular'],
+  ['site', 'Website & Ränge', 'Website', 'globe', ['site.edit'], 'Ränge Anwalt des Monats Website-Texte Team'],
+  ['home', 'Startseite', 'Website', 'home', 'cfg', 'Startseite Abschnitte Reihenfolge'],
+  ['labels', 'Beschriftungen', 'Website', 'edit', 'cfg', 'Beschriftungen Namen Begriffe'],
+  ['banner', 'Banner', 'Website', 'bell', 'cfg', 'Banner Hinweis Streifen Countdown'],
+  ['style', 'Stil & Saison', 'Website', 'star', 'cfg', 'Stil Farbe Akzent Schrift Glas Rundung Bewegung Saison Halloween Weihnachten Deko'],
+  ['promos', 'Rabattaktionen', 'Geld', 'tag', 'cfg', 'Rabatt Aktion Black Friday Ostern Prozent'],
+  ['@fees', 'Honorarordnung', 'Geld', 'scale', 'view', 'Preise Gebühren Leistungen'],
+  ['@vip', 'VIP & Lifetime', 'Geld', 'crown', 'view', 'VIP Lifetime Mitgliedschaft'],
+  ['bot', 'Discord', 'Kommunikation', 'discord', ['discord.edit'], 'Discord Webhook Bot Tickets Rollen Login Kanäle Nachrichten'],
+  ['messages', 'Mitteilungen', 'Kommunikation', 'mail', 'cfg', 'Mitteilungen Texte Erinnerung Ansprache'],
+  ['integrations', 'Integrationen', 'Kommunikation', 'link', ['system.edit'], 'FiveNet Google Docs Drive Sheets'],
+  ['access', 'Rechte & Schalter', 'Rechte & System', 'key', CONFIG_PERMS, 'Rechte Funktionen Schalter Web-Admin Protokoll'],
+  ['system', 'Sicherung & Notfall', 'Rechte & System', 'shield', ['system.edit'], 'Datensicherung Backup Wiederherstellen Notfall Wartung'],
+  ['health', 'Systemzustand', 'Rechte & System', 'chart', ['system.edit'], 'Systemzustand Speicher Datenbank Selbsttest Anfragen Leistung'],
+].map(([key, label, group, ic, perm, words]) => ({ key, label, group, icon: ic, perm, words }));
+/** Alte Reiter-Namen (Links, Lesezeichen) → neuer Bereich. */
+const SETTINGS_LEGACY = { texte: 'banner', lager: 'general' };
+/** Für ältere Teile: die (sichtbaren) Bereichsschlüssel. */
+const SETTINGS_TABS = SETTINGS_SECTIONS.filter((x) => !x.key.startsWith('@')).map((x) => [x.key, x.label, x.icon]);
+
+function settingsVisible() {
+  return SETTINGS_SECTIONS.filter((x) => {
+    if (x.perm === 'view') return allowed(x.key.slice(1));
+    if (x.perm === 'cfg') {
+      const t = CFG_TABS.find(([k]) => k === x.key);
+      return !!t && can(t[2]);
+    }
+    return canAny(x.perm);
+  });
+}
+function settingsCurrent(list = settingsVisible()) {
+  const want = SETTINGS_LEGACY[st.settingsTab] || st.settingsTab;
+  const ok = list.filter((x) => !x.key.startsWith('@'));
+  return ok.some((x) => x.key === want) ? want : ok.length ? ok[0].key : '';
+}
+const settingsIsCfg = (key) => CFG_TABS.some(([k]) => k === key);
+/** Ein Eintrag der Leiste: Einstellungs-Bereich, Konfigurations-Bereich (Entwurf/Veröffentlichen) oder Verweis auf eine Seite. */
+function settingsNavItem(x, key) {
+  const ic = x.icon === 'discord' ? DISCORD_ICON : icon(x.icon, 'ico-sm');
+  const draft = settingsIsCfg(x.key) && st.cfg && st.cfg.config[x.key] && st.cfg.config[x.key].draft ? '<span class="set-draft" title="Entwurf – noch nicht veröffentlicht">•</span>' : '';
+  const words = `${x.label} ${x.group} ${x.words}`.toLowerCase();
+  if (x.key.startsWith('@')) return `<a href="#${x.key.slice(1)}" class="set-nav-item set-nav-link" data-key="${x.key}" data-words="${esc(words)}">${ic}<span>${esc(x.label)}</span>${icon('chevronRight', 'ico-xs set-go')}</a>`;
+  const action = settingsIsCfg(x.key) ? 'cfg-tab' : 'settings-tab';
+  const on = x.key === key;
+  return `<button type="button" class="set-nav-item ${on ? 'active' : ''}" data-action="${action}" data-tab="${x.key}" data-key="${x.key}" data-words="${esc(words)}" ${on ? 'aria-current="page"' : ''}>${ic}<span>${esc(x.label)}</span>${draft}</button>`;
+}
+/** Leiste links (PC) bzw. Auswahlliste (Handy) mit Suche. */
+function settingsSide(list, key) {
+  const groups = [...new Set(list.map((x) => x.group))];
+  const nav = groups
+    .map((g) => `<div class="set-nav-group" data-group="${esc(g)}"><div class="set-nav-head">${esc(g)}</div>${list.filter((x) => x.group === g).map((x) => settingsNavItem(x, key)).join('')}</div>`)
+    .join('');
+  const pick = `<select id="setPick" class="field set-pick" aria-label="Bereich der Einstellungen">${groups
+    .map((g) => `<optgroup label="${esc(g)}">${list.filter((x) => x.group === g).map((x) => `<option value="${x.key}"${x.key === key ? ' selected' : ''}>${esc(x.label)}${x.key.startsWith('@') ? ' ↗' : ''}</option>`).join('')}</optgroup>`)
+    .join('')}</select>`;
+  return `<aside class="set-side">
+      <label class="search set-search">${icon('search')}<input id="setSearch" class="field" type="search" placeholder="Einstellung finden …" aria-label="Einstellung finden" autocomplete="off"></label>
+      ${pick}
+      <nav class="set-nav" aria-label="Bereiche der Einstellungen">${nav}<p class="set-none text-sm text-dim" hidden>Nichts gefunden.</p></nav>
+    </aside>`;
+}
+/** Inhalt des gewählten Bereichs (die Formulare selbst sind unverändert). */
+function settingsBody(key, s) {
+  if (settingsIsCfg(key)) {
+    if (!st.cfg) return '<div class="panel panel-pad"><p class="text-sm text-muted">Wird geladen …</p></div>';
+    st.cfgTab = key;
+    if (key !== 'style' && typeof stylePreviewEnd === 'function') stylePreviewEnd();
+    return { banner: cfgBanner, home: cfgHome, labels: cfgLabels, messages: cfgMessages, style: cfgStyle, promos: cfgPromos, numbering: cfgNumbering }[key]();
+  }
+  if (key === 'access') return accessPanels();
+  if (key === 'listen') return listsPanels();
+  if (key === 'bot') return botSettings();
+  if (key === 'integrations') return `${fivenetSettingsPanel(s)}${googleDocsPanel(st.google)}`;
+  if (key === 'system') return `${backupPanel()}<div class="mt-4 lg:mt-5">${emergencyPanel()}</div>`;
+  if (key === 'health') return st.system ? systemPanel(true) : '<div class="panel panel-pad"><p class="text-sm text-muted">Wird geladen …</p></div>';
+  if (key === 'site') return `${websitePanel(s)}<div class="mt-4 lg:mt-5">${lotmPanel(s)}</div><div class="mt-4 lg:mt-5">${siteTextsPanel()}</div><div class="mt-4 lg:mt-5">${ranksPanel()}</div>`;
+  return settingsGeneral(s);
+}
+/** Suche: Leiste filtern (Bezeichnung, Gruppe, Stichworte); Enter öffnet den ersten Treffer. */
+document.addEventListener('input', (e) => {
+  if (e.target.id !== 'setSearch') return;
+  const q = e.target.value.trim().toLowerCase();
+  const nav = document.querySelector('.set-nav');
+  if (!nav) return;
+  let any = 0;
+  nav.querySelectorAll('.set-nav-group').forEach((g) => {
+    let n = 0;
+    g.querySelectorAll('.set-nav-item').forEach((it) => {
+      const hit = !q || q.split(/\s+/).every((w) => it.dataset.words.includes(w));
+      it.hidden = !hit;
+      if (hit) n++;
+    });
+    g.hidden = !n;
+    any += n;
+  });
+  nav.querySelector('.set-none').hidden = !!any;
+  nav.classList.toggle('is-searching', !!q);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' || e.target.id !== 'setSearch') return;
+  const first = [...document.querySelectorAll('.set-nav .set-nav-item')].find((x) => !x.hidden);
+  if (first) {
+    e.preventDefault();
+    first.click();
+  }
+});
+/** Handy: Auswahl in der Liste wählt den Bereich (bzw. öffnet die verlinkte Seite). */
+document.addEventListener('change', (e) => {
+  if (e.target.id !== 'setPick') return;
+  const it = document.querySelector(`.set-nav [data-key="${CSS.escape(e.target.value)}"]`);
+  if (it) it.click();
+});
 
 /** Discord → Webhook: Kanzlei-Updates in Kanäle, je Ereignis Kanal und Rolle. */
 function discordWebhookPanel(s) {

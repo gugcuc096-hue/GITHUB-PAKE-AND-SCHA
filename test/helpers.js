@@ -175,6 +175,9 @@ async function pickTab(page, selector) {
   // die Reiterleiste wird nach dem Zeichnen (nächstes Bild) gemessen – erst danach steht fest, ob sie eine Liste ist
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   if (await el.isVisible()) return el.click();
+  // Einstellungen am Handy: Bereich in der Auswahlliste (#setPick)
+  const key = await el.evaluate((node) => (node.closest('.set-nav') ? node.dataset.key : null));
+  if (key) return page.selectOption('#setPick', key);
   const index = await el.evaluate((node) => {
     const row = node.closest('.tabrow-collapsed');
     if (!row) return -1;

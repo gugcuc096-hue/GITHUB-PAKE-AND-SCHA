@@ -826,7 +826,7 @@ Object.assign(forms, {
 
 /* ================================================================
    Kanzlei-Lager: Gegenstände, Geld und Schwarzgeld ein- und auslagern. Die Gegenstände (Name + Bild) pflegen Admins
-   unter Einstellungen → Lager; Schwarzgeld sieht standardmäßig nur das Board of Partners.
+   oben über „Gegenstände verwalten“; Schwarzgeld sieht standardmäßig nur das Board of Partners.
    ================================================================ */
 const STORAGE_KIND = { item: 'Gegenstand', geld: 'Geld', schwarzgeld: 'Schwarzgeld' };
 const itemPic = (i, cls = 'item-pic') =>
@@ -859,7 +859,7 @@ function storageGrid() {
         )
         .join('')}</div>`
     : empty(
-        s.items.length ? 'Kein Gegenstand passt zur Suche.' : s.canManage ? 'Noch keine Gegenstände – lege sie unter Einstellungen → Lager mit Name und Bild an.' : 'Noch keine Gegenstände angelegt (das macht ein Admin in den Einstellungen).',
+        s.items.length ? 'Kein Gegenstand passt zur Suche.' : s.canManage ? 'Noch keine Gegenstände – lege sie oben über „Gegenstände verwalten“ mit Name und Bild an.' : 'Noch keine Gegenstände angelegt (das macht ein Admin hier auf der Seite).',
         'box'
       );
 }
@@ -877,13 +877,14 @@ views.lager = {
     return `
         <div class="page-head">
           <div><h1 class="page-title">Kanzlei-Lager</h1><p class="page-sub">Was die Kanzlei an Gegenständen, Geld${s.canBlack ? ' und Schwarzgeld' : ''} hat – jede Ein- und Auslagerung steht mit Name und Uhrzeit in den Buchungen.</p></div>
-          <div class="page-actions">${s.canManage ? `<button class="btn-ghost btn-md" data-action="storage-manage">${icon('cog')}<span>Gegenstände</span></button>` : ''}<button class="btn-gold btn-md" data-action="storage-book">${icon('plus')}<span>Buchen</span></button></div>
+          <div class="page-actions">${s.canManage ? `<button class="btn-ghost btn-md ${st.lagerManage ? 'is-on' : ''}" data-action="storage-manage" aria-expanded="${!!st.lagerManage}">${icon('cog')}<span>${st.lagerManage ? 'Verwalten schließen' : 'Gegenstände verwalten'}</span></button>` : ''}<button class="btn-gold btn-md" data-action="storage-book">${icon('plus')}<span>Buchen</span></button></div>
         </div>
         <div class="kpi-row lager-kpis">
           ${cash('geld', 'Geld', s.money, 'Kasse der Kanzlei')}
           ${s.canBlack ? cash('schwarzgeld', 'Schwarzgeld', s.black, s.blackAll ? 'für alle Mitarbeiter sichtbar' : 'nur Board of Partners') : ''}
           <div class="panel kpi"><div class="kpi-label">${icon('box', 'ico-sm')}Gegenstände</div><div class="kpi-value" data-roll="lager:items">${stocked.reduce((n, i) => n + i.stock, 0).toLocaleString('de-DE')}</div><div class="kpi-sub">${stocked.length} von ${s.items.length} Sorten auf Lager</div></div>
         </div>
+        ${s.canManage && st.lagerManage ? `<div class="lager-manage mt-4 lg:mt-5" id="lagerManage">${storageSettingsPanel()}</div>` : ''}
         <section class="panel panel-pad mt-4 lg:mt-5">
           <div class="panel-head"><h2 class="panel-title">Gegenstände</h2>${s.items.length > 8 ? `<label class="search lager-search">${icon('search')}<input id="storageSearch" class="field" type="search" placeholder="Gegenstand suchen …" value="${esc(st.storageQuery || '')}" aria-label="Gegenstände durchsuchen"></label>` : ''}</div>
           <div id="storageGrid">${storageGrid()}</div>
@@ -925,7 +926,7 @@ function storageBookModal(kind = 'item', itemId = null, replace = false) {
   return replace ? replaceModal(html) : openModal(html);
 }
 
-/** Einstellungen → Lager: Gegenstände mit Name und Bild, Schwarzgeld-Freigabe. */
+/** Lager → „Gegenstände verwalten“: Gegenstände mit Name und Bild, Schwarzgeld-Freigabe. */
 function storageSettingsPanel() {
   const a = st.storageAdmin;
   if (!a) return `<section class="panel panel-pad">${empty('Lager-Einstellungen konnten nicht geladen werden.', 'box')}</section>`;
@@ -952,9 +953,11 @@ function storageSettingsPanel() {
       </form>
     </section>`;
 }
+/** Verwalten (Gegenstände, Schwarzgeld) steht direkt auf der Lager-Seite – nicht mehr in den Einstellungen. */
 async function reloadStorageAdmin() {
   st.storageAdmin = await api.get('/api/storage/items');
-  if (st.view === 'settings') renderView();
+  if (st.view === 'lager') st.storage = await api.get('/api/storage');
+  renderView();
 }
 
 Object.assign(actions, {
@@ -966,8 +969,10 @@ Object.assign(actions, {
     renderView();
   },
   'storage-manage': async () => {
-    st.settingsTab = 'lager';
-    await navigate('settings');
+    st.lagerManage = !st.lagerManage;
+    if (st.lagerManage) st.storageAdmin = await api.get('/api/storage/items');
+    renderView();
+    if (st.lagerManage) document.getElementById('lagerManage')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   },
   'storage-item-del': async (el) => {
     if (!(await askDelete(`„${el.dataset.name}“ entfernen?`, 'Der Gegenstand kann danach nicht mehr gebucht werden; bisherige Buchungen bleiben erhalten.'))) return;

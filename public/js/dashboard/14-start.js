@@ -1408,7 +1408,7 @@ document.addEventListener('ps:form-ok', () => buzz());
   }
   if (isStaff()) await loadStaffParts();
   renderUser();
-  // Banner, Beschriftungen und Hinweise aus Einstellungen → Texte & Banner
+  // Banner, Beschriftungen und Hinweise aus Einstellungen → Website
   if (window.PS.siteConfig && st.siteConfig) {
     PS.siteConfig.setLabels(st.siteConfig.labels);
     PS.siteConfig.banners(st.siteConfig, $('#content'), { className: 'dash-banner' });

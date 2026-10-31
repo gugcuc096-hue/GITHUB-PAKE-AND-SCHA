@@ -589,7 +589,7 @@
     const box = document.getElementById('firmStats');
     if (!box) return;
     const cards = [];
-    const kpi = window.PS.kpis || {}; // welche Kennzahlen öffentlich stehen (Dashboard → Texte & Banner → Startseite)
+    const kpi = window.PS.kpis || {}; // welche Kennzahlen öffentlich stehen (Dashboard → Einstellungen → Website → Startseite)
     if (firmStats.visible && firmStats.closed && kpi.closed !== false) cards.push([firmStats.closed.toLocaleString('de-DE'), 'Verfahren abgeschlossen']);
     if (firmStats.visible && firmStats.successRate != null && kpi.success !== false) cards.push([`${firmStats.successRate} %`, 'Erfolgsquote']);
     if (firmStats.visible && firmStats.rating && kpi.rating !== false) cards.push([`${firmStats.rating.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ★`, `Ø aus ${firmStats.ratingCount} Bewertungen`]);
