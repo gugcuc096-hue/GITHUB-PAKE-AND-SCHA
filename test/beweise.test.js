@@ -5,7 +5,7 @@
  */
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const { startServer, client, TEAM, PASSWORD } = require('./helpers');
+const { startServer, client, TEAM, PASSWORD, pickTab } = require('./helpers');
 
 let chromium = null;
 try {
@@ -136,7 +136,7 @@ describe('Beweismittel in der Akte (Browser)', { skip: chromium ? false : 'Playw
         await page.waitForSelector('#chatList .ev-ref', { timeout: 8000 });
         assert.deepEqual(await page.$$eval('#chatList .ev-ref', (b) => b.map((x) => x.textContent)), ['B2']);
         // Beweisliste
-        await page.click('[data-action="ev-view"][data-value="liste"]');
+        await pickTab(page, '[data-action="ev-view"][data-value="liste"]');
         await page.waitForSelector('.ev-table');
         assert.equal(await page.$$eval('.ev-table tbody tr', (r) => r.length), 2);
         await page.click('.ev-table tbody tr:nth-child(2) [data-action="ev-edit"]');

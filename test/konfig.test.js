@@ -213,7 +213,7 @@ describe('Texte & Banner im Browser', { skip: chromium ? false : 'Playwright nic
       // Als Rang ansehen: Mandant → kein Einstellungs-Punkt
       await page.evaluate(() => (location.href = '/dashboard?tab=access#settings'));
       await page.waitForSelector('[data-action="view-as"][data-as="mandant"]', { timeout: 15000 });
-      await page.click('[data-action="view-as"][data-as="mandant"]');
+      await pickTab(page, '[data-action="view-as"][data-as="mandant"]');
       await page.waitForSelector('#viewAsBand');
       if (device.isMobile && !(await page.$('#sidebar.open'))) await page.click('#bottomNav [data-action="open-sidebar"]').catch(() => {});
       assert.equal(await page.locator('#nav a[href="#settings"]').count(), 0, 'Mandant sieht keine Einstellungen');
