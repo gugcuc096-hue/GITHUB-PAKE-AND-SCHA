@@ -11,7 +11,7 @@
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
-const { startServer, client, TEAM, PASSWORD } = require('./helpers');
+const { startServer, client, TEAM, PASSWORD, pickTab } = require('./helpers');
 
 let chromium = null;
 try {
@@ -487,7 +487,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
 
         // Verwenden → Per DM an Rolle: Empfänger anzeigen, senden, Fortschritt
         await page.click('[data-action="msg-tab"][data-tab="use"]');
-        await page.click('[data-action="msg-use-tab"][data-tab="dm"]');
+        await pickTab(page, '[data-action="msg-use-tab"][data-tab="dm"]');
         await settle();
         assert.match(await page.textContent('#msgUse'), /in Direktnachrichten pingt das niemanden/);
         await page.selectOption('#dmRole', ROLES.burgershot);
@@ -585,7 +585,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         if (device === DESKTOP) assert.equal(await staff.page.textContent('#nav a[href="#invoices"] .nav-count'), '1');
         await staff.page.evaluate(() => (location.hash = '#invoices'));
         await staff.settle();
-        await staff.page.click('[data-action="inv-filter"][data-value="gemeldet"]');
+        await pickTab(staff.page, '[data-action="inv-filter"][data-value="gemeldet"]');
         await staff.settle();
         const row = staff.page.locator('tbody tr', { has: staff.page.locator(`text=${inv.number}`) });
         assert.match(await row.textContent(), /Zahlung gemeldet/);

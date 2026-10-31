@@ -2407,6 +2407,10 @@ tr.pin-drop > td, .list-row.pin-drop { animation: pin-drop 0.9s ease-out; }
 .pt-box { margin: 0 0 1rem; }
 
 /* Direkt änderbare Felder */
+/* Mandant in der Akte: Name = Link zur Kartei, Stift = umbenennen (dann Feld statt Link) */
+.ie-swap .ie-swap-field, .ie-swap.is-renaming .client-link, .ie-swap.is-renaming [data-ie-open] { display: none; }
+.ie-swap.is-renaming .ie-swap-field { display: inline; }
+.ie-swap [data-ie-open] { margin-left: 0.25rem; vertical-align: -3px; }
 .ie { cursor: text; border-radius: 6px; padding: 0 0.15rem; margin: 0 -0.15rem; border-bottom: 1px dashed transparent; transition: background 0.15s, border-color 0.15s; }
 .ie:hover, .ie:focus-visible { background: rgba(var(--accent-rgb), 0.08); border-bottom-color: rgba(var(--accent-rgb), 0.5); outline: none; }
 .ie-empty { color: var(--text-dim); font-style: italic; font-weight: 400; font-size: 0.9em; }

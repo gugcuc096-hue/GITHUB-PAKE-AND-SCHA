@@ -458,6 +458,23 @@ function ieOpen(el) {
   input.addEventListener('blur', () => finish(true));
   if (type === 'select') input.addEventListener('change', () => finish(true));
 }
+// Name, der zugleich ein Link ist (Mandant in der Akte): der Stift daneben schaltet auf das Feld um, danach zurück
+document.addEventListener('click', (e) => {
+  const pen = e.target.closest && e.target.closest('[data-ie-open]');
+  if (!pen) return;
+  const wrap = pen.closest('.ie-swap');
+  const el = wrap && wrap.querySelector(`.ie[data-ie="${pen.dataset.ieOpen}"]`);
+  if (!el) return;
+  wrap.classList.add('is-renaming');
+  ieOpen(el);
+  const back = () => {
+    if (el.classList.contains('is-editing') || el.classList.contains('is-saving')) return setTimeout(back, 150);
+    wrap.classList.remove('is-renaming');
+    const link = wrap.querySelector('.client-link');
+    if (link && el.dataset.value) link.textContent = el.dataset.value;
+  };
+  setTimeout(back, 150);
+});
 document.addEventListener('click', (e) => {
   const el = e.target.closest && e.target.closest('.ie[data-ie]');
   if (el && !e.target.closest('.ie-input')) {

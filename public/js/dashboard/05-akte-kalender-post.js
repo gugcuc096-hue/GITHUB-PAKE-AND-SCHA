@@ -912,13 +912,13 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     .filter(Boolean)
     .join(' · ');
   const info = [
-    // Kanzlei: der Name öffnet die Mandantenkartei; Mandanten ohne Konto lassen sich direkt hier umbenennen (ein Feld,
-    // keine zweite Zeile „Name des Mandanten“) – die Kartei öffnet dann das Symbol daneben
+    // Kanzlei: der Name öffnet die Mandantenkartei; Mandanten ohne Konto benennt der Stift daneben direkt hier um
+    // (ein Feld – keine zweite Zeile „Name des Mandanten“ mehr)
     staff && c.canEdit && !c.hasClientAccount
       ? [
           'Mandant',
           null,
-          `${ie(c, 'clientName', c.clientName === '—' ? '' : c.clientName, { placeholder: 'Name eintragen' })} <span class="text-dim">(ohne Konto)</span>${c.clientKey ? ` <button type="button" class="copy-btn" data-action="open-client" data-key="${esc(c.clientKey)}" title="Mandantenkartei öffnen" aria-label="Mandantenkartei öffnen">${icon('idCard', 'ico-xs')}</button>` : ''}`,
+          `<span class="ie-swap">${c.clientKey ? clientLink(c.clientKey, c.clientName) : ''}${ie(c, 'clientName', c.clientName === '—' ? '' : c.clientName, { placeholder: 'Name eintragen', cls: c.clientKey ? 'ie-swap-field' : '' })}${c.clientKey ? `<button type="button" class="copy-btn" data-ie-open="clientName" title="Namen ändern" aria-label="Namen des Mandanten ändern">${icon('edit', 'ico-xs')}</button>` : ''}</span> <span class="text-dim">(ohne Konto)</span>`,
         ]
       : staff && c.clientKey
       ? [

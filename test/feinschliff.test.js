@@ -122,17 +122,23 @@ describe('Reiterleisten, Akte und Handy (Browser)', { skip: chromium ? false : '
     }
   });
 
-  it('Akte: Mandantenname nur einmal – als Feld; langer Titel bekommt am PC zwei Zeilen', async () => {
+  it('Akte: Mandantenname nur einmal – Link zur Kartei, Stift benennt um; langer Titel bekommt am PC zwei Zeilen', async () => {
     const ctx = await browser.newContext({ viewport: { width: 1366, height: 860 }, locale: 'de-DE' });
     const page = await ctx.newPage();
     try {
       await login(page);
       await page.evaluate((id) => openCase(id), kase.id);
-      await page.waitForSelector('#modal.open [data-ie="clientName"]');
+      await page.waitForSelector('#modal.open [data-ie="clientName"]', { state: 'attached' });
       const text = await page.$eval('#modalBody', (b) => b.textContent);
       assert.ok(!text.includes('Name des Mandanten'), 'keine zweite Zeile');
       assert.equal(await page.$$eval('#modalBody [data-ie="clientName"]', (l) => l.length), 1);
-      assert.ok(await page.$('#modalBody [data-action="open-client"]'), 'Kartei bleibt erreichbar');
+      assert.ok(await page.isVisible('#modalBody .ie-swap .client-link'), 'der Name öffnet die Kartei');
+      assert.equal(await page.isVisible('#modalBody [data-ie="clientName"]'), false, 'Feld erst nach dem Stift');
+      // Stift: Feld statt Link, speichern, danach wieder der Link mit neuem Namen
+      await page.click('#modalBody [data-ie-open="clientName"]');
+      await page.fill('#modalBody [data-ie="clientName"] input', 'Vito Russo jr.');
+      await page.keyboard.press('Enter');
+      await page.waitForFunction(() => document.querySelector('#modalBody .ie-swap .client-link')?.textContent === 'Vito Russo jr.' && !document.querySelector('#modalBody .ie-swap.is-renaming'));
       const title = await page.$eval('#modalBody .case-title', (t) => ({ h: t.getBoundingClientRect().height, lh: parseFloat(getComputedStyle(t).lineHeight), clamp: getComputedStyle(t).webkitLineClamp }));
       assert.equal(title.clamp, '2');
       assert.ok(title.h > title.lh * 1.5, 'zwei Zeilen');
