@@ -794,7 +794,7 @@ document.addEventListener(
 function markCaseJump() {
   const body = $('#modalBody');
   const bar = $('#modalBody .case-jump');
-  if (!bar) return;
+  if (!bar || bar.classList.contains('case-tabs')) return; // Akte mit Reitern: markiert ist der gewählte Reiter
   const items = $$('.jump', bar);
   const line = bar.getBoundingClientRect().bottom + 12;
   let active = null;
@@ -1445,7 +1445,7 @@ document.addEventListener('ps:form-ok', () => buzz());
     if (Number.isInteger(caseParam) && caseParam > 0) {
       await guard(() => openCase(caseParam));
       // „Jetzt bewerten“ aus der Discord-Nachricht: gleich zur Bewertung in der Akte
-      if (params.get('bewerten')) $('#secReview')?.scrollIntoView({ block: 'start' });
+      if (params.get('bewerten')) caseReveal('secReview')?.scrollIntoView({ block: 'start' });
     } else if (Number.isInteger(eventParam) && eventParam > 0) {
       await guard(async () => {
         await load.events();

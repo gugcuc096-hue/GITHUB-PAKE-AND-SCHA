@@ -2876,3 +2876,11 @@ body.hint-edit .form-hint[data-hint-key]:hover { background: rgba(var(--accent-r
   .set-pick { display: block; }
   .set-nav.is-searching { display: flex; max-height: none; padding: 0.4rem; border: 1px solid var(--glass-border); border-radius: 14px; background: rgba(8, 14, 32, 0.96); }
 }
+
+/* Akte in vier Reitern (12-akte-ansicht.js): nur der gewählte Bereich ist zu sehen; „Ansicht anpassen“ zeigt alle */
+.case-root[data-case-tab="ueberblick"] [data-pane]:not([data-pane="ueberblick"]),
+.case-root[data-case-tab="kommunikation"] [data-pane]:not([data-pane="kommunikation"]),
+.case-root[data-case-tab="fall"] [data-pane]:not([data-pane="fall"]),
+.case-root[data-case-tab="dokumente"] [data-pane]:not([data-pane="dokumente"]) { display: none; }
+.case-root:has(#caseSections.is-editing) .sec-wrap[data-pane] { display: block; }
+.case-tabs .jump { font-size: 0.85rem; }

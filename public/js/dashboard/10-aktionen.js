@@ -113,7 +113,7 @@ const actions = {
   // „Was ist zu tun?“: Akte öffnen und direkt zu den Nachrichten springen
   'open-case-chat': async (el) => {
     await openCase(Number(el.dataset.id));
-    $('#secChat')?.scrollIntoView({ block: 'start' });
+    caseReveal('secChat')?.scrollIntoView({ block: 'start' });
   },
   'case-step': async (el) => {
     const id = Number(el.dataset.id);
@@ -262,14 +262,14 @@ const actions = {
     await openTrash(true);
   },
   'chat-focus': () => {
-    const sec = $('#secChat');
+    const sec = caseReveal('secChat');
     if (!sec) return;
     sec.scrollIntoView({ block: 'start', behavior: 'smooth' });
     $('#secChat .chat-input')?.focus({ preventScroll: true });
   },
   // „Notiz“ in der Hinweisleiste einer liegengebliebenen Akte: zum Verlauf und gleich ins Notizfeld
   'note-focus': () => {
-    const sec = $('#secNotes');
+    const sec = caseReveal('secNotes');
     if (!sec) return;
     sec.scrollIntoView({ block: 'start', behavior: 'smooth' });
     $('#secNotes textarea[name="body"]')?.focus({ preventScroll: true });
@@ -1030,8 +1030,17 @@ const actions = {
     toast('Verknüpfung gelöst.');
     await reloadCase(id);
   },
+  // Akte: Reiter wechseln; der Inhalt beginnt direkt unter der (klebenden) Reiterleiste
+  'case-tab': (el) => {
+    caseTabSet(el.dataset.tab);
+    const body = $('#modalBody');
+    const bar = $('#modalBody .case-jump');
+    if (body && bar && bar.getBoundingClientRect().top <= body.getBoundingClientRect().top + 2) bar.scrollIntoView({ block: 'start' });
+    const root = $('#modalBody .case-root');
+    if (root) playIn(root, 'swap-in');
+  },
   'scroll-to': (el) => {
-    const target = $('#' + el.dataset.target);
+    const target = caseReveal(el.dataset.target) || $('#' + el.dataset.target);
     const folded = target && target.closest('.sec-wrap.is-collapsed');
     if (folded) folded.classList.add('is-open-tmp'); // eingeklappter Abschnitt klappt für den Sprung auf
     target?.scrollIntoView({ behavior: 'smooth', block: 'start' });

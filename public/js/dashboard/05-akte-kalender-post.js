@@ -1137,8 +1137,19 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     ['secWork', 'Zeiten', 0, parts.work],
     ['secNotes', 'Verlauf', 0, true],
   ].filter((j) => j[3]);
-  const jumpBar = `<nav class="case-jump" aria-label="Abschnitte der Akte"><div class="case-jump-list">${caseSecSort(c, jumps, staff)
-    .map(([id, label, n]) => `<button type="button" class="jump" data-action="scroll-to" data-target="${id}" data-sec-jump="${caseSecKey(id)}"${caseSecIsHidden(c, id) ? ' hidden' : ''}>${esc(label)}${n ? `<span class="jump-n">${n}</span>` : ''}</button>`)
+  // Vier Reiter (12-akte-ansicht.js): je Reiter die Summe der Zahlen seiner sichtbaren Abschnitte; Reiter ohne Abschnitte fehlen
+  if (st.caseTabFor !== c.id) {
+    st.caseTabFor = c.id;
+    st.caseTab = 'ueberblick';
+  }
+  const tabsShown = CASE_TABS.filter(([k, , keys]) => k === 'ueberblick' || jumps.some(([id]) => keys.includes(caseSecKey(id)) && !caseSecIsHidden(c, id)));
+  const caseTab = tabsShown.some(([k]) => k === st.caseTab) ? st.caseTab : 'ueberblick';
+  const tabCount = (keys) => jumps.filter(([id]) => keys.includes(caseSecKey(id)) && !caseSecIsHidden(c, id)).reduce((n, j) => n + (j[2] || 0), 0);
+  const jumpBar = `<nav class="case-jump case-tabs" aria-label="Bereiche der Akte"><div class="case-jump-list" role="tablist" aria-label="Bereiche der Akte">${tabsShown
+    .map(([k, label, keys]) => {
+      const n = k === 'ueberblick' ? 0 : tabCount(keys);
+      return `<button type="button" class="jump ${k === caseTab ? 'active' : ''}" role="tab" aria-selected="${k === caseTab}" data-action="case-tab" data-tab="${k}">${esc(label)}${n ? `<span class="jump-n">${n}</span>` : ''}</button>`;
+    })
     .join('')}</div>${staff ? `<button type="button" class="btn-ghost btn-sm jump-edit" data-action="sec-edit" title="Abschnitte umsortieren, ausblenden oder einklappen">${icon('grip', 'ico-sm')}<span>Ansicht anpassen</span></button>` : ''}</nav>`;
 
   const notesHtml = `<div class="section" id="secNotes"><h3 class="section-title">${staff ? 'Verlauf & interne Notizen' : 'Verlauf'}</h3>
@@ -1159,7 +1170,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
   // Abschnitte der Akte: Reihenfolge, Ausblenden und Einklappen je Person (12-akte-ansicht.js); Mandanten sehen die feste Reihenfolge
   const secMap = { charges: parts.charges, chat: parts.chat, events: eventsSection, witnesses: parts.witnesses, karte: parts.karte, contracts: parts.contracts, briefs: parts.briefs, external: parts.external, evidence: parts.evidence, requests: parts.requests, tasks: parts.tasks, invoices: parts.invoices, work: parts.work, notes: notesHtml };
   const secMeta = Object.fromEntries(jumps.map(([id, label, n]) => [caseSecKey(id), { label, n }]));
-  return `
+  return `<div class="case-root" data-case-tab="${caseTab}">
       <div class="case-head case-cover mb-5" data-case-head="${c.id}">
         <span class="cover-tab" aria-hidden="true">${staff && c.priority >= 3 && !c.closed ? `<i class="cover-tab-dot p${c.priority}"></i>` : ''}Akte</span>
         ${c.closed ? '<span class="cover-stamp" aria-hidden="true">Abgeschlossen</span>' : ''}
@@ -1173,6 +1184,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       ${idleStrip}
       ${pinnedStrip}
       ${claim}
+      <div class="case-overview" data-pane="ueberblick">
       ${track}
       ${
         staff
@@ -1193,8 +1205,9 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       ${c.publicNote ? `<div class="section"><h3 class="section-title">Statushinweis</h3><div class="banner banner-gold mb-0"><p class="text-sm whitespace-pre-wrap">${esc(c.publicNote)}</p></div></div>` : ''}`
       }
       ${staff ? precedentStrip(c, similar, precedentId) : ''}
+      </div>
       ${caseSecHtml(c, secMap, secMeta, staff)}
-    `;
+    </div>`;
 }
 
 /** Zusatzfelder des Rechtsgebiets im Formular „Neue Akte / Mandat einreichen“ (Einstellungen → Listen → Rechtsgebiete). */
