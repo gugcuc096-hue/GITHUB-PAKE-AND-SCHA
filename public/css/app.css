@@ -2841,4 +2841,9 @@ body.hint-edit .form-hint[data-hint-key]:hover { background: rgba(var(--accent-r
 .tabrow-collapsed { display: none !important; }
 .tabrow-pick { position: relative; min-width: 0; }
 .tabrow-pick select { width: 100%; }
-.case-jump .tabrow-pick { flex: 1; margin: 0.35rem 0; }
+/* Akte am Handy: Leiste und Auswahlliste gleich hoch – sonst verrutscht die Stelle beim Zurückkehren aus einem Unterfenster */
+.case-jump .tabrow-pick { flex: 1; margin: 0; }
+@media (max-width: 699px) {
+  .case-jump { min-height: 3.2rem; align-items: center; }
+  .case-jump .tabrow-pick select { min-height: 0; height: 2.5rem; padding-block: 0; }
+}

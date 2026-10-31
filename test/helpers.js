@@ -165,4 +165,22 @@ function docxText(buf) {
     .replace(/&quot;/g, '"');
 }
 
-module.exports = { ROOT, PASSWORD, TEAM, startServer, client, readZipEntry, docxText };
+/**
+ * Reiter wählen wie ein Mensch: sichtbar → anklicken; am Handy steckt eine zu breite Reiterleiste in einer Auswahlliste
+ * (13-reiter.js) → dort den Eintrag wählen.
+ */
+async function pickTab(page, selector) {
+  const el = page.locator(selector).first();
+  await el.waitFor({ state: 'attached' });
+  if (await el.isVisible()) return el.click();
+  const index = await el.evaluate((node) => {
+    const row = node.closest('.tabrow-collapsed');
+    if (!row) return -1;
+    return [...row.children].filter((c) => c.matches('button, a') && !c.hidden).indexOf(node);
+  });
+  if (index < 0) return el.click(); // nicht in einer Auswahlliste – normal klicken (Playwright wartet auf Sichtbarkeit)
+  const select = el.locator('xpath=ancestor::*[contains(@class,"tabrow-collapsed")]/preceding-sibling::*[contains(@class,"tabrow-pick")][1]//select');
+  await select.selectOption(String(index));
+}
+
+module.exports = { ROOT, PASSWORD, TEAM, startServer, client, readZipEntry, docxText, pickTab };
