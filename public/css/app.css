@@ -228,7 +228,8 @@ input[type="datetime-local"].field, input[type="date"].field { color-scheme: dar
   .tbl-cards tr:last-child { margin-bottom: 0; }
   .tbl-cards td { border: 0; padding: 0.45rem 0; display: flex; align-items: center; justify-content: space-between; gap: 1rem; text-align: right; min-width: 0; }
   .tbl-cards td + td { border-top: 1px solid var(--line); }
-  .tbl-cards td::before { content: attr(data-label); color: var(--text-dim); font-size: 0.75rem; text-align: left; flex-shrink: 0; }
+  /* Beschriftung immer in der Grundschrift – auch in Zellen mit Zahlen in Schreibmaschinenschrift (z. B. „Betrag“) */
+  .tbl-cards td::before { content: attr(data-label); color: var(--text-dim); font-family: var(--font-body); font-size: 0.75rem; font-weight: 400; letter-spacing: normal; text-align: left; flex-shrink: 0; }
   .tbl-cards td.td-main { display: block; text-align: left; }
   .tbl-cards td.td-main::before, .tbl-cards td.td-actions::before { display: none; }
   .tbl-cards td.td-actions { justify-content: flex-end; flex-wrap: wrap; gap: 0.4rem; }
@@ -755,6 +756,14 @@ details.edit-box[open] > summary::after { content: '–'; }
 .duty-btn.on { border-color: rgba(52, 211, 153, 0.45); color: #a7f3d0; background: rgba(16, 185, 129, 0.08); }
 .duty-btn .lbl { display: none; }
 @media (min-width: 480px) { .duty-btn .lbl { display: inline; } }
+/* Handy: Uhr mit Statuspunkt (nur ein Punkt war nicht zu verstehen) */
+.duty-ico { display: none; position: relative; }
+.duty-ico .duty-dot { position: absolute; right: -4px; bottom: -3px; width: 8px; height: 8px; box-shadow: 0 0 0 2px var(--navy-950); }
+@media (max-width: 479px) {
+  .duty-ico { display: inline-flex; }
+  .duty-btn > .duty-dot-main { display: none; }
+  .duty-btn { width: 40px; padding: 0; justify-content: center; }
+}
 .pop-wrap { position: relative; }
 .pop { position: absolute; top: calc(100% + 8px); right: 0; z-index: 65; min-width: 240px; padding: 0.4rem; border-radius: 14px; background: rgba(8, 14, 32, 0.98); border: 1px solid var(--glass-border); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6); display: none; }
 .pop.open { display: block; animation: toast-in 0.15s ease; }
@@ -2376,8 +2385,8 @@ tr.pin-drop > td, .list-row.pin-drop { animation: pin-drop 0.9s ease-out; }
 
 /* Aktenkopf: Zeile mit Aktenzeichen, Rechtsgebiet und Tickets, darunter der Titel in einer Zeile */
 .case-area { font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); }
+/* Aktentitel: bis zu zwei Zeilen (auch am PC), erst danach „…“ */
 .case-title { margin: 0.2rem 0 0; font-family: var(--font-display); font-size: clamp(1.35rem, 2.2vw + 0.7rem, 1.95rem); font-weight: 600; line-height: 1.25; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
-@media (min-width: 768px) { .case-title { -webkit-line-clamp: 1; } }
 .case-title .ie-title { display: inline; }
 .case-title:has(.is-editing) { display: block; overflow: visible; }
 .case-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.7rem; }
@@ -2817,3 +2826,19 @@ body.hint-edit .form-hint[data-hint-key]:hover { background: rgba(var(--accent-r
 .seg-fonts .font-try-klassisch { font-family: 'Cormorant Garamond', Georgia, serif !important; font-size: 1.12rem; font-weight: 600; font-style: normal !important; }
 .seg-fonts .font-try-modern { font-family: var(--font-body) !important; font-weight: 650; letter-spacing: -0.02em; font-style: normal !important; }
 .seg-fonts .font-try-elegant { font-family: 'Cormorant Garamond', Georgia, serif !important; font-size: 1.12rem; font-style: italic !important; font-weight: 500; }
+
+/* Touch: kleine Knöpfe und Links bekommen eine größere, unsichtbare Tippfläche – die Optik bleibt (mind. ~40 px) */
+@media (pointer: coarse) {
+  :where(.star-btn, .task-check, .copy-btn, .link-btn, .doc-title, .ie, .copy-az, #forgotBtn, #registerLink, button[data-action="open-case"], footer a) { position: relative; }
+  :where(.star-btn, .task-check, .copy-btn)::after { content: ''; position: absolute; inset: -9px; }
+  :where(.link-btn, .doc-title, .ie, .copy-az, #forgotBtn, #registerLink, button[data-action="open-case"], footer a)::after { content: ''; position: absolute; inset: -12px 0; }
+  .num-btn { width: 2.4rem; height: 2.4rem; }
+}
+
+/* Eine Reiterleiste für alles (13-reiter.js): passt eine Reiter-/Filterleiste nicht, bricht sie am PC um;
+   am Handy wird sie zur Auswahlliste (die Leiste bleibt unsichtbar im Hintergrund und wird von der Liste geklickt) */
+@media (min-width: 700px) { .chip-row.tabrow, .case-jump-list.tabrow { flex-wrap: wrap; overflow: visible; row-gap: 0.45rem; } }
+.tabrow-collapsed { display: none !important; }
+.tabrow-pick { position: relative; min-width: 0; }
+.tabrow-pick select { width: 100%; }
+.case-jump .tabrow-pick { flex: 1; margin: 0.35rem 0; }

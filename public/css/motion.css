@@ -30,8 +30,10 @@
 /* ---------------------------------------------------------------- 3. Felder: Goldlinie wächst, Label folgt, Fehler wackelt */
 .field { transition: border-color var(--m-micro) ease, box-shadow var(--m-panel) var(--m-ease), background-color var(--m-micro) ease, height var(--m-panel) var(--m-ease); background-repeat: no-repeat; background-position: center bottom; background-size: 0% 2px; background-image: linear-gradient(90deg, transparent, var(--gold-500, #d4af37), transparent); }
 .field:focus, .field:focus-visible { background-size: 100% 2px; }
-select.field { background-size: auto; background-image: none; } /* Pfeil und Anzeige der Auswahl bleiben, wie sie sind */
-select.field:focus { background-size: auto; }
+/* Auswahllisten: keine Goldlinie, aber ihr Pfeil (vorher fiel er hier mit weg – Listen sahen aus wie Textfelder) */
+select.field, select.field:focus { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d4af37' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-size: 16px; background-position: right 0.75rem center; }
+/* moderne Browser (appearance: base-select, select.css): eingebauter Pfeil in der Kanzleifarbe statt des Bildes */
+@supports (appearance: base-select) { select.field, select.field:focus { background-image: none; } }
 .label { transition: color var(--m-micro) ease, transform var(--m-panel) var(--m-ease), letter-spacing var(--m-panel) var(--m-ease); transform-origin: left center; }
 :is(div, label, p):has(> .field:focus) > .label, :is(div, label, p):has(> .field:focus) > .label-row .label { color: var(--gold-light, #f3e5ab); transform: translateY(-1px) scale(1.02); }
 .chat-input { transition: height var(--m-panel) var(--m-ease), border-color var(--m-micro) ease, box-shadow var(--m-panel) var(--m-ease); }

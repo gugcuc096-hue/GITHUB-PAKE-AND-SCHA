@@ -306,6 +306,11 @@
            angeklickte Karte, Gegenstück in views/anwalt.html) */
         ::view-transition-group(pf-photo), ::view-transition-group(pf-name) { animation-duration: 0.5s; animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1); }
         ::view-transition-old(pf-name), ::view-transition-new(pf-name) { height: 100%; object-fit: contain; object-position: left center; }
+        /* Touch: kleine Links (Kopfleiste, Fußzeile, Teamnamen) bekommen eine größere, unsichtbare Tippfläche */
+        @media (pointer: coarse) {
+            :where(footer a, [data-auth-link], .team-name) { position: relative; }
+            :where(footer a, [data-auth-link], .team-name)::after { content: ''; position: absolute; inset: -12px 0; }
+        }
     </style>
     <!-- Tailwind fest gebaut (npm run build:css) – zuletzt eingebunden wie zuvor beim Play-CDN -->
     <link rel="stylesheet" href="/css/tailwind.css">

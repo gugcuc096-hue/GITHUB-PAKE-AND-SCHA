@@ -251,7 +251,7 @@
                 <form id="accessForm" data-nodraft class="flex flex-col sm:flex-row gap-3" novalidate>
                     <input id="acNumber" class="field font-mono" placeholder="Bewerbungsnummer, z. B. BW-2026-0001" autocapitalize="characters" aria-label="Bewerbungsnummer">
                     <input id="acCode" class="field font-mono sm:w-48" inputmode="numeric" maxlength="6" placeholder="Zugangscode" aria-label="Zugangscode">
-                    <button type="submit" class="btn-gold btn-md">Öffnen</button>
+                    <button type="submit" class="btn-gold btn-md shrink-0">Öffnen</button>
                 </form>
                 <p id="accessError" class="form-error mt-3" role="alert"></p>
                 <p class="text-xs text-dim mt-4">Noch nicht beworben? <a href="/karriere" class="text-gold hover:underline">Zu den offenen Stellen</a></p>
