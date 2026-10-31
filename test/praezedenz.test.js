@@ -167,7 +167,7 @@ describe('Präzedenzfälle im Browser', { skip: chromium ? false : 'Playwright n
       await page.waitForFunction(() => st.user && st.user.id, null, { timeout: 15000 });
       // Wiki → Präzedenzfälle
       await page.evaluate(() => (location.hash = '#wiki'));
-      await page.waitForSelector('[data-action="wiki-tab"][data-tab="fall"]');
+      await page.waitForSelector('[data-action="wiki-tab"][data-tab="fall"]', { state: 'attached' });
       await pickTab(page, '[data-action="wiki-tab"][data-tab="fall"]');
       await page.waitForSelector('.prec-card');
       await page.fill('#precSearch', 'ausgleich');

@@ -2080,7 +2080,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       assert.equal(await calmMedia(), '(prefers-reduced-motion: reduce)');
       assert.equal(await calm(), true);
       await page.evaluate(() => (location.hash = '#profile'));
-      await page.waitForSelector('[data-action="motion-set"][data-value="on"]');
+      await page.waitForSelector('[data-action="motion-set"][data-value="on"]', { state: 'attached' });
       assert.match(await page.textContent('#content'), /Bewegung reduzieren/, 'Hinweis auf die Systemeinstellung');
       await pickTab(page, '[data-action="motion-set"][data-value="on"]');
       assert.equal(await calmMedia(), 'not all', 'gedämpfte Fassung abgeschaltet');
@@ -2104,7 +2104,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       await page.goto(msrv.base + '/');
       assert.equal(await calmMedia(), 'not all');
       await page.goto(msrv.base + '/dashboard#profile');
-      await page.waitForSelector('[data-action="motion-set"][data-value="off"]');
+      await page.waitForSelector('[data-action="motion-set"][data-value="off"]', { state: 'attached' });
       await pickTab(page, '[data-action="motion-set"][data-value="off"]');
       assert.equal(await calmMedia(), 'all');
       await page.emulateMedia({ reducedMotion: 'no-preference' });

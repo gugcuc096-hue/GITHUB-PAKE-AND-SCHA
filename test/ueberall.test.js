@@ -66,7 +66,7 @@ describe('Bewegung und Glas überall (Browser)', { skip: chromium ? false : 'Pla
       assert.ok(anims > 0, 'Einblenden läuft');
       // 2. Reiter in Rechnungen überblenden
       await page.evaluate(() => (location.hash = '#invoices'));
-      await page.waitForSelector('[data-action="inv-tab"]');
+      await page.waitForSelector('[data-action="inv-tab"]', { state: 'attached' });
       await page.waitForTimeout(500);
       await pickTab(page, '[data-action="inv-tab"][data-tab="dauer"]');
       await page.waitForFunction(() => document.querySelector('#content').getAnimations().length > 0, null, { timeout: 3000 });

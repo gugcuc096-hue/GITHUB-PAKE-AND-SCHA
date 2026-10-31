@@ -170,7 +170,7 @@ describe('Dauermandate im Browser', { skip: chromium ? false : 'Playwright nicht
       await page.waitForURL(/dashboard/);
       await page.waitForFunction(() => st.user && st.user.id, null, { timeout: 15000 });
       await page.evaluate(() => (location.hash = '#invoices'));
-      await page.waitForSelector('[data-action="inv-tab"][data-tab="dauer"]');
+      await page.waitForSelector('[data-action="inv-tab"][data-tab="dauer"]', { state: 'attached' });
       await pickTab(page, '[data-action="inv-tab"][data-tab="dauer"]');
       await page.waitForSelector('.ret-card');
       // neu anlegen
