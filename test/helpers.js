@@ -172,6 +172,8 @@ function docxText(buf) {
 async function pickTab(page, selector) {
   const el = page.locator(selector).first();
   await el.waitFor({ state: 'attached' });
+  // die Reiterleiste wird nach dem Zeichnen (nächstes Bild) gemessen – erst danach steht fest, ob sie eine Liste ist
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   if (await el.isVisible()) return el.click();
   const index = await el.evaluate((node) => {
     const row = node.closest('.tabrow-collapsed');

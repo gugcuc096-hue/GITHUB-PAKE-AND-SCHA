@@ -37,6 +37,8 @@ function tabrowFit(row) {
     row.classList.remove('tabrow', 'tabrow-collapsed');
     return;
   }
+  // in einem versteckten Bereich (z. B. zweiter Reiter eines Fensters) lässt sich nichts messen – später, wenn sichtbar
+  if (!row.getClientRects().length && !row.classList.contains('tabrow-collapsed')) return;
   row.classList.add('tabrow');
   const narrow = window.matchMedia(TABROW_NARROW).matches;
   // messen, ob die Leiste in die Zeile passt (dafür kurz sichtbar)
@@ -83,9 +85,9 @@ function tabrowScan() {
   });
 }
 new MutationObserver((records) => {
-  // eigene Änderungen (Auswahlliste, Klassen) lösen keinen neuen Durchlauf aus
-  if (records.every((r) => [...r.addedNodes, ...r.removedNodes].every((n) => n.nodeType !== 1 || n.classList.contains('tabrow-pick')))) return;
+  // eigene Änderungen (Auswahlliste) lösen keinen neuen Durchlauf aus; ein Bereich, der sichtbar wird (hidden/open), schon
+  if (records.every((r) => r.type === 'childList' && [...r.addedNodes, ...r.removedNodes].every((n) => n.nodeType !== 1 || n.classList.contains('tabrow-pick')))) return;
   tabrowScan();
-}).observe(document.body, { childList: true, subtree: true });
+}).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'open'] });
 window.addEventListener('resize', tabrowScan);
 tabrowScan();
