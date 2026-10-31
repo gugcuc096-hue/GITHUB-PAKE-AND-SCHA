@@ -367,7 +367,7 @@ describe('Stil, Saison und Aktionen im Browser', { skip: chromium ? false : 'Pla
       assert.equal(await page.textContent('.range-val[data-for="stRadius"]'), '80');
       // Saison ansehen
       await page.click('[data-action="season-try"][data-season="weihnachten"]');
-      await page.waitForFunction(() => document.documentElement.dataset.season === 'weihnachten' && document.querySelector('.ps-garland .bulb') && document.querySelector('.ps-season-canvas'));
+      await page.waitForFunction(() => document.documentElement.dataset.season === 'weihnachten' && document.querySelector('.topbar .ps-lights .bulb') && document.querySelector('.ps-scene.is-dash .ps-fx'));
       // Anderer Bereich: Vorschau endet, Stil wie veröffentlicht
       await page.click('[data-action="cfg-tab"][data-tab="banner"]');
       await page.waitForFunction(() => getComputedStyle(document.documentElement).getPropertyValue('--gold-500').trim() !== '#34d399');
@@ -452,6 +452,54 @@ describe('Stil, Saison und Aktionen im Browser', { skip: chromium ? false : 'Pla
     }
   });
 
+  it('Saison-Szenen: alle acht liegen hinter dem Inhalt, Felder bleiben klickbar und lesbar', async () => {
+    const ctx = await browser.newContext({ viewport: { width: 1366, height: 860 }, locale: 'de-DE' });
+    const page = await ctx.newPage();
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(e.message));
+    page.on('console', (m) => m.type() === 'error' && /Saison/.test(m.text()) && problems.push(m.text()));
+    try {
+      await page.goto(`${srv.base}/`);
+      await page.waitForFunction(() => window.PS && window.PS.season);
+      for (const name of ['halloween', 'weihnachten', 'silvester', 'valentin', 'ostern', 'sommer', 'blackfriday', 'jubilaeum']) {
+        await page.evaluate((n) => PS.season.set(n), name);
+        await page.waitForSelector(`.ps-scene-${name} .ps-fx`);
+        await page.waitForTimeout(250);
+        const r = await page.evaluate(() => {
+          const scene = document.querySelector('.ps-scene');
+          const cs = getComputedStyle(scene);
+          // gezeichnet? (Landschaft hat Pixel)
+          const c = scene.querySelector('.ps-scenery');
+          const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+          let painted = 0;
+          for (let i = 3; i < d.length; i += 4 * 97) if (d[i]) painted++;
+          // was liegt ganz oben in der Mitte des ersten Knopfes?
+          const btn = [...document.querySelectorAll('main a, main button')].find((x) => {
+            const q = x.getBoundingClientRect();
+            return q.width > 20 && q.top > 80 && q.bottom < innerHeight - 20;
+          });
+          const b = btn.getBoundingClientRect();
+          const top = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+          const fx = scene.querySelector('.ps-fx');
+          return { z: cs.zIndex, pos: cs.position, events: cs.pointerEvents, painted, hit: !!top && !top.closest('.ps-season'), scenes: document.querySelectorAll('.ps-scene').length, fxW: fx.width, w: innerWidth };
+        });
+        assert.equal(r.z, '-1', `${name}: hinter allem`);
+        assert.equal(r.pos, 'fixed', `${name}: fest`);
+        assert.equal(r.events, 'none', `${name}: nicht klickbar`);
+        assert.ok(r.painted > 20, `${name}: Landschaft gezeichnet`);
+        assert.ok(r.hit, `${name}: Knopf liegt über der Szene`);
+        assert.equal(r.scenes, 1, `${name}: genau eine Szene`);
+        assert.equal(r.fxW, r.w, `${name}: Bewegungsebene in einfacher Auflösung (schont schwache Geräte)`);
+      }
+      await page.evaluate(() => PS.season.set('none'));
+      assert.equal(await page.$('.ps-season'), null, 'aus');
+      assert.equal(await page.evaluate(() => document.documentElement.classList.contains('has-season')), false);
+      assert.deepEqual(problems, []);
+    } finally {
+      await ctx.close();
+    }
+  });
+
   it('Bewegung reduzieren: Saison-Deko ohne Teilchen, eigene Abschaltung je Gerät', async () => {
     const ctx = await browser.newContext({ viewport: { width: 1366, height: 860 }, locale: 'de-DE', reducedMotion: 'reduce' });
     const page = await ctx.newPage();
@@ -459,10 +507,11 @@ describe('Stil, Saison und Aktionen im Browser', { skip: chromium ? false : 'Pla
       await page.goto(`${srv.base}/`);
       await page.waitForFunction(() => window.PS && window.PS.season);
       await page.evaluate(() => PS.season.set('weihnachten'));
-      await page.waitForSelector('.ps-garland');
-      assert.equal(await page.$('.ps-season-canvas'), null, 'keine Teilchen');
+      await page.waitForSelector('.ps-scene-weihnachten .ps-scenery');
+      assert.equal(await page.$('.ps-scene .ps-fx'), null, 'keine Teilchen, nur das stehende Bild');
       await page.evaluate(() => PS.season.off(true));
-      assert.equal(await page.$('.ps-garland'), null, 'abgeschaltet');
+      assert.equal(await page.$('.ps-scene'), null, 'abgeschaltet');
+      assert.equal(await page.$('.ps-lights'), null, 'Lichterkette weg');
       await page.reload();
       await page.evaluate(() => PS.season.set('halloween'));
       assert.equal(await page.$('.ps-season'), null, 'bleibt aus (gemerkt)');
