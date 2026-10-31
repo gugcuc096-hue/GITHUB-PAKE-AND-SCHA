@@ -6,7 +6,7 @@
  */
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const { startServer, client, TEAM, PASSWORD } = require('./helpers');
+const { startServer, client, TEAM, PASSWORD, pickTab } = require('./helpers');
 
 let chromium = null;
 try {
@@ -66,9 +66,9 @@ describe('Bewegung und Glas überall (Browser)', { skip: chromium ? false : 'Pla
       assert.ok(anims > 0, 'Einblenden läuft');
       // 2. Reiter in Rechnungen überblenden
       await page.evaluate(() => (location.hash = '#invoices'));
-      await page.waitForSelector('[data-action="inv-tab"]');
+      await page.waitForSelector('[data-action="inv-tab"]', { state: 'attached' });
       await page.waitForTimeout(500);
-      await page.click('[data-action="inv-tab"][data-tab="dauer"]');
+      await pickTab(page, '[data-action="inv-tab"][data-tab="dauer"]');
       await page.waitForFunction(() => document.querySelector('#content').getAnimations().length > 0, null, { timeout: 3000 });
       // 3. Hinweis ist Glas
       await page.evaluate(() => toast('Glas-Test'));

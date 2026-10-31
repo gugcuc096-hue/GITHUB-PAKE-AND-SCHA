@@ -17,7 +17,10 @@
   /* Eigener Gold-Pfeil (Hintergrundbild) bei .field und in der Aktenleiste – sonst der eingebaute, in Gold */
   select::picker-icon { color: var(--gold-500); transition: rotate 0.2s ease; }
   select:open::picker-icon { rotate: 180deg; }
-  select.field::picker-icon, .prop-v select::picker-icon { display: none; }
+  .prop-v select::picker-icon { display: none; }
+  /* .field: Pfeil rechts außen (statt des Hintergrundbilds, motion.css) */
+  select.field:not([multiple]):not([size]), select.field.field-sm:not([multiple]):not([size]) { padding-right: 0.8rem; gap: 0.5rem; }
+  select.field::picker-icon { margin-left: auto; }
   select.field:open { border-color: var(--gold-500, #d4af37); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15); }
 
   :is(select.field, select)::picker(select) {

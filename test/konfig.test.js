@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { startServer, client, TEAM, PASSWORD } = require('./helpers');
+const { startServer, client, TEAM, PASSWORD, pickTab } = require('./helpers');
 
 let chromium = null;
 try {
@@ -193,13 +193,13 @@ describe('Texte & Banner im Browser', { skip: chromium ? false : 'Playwright nic
       await page.waitForFunction(() => /Entwurf – noch nicht/.test(document.querySelector('.cfg-bar .badge')?.textContent || ''), null, { timeout: 8000 });
       await Promise.all([page.waitForResponse((r) => r.url().includes('/api/config/banner/publish') && r.ok()), page.click('[data-action="cfg-publish"][data-key="banner"]')]);
       // Startseite: Abschnitt „Karriere“ ausblenden
-      await page.click('[data-action="cfg-tab"][data-tab="home"]');
+      await pickTab(page, '[data-action="cfg-tab"][data-tab="home"]');
       await page.waitForSelector('#cfgSections');
       await page.uncheck('.home-sec[data-id="karriere"] input[name="show"]');
       await page.click('[data-action="home-move"][data-dir="1"] >> nth=0'); // erster Abschnitt eine Stelle nach unten
       await Promise.all([page.waitForResponse((r) => r.url().includes('/api/config/home/publish') && r.ok()), page.click('[data-action="cfg-publish"][data-key="home"]')]);
       // Beschriftungen: Mandant → Klient
-      await page.click('[data-action="cfg-tab"][data-tab="labels"]');
+      await pickTab(page, '[data-action="cfg-tab"][data-tab="labels"]');
       await page.waitForSelector('.term-row[data-term="mandant"]');
       await page.fill('.term-row[data-term="mandant"] [data-t="sg"]', 'Klient');
       await page.fill('.term-row[data-term="mandant"] [data-t="pl"]', 'Klienten');
@@ -213,7 +213,7 @@ describe('Texte & Banner im Browser', { skip: chromium ? false : 'Playwright nic
       // Als Rang ansehen: Mandant → kein Einstellungs-Punkt
       await page.evaluate(() => (location.href = '/dashboard?tab=access#settings'));
       await page.waitForSelector('[data-action="view-as"][data-as="mandant"]', { timeout: 15000 });
-      await page.click('[data-action="view-as"][data-as="mandant"]');
+      await pickTab(page, '[data-action="view-as"][data-as="mandant"]');
       await page.waitForSelector('#viewAsBand');
       if (device.isMobile && !(await page.$('#sidebar.open'))) await page.click('#bottomNav [data-action="open-sidebar"]').catch(() => {});
       assert.equal(await page.locator('#nav a[href="#settings"]').count(), 0, 'Mandant sieht keine Einstellungen');

@@ -5,7 +5,7 @@
  */
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const { startServer, client, TEAM, PASSWORD } = require('./helpers');
+const { startServer, client, TEAM, PASSWORD, pickTab } = require('./helpers');
 
 let chromium = null;
 try {
@@ -167,8 +167,8 @@ describe('Präzedenzfälle im Browser', { skip: chromium ? false : 'Playwright n
       await page.waitForFunction(() => st.user && st.user.id, null, { timeout: 15000 });
       // Wiki → Präzedenzfälle
       await page.evaluate(() => (location.hash = '#wiki'));
-      await page.waitForSelector('[data-action="wiki-tab"][data-tab="fall"]');
-      await page.click('[data-action="wiki-tab"][data-tab="fall"]');
+      await page.waitForSelector('[data-action="wiki-tab"][data-tab="fall"]', { state: 'attached' });
+      await pickTab(page, '[data-action="wiki-tab"][data-tab="fall"]');
       await page.waitForSelector('.prec-card');
       await page.fill('#precSearch', 'ausgleich');
       await page.waitForFunction(() => document.querySelectorAll('.prec-card').length === 1);

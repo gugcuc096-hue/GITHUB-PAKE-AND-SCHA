@@ -21,6 +21,11 @@ html.has-season { --navy-800: rgba(10, 18, 40, 0.92); }
 html.has-season .panel, html.has-season .kpi { --panel-alpha: 0.88; }
 /* durchsichtige Knöpfe und Reiter bekommen einen dunklen Grund – helle Stellen der Szene stören die Schrift nicht */
 html.has-season .btn-outline:not(:hover), html.has-season .tab-btn:not(.active) { background-color: rgba(6, 10, 24, 0.72); }
+/* Reiter und Filter (Chips) ebenso – der Mond scheint nicht mehr durch; Bündel-Reiter bekommen einen Grund als Leiste */
+html.has-season :not(.hub-tabs) > .chip:not(.active) { background-color: rgba(6, 10, 24, 0.8); }
+html.has-season :not(.hub-tabs) > .chip.active { background-color: rgba(6, 10, 24, 0.85); }
+html.has-season .chip-row.hub-tabs { background: rgba(6, 10, 24, 0.6); border-radius: 12px 12px 0 0; }
+html.has-season .field { background-color: rgba(6, 10, 24, 0.88); }
 
 /* Himmel je Saison – jede hat ihre eigene Farbe */
 .ps-scene-halloween .ps-sky { background: radial-gradient(ellipse 60% 40% at 84% 22%, rgba(255, 140, 60, 0.18), transparent 70%), linear-gradient(180deg, #06020d 0%, #140724 42%, #2a0b31 68%, #4a1a14 86%, #120608 100%); }

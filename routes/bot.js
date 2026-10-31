@@ -49,14 +49,16 @@ function overview() {
 
 router.get('/', (req, res) => res.json(overview()));
 
-/** Rollen und Kanäle des Servers (für die Auswahllisten). ?refresh=1 lädt neu. */
+/** Rollen und Kanäle des Servers (für die Auswahllisten). ?refresh=1 lädt neu. Noch nicht eingerichtet (kein Token,
+ * keine Server-ID) ist ein normaler Zustand, kein Fehler: 200 mit { configured: false, error }. */
 router.get(
   '/discord',
   wrap(async (req, res) => {
     try {
       res.json(await bot.discordData(req.query.refresh === '1'));
     } catch (err) {
-      res.status(err.status === 400 ? 400 : 502).json({ error: err.message });
+      if (err.status === 400) return res.json({ configured: false, error: err.message });
+      res.status(502).json({ error: err.message });
     }
   })
 );

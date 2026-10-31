@@ -912,8 +912,15 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     .filter(Boolean)
     .join(' · ');
   const info = [
-    // Kanzlei: der Name öffnet die Mandantenkartei; Mandanten ohne Konto lassen sich hier umbenennen
-    staff && c.clientKey
+    // Kanzlei: der Name öffnet die Mandantenkartei; Mandanten ohne Konto benennt der Stift daneben direkt hier um
+    // (ein Feld – keine zweite Zeile „Name des Mandanten“ mehr)
+    staff && c.canEdit && !c.hasClientAccount
+      ? [
+          'Mandant',
+          null,
+          `<span class="ie-swap">${c.clientKey ? clientLink(c.clientKey, c.clientName) : ''}${ie(c, 'clientName', c.clientName === '—' ? '' : c.clientName, { placeholder: 'Name eintragen', cls: c.clientKey ? 'ie-swap-field' : '' })}${c.clientKey ? `<button type="button" class="copy-btn" data-ie-open="clientName" title="Namen ändern" aria-label="Namen des Mandanten ändern">${icon('edit', 'ico-xs')}</button>` : ''}</span> <span class="text-dim">(ohne Konto)</span>`,
+        ]
+      : staff && c.clientKey
       ? [
           'Mandant',
           null,
@@ -940,9 +947,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
   const accountRow =
     staff && c.hasClientAccount && canLinkClient(c)
       ? `<div class="account-row"><div><span class="k inline">Mandanten-Konto</span> <strong>${esc(c.clientName)}</strong>${c.clientEmail ? ` <span class="text-dim">· ${esc(c.clientEmail)}</span>` : ''}</div><div class="flex flex-wrap gap-2">${isBoard() && c.clientId ? `<button type="button" class="btn-outline btn-sm" data-action="name-direct" data-user-id="${c.clientId}" data-name="${esc(c.clientName)}" data-email="${esc(c.clientEmail || '')}" data-return-case="${c.id}">Name korrigieren</button>` : ''}<button type="button" class="btn-outline btn-sm" data-action="case-client-search" data-id="${c.id}">Anderes Konto</button><button type="button" class="btn-ghost btn-sm" data-action="case-unlink-client" data-id="${c.id}">Verknüpfung lösen</button></div></div>`
-      : staff && c.canEdit && !c.hasClientAccount
-        ? `<div class="account-row"><div><span class="k inline">Name des Mandanten</span> ${ie(c, 'clientName', c.clientName === '—' ? '' : c.clientName, { placeholder: 'Name eintragen' })}</div></div>`
-        : '';
+      : '';
 
   // Aktenkopf: eine Leiste unter dem Titel – je Angabe ein Feld „STATUS | ● In Bearbeitung“. Zuständige Anwälte
   // wählen Status und Priorität direkt aus; alle anderen sehen dieselben Felder nur zum Lesen.

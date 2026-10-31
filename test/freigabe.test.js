@@ -5,7 +5,7 @@
  */
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const { startServer, client, TEAM, PASSWORD } = require('./helpers');
+const { startServer, client, TEAM, PASSWORD, pickTab } = require('./helpers');
 
 let chromium = null;
 try {
@@ -161,8 +161,8 @@ describe('Rabatt-Freigabe im Browser', { skip: chromium ? false : 'Playwright ni
 
       const b = await login(TEAM.admin);
       await b.page.evaluate(() => (location.hash = '#invoices'));
-      await b.page.waitForSelector('[data-action="inv-tab"][data-tab="freigaben"]');
-      await b.page.click('[data-action="inv-tab"][data-tab="freigaben"]');
+      await b.page.waitForSelector('[data-action="inv-tab"][data-tab="freigaben"]', { state: 'attached' });
+      await pickTab(b.page, '[data-action="inv-tab"][data-tab="freigaben"]');
       const card = b.page.locator('.appr-card', { hasText: `Rabatt ${name}` }).or(b.page.locator('.appr-card', { hasText: 'Stammkunde' })).first();
       await card.waitFor();
       assert.ok((await card.textContent()).includes('40 %'));

@@ -226,6 +226,13 @@
       s = { w: A.w, h: A.h, u: Math.max(0.55, Math.min(A.w, A.h) / 900), k: isDash ? 0.45 : 1, dash: isDash, top: headerBottom() };
       A.ctx.clearRect(0, 0, A.w, A.h);
       S.scenery(A.ctx, A.w, A.h, s);
+      // Dashboard: oben stehen Überschriften und Reiter – Mond & Co. dort deutlich zurücknehmen, unten bleibt die Landschaft
+      if (isDash) {
+        A.ctx.globalCompositeOperation = 'destination-out';
+        A.ctx.fillStyle = vgrad(A.ctx, 0, A.h, [[0, 'rgba(0,0,0,0.7)'], [0.45, 'rgba(0,0,0,0.55)'], [0.75, 'rgba(0,0,0,0)']]);
+        A.ctx.fillRect(0, 0, A.w, A.h);
+        A.ctx.globalCompositeOperation = 'source-over';
+      }
       if (fx) {
         B = fit(fx, false);
         if (S.init) S.init(s);

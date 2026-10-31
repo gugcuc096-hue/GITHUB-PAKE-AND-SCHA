@@ -190,7 +190,10 @@ function renderDutyBtn() {
   const s = myDutyStatus();
   const btn = $('#dutyBtn');
   btn.classList.toggle('on', s !== 'off');
-  btn.innerHTML = `<span class="duty-dot s-${s}"></span><span class="lbl">${esc(DUTY[s])}</span>`;
+  // Handy: Uhr (Stempeluhr) mit Statuspunkt statt eines einzelnen Punkts; PC: Punkt und Text
+  btn.innerHTML = `<span class="duty-ico" aria-hidden="true">${icon('clock', 'ico-sm')}<span class="duty-dot s-${s}"></span></span><span class="duty-dot duty-dot-main s-${s}"></span><span class="lbl">${esc(DUTY[s])}</span>`;
+  btn.title = `Dienststatus: ${DUTY[s]}`;
+  btn.setAttribute('aria-label', btn.title);
 }
 function openDutyPop() {
   const s = myDutyStatus();

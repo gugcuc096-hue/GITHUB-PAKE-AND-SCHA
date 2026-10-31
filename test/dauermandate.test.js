@@ -5,7 +5,7 @@
  */
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const { startServer, client, TEAM, PASSWORD } = require('./helpers');
+const { startServer, client, TEAM, PASSWORD, pickTab } = require('./helpers');
 
 let chromium = null;
 try {
@@ -170,8 +170,8 @@ describe('Dauermandate im Browser', { skip: chromium ? false : 'Playwright nicht
       await page.waitForURL(/dashboard/);
       await page.waitForFunction(() => st.user && st.user.id, null, { timeout: 15000 });
       await page.evaluate(() => (location.hash = '#invoices'));
-      await page.waitForSelector('[data-action="inv-tab"][data-tab="dauer"]');
-      await page.click('[data-action="inv-tab"][data-tab="dauer"]');
+      await page.waitForSelector('[data-action="inv-tab"][data-tab="dauer"]', { state: 'attached' });
+      await pickTab(page, '[data-action="inv-tab"][data-tab="dauer"]');
       await page.waitForSelector('.ret-card');
       // neu anlegen
       await page.click('[data-action="ret-new"]');

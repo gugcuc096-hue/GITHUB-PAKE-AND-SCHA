@@ -11,7 +11,7 @@
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
-const { startServer, client, TEAM, PASSWORD } = require('./helpers');
+const { startServer, client, TEAM, PASSWORD, pickTab } = require('./helpers');
 
 let chromium = null;
 try {
@@ -486,8 +486,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await settle();
 
         // Verwenden → Per DM an Rolle: Empfänger anzeigen, senden, Fortschritt
-        await page.click('[data-action="msg-tab"][data-tab="use"]');
-        await page.click('[data-action="msg-use-tab"][data-tab="dm"]');
+        await pickTab(page, '[data-action="msg-tab"][data-tab="use"]');
+        await pickTab(page, '[data-action="msg-use-tab"][data-tab="dm"]');
         await settle();
         assert.match(await page.textContent('#msgUse'), /in Direktnachrichten pingt das niemanden/);
         await page.selectOption('#dmRole', ROLES.burgershot);
@@ -585,7 +585,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         if (device === DESKTOP) assert.equal(await staff.page.textContent('#nav a[href="#invoices"] .nav-count'), '1');
         await staff.page.evaluate(() => (location.hash = '#invoices'));
         await staff.settle();
-        await staff.page.click('[data-action="inv-filter"][data-value="gemeldet"]');
+        await pickTab(staff.page, '[data-action="inv-filter"][data-value="gemeldet"]');
         await staff.settle();
         const row = staff.page.locator('tbody tr', { has: staff.page.locator(`text=${inv.number}`) });
         assert.match(await row.textContent(), /Zahlung gemeldet/);
@@ -1016,12 +1016,12 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.evaluate(() => (location.hash = '#concerns-board'));
         await settle();
         assert.ok((await page.textContent('#content')).includes('Rückruf zu meiner Akte'), 'Eingang zeigt das Anliegen');
-        await page.click('#content .settings-tabs a[href="#concerns"]');
+        await pickTab(page, '#content .settings-tabs a[href="#concerns"]');
         await settle();
         assert.equal(await page.evaluate(() => location.hash), '#concerns');
         assert.match(await page.textContent('#content .page-title'), /Meine Anliegen/);
         assert.ok(await page.$('#nav a[href="#concerns-board"].active'), 'Menüpunkt bleibt markiert');
-        await page.click('#content .settings-tabs a[href="#concerns-board"]');
+        await pickTab(page, '#content .settings-tabs a[href="#concerns-board"]');
         await settle();
         assert.equal(await page.evaluate(() => location.hash), '#concerns-board');
 
@@ -1029,7 +1029,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.evaluate((id) => openCase(id), kase.id);
         await page.waitForSelector('#modalBody .case-jump');
         assert.match(await page.textContent('#modalBody .case-jump [data-target="secInvoices"]'), /Rechnungen\s*1/);
-        await page.click('#modalBody .case-jump [data-target="secInvoices"]');
+        await pickTab(page, '#modalBody .case-jump [data-target="secInvoices"]');
         // weich gescrollt – warten, bis der Abschnitt angekommen ist
         await page.waitForFunction(() => {
           const sec = document.getElementById('secInvoices').getBoundingClientRect().top;
@@ -1079,7 +1079,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         assert.deepEqual(await page.$$eval('#content .settings-tabs .chip', (els) => els.map((e) => e.textContent.trim())), ['Kanzlei & Rechnungen', 'Website & Ränge', 'Discord', 'Integrationen', 'Lager', 'System', 'Listen', 'Texte & Banner', 'Rechte & Schalter']);
         assert.ok(await page.$('#content form[data-form="settings-firm"]'));
         // Website & Ränge: Bearbeiten-Links, Ränge mit Knöpfen, Rang-Dialog
-        await page.click('#content .settings-tabs [data-tab="site"]');
+        await pickTab(page, '#content .settings-tabs [data-tab="site"]');
         await settle();
         assert.equal(await page.locator('#content a[href="/?bearbeiten"]').count(), 1);
         assert.equal(await page.locator('#content [data-action="rank-edit"][data-id]').count(), 6, 'sechs Ränge');
@@ -1089,13 +1089,13 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         assert.equal(await page.inputValue('form[data-form="rank"] input[name="name"]'), 'Founding Partner');
         await page.keyboard.press('Escape');
         await settle();
-        await page.click('#content .settings-tabs [data-tab="integrations"]');
+        await pickTab(page, '#content .settings-tabs [data-tab="integrations"]');
         await settle();
         assert.match(await page.textContent('#content'), /FiveNet[\s\S]*Google Docs/);
-        await page.click('#content .settings-tabs [data-tab="system"]');
+        await pickTab(page, '#content .settings-tabs [data-tab="system"]');
         await settle();
         assert.match(await page.textContent('#content'), /Datensicherung[\s\S]*Notfall/);
-        await page.click('#content .settings-tabs [data-tab="bot"]');
+        await pickTab(page, '#content .settings-tabs [data-tab="bot"]');
         await settle();
         await page.click('#content .bot-nav-item[data-module="webhook"]');
         await settle();
@@ -1294,10 +1294,10 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         assert.ok(tags.n >= 4, 'Markierungen in der Liste');
         assert.deepEqual(tags.styles, ['6px|0px|true'], 'ein Stil für alle Markierungen');
         assert.doesNotMatch(await page.textContent(`#caseList tr.row[data-id="${webCase.id}"]`), /liegt seit/);
-        await page.click('[data-action="case-filter"][data-value="liegt"]');
+        await pickTab(page, '[data-action="case-filter"][data-value="liegt"]');
         await page.waitForFunction(() => document.querySelectorAll('#caseList tr.row').length === 1);
         assert.equal(await page.getAttribute('#caseList tr.row', 'data-id'), String(quiet.id));
-        await page.click('[data-action="case-filter"][data-value="aktiv"]');
+        await pickTab(page, '[data-action="case-filter"][data-value="aktiv"]');
 
         // Website-Anfrage „Eilig“: Kanzlei sieht die Priorität, die Angabe des Mandanten nur als Hinweis daneben
         await page.click(`#caseList tr.row[data-id="${webCase.id}"]`);
@@ -2080,9 +2080,9 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       assert.equal(await calmMedia(), '(prefers-reduced-motion: reduce)');
       assert.equal(await calm(), true);
       await page.evaluate(() => (location.hash = '#profile'));
-      await page.waitForSelector('[data-action="motion-set"][data-value="on"]');
+      await page.waitForSelector('[data-action="motion-set"][data-value="on"]', { state: 'attached' });
       assert.match(await page.textContent('#content'), /Bewegung reduzieren/, 'Hinweis auf die Systemeinstellung');
-      await page.click('[data-action="motion-set"][data-value="on"]');
+      await pickTab(page, '[data-action="motion-set"][data-value="on"]');
       assert.equal(await calmMedia(), 'not all', 'gedämpfte Fassung abgeschaltet');
       assert.equal(await calm(), false);
       assert.equal(await page.getAttribute('[data-action="motion-set"][data-value="on"]', 'aria-pressed'), 'true');
@@ -2104,12 +2104,12 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       await page.goto(msrv.base + '/');
       assert.equal(await calmMedia(), 'not all');
       await page.goto(msrv.base + '/dashboard#profile');
-      await page.waitForSelector('[data-action="motion-set"][data-value="off"]');
-      await page.click('[data-action="motion-set"][data-value="off"]');
+      await page.waitForSelector('[data-action="motion-set"][data-value="off"]', { state: 'attached' });
+      await pickTab(page, '[data-action="motion-set"][data-value="off"]');
       assert.equal(await calmMedia(), 'all');
       await page.emulateMedia({ reducedMotion: 'no-preference' });
       assert.equal(await calm(), true, '„Aus“ gilt auch ohne Systemeinstellung');
-      await page.click('[data-action="motion-set"][data-value="auto"]');
+      await pickTab(page, '[data-action="motion-set"][data-value="auto"]');
       assert.equal(await calmMedia(), '(prefers-reduced-motion: reduce)');
       assert.equal(await calm(), false, '„Wie System“: System ohne Einschränkung → Animationen an');
       assert.deepEqual(problems, []);
@@ -2457,7 +2457,7 @@ describe('Browser: Strafmaß, Verhandlung, Wiki, Beschlüsse, Rechnungszeile, Ge
       await page.click('.wiki-card >> nth=0');
       await page.waitForSelector('.wiki-body h3, .wiki-body p');
       await page.click('#modalCard [data-action="close-modal"]');
-      await page.click('[data-action="wiki-tab"][data-tab="stgb"]');
+      await pickTab(page, '[data-action="wiki-tab"][data-tab="stgb"]');
       await page.fill('#stgbSearch', 'raub');
       await page.waitForSelector('.stgb-row');
       await page.click('.stgb-row >> text=Raub');
@@ -2606,7 +2606,7 @@ describe('Browser: Board-Menü gebündelt, Hover-Karte, Kalender ziehen, Vorlage
       await page.click('#nav a[data-hub="inbox"]');
       await page.waitForSelector('#content .hub-tabs');
       assert.deepEqual(await page.$$eval('#content .hub-tabs a', (as) => as.map((x) => x.getAttribute('href'))), ['#concerns-board', '#applications', '#name-requests', '#reviews', '#resolutions']);
-      await page.click('#content .hub-tabs a[href="#applications"]');
+      await pickTab(page, '#content .hub-tabs a[href="#applications"]');
       await page.waitForFunction(() => location.hash === '#applications' && document.querySelector('#content .hub-tabs a.active')?.getAttribute('href') === '#applications');
       assert.equal(await page.getAttribute('#nav a[data-hub="inbox"]', 'aria-current'), 'page', 'Menüpunkt bleibt markiert');
 
@@ -2650,7 +2650,7 @@ describe('Browser: Board-Menü gebündelt, Hover-Karte, Kalender ziehen, Vorlage
 
       // Vorlagen im Wiki statt in den Einstellungen; Archiv-Regel
       await page.click('#nav a[href="#wiki"]');
-      await page.click('#content [data-action="wiki-tab"][data-tab="vorlagen"]');
+      await pickTab(page, '#content [data-action="wiki-tab"][data-tab="vorlagen"]');
       await page.waitForSelector('#content >> text=Vertragsvorlagen');
       assert.equal(await page.evaluate(() => [isArchived({ status: 'geschlossen', closedAt: '2020-01-01 10:00:00' }), isArchived({ status: 'geschlossen', closedAt: new Date().toISOString() }), isArchived({ status: 'offen' })].join()), 'true,false,false');
       assert.deepEqual(problems, []);
