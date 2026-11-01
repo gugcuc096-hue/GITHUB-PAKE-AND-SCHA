@@ -4,7 +4,7 @@
  */
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const assistant = require('../assistant');
+const assistant = require('../server/domain/assistant');
 
 describe('Assistent: Mandanten-Sicht', () => {
   const base = { case: { id: 1, caseNumber: 'PS-1', title: 'T', area: 'strafrecht', areaLabel: 'Strafrecht', step: 2, stepLabel: 'Verhandlung', statusLabel: 'In Bearbeitung', clientName: 'A', closed: false, lawyerId: 5, lawyerName: 'Dr. X', idleDays: 0, hasClientAccount: true, publicNote: 'ok' }, appointments: [], tasks: [], parties: [], attachments: [], invoices: [], requests: [], chat: { messages: [] }, charges: { charges: [], sentence: {}, estimate: {} } };

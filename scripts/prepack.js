@@ -8,7 +8,7 @@ process.env.NODE_ENV = 'production';
 const started = Date.now();
 (async () => {
   try {
-    const n = await require('../assets').packAll();
+    const n = await require('../server/web/assets').packAll();
     console.log(`Vorab gepackt: ${n} Dateien in ${Date.now() - started} ms (.packed/)`);
   } catch (err) {
     console.warn('Vorab packen übersprungen:', err.message);
