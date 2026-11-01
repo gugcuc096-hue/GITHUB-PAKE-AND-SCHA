@@ -2140,8 +2140,18 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       // Die Karte hebt sich beim Darüberfahren an (0,35 s) – erst danach messen, wo sie steht
       const start = await card.boundingBox();
       await A.page.mouse.move(start.x + 30, start.y + 30);
-      await A.page.waitForTimeout(600);
-      const box = await card.boundingBox();
+      // warten, bis die Karte ruhig steht (Anheben, Seite lädt nach) – auf ausgelasteten Rechnern dauert das länger
+      const steady = async () => {
+        let prev = null;
+        for (let i = 0; i < 40; i++) {
+          const b = await card.boundingBox();
+          if (prev && Math.abs(b.x - prev.x) < 0.5 && Math.abs(b.y - prev.y) < 0.5) return b;
+          prev = b;
+          await A.page.waitForTimeout(100);
+        }
+        return prev;
+      };
+      const box = await steady();
       await A.page.mouse.move(box.x + 60, box.y + 80);
       await A.page.waitForFunction(() => document.querySelector('#teamGrid .team-card.ps-spot-on'));
       await A.page.waitForTimeout(300); // Neigung zur Maus abwarten
