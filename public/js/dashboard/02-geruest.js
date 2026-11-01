@@ -1319,7 +1319,7 @@ function showCredentials(cred, name) {
 
 /* ---------------------------------------------------------------- Eingabe mit Vorschlägen */
 /**
- * Freitext-Feld mit eigener Vorschlagsliste im Stil der Auswahllisten (statt <datalist>, das sich nicht gestalten lässt).
+ * Freitext-Feld mit eigener Vorschlagsliste im Stil der Auswahllisten (statt des Browser-Elements „datalist“, das sich nicht gestalten lässt).
  * Tippen filtert, Pfeiltasten wählen, Enter übernimmt, Esc schließt – eigener Text bleibt erlaubt.
  */
 function comboField({ id, name, value = '', options = [], maxlength = 120, placeholder = '', attrs = '' }) {
