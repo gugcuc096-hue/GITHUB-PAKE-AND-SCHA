@@ -188,4 +188,30 @@ async function pickTab(page, selector) {
   await select.selectOption(String(index));
 }
 
-module.exports = { ROOT, PASSWORD, TEAM, startServer, client, readZipEntry, docxText, pickTab };
+/** Akte: den Reiter öffnen, in dem ein Abschnitt steht (secChat → Kommunikation …) – wie ein Klick auf den Reiter. */
+async function caseSec(page, secId) {
+  await page.waitForSelector('#modalBody .case-root', { state: 'attached' });
+  const tab = await page.evaluate((id) => {
+    const el = document.getElementById(id);
+    const pane = el && el.closest('[data-pane]');
+    return pane ? pane.dataset.pane : null;
+  }, secId);
+  if (!tab) return;
+  if ((await page.getAttribute('#modalBody .case-root', 'data-case-tab')) !== tab) await pickTab(page, `#modalBody [data-action="case-tab"][data-tab="${tab}"]`);
+  await page.waitForFunction((t) => document.querySelector('#modalBody .case-root')?.dataset.caseTab === t, tab);
+}
+
+/** Akte: den Reiter öffnen, in dem das Element steht (falls es in einem Reiter steht) – vor Klick, Eingabe oder Prüfung. */
+async function caseShow(page, selector) {
+  await page.waitForSelector(selector, { state: 'attached' });
+  const tab = await page.$eval(selector, (el) => {
+    const pane = el.closest('.case-root [data-pane]');
+    const root = el.closest('.case-root');
+    return pane && root && root.dataset.caseTab !== pane.dataset.pane ? pane.dataset.pane : null;
+  });
+  if (!tab) return;
+  await pickTab(page, `#modalBody [data-action="case-tab"][data-tab="${tab}"]`);
+  await page.waitForFunction((t) => document.querySelector('#modalBody .case-root')?.dataset.caseTab === t, tab);
+}
+
+module.exports = { ROOT, PASSWORD, TEAM, startServer, client, readZipEntry, docxText, pickTab, caseSec, caseShow };

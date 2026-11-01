@@ -5,7 +5,7 @@
  */
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const { startServer, client, TEAM, PASSWORD } = require('./helpers');
+const { startServer, client, TEAM, PASSWORD, caseShow } = require('./helpers');
 
 let chromium = null;
 try {
@@ -181,9 +181,9 @@ describe('Tatort-Karte (Browser)', { skip: chromium ? false : 'Playwright nicht 
         await page.waitForSelector('#kmapWrap .kmap-card:not([hidden])', { timeout: 5000 });
         assert.match(await page.textContent('#kmapWrap .kmap-card'), /Tankstelle/);
         assert.equal(await page.locator('#secKarte [data-action="kmap-play"]').count(), 1);
-        await page.click('#secKarte [data-action="kmap-style"][data-style="karte"]');
+        await caseShow(page, '#secKarte [data-action="kmap-style"][data-style="karte"]'); await page.click('#secKarte [data-action="kmap-style"][data-style="karte"]');
         await page.waitForFunction(() => karteBase() && karteBase().style === 'karte', null, { timeout: 15000 });
-        await page.click('#secKarte [data-action="kmap-style"][data-style="sat"]');
+        await caseShow(page, '#secKarte [data-action="kmap-style"][data-style="sat"]'); await page.click('#secKarte [data-action="kmap-style"][data-style="sat"]');
         await page.waitForFunction(() => karteBase() && karteBase().style === 'sat', null, { timeout: 15000 });
         // Hinzufügen per Postleitzahl
         await page.click('[data-action="place-add"]');

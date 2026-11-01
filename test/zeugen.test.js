@@ -5,7 +5,7 @@
  */
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const { startServer, client, TEAM, PASSWORD } = require('./helpers');
+const { startServer, client, TEAM, PASSWORD, caseShow } = require('./helpers');
 
 let chromium = null;
 try {
@@ -139,7 +139,7 @@ describe('Zeugenverwaltung in der Akte (Browser)', { skip: chromium ? false : 'P
         await page.evaluate((id) => openCase(id), caseId);
         if (await page.waitForSelector('#secWitnesses', { timeout: 10000 }).then(() => true, () => false)) break;
       }
-      await page.waitForSelector('#secWitnesses');
+      await caseShow(page, '#secWitnesses');
       const nm = `Zeuge ${name}`;
       await page.click('[data-action="wit-add"]');
       await page.fill('#witName', nm);

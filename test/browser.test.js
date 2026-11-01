@@ -11,7 +11,7 @@
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
-const { startServer, client, TEAM, PASSWORD, pickTab } = require('./helpers');
+const { startServer, client, TEAM, PASSWORD, pickTab, caseShow } = require('./helpers');
 
 let chromium = null;
 try {
@@ -158,7 +158,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       await page.evaluate(() => (location.hash = '#cases'));
       await settle();
       await page.click(`[data-action="open-case"][data-id="${data.caseId}"] >> nth=0`);
-      await page.waitForSelector('#modalBody #secContracts');
+      await caseShow(page, '#modalBody #secContracts');
       const backInCase = async (what) => {
         await page.waitForSelector('#modalBody #secContracts', { timeout: 5000 });
         assert.ok(await page.evaluate((n) => document.querySelector('#modal').classList.contains('open') && document.querySelector('#modalBody').textContent.includes(n), data.caseNumber), `${what}: zurück in der Akte`);
@@ -177,28 +177,28 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       await page.click('.modal-close');
       await backInCase('Mandatsvertrag → X');
       assert.ok(Math.abs((await scrollTop()) - before) <= 5, `wieder an derselben Stelle (${before} → ${await scrollTop()})`);
-      await page.click('#modalBody [data-action="brief-new"]');
+      await caseShow(page, '#modalBody [data-action="brief-new"]'); await page.click('#modalBody [data-action="brief-new"]');
       await page.waitForSelector('#modalBody form[data-form="brief-new"]');
       await page.keyboard.press('Escape');
       await backInCase('Schriftsatz → Esc');
-      await page.click('#modalBody [data-action="task-new"]');
+      await caseShow(page, '#modalBody [data-action="task-new"]'); await page.click('#modalBody [data-action="task-new"]');
       await page.waitForSelector('#modalBody form[data-form="task"]');
       await page.mouse.click(5, 5);
       await backInCase('Aufgabe → Klick daneben');
-      await page.click('#modalBody [data-action="new-event"]');
+      await caseShow(page, '#modalBody [data-action="new-event"]'); await page.click('#modalBody [data-action="new-event"]');
       await page.waitForSelector('#modalBody form[data-form="event"]');
       await page.click('#modalBody form[data-form="event"] [data-action="close-modal"]');
       await backInCase('Termin → Abbrechen');
 
       // Speichern im Unterfenster → zurück in die Akte, Neues ist sofort zu sehen
-      await page.click('#modalBody [data-action="task-new"]');
+      await caseShow(page, '#modalBody [data-action="task-new"]'); await page.click('#modalBody [data-action="task-new"]');
       await page.fill('#modalBody form[data-form="task"] input[name="title"]', `Zeugen anrufen ${label}`);
       await page.click('#modalBody form[data-form="task"] button[type=submit]');
       await backInCase('Aufgabe speichern');
       assert.ok((await page.textContent('#modalBody')).includes(`Zeugen anrufen ${label}`), 'neue Aufgabe in der Akte');
 
       // Rechnung aus der Akte: Abbrechen → zurück in die Akte
-      await page.click('#modalBody [data-action="new-invoice"]');
+      await caseShow(page, '#modalBody [data-action="new-invoice"]'); await page.click('#modalBody [data-action="new-invoice"]');
       await page.waitForSelector('#invoiceForm');
       assert.ok((await page.textContent('.page-head')).includes(`Akte ${data.caseNumber}`), 'Rückweg zur Akte angezeigt');
       await page.click('#invoiceForm [data-action="inv-back"]');
@@ -282,12 +282,12 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       await settle();
       assert.ok(await page.$(`[data-action="open-case"][data-id="${kase.id}"] .chat-new`), 'neue Nachricht in der Aktenliste');
       await page.click(`[data-action="open-case"][data-id="${kase.id}"] >> nth=0`);
-      await page.waitForSelector('#chatList .chat-msg.in');
+      await caseShow(page, '#chatList .chat-msg.in');
       await page.waitForFunction((sel) => !document.querySelector(sel), badge); // beim Öffnen gelesen
-      await page.fill('#secChat .chat-input', `Antwort der Kanzlei (${label})`);
-      if (device === DESKTOP) await page.press('#secChat .chat-input', 'Enter');
-      else await page.click('#secChat .chat-send');
-      await page.waitForSelector('#chatList .chat-msg.out');
+      await caseShow(page, '#secChat .chat-input'); await page.fill('#secChat .chat-input', `Antwort der Kanzlei (${label})`);
+      if (device === DESKTOP) { await caseShow(page, '#secChat .chat-input'); await page.press('#secChat .chat-input', 'Enter'); }
+      else { await caseShow(page, '#secChat .chat-send'); await page.click('#secChat .chat-send'); }
+      await caseShow(page, '#chatList .chat-msg.out');
       assert.equal(await page.inputValue('#secChat .chat-input'), '', 'Eingabe nach dem Senden leer');
       assert.ok((await mandant.get(`/api/cases/${kase.id}/chat`)).json.messages.some((m) => m.body === `Antwort der Kanzlei (${label})`), 'Mandant sieht die Antwort');
       // Antwort des Mandanten erscheint im offenen Chat von selbst
@@ -313,8 +313,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       await page.waitForSelector('#appChatList');
       await page.click('#modalBody .track-step[data-status="in_pruefung"]');
       await page.waitForSelector('#modalBody .track-step[aria-current="step"] >> text=In Prüfung');
-      await page.fill('#secAppChat .chat-input', `Hallo vom Board (${label})`);
-      await page.click('#secAppChat .chat-send');
+      await caseShow(page, '#secAppChat .chat-input'); await page.fill('#secAppChat .chat-input', `Hallo vom Board (${label})`);
+      await caseShow(page, '#secAppChat .chat-send'); await page.click('#secAppChat .chat-send');
       await page.waitForSelector('#appChatList .chat-msg.out');
 
       const portal = await ctx.newPage();
@@ -372,22 +372,22 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.waitForTimeout(500);
       };
       await page.click(`[data-action="open-case"][data-id="${data.caseId}"] >> nth=0`);
-      await page.waitForSelector('#modalBody #secContracts');
+      await caseShow(page, '#modalBody #secContracts');
       await page.waitForFunction((id) => new URLSearchParams(location.search).get('case') === String(id), data.caseId);
 
       // Unterfenster → Zurück → Akte → Zurück → Liste (die Seite bleibt dieselbe)
-      await page.click('#modalBody [data-action="task-new"]');
+      await caseShow(page, '#modalBody [data-action="task-new"]'); await page.click('#modalBody [data-action="task-new"]');
       await page.waitForSelector('#modalBody form[data-form="task"]');
       await back();
-      await page.waitForSelector('#modalBody #secContracts');
+      await caseShow(page, '#modalBody #secContracts');
       await back();
       assert.equal(await modalOpen(), false, 'Zurück schließt die Akte');
       assert.equal(await page.evaluate(() => location.hash + location.search), '#cases', 'weiter in der Aktenliste');
 
       // Ungespeicherte Eingaben: Esc und Zurück fragen nach, „Weiter bearbeiten“ behält alles
       await page.click(`[data-action="open-case"][data-id="${data.caseId}"] >> nth=0`);
-      await page.waitForSelector('#modalBody #secContracts');
-      await page.click('#modalBody [data-action="task-new"]');
+      await caseShow(page, '#modalBody #secContracts');
+      await caseShow(page, '#modalBody [data-action="task-new"]'); await page.click('#modalBody [data-action="task-new"]');
       await page.fill('#modalBody form[data-form="task"] input[name="title"]', 'Nicht verlieren');
       await page.keyboard.press('Escape');
       await page.click('.ps-dialog-root.open [data-ps-dialog="cancel"]');
@@ -397,11 +397,11 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       assert.equal(await page.inputValue('#modalBody form[data-form="task"] input[name="title"]'), 'Nicht verlieren');
       await page.click('.modal-close');
       await page.click('.ps-dialog-root.open [data-ps-dialog="ok"]'); // Verwerfen
-      await page.waitForSelector('#modalBody #secContracts');
+      await caseShow(page, '#modalBody #secContracts');
 
       // Neu laden: dieselbe Akte ist wieder offen, Zurück führt in die Liste
       await page.reload();
-      await page.waitForSelector('#modalBody #secContracts');
+      await caseShow(page, '#modalBody #secContracts');
       assert.ok((await page.textContent('#modalBody')).includes(data.caseNumber), 'Akte nach dem Neuladen offen');
       await back();
       assert.equal(await modalOpen(), false);
@@ -570,7 +570,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
 
         // Neue Nachricht: öffnet die Akte direkt beim Chat; danach ist auch dieser Punkt erledigt
         await page.click(`#content section.todo [data-action="open-case-chat"][data-id="${kase.id}"]`);
-        await page.waitForSelector('#chatList .chat-msg.in');
+        await caseShow(page, '#chatList .chat-msg.in');
         const chatTop = await page.$eval('#secChat', (el) => el.getBoundingClientRect().top);
         assert.ok(chatTop < 300, `Nachrichten sind im Blick (${Math.round(chatTop)}px)`);
         await page.click('.modal-close');
@@ -674,7 +674,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.waitForSelector('#modalBody .case-head');
         await settle();
         // „Rechnung“ in der Akte: Leistungen aus dem Vertrag stehen schon drin
-        await page.click(`#modalBody [data-action="new-invoice"][data-case-id="${kase.id}"]`);
+        await caseShow(page, `#modalBody [data-action="new-invoice"][data-case-id="${kase.id}"]`); await page.click(`#modalBody [data-action="new-invoice"][data-case-id="${kase.id}"]`);
         await page.waitForSelector('#invContract .ticket-strip');
         assert.match(await page.textContent('#invContract'), /Aus dem Vertrag übernommen/);
         assert.equal(await page.$$eval('#invItems .item-row', (r) => r.length), 2);
@@ -789,7 +789,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         assert.equal(await atts(), 2);
         if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Akte passt aufs Handy');
 
-        await page.click('#modalBody form[data-form="chat-send"] button[type=submit]');
+        await caseShow(page, '#modalBody form[data-form="chat-send"] button[type=submit]'); await page.click('#modalBody form[data-form="chat-send"] button[type=submit]');
         await page.waitForFunction((t) => [...document.querySelectorAll('#chatList .bubble, #chatList [class*="bubble"]')].some((b) => b.textContent.includes(t)), `Bitte morgen anrufen (${label})`);
         await page.reload();
         await page.waitForSelector('#modalBody .case-head');
@@ -797,7 +797,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         assert.equal(await page.inputValue(chat), '', 'nach dem Senden kein Entwurf mehr');
 
         // Rechnung: angefangene Positionen überstehen das Neuladen; „Abbrechen“ verwirft sie
-        await page.click(`#modalBody [data-action="new-invoice"][data-case-id="${kase.id}"]`);
+        await caseShow(page, `#modalBody [data-action="new-invoice"][data-case-id="${kase.id}"]`); await page.click(`#modalBody [data-action="new-invoice"][data-case-id="${kase.id}"]`);
         await page.waitForSelector('#invoiceForm');
         await page.click('[data-action="inv-add-item"]');
         await page.fill('#invItems .item-desc', `Abschleppkosten prüfen (${label})`);
@@ -808,7 +808,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.click('[data-action="inv-back"][data-cancel]');
         await page.waitForFunction(() => !document.querySelector('#invoiceForm'));
         await openKase();
-        await page.click(`#modalBody [data-action="new-invoice"][data-case-id="${kase.id}"]`);
+        await caseShow(page, `#modalBody [data-action="new-invoice"][data-case-id="${kase.id}"]`); await page.click(`#modalBody [data-action="new-invoice"][data-case-id="${kase.id}"]`);
         await page.waitForSelector('#invoiceForm');
         assert.equal(await page.$$eval('#invItems .item-row', (r) => r.length), 0, 'nach „Abbrechen“ frisch');
 
@@ -1025,26 +1025,21 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await settle();
         assert.equal(await page.evaluate(() => location.hash), '#concerns-board');
 
-        // Akte: Sprungleiste mit Zahlen, bleibt beim Springen oben stehen
+        // Akte: vier Reiter mit Zahlen; die Reiterleiste klebt beim Scrollen oben
         await page.evaluate((id) => openCase(id), kase.id);
-        await page.waitForSelector('#modalBody .case-jump');
-        assert.match(await page.textContent('#modalBody .case-jump [data-target="secInvoices"]'), /Rechnungen\s*1/);
-        await pickTab(page, '#modalBody .case-jump [data-target="secInvoices"]');
-        // weich gescrollt – warten, bis der Abschnitt angekommen ist
-        await page.waitForFunction(() => {
-          const sec = document.getElementById('secInvoices').getBoundingClientRect().top;
-          return sec >= document.querySelector('#modalBody .case-jump').getBoundingClientRect().bottom - 2 && sec < window.innerHeight / 2;
-        }, null, { timeout: 5000 });
+        await page.waitForSelector('#modalBody .case-root');
+        assert.match(await page.textContent('#modalBody [data-action="case-tab"][data-tab="dokumente"]'), /Dokumente\s*1/);
+        await pickTab(page, '#modalBody [data-action="case-tab"][data-tab="dokumente"]');
+        await page.waitForSelector('#secInvoices');
+        await page.$eval('#modalBody', (b) => (b.scrollTop = b.scrollHeight));
         await page.waitForTimeout(300);
         const pos = await page.evaluate(() => {
           const scroller = document.querySelector('#modalBody');
           const top = scroller.getBoundingClientRect().top;
           const bar = document.querySelector('#modalBody .case-jump').getBoundingClientRect();
-          return { scrolled: scroller.scrollTop, barTop: Math.round(bar.top - top), barBottom: bar.bottom, sec: document.getElementById('secInvoices').getBoundingClientRect().top };
+          return { barTop: Math.round(bar.top - top) };
         });
-        assert.ok(pos.scrolled > 200, `zu den Rechnungen gesprungen (${pos.scrolled})`);
         assert.ok(Math.abs(pos.barTop) <= 2, `Leiste klebt oben (${pos.barTop})`);
-        assert.ok(pos.sec >= pos.barBottom - 2 && pos.sec < 844 / 2, `Abschnitt direkt unter der Leiste (${pos.sec} / ${pos.barBottom})`);
         const closeFree = await page.$eval('.modal-close', (x) => {
           const r = x.getBoundingClientRect();
           return r.bottom < 0 || x.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
@@ -1073,13 +1068,13 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.waitForFunction(() => !document.querySelector('#modal').classList.contains('open'));
         assert.equal((await adm.get(`/api/cases/${kase.id}`)).status, 404, 'Akte gelöscht (Papierkorb)');
 
-        // Einstellungen: neun Reiter, Discord mit Webhook und Login als Module, System mit Datensicherung
+        // Einstellungen: Leiste mit fünf Gruppen, Discord mit Webhook und Login als Module, Sicherung & Notfall
         await page.evaluate(() => (location.hash = '#settings'));
         await settle();
-        assert.deepEqual(await page.$$eval('#content .settings-tabs .chip', (els) => els.map((e) => e.textContent.trim())), ['Kanzlei & Rechnungen', 'Website & Ränge', 'Discord', 'Integrationen', 'Lager', 'System', 'Listen', 'Texte & Banner', 'Rechte & Schalter']);
+        assert.deepEqual(await page.$$eval('#content .set-nav-head', (els) => els.map((e) => e.textContent.trim())), ['Kanzlei', 'Website', 'Geld', 'Kommunikation', 'Rechte & System']);
         assert.ok(await page.$('#content form[data-form="settings-firm"]'));
         // Website & Ränge: Bearbeiten-Links, Ränge mit Knöpfen, Rang-Dialog
-        await pickTab(page, '#content .settings-tabs [data-tab="site"]');
+        await pickTab(page, '#content .set-nav [data-tab="site"]');
         await settle();
         assert.equal(await page.locator('#content a[href="/?bearbeiten"]').count(), 1);
         assert.equal(await page.locator('#content [data-action="rank-edit"][data-id]').count(), 6, 'sechs Ränge');
@@ -1089,13 +1084,13 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         assert.equal(await page.inputValue('form[data-form="rank"] input[name="name"]'), 'Founding Partner');
         await page.keyboard.press('Escape');
         await settle();
-        await pickTab(page, '#content .settings-tabs [data-tab="integrations"]');
+        await pickTab(page, '#content .set-nav [data-tab="integrations"]');
         await settle();
         assert.match(await page.textContent('#content'), /FiveNet[\s\S]*Google Docs/);
-        await pickTab(page, '#content .settings-tabs [data-tab="system"]');
+        await pickTab(page, '#content .set-nav [data-tab="system"]');
         await settle();
         assert.match(await page.textContent('#content'), /Datensicherung[\s\S]*Notfall/);
-        await pickTab(page, '#content .settings-tabs [data-tab="bot"]');
+        await pickTab(page, '#content .set-nav [data-tab="bot"]');
         await settle();
         await page.click('#content .bot-nav-item[data-module="webhook"]');
         await settle();
@@ -1443,7 +1438,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.waitForFunction(() => document.querySelector('#modalBody .track-node.current')?.textContent.trim() === '3');
         assert.equal(await page.$$eval('#modalBody .track-node.done', (n) => n.length), 2, 'wieder offen auf „Strategie“');
         // Knopf in der leeren Zeile funktioniert wie zuvor
-        await page.click('#modalBody #secBriefs [data-action="brief-new"]');
+        await caseShow(page, '#modalBody #secBriefs [data-action="brief-new"]'); await page.click('#modalBody #secBriefs [data-action="brief-new"]');
         await page.waitForSelector('#modalBody form[data-form="brief-new"]');
         if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'leere Akte passt aufs Handy');
         assert.deepEqual(problems, []);
@@ -1529,13 +1524,13 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
 
         // Aufgabe abhaken
         await page.route('**/api/tasks/*', slow('PATCH'));
-        await page.click('#secTasks .task-check');
+        await caseShow(page, '#secTasks .task-check'); await page.click('#secTasks .task-check');
         assert.equal(await page.$eval('#secTasks .task-row', (r) => r.classList.contains('is-done')), true, 'Haken sofort da');
         await settle();
         await page.unroute('**/api/tasks/*');
         await page.route('**/api/tasks/*', fail('PATCH'));
         await clearToasts();
-        await page.click('#secTasks .task-check');
+        await caseShow(page, '#secTasks .task-check'); await page.click('#secTasks .task-check');
         await hint('Nicht gespeichert – Datenbank nicht erreichbar.');
         assert.equal(await page.$eval('#secTasks .task-row', (r) => r.classList.contains('is-done')), true, 'Haken springt zurück');
         await page.unroute('**/api/tasks/*');
@@ -1822,10 +1817,10 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       await page.waitForURL(/dashboard/);
       await page.waitForSelector('#nav a.nav-item');
       await page.evaluate((id) => openCase(id), kase.id);
-      await page.waitForSelector('#modalBody #secChat .chat-input');
+      await caseShow(page, '#modalBody #secChat .chat-input');
       await page.waitForFunction(() => live.ok, null, { timeout: 5000 });
       // Mandant tippt schon eine Antwort, da schreibt die Kanzlei
-      await page.fill('#secChat .chat-input', 'Ich schreibe gerade …');
+      await caseShow(page, '#secChat .chat-input'); await page.fill('#secChat .chat-input', 'Ich schreibe gerade …');
       assert.equal((await anwalt.post(`/api/cases/${kase.id}/notes`, { body: 'Ihr Termin ist bestätigt.' })).status, 201);
       // ohne Live käme sie erst mit dem nächsten Abruf (30 s) – so nach höchstens 3 s
       await page.waitForFunction(() => /Ihr Termin ist bestätigt/.test(document.querySelector('#chatList').textContent), null, { timeout: 3000 });
@@ -2195,7 +2190,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       // erst wenn das Dashboard fertig gestartet ist – sonst kann der Start das Fenster wieder schließen
       await M.page.waitForSelector('#nav a.nav-item');
       await M.page.evaluate((id) => openCase(id), kase.id);
-      await M.page.waitForSelector('#modalBody #secChat .chat-input');
+      await caseShow(M.page, '#modalBody #secChat .chat-input');
       await M.page.waitForFunction(() => live.ok);
       await M.page.waitForTimeout(2000);
       assert.equal(await M.page.locator('#caseHere').count(), 0);
@@ -2429,16 +2424,16 @@ describe('Browser: Strafmaß, Verhandlung, Wiki, Beschlüsse, Rechnungszeile, Ge
     try {
       // Anklagepunkt über die Auswahl, zweimal = Anzahl 2
       await page.evaluate((id) => openCase(id), c.id);
-      await page.click('#secCharges [data-action="charge-pick"]');
+      await caseShow(page, '#secCharges [data-action="charge-pick"]'); await page.click('#secCharges [data-action="charge-pick"]');
       await page.fill('#pkSearch', '21');
       await page.click('#pkList .pk-add >> nth=0');
       await page.click('#pkList .pk-add >> nth=0');
       await page.waitForFunction(() => /2×/.test(document.querySelector('#pkList .pk-row.added .pk-state')?.textContent || ''));
       await page.click('#modalCard [data-action="close-modal"]');
-      await page.waitForSelector('#secCharges .chg-row');
+      await caseShow(page, '#secCharges .chg-row');
       assert.equal(await page.locator('#secCharges .chg-row').count(), 1, 'gleicher Tatbestand = eine Zeile');
       // Verhandlungsmodus: Notiz mit Enter, Beenden speichert das Protokoll als interne Notiz
-      await page.click('#secCharges [data-action="hearing-start"]');
+      await caseShow(page, '#secCharges [data-action="hearing-start"]'); await page.click('#secCharges [data-action="hearing-start"]');
       await page.waitForSelector('#hearing');
       await page.fill('#hrInput', 'Zeuge: Officer Miller hat den Mandanten nicht gesehen.');
       await page.keyboard.press('Enter');
@@ -2535,11 +2530,11 @@ describe('Browser: Textbausteine, Vorschaubilder, Menü vorladen', { skip: chrom
       await early;
       // Akte: Vorschaubild entsteht im Hintergrund
       await page.evaluate((id) => openCase(id), c.id);
-      await page.waitForSelector('#modalBody #secChat .chat-input');
+      await caseShow(page, '#modalBody #secChat .chat-input');
       for (let i = 0; i < 40 && (await a.get(`/api/cases/${c.id}`)).json.attachments[0].needsThumb; i++) await page.waitForTimeout(150);
       assert.equal((await a.get(`/api/cases/${c.id}`)).json.attachments[0].needsThumb, false, 'Vorschaubild angelegt');
       // Textbaustein
-      await page.click('#secChat .chat-input');
+      await caseShow(page, '#secChat .chat-input'); await page.click('#secChat .chat-input');
       await page.keyboard.type('/mand');
       await page.waitForSelector('.snip-menu .snip-item.active >> text=/mandatsübernahme');
       await page.keyboard.press('Enter');
@@ -2550,7 +2545,7 @@ describe('Browser: Textbausteine, Vorschaubilder, Menü vorladen', { skip: chrom
       assert.equal(await page.locator('.snip-menu').count(), 0, 'Auswahl geschlossen');
       assert.equal(await page.locator('#secChat .chat-bubble').count(), 0, 'Enter hat nur eingefügt, nicht gesendet');
       // Esc schließt nur die Auswahl
-      await page.fill('#secChat .chat-input', '');
+      await caseShow(page, '#secChat .chat-input'); await page.fill('#secChat .chat-input', '');
       await page.keyboard.type('/');
       await page.waitForSelector('.snip-menu');
       await page.keyboard.press('Escape');
@@ -2707,7 +2702,7 @@ describe('Browser: Tastenkürzel, Mitteilungskarten, Verlaufslinien, Deal-Rechne
       assert.match(await page.textContent('#modalBody .deal-row'), /15 HE.*wartet auf Mandant/);
 
       // Verhandlungsmodus: Plädoyer aus dem Vorschlag, Teleprompter läuft und schließt mit Esc
-      await page.click('#modalBody [data-action="hearing-start"]');
+      await caseShow(page, '#modalBody [data-action="hearing-start"]'); await page.click('#modalBody [data-action="hearing-start"]');
       await page.waitForSelector('#hearing');
       await page.click('#hearing [data-action="plea-open"]');
       await page.click('#pleaPanel [data-action="plea-suggest"]');
@@ -2775,7 +2770,7 @@ describe('Browser: Aktenmappe, verknüpfte Akten, Mehrfachauswahl, Kanzlei-Lager
       assert.ok(await page.locator('#modalBody .slip-row').count() >= 1, 'Laufzettel');
 
       // Schwärzen: Rechteck ziehen → Kopie als B2
-      await page.click('#secEvidence [data-action="att-open"][data-index="0"]');
+      await caseShow(page, '#secEvidence [data-action="att-open"][data-index="0"]'); await page.click('#secEvidence [data-action="att-open"][data-index="0"]');
       await page.click('#modalBody [data-action="redact-open"]');
       await page.waitForSelector('#redactCanvas');
       const box = await page.locator('#redactCanvas').boundingBox();
@@ -2853,7 +2848,7 @@ describe('Browser: Bewegung, die zeigt, woher etwas kommt – Zahlen, die mitlau
       assert.match(await page.$eval('#modalBody .case-emboss', (e) => e.style.getPropertyValue('--ex')), /^\d+px$/);
 
       // Beweisbild: fliegt aus dem Vorschaubild, Lupe folgt der Maus, beim Zurück fliegt es wieder hinein
-      await page.click('#secEvidence [data-action="att-open"][data-index="0"]');
+      await caseShow(page, '#secEvidence [data-action="att-open"][data-index="0"]'); await page.click('#secEvidence [data-action="att-open"][data-index="0"]');
       await page.waitForSelector('.fly-img');
       await page.waitForFunction(() => !document.querySelector('.fly-img') && !document.querySelector('.lb-zoom.is-flying'));
       const img = await page.locator('#modalBody .lightbox-img').boundingBox();
@@ -2862,7 +2857,7 @@ describe('Browser: Bewegung, die zeigt, woher etwas kommt – Zahlen, die mitlau
       await page.waitForSelector('#modalBody .lb-zoom.is-lens');
       assert.match(await page.$eval('#modalBody .lb-lens', (l) => l.style.backgroundSize), /px \d+(\.\d+)?px/);
       await page.click('#modalBody [data-action="back-to-case"]');
-      await page.waitForSelector('#modalBody #secEvidence');
+      await caseShow(page, '#modalBody #secEvidence');
       await page.waitForFunction(() => !document.querySelector('.fly-img'));
 
       // Anklage einfügen: erkannt, einer abgewählt, zwei übernommen – das Strafmaß läuft zum neuen Wert
@@ -2994,8 +2989,8 @@ describe('Browser: Bewegung, die zeigt, woher etwas kommt – Zahlen, die mitlau
       page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
       await signIn(page);
       await page.goto(`${srv.base}/dashboard?case=${A.id}#cases`);
-      await page.waitForSelector('#modalBody #secEvidence [data-action="att-open"]');
-      await page.click('#modalBody #secEvidence [data-action="att-open"][data-index="0"]');
+      await caseShow(page, '#modalBody #secEvidence [data-action="att-open"]');
+      await caseShow(page, '#modalBody #secEvidence [data-action="att-open"][data-index="0"]'); await page.click('#modalBody #secEvidence [data-action="att-open"][data-index="0"]');
       await page.waitForFunction(() => !document.querySelector('.lb-zoom.is-flying') && document.querySelector('.lb-zoom .lightbox-img').complete);
       const box = await page.locator('#modalBody .lightbox-img').boundingBox();
       const at = [box.x + box.width / 2, box.y + box.height / 2];
@@ -3016,12 +3011,12 @@ describe('Browser: Bewegung, die zeigt, woher etwas kommt – Zahlen, die mitlau
       const p2 = await calm.newPage();
       await signIn(p2);
       await p2.goto(`${srv.base}/dashboard?case=${A.id}#cases`);
-      await p2.waitForSelector('#modalBody #secEvidence [data-action="att-open"]');
+      await caseShow(p2, '#modalBody #secEvidence [data-action="att-open"]');
       await p2.evaluate(() => {
         window.flew = 0;
         new MutationObserver((m) => m.forEach((x) => x.addedNodes.forEach((n) => n.classList && n.classList.contains('fly-img') && window.flew++))).observe(document.body, { childList: true });
       });
-      await p2.click('#modalBody #secEvidence [data-action="att-open"][data-index="0"]');
+      await caseShow(p2, '#modalBody #secEvidence [data-action="att-open"][data-index="0"]'); await p2.click('#modalBody #secEvidence [data-action="att-open"][data-index="0"]');
       await p2.waitForSelector('#modalBody .lb-zoom:not(.is-flying)');
       await p2.waitForTimeout(400);
       assert.equal(await p2.evaluate(() => window.flew), 0, 'kein Flug bei „Bewegung reduzieren“');
@@ -3224,10 +3219,10 @@ describe('Browser: Zahlenfelder mit eigenen Tasten, Kästchen im Kanzlei-Stil, E
       await page.waitForURL(/dashboard/);
       await page.waitForSelector('#nav a.nav-item', { state: 'attached' });
       await page.evaluate((id) => openCase(id), c.id);
-      await page.waitForSelector('#secCharges .chg-est .num-btn');
+      await caseShow(page, '#secCharges .chg-est .num-btn');
       const reads = caseReads.length;
-      await page.click('#secCharges .chg-est .num-btn[data-dir="1"] >> nth=0');
-      await page.click('#secCharges .chg-est .num-btn[data-dir="1"] >> nth=0');
+      await caseShow(page, '#secCharges .chg-est .num-btn[data-dir="1"] >> nth=0'); await page.click('#secCharges .chg-est .num-btn[data-dir="1"] >> nth=0');
+      await caseShow(page, '#secCharges .chg-est .num-btn[data-dir="1"] >> nth=0'); await page.click('#secCharges .chg-est .num-btn[data-dir="1"] >> nth=0');
       await page.waitForTimeout(600);
       assert.equal(await page.inputValue('#secCharges .chg-est input >> nth=0'), '2');
       // nichts überlappt: Felder und ihre Beschriftung (HE / $) liegen nebeneinander oder untereinander, nie übereinander
@@ -3385,7 +3380,7 @@ describe('Browser: Aufgeräumte Akte – Direktbearbeitung, Chips, Beteiligte, P
       assert.ok(await page.isVisible('#modalBody .case-head'), 'Esc schließt zuerst die Vorschau, nicht die Akte');
 
       // Anklagepunkt → Schriftsatz mit vorbefülltem Anklagepunkt
-      await page.click('#secCharges [data-action="charge-brief"]');
+      await caseShow(page, '#secCharges [data-action="charge-brief"]'); await page.click('#secCharges [data-action="charge-brief"]');
       await page.waitForSelector('form[data-form="brief-new"]');
       assert.match(await page.inputValue('#bf_anklagepunkte'), /33/);
       assert.match(await page.inputValue('#bf_begruendung'), /^Zum Vorwurf/);
@@ -3428,7 +3423,7 @@ describe('Browser: Abschluss mit Rechnungs-Vorschlag und Strafmaß, Aufgaben-Pak
         await page.waitForTimeout(500);
 
         // Aufgaben-Paket: Auswahl, Übernehmen legt die Aufgaben an
-        await page.click('#secTasks [data-action="task-package"], [data-action="task-package"]');
+        await caseShow(page, '#secTasks [data-action="task-package"], [data-action="task-package"]'); await page.click('#secTasks [data-action="task-package"], [data-action="task-package"]');
         await page.waitForSelector('.pack-list .pack');
         assert.ok(await page.$('.pack.is-fit'), 'Paket zum Rechtsgebiet zuerst');
         await page.click('.pack:has(strong:text-is("Festnahme")) [data-action="task-package-apply"]');
@@ -3437,13 +3432,13 @@ describe('Browser: Abschluss mit Rechnungs-Vorschlag und Strafmaß, Aufgaben-Pak
         assert.ok((await a.get(`/api/cases/${c.id}`)).json.tasks.length >= 4);
 
         // Unterlage anfordern
-        await page.click('#secRequests [data-action="req-new"]');
+        await caseShow(page, '#secRequests [data-action="req-new"]'); await page.click('#secRequests [data-action="req-new"]');
         await page.fill('#rqTitle', 'Foto der Verletzungen');
         await page.click('form[data-form="req-add"] button[type="submit"]');
-        await page.waitForSelector('#secRequests .req-row');
+        await caseShow(page, '#secRequests .req-row');
         assert.match(await page.textContent('#secRequests .req-title'), /Foto der Verletzungen/);
-        await page.click('#secRequests [data-action="req-toggle"]');
-        await page.waitForSelector('#secRequests .req-row.is-done');
+        await caseShow(page, '#secRequests [data-action="req-toggle"]'); await page.click('#secRequests [data-action="req-toggle"]');
+        await caseShow(page, '#secRequests .req-row.is-done');
 
         // Abschließen: Hinweis auf fehlende Rechnung, Strafmaß-Felder mit der Einschätzung
         await page.click('.track-node:last-child, [data-action="case-close"]');
@@ -3549,7 +3544,7 @@ describe('Browser: Nachladen in der Akte, Listen virtuell zeichnen, weniger Live
         page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
         await loginAs(page, srv.base, TEAM.admin);
         await page.goto(`${srv.base}/dashboard?case=${c.id}#cases`);
-        await page.waitForSelector('#chatList .chat-msg');
+        await caseShow(page, '#chatList .chat-msg');
         await page.waitForTimeout(500);
         assert.equal((await page.$$('#chatList .chat-msg')).length, 40);
         assert.match(await page.textContent('#chatList .chat-msg'), /Nachricht 16/);
