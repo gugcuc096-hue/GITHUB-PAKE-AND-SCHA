@@ -215,3 +215,55 @@ async function caseShow(page, selector) {
 }
 
 module.exports = { ROOT, PASSWORD, TEAM, startServer, client, readZipEntry, docxText, pickTab, caseSec, caseShow };
+
+/*
+ * Akte in Reitern: Tests, die einen Abschnitt bedienen (klicken, tippen, auf Sichtbarkeit warten), wechseln vorher
+ * automatisch in dessen Reiter – wie eine Person, die erst auf „Kommunikation“ tippt. Prüfungen auf Unsichtbarkeit
+ * (isVisible, state: 'hidden') bleiben unberührt.
+ */
+let caseTabsBusy = false;
+async function caseTabFor(page, selector, timeout) {
+  if (caseTabsBusy || typeof selector !== 'string') return;
+  caseTabsBusy = true;
+  try {
+    const h = await page.waitForSelector(selector, { state: 'attached', timeout: timeout || 30000 }).catch(() => null);
+    if (!h) return;
+    const tab = await h.evaluate((el) => {
+      const pane = el.closest('.case-root [data-pane]');
+      const root = el.closest('.case-root');
+      return pane && root && root.dataset.caseTab !== pane.dataset.pane && !el.closest('.is-editing') ? pane.dataset.pane : null;
+    }).catch(() => null);
+    if (!tab) return;
+    await pickTab(page, `#modalBody [data-action="case-tab"][data-tab="${tab}"]`);
+    await page.waitForFunction((t) => document.querySelector('#modalBody .case-root')?.dataset.caseTab === t, tab);
+  } finally {
+    caseTabsBusy = false;
+  }
+}
+function patchCaseTabs(Page) {
+  if (!Page || Page.__caseTabs) return;
+  Page.__caseTabs = true;
+  for (const name of ['click', 'dblclick', 'fill', 'press', 'type', 'check', 'uncheck', 'hover', 'focus', 'tap', 'setInputFiles', 'selectOption', 'waitForSelector']) {
+    const orig = Page[name];
+    if (typeof orig !== 'function') continue;
+    Page[name] = async function (selector, ...rest) {
+      const opts = name === 'waitForSelector' ? rest[0] || {} : {};
+      if (!(name === 'waitForSelector' && opts.state && opts.state !== 'visible')) await caseTabFor(this, selector, opts.timeout);
+      return orig.call(this, selector, ...rest);
+    };
+  }
+}
+try {
+  const { chromium } = require('playwright');
+  const launch = chromium.launch.bind(chromium);
+  chromium.launch = async (...args) => {
+    const browser = await launch(...args);
+    const ctx = await browser.newContext();
+    const p = await ctx.newPage();
+    patchCaseTabs(Object.getPrototypeOf(p));
+    await ctx.close();
+    return browser;
+  };
+} catch {
+  /* Playwright optional */
+}
