@@ -3557,6 +3557,9 @@ describe('Browser: Nachladen in der Akte, Listen virtuell zeichnen, weniger Live
         assert.match(await page.textContent('.log-more'), /ältere Einträge laden/);
 
         // Ältere Nachrichten: 15 kommen dazu, der Knopf verschwindet, die Leseposition bleibt
+        // (erst wenn die Seite hinter der Akte fertig geladen ist – sonst zeichnet sie die Akte noch einmal neu)
+        await page.waitForLoadState('networkidle');
+        await page.waitForFunction(() => !document.getAnimations().some((a) => a.playState === 'running' && a.effect && a.effect.target && a.effect.target.closest && a.effect.target.closest('#modal, #content') && isFinite(a.effect.getComputedTiming().endTime)));
         await page.evaluate(() => {
           document.querySelector('#secChat').scrollIntoView({ block: 'center' });
           document.querySelector('#chatList').scrollTo({ top: 0, behavior: 'instant' }); // oben im Chat – dort sitzt „Ältere laden“
