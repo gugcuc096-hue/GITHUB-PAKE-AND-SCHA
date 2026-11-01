@@ -239,6 +239,20 @@ document.querySelectorAll('.price-item').forEach((item, i) => item.dataset.origi
 enhancePriceCategories();
 
 /* ---------- Interactive Calculator ---------- */
+const pctDe = (n) => String(n).replace('.', ',');
+/** Beschriftung des Prioritätszuschlags und des Bündelrabatts nach den Einstellungen. */
+function syncPriorityLabel(calc, priorityPct) {
+    const opt = document.getElementById('priorityAddon')?.closest('.calc-opt');
+    if (opt) {
+        const name = opt.querySelector('.calc-opt-name');
+        const sub = opt.querySelector('.calc-opt-sub');
+        if (name) name.textContent = `${calc.priorityLabel || 'Priorisierte Bearbeitung'} (+${pctDe(priorityPct)} %)`;
+        if (sub && calc.prioritySub !== undefined) { sub.textContent = calc.prioritySub; sub.hidden = !calc.prioritySub; }
+        opt.hidden = !priorityPct;
+    }
+    const label = document.getElementById('discountLabel');
+    if (label && calc.bundlePct !== undefined) label.textContent = `Mandatsbündel-Rabatt (${pctDe(calc.bundlePct)} %)`;
+}
 function calculateTotal() {
     const checkboxes = document.querySelectorAll('.calc-check:checked:not(#priorityAddon)');
     const priorityChecked = document.getElementById('priorityAddon').checked;
@@ -260,8 +274,14 @@ function calculateTotal() {
         });
     }
 
-    const bundleEligible = checkboxes.length >= 3;
-    const discount = bundleEligible ? Math.round(subtotal * 0.10) : 0;
+    // Bündelrabatt und Prioritätszuschlag aus den Einstellungen (Tarifrechner), sonst wie bisher 3 Leistungen / 10 % / 15 %
+    const calc = (window.PS && window.PS.calc) || {};
+    const bundleMin = calc.bundleMin || 3;
+    const bundlePct = calc.bundlePct ?? 10;
+    const priorityPct = calc.priorityPct ?? 15;
+    syncPriorityLabel(calc, priorityPct);
+    const bundleEligible = bundlePct > 0 && checkboxes.length >= bundleMin;
+    const discount = bundleEligible ? Math.round((subtotal * bundlePct) / 100) : 0;
     document.getElementById('discountRow').classList.toggle('hidden', !bundleEligible);
     document.getElementById('discountAmount').textContent = '− ' + discount.toLocaleString('de-DE') + ' $';
 
@@ -279,7 +299,7 @@ function calculateTotal() {
     let total = subtotal - discount - promoAmount;
     const noteEl = document.getElementById('totalNote');
     if (priorityChecked && total > 0) {
-        const surcharge = Math.round(total * 0.15);
+        const surcharge = Math.round((total * priorityPct) / 100);
         total += surcharge;
         noteEl.textContent = 'inkl. Zuschlag priorisierte Bearbeitung (+' + surcharge.toLocaleString('de-DE') + ' $)';
     } else if (promoAmount) {

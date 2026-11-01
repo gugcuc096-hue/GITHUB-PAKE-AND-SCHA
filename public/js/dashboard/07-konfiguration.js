@@ -233,6 +233,8 @@ function cfgCollectMessages(f) {
   return { tone: val(fd, 'tone') === 'du' ? 'du' : 'sie', docsAfterDays: Number(val(fd, 'docsAfterDays') || 3), texts };
 }
 
+/** Weitere Bereiche (07-mehr-konfig.js): Schlüssel → Inhalt der Seite. */
+const CFG_PANELS = {};
 const CFG_COLLECT = { banner: cfgCollectBanner, home: cfgCollectHome, labels: cfgCollectLabels, messages: cfgCollectMessages };
 
 async function cfgSave(key, form) {

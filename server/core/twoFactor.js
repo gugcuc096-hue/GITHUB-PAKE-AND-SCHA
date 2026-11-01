@@ -101,7 +101,7 @@ async function sendCode(u, code, req) {
       }),
     ],
     allowed_mentions: { parse: [] },
-  });
+  }, { important: true }); // Login-Code: kommt immer an
 }
 function deliveryError(err) {
   const closed = err && (err.code === 50007 || err.status === 403);

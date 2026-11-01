@@ -8,6 +8,13 @@
     const id = Number(params.get('id'));
     const templateId = Number(params.get('vorlage'));
     const root = document.getElementById('doc');
+    // Wasserzeichen und Fußzeile aus Einstellungen → Dokumente (je Blatt)
+    let docSettings = null;
+    function docLook() {
+        const run = (doc) => root.querySelectorAll('.sheet, .k-sheet, .page').forEach((sh) => window.PS.docLook && window.PS.docLook.apply(sh, doc, 'contract'));
+        if (docSettings) return run(docSettings);
+        api.get('/api/invoices/firm').then(({ firm }) => run((docSettings = firm.doc || {}))).catch(() => {});
+    }
     const panel = document.getElementById('panel');
     let state = null;
 
@@ -128,6 +135,7 @@
         root.className = '';
         const before = drawnOnce ? new Set([...document.querySelectorAll('.k-script')].map(sigKey)) : null;
         root.innerHTML = sheets(render(k.body, values(k, c), k, { fivenetUrl: state.fivenetUrl }), header(state.header));
+        docLook();
         refit();
         animateSignatures(before);
         drawnOnce = true;

@@ -76,7 +76,7 @@ describe('Aufgeräumte Bedienung (Browser)', { skip: chromium ? false : 'Playwri
       await login(page);
       await page.goto(`${srv.base}/dashboard?tab=texte#settings`); // alter Link → Banner
       await page.waitForSelector('.set-nav');
-      assert.deepEqual(await page.$$eval('.set-nav-head', (l) => l.map((x) => x.textContent.trim())), ['Kanzlei', 'Website', 'Geld', 'Kommunikation', 'Rechte & System']);
+      assert.deepEqual(await page.$$eval('.set-nav-head', (l) => l.map((x) => x.textContent.trim())), ['Kanzlei', 'Dashboard', 'Website', 'Geld', 'Kommunikation', 'Rechte & System']);
       assert.equal(await page.getAttribute('.set-nav-item.active', 'data-key'), 'banner');
       assert.ok(await page.$('form[data-form="cfg-banner"]'));
       assert.equal(await page.$('.set-nav [data-key="lager"]'), null, 'Lager nicht mehr in den Einstellungen');
@@ -114,7 +114,7 @@ describe('Aufgeräumte Bedienung (Browser)', { skip: chromium ? false : 'Playwri
       await page.evaluate(() => (location.hash = '#settings'));
       await page.waitForSelector('#setPick');
       assert.equal(await page.isVisible('.set-nav'), false);
-      assert.deepEqual(await page.$$eval('#setPick optgroup', (l) => l.map((g) => g.label)), ['Kanzlei', 'Website', 'Geld', 'Kommunikation', 'Rechte & System']);
+      assert.deepEqual(await page.$$eval('#setPick optgroup', (l) => l.map((g) => g.label)), ['Kanzlei', 'Dashboard', 'Website', 'Geld', 'Kommunikation', 'Rechte & System']);
       await page.selectOption('#setPick', 'style');
       await page.waitForFunction(() => st.settingsTab === 'style');
       await page.fill('#setSearch', 'rabatt');

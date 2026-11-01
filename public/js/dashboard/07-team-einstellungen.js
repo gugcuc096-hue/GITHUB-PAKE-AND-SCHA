@@ -516,16 +516,21 @@ const SETTINGS_SECTIONS = [
   ['general', 'Kanzleidaten & Rechnungen', 'Kanzlei', 'receipt', ['settings.edit'], 'Kanzleisitz Anschrift Briefkopf Zahlungshinweis Kontakt Zahlungserinnerung Wochenbericht Aufräumen Einarbeitung Checkliste liegengeblieben'],
   ['numbering', 'Aktenzeichen', 'Kanzlei', 'folder', 'cfg', 'Muster Nummern Kürzel Bereich'],
   ['listen', 'Listen', 'Kanzlei', 'tag', ['settings.edit'], 'Rechtsgebiete Terminarten Fristenarten Rechnungsarten Gebühren Mandatsformular'],
+  ['documents', 'Dokumente', 'Kanzlei', 'doc', 'cfg', 'Rechnung Aktenauszug Vertrag Logo Fußzeile Unterschrift Wasserzeichen PDF'],
+  ['nav', 'Navigation', 'Dashboard', 'list', 'cfg', 'Menü Reihenfolge ausblenden umbenennen Links Rang'],
+  ['start', 'Dashboard-Start', 'Dashboard', 'home', 'cfg', 'Übersicht Kacheln Kästen Startseite Rang Reihenfolge'],
   ['site', 'Website & Ränge', 'Website', 'globe', ['site.edit'], 'Ränge Anwalt des Monats Website-Texte Team'],
   ['home', 'Startseite', 'Website', 'home', 'cfg', 'Startseite Abschnitte Reihenfolge'],
   ['labels', 'Beschriftungen', 'Website', 'edit', 'cfg', 'Beschriftungen Namen Begriffe'],
   ['banner', 'Banner', 'Website', 'bell', 'cfg', 'Banner Hinweis Streifen Countdown'],
   ['style', 'Stil & Saison', 'Website', 'star', 'cfg', 'Stil Farbe Akzent Schrift Glas Rundung Bewegung Saison Halloween Weihnachten Deko'],
   ['promos', 'Rabattaktionen', 'Geld', 'tag', 'cfg', 'Rabatt Aktion Black Friday Ostern Prozent'],
+  ['calculator', 'Tarifrechner', 'Geld', 'chart', 'cfg', 'Tarifrechner Bündelrabatt Prioritätszuschlag Rechner Website'],
   ['@fees', 'Honorarordnung', 'Geld', 'scale', 'view', 'Preise Gebühren Leistungen'],
   ['@vip', 'VIP & Lifetime', 'Geld', 'crown', 'view', 'VIP Lifetime Mitgliedschaft'],
   ['bot', 'Discord', 'Kommunikation', 'discord', ['discord.edit'], 'Discord Webhook Bot Tickets Rollen Login Kanäle Nachrichten'],
   ['messages', 'Mitteilungen', 'Kommunikation', 'mail', 'cfg', 'Mitteilungen Texte Erinnerung Ansprache'],
+  ['discordLook', 'Discord-Meldungen', 'Kommunikation', 'discord', 'cfg', 'Discord Meldungen Farbe Titel Felder Fußzeile Aussehen'],
   ['integrations', 'Integrationen', 'Kommunikation', 'link', ['system.edit'], 'FiveNet Google Docs Drive Sheets'],
   ['access', 'Rechte & Schalter', 'Rechte & System', 'key', CONFIG_PERMS, 'Rechte Funktionen Schalter Web-Admin Protokoll'],
   ['system', 'Sicherung & Notfall', 'Rechte & System', 'shield', ['system.edit'], 'Datensicherung Backup Wiederherstellen Notfall Wartung'],
@@ -583,7 +588,7 @@ function settingsBody(key, s) {
     if (!st.cfg) return '<div class="panel panel-pad"><p class="text-sm text-muted">Wird geladen …</p></div>';
     st.cfgTab = key;
     if (key !== 'style' && typeof stylePreviewEnd === 'function') stylePreviewEnd();
-    return { banner: cfgBanner, home: cfgHome, labels: cfgLabels, messages: cfgMessages, style: cfgStyle, promos: cfgPromos, numbering: cfgNumbering }[key]();
+    return ({ banner: cfgBanner, home: cfgHome, labels: cfgLabels, messages: cfgMessages, style: cfgStyle, promos: cfgPromos, numbering: cfgNumbering, ...CFG_PANELS }[key] || (() => ''))();
   }
   if (key === 'access') return accessPanels();
   if (key === 'listen') return listsPanels();

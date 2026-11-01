@@ -262,14 +262,14 @@
                 </div>
 
                 <!-- Zusammenfassung -->
-                <div class="glass-card p-6 md:p-8 flex flex-col justify-between border-t-2 border-t-[var(--gold-500)]">
+                <div class="glass-card calc-summary p-6 md:p-8 flex flex-col gap-2 border-t-2 border-t-[var(--gold-500)]">
                     <div>
                         <h3 class="text-lg font-semibold text-white mb-4 border-b border-[var(--glass-border)] pb-2">Kostenschätzung</h3>
-                        <ul id="selectedList" class="text-xs text-[var(--text-muted)] space-y-2 mb-4 min-h-[100px]">
+                        <ul id="selectedList" class="text-xs text-[var(--text-muted)] space-y-2 mb-4">
                             <li class="italic text-gray-500">Keine Leistungen ausgewählt</li>
                         </ul>
                         <div id="discountRow" class="hidden text-xs text-emerald-400 flex justify-between border-t border-[var(--glass-border)] pt-2 mb-2">
-                            <span>Mandatsbündel-Rabatt (10 %)</span>
+                            <span id="discountLabel">Mandatsbündel-Rabatt (10 %)</span>
                             <span id="discountAmount" data-count="calc:discount" class="num">− 0 $</span>
                         </div>
                         <div id="promoRow" class="hidden calc-promo-row text-xs flex justify-between pt-2 mb-2">

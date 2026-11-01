@@ -410,6 +410,7 @@
     applyTheme(cfg.style, { force: !!preview });
     applySeason(cfg.season);
     PS.promo = cfg.promo || null;
+    if (cfg.calculator) PS.calc = cfg.calculator; // Tarifrechner: Bündelrabatt, Prioritätszuschlag
     window.dispatchEvent(new CustomEvent('ps:promo'));
     if (page === 'site') {
       banners(cfg, document.querySelector('.topstrip') || document.body.firstElementChild);

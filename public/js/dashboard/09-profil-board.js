@@ -43,6 +43,35 @@ function twoFactorPanel(tf) {
 }
 
 /** Offline-Modus (nur dieses Gerät): freiwillig, Daten bleiben im Browser dieses Geräts und werden beim Abmelden gelöscht. */
+/** Benachrichtigungen: Discord-Direktnachrichten (an / still / aus), Ruhezeiten, Hinweise und Ton im Dashboard. */
+function notifyPanel() {
+  const p = st.notify;
+  if (!p) return '';
+  const u = st.user;
+  const seg = (name, map, cur) =>
+    `<div class="seg" role="radiogroup">${Object.entries(map)
+      .map(([k, l]) => `<label class="seg-opt"><input type="radio" name="${name}" value="${k}" ${cur === k ? 'checked' : ''}><span>${esc(l)}</span></label>`)
+      .join('')}</div>`;
+  return `<section class="panel panel-pad" id="notifyPanel">
+      <div class="panel-head"><h2 class="panel-title">Benachrichtigungen</h2></div>
+      <form data-form="notify-prefs" class="form-grid">
+        <div><div class="label">Discord-Direktnachrichten${u.discord ? '' : ' <span class="text-dim font-normal">(erst nach „Mit Discord verbinden“)</span>'}</div>
+          ${seg('dm', { an: 'An', still: 'Still (ohne Ton)', aus: 'Aus' }, p.dm)}
+          <p class="form-hint">„Still“: Nachrichten kommen an, aber ohne Ton und ohne Push aufs Handy. Login-Codes und neue Zugangsdaten kommen immer.</p></div>
+        <div><label class="check"><input type="checkbox" name="quiet" ${p.quiet ? 'checked' : ''}> Ruhezeiten – in dieser Zeit kommt alles still an</label>
+          <div class="flex flex-wrap items-center gap-2 mt-2"><input type="time" name="quietFrom" class="field w-auto" value="${esc(p.quietFrom)}" aria-label="Ruhezeit ab"><span class="text-dim">bis</span><input type="time" name="quietTo" class="field w-auto" value="${esc(p.quietTo)}" aria-label="Ruhezeit bis"></div></div>
+        ${
+          isStaff()
+            ? `<div><div class="label">Im Dashboard</div>
+          <label class="check"><input type="checkbox" name="toasts" ${p.toasts ? 'checked' : ''}> Hinweis bei neuen Nachrichten in Akten, die gerade nicht offen sind</label>
+          <label class="check"><input type="checkbox" name="sound" ${p.sound ? 'checked' : ''}> Mit leisem Ton</label></div>`
+            : ''
+        }
+        <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('check', 'ico-sm')}<span>Speichern</span></button></div>
+      </form>
+    </section>`;
+}
+
 function offlinePanel() {
   const o = window.PS.offline;
   if (!o) return '';
@@ -69,6 +98,7 @@ views.profile = {
       load.fivenet(),
     ]);
     st.otherSessions = sessions.others;
+    st.notify = await api.get('/api/notify-prefs').then((r) => r.prefs, () => st.notify || null);
     st.offlineStats = window.PS.offline ? await window.PS.offline.stats() : null;
     st.twoFactor = me.twoFactor;
     st.myCoops = coops ? coops.matches : [];
@@ -126,6 +156,7 @@ views.profile = {
           ${motionPanel()}
           ${offlinePanel()}
           ${twoFactorPanel(st.twoFactor)}
+          ${notifyPanel()}
           <section class="panel panel-pad">
             <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${DISCORD_ICON} Discord</h2>${u.discord ? badge('Verbunden', 'emerald') : ''}</div>
             ${discord}

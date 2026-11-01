@@ -57,6 +57,15 @@ const url = z
 const day = z.string().trim().refine((v) => v === '' || /^\d{4}-\d{2}-\d{2}$/.test(v), 'Datum als JJJJ-MM-TT.');
 
 const BANNER_STYLES = ['edel', 'dezent', 'hinweis', 'dringend', 'feierlich'];
+/** Personengruppen für Menü und Dashboard-Start: Mandanten, Team (ohne Board), Board of Partners. */
+const PROFILES = ['mandant', 'team', 'board'];
+const viewKey = z.string().regex(/^[a-z][a-z-]{1,39}$/);
+const navProfile = z.object({ order: z.array(viewKey).max(80).default([]), hidden: z.array(viewKey).max(80).default([]), labels: z.record(viewKey, z.string().trim().max(40)).default({}) });
+const NAV_EMPTY = { order: [], hidden: [], labels: {} };
+/** Bausteine der Dashboard-Startseite (Kennzahlen und Kästen); Mandanten haben eigene. */
+const START_BLOCKS = ['kpi-requests', 'kpi-work', 'kpi-deadline', 'kpi-mail', 'kpi-cases', 'kpi-next', 'kpi-invoices', 'attention', 'requests', 'events', 'recent', 'pinboard', 'todo', 'duty', 'absence'];
+const startProfile = z.object({ order: z.array(z.enum(START_BLOCKS)).max(START_BLOCKS.length).default([]), hidden: z.array(z.enum(START_BLOCKS)).max(START_BLOCKS.length).default([]) });
+const START_EMPTY = { order: [], hidden: [] };
 
 const SPECS = {
   banner: {
@@ -142,6 +151,66 @@ const SPECS = {
       texts: z.record(z.enum(MESSAGE_KEYS), z.string().max(1200)),
     }),
     defaults: { tone: 'sie', docsAfterDays: 3, texts: {} },
+  },
+  // Menü des Dashboards je Personengruppe: Reihenfolge, Ausblenden, eigene Namen; dazu eigene Links
+  nav: {
+    perm: 'site.edit',
+    label: 'Navigation',
+    schema: z.object({
+      profiles: z.object({ mandant: navProfile, team: navProfile, board: navProfile }),
+      links: z
+        .array(z.object({ label: z.string().trim().min(1).max(40), url: url.refine((v) => v !== '', 'Adresse fehlt.'), audience: z.array(z.enum(PROFILES)).min(1).max(3) }))
+        .max(8),
+    }),
+    defaults: { profiles: { mandant: NAV_EMPTY, team: NAV_EMPTY, board: NAV_EMPTY }, links: [] },
+  },
+  // Startseite des Dashboards je Personengruppe: Reihenfolge und Ausblenden der Kacheln und Kästen
+  start: {
+    perm: 'site.edit',
+    label: 'Dashboard-Start',
+    schema: z.object({ profiles: z.object({ mandant: startProfile, team: startProfile, board: startProfile }) }),
+    defaults: { profiles: { mandant: START_EMPTY, team: START_EMPTY, board: START_EMPTY } },
+  },
+  // Aussehen der Discord-Meldungen je Ereignis: Farbe, Titel (mit {titel}), ausgeblendete Felder; Fußzeile für alle
+  discordLook: {
+    perm: 'discord.edit',
+    label: 'Discord-Meldungen',
+    schema: z.object({
+      events: z.record(
+        z.string().regex(/^[a-z]+\.[a-z]+$/),
+        z.object({ color: z.string().trim().regex(/^(#[0-9a-fA-F]{6})?$/, 'Farbe als #RRGGBB.').default(''), title: z.string().trim().max(120).default(''), hide: z.array(z.string().trim().min(1).max(80)).max(25).default([]) })
+      ),
+      footer: z.string().trim().max(120),
+    }),
+    defaults: { events: {}, footer: '' },
+  },
+  // Tarifrechner der Website: Bündelrabatt und Prioritätszuschlag (welche Leistungen drinstehen: Honorarordnung)
+  calculator: {
+    perm: 'site.edit',
+    label: 'Tarifrechner',
+    schema: z.object({
+      bundleMin: z.number().int().min(2).max(10),
+      bundlePct: z.number().min(0).max(50),
+      priorityPct: z.number().min(0).max(100),
+      priorityLabel: z.string().trim().min(2).max(60),
+      prioritySub: z.string().trim().max(120),
+    }),
+    defaults: { bundleMin: 3, bundlePct: 10, priorityPct: 15, priorityLabel: 'Priorisierte Bearbeitung', prioritySub: 'Vorrangige Terminierung innerhalb von 2 Stunden' },
+  },
+  // Rechnungen, Aktenauszug, Verträge: Logo-Position, Zeile unter dem Namen, Fußzeile, Unterschrift, Wasserzeichen
+  documents: {
+    perm: 'settings.edit',
+    label: 'Dokumente',
+    schema: z.object({
+      logoPos: z.enum(['links', 'mitte', 'rechts']),
+      tagline: z.string().trim().max(80),
+      footer: z.string().trim().max(200),
+      signature: z.boolean(),
+      signatureStyle: z.enum(['schrift', 'klar']),
+      watermark: z.string().trim().max(30),
+      watermarkOn: z.array(z.enum(['invoice', 'extract', 'contract'])).max(3),
+    }),
+    defaults: { logoPos: 'links', tagline: 'Legal Consulting & Advocacy', footer: '', signature: true, signatureStyle: 'schrift', watermark: '', watermarkOn: [] },
   },
 };
 const KEYS = Object.keys(SPECS);
@@ -240,6 +309,13 @@ function promoBanner(user, promo) {
   return { id, promo: true, text, title: promo.name, sub, tone: 'promo', occasion: promo.occasion, icon: promo.icon, pct: promo.pct, endsAt: promo.endsAt, link: who === 'staff' ? '' : '/#rechner', linkLabel: 'Jetzt berechnen', dismissible: true };
 }
 
+/** Personengruppe für Menü und Dashboard-Start (ohne Anmeldung: keine). */
+function profileOf(user) {
+  if (!user) return null;
+  if (user.role === 'mandant') return 'mandant';
+  return require('../core/helpers').isBoard(user) ? 'board' : 'team';
+}
+
 /** Beschriftungen, wie sie die Oberfläche braucht. */
 function labelsPayload(source = get('labels')) {
   return { terms: source.terms, hints: source.hints };
@@ -250,7 +326,25 @@ function publicPayload(user, { draft = false } = {}) {
   const pick = (k) => (draft ? getForEdit(k) : get(k));
   const promo = require('../domain/promotions').publicCurrent();
   const style = pick('style');
-  return { banner: activeBanner(user, pick('banner')), promo, promoBanner: promoBanner(user, promo), home: pick('home'), labels: labelsPayload(pick('labels')), style, season: require('../domain/promotions').season(style.season), draft };
+  // Menü und Dashboard-Start: nur die eigene Personengruppe; Tarifrechner und Dokumente für alle
+  const prof = profileOf(user);
+  const nav = pick('nav');
+  const navMine = prof ? { ...nav.profiles[prof], links: nav.links.filter((l) => l.audience.includes(prof)) } : null;
+  const startMine = prof ? pick('start').profiles[prof] : null;
+  return {
+    banner: activeBanner(user, pick('banner')),
+    promo,
+    promoBanner: promoBanner(user, promo),
+    home: pick('home'),
+    labels: labelsPayload(pick('labels')),
+    style,
+    season: require('../domain/promotions').season(style.season),
+    nav: navMine,
+    start: startMine,
+    calculator: pick('calculator'),
+    documents: pick('documents'),
+    draft,
+  };
 }
 
-module.exports = { BANNER_STYLES, PRESETS, FONTS, SPECS, KEYS, SECTIONS, SECTION_IDS, TERMS, MESSAGE_KEYS, get, getDraft, hasDraft, getForEdit, saveDraft, discardDraft, publish, setPublished, activeBanner, labelsPayload, publicPayload };
+module.exports = { BANNER_STYLES, PROFILES, START_BLOCKS, profileOf, PRESETS, FONTS, SPECS, KEYS, SECTIONS, SECTION_IDS, TERMS, MESSAGE_KEYS, get, getDraft, hasDraft, getForEdit, saveDraft, discardDraft, publish, setPublished, activeBanner, labelsPayload, publicPayload };

@@ -87,6 +87,11 @@ function navActive(key) {
   if (key === 'stats') return st.view === 'stats' || st.view === 'work'; // Aktenbearbeitung = Reiter der Statistik
   return st.view === key;
 }
+/** Schlüssel eines Menüpunkts in Einstellungen → Navigation (Bündel: „hub-…“, sonst die Seite). */
+const navCfgKey = (key) => {
+  const h = hubOf(key);
+  return h ? `hub-${h.key}` : key;
+};
 function renderNav() {
   const prefs = st.navClosed || (st.navClosed = navClosedPrefs());
   const groups = []; // [{ name, items: [key] }]
@@ -99,6 +104,21 @@ function renderNav() {
     if (!groups.length || groups[groups.length - 1].name !== name) groups.push({ name, items: [] });
     groups[groups.length - 1].items.push(key);
   }
+  // Einstellungen → Navigation (je Personengruppe): ausgeblendete Punkte weg, Reihenfolge je Gruppe, eigene Namen
+  const navCfg = (st.siteConfig && st.siteConfig.nav) || null;
+  if (navCfg) {
+    const hidden = new Set(navCfg.hidden || []);
+    const rank = (k) => {
+      const i = (navCfg.order || []).indexOf(k);
+      return i < 0 ? 1000 : i;
+    };
+    groups.forEach((g) => {
+      g.items = g.items.filter((k) => !hidden.has(navCfgKey(k)) || navActive(k));
+      g.items = g.items.map((k, i) => [k, i]).sort((a, b) => rank(navCfgKey(a[0])) - rank(navCfgKey(b[0])) || a[1] - b[1]).map(([k]) => k);
+    });
+    for (let i = groups.length - 1; i >= 0; i--) if (!groups[i].items.length) groups.splice(i, 1);
+  }
+  const navLabel = (key, fallback) => (navCfg && navCfg.labels && navCfg.labels[navCfgKey(key)]) || fallback;
   // Menüpunkt eines Bündels: aktiv bzw. Zähler über alle seine Seiten
   const itemActive = (key) => (hubOf(key) ? hubOf(key).members.some(([k]) => hubTabActive(k)) : navActive(key));
   const itemCount = (key) => (hubOf(key) ? hubOf(key).members.reduce((n, [k]) => n + navCount(k), 0) : navCount(key));
@@ -109,12 +129,12 @@ function renderNav() {
       const count = itemCount(key);
       const active = itemActive(key);
       const target = (st.hubLast && st.hubLast[h.key]) || h.members[0][0];
-      return `<a href="#${target}" class="nav-item ${active ? 'active' : ''}" data-hub="${h.key}" ${active ? 'aria-current="page"' : ''}>${icon(h.hub.icon)}<span>${esc(h.hub.label)}</span>${count ? `<span class="nav-count">${count > 99 ? '99+' : count}</span>` : ''}</a>`;
+      return `<a href="#${target}" class="nav-item ${active ? 'active' : ''}" data-hub="${h.key}" ${active ? 'aria-current="page"' : ''}>${icon(h.hub.icon)}<span>${esc(navLabel(key, h.hub.label))}</span>${count ? `<span class="nav-count">${count > 99 ? '99+' : count}</span>` : ''}</a>`;
     }
     const v = VIEWS[key];
     const count = navCount(key);
     const active = navActive(key);
-    const label = isBoard() && v.navLabel ? v.navLabel : viewLabel(key);
+    const label = navLabel(key, isBoard() && v.navLabel ? v.navLabel : viewLabel(key));
     return `<a href="#${key}" class="nav-item ${active ? 'active' : ''}" ${active ? 'aria-current="page"' : ''}>${icon(v.icon)}<span>${esc(label)}</span>${count ? `<span class="nav-count">${count > 99 ? '99+' : count}</span>` : ''}</a>`;
   };
   let html = '';
@@ -145,7 +165,13 @@ function renderNav() {
       return `<a href="#${k}" class="nav-item nav-foot-item ${active ? 'active' : ''}" ${active ? 'aria-current="page"' : ''}>${icon(VIEWS[k].icon)}<span>${esc(viewLabel(k))}</span></a>`;
     })
     .join('');
-  $('#nav').innerHTML = html + (foot ? `<div class="nav-foot">${foot}</div>` : '');
+  // Eigene Links (Einstellungen → Navigation), z. B. Discord-Server oder Wiki – öffnen in einem neuen Tab
+  const links = navCfg && navCfg.links && navCfg.links.length
+    ? `<div class="nav-section">Links</div>${navCfg.links
+        .map((l) => `<a href="${esc(l.url)}" class="nav-item nav-ext" target="_blank" rel="noopener">${icon('external')}<span>${esc(l.label)}</span></a>`)
+        .join('')}`
+    : '';
+  $('#nav').innerHTML = html + links + (foot ? `<div class="nav-foot">${foot}</div>` : '');
   st.navOpenedFor = st.view;
 
   // Handy-Leiste: Mitarbeiter haben Aufgaben statt Post (Post steht ohnehin oben als Briefsymbol)

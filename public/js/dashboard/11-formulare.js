@@ -179,6 +179,13 @@ const forms = {
     await modalBack();
     await refreshBehind();
   },
+  'notify-prefs': async (f) => {
+    const fd = new FormData(f);
+    const body = { dm: val(fd, 'dm') || 'an', quiet: fd.has('quiet'), quietFrom: val(fd, 'quietFrom') || '22:00', quietTo: val(fd, 'quietTo') || '08:00' };
+    if (f.elements.toasts) Object.assign(body, { toasts: fd.has('toasts'), sound: fd.has('sound') });
+    st.notify = (await api.put('/api/notify-prefs', body)).prefs;
+    toast('Benachrichtigungen gespeichert.');
+  },
   'new-case': async (f) => {
     const fd = new FormData(f);
     const body = { title: val(fd, 'title'), area: val(fd, 'area'), urgency: val(fd, 'urgency') || 'normal', description: val(fd, 'description') };

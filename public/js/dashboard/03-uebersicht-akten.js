@@ -183,6 +183,23 @@ function attentionPanel() {
     </section>`;
 }
 
+/**
+ * Dashboard-Start nach Einstellungen (Einstellungen → Dashboard-Start, je Personengruppe): Bausteine [Schlüssel, Inhalt]
+ * ohne die ausgeblendeten und in der eingestellten Reihenfolge (nicht genannte bleiben an ihrer Stelle dahinter).
+ */
+const startHidden = (k) => ((st.siteConfig && st.siteConfig.start && st.siteConfig.start.hidden) || []).includes(k);
+function startArrange(list) {
+  const cfg = (st.siteConfig && st.siteConfig.start) || {};
+  const hidden = new Set(cfg.hidden || []);
+  const order = cfg.order || [];
+  const rank = (k) => (order.includes(k) ? order.indexOf(k) : 1000);
+  return list
+    .filter(([k]) => !hidden.has(k))
+    .map((x, i) => [x, i])
+    .sort((a, b) => rank(a[0][0]) - rank(b[0][0]) || a[1] - b[1])
+    .map(([x]) => x[1]);
+}
+
 views.overview = {
   async load() {
     await Promise.all([
@@ -240,29 +257,39 @@ views.overview = {
         : '',
     ].join('');
 
-    const kpis = staff
-      ? [
-          (() => {
-            const free = active.filter((c) => !c.lawyerId).length;
-            return kpi('Neue Anfragen', active.filter((c) => c.status === 'offen').length, free ? `${free} ${free === 1 ? 'Akte wartet' : 'Akten warten'} auf einen Anwalt` : 'jede Akte hat einen Anwalt', 'folder', '#cases');
-          })(),
-          kpi('In Bearbeitung', active.filter((c) => c.status === 'in_bearbeitung').length, `${active.filter((c) => onCase(c, u.id)).length} davon bei Ihnen`, 'briefcase', '#cases'),
-          kpiEvent('Nächste Frist / Termin', nextDeadline),
-          kpi('Kanzlei-Post', st.unread, st.unread === 1 ? 'ungelesene Nachricht' : 'ungelesene Nachrichten', 'mail', '#mail'),
-        ]
-      : [
-          active.length ? kpi('Meine Akten', active.length, active.length === 1 ? 'laufendes Mandat' : 'laufende Mandate', 'folder', '#cases') : kpiQuiet('Meine Akten', 'kein laufendes Mandat', 'folder', '#cases'),
-          upcoming[0] ? kpiEvent('Nächster Termin', upcoming[0]) : kpiQuiet('Nächster Termin', 'kein Termin geplant', 'clock', '#calendar'),
-          st.unread ? kpi('Kanzlei-Post', st.unread, 'ungelesen', 'mail', '#mail') : kpiQuiet('Kanzlei-Post', 'nichts Ungelesenes', 'mail', '#mail'),
-          openInvoices.length
-            ? kpi('Offene Rechnungen', money(openSum), openInvoices.length === 1 ? '1 Rechnung' : `${openInvoices.length} Rechnungen`, 'receipt', '#invoices')
-            : kpiQuiet('Offene Rechnungen', 'Keine offenen Rechnungen', 'receipt', '#invoices'),
-        ];
+    const kpis = startArrange(
+      staff
+        ? [
+            [
+              'kpi-requests',
+              (() => {
+                const free = active.filter((c) => !c.lawyerId).length;
+                return kpi('Neue Anfragen', active.filter((c) => c.status === 'offen').length, free ? `${free} ${free === 1 ? 'Akte wartet' : 'Akten warten'} auf einen Anwalt` : 'jede Akte hat einen Anwalt', 'folder', '#cases');
+              })(),
+            ],
+            ['kpi-work', kpi('In Bearbeitung', active.filter((c) => c.status === 'in_bearbeitung').length, `${active.filter((c) => onCase(c, u.id)).length} davon bei Ihnen`, 'briefcase', '#cases')],
+            ['kpi-deadline', kpiEvent('Nächste Frist / Termin', nextDeadline)],
+            ['kpi-mail', kpi('Kanzlei-Post', st.unread, st.unread === 1 ? 'ungelesene Nachricht' : 'ungelesene Nachrichten', 'mail', '#mail')],
+          ]
+        : [
+            ['kpi-cases', active.length ? kpi('Meine Akten', active.length, active.length === 1 ? 'laufendes Mandat' : 'laufende Mandate', 'folder', '#cases') : kpiQuiet('Meine Akten', 'kein laufendes Mandat', 'folder', '#cases')],
+            ['kpi-next', upcoming[0] ? kpiEvent('Nächster Termin', upcoming[0]) : kpiQuiet('Nächster Termin', 'kein Termin geplant', 'clock', '#calendar')],
+            ['kpi-mail', st.unread ? kpi('Kanzlei-Post', st.unread, 'ungelesen', 'mail', '#mail') : kpiQuiet('Kanzlei-Post', 'nichts Ungelesenes', 'mail', '#mail')],
+            [
+              'kpi-invoices',
+              openInvoices.length
+                ? kpi('Offene Rechnungen', money(openSum), openInvoices.length === 1 ? '1 Rechnung' : `${openInvoices.length} Rechnungen`, 'receipt', '#invoices')
+                : kpiQuiet('Offene Rechnungen', 'Keine offenen Rechnungen', 'receipt', '#invoices'),
+            ],
+          ]
+    );
     // Mandant: Kacheln mit Inhalt zuerst und groß, leere als schmale Zeilen darunter
     const fullKpis = kpis.filter((k) => !k.includes('kpi-quiet'));
     const quietKpis = kpis.filter((k) => k.includes('kpi-quiet'));
     const kpiHtml = staff
-      ? `<div class="kpi-grid">${kpis.join('')}</div>`
+      ? kpis.length
+        ? `<div class="kpi-grid${kpis.length < 4 ? ` kpi-grid-${kpis.length}` : ''}">${kpis.join('')}</div>`
+        : ''
       : `${fullKpis.length ? `<div class="kpi-grid${fullKpis.length < 4 ? ` kpi-grid-${fullKpis.length}` : ''}">${fullKpis.join('')}</div>` : ''}${quietKpis.length ? `<div class="kpi-quiet-grid">${quietKpis.join('')}</div>` : ''}`;
 
     const eventsPanel = `
@@ -294,20 +321,19 @@ views.overview = {
             <p class="page-sub">${esc(u.rank || ROLES[u.role])} · Pake &amp; Scha Legal Consulting</p></div>
           <div class="page-actions"><button class="btn-outline btn-md" data-action="concern-new">${icon('chat', 'ico-sm')}<span>Anliegen ans Board</span></button>${staff ? `<button class="btn-outline btn-md" data-action="new-event">${icon('calendar', 'ico-sm')}<span>Frist / Termin</span></button><button class="btn-gold btn-md" data-action="new-case">${icon('plus')}<span>Neue Akte</span></button>` : `<button class="btn-gold btn-md" data-action="new-case">${icon('plus')}<span>Mandat einreichen</span></button>`}</div>
         </div>
-        ${staff ? '' : todoPanel()}
-        ${dutyStrip()}
-        ${absenceStrip()}
+        ${startArrange([
+          ['todo', staff ? '' : todoPanel()],
+          ['duty', dutyStrip()],
+          ['absence', absenceStrip()],
+        ]).join('')}
         ${kpiHtml}`;
 
     // Zwei Kästen nebeneinander, einer kurz (≤ 2 Einträge), einer deutlich länger: der kurze wird so hoch wie sein Inhalt
     // und schmaler, der lange bekommt die Breite – kein leerer Raum im kurzen Kasten.
     const fit = (a, b) => (b && Math.abs(a - b) >= 3 && Math.min(a, b) <= 2 ? (a < b ? ' ov-fit-l' : ' ov-fit-r') : '');
     if (!staff) {
-      return `${head}${
-        upcoming.length
-          ? `<div class="grid-2 ov-row${fit(upcoming.length, recent.length + 1)}">${eventsPanel}${recentPanel}</div>`
-          : `<div class="grid-2 ov-row">${recentPanel}</div>`
-      }`;
+      const mine = startArrange([upcoming.length ? ['events', eventsPanel] : null, ['recent', recentPanel]].filter(Boolean));
+      return `${head}${mine.length ? `<div class="grid-2 ov-row${mine.length === 2 ? fit(upcoming.length, recent.length + 1) : ''}">${mine.join('')}</div>` : ''}`;
     }
 
     const unassigned = active.filter((c) => !c.lawyerId).slice(0, 5);
@@ -328,24 +354,26 @@ views.overview = {
     const quietRow = (ico, title, note, action = '') =>
       `<div class="panel quiet-row">${icon(ico, 'ico-sm')}<span class="quiet-title">${esc(title)}</span><span class="sec-empty-note">${esc(note)}</span>${action ? `<span class="quiet-act">${action}</span>` : ''}</div>`;
     const quiet = [
-      unassigned.length ? '' : quietRow('check', 'Neue Mandatsanfragen', 'alle Anfragen sind vergeben'),
-      pinned.length ? '' : quietRow('pin', 'Pinnwand', 'keine angehefteten Notizen', '<a href="#board" class="btn-ghost btn-sm">Zur Pinnwand</a>'),
-      upcoming.length ? '' : quietRow('calendar', 'Fristen & Termine', 'nichts geplant', `<button class="btn-ghost btn-sm" data-action="new-event">${icon('plus', 'ico-sm')}<span>Frist / Termin</span></button>`),
+      unassigned.length || startHidden('requests') ? '' : quietRow('check', 'Neue Mandatsanfragen', 'alle Anfragen sind vergeben'),
+      pinned.length || startHidden('pinboard') ? '' : quietRow('pin', 'Pinnwand', 'keine angehefteten Notizen', '<a href="#board" class="btn-ghost btn-sm">Zur Pinnwand</a>'),
+      upcoming.length || startHidden('events') ? '' : quietRow('calendar', 'Fristen & Termine', 'nichts geplant', `<button class="btn-ghost btn-sm" data-action="new-event">${icon('plus', 'ico-sm')}<span>Frist / Termin</span></button>`),
     ].join('');
     // Je Kasten die Zahl der Einträge: ein Paar aus kurzem und langem Kasten teilt die Breite nach Inhalt auf
-    const panels = [
-      unassigned.length ? [requestsPanel, unassigned.length] : null,
-      upcoming.length ? [eventsPanel, upcoming.length] : null,
-      [recentPanel, Math.max(recent.length, 1)],
-      pinned.length ? [boardPanel, pinned.length] : null,
-    ].filter(Boolean);
+    const panels = startArrange(
+      [
+        unassigned.length ? ['requests', [requestsPanel, unassigned.length]] : null,
+        upcoming.length ? ['events', [eventsPanel, upcoming.length]] : null,
+        ['recent', [recentPanel, Math.max(recent.length, 1)]],
+        pinned.length ? ['pinboard', [boardPanel, pinned.length]] : null,
+      ].filter(Boolean)
+    );
     const rows = [];
     for (let i = 0; i < panels.length; i += 2) {
       const [a, b] = panels.slice(i, i + 2);
       rows.push(`<div class="grid-2 ov-row${b ? fit(a[1], b[1]) : ''}${i ? ' mt-4 lg:mt-5' : ''}">${a[0]}${b ? b[0] : ''}</div>`);
     }
     return `${head}
-        ${attentionPanel()}
+        ${startArrange([['attention', attentionPanel()]]).join('')}
         ${rows.join('')}
         ${quiet ? `<div class="quiet-rows">${quiet}</div>` : ''}`;
   },

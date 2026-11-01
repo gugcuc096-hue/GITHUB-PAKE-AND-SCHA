@@ -1074,7 +1074,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         // Einstellungen: Leiste mit fünf Gruppen, Discord mit Webhook und Login als Module, Sicherung & Notfall
         await page.evaluate(() => (location.hash = '#settings'));
         await settle();
-        assert.deepEqual(await page.$$eval('#content .set-nav-head', (els) => els.map((e) => e.textContent.trim())), ['Kanzlei', 'Website', 'Geld', 'Kommunikation', 'Rechte & System']);
+        assert.deepEqual(await page.$$eval('#content .set-nav-head', (els) => els.map((e) => e.textContent.trim())), ['Kanzlei', 'Dashboard', 'Website', 'Geld', 'Kommunikation', 'Rechte & System']);
         assert.ok(await page.$('#content form[data-form="settings-firm"]'));
         // Website & Ränge: Bearbeiten-Links, Ränge mit Knöpfen, Rang-Dialog
         await pickTab(page, '#content .set-nav [data-tab="site"]');

@@ -21,12 +21,15 @@ router.use(requireAuth);
 const money = (n) => `${Math.round(n).toLocaleString('de-DE')} $`;
 
 /** Rechnungsdaten der Kanzlei (im Dashboard unter Einstellungen pflegbar). */
-function firmInfo() {
+function firmInfo({ draft = false } = {}) {
+  const siteConfig = require('../web/siteConfig');
   return {
     address: getSetting('firm_address', 'Pake & Scha Legal Consulting\nWürfelpark\nLos Santos, San Andreas'),
     paymentInfo: getSetting('firm_payment_info', 'Zahlbar per Überweisung an Pake & Scha Legal Consulting (Maze Bank).'),
     contact: getSetting('firm_contact', 'kontakt@pake-scha.ls'),
     seat: require('../db/models').firmSeat(),
+    // Aussehen der Dokumente (Einstellungen → Dokumente); draft = Entwurf für die Vorschau
+    doc: draft ? siteConfig.getForEdit('documents') : siteConfig.get('documents'),
   };
 }
 
@@ -49,7 +52,11 @@ router.get('/', (req, res) => {
 });
 
 /** Briefkopf der Kanzlei (Anschrift, Kontakt) – z. B. für den Aktenauszug. */
-router.get('/firm', (req, res) => res.json({ firm: firmInfo() }));
+router.get('/firm', (req, res) => {
+  // ?draft=1: Vorschau des Entwurfs (nur wer die Dokumente gestalten darf)
+  const draft = req.query.draft === '1' && require('../core/permissions').can(req.user, 'settings.edit');
+  res.json({ firm: firmInfo({ draft }) });
+});
 
 /** Kanzlei: offene Rechnungen, die der Mandant als bezahlt gemeldet hat (Badge „Rechnungen“). */
 router.get('/payment-reports', requireStaff, (req, res) => {
