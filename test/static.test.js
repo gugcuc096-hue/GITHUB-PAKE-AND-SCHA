@@ -50,6 +50,14 @@ describe('Strenge Content-Security-Policy', () => {
     for (const file of [...htmlPages, ...browserScripts]) assert.doesNotMatch(read(file), /javascript:/i, rel(file));
   });
 
+  it('Website und Dashboard ohne eingebettete <style>-Blöcke (Styles gehören nach public/css/; nur Druckseiten dürfen)', () => {
+    const PRINT = new Set(['invoice.html', 'vertrag.html', 'aktenauszug.html', 'offline.html', 'aufwachen.html']);
+    for (const f of fs.readdirSync(PUBLIC).filter((x) => x.endsWith('.html') && !PRINT.has(x))) {
+      const html = fs.readFileSync(path.join(PUBLIC, f), 'utf8');
+      const big = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].filter((m) => m[1].split('\n').length > 15);
+      assert.equal(big.length, 0, `${f}: größerer <style>-Block – bitte in eine CSS-Datei unter public/css/`);
+    }
+  });
   it('alle eingebundenen Skripte und Stylesheets existieren', () => {
     for (const page of htmlPages) {
       const refs = [...read(page).matchAll(/<(?:script[^>]+src|link[^>]+href)\s*=\s*["'](\/[^"'?#]+)/gi)].map((m) => m[1]);

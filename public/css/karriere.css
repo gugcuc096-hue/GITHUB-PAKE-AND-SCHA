@@ -1,0 +1,55 @@
+/*
+ * Karriereseite (karriere.html) – vorher als <style> in der Seite.
+ */
+html { scroll-padding-top: 88px; }
+.hero-title { font-size: clamp(2.5rem, 7vw, 4.75rem); line-height: 1.05; }
+.pos-card { transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease; }
+.pos-card:hover { transform: translateY(-3px); border-color: var(--gold-hairline); }
+.counter { font-size: 0.72rem; color: var(--text-dim); text-align: right; margin-top: 0.25rem; }
+.counter.ok { color: #6ee7b7; }
+/* Knöpfe wie auf der Startseite: Großbuchstaben mit Sperrung (Formularfelder bleiben normal) */
+.site-page .btn-gold, .site-page .btn-outline, .site-page .btn-discord { text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.75rem; }
+.site-page .btn-lg { font-size: 0.875rem; }
+.site-page .btn-plain { text-transform: none; letter-spacing: normal; font-size: 0.875rem; }
+/* Handy-Menü (wie auf der Startseite) */
+#karMenu { max-height: 0; overflow: hidden; visibility: hidden; transition: max-height 0.4s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s linear 0.4s; }
+#karMenu.open { max-height: 420px; visibility: visible; transition: max-height 0.4s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s; }
+/* Eigene Bewerbung oben (auf diesem Gerät gespeichert) */
+.my-app { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; text-align: left; border-color: var(--gold-hairline); transition: border-color 0.2s ease, transform 0.2s ease; }
+.my-app:hover { border-color: var(--gold-500); transform: translateY(-1px); }
+.my-app + .my-app { margin-top: 0.75rem; }
+.my-app .go { color: var(--gold-500); flex: none; }
+@media (max-width: 480px) { .my-app { flex-direction: column; align-items: flex-start; } .my-app .right { width: 100%; justify-content: space-between; } }
+/* Kennzahlen unter den Knöpfen */
+.facts { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem 1.75rem; font-size: 0.8rem; color: var(--text-muted); }
+.facts span { display: inline-flex; align-items: center; gap: 0.45rem; }
+.facts i { width: 6px; height: 6px; border-radius: 50%; background: var(--gold-500); }
+.facts i.live { background: #34d399; box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.15); }
+/* Ablauf der Bewerbung: vier Kreise wie auf der Bewerberseite */
+.steps { display: grid; gap: 1.5rem; list-style: none; margin: 0; padding: 0; }
+.steps li { display: grid; grid-template-columns: 44px 1fr; column-gap: 1rem; align-items: start; }
+.steps .dot { grid-row: span 2; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--gold-hairline); background: var(--navy-900, #060b19); color: var(--gold-light); display: inline-flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; position: relative; z-index: 1; }
+.steps h3 { font-size: 1.35rem; font-weight: 600; color: #fff; line-height: 1.2; margin-top: 0.5rem; }
+.steps p { font-size: 0.875rem; color: var(--text-muted); line-height: 1.6; margin-top: 0.35rem; }
+@media (min-width: 768px) {
+    .steps { grid-template-columns: repeat(4, minmax(0, 1fr)); position: relative; }
+    .steps::before { content: ''; position: absolute; top: 22px; left: 12.5%; right: 12.5%; height: 1px; background: linear-gradient(90deg, var(--gold-500), var(--glass-border)); }
+    .steps li { display: block; text-align: center; padding: 0 0.5rem; }
+    .steps .dot { margin: 0 auto 0.75rem; }
+}
+/* Bewerbungsformular in drei Schritten */
+.form-step { display: flex; align-items: center; gap: 0.65rem; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: var(--gold-500); padding-top: 0.75rem; }
+.form-step:first-child { padding-top: 0; }
+.form-step b { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--gold-hairline); display: inline-flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-weight: 500; letter-spacing: 0; color: var(--gold-light); flex: none; }
+.form-step::after { content: ''; flex: 1; height: 1px; background: var(--glass-border); }
+/* Fragen & Antworten */
+.kfaq summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.15rem 0; font-weight: 500; color: #fff; }
+.kfaq summary::-webkit-details-marker { display: none; }
+.kfaq summary svg { width: 20px; height: 20px; color: var(--gold-500); flex: none; transition: transform 0.3s ease; }
+.kfaq[open] summary svg { transform: rotate(45deg); }
+.kfaq summary:focus-visible { outline: 2px solid var(--gold-500); outline-offset: 4px; border-radius: 6px; }
+.kfaq + .kfaq { border-top: 1px solid var(--glass-border); }
+.kfaq p { font-size: 0.875rem; color: var(--text-muted); line-height: 1.7; padding: 0 2rem 1.15rem 0; }
+/* Große Bildschirme: alles wächst mit (Größen in rem) – die Seite wirkt auf breiten Monitoren nicht mehr klein */
+@media (min-width: 1920px) { html { font-size: 18px; } }
+@media (min-width: 2400px) { html { font-size: 20px; } }

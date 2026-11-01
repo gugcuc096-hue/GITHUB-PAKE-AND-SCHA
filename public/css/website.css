@@ -1,0 +1,280 @@
+/*
+ * Startseite (index.html): Kopf, Abschnitte, Tarifrechner, Team, Kontakt – vorher als <style> in der Seite.
+ */
+:root {
+    --navy-950: #02050e;
+    --navy-900: #060b19;
+    --navy-800: rgba(10, 18, 40, 0.85);
+    --navy-700: rgba(18, 30, 62, 0.90);
+    --navy-600: rgba(24, 38, 74, 0.6);
+
+    --gold-500: #d4af37;
+    --gold-600: #b8962e;
+    --gold-light: #f3e5ab;
+    --gold-glow: rgba(var(--accent-rgb), 0.25);
+    --gold-hairline: rgba(var(--accent-rgb), 0.35);
+
+    --emerald-500: #10b981;
+
+    --text-main: #f8fafc;
+    --text-muted: #cbd5e1;
+    --text-dim: #7d8aa8;
+    --glass-border: rgba(255, 255, 255, 0.12);
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-padding-top: 96px; }
+/* Platzhalter, solange Team und Angebote laden */
+.skeleton { height: 14px; border-radius: 8px; background: linear-gradient(90deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.04)); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+/* Große Bildschirme: alles wächst mit (Größen in rem) – die Seite wirkt auf breiten Monitoren nicht mehr klein */
+@media (min-width: 1920px) { html { font-size: 18px; } }
+@media (min-width: 2400px) { html { font-size: 20px; } }
+
+body {
+    background-color: var(--navy-950);
+    color: var(--text-main);
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+    font-variant-numeric: lining-nums; /* Cormorant: 1 und 0 sonst wie I und o */
+}
+
+.font-serif { font-family: 'Cormorant Garamond', serif; }
+.font-mono { font-family: 'JetBrains Mono', monospace; }
+h1, h2, h3 { text-wrap: balance; } /* kein einzelnes Wort allein in der letzten Zeile */
+/* Seite beim Laden weich einblenden (wie Karriere, Anmeldung und Dashboard) */
+body.page-in { animation: page-in 0.35s ease-out; }
+@keyframes page-in { from { opacity: 0; } to { opacity: 1; } }
+/* „Bewegung reduzieren“: /css/calm.css (Einblenden der Seite bleibt – reines Überblenden ist keine Bewegung) */
+
+/* Custom Scrollbar */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--navy-950); }
+::-webkit-scrollbar-thumb { background: rgba(var(--accent-rgb), 0.3); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--gold-500); }
+
+/* Ambient Background & Grid Engine */
+.ambient-bg {
+    position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden;
+    background:
+        radial-gradient(circle at 50% -10%, #0c1836 0%, var(--navy-950) 80%),
+        linear-gradient(to right, rgba(255,255,255,0.015) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.015) 1px, transparent 1px);
+    background-size: 100% 100%, 50px 50px, 50px 50px;
+}
+.glow-orb {
+    position: absolute; border-radius: 50%; filter: blur(150px); pointer-events: none; opacity: 0.3;
+    animation: pulse-glow 14s ease-in-out infinite alternate;
+}
+.orb-1 { top: -15%; left: -10%; width: 60vw; height: 60vw; background: var(--gold-glow); }
+.orb-2 { bottom: -10%; right: -5%; width: 65vw; height: 65vw; background: rgba(30, 58, 138, 0.35); animation-delay: -7s; }
+
+@keyframes pulse-glow {
+    0% { transform: scale(1) translate(0, 0); opacity: 0.25; }
+    100% { transform: scale(1.12) translate(4%, 6%); opacity: 0.45; }
+}
+
+/* Glassmorphism Engine */
+.glass-nav {
+    background: rgba(2, 5, 14, 0.88);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.glass-card {
+    background: var(--navy-800);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+}
+.glass-card::before {
+    content: ''; position: absolute; inset: 0; border-radius: 20px; padding: 1px;
+    background: linear-gradient(135deg, var(--gold-hairline), transparent 60%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+    opacity: 0; transition: opacity 0.4s ease; pointer-events: none;
+}
+.glass-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(var(--accent-rgb), 0.4);
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(var(--accent-rgb), 0.15);
+}
+.glass-card:hover::before { opacity: 1; }
+
+/* Buttons & Badges */
+.btn-gold {
+    background: linear-gradient(135deg, var(--gold-500), var(--gold-600));
+    color: #02050e; font-weight: 600;
+    border-radius: 999px;
+    box-shadow: 0 4px 20px rgba(var(--accent-rgb), 0.3);
+    transition: all 0.25s ease;
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+}
+.btn-gold:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(var(--accent-rgb), 0.45);
+    filter: brightness(1.1);
+}
+.btn-gold:focus-visible, .btn-outline:focus-visible, a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--gold-500); outline-offset: 3px;
+}
+
+.btn-outline {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(var(--accent-rgb), 0.4);
+    color: var(--text-main); border-radius: 999px;
+    backdrop-filter: blur(8px);
+    transition: all 0.25s ease;
+}
+.btn-outline:hover {
+    border-color: var(--gold-500);
+    color: var(--gold-light);
+    background: rgba(var(--accent-rgb), 0.12);
+    transform: translateY(-2px);
+}
+
+/* Tabs & Filters */
+.tab-btn {
+    padding: 0.65rem 1.35rem; font-size: 0.825rem; font-weight: 500;
+    border-radius: 999px; transition: all 0.25s ease; color: var(--text-muted);
+    border: 1px solid transparent; white-space: nowrap; cursor: pointer;
+}
+.tab-btn:hover { color: var(--text-main); background: rgba(255, 255, 255, 0.06); }
+.tab-btn.active {
+    background: rgba(var(--accent-rgb), 0.18);
+    color: var(--gold-light);
+    border-color: rgba(var(--accent-rgb), 0.5);
+    box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.2);
+}
+
+.status-dot {
+    width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+}
+.status-active { background: #10b981; box-shadow: 0 0 10px #10b981; }
+
+.ledger-item {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    transition: all 0.2s ease;
+}
+.ledger-item:hover {
+    background: rgba(var(--accent-rgb), 0.05);
+    border-radius: 12px;
+    padding-left: 0.85rem; padding-right: 0.85rem;
+}
+.ledger-item:last-child { border-bottom: none; }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Scrollspy Nav */
+.nav-link { position: relative; }
+.nav-link::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: -6px; height: 1px;
+    background: var(--gold-500); transform: scaleX(0); transform-origin: left;
+    transition: transform 0.3s ease;
+}
+.nav-link.nav-active { color: var(--gold-light) !important; }
+.nav-link.nav-active::after { transform: scaleX(1); }
+
+.nav-link { white-space: nowrap; }
+
+/* Top-Leiste (Eilnotdienst & Portal) */
+.topstrip { background: rgba(2, 5, 14, 0.96); border-bottom: 1px solid rgba(255, 255, 255, 0.06); font-size: 0.72rem; color: var(--text-muted); }
+
+/* Mobile Menu */
+/* zugeklappt auch für Tastatur und Screenreader weg (visibility erst nach dem Zuklappen) */
+#mobileMenu { max-height: 0; overflow: hidden; visibility: hidden; transition: max-height 0.4s cubic-bezier(0.16,1,0.3,1), visibility 0s linear 0.4s; }
+#mobileMenu.open { max-height: 820px; visibility: visible; transition: max-height 0.4s cubic-bezier(0.16,1,0.3,1), visibility 0s; }
+
+/* Team-Karten (Anzahl variabel, unvollständige Reihen zentriert) */
+.team-card { width: 100%; }
+@media (min-width: 640px) { .team-card { width: calc(50% - 0.75rem); } }
+@media (min-width: 1024px) { .team-card { width: calc(33.333% - 1rem); } }
+/* Name führt zur Profilseite (/team/<name>) */
+.team-name { color: inherit; text-decoration: none; transition: color 0.2s ease; }
+.team-card:hover .team-name, .team-name:focus-visible { color: var(--gold-light); }
+
+/* Formularfelder im Mandats-Dialog: 16px verhindert Auto-Zoom auf iOS */
+@media (max-width: 767px) { #ticketModal input, #ticketModal select, #ticketModal textarea, #honorar input { font-size: 16px; } }
+
+/* Reveal-on-scroll (single orchestrated entrance) */
+.reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.7s cubic-bezier(0.16,1,0.3,1), transform 0.7s cubic-bezier(0.16,1,0.3,1); }
+.reveal.in-view { opacity: 1; transform: translateY(0); }
+
+/* FAQ Accordion */
+.faq-item { border-bottom: 1px solid var(--glass-border); }
+.faq-item:last-child { border-bottom: none; }
+.faq-answer { max-height: 0; overflow: hidden; transition: max-height 0.4s ease; }
+.faq-item.open .faq-answer { max-height: 300px; }
+.faq-icon { transition: transform 0.3s ease; }
+.faq-item.open .faq-icon { transform: rotate(45deg); }
+
+/* Testimonial Track */
+#testimonialTrack { transition: transform 0.6s cubic-bezier(0.16,1,0.3,1); }
+.dot-btn { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.2); transition: all 0.25s ease; cursor: pointer; }
+.dot-btn.active { background: var(--gold-500); width: 22px; border-radius: 99px; }
+
+/* Toast */
+#toastRoot { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 70; display: flex; flex-direction: column; gap: 0.6rem; }
+.toast {
+    background: rgba(6, 11, 25, 0.96); border: 1px solid var(--gold-hairline); border-left: 3px solid var(--gold-500);
+    border-radius: 12px; padding: 0.9rem 1.1rem; max-width: 320px; box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+    backdrop-filter: blur(16px); animation: toast-in 0.35s cubic-bezier(0.16,1,0.3,1);
+}
+@keyframes toast-in { from { opacity: 0; transform: translateY(10px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.toast.leaving { animation: toast-out 0.3s ease forwards; }
+@keyframes toast-out { to { opacity: 0; transform: translateX(20px); } }
+
+/* Copy button */
+.copy-btn { transition: all 0.2s ease; }
+.copy-btn.copied { color: var(--emerald-500) !important; border-color: rgba(16,185,129,0.5) !important; }
+/* Anliegen ans Board: Reiter „Einreichen“ / „Meine Anliegen“ */
+.concern-tab { border-color: var(--glass-border); color: var(--text-muted); background: transparent; }
+.concern-tab:hover { color: #fff; }
+.concern-tab.is-active { border-color: var(--gold-500); color: var(--gold-light); background: rgba(var(--accent-rgb), 0.1); }
+
+/* Back to top */
+#backToTop { opacity: 0; pointer-events: none; transition: all 0.3s ease; transform: translateY(8px); }
+#backToTop.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
+
+/* Honorarordnung: Kategorien auf- und zuklappen (unter „Alle Leistungen“ ist die erste offen) */
+.price-head { cursor: pointer; user-select: none; border-radius: 6px; }
+.price-head:focus-visible { outline: 2px solid var(--gold-500); outline-offset: 4px; }
+.price-head .price-count { margin-left: auto; font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; }
+.price-head .price-chev { width: 18px; height: 18px; flex: none; color: var(--gold-500); transition: transform 0.2s ease; }
+.price-head > span:first-child { flex: none; }
+.price-head h3 { min-width: 0; hyphens: auto; }
+@media (max-width: 639px) {
+    .price-head { flex-wrap: wrap; row-gap: 0.15rem; }
+    .price-head h3 { flex: 1 1 0; font-size: 1.4rem; line-height: 1.25; }
+    .price-head .price-chev { order: 2; }
+    .price-head .price-count { order: 3; flex-basis: 100%; margin-left: 1.25rem; }
+}
+.price-category.collapsed .price-chev { transform: rotate(-90deg); }
+.price-category.collapsed > .grid { display: none; }
+#priceListContainer > .price-category + .price-category { margin-top: 1.5rem; }
+
+/* Am Handy: fester Knopf „Mandat anfragen“ (der Knopf oben in der Kopfzeile ist dort ausgeblendet) */
+#mobileCta { display: none; }
+@media (max-width: 639px) {
+    #mobileCta { display: flex; position: fixed; left: 4.75rem; right: 1rem; bottom: 1.5rem; z-index: 40; height: 2.75rem; opacity: 0; pointer-events: none; transform: translateY(8px); transition: all 0.3s ease; }
+    #mobileCta.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
+    /* Platz unter dem Footer, damit der feste Knopf nichts verdeckt */
+    body > footer.py-10 { padding-bottom: 5.5rem; }
+}
+/* Teamkarte → Profilseite: Foto und Name gleiten hinüber (site.js meldet nur diesen Wechsel an und benennt die
+   angeklickte Karte, Gegenstück in views/anwalt.html) */
+::view-transition-group(pf-photo), ::view-transition-group(pf-name) { animation-duration: 0.5s; animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1); }
+::view-transition-old(pf-name), ::view-transition-new(pf-name) { height: 100%; object-fit: contain; object-position: left center; }
+/* Touch: kleine Links (Kopfleiste, Fußzeile, Teamnamen) bekommen eine größere, unsichtbare Tippfläche */
+@media (pointer: coarse) {
+    :where(footer a, [data-auth-link], .team-name) { position: relative; }
+    :where(footer a, [data-auth-link], .team-name)::after { content: ''; position: absolute; inset: -12px 0; }
+}
