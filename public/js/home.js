@@ -131,6 +131,13 @@ document.querySelectorAll('#mobileMenu a[href^="#"]').forEach(link => {
             done = true;
             target.scrollIntoView({ behavior: 'smooth', block: 'start' });
             history.pushState(null, '', hash);
+            // Lädt oberhalb noch etwas nach (Team, Stimmen …), verschiebt sich das Ziel – nach dem Scrollen nachjustieren
+            const pad = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 96;
+            const settle = () => {
+                if (Math.abs(target.getBoundingClientRect().top - pad) > 12) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            };
+            if ('onscrollend' in window) window.addEventListener('scrollend', settle, { once: true });
+            setTimeout(settle, 1400);
         };
         menu.addEventListener('transitionend', jump, { once: true });
         setTimeout(jump, 450); // falls kein Übergang läuft (z. B. reduzierte Bewegung)
