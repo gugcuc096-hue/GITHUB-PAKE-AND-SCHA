@@ -914,3 +914,244 @@ function clientCard(d) {
       ${flagPart}`;
 }
 
+
+/* ================================================================
+   Aktionen: Rechnungen, Honorare, VIP & Kooperationen (Klicks auf data-action)
+   ================================================================ */
+Object.assign(actions, {
+  // Rechnungen
+  'inv-filter': (el) => {
+    st.invFilter = el.dataset.value;
+    renderView();
+  },
+  'new-invoice': async (el) => {
+    await load.cases();
+    // Aus der Akte heraus: Abbrechen und Erstellen führen zurück in diese Akte
+    const from = el.dataset.caseId && st.modalCaseId === Number(el.dataset.caseId) ? { view: st.view, caseId: st.modalCaseId, caseNumber: st.caseInfo ? st.caseInfo.caseNumber : '' } : null;
+    const caseId = el.dataset.caseId ? Number(el.dataset.caseId) : null;
+    // Für diese Akte schon angefangen (auch vor dem Neuladen): dort weitermachen
+    const saved = savedInvoiceDraft(caseId);
+    st.draft = saved || newDraft(caseId);
+    st.invoiceFrom = from;
+    await navigate('invoice-new');
+    if (saved) toast('Angefangene Rechnung wiederhergestellt.');
+  },
+  'inv-back': async (el) => {
+    const from = st.invoiceFrom;
+    if (el.dataset.cancel && st.draft) {
+      // „Abbrechen“: Entwurf verwerfen
+      forgetInvoiceDraft(st.draft.caseId);
+      st.draft = null;
+    }
+    if (!from) return navigate('invoices');
+    await returnToView(from.view);
+    await openCase(from.caseId);
+  },
+  'inv-from-contract': async () => {
+    const d = st.draft;
+    if (d.items.length && !(await ask('Die bisherigen Positionen werden durch die Leistungen aus dem Vertrag ersetzt.', { title: 'Positionen ersetzen?', confirmText: 'Ersetzen' }))) return;
+    applyContractItems(d);
+    renderView();
+    toast('Leistungen aus dem Vertrag übernommen.');
+  },
+  'inv-add-item': () => {
+    st.draft.items.push({ description: '', quantity: 1, unitPrice: 0 });
+    renderView();
+    const inputs = $$('.item-desc');
+    inputs[inputs.length - 1]?.focus();
+  },
+  'inv-remove-item': (el) => {
+    st.draft.items.splice(Number(el.dataset.index), 1);
+    renderView();
+  },
+  'inv-preset': (el) => {
+    st.draft[el.dataset.field] = Number(el.dataset.value);
+    const input = $(`#invoiceForm [name="${el.dataset.field}"]`);
+    if (input) input.value = el.dataset.value;
+    updateInvoiceSummary();
+  },
+  'inv-status': async (el) => {
+    const row = el.closest('tr, .inv-card, .row') || el;
+    await api.patch('/api/invoices/' + el.dataset.id, { status: el.dataset.status });
+    toast(
+      el.dataset.reported && el.dataset.status === 'bezahlt'
+        ? 'Zahlungseingang bestätigt – der Mandant wird informiert.'
+        : { bezahlt: 'Als bezahlt markiert.', storniert: 'Dokument storniert.', offen: 'Wieder als offen markiert.' }[el.dataset.status]
+    );
+    await afterInvoiceChange(el);
+  },
+  // Mandant: „Ich habe bezahlt“ melden · Kanzlei: Meldung zurückweisen (Zahlung nicht eingegangen)
+  'inv-pay-report': (el) => paymentReportModal(Number(el.dataset.id)),
+  'inv-pay-reject': (el) => paymentRejectModal(Number(el.dataset.id), el.dataset.number),
+  'inv-remind': async (el) => {
+    const r = await api.post(`/api/invoices/${el.dataset.id}/remind`);
+    if (r.sent.length) toast(`Zahlungserinnerung zu ${el.dataset.number} gesendet (${r.sent.join(' und ')}).`);
+    else toast('Erinnerung vermerkt – der Mandant ist über Discord nicht erreichbar (kein verknüpftes Discord, kein Ticket). Bitte direkt ansprechen.', 'error');
+    await refreshBehind();
+  },
+  'inv-delete': async (el) => {
+    if (!(await askDelete(`Dokument ${el.dataset.number} löschen?`, 'Stornieren ist meist die bessere Wahl – dann bleibt das Dokument nachvollziehbar.', 'Endgültig löschen'))) return;
+    await api.del('/api/invoices/' + el.dataset.id);
+    toast('Dokument gelöscht.');
+    await refreshBehind();
+  },
+
+  // Honorarordnung
+  'fee-new': (el) => feeModal(null, el.dataset.category),
+  'fee-edit': (el) => feeModal(st.adminFees.find((f) => f.id === Number(el.dataset.id))),
+  'fee-delete': async (el) => {
+    const f = st.adminFees.find((x) => x.id === Number(el.dataset.id));
+    if (!f || !(await askDelete('Leistung löschen?', `„${f.name}“ wird aus der Honorarordnung gelöscht – auch auf der Website.`))) return;
+    await api.del('/api/admin/fees/' + f.id);
+    toast('Leistung gelöscht.');
+    await refreshBehind();
+  },
+
+  // VIP & Lifetime – Anfragen
+  'vipreq-filter': async (el) => {
+    st.vipReqAll = el.dataset.value === 'alle';
+    await refreshBehind();
+  },
+  'vipreq-accept': (el) => {
+    const r = st.vip.requests.find((x) => x.id === Number(el.dataset.id));
+    if (!r) return;
+    openModal(`
+        <h2 class="modal-title">Anfrage annehmen</h2>
+        <p class="modal-sub">${esc(r.name)} · ${esc(r.tierName)} · ${money(r.price)}. Es wird eine Rechnung über den Preis erstellt (im Portal des Mandanten sichtbar). Sobald sie bezahlt ist, wird die Mitgliedschaft automatisch freigeschaltet.</p>
+        <form data-form="vipreq-accept" data-id="${r.id}" class="form-grid">
+          <label class="check"><input type="checkbox" name="paid"> Zahlung bereits erhalten – sofort freischalten</label>
+          <div><label class="label">Hinweis an den Mandanten <span class="text-dim font-normal normal-case tracking-normal">(optional)</span></label><input name="note" class="field" maxlength="500" placeholder="z. B. Zahlung bitte bei Dr. Alois Pake in der Kanzlei"></div>
+          <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Annehmen</span></button></div>
+        </form>`);
+  },
+  'vipreq-decline': (el) => {
+    const r = st.vip.requests.find((x) => x.id === Number(el.dataset.id));
+    if (!r) return;
+    openModal(`
+        <h2 class="modal-title">Anfrage ablehnen</h2>
+        <p class="modal-sub">${esc(r.name)} · ${esc(r.tierName)}. Der Grund wird dem Mandanten angezeigt.</p>
+        <form data-form="vipreq-decline" data-id="${r.id}" class="form-grid">
+          <div><label class="label">Grund</label><input name="reason" class="field" required minlength="2" maxlength="500" autofocus></div>
+          <div class="form-actions"><button type="submit" class="btn-danger btn-md">Ablehnen</button></div>
+        </form>`);
+  },
+  'vipreq-paid': async (el) => {
+    const r = st.vip.requests.find((x) => x.id === Number(el.dataset.id));
+    if (!r || !r.invoice) return;
+    if (!(await ask(`Rechnung ${r.invoice.number} über ${money(r.price)} als bezahlt markieren? ${r.name} erhält ${r.tierName} sofort.`, { title: 'Bezahlt – freischalten?', confirmText: 'Freischalten' }))) return;
+    const res = await api.patch(`/api/invoices/${r.invoice.id}`, { status: 'bezahlt' });
+    toast(`${r.tierName} für ${r.name} freigeschaltet.`);
+    (res.warnings || []).forEach((w) => toast(w, 'error'));
+    await refreshBehind();
+  },
+  'vip-request': (el) => {
+    const t = st.offers.tiers.find((x) => x.id === Number(el.dataset.id));
+    if (t) vipRequestModal(t);
+  },
+  'vip-request-withdraw': async (el) => {
+    if (!(await ask('Die Anfrage wird zurückgezogen.', { title: 'Anfrage zurückziehen?', confirmText: 'Zurückziehen' }))) return;
+    await api.del(`/api/memberships/requests/${el.dataset.id}`);
+    toast('Anfrage zurückgezogen.');
+    await refreshBehind();
+  },
+
+  // VIP & Lifetime
+  'vip-filter': async (el) => {
+    st.vipAll = el.dataset.value === 'alle';
+    await refreshBehind();
+  },
+  'vip-grant': async () => {
+    if (!st.vip.tiers.some((t) => t.active)) throw new Error('Es gibt keine aktive Stufe. Bitte zuerst unter „Stufen, Preise & Rabatte“ eine anlegen.');
+    openModal(grantDialog());
+    await searchVipAccounts($('#vipAccSearch'));
+  },
+  'vip-pick': async (el) => {
+    $('form[data-form="vip-grant"] input[name="userId"]').value = el.dataset.id;
+    $('#vipAccSearch').value = el.dataset.name;
+    await searchVipAccounts($('#vipAccSearch'));
+  },
+  'vip-renew': (el) => {
+    const m = st.vip.memberships.find((x) => x.id === Number(el.dataset.id));
+    const t = m && st.vip.tiers.find((x) => x.id === m.tierId);
+    if (!m) return;
+    if (!t) throw new Error('Die Stufe dieser Mitgliedschaft gibt es nicht mehr – bitte neu vergeben.');
+    openModal(`
+        <h2 class="modal-title">${esc(m.tierName)} verlängern</h2>
+        <p class="modal-sub">${esc(m.name)} · um ${tierPeriod(t)}${m.status === 'aktiv' && m.expiresAt ? ` ab dem ${esc(fmtDateOnly(String(m.expiresAt).slice(0, 10)))}` : ' ab heute'} · ${money(t.price)}</p>
+        <form data-form="vip-renew" data-id="${m.id}" class="form-grid">
+          <label class="check"><input type="checkbox" name="invoice" checked> Rechnung über ${money(t.price)} erstellen</label>
+          <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Verlängern</span></button></div>
+        </form>`);
+  },
+  'vip-end': (el) => {
+    const m = st.vip.memberships.find((x) => x.id === Number(el.dataset.id));
+    if (!m) return;
+    openModal(`
+        <h2 class="modal-title">${esc(m.tierName)} beenden?</h2>
+        <p class="modal-sub">${esc(m.name)} erhält den Rabatt danach nicht mehr; die Discord-Rolle wird entfernt. Bereits erstellte Rechnungen bleiben unverändert.</p>
+        <form data-form="vip-end" data-id="${m.id}" class="form-grid">
+          <div><label class="label">Grund <span class="text-dim font-normal normal-case tracking-normal">(optional)</span></label><input name="reason" class="field" maxlength="300" placeholder="z. B. Missbrauch, Charakter verstorben (CK), auf Wunsch"></div>
+          <div class="form-actions"><button type="submit" class="btn-danger btn-md">Beenden</button></div>
+        </form>`);
+  },
+  'tier-new': async () => {
+    openModal(tierForm());
+    await loadTierRoles('');
+  },
+  'tier-edit': async (el) => {
+    const t = st.vip.tiers.find((x) => x.id === Number(el.dataset.id));
+    if (!t) return;
+    openModal(tierForm(t));
+    await loadTierRoles(t.discordRoleId);
+  },
+  'tier-delete': async (el) => {
+    const t = st.vip.tiers.find((x) => x.id === Number(el.dataset.id));
+    if (!t || !(await askDelete(`Stufe „${t.name}“ löschen?`, t.activeMembers ? `${t.activeMembers === 1 ? '1 aktive Mitgliedschaft behält' : `${t.activeMembers} aktive Mitgliedschaften behalten`} Name und Rabatt, lassen sich aber nicht mehr verlängern. Tipp: stattdessen „Aktiv“ abwählen.` : 'Die Stufe kann danach nicht mehr vergeben werden.'))) return;
+    await api.del(`/api/memberships/tiers/${t.id}`);
+    toast('Stufe gelöscht.');
+    await refreshBehind();
+  },
+
+  // Kooperationen
+  'coop-new': async () => {
+    openModal(coopForm());
+    await loadCoopRoles([]);
+  },
+  'coop-edit': async (el) => {
+    const k = st.coops.cooperations.find((x) => x.id === Number(el.dataset.id));
+    if (!k) return;
+    openModal(coopForm(k));
+    await loadCoopRoles(k.roles.map((r) => r.id));
+  },
+  'coop-load-roles': () => loadCoopRoles(),
+  'coop-delete': async (el) => {
+    const k = st.coops.cooperations.find((x) => x.id === Number(el.dataset.id));
+    if (!k || !(await askDelete(`Kooperation „${k.name}“ löschen?`, 'Neue Rechnungen erhalten den Rabatt dann nicht mehr. Bereits erstellte Rechnungen behalten ihn. Tipp: Zum Pausieren stattdessen „Aktiv“ abwählen.'))) return;
+    await api.del(`/api/cooperations/${k.id}`);
+    toast('Kooperation gelöscht.');
+    await refreshBehind();
+  },
+  'coop-accounts': async (el) => {
+    const k = el.dataset.id ? st.coops.cooperations.find((x) => x.id === Number(el.dataset.id)) : null;
+    openModal(coopAccountsDialog(el.dataset.mode, k));
+    await searchCoopAccounts($('#coopAccSearch'));
+  },
+  'coop-member-add': async (el) => {
+    await api.post(`/api/cooperations/${el.dataset.id}/members`, { userId: Number(el.dataset.user) });
+    toast(`${el.dataset.name} zugeordnet.`);
+    await modalBack();
+    await refreshBehind();
+  },
+  'coop-member-remove': async (el) => {
+    if (!(await ask(`${el.dataset.name} erhält den Rabatt dann nur noch, wenn die Discord-Rolle passt.`, { title: 'Zuordnung entfernen?', confirmText: 'Entfernen' }))) return;
+    await api.del(`/api/cooperations/${el.dataset.id}/members/${el.dataset.user}`);
+    toast('Zuordnung entfernt.');
+    await refreshBehind();
+  },
+  'coop-check': async (el) => {
+    const box = $('#coopCheckResult');
+    box.innerHTML = '<p class="text-sm text-dim">Wird geprüft …</p>';
+    const r = await api.get(`/api/cooperations/detect?userId=${el.dataset.user}`);
+    box.innerHTML = coopDetectHtml(r, el.dataset.name);
+  },
+});

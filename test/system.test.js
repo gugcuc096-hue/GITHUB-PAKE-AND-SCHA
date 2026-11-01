@@ -27,7 +27,7 @@ describe('Skripte packen, ohne den Server zu blockieren', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'packed-'));
     const script = `
       process.env.NODE_ENV = 'production';
-      const assets = require('./assets');
+      const assets = require('./server/web/assets');
       let last = Date.now(), worst = 0;
       const t = setInterval(() => { const now = Date.now(); worst = Math.max(worst, now - last - 20); last = now; }, 20);
       const t0 = Date.now();
@@ -52,8 +52,8 @@ describe('Indizes für Fremdschlüssel', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'idx-'));
     const out = node(
       `
-      const { db } = require('./db');
-      const health = require('./health');
+      const { db } = require('./server/db/db');
+      const health = require('./server/db/health');
       health.ensureIndexes();
       db.exec('CREATE TABLE zz_eltern (id INTEGER PRIMARY KEY); CREATE TABLE zz_kinder (id INTEGER PRIMARY KEY, eltern INTEGER REFERENCES zz_eltern(id), bezug INTEGER REFERENCES zz_eltern(id)); CREATE INDEX idx_zz_bezug ON zz_kinder(bezug);');
       const made = health.ensureIndexes();

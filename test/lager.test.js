@@ -16,8 +16,8 @@ describe('Discord-Rolle „Mandant mit offener Akte“', () => {
   it('kommt mit der offenen Akte (Konto oder Ticket-Discord), geht mit dem Abschluss – andere Rollen bleiben', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pake-scha-rolle-'));
     process.env.DB_PATH = path.join(dir, 'r.db');
-    const { db, setSetting } = require('../db');
-    const bot = require('../discordBot');
+    const { db, setSetting } = require('../server/db/db');
+    const bot = require('../server/integrations/discordBot');
     const ROLE = '900000000000000951';
     const OTHER = '900000000000000952';
     setSetting('bot_rank_sync', JSON.stringify({ enabled: true, ranks: {}, clientOpen: ROLE }));

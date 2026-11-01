@@ -253,8 +253,8 @@ describe('Automatisch aufräumen', () => {
   it('löscht abgelehnte Bewerbungen und erledigte Anliegen nach X Tagen – offene bleiben', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ps-cleanup-'));
     process.env.DB_PATH = path.join(dir, 'c.db');
-    const { db } = require('../db');
-    const cleanup = require('../cleanup');
+    const { db } = require('../server/db/db');
+    const cleanup = require('../server/db/cleanup');
     const app = db.prepare("INSERT INTO applications (number, access_code, position_title, name, motivation, status, updated_at) VALUES (?, 'x', 'Associate', 'A', 'M', ?, datetime('now', ?))");
     app.run('BW-1', 'abgelehnt', '-90 days');
     app.run('BW-2', 'abgelehnt', '-5 days');

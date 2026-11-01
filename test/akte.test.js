@@ -6,7 +6,7 @@
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { startServer, client, TEAM } = require('./helpers');
-const { intakeTitle } = require('../caseTitles');
+const { intakeTitle } = require('../server/domain/caseTitles');
 
 let server;
 const as = {};

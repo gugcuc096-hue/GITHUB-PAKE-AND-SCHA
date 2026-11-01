@@ -884,8 +884,6 @@ video {
   white-space: pre-line;
 }.whitespace-pre-wrap {
   white-space: pre-wrap;
-}.text-wrap {
-  text-wrap: wrap;
 }.break-words {
   overflow-wrap: break-word;
 }.break-all {

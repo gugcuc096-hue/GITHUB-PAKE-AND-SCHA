@@ -28,7 +28,7 @@ describe('Rabattaktionen: Zeiträume und Saison (ohne Server)', () => {
   let promotions;
   before(async () => {
     srv = await startServer(); // Datenbank anlegen
-    promotions = require('../promotions');
+    promotions = require('../server/domain/promotions');
   });
   after(async () => srv && srv.stop());
 
@@ -195,7 +195,7 @@ describe('Rabattaktionen, Aktenzeichen und Stil (API)', () => {
   });
 
   it('Kanzleifarbe überall: Logo (SVG und PNG), Browserleiste, Discord-Farbe, Word-Farbe', async () => {
-    const brand = require('../brand');
+    const brand = require('../server/web/brand');
     const svg0 = await (await fetch(`${srv.base}/img/logo.svg`)).text();
     assert.match(svg0, /stroke="#caa32f"/, 'Standard: Originalfarbe');
     const png0 = Buffer.from(await (await fetch(`${srv.base}/img/logo.png`)).arrayBuffer());
@@ -214,13 +214,13 @@ describe('Rabattaktionen, Aktenzeichen und Stil (API)', () => {
     assert.equal((await fetch(`${srv.base}/img/logo.png`, { headers: { 'If-None-Match': etag } })).status, 304);
     assert.match(await (await fetch(`${srv.base}/`)).text(), /<meta name="theme-color" content="#2db584">/);
     // Discord: Gold wird zur Kanzleifarbe, andere Farben bleiben (der Server läuft in einem eigenen Prozess – Farbe hier übergeben)
-    const out = require('../discord').brandColors({ embeds: [{ color: 0xd4af37 }, { color: 0xef4444 }] }, { isDefault: false, int: 0x34d399 });
+    const out = require('../server/integrations/discord').brandColors({ embeds: [{ color: 0xd4af37 }, { color: 0xef4444 }] }, { isDefault: false, int: 0x34d399 });
     assert.deepEqual(out.embeds.map((e) => e.color), [0x34d399, 0xef4444]);
     assert.equal(brand.docx('#2db584'), '2DB584');
     await owner.put('/api/config/style/draft', { preset: 'gold', accent: '#d4af37', glass: 50, radius: 50, font: 'klassisch', motion: 'normal', season: 'aus', seasonDash: true });
     await owner.post('/api/config/style/publish', {});
     assert.match(await (await fetch(`${srv.base}/img/logo.svg`)).text(), /#caa32f/);
-    assert.deepEqual(require('../discord').brandColors({ embeds: [{ color: 0xd4af37 }] }, { isDefault: true }).embeds[0].color, 0xd4af37);
+    assert.deepEqual(require('../server/integrations/discord').brandColors({ embeds: [{ color: 0xd4af37 }] }, { isDefault: true }).embeds[0].color, 0xd4af37);
   });
 
   it('Banner: Symbol und Countdown bis Tagesende', async () => {

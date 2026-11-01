@@ -21,7 +21,7 @@ describe('Mitteilungs-Vorlagen', () => {
   let templates;
   before(() => {
     process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pake-scha-msg-')), 'm.db');
-    templates = require('../messageTemplates');
+    templates = require('../server/domain/messageTemplates');
   });
 
   it('Standardtexte: Sie und Du, Platzhalter werden gefüllt, unbekannte und leere verschwinden', () => {
@@ -29,10 +29,10 @@ describe('Mitteilungs-Vorlagen', () => {
     assert.match(templates.render('review', vars), /^Ihre Akte \*\*PS-2026-0012\*\* ist abgeschlossen/);
     assert.equal(templates.fill('Hallo {mandant}, {gibtsnicht}Ende', vars), 'Hallo Tina, Ende');
     assert.equal(templates.fill('A\n\n\n\n{notiz}\n\n\nB', { notiz: '' }), 'A\n\nB');
-    const { SPECS } = require('../siteConfig');
+    const { SPECS } = require('../server/web/siteConfig');
     assert.ok(SPECS.messages.schema.safeParse({ tone: 'du', docsAfterDays: 3, texts: {} }).success);
     // Ton „Du“ und eigener Text
-    const siteConfig = require('../siteConfig');
+    const siteConfig = require('../server/web/siteConfig');
     siteConfig.publish('messages', null, { tone: 'du', docsAfterDays: 5, texts: { receipt: 'Hi {mandant}, Akte {aktenzeichen} ist da.' } });
     assert.match(templates.render('review', vars), /^Deine Akte/);
     assert.equal(templates.render('receipt', { mandant: '<@1>', aktenzeichen: 'X-1' }), 'Hi <@1>, Akte X-1 ist da.');

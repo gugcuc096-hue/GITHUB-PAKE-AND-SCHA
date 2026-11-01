@@ -29,9 +29,9 @@ describe('Antworten aus dem Discord-Ticket im Chat der Akte', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pake-scha-import-'));
     process.env.DB_PATH = path.join(dir, 'i.db');
     process.env.DISCORD_BOT_TOKEN = 'test-token';
-    const { db, setSetting, getSetting } = require('../db');
-    const caseChat = require('../caseChat');
-    const bot = require('../discordBot');
+    const { db, setSetting, getSetting } = require('../server/db/db');
+    const caseChat = require('../server/domain/caseChat');
+    const bot = require('../server/integrations/discordBot');
     for (const [k, v] of [
       ['discord_tickets_enabled', '1'],
       ['discord_ticket_guild', GUILD],

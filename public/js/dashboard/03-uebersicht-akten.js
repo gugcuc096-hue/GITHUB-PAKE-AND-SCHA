@@ -1175,3 +1175,469 @@ function caseStats(c, { appointments, tasks }) {
     fact('Letzte Aktivität', c.idleDays ? `<span class="is-idle">${esc(relDays(c.updatedAt))}</span>` : esc(relDays(c.updatedAt)), 'secNotes'),
   ].join('');
 }
+
+/* ================================================================
+   Aktionen: Akten & Mandanten (Klicks auf data-action)
+   ================================================================ */
+Object.assign(actions, {
+  // Mandantenkartei
+  'open-client': (el) => openClient(el.dataset.key),
+  'client-filter': (el) => {
+    st.clientFilter = el.dataset.value;
+    renderView();
+  },
+  'client-note-delete': (el) => {
+    const key = st.clientCard.key;
+    undoDelete({
+      url: `/api/clients/notes/${el.dataset.id}`,
+      hide: `.client-note:has([data-action="client-note-delete"][data-id="${el.dataset.id}"])`,
+      label: 'Notiz',
+      after: async () => st.clientCard && st.clientCard.key === key && showClient(await api.get('/api/clients/' + encodeURIComponent(key))),
+    });
+  },
+
+  // Akten
+  'case-filter': (el) => {
+    st.caseFilter = el.dataset.value;
+    renderView();
+  },
+  'case-mine': () => {
+    st.caseMine = !st.caseMine;
+    renderView();
+  },
+  'cases-filter-reset': () => {
+    Object.assign(st, { caseFilter: 'aktiv', caseQuery: '', caseMine: false });
+    renderView();
+  },
+  // Mehrfachauswahl in der Aktenliste
+  'case-select': () => {
+    st.caseSel = caseSelecting() ? null : new Set();
+    renderView();
+  },
+  'case-pick': (el) => {
+    const id = Number(el.dataset.id);
+    if (st.caseSel.has(id)) st.caseSel.delete(id);
+    else st.caseSel.add(id);
+    const on = st.caseSel.has(id);
+    el.classList.toggle('is-picked', on);
+    el.setAttribute('aria-selected', String(on));
+    $('#bulkBarSlot').innerHTML = bulkBar();
+  },
+  'case-select-all': () => {
+    const rows = filteredCases();
+    const all = rows.length && rows.every((c) => st.caseSel.has(c.id));
+    st.caseSel = new Set(all ? [] : rows.map((c) => c.id));
+    $('#caseList').innerHTML = caseTable();
+    $('#bulkBarSlot').innerHTML = bulkBar();
+  },
+  'bulk-priority': (sel) => sel.value && bulkPatch(() => ({ priority: Number(sel.value) }), `Priorität „${PRIORITY[sel.value][0]}“`),
+  'bulk-lawyer': (sel) => {
+    const l = sel.value && st.lawyers.find((x) => x.id === Number(sel.value));
+    if (l) bulkPatch(() => ({ lawyerId: l.id }), `Federführung: ${l.displayName}`);
+  },
+  'bulk-stage': (sel) => {
+    const v = sel.value;
+    if (!v) return;
+    if (v !== 'geschlossen') return bulkPatch(() => (v.startsWith('step:') ? { status: 'in_bearbeitung', step: Number(v.slice(5)) } : { status: v }), `Stand „${v.startsWith('step:') ? STEPS[Number(v.slice(5))] : 'Offen'}“`);
+    sel.value = '';
+    openModal(`<h2 class="modal-title">${st.caseSel.size} ${st.caseSel.size === 1 ? 'Akte' : 'Akten'} abschließen</h2>
+        <p class="modal-sub">Alle gewählten Akten bekommen dasselbe Ergebnis. Offene Rechnungen, Unterschriften oder Termine werden dabei nicht geprüft – im Zweifel lieber einzeln abschließen.</p>
+        <form data-form="bulk-close" class="form-grid">
+          <div><label class="label" for="bcOutcome">Ergebnis</label><select id="bcOutcome" name="outcome" class="field" required>${outcomeOptions()}</select></div>
+          <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('check', 'ico-sm')}<span>Abschließen</span></button></div>
+        </form>`);
+  },
+  'new-case': newCaseModal,
+  'nc-pick': (el) => ncPick({ name: el.dataset.name, email: el.dataset.email }),
+  'nc-unpick': () => ncPick(null),
+  'open-case': (el) => openCaseFrom(el),
+  // „Was ist zu tun?“: Akte öffnen und direkt zu den Nachrichten springen
+  'open-case-chat': async (el) => {
+    await openCase(Number(el.dataset.id));
+    caseReveal('secChat')?.scrollIntoView({ block: 'start' });
+  },
+  'case-step': async (el) => {
+    const id = Number(el.dataset.id);
+    const step = Number(el.dataset.step);
+    const steps = $$('button.track-step');
+    steps.forEach((b) => (b.disabled = true)); // kein Doppelklick während des Speicherns
+    const undo = previewStage(`step:${step}`); // Kreise springen sofort um
+    const was = st.caseInfo && st.caseInfo.id === id ? st.caseInfo.step : null;
+    try {
+      await casePatch(id, { step });
+    } catch (err) {
+      undo();
+      throw notSaved(err);
+    } finally {
+      steps.forEach((b) => b.isConnected && (b.disabled = false));
+    }
+    toast(`Bearbeitungsstand: ${stepsOf(st.caseInfo && st.caseInfo.id === id ? st.caseInfo.area : '')[step]}`, 'ok', { duration: 6000, ...(was !== null && was !== step ? { action: undoPatch(id, { step: was }) } : {}) });
+    await reloadCase(id);
+  },
+  // Fünfter Kreis „Abgeschlossen“ im Bearbeitungsstand
+  'case-close': (el) => closeCase(Number(el.dataset.id)),
+  // Abgeschlossene Akte: Klick auf einen Schritt öffnet sie dort wieder
+  'case-reopen': async (el) => {
+    const id = Number(el.dataset.id);
+    const step = Number(el.dataset.step);
+    if (!(await ask(`Die Akte wird wieder geöffnet und steht dann auf „${stepsOf(st.caseInfo && st.caseInfo.id === id ? st.caseInfo.area : '')[step]}“.`, { title: 'Akte wieder öffnen?', confirmText: 'Wieder öffnen' }))) return;
+    await api.patch('/api/cases/' + id, { status: 'in_bearbeitung', step });
+    toast(`Akte wieder geöffnet – ${stepsOf(st.caseInfo && st.caseInfo.id === id ? st.caseInfo.area : '')[step]}`);
+    await reloadCase(id);
+  },
+  'pt-toggle': () => {
+    const box = $('#ptBox');
+    if (!box) return;
+    box.hidden = !box.hidden;
+    if (box.hidden) return;
+    const input = box.querySelector('[name="url"]');
+    input.focus();
+    input.select();
+    box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  },
+  'pt-remove': async (el) => {
+    const id = Number(el.dataset.id);
+    if (!(await askDelete('Prozessticket entfernen?', 'Der Link wird aus der Akte entfernt. Der Kanal im Discord des DOJ bleibt davon unberührt.', 'Entfernen'))) return;
+    await api.del(`/api/cases/${id}/process-ticket`);
+    toast('Prozessticket entfernt.');
+    await reloadCase(id);
+  },
+  'claim-case': async (el) => {
+    const id = Number(el.dataset.id);
+    await api.patch('/api/cases/' + id, { lawyerId: st.user.id });
+    toast('Akte übernommen – sie liegt jetzt bei Ihnen.');
+    if (st.modalCaseId === id) await reloadCase(id);
+    else await refreshBehind();
+  },
+  'release-case': async (el) => {
+    const next = st.caseInfo && st.caseInfo.id === Number(el.dataset.id) ? (st.caseInfo.coLawyers || [])[0] : null;
+    const text = next
+      ? `Die Federführung geht an ${next.name} über. Sie arbeiten danach nicht mehr an der Akte mit.`
+      : 'Die Akte erscheint danach wieder als offene Anfrage für das Team.';
+    if (!(await ask(text, { title: 'Akte abgeben?', confirmText: 'Akte abgeben' }))) return;
+    const id = Number(el.dataset.id);
+    await api.patch('/api/cases/' + id, { lawyerId: null });
+    toast(next ? `Akte abgegeben – federführend ist jetzt ${next.name}.` : 'Akte abgegeben.');
+    await reloadCase(id);
+  },
+  'leave-case': async (el) => {
+    const id = Number(el.dataset.id);
+    const c = st.caseInfo && st.caseInfo.id === id ? st.caseInfo : null;
+    if (!c) return;
+    if (!(await ask('Sie werden als weiterer Anwalt aus der Akte ausgetragen und können sie danach nicht mehr bearbeiten.', { title: 'Mitarbeit beenden?', confirmText: 'Mitarbeit beenden' }))) return;
+    await api.patch('/api/cases/' + id, { coLawyerIds: (c.coLawyers || []).map((l) => l.id).filter((uid) => uid !== st.user.id) });
+    toast('Sie arbeiten nicht mehr an dieser Akte mit.');
+    await reloadCase(id);
+  },
+  'delete-case': async (el) => {
+    if (!(await askDelete(`Akte ${el.dataset.number} löschen?`, 'Die Akte kommt mit Notizen, Aufgaben, Anhängen und Verträgen 30 Tage in den Papierkorb (Aktenverwaltung → Papierkorb) und lässt sich bis dahin wiederherstellen. Danach wird sie endgültig gelöscht.', 'Löschen'))) return;
+    await api.del('/api/cases/' + el.dataset.id);
+    toast('Akte gelöscht – 30 Tage im Papierkorb.');
+    await modalBack();
+    await refreshBehind();
+  },
+  'case-trash': () => openTrash(),
+  'global-search': () => openSearch(),
+  'trash-restore': async (el) => {
+    const r = await api.post(`/api/cases/trash/${el.dataset.id}/restore`);
+    toast(`Akte ${el.dataset.number} wiederhergestellt.`);
+    await refreshBehind();
+    await openCase(r.case.id);
+  },
+  'trash-purge': async (el) => {
+    if (!(await askDelete(`Akte ${el.dataset.number} endgültig löschen?`, 'Die Akte und ihre Anhänge werden sofort und unwiderruflich gelöscht.', 'Endgültig löschen'))) return;
+    await api.del('/api/cases/trash/' + el.dataset.id);
+    toast('Endgültig gelöscht.');
+    await openTrash(true);
+  },
+  'chat-focus': () => {
+    const sec = caseReveal('secChat');
+    if (!sec) return;
+    sec.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    $('#secChat .chat-input')?.focus({ preventScroll: true });
+  },
+  // „Notiz“ in der Hinweisleiste einer liegengebliebenen Akte: zum Verlauf und gleich ins Notizfeld
+  'note-focus': () => {
+    const sec = caseReveal('secNotes');
+    if (!sec) return;
+    sec.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    $('#secNotes textarea[name="body"]')?.focus({ preventScroll: true });
+  },
+  'delete-note': (el) => {
+    const caseId = Number(el.dataset.caseId);
+    const sel = `[data-action="delete-note"][data-id="${el.dataset.id}"]`;
+    undoDelete({
+      url: `/api/cases/${caseId}/notes/${el.dataset.id}`,
+      hide: `.tl-item:has(${sel}), .chat-msg:has(${sel})`,
+      label: el.closest('.chat-msg') ? 'Nachricht' : 'Notiz',
+      after: () => (st.modalCaseId === caseId ? reloadCase(caseId) : refreshBehind()),
+    });
+  },
+  // Akten verknüpfen
+  'case-link': (el) => {
+    const id = Number(el.dataset.id);
+    const c = st.cases.find((x) => x.id === id);
+    const others = st.cases.filter((x) => x.id !== id).sort((a, b) => caseTime(b, 'createdAt') - caseTime(a, 'createdAt'));
+    st.returnCase = id;
+    openModal(`<p class="text-xs uppercase tracking-[0.2em] text-gold mb-1">Akte ${esc(c ? c.caseNumber : '')}</p>
+        <h2 class="modal-title">Akte verknüpfen</h2>
+        <p class="modal-sub">Für zusammenhängende Fälle, z. B. ein Vorfall mit mehreren Festgenommenen. Verknüpfte Akten stehen sich gegenseitig im Aktenkopf, ihre Beweismittel erscheinen als gemeinsame Beweismappe – nur für die Kanzlei, nie für Mandanten.</p>
+        <form data-form="case-link" data-id="${id}" class="form-grid">
+          <div><label class="label" for="clOther">Andere Akte</label><select id="clOther" name="otherId" class="field" required><option value="">Bitte wählen …</option>${others
+            .map((x) => opt(x.id, `${x.caseNumber} · ${x.clientName} · ${x.title}`))
+            .join('')}</select></div>
+          <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('link', 'ico-sm')}<span>Verknüpfen</span></button></div>
+        </form>`);
+  },
+  'case-unlink': async (el) => {
+    if (!(await ask(`Die Verknüpfung mit ${el.dataset.number} wird gelöst – beide Akten bleiben unverändert.`, { title: 'Verknüpfung lösen?', confirmText: 'Lösen' }))) return;
+    await api.del(`/api/cases/${el.dataset.id}/links/${el.dataset.other}`);
+    toast('Verknüpfung gelöst.');
+    await reloadCase(Number(el.dataset.id));
+  },
+  'back-to-case': () => modalDismiss(returnOrClose),
+  'case-client-search': async (el) => {
+    const id = Number(el.dataset.id);
+    const c = st.caseInfo && st.caseInfo.id === id ? st.caseInfo : (await api.get('/api/cases/' + id)).case;
+    const { accounts } = await api.get(`/api/cases/client-accounts?caseId=${id}`);
+    st.returnCase = id;
+    openModal(clientSearchDialog(c, accounts));
+  },
+  'case-link-client': async (el) => {
+    const id = Number(el.dataset.id);
+    const c = st.caseInfo && st.caseInfo.id === id ? st.caseInfo : null;
+    const msg = `${el.dataset.name} sieht die Akte${c ? ` ${c.caseNumber}` : ''} danach unter „Meine Akten“ – mit Terminen, Verträgen, Rechnungen, Nachrichten und (falls eingerichtet) dem Discord-Ticket. Interne Notizen bleiben intern.${c && c.hasClientAccount ? ` Das bisherige Konto (${c.clientName}) verliert den Zugriff.` : ''}`;
+    if (!(await ask(msg, { title: 'Mandanten-Konto verknüpfen?', confirmText: 'Verknüpfen' }))) return;
+    const fromDialog = !!$('#clientAccSearch');
+    await api.put(`/api/cases/${id}/client`, { clientId: Number(el.dataset.client) });
+    toast(`Konto von ${el.dataset.name} mit der Akte verknüpft.`);
+    if (fromDialog) {
+      st.returnCase = null;
+      await openCase(id);
+      refreshBehind();
+    } else await reloadCase(id);
+  },
+  'case-unlink-client': async (el) => {
+    const id = Number(el.dataset.id);
+    const c = st.caseInfo && st.caseInfo.id === id ? st.caseInfo : null;
+    if (!(await askDelete('Verknüpfung lösen?', `${c ? c.clientName : 'Der Mandant'} sieht die Akte danach nicht mehr im Portal. Der Name bleibt in der Akte eingetragen.`, 'Verknüpfung lösen'))) return;
+    await api.put(`/api/cases/${id}/client`, { clientId: null });
+    toast('Verknüpfung gelöst.');
+    await reloadCase(id);
+  },
+  // Akte: Reiter wechseln; der Inhalt beginnt direkt unter der (klebenden) Reiterleiste
+  'case-tab': (el) => {
+    caseTabSet(el.dataset.tab);
+    const body = $('#modalBody');
+    const bar = $('#modalBody .case-jump');
+    if (body && bar && bar.getBoundingClientRect().top <= body.getBoundingClientRect().top + 2) bar.scrollIntoView({ block: 'start' });
+    const root = $('#modalBody .case-root');
+    if (root) playIn(root, 'swap-in');
+  },
+  'scroll-to': (el) => {
+    const target = caseReveal(el.dataset.target) || $('#' + el.dataset.target);
+    const folded = target && target.closest('.sec-wrap.is-collapsed');
+    if (folded) folded.classList.add('is-open-tmp'); // eingeklappter Abschnitt klappt für den Sprung auf
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (el.closest('.case-jump')) {
+      caseJumpPinned = el.dataset.target; // Reiter bleibt markiert, bis man selbst scrollt
+      markCaseJump();
+    }
+  },
+  // Discord-Ticket einer Akte
+  // Beitrittslink für den Mandanten: in die Zwischenablage (Handy im Spiel) und – mit Konto – als Nachricht in die Akte
+  'client-join-link': async (el) => {
+    const id = Number(el.dataset.id);
+    const { url, text } = await api.get(`/api/cases/${id}/join-link`);
+    const ok = await copy(text);
+    const hasAccount = st.caseInfo && st.caseInfo.id === id && st.caseInfo.hasClientAccount;
+    toast(ok ? 'Beitrittslink kopiert.' : `Link: ${url}`, 'ok', {
+      duration: 9000,
+      ...(hasAccount
+        ? {
+            action: {
+              label: 'Als Nachricht senden',
+              onClick: () =>
+                guard(async () => {
+                  await api.post(`/api/cases/${id}/notes`, { body: text, internal: false });
+                  toast('Nachricht an den Mandanten gesendet.');
+                  await reloadCase(id);
+                }),
+            },
+          }
+        : {}),
+    });
+  },
+  'ticket-sync': async (el) => {
+    el.disabled = true;
+    try {
+      const r = await api.post(`/api/tickets/cases/${el.dataset.id}/sync`, {});
+      toast(r.ticket && r.ticket.exists ? (isStaff() ? 'Discord-Ticket abgeglichen.' : r.ticket.clientInTicket ? 'Sie sind im Discord-Ticket.' : 'Noch nicht auf dem Discord-Server der Kanzlei.') : 'Discord-Ticket wird angelegt …');
+    } finally {
+      await reloadCase(Number(el.dataset.id));
+    }
+  },
+  // Deal-Rechner
+  'deal-new': (el) => {
+    st.returnCase = Number(el.dataset.id);
+    openModal(dealForm(Number(el.dataset.id)));
+  },
+  'deal-answer': async (el) => {
+    const accept = el.dataset.accept === '1';
+    const staff = isStaff();
+    if (!(await ask(staff ? `Hat der Mandant das Angebot im Spiel ${accept ? 'angenommen' : 'abgelehnt'}? Das wird mit Ihrem Namen in der Akte vermerkt.` : `Möchten Sie das Angebot wirklich ${accept ? 'annehmen' : 'ablehnen'}? Ihre Antwort wird in der Akte festgehalten.`, { title: accept ? 'Angebot annehmen' : 'Angebot ablehnen', confirmText: accept ? 'Annehmen' : 'Ablehnen' }))) return;
+    await api.post(`/api/cases/${el.dataset.caseId}/deals/${el.dataset.id}/answer`, { accept });
+    toast(accept ? 'Angebot angenommen – die Kanzlei ist informiert.' : 'Angebot abgelehnt – die Kanzlei ist informiert.');
+    await reloadCase(Number(el.dataset.caseId));
+  },
+  'deal-withdraw': async (el) => {
+    await api.del(`/api/cases/${el.dataset.caseId}/deals/${el.dataset.id}`);
+    toast('Angebot zurückgezogen.');
+    await reloadCase(Number(el.dataset.caseId));
+  },
+
+  // Aufgaben & Wiedervorlagen
+  'task-scope': async (el) => {
+    st.taskScope = el.dataset.value;
+    await load.tasks();
+    renderView();
+  },
+  'task-state': async (el) => {
+    st.taskState = el.dataset.value;
+    await load.tasks();
+    renderView();
+  },
+  'task-toggle': async (el) => {
+    const done = el.dataset.done !== '1';
+    // Haken sofort setzen bzw. entfernen – scheitert das Speichern, springt er zurück
+    const show = (on) => {
+      el.closest('.task-row')?.classList.toggle('is-done', on);
+      el.innerHTML = on ? icon('check', 'ico-sm') : '';
+      el.dataset.done = on ? '1' : '0';
+    };
+    show(done);
+    if (done && !window.PS.motion.calm()) {
+      el.classList.remove('pop');
+      void el.offsetWidth;
+      el.classList.add('pop'); // Haken federt kurz auf
+    }
+    el.disabled = true;
+    try {
+      await guardedPatch('/api/tasks/' + el.dataset.id, { done }, { done: !done }, { reload: afterTaskChange });
+    } catch (err) {
+      if (el.isConnected) show(!done);
+      throw notSaved(err);
+    } finally {
+      if (el.isConnected) el.disabled = false;
+    }
+    toast(done ? 'Erledigt.' : 'Aufgabe wieder geöffnet.');
+    await afterTaskChange();
+  },
+  'task-new': async (el) => {
+    const caseId = el.dataset.caseId ? Number(el.dataset.caseId) : null;
+    st.returnCase = caseId && st.modalCaseId === caseId ? caseId : null;
+    await Promise.all([load.lawyers(), load.cases()]);
+    const lawyer = caseId && st.caseInfo && st.caseInfo.id === caseId ? st.caseInfo.lawyerId : null;
+    taskModal(null, { caseId, assignedTo: lawyer || st.user.id });
+  },
+  'task-edit': async (el) => {
+    const t = findTask(Number(el.dataset.id));
+    if (!t) return;
+    st.returnCase = st.modalCaseId && t.caseId === st.modalCaseId ? st.modalCaseId : null;
+    await Promise.all([load.lawyers(), load.cases()]);
+    taskModal(t);
+  },
+  'task-delete': (el) =>
+    undoDelete({
+      url: '/api/tasks/' + el.dataset.id,
+      hide: `.task-row:has([data-action="task-delete"][data-id="${el.dataset.id}"])`,
+      label: 'Aufgabe',
+      after: afterTaskChange,
+    }),
+  // Ältere Nachrichten einer Akte nachladen (die Akte zeigt zuerst nur die jüngsten)
+  'chat-older': async (el) => {
+    const list = $('#chatList');
+    const first = list && list.querySelector('.chat-msg[data-id]');
+    if (!list || !first) return;
+    const caseId = Number(el.dataset.caseId);
+    el.disabled = true;
+    const r = await api.get(`/api/cases/${caseId}/chat?before=${first.dataset.id}&limit=40`);
+    caseFull.add(caseId);
+    const old = r.messages;
+    if (old.length) {
+      const lastDay = chatDayLabel(old[old.length - 1].createdAt);
+      const firstSep = list.querySelector('.chat-day');
+      if (firstSep && firstSep.textContent.trim() === lastDay) firstSep.remove(); // Tag steht schon bei den älteren
+      // Leseposition bleibt: die bisher oberste Nachricht soll auf dem Bildschirm stehen bleiben (Liste oder Fenster scrollt)
+      const top = first.getBoundingClientRect().top;
+      el.closest('.chat-more').insertAdjacentHTML('afterend', chatBubbles(old, caseBubble));
+      let scroller = list;
+      while (scroller && !(scroller.scrollHeight > scroller.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(scroller).overflowY))) scroller = scroller.parentElement;
+      if (scroller) scroller.scrollTo({ top: scroller.scrollTop + first.getBoundingClientRect().top - top, behavior: 'instant' });
+    }
+    if (r.more) el.disabled = false;
+    else el.closest('.chat-more').remove();
+  },
+  // Älteren Verlauf: die Akte wird ganz neu geladen (Phasen gruppieren sich dabei richtig)
+  'log-older': async (el) => {
+    const caseId = Number(el.dataset.caseId);
+    caseFull.add(caseId);
+    await reloadCase(caseId);
+  },
+  // Fehlende Unterlagen
+  'req-new': (el) => {
+    const caseId = Number(el.dataset.caseId);
+    st.returnCase = st.modalCaseId === caseId ? caseId : null;
+    openModal(`<h2 id="modalTitle" class="modal-title">Unterlage anfordern</h2>
+      <p class="modal-sub">Der Mandant sieht es im Portal unter „Was ist zu tun?“ und im Discord-Ticket. Nach 3 Tagen erinnert ihn der Bot einmal.</p>
+      <form data-form="req-add" data-case-id="${caseId}" class="form-grid">
+        <div><label class="label" for="rqTitle">Was fehlt?</label><input id="rqTitle" name="title" class="field" required minlength="2" maxlength="120" placeholder="z. B. Beleg der Zahlung, Foto des Unfallorts" autofocus></div>
+        <div><label class="label" for="rqNote">Hinweis (optional)</label><textarea id="rqNote" name="note" class="field" rows="3" maxlength="500"></textarea></div>
+        <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('send', 'ico-sm')}<span>Anfordern</span></button><button type="button" class="btn-ghost btn-md" data-action="back-to-case">Abbrechen</button></div>
+      </form>`);
+  },
+  'req-toggle': async (el) => {
+    const caseId = Number(el.dataset.caseId);
+    await api.patch(`/api/cases/${caseId}/requests/${el.dataset.id}`, { done: !!el.dataset.done });
+    if (!isStaff()) load.requests().catch(() => {});
+    await reloadCase(caseId);
+  },
+  'req-del': async (el) => {
+    const caseId = Number(el.dataset.caseId);
+    if (!(await askDelete('Anforderung löschen?', 'Sie verschwindet auch beim Mandanten.'))) return;
+    await api.del(`/api/cases/${caseId}/requests/${el.dataset.id}`);
+    await reloadCase(caseId);
+  },
+  'task-package': async (el) => {
+    const caseId = Number(el.dataset.caseId);
+    st.returnCase = st.modalCaseId === caseId ? caseId : null;
+    const { packages } = await api.get('/api/task-packages');
+    const html = taskPackagesHtml(caseId, packages, st.caseInfo && st.caseInfo.id === caseId ? st.caseInfo.area : '');
+    if ($('#modalBody .pack-list, #modalBody .pack-form')) replaceModal(html);
+    else openModal(html);
+  },
+  'task-package-edit': async (el) => {
+    const caseId = Number(el.dataset.caseId);
+    const { packages } = await api.get('/api/task-packages');
+    replaceModal(taskPackagesEditHtml(caseId, packages));
+  },
+  'task-package-apply': async (el) => {
+    const caseId = Number(el.dataset.caseId);
+    const r = await api.post(`/api/task-packages/${el.dataset.id}/apply`, { caseId });
+    toast(r.added ? `${r.added} ${r.added === 1 ? 'Aufgabe' : 'Aufgaben'} angelegt${r.skipped ? ` (${r.skipped} schon vorhanden)` : ''}.` : 'Alle Aufgaben des Pakets sind schon in der Akte.');
+    await returnOrClose();
+    await afterTaskChange();
+  },
+  'task-package-del': async (el) => {
+    if (!(await askDelete('Paket löschen?', 'Bereits angelegte Aufgaben bleiben in den Akten.'))) return;
+    await api.del(`/api/task-packages/${el.dataset.id}`);
+    toast('Paket gelöscht.');
+    await actions['task-package-edit'](el);
+  },
+  'task-checklist': async (el) => {
+    const caseId = Number(el.dataset.caseId);
+    const r = await api.post('/api/tasks/checklist', { caseId });
+    toast(r.added ? `${r.added} Aufgaben aus der Checkliste übernommen.` : 'Alle Punkte der Checkliste sind bereits in der Akte.');
+    await afterTaskChange();
+  },
+});

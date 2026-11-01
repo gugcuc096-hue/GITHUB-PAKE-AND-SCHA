@@ -1,0 +1,545 @@
+'use strict';
+const express = require('express');
+const { z } = require('zod');
+const { db, tx, getSetting, setSetting } = require('../db/db');
+const Q = require('../db/queries');
+const { requireAuth, requireAdmin, requireStaff, hashPassword, generateTempPassword, destroyAllSessions, userAvatarUrl } = require('../core/auth');
+const { wrap, parseBody, idParam, DUTY_STATUS, rankField, RANK_ORDER_SQL, BOARD_RANKS, firmEmail, EMAIL_HINT } = require('../core/helpers');
+const { logActivity, idleLimit, setIdleLimit } = require('../db/models');
+const { removeFile } = require('../core/uploads');
+const discord = require('../integrations/discord');
+const fivenet = require('../integrations/fivenet');
+const personnel = require('./personnel');
+const tickets = require('../integrations/tickets');
+const backup = require('../db/backup');
+const media = require('../integrations/mediaBackup');
+
+const ROLE_LABEL = { mandant: 'Mandant', anwalt: 'Anwalt', admin: 'Board of Partners' };
+
+/* Verzeichnis der Anwälte (für Zuweisungen) -- für das ganze Team */
+const directoryRouter = express.Router();
+directoryRouter.get('/', requireAuth, requireStaff, (req, res) => {
+  const lawyers = db
+    .prepare(
+      `SELECT * FROM users
+       WHERE role IN ('anwalt','admin') AND active = 1
+       ORDER BY ${RANK_ORDER_SQL()}, display_name`
+    )
+    .all()
+    .map((u) => ({ id: u.id, displayName: u.display_name, role: u.role, rank: u.rank, avatarUrl: userAvatarUrl(u) }));
+  res.json({ lawyers });
+});
+
+/* Board of Partners */
+const router = express.Router();
+const perms = require('../core/permissions');
+/*
+ * Konten und Protokoll: weiter nur Board of Partners (Admin). Einstellungen, Sicherung und Tests hängen an den Rechten
+ * der Konfiguration (Inhaber, Web-Admins, Rechte-Tabelle).
+ */
+const anyConfig = perms.requirePerm('settings.edit', 'site.edit', 'discord.edit', 'system.edit', 'templates.edit');
+router.use(requireAuth, (req, res, next) => {
+  if (req.path === '/settings') return req.method === 'GET' ? anyConfig(req, res, next) : next(); // PATCH prüft je Feld
+  if (/^\/weekly-report(\/|$)/.test(req.path)) return perms.requirePerm('settings.edit')(req, res, next);
+  if (/^\/discord(\/|$)/.test(req.path)) return perms.requirePerm('discord.edit')(req, res, next);
+  if (/^\/backups(\/|$)/.test(req.path)) return perms.requirePerm('system.edit')(req, res, next);
+  requireAdmin(req, res, next);
+});
+
+/** Recht je Einstellungsfeld des PATCH. */
+const FIELD_PERM = (key) =>
+  /^discord/.test(key) ? 'discord.edit' : key === 'fivenetUrl' ? 'system.edit' : /^(showDutyPublic|showSuccessPublic|lotm)/.test(key) ? 'site.edit' : 'settings.edit';
+
+function userRow(u) {
+  return {
+    id: u.id,
+    email: u.email,
+    oldEmail: u.old_email || null, // Adresse vor der Umstellung auf @pake-scha.ls (funktioniert beim Login weiter)
+    displayName: u.display_name,
+    role: u.role,
+    rank: u.rank,
+    phone: u.phone,
+    active: !!u.active,
+    mustChangePassword: !!u.must_change_password,
+    discordUsername: u.discord_username || null,
+    avatarUrl: userAvatarUrl(u),
+    duty: u.duty_status && u.duty_status !== 'off' ? u.duty_status : null,
+    dutyLabel: u.duty_status && u.duty_status !== 'off' ? DUTY_STATUS[u.duty_status] : null,
+    lastLoginAt: u.last_login_at,
+    createdAt: u.created_at,
+  };
+}
+
+function activeAdminCount() {
+  return Q.users.countActiveAdmins.get().n;
+}
+
+router.get('/users', (req, res) => {
+  const rows = db
+    .prepare("SELECT * FROM users ORDER BY CASE role WHEN 'admin' THEN 0 WHEN 'anwalt' THEN 1 ELSE 2 END, display_name")
+    .all();
+  res.json({ users: rows.map(userRow) });
+});
+
+router.post(
+  '/users',
+  wrap(async (req, res) => {
+    const schema = z.object({
+      displayName: z.string().trim().min(2).max(80),
+      email: z.string().trim().min(1).max(120),
+      role: z.enum(['mandant', 'anwalt', 'admin']),
+      rank: rankField.optional(),
+      phone: z.string().trim().max(40).optional(),
+    });
+    const d = parseBody(schema, req, res);
+    if (!d) return;
+    const email = firmEmail(d.email);
+    if (!email) return res.status(400).json({ error: EMAIL_HINT });
+    if (Q.users.idByEmail.get(email)) {
+      return res.status(409).json({ error: 'Diese E-Mail-Adresse ist bereits vergeben.' });
+    }
+    const password = generateTempPassword();
+    const info = db
+      .prepare('INSERT INTO users (email, password_hash, display_name, role, rank, phone, must_change_password) VALUES (?, ?, ?, ?, ?, ?, 1)')
+      .run(email, hashPassword(password), d.displayName, d.role, d.rank || null, d.phone || null);
+    const user = Q.users.getById.get(Number(info.lastInsertRowid));
+    logActivity(req.user, 'Konto angelegt', 'user', user.id, `${user.display_name} (${ROLE_LABEL[user.role]})`);
+    // Neues Mitarbeiterkonto = Einstellung (Personalprotokoll)
+    if (user.role !== 'mandant') personnel.recordHire({ userId: user.id, name: user.display_name, rank: user.rank, by: req.user });
+    // Neue Anwälte: Einarbeitung mit Checkliste, Mentor ist zunächst, wer das Konto angelegt hat
+    if (user.role === 'anwalt') require('../domain/onboarding').start(user.id, req.user.id);
+    res.status(201).json({ user: userRow(user), credentials: { email, password } });
+  })
+);
+
+router.patch(
+  '/users/:id',
+  wrap(async (req, res) => {
+    const id = idParam(req);
+    const target = id && Q.users.getById.get(id);
+    if (!target) return res.status(404).json({ error: 'Nutzer nicht gefunden.' });
+    const schema = z.object({
+      role: z.enum(['mandant', 'anwalt', 'admin']).optional(),
+      rank: rankField.nullable().optional(),
+      active: z.boolean().optional(),
+      displayName: z.string().trim().min(2).max(80).optional(),
+      email: z.string().trim().min(1).max(120).optional(),
+    });
+    const d = parseBody(schema, req, res);
+    if (!d) return;
+
+    const self = id === req.user.id;
+    if (self && d.active === false) return res.status(400).json({ error: 'Sie können sich nicht selbst sperren.' });
+    if (self && d.role && d.role !== 'admin') return res.status(400).json({ error: 'Sie können sich nicht selbst die Admin-Rechte entziehen.' });
+    const losesAdmin = target.role === 'admin' && target.active && ((d.role && d.role !== 'admin') || d.active === false);
+    if (losesAdmin && activeAdminCount() <= 1) {
+      return res.status(400).json({ error: 'Es muss mindestens ein aktiver Admin bestehen bleiben.' });
+    }
+    if (d.email !== undefined) {
+      d.email = firmEmail(d.email);
+      if (!d.email) return res.status(400).json({ error: EMAIL_HINT });
+    }
+    if (d.email && d.email !== target.email) {
+      if (Q.users.idByEmailExceptId.get(d.email, id)) {
+        return res.status(409).json({ error: 'Diese E-Mail-Adresse ist bereits vergeben.' });
+      }
+    }
+
+    const sets = [];
+    const values = [];
+    const set = (col, val) => {
+      sets.push(`${col} = ?`);
+      values.push(val);
+    };
+    if (d.role !== undefined) set('role', d.role);
+    if (d.rank !== undefined) set('rank', d.rank || null);
+    if (d.active !== undefined) set('active', d.active ? 1 : 0);
+    if (d.displayName !== undefined) set('display_name', d.displayName);
+    if (d.email !== undefined) set('email', d.email);
+    if (!sets.length) return res.json({ user: userRow(target) });
+
+    tx(() => {
+      db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`).run(...values, id);
+      if (d.active === false || (d.role && d.role !== target.role)) destroyAllSessions(id);
+      // Gesperrte oder zu Mandanten herabgestufte Konten werden ausgestempelt.
+      if (d.active === false || d.role === 'mandant') {
+        Q.dutySessions.endOpenByUserId.run(new Date().toISOString(), id);
+        Q.users.clearDutyById.run(id);
+      }
+      // Name/Rang im verknüpften Team-Profil mitziehen.
+      if (d.displayName !== undefined) Q.teamMembers.setNameByUserId.run(d.displayName, id);
+      if (d.rank) {
+        db.prepare(
+          "UPDATE team_members SET role_title = ?, tier = CASE WHEN ? THEN 'leitung' WHEN tier = 'leitung' THEN 'anwalt' ELSE tier END WHERE user_id = ?"
+        ).run(d.rank, BOARD_RANKS.includes(d.rank) ? 1 : 0, id);
+      }
+    });
+    if (d.role !== undefined || d.rank !== undefined || d.active !== undefined) require('../integrations/discordBot').syncUser(id); // Rang-Sync nach Discord
+    // Personalprotokoll: Mandant → Mitarbeiter ist eine Einstellung, sonst ggf. Beförderung/Rangänderung.
+    const nowRole = d.role ?? target.role;
+    const nowRank = d.rank !== undefined ? d.rank || null : target.rank;
+    const name = d.displayName ?? target.display_name;
+    if (target.role === 'mandant' && nowRole !== 'mandant') personnel.recordHire({ userId: id, name, rank: nowRank, by: req.user });
+    else if (target.role !== 'mandant' && nowRole !== 'mandant' && d.rank !== undefined) {
+      personnel.recordRankChange({ userId: id, name, oldRank: target.rank, newRank: nowRank, by: req.user });
+    }
+    const changes = [];
+    if (d.role !== undefined && d.role !== target.role) changes.push(`Rolle: ${ROLE_LABEL[target.role]} → ${ROLE_LABEL[d.role]}`);
+    if (d.active !== undefined && !!d.active !== !!target.active) changes.push(d.active ? 'entsperrt' : 'gesperrt');
+    if (d.rank !== undefined && (d.rank || null) !== target.rank) changes.push(`Rang: ${d.rank || '—'}`);
+    if (d.displayName !== undefined && d.displayName !== target.display_name) changes.push(`Name: ${d.displayName}`);
+    if (changes.length) logActivity(req.user, 'Konto geändert', 'user', id, `${target.display_name}: ${changes.join(', ')}`);
+    // Rolle, Rang oder Sperre ändern ggf. die Zugehörigkeit zum Board → Board-Tickets abgleichen
+    if (d.role !== undefined || d.rank !== undefined || d.active !== undefined) tickets.syncBoardAll();
+    res.json({ user: userRow(Q.users.getById.get(id)) });
+  })
+);
+
+// Passwort vergessen: Das Board of Partners erzeugt ein Einmal-Passwort (keine Shell nötig).
+router.post(
+  '/users/:id/reset-password',
+  wrap(async (req, res) => {
+    const id = idParam(req);
+    const target = id && Q.users.getById.get(id);
+    if (!target) return res.status(404).json({ error: 'Nutzer nicht gefunden.' });
+    if (id === req.user.id) return res.status(400).json({ error: 'Ihr eigenes Passwort ändern Sie unter "Profil".' });
+    const password = generateTempPassword();
+    Q.users.setTempPasswordById.run(hashPassword(password), id);
+    destroyAllSessions(id);
+    logActivity(req.user, 'Passwort zurückgesetzt', 'user', id, target.display_name);
+    res.json({ credentials: { email: target.email, password } });
+  })
+);
+
+router.delete(
+  '/users/:id',
+  wrap(async (req, res) => {
+    const id = idParam(req);
+    if (id === req.user.id) return res.status(400).json({ error: 'Sie können sich nicht selbst löschen.' });
+    const target = id && Q.users.getById.get(id);
+    if (!target) return res.status(404).json({ error: 'Nutzer nicht gefunden.' });
+    if (target.role === 'admin' && target.active && activeAdminCount() <= 1) {
+      return res.status(400).json({ error: 'Der letzte aktive Admin kann nicht gelöscht werden.' });
+    }
+    try {
+      tx(() => {
+        // Name bleibt in den Akten erhalten, auch wenn das Konto verschwindet.
+        db.prepare("UPDATE cases SET client_name = ? WHERE client_id = ? AND client_name = ''").run(target.display_name, id);
+        db.prepare('DELETE FROM users WHERE id = ?').run(id);
+      });
+    } catch (err) {
+      if (String(err?.message || '').toUpperCase().includes('FOREIGN KEY')) {
+        return res.status(409).json({ error: 'Das Konto ist noch mit Daten verknüpft. Sperren Sie es stattdessen über "Sperren".' });
+      }
+      throw err;
+    }
+    removeFile('avatars', target.avatar);
+    logActivity(req.user, 'Konto gelöscht', 'user', id, `${target.display_name} (${target.email})`);
+    require('../integrations/discordBot').syncUser(id, { previousDiscordId: target.discord_id }); // Rang-Rollen in Discord entfernen
+    res.json({ success: true });
+  })
+);
+
+/* ---------------------------------------------------------------- Aktivitätsprotokoll */
+router.get('/audit', (req, res) => {
+  const q = String(req.query.q || '').trim().slice(0, 80);
+  const before = Number(req.query.before) || null;
+  const params = [];
+  let where = '1 = 1';
+  if (before) {
+    where += ' AND id < ?';
+    params.push(before);
+  }
+  if (q) {
+    where += ' AND (user_name LIKE ? OR action LIKE ? OR details LIKE ?)';
+    params.push(`%${q}%`, `%${q}%`, `%${q}%`);
+  }
+  const rows = db.prepare(`SELECT * FROM audit_log WHERE ${where} ORDER BY id DESC LIMIT 100`).all(...params);
+  res.json({
+    entries: rows.map((r) => ({
+      id: r.id,
+      userName: r.user_name,
+      action: r.action,
+      entity: r.entity,
+      entityId: r.entity_id,
+      details: r.details,
+      createdAt: r.created_at,
+    })),
+    hasMore: rows.length === 100,
+  });
+});
+
+/* ---------------------------------------------------------------- Einstellungen */
+/** Anwalt des Monats: Modus, Auswahl und wer es gerade ist (mit Punkten der Automatik als Vorschau). */
+function lotmSettings() {
+  const lotm = require('../domain/lawyerOfMonth');
+  const cur = lotm.current();
+  const name = (id) => (id ? db.prepare('SELECT name FROM team_members WHERE id = ?').get(id)?.name || '' : '');
+  return {
+    lotmMode: getSetting('lotm_mode', 'auto'),
+    lotmMember: Number(getSetting('lotm_member', '')) || null,
+    lotmCandidates: db.prepare('SELECT id, name FROM team_members WHERE visible = 1 ORDER BY name COLLATE NOCASE').all(),
+    lotmCurrent: cur ? { name: name(cur.memberId), label: cur.label, stats: cur.stats } : null,
+    lotmMonth: lotm.monthLabel(lotm.previousMonth()),
+    lotmRanking: lotm.ranking(lotm.previousMonth()).slice(0, 3),
+  };
+}
+
+function settingsPayload() {
+  const dbUrl = getSetting('discord_webhook_url', '');
+  return {
+    discordWebhookUrl: dbUrl,
+    discordWebhookFromEnv: !dbUrl && discord.isValidWebhookUrl(discord.envValue('DISCORD_WEBHOOK_URL')),
+    discordWebhookActive: !!discord.webhookUrl() || Object.keys(discord.eventWebhooks()).length > 0,
+    discordEventWebhooks: discord.eventWebhooks(),
+    discordEventRoles: discord.eventRoles(),
+    discordEvents: discord.enabledEvents(),
+    availableEvents: discord.EVENTS,
+    discordPingRole: discord.pingRole(),
+    discordPingEvents: discord.pingEvents(),
+    discordOAuthConfigured: discord.oauthConfigured(),
+    discordOAuth: discord.oauthDiagnostics(),
+    firmAddress: getSetting('firm_address', 'Pake & Scha Legal Consulting\nWürfelpark\nLos Santos, San Andreas'),
+    firmSeat: require('../db/models').firmSeat(),
+    firmPaymentInfo: getSetting('firm_payment_info', 'Zahlbar per Überweisung an Pake & Scha Legal Consulting (Maze Bank).'),
+    firmContact: getSetting('firm_contact', 'kontakt@pake-scha.ls'),
+    invoiceReminderDays: require('../domain/paymentReminders').reminderDays(),
+    caseIdleDays: idleLimit(),
+    cleanupDays: require('../db/cleanup').days(),
+    weeklyReport: require('../domain/weeklyReport').enabled(),
+    onboardingTemplate: require('../domain/onboarding').template(),
+    showDutyPublic: getSetting('show_duty_public', '1') === '1',
+    showSuccessPublic: getSetting('show_success_public', '1') === '1',
+    ...lotmSettings(),
+    fivenetUrl: getSetting('fivenet_url', ''),
+    fivenetInstance: fivenet.instance(),
+    fivenetEnvUrl: process.env.FIVENET_URL || '',
+    fivenetDefaultUrl: fivenet.DEFAULT_URL,
+  };
+}
+
+router.get('/settings', (req, res) => res.json({ settings: settingsPayload() }));
+
+router.patch(
+  '/settings',
+  wrap(async (req, res) => {
+    const schema = z.object({
+      discordWebhookUrl: z.string().trim().max(300).optional(),
+      discordEvents: z.array(z.string()).max(50).optional(),
+      discordPingRole: z.string().trim().max(40).optional(),
+      discordPingEvents: z.array(z.string()).max(50).optional(),
+      discordEventWebhooks: z.record(z.string().trim().max(300)).optional(),
+      discordEventRoles: z.record(z.string().trim().max(40)).optional(),
+      firmAddress: z.string().trim().max(300).optional(),
+      firmSeat: z.string().trim().min(2).max(80).optional(),
+      firmPaymentInfo: z.string().trim().max(300).optional(),
+      firmContact: z.string().trim().max(120).optional(),
+      invoiceReminderDays: z.number().int().min(0).max(60).optional(),
+      caseIdleDays: z.number().int().min(0).max(60).optional(),
+      cleanupDays: z.number().int().min(0).max(365).optional(),
+      weeklyReport: z.boolean().optional(),
+      onboardingTemplate: z.string().max(4000).optional(),
+      showDutyPublic: z.boolean().optional(),
+      showSuccessPublic: z.boolean().optional(),
+      lotmMode: z.enum(['auto', 'manual', 'off']).optional(),
+      lotmMember: z.number().int().positive().nullable().optional(),
+      fivenetUrl: z.string().trim().max(200).optional(),
+    });
+    const d = parseBody(schema, req, res);
+    if (!d) return;
+    const missing = Object.keys(d).find((k) => !perms.can(req.user, FIELD_PERM(k)));
+    if (missing) return res.status(403).json({ error: 'Dafür fehlt Ihnen das Recht – das vergibt der Inhaber unter Einstellungen → Rechte.' });
+    if (d.fivenetUrl) {
+      const parsed = fivenet.normalizeBaseUrl(d.fivenetUrl);
+      if (!parsed.ok) return res.status(400).json({ error: parsed.error });
+      d.fivenetUrl = parsed.url;
+    }
+    if (d.discordPingRole !== undefined) {
+      const role = discord.parseRoleId(d.discordPingRole);
+      if (role === null) return res.status(400).json({ error: 'Die Rollen-ID besteht nur aus Ziffern (z. B. 1546979799820537986).' });
+      d.discordPingRole = role;
+    }
+    if (d.discordEventWebhooks !== undefined) {
+      const clean = {};
+      for (const [event, url] of Object.entries(d.discordEventWebhooks)) {
+        if (!discord.EVENTS[event] || !url) continue;
+        if (!discord.isValidWebhookUrl(url)) {
+          return res.status(400).json({ error: `Keine gültige Discord-Webhook-URL bei „${discord.EVENTS[event]}“ (https://discord.com/api/webhooks/…).` });
+        }
+        clean[event] = url;
+      }
+      d.discordEventWebhooks = clean;
+    }
+    if (d.discordEventRoles !== undefined) {
+      const clean = {};
+      for (const [event, input] of Object.entries(d.discordEventRoles)) {
+        if (!discord.EVENTS[event]) continue;
+        const role = discord.parseRoleId(input);
+        if (role === null) return res.status(400).json({ error: `Die Rollen-ID bei „${discord.EVENTS[event]}“ besteht nur aus Ziffern.` });
+        if (role) clean[event] = role;
+      }
+      d.discordEventRoles = clean;
+    }
+    if (d.discordWebhookUrl && !discord.isValidWebhookUrl(d.discordWebhookUrl)) {
+      return res.status(400).json({ error: 'Das ist keine gültige Discord-Webhook-URL (https://discord.com/api/webhooks/…).' });
+    }
+    logActivity(req.user, 'Einstellungen geändert', 'settings', null, Object.keys(d).join(', '));
+    const fivenetBefore = getSetting('fivenet_url', '');
+    tx(() => {
+      if (d.showDutyPublic !== undefined) setSetting('show_duty_public', d.showDutyPublic ? '1' : '0');
+      if (d.showSuccessPublic !== undefined) setSetting('show_success_public', d.showSuccessPublic ? '1' : '0');
+      if (d.lotmMode !== undefined) setSetting('lotm_mode', d.lotmMode);
+      if (d.lotmMember !== undefined) setSetting('lotm_member', d.lotmMember ? String(d.lotmMember) : '');
+      if (d.discordWebhookUrl !== undefined) setSetting('discord_webhook_url', d.discordWebhookUrl);
+      if (d.discordEvents !== undefined) {
+        setSetting('discord_events', JSON.stringify(d.discordEvents.filter((e) => discord.EVENTS[e])));
+        setSetting('discord_events_known', JSON.stringify(Object.keys(discord.EVENTS)));
+      }
+      if (d.discordPingRole !== undefined) setSetting('discord_ping_role', d.discordPingRole);
+      if (d.discordEventWebhooks !== undefined) setSetting('discord_event_webhooks', JSON.stringify(d.discordEventWebhooks));
+      if (d.discordEventRoles !== undefined) setSetting('discord_event_roles', JSON.stringify(d.discordEventRoles));
+      if (d.discordPingEvents !== undefined) setSetting('discord_ping_events', JSON.stringify(d.discordPingEvents.filter((e) => discord.EVENTS[e])));
+      if (d.firmAddress !== undefined) setSetting('firm_address', d.firmAddress);
+      if (d.firmSeat !== undefined) setSetting('firm_seat', d.firmSeat);
+      if (d.firmPaymentInfo !== undefined) setSetting('firm_payment_info', d.firmPaymentInfo);
+      if (d.firmContact !== undefined) setSetting('firm_contact', d.firmContact);
+      if (d.invoiceReminderDays !== undefined) require('../domain/paymentReminders').setReminderDays(d.invoiceReminderDays);
+      if (d.caseIdleDays !== undefined) setIdleLimit(d.caseIdleDays);
+      if (d.cleanupDays !== undefined) require('../db/cleanup').setDays(d.cleanupDays);
+      if (d.weeklyReport !== undefined) require('../domain/weeklyReport').setEnabled(d.weeklyReport);
+      if (d.onboardingTemplate !== undefined) require('../domain/onboarding').setTemplate(d.onboardingTemplate);
+      if (d.fivenetUrl !== undefined) setSetting('fivenet_url', d.fivenetUrl);
+    });
+    // Anschrift/Zahlungshinweis stehen auf den Rechnungen → deren Google Docs neu schreiben
+    if (d.firmAddress !== undefined || d.firmSeat !== undefined || d.firmPaymentInfo !== undefined || d.firmContact !== undefined) require('../integrations/googleDocs').touchKind('invoice');
+    // Links „DOC - Nummer“ in Schriftsätzen zeigen auf die FiveNet-Instanz → bei neuer Adresse deren Google Docs neu schreiben
+    if (d.fivenetUrl !== undefined && d.fivenetUrl !== fivenetBefore) require('../integrations/googleDocs').touchKind('contract');
+    res.json({ settings: settingsPayload() });
+  })
+);
+
+/** Wochenbericht ausprobieren: jetzt an das eigene Discord senden. */
+router.post(
+  '/weekly-report/test',
+  wrap(async (req, res) => {
+    if (!req.user.discord_id) return res.status(400).json({ error: 'Verknüpfe zuerst dein Discord (Mein Profil → Discord verbinden).' });
+    const r = await require('../domain/weeklyReport').send([req.user]);
+    if (r.error) return res.status(400).json({ error: r.error });
+    if (!r.sent) return res.status(502).json({ error: 'Die Direktnachricht kam nicht an – erlaubt Discord Nachrichten vom Kanzlei-Bot?' });
+    res.json({ success: true });
+  })
+);
+
+router.post(
+  '/discord/test',
+  wrap(async (req, res) => {
+    if (!discord.webhookUrl() && !Object.keys(discord.eventWebhooks()).length) {
+      return res.status(400).json({ error: 'Es ist noch kein Discord-Webhook hinterlegt.' });
+    }
+    const result = await discord.sendTestAll(req.user.display_name);
+    if (result.failed.length) {
+      const f = result.failed[0];
+      return res.status(502).json({
+        error: `Discord hat die Testnachricht für den Kanal mit „${f.events.join(', ') || 'Standard'}“ abgelehnt: ${f.error}`,
+        sent: result.sent,
+      });
+    }
+    res.json({ success: true, sent: result.sent, pinged: result.pinged });
+  })
+);
+
+/* ---------------------------------------------------------------- Datensicherung (nur Board of Partners / Admin) */
+const backupInfo = () => ({
+  backups: backup.list(),
+  free: backup.freeBytes(),
+  dbSize: backup.dbBytes(),
+  keepDays: backup.KEEP_DAILY_DAYS,
+  keepWeeklyDays: backup.KEEP_WEEKLY_DAYS,
+  media: media.stats(),
+  pendingRestore: media.pendingRestore(),
+  drive: require('../integrations/driveBackup').status(),
+});
+
+router.get('/backups', (req, res) => res.json(backupInfo()));
+
+router.post(
+  '/backups',
+  wrap(async (req, res) => {
+    let b;
+    try {
+      b = backup.create('manual');
+    } catch (err) {
+      return res.status(507).json({ error: `Sicherung fehlgeschlagen: ${err.message}` });
+    }
+    logActivity(req.user, 'Datensicherung erstellt', 'settings', null, b.name);
+    // gleich auch ins Google Drive (falls verbunden) – höchstens 20 Sekunden warten, danach läuft es im Hintergrund weiter
+    const copy = require('../integrations/driveBackup')
+      .run()
+      .catch((err) => console.warn('Sicherung im Google Drive fehlgeschlagen:', err.message));
+    await Promise.race([copy, new Promise((r) => setTimeout(r, 20000).unref())]);
+    res.status(201).json({ backup: b, ...backupInfo() });
+  })
+);
+
+/* ---------------------------------------------------------------- Systemwarnungen (für die Übersicht) */
+router.get('/alerts', (req, res) => res.json({ alerts: require('../integrations/systemAlerts').active() }));
+
+/** Alle hochgeladenen Bilder (Profilbilder, Team-Fotos, Beweismittel) als .tar.gz. */
+router.get('/backups/media', (req, res) => {
+  const name = `pake-scha-bilder-${new Date().toISOString().slice(0, 10)}.tar.gz`;
+  res.set({ 'Content-Type': 'application/gzip', 'Content-Disposition': `attachment; filename="${name}"` });
+  logActivity(req.user, 'Bilder-Sicherung heruntergeladen', 'settings', null, name);
+  media.writeArchive(res).catch((err) => {
+    console.warn('Bilder-Sicherung abgebrochen:', err.message);
+    res.destroy();
+  });
+});
+
+/** Sicherung hochladen: Datenbank (.db) → beim nächsten Start einspielen, Bilder (.tar.gz) → sofort ergänzen. */
+router.post(
+  '/backups/upload',
+  wrap(async (req, res) => {
+    let result;
+    try {
+      result = await media.receiveUpload(req);
+    } catch (err) {
+      if (err.status) return res.status(err.status).json({ error: err.message }); // auch 507 (Speicher voll) mit Klartext
+      throw err;
+    }
+    if (result.kind === 'datenbank') {
+      logActivity(req.user, 'Datensicherung zum Einspielen hochgeladen', 'settings', null, `${Math.round(result.size / 1024)} KB – wird beim nächsten Neustart eingespielt`);
+    } else {
+      logActivity(req.user, 'Bilder eingespielt', 'settings', null, `${result.added} neu, ${result.existing} schon vorhanden, ${result.skipped} übersprungen`);
+    }
+    res.json({ result, ...backupInfo() });
+  })
+);
+
+/** Gespeicherte Sicherung für den nächsten Start vormerken. */
+router.post(
+  '/backups/:name/restore',
+  wrap(async (req, res) => {
+    const file = backup.fileOf(req.params.name);
+    if (!file) return res.status(404).json({ error: 'Sicherung nicht gefunden.' });
+    media.stageBackup(file);
+    logActivity(req.user, 'Datensicherung zum Einspielen vorgemerkt', 'settings', null, req.params.name);
+    res.json(backupInfo());
+  })
+);
+
+router.delete('/backups/pending', (req, res) => {
+  if (media.pendingRestore()) {
+    media.cancelRestore();
+    logActivity(req.user, 'Einspielen der Datensicherung abgebrochen', 'settings', null, null);
+  }
+  res.json(backupInfo());
+});
+
+router.get('/backups/:name', (req, res) => {
+  const file = backup.fileOf(req.params.name);
+  if (!file) return res.status(404).json({ error: 'Sicherung nicht gefunden.' });
+  logActivity(req.user, 'Datensicherung heruntergeladen', 'settings', null, req.params.name);
+  res.download(file, req.params.name);
+});
+
+module.exports = { router, directoryRouter };

@@ -79,8 +79,7 @@ describe('Saubere Adressen', () => {
       ...fs.readdirSync(path.join(root, 'public')).filter((f) => f.endsWith('.html')).map((f) => path.join('public', f)),
       ...fs.readdirSync(path.join(root, 'public/js')).filter((f) => f.endsWith('.js')).map((f) => path.join('public/js', f)),
       ...fs.readdirSync(path.join(root, 'public/js/dashboard')).map((f) => path.join('public/js/dashboard', f)),
-      ...fs.readdirSync(root).filter((f) => f.endsWith('.js')).filter((f) => f !== 'server.js'),
-      ...fs.readdirSync(path.join(root, 'routes')).map((f) => path.join('routes', f)),
+      ...fs.readdirSync(path.join(root, 'server'), { recursive: true }).filter((f) => f.endsWith('.js')).map((f) => path.join('server', f)),
       'public/sw.js',
     ];
     const old = /["'`(=]\/(index|login|register|karriere|bewerbung|dashboard|vertrag|invoice|aktenauszug)\.html\b/;
@@ -208,8 +207,8 @@ describe('Automatisch aufräumen', () => {
   it('löscht abgelaufene Sitzungen, Codes und Geräte – Akten bleiben', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ps-maint-'));
     process.env.DB_PATH = path.join(dir, 'm.db');
-    const { db } = require('../db');
-    const maintenance = require('../maintenance');
+    const { db } = require('../server/db/db');
+    const maintenance = require('../server/db/maintenance');
     const uid = db.prepare("INSERT INTO users (email, password_hash, display_name, role) VALUES ('x@pake-scha.ls', 'x', 'X', 'mandant')").run().lastInsertRowid;
     const past = new Date(Date.now() - 864e5).toISOString();
     const future = new Date(Date.now() + 864e5).toISOString();

@@ -5,8 +5,8 @@
  *
  * Aufruf: npm run seed:admin -- "Name Nachname" mail@example.com einPasswort123
  */
-const { db } = require('../db');
-const { hashPassword } = require('../auth');
+const { db } = require('../server/db/db');
+const { hashPassword } = require('../server/core/auth');
 
 const [displayName, email, password] = process.argv.slice(2);
 

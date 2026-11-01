@@ -28,7 +28,7 @@ describe('Anklagetext lesen (penal.parseCharges)', () => {
   it('erkennt Paragraphen, Absatz/Satz, Anzahl, Versuch, Beihilfe und Namen – andere Gesetze und Unbekanntes als Hinweis', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pake-scha-anklage-'));
     process.env.DB_PATH = path.join(dir, 'a.db');
-    const penal = require('../penal');
+    const penal = require('../server/domain/penal');
     penal.init();
     const r = penal.parseCharges(SAMPLE);
     const by = (cite) => r.items.find((i) => i.citation === cite);

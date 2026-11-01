@@ -23,8 +23,8 @@ describe('Willkommensnachricht', () => {
     process.env.DB_PATH = path.join(dir, 'w.db');
     process.env.DISCORD_BOT_TOKEN = 'test-token';
     const stub = require('./discordStub');
-    const { setSetting } = require('../db');
-    const bot = require('../discordBot');
+    const { setSetting } = require('../server/db/db');
+    const bot = require('../server/integrations/discordBot');
     setSetting('discord_ticket_guild', GUILD);
     const channel = '900000000000000500';
     setSetting('bot_welcome', JSON.stringify({ enabled: true, channelId: channel, since: new Date(Date.now() - 3600e3).toISOString(), content: 'Willkommen {user}!', embed: { enabled: false } }));
@@ -205,16 +205,16 @@ describe('Einheitliche Bot-Nachrichten & Bot-Status', () => {
     const prev = process.env.PUBLIC_URL;
     process.env.PUBLIC_URL = 'https://kanzlei.example/';
     try {
-      const discord = require('../discord');
-      const tickets = require('../tickets');
+      const discord = require('../server/integrations/discord');
+      const tickets = require('../server/integrations/tickets');
       for (const e of [tickets.embed({ title: 'Test' }), discord.brandEmbed({ title: 'x', footer: { text: 'Board of Partners' } })]) {
         assert.equal(e.footer.icon_url, 'https://kanzlei.example/apple-touch-icon.png');
         assert.ok(e.footer.text);
         assert.ok(!Number.isNaN(Date.parse(e.timestamp)));
       }
       assert.equal(discord.discordTime('2026-10-18T12:00:00Z'), '<t:1792324800:f> (<t:1792324800:R>)');
-      const { db } = require('../db');
-      const bot = require('../discordBot');
+      const { db } = require('../server/db/db');
+      const bot = require('../server/integrations/discordBot');
       const open = db.prepare("SELECT COUNT(*) AS n FROM cases WHERE status != 'geschlossen'").get().n;
       const duty = db.prepare("SELECT COUNT(*) AS n FROM users WHERE duty_status != 'off' AND active = 1 AND role IN ('anwalt','admin')").get().n;
       assert.equal(bot.presenceText(), `${duty} im Dienst · ${open} ${open === 1 ? 'offene Akte' : 'offene Akten'}`);
@@ -244,9 +244,9 @@ describe('Liegengebliebene Akten', () => {
     if (!process.env.DB_PATH) process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pake-scha-idle-')), 'i.db');
     process.env.DISCORD_BOT_TOKEN = 'test-token';
     stub = require('./discordStub');
-    ({ db } = require('../db'));
-    models = require('../models');
-    idle = require('../idleCases');
+    ({ db } = require('../server/db/db'));
+    models = require('../server/db/models');
+    idle = require('../server/domain/idleCases');
     lead = addUser('idle.lead@pake-scha.ls', 'Idle Lead', 'anwalt', MEMBERS.mo);
     noDiscord = addUser('idle.ohne@pake-scha.ls', 'Ohne Discord', 'anwalt');
     client = addUser('idle.mandant@pake-scha.ls', 'Idle Mandant', 'mandant');
@@ -323,8 +323,8 @@ describe('Fehlende Unterlagen: Erinnerung nach drei Tagen', () => {
     if (!process.env.DB_PATH) process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pake-scha-req-')), 'r.db');
     process.env.DISCORD_BOT_TOKEN = 'test-token';
     stub = require('./discordStub');
-    ({ db } = require('../db'));
-    requests = require('../docRequests');
+    ({ db } = require('../server/db/db'));
+    requests = require('../server/domain/docRequests');
     clientId = Number(db.prepare(`INSERT INTO users (email, password_hash, display_name, role, discord_id) VALUES ('req.mandant@x.ls', 'x', 'Req Mandant', 'mandant', ?)`).run(MEMBERS.jaywa).lastInsertRowid);
     caseId = Number(db.prepare(`INSERT INTO cases (case_number, access_pin, title, client_id, status, client_name) VALUES ('PS-REQ-A', '0000', 'Akte Req', ?, 'offen', 'Req Mandant')`).run(clientId).lastInsertRowid);
   });
@@ -366,8 +366,8 @@ describe('Discord-Rolle „Web Admin“', () => {
     if (!process.env.DB_PATH) process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pake-scha-wa-')), 'w.db');
     process.env.DISCORD_BOT_TOKEN = 'test-token';
     stub = require('./discordStub');
-    ({ db, setSetting } = require('../db'));
-    bot = require('../discordBot');
+    ({ db, setSetting } = require('../server/db/db'));
+    bot = require('../server/integrations/discordBot');
     setSetting('discord_ticket_guild', GUILD);
   });
 
@@ -387,7 +387,7 @@ describe('Discord-Rolle „Web Admin“', () => {
   });
 
   it('/webadmin: nur der Inhaber ernennt und entzieht', () => {
-    const cmd = require('../botCommands').commands.webadmin;
+    const cmd = require('../server/integrations/botCommands').commands.webadmin;
     const owner = { id: 9001, role: 'admin', is_owner: 1, display_name: 'Inhaber' };
     const body = (aktion, person) => ({ data: { options: [{ name: 'aktion', value: aktion }, ...(person ? [{ name: 'person', value: person }] : [])] } });
     const other = linked('wa.jay@x.ls', 'Wa Jay', MEMBERS.jaywa);

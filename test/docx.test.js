@@ -11,8 +11,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { ROOT, docxText, readZipEntry } = require('./helpers');
-const render = require('../docxRender');
-const contracts = require('../contracts');
+const render = require('../server/web/docxRender');
+const contracts = require('../server/domain/contracts');
 
 // contract-render.js wie im Browser laden (mit den beiden Helfern aus api.js)
 function browserRenderer() {

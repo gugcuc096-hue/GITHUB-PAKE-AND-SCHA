@@ -14,6 +14,12 @@ const { api, esc, fmtDate, parseDate, money, copy, toast, resizeImage } = window
 const ask = (message, opts) => window.PS.confirm(message, opts);
 const askDelete = (title, message, confirmText = 'Löschen') => ask(message, { title, confirmText, danger: true });
 
+/**
+ * Aktionen (Klicks auf data-action="…"): jeder Bereich trägt seine eigenen ein – Object.assign(actions, { … }) am Ende
+ * seiner Datei (Akten in 03, Verträge in 04, Kalender & Post in 05, Rechnungen in 06, Profil & Board in 09 …).
+ */
+const actions = {};
+
 /* ================================================================
    Konstanten
    ================================================================ */

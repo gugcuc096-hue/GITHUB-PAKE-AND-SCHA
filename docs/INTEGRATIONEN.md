@@ -166,7 +166,7 @@ Weil FiveNet keine delegierte Freigabe für Drittanwendungen anbietet, speichert
 7. **Nachvollziehbar:** Verknüpfen, Abschrift, Bildübernahme, Sichtbarkeitswechsel und Entfernen landen im Aktenverlauf und im Protokoll.
 8. **Verbindungsstatus:** Unter *Mein Profil* zeigt „FiveNet-Verbindung“ den tatsächlichen Stand (Account nicht verbindbar, Charakter nicht abrufbar, Referenz-Modus) statt einer vorgetäuschten Verbindung.
 
-Adresse der Instanz: Dashboard → *Einstellungen* → *Integrationen* → *FiveNet* (oder Umgebungsvariable `FIVENET_URL`, Standard `https://fivenet.modernv.net`). Dort lässt sich auch die Erreichbarkeit prüfen. Bietet FiveNet später eine offizielle, delegierte Anmeldung an, wird sie in `fivenet.js` ergänzt (dort steht auch die vollständige Prüfung).
+Adresse der Instanz: Dashboard → *Einstellungen* → *Integrationen* → *FiveNet* (oder Umgebungsvariable `FIVENET_URL`, Standard `https://fivenet.modernv.net`). Dort lässt sich auch die Erreichbarkeit prüfen. Bietet FiveNet später eine offizielle, delegierte Anmeldung an, wird sie in `server/integrations/fivenet.js` ergänzt (dort steht auch die vollständige Prüfung).
 
 ## Google Docs ausgeben (Rechnungen, Verträge, Schriftsätze, Aktenauszüge)
 
@@ -198,7 +198,7 @@ Danach legt der Server für alle Rechnungen, Verträge und Schriftsätze die Goo
 
 **Sicherheit:** Die Website erhält nur den Bereich `drive.file` – sie sieht und ändert ausschließlich Dateien, die sie selbst angelegt hat, nicht den übrigen Inhalt des Google Drive. Der Zugangsschlüssel (Refresh-Token) liegt nur auf dem Server, verschlüsselt mit einem aus `GOOGLE_CLIENT_SECRET` abgeleiteten Schlüssel, und gelangt nie in den Browser. „Trennen“ widerruft den Zugang bei Google; vorhandene Docs bleiben dann unter ihrem Link erreichbar, werden aber nicht mehr aktualisiert. Wird `GOOGLE_CLIENT_SECRET` geändert, einfach neu verbinden.
 
-Technik: `docxRender.js` baut aus denselben Daten wie die Druckansicht eine Word-Datei, Google wandelt sie beim Hochladen in ein Google Doc um (`googleDrive.js`); `googleDocs.js` merkt sich je Dokument das Doc, legt fehlende automatisch an (Tabelle `google_docs_optout` merkt sich bewusst beendete Freigaben) und schreibt es bei Änderungen neu. Die unten beschriebene Google-Docs-*Integration* (Dokumente in eine Akte übernehmen) ist davon unabhängig und braucht weiterhin keine Einrichtung.
+Technik: `server/web/docxRender.js` baut aus denselben Daten wie die Druckansicht eine Word-Datei, Google wandelt sie beim Hochladen in ein Google Doc um (`server/integrations/googleDrive.js`); `server/integrations/googleDocs.js` merkt sich je Dokument das Doc, legt fehlende automatisch an (Tabelle `google_docs_optout` merkt sich bewusst beendete Freigaben) und schreibt es bei Änderungen neu. Die unten beschriebene Google-Docs-*Integration* (Dokumente in eine Akte übernehmen) ist davon unabhängig und braucht weiterhin keine Einrichtung.
 
 ## Google-Docs-Integration
 
@@ -210,7 +210,7 @@ Google-Docs-Dokumente werden genauso wie FiveNet-Dokumente im Abschnitt **„Ext
 | „Datei → Freigeben → Im Web veröffentlichen“ | wie oben (Link `…/document/d/e/…/pub`) |
 | Eingeschränkt (nur bestimmte Personen) | Die Kanzlei erkennt das und zeigt, wie man die Freigabe setzt. Alternativ in Google Docs Strg+A, Strg+C und im Feld „Inhalt aus Google Docs“ Strg+V – Text und Bilder werden übernommen. |
 
-So funktioniert es technisch (`gdocs.js`): Für freigegebene Dokumente stellt Google ohne Anmeldung einen HTML-Export bereit (`docs.google.com/document/d/<ID>/export?format=html`). Die Kanzlei nutzt **kein Google-Konto, keine Passwörter, keine Cookies**; es wird keine Einrichtung in der Google Cloud benötigt. Sicherheitsgrenzen:
+So funktioniert es technisch (`server/integrations/gdocs.js`): Für freigegebene Dokumente stellt Google ohne Anmeldung einen HTML-Export bereit (`docs.google.com/document/d/<ID>/export?format=html`). Die Kanzlei nutzt **kein Google-Konto, keine Passwörter, keine Cookies**; es wird keine Einrichtung in der Google Cloud benötigt. Sicherheitsgrenzen:
 
 - Aufgerufen wird nur `docs.google.com` mit der Dokument-ID aus dem Link; Weiterleitungen nur zu Google-Inhaltsservern (`*.googleusercontent.com`). Eine Weiterleitung zur Google-Anmeldung wird als „nicht freigegeben“ erkannt und nicht verfolgt.
 - Höchstens 3 MB pro Dokument und 5 MB pro Bild, höchstens 10 Bilder je Vorgang, nur echte JPG-/PNG-/WebP-Dateien. Bilder werden am Inhalt erkannt, damit „Aktualisieren“ keine Dubletten erzeugt.
@@ -229,4 +229,4 @@ Tabellen aus Google Sheets (z. B. Asservatenlisten, Zeugenlisten, Kostenaufstell
 
 - **Welches Tabellenblatt?** Das aus dem Link: Wer ein bestimmtes Blatt geöffnet hat und die Adresse aus der Adresszeile kopiert, bekommt dieses Blatt (`#gid=…`). Ein Link ohne Blattangabe (z. B. über „Link kopieren“ im Freigabedialog) liefert das erste Blatt. Mehrere Blätter derselben Tabelle lassen sich einzeln verknüpfen; die Aktensuche per Link findet alle.
 - **In der Akte:** Anzeige als Tabelle (erste Zeile = Kopfzeile), „Tabelle kopieren“ fügt sich mit allen Spalten in Excel oder Google Sheets ein, „Als Textdatei“ liefert ausgerichtete Spalten.
-- **Technik (`gsheets.js`):** CSV-Export freigegebener Tabellen (`docs.google.com/spreadsheets/d/<ID>/export?format=csv&gid=<Blatt>`), gleiche Sicherheitsgrenzen wie bei Google Docs – kein Google-Konto, keine Passwörter, keine Cookies, nur `docs.google.com` und Weiterleitungen zu `*.googleusercontent.com`, höchstens 3 MB. Übernommen werden Werte (keine Formeln, Formatierungen oder Diagramme), höchstens 50 Spalten und 60.000 Zeichen – bei größeren Tabellen wird an einer Zeilengrenze gekürzt und das angezeigt.
+- **Technik (`server/integrations/gsheets.js`):** CSV-Export freigegebener Tabellen (`docs.google.com/spreadsheets/d/<ID>/export?format=csv&gid=<Blatt>`), gleiche Sicherheitsgrenzen wie bei Google Docs – kein Google-Konto, keine Passwörter, keine Cookies, nur `docs.google.com` und Weiterleitungen zu `*.googleusercontent.com`, höchstens 3 MB. Übernommen werden Werte (keine Formeln, Formatierungen oder Diagramme), höchstens 50 Spalten und 60.000 Zeichen – bei größeren Tabellen wird an einer Zeilengrenze gekürzt und das angezeigt.

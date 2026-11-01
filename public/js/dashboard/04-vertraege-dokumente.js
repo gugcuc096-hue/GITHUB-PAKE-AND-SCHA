@@ -1386,3 +1386,232 @@ document.addEventListener('keydown', (e) => {
     moveExternalByKey(e.target, e.key === 'ArrowUp' ? -1 : 1);
   }
 });
+
+/* ================================================================
+   Aktionen: Verträge, Schriftsätze, FiveNet & Bilder (Klicks auf data-action)
+   ================================================================ */
+Object.assign(actions, {
+  'gs-open': (el) => openSearchResult(el.dataset.type, Number(el.dataset.id)),
+  'peek-close': () => docPeekClose(),
+  'peek-step': (el) => {
+    const box = $('#docPeek');
+    const dir = Number(el.dataset.dir || 0);
+    if (box && dir) docPeekOpen(Number(box.dataset.index) + dir, box.dataset.linked === '1');
+  },
+  'att-open': (el) => {
+    // Eigene Beweise (data-index) oder Beweise einer verknüpften Akte (data-linked, nur ansehen)
+    const linked = el.dataset.linked != null;
+    const index = Number(linked ? el.dataset.linked : el.dataset.index);
+    if (peekOk() && el.classList.contains('att')) return docPeekOpen(index, linked);
+    const a = linked ? st.linkedAttachments[index] : st.caseAttachments[index];
+    if (!a) return;
+    const caseId = st.modalCaseId;
+    st.returnCase = caseId;
+    const no = a.no;
+    const canDelete = !linked && (a.uploaderId === st.user.id || isAdmin());
+    // Großansicht wächst aus dem Vorschaubild hervor und kehrt beim Schließen dorthin zurück (13-bewegung.js)
+    const from = flyOk() && el.classList.contains('att') ? el.getBoundingClientRect() : null;
+    st.lightboxBack = { attr: linked ? 'data-linked' : 'data-index', value: linked ? el.dataset.linked : el.dataset.index };
+    openModal(
+      `<p class="text-xs uppercase tracking-[0.2em] text-gold mb-1">Beweismittel B${no}${linked ? ` · Akte ${esc(a.caseNumber)}` : ''}</p>
+        <h2 class="modal-title">${esc(a.caption || 'Anhang')}</h2>
+        <p class="modal-sub flex flex-wrap items-center gap-2">${esc(a.uploaderName)} <span class="stamp-mini is-in" title="Eingang">Eingang ${esc(fmtDate(a.createdAt))}</span>${a.internal ? '<span class="stamp-mini">Vertraulich</span>' : ''}</p>
+        ${evMetaLine(a) ? `<p class="modal-sub">${evMetaLine(a)}</p>` : ''}${evDetails(a)}
+        <div class="lb-zoom${from ? ' is-flying' : ''}"><img class="lightbox-img" src="${esc(a.url)}" alt="${esc(a.caption)}"><div class="lb-lens" aria-hidden="true"></div></div>
+        <p class="lb-hint">Zum Vergrößern mit der Maus über das Bild fahren – am Handy mit zwei Fingern oder doppelt tippen.</p>
+        <div class="form-actions">
+          <button class="btn-outline btn-md" data-action="back-to-case">${icon('chevronLeft', 'ico-sm')}<span>Zurück zur Akte</span></button>
+          ${linked ? `<button class="btn-ghost btn-md" data-action="open-case" data-id="${a.caseId}">${icon('folder', 'ico-sm')}<span>Akte ${esc(a.caseNumber)} öffnen</span></button>` : ''}
+          <a class="btn-ghost btn-md" href="${esc(a.url)}" download>${icon('download', 'ico-sm')}<span>Herunterladen</span></a>
+          ${!linked && isStaff() && st.caseInfo && st.caseInfo.canEdit ? `<button class="btn-ghost btn-md" data-action="ev-edit-box" data-id="${a.id}">${icon('edit', 'ico-sm')}<span>Beschreiben</span></button>` : ''}
+          ${!linked && isStaff() ? `<button class="btn-ghost btn-md" data-action="redact-open" data-index="${index}">${icon('edit', 'ico-sm')}<span>Schwärzen</span></button>` : ''}
+          ${canDelete ? `<button class="btn-danger btn-md" data-action="att-delete" data-id="${a.id}" data-case-id="${caseId}">${icon('trash', 'ico-sm')}<span>Löschen</span></button>` : ''}
+        </div>`,
+      { wide: true }
+    );
+    lightboxEnter(from);
+  },
+  'redact-open': (el) => redactOpen(Number(el.dataset.index)),
+  'redact-undo': () => {
+    redact.boxes.pop();
+    redactDraw();
+  },
+  'redact-save': async () => {
+    const r = redact;
+    if (!r.boxes.length) throw new Error('Bitte zuerst mindestens eine Stelle schwärzen (mit der Maus bzw. dem Finger ein Rechteck ziehen).');
+    const blob = await new Promise((res) => r.canvas.toBlob(res, 'image/jpeg', 0.9));
+    const caption = `${r.att.caption || `B${r.att.no}`} (geschwärzt)`.slice(0, 200);
+    const internal = $('#redactInternal') && $('#redactInternal').checked ? '1' : '0';
+    await api.upload(`/api/cases/${r.caseId}/attachments?caption=${encodeURIComponent(caption)}&internal=${internal}`, blob);
+    toast('Geschwärzte Kopie gespeichert – das Original bleibt unverändert.');
+    st.returnCase = r.caseId;
+    await returnOrClose();
+  },
+  'att-delete': async (el) => {
+    if (!(await askDelete('Anhang löschen?', 'Das Bild wird endgültig aus der Akte gelöscht.'))) return;
+    await api.del(`/api/cases/${el.dataset.caseId}/attachments/${el.dataset.id}`);
+    toast('Anhang gelöscht.');
+    await returnOrClose();
+  },
+
+  // FiveNet-Dokumente
+  'fn-add': async () => {
+    if (!st.caseInfo) return;
+    st.returnCase = st.caseInfo.id;
+    await load.fivenet();
+    resetPending();
+    openModal(externalForm('fivenet', null, st.caseInfo));
+    // Übergabe aus dem FiveNet-Skript: Bilder vormerken, Dokument-ID prüfen lassen
+    if (st.fnPrefill) {
+      if (st.fnPrefill.imageUrls.length) addPendingImages({ urls: st.fnPrefill.imageUrls, meta: st.fnPrefill.imageMeta || {} });
+      st.fnPending.seq = st.fnPrefill.imageSeq || 0;
+      const input = $('#fnInput');
+      if (input && input.value) checkFivenetInput(input);
+      st.fnPrefill = null;
+    }
+  },
+  // Übergabe aus dem FiveNet-Skript: gewählte Akte öffnen, dann das vorbelegte Formular
+  'fn-import-case': async (el) => {
+    const pre = st.fnImport;
+    if (!pre) return;
+    st.fnImport = null;
+    await openCase(Number(el.dataset.id));
+    st.fnPrefill = pre;
+    await actions['fn-add']();
+  },
+  'contract-new': async (el) => {
+    if (!st.caseInfo) return;
+    const c = st.caseInfo;
+    st.returnCase = c.id;
+    const [{ templates: all }, defaults] = await Promise.all([api.get('/api/contract-templates'), api.get(`/api/cases/${c.id}/contracts/defaults`), load.lawyers(), load.fees()]);
+    const templates = all.filter((t) => t.kind !== 'schriftsatz');
+    if (!templates.length) throw new Error('Es gibt keine aktive Vertragsvorlage. Das Board of Partners kann sie im Kanzlei-Wiki unter „Verträge & Schriftsätze“ anlegen.');
+    openModal(contractForm(c, { templates, defaults }));
+  },
+  'brief-new': async () => {
+    if (!st.caseInfo) return;
+    const c = st.caseInfo;
+    st.returnCase = c.id;
+    const [{ templates: all }, defaults] = await Promise.all([api.get('/api/contract-templates'), api.get(`/api/cases/${c.id}/contracts/defaults`), load.lawyers()]);
+    st.briefTemplates = all.filter((t) => t.kind === 'schriftsatz');
+    if (!st.briefTemplates.length) throw new Error('Es gibt keine aktive Schriftsatz-Vorlage. Das Board of Partners kann sie im Kanzlei-Wiki unter „Verträge & Schriftsätze“ anlegen (Art „Schriftsatz“).');
+    openModal(briefForm(c, { templates: st.briefTemplates, defaults }));
+    syncBriefForm($('form[data-form="brief-new"]'));
+  },
+  // FiveNet-Dokument der Akte als Aktenzeichen übernehmen („DOC - 74412“)
+  'brief-fivenet': (el) => {
+    const input = $('#bf_fivenet_az');
+    if (!input) return;
+    input.value = el.dataset.ref;
+    input.focus();
+  },
+  'brief-edit': async (el) => {
+    const k = (st.caseContracts || []).find((x) => x.id === Number(el.dataset.id));
+    if (!k || !st.caseInfo) return;
+    st.returnCase = st.caseInfo.id;
+    const [full, defaults] = await Promise.all([api.get(`/api/contracts/${k.id}`), api.get(`/api/cases/${st.caseInfo.id}/contracts/defaults`), load.lawyers()]);
+    k.body = full.contract.body;
+    openModal(briefForm(st.caseInfo, { templates: [], defaults, k }));
+    syncBriefForm($('form[data-form="brief-edit"]'));
+  },
+  'brief-visibility': async (el) => {
+    const k = (st.caseContracts || []).find((x) => x.id === Number(el.dataset.id));
+    if (!k) return;
+    if (k.internal && !(await ask(`„${k.templateName}“ wird im Mandantenportal sichtbar, und im Ticket erscheint ein Hinweis.`, { title: 'Für den Mandanten freigeben?', confirmText: 'Freigeben' }))) return;
+    await api.patch(`/api/contracts/${k.id}`, { internal: !k.internal });
+    toast(k.internal ? 'Für den Mandanten freigegeben.' : 'Nur noch für die Kanzlei sichtbar.');
+    await reloadCase(Number(el.dataset.caseId));
+  },
+  'contract-edit': async (el) => {
+    const k = (st.caseContracts || []).find((x) => x.id === Number(el.dataset.id));
+    if (!k || !st.caseInfo) return;
+    st.returnCase = st.caseInfo.id;
+    const [defaults] = await Promise.all([api.get(`/api/cases/${st.caseInfo.id}/contracts/defaults`), load.lawyers(), load.fees()]);
+    openModal(contractForm(st.caseInfo, { templates: [], defaults, k }));
+  },
+  // Fertigen Schriftsatz ins Prozessticket (DOJ-Kanal): Bot postet – oder Text kopieren und Kanal öffnen
+  'brief-to-process': async (el) => {
+    const r = await api.post(`/api/contracts/${el.dataset.id}/process-ticket`);
+    if (r.posted) return toast('Im Prozessticket eingereicht – mit Dokument-Link.');
+    await window.PS.copy(r.text);
+    window.open(r.channelUrl, '_blank', 'noopener');
+    toast('Der Bot ist nicht auf diesem Discord – Text mit Dokument-Link kopiert. Im Prozessticket einfach einfügen (Strg+V).');
+  },
+  'contract-record': async (el) => {
+    const k = (st.caseContracts || []).find((x) => x.id === Number(el.dataset.id));
+    if (!k) return;
+    if (!(await ask(`Bitte nur bestätigen, wenn ${k.data.mandant || 'der Mandant'} ${k.kind === 'schriftsatz' ? 'das Dokument' : 'den Vertrag'} im Spiel tatsächlich unterschrieben hat. Die Erfassung wird mit Ihrem Namen im Aktenverlauf vermerkt.`, { title: 'Unterschrift des Mandanten erfassen?', confirmText: 'Erfassen' }))) return;
+    const r = await api.post(`/api/contracts/${k.id}/sign`, { as: 'erfassen' });
+    toast('Unterschrift des Mandanten erfasst.');
+    await reloadCase(Number(el.dataset.caseId));
+  },
+  'contract-delete': async (el) => {
+    const k = (st.caseContracts || []).find((x) => x.id === Number(el.dataset.id));
+    if (!k) return;
+    const signedMsg =
+      k.kind === 'schriftsatz'
+        ? 'Das Dokument ist bereits unterschrieben. Es wird endgültig entfernt; im Aktenverlauf bleibt ein Vermerk.'
+        : 'Der Vertrag ist bereits unterschrieben. Er wird endgültig entfernt; im Aktenverlauf bleibt ein Vermerk.';
+    if (!(await askDelete(`${k.templateName} löschen?`, k.locked ? signedMsg : 'Der Entwurf wird entfernt.', 'Löschen'))) return;
+    await api.del(`/api/contracts/${k.id}`);
+    toast(k.kind === 'schriftsatz' ? 'Schriftsatz gelöscht.' : 'Vertrag gelöscht.');
+    await reloadCase(Number(el.dataset.caseId));
+  },
+  'gd-add': async (el) => {
+    if (!st.caseInfo) return;
+    st.returnCase = st.caseInfo.id;
+    await load.fivenet(); // Vorschläge für Dokumentarten
+    resetPending();
+    openModal(externalForm(el.dataset.provider === 'gsheets' ? 'gsheets' : 'gdocs', null, st.caseInfo));
+  },
+  'fn-edit': async (el) => {
+    const d = st.caseDocs.find((x) => x.id === Number(el.dataset.id));
+    if (!d || !st.caseInfo) return;
+    st.returnCase = st.caseInfo.id;
+    await load.fivenet();
+    resetPending();
+    openModal(externalForm(EXT[d.provider] ? d.provider : 'fivenet', d, st.caseInfo));
+    if (el.dataset.focus) {
+      const target = $('#' + el.dataset.focus);
+      target?.scrollIntoView({ block: 'center' });
+      target?.focus();
+    }
+    if (el.dataset.reload && extOf(d).google) await loadGoogleDoc(d.url, { replace: true });
+  },
+  'gd-reload': (el) => loadGoogleDoc(el.dataset.url, { replace: true }),
+  'fn-img-remove': (el) => {
+    const i = Number(el.dataset.index);
+    if (el.dataset.kind === 'url') st.fnPending.urls.splice(i, 1);
+    else st.fnPending.blobs.splice(i, 1);
+    renderPending();
+  },
+  'fn-copy-text': async (el) => {
+    const d = st.caseDocs.find((x) => x.id === Number(el.dataset.id));
+    if (!d) return;
+    const ok = await copy(PS.transcriptPlain(d.contentText));
+    toast(ok ? 'Abschrift kopiert.' : 'Kopieren nicht möglich.', ok ? 'ok' : 'error');
+  },
+  'fn-delete': async (el) => {
+    const d = st.caseDocs.find((x) => x.id === Number(el.dataset.id));
+    if (!d || !(await askDelete('Verknüpfung entfernen?', `${extOf(d).noun}${d.title ? ` „${d.title}“` : ''} wird aus der Akte entfernt. Das Original bleibt unverändert, übernommene Bilder bleiben als Beweismittel in der Akte.`, 'Entfernen'))) return;
+    const caseId = Number(el.dataset.caseId);
+    await api.del(extUrl(caseId, d.id));
+    toast('Verknüpfung entfernt.');
+    await reloadCase(caseId);
+  },
+  'fn-cite': async (el) => {
+    const d = st.caseDocs.find((x) => x.id === Number(el.dataset.id));
+    if (!d) return;
+    const ok = await copy(externalCitation(d));
+    toast(ok ? 'Zitat kopiert – z. B. für Schriftsätze oder Nachrichten.' : 'Kopieren nicht möglich.', ok ? 'ok' : 'error');
+  },
+  'fn-check': async () => {
+    const box = $('#fnCheckResult');
+    if (box) box.innerHTML = '<span class="text-dim">Prüfe …</span>';
+    const r = await api.post('/api/fivenet/check');
+    if (!box || !box.isConnected) return;
+    box.innerHTML = r.result.reachable
+      ? `<span class="text-emerald-300">✓ ${esc(r.instance.host)} ist erreichbar – FiveNet ${esc(r.result.version)}</span>`
+      : `<span class="text-amber-300">${esc(r.instance.host)} antwortet nicht wie erwartet (${esc(r.result.detail || 'unbekannt')}). Verknüpfen funktioniert trotzdem – die Kanzlei ruft FiveNet dafür nicht auf.</span>`;
+  },
+});

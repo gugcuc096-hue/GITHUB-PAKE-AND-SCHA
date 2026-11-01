@@ -10,7 +10,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
 const { startServer, client, TEAM } = require('./helpers');
-const contracts = require('../contracts');
+const contracts = require('../server/domain/contracts');
 
 const FIVENET = 'https://fivenet.modernv.net';
 
