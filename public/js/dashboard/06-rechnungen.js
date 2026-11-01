@@ -69,7 +69,7 @@ function invoiceTable(rows) {
           <td class="td-main"><div class="font-mono text-gold text-sm nowrap">${docTitleLink(`/rechnung?id=${i.id}`, esc(i.number))}</div><div class="text-xs text-dim">${esc(invKind(i))}${i.subject ? ' · ' + esc(i.subject) : ''}</div></td>
           <td data-label="Empfänger">${staff && i.clientKey ? clientLink(i.clientKey, i.clientName) : esc(i.clientName)}</td>
           <td data-label="Akte" class="nowrap">${i.caseNumber ? `<button class="text-gold font-mono text-xs hover:underline" data-action="open-case" data-id="${i.caseId}">${esc(i.caseNumber)}</button>` : '—'}</td>
-          <td data-label="Betrag" class="font-mono nowrap" style="text-align:right">${money(i.total)}</td>
+          <td data-label="Betrag" class="num nowrap" style="text-align:right">${money(i.total)}</td>
           <td data-label="Status">${invoiceBadge(i, true)}${staff && paymentReported(i) && i.paymentReport.note ? `<div class="text-xs text-dim pay-note">„${esc(i.paymentReport.note)}“</div>` : ''}</td>
           <td data-label="Datum" class="text-xs text-dim nowrap"><div><span title="${esc(fmtDate(i.createdAt))}">${esc(parseDate(i.createdAt)?.toLocaleDateString('de-DE') || '—')}</span>${i.dueDate && i.status === 'offen' ? `<div${i.overdueDays > 0 ? ` class="text-red-300" title="${esc(overdueText(i))}"` : ''}>fällig ${esc(fmtDateOnly(i.dueDate))}</div>` : ''}</div></td>
           <td class="td-actions inv-actions">
@@ -238,7 +238,7 @@ function itemRowHtml(it, i) {
   return `<div class="item-row">
       <input class="field item-desc" data-item="description" data-index="${i}" value="${esc(it.description)}" placeholder="Leistung / Beschreibung" maxlength="200" aria-label="Leistung">
       <input class="field item-qty" data-item="quantity" data-index="${i}" type="number" inputmode="numeric" min="1" max="999" step="1" value="${esc(it.quantity)}" aria-label="Menge">
-      <input class="field item-price" data-item="unitPrice" data-index="${i}" type="number" inputmode="numeric" min="0" step="1" value="${esc(it.unitPrice)}" aria-label="Einzelpreis in Dollar">
+      <input class="field item-price" data-money data-item="unitPrice" data-index="${i}" type="number" inputmode="numeric" min="0" step="1" value="${esc(it.unitPrice)}" aria-label="Einzelpreis in Dollar">
       <div class="item-total" data-item-total="${i}" data-count="inv:item:${i}">${money((Number(it.quantity) || 0) * (Number(it.unitPrice) || 0))}</div>
       <button type="button" class="icon-btn sm item-remove" data-action="inv-remove-item" data-index="${i}" aria-label="Position entfernen">${icon('x', 'ico-sm')}</button></div>`;
 }
@@ -839,7 +839,7 @@ function clientCard(d) {
         .map(
           (i) => `<div class="list-row wrap inv-row"><div class="main"><div class="title">${docTitleLink(`/rechnung?id=${i.id}`, esc(i.number), 'font-mono text-gold')} · ${esc(invKind(i))}</div>
               <div class="meta">${esc(fmtDate(i.createdAt))}${i.caseNumber ? ` · Akte ${esc(i.caseNumber)}` : ''}</div></div>
-            <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end"><span class="font-mono nowrap">${money(i.total)}</span>${invoiceBadge(i)}${openDoc(i.googleDoc, `/rechnung?id=${i.id}`, 'Ansehen')}</div></div>`
+            <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end"><span class="num nowrap">${money(i.total)}</span>${invoiceBadge(i)}${openDoc(i.googleDoc, `/rechnung?id=${i.id}`, 'Ansehen')}</div></div>`
         )
         .join('')}</div>`
     : emptySection('', 'Rechnungen & Honorare', 'keine');

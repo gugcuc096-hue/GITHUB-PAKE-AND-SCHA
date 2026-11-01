@@ -56,14 +56,20 @@ const url = z
   .refine((v) => v === '' || /^(https?:\/\/[^\s]+|\/[^\s]*|#[^\s]*|mailto:[^\s]+)$/i.test(v), 'Bitte eine Adresse mit https:// (oder /pfad) angeben.');
 const day = z.string().trim().refine((v) => v === '' || /^\d{4}-\d{2}-\d{2}$/.test(v), 'Datum als JJJJ-MM-TT.');
 
+const BANNER_STYLES = ['edel', 'dezent', 'hinweis', 'dringend', 'feierlich'];
+
 const SPECS = {
   banner: {
     perm: 'site.edit',
     label: 'Banner',
     schema: z.object({
       enabled: z.boolean(),
+      title: z.string().trim().max(80).default(''), // fette Zeile vorne (Schrift der Überschriften)
       text: z.string().trim().max(240),
       tone: z.enum(['gold', 'sky', 'amber', 'red', 'green', 'glass', 'night']),
+      style: z.enum(BANNER_STYLES).default('edel'), // Aufmachung: edel, dezent, hinweis, dringend, feierlich
+      // Weitere Meldungen, die sich mit der ersten abwechseln (bis zu drei insgesamt)
+      slides: z.array(z.object({ title: z.string().trim().max(80).default(''), text: z.string().trim().min(1).max(240), icon: z.string().trim().max(8).default(''), link: url, linkLabel: z.string().trim().max(40).default('') })).max(2).default([]),
       icon: z.string().trim().max(8).default(''), // Emoji vor dem Text, z. B. 🎃
       countdown: z.boolean().default(false), // Countdown bis zum Ende (Datum „bis“)
       link: url,
@@ -73,7 +79,7 @@ const SPECS = {
       audience: z.array(z.enum(['public', 'mandant', 'staff'])).max(3),
       dismissible: z.boolean(),
     }),
-    defaults: { enabled: false, text: '', tone: 'gold', icon: '', countdown: false, link: '', linkLabel: '', from: '', to: '', audience: ['public', 'mandant', 'staff'], dismissible: true },
+    defaults: { enabled: false, title: '', text: '', tone: 'gold', style: 'edel', slides: [], icon: '', countdown: false, link: '', linkLabel: '', from: '', to: '', audience: ['public', 'mandant', 'staff'], dismissible: true },
   },
   style: {
     perm: 'site.edit',
@@ -214,9 +220,14 @@ function activeBanner(user, source = get('banner')) {
   if (b.to && today > b.to) return null;
   if (!b.audience.includes(audienceOf(user))) return null;
   // Kennung: ändert sich der Text, erscheint ein weggeklicktes Banner wieder
-  const id = require('crypto').createHash('sha1').update(`${b.text}|${b.link}|${b.tone}`).digest('hex').slice(0, 10);
+  const slides = [{ title: b.title || '', text: b.text, icon: b.icon || '', link: b.link, linkLabel: b.linkLabel }, ...(b.slides || [])];
+  const id = require('crypto')
+    .createHash('sha1')
+    .update(`${slides.map((x) => `${x.title}|${x.text}|${x.link}`).join('||')}|${b.tone}|${b.style || 'edel'}`)
+    .digest('hex')
+    .slice(0, 10);
   const endsAt = b.countdown && b.to ? require('../domain/promotions').berlinEndOfDay(b.to) : null;
-  return { id, text: b.text, tone: b.tone, icon: b.icon || '', endsAt, link: b.link, linkLabel: b.linkLabel, dismissible: b.dismissible };
+  return { id, title: b.title || '', text: b.text, tone: b.tone, style: b.style || 'edel', icon: b.icon || '', endsAt, link: b.link, linkLabel: b.linkLabel, dismissible: b.dismissible, slides };
 }
 /** Aktionsbanner: kündigt eine laufende Rabattaktion mit Countdown an (für alle außer der Kanzlei selbst). */
 function promoBanner(user, promo) {
@@ -242,4 +253,4 @@ function publicPayload(user, { draft = false } = {}) {
   return { banner: activeBanner(user, pick('banner')), promo, promoBanner: promoBanner(user, promo), home: pick('home'), labels: labelsPayload(pick('labels')), style, season: require('../domain/promotions').season(style.season), draft };
 }
 
-module.exports = { PRESETS, FONTS, SPECS, KEYS, SECTIONS, SECTION_IDS, TERMS, MESSAGE_KEYS, get, getDraft, hasDraft, getForEdit, saveDraft, discardDraft, publish, setPublished, activeBanner, labelsPayload, publicPayload };
+module.exports = { BANNER_STYLES, PRESETS, FONTS, SPECS, KEYS, SECTIONS, SECTION_IDS, TERMS, MESSAGE_KEYS, get, getDraft, hasDraft, getForEdit, saveDraft, discardDraft, publish, setPublished, activeBanner, labelsPayload, publicPayload };

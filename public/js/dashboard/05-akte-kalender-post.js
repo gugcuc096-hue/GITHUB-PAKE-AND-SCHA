@@ -574,7 +574,7 @@ function closeCaseHtml(data) {
         ${
           sent && sent.estimateHe != null
             ? `<div><div class="label">Tatsächliches Strafmaß <span class="text-dim font-normal normal-case tracking-normal">– optional, für den Vergleich mit eurer Einschätzung (${esc(String(sent.estimateHe))} HE${sent.estimateFine ? ` · ${esc(money(sent.estimateFine))}` : ''})</span></div>
-          <div class="chg-est-row"><label class="chg-est"><span class="chg-est-k">Haftstrafe <b>HE</b></span><input type="number" name="actualHe" min="0" max="100000" class="field" placeholder="—" value="${sent.actualHe ?? ''}" aria-label="Tatsächliche Haftstrafe in Hafteinheiten"></label><label class="chg-est"><span class="chg-est-k">Geldstrafe <b>$</b></span><input type="number" name="actualFine" min="0" max="100000000" class="field" placeholder="—" value="${sent.actualFine ?? ''}" aria-label="Tatsächliche Geldstrafe"></label></div>
+          <div class="chg-est-row"><label class="chg-est"><span class="chg-est-k">Haftstrafe <b>HE</b></span><input type="number" name="actualHe" min="0" max="100000" class="field" placeholder="—" value="${sent.actualHe ?? ''}" aria-label="Tatsächliche Haftstrafe in Hafteinheiten"></label><label class="chg-est"><span class="chg-est-k">Geldstrafe <b>$</b></span><input type="number" name="actualFine" data-money min="0" max="100000000" class="field" placeholder="—" value="${sent.actualFine ?? ''}" aria-label="Tatsächliche Geldstrafe"></label></div>
           <p class="form-hint">Nur intern – die Statistik zeigt, wie gut die Einschätzung getroffen hat.</p></div>`
             : ''
         }
@@ -1056,7 +1056,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
               ? `<a class="icon-btn sm" href="${esc(gd)}" target="_blank" rel="noopener noreferrer" aria-label="Google Doc öffnen" title="Google Doc öffnen">${icon('doc', 'ico-sm')}</a>`
               : `<a class="icon-btn sm" href="/rechnung?id=${i.id}" target="_blank" rel="noopener" aria-label="Ansehen" title="Ansehen">${icon('eye', 'ico-sm')}</a>`;
             return `<div class="list-row wrap inv-row"><div class="main"><div class="title">${docTitleLink(`/rechnung?id=${i.id}`, esc(i.number), 'font-mono text-gold')} · ${esc(invKind(i))}</div><div class="meta">${esc(fmtDate(i.createdAt))} · ${esc(i.issuerName)}</div></div>
-            <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end"><span class="font-mono nowrap">${money(i.total)}</span>${invoiceBadge(i)}${open}</div>${
+            <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end"><span class="num nowrap">${money(i.total)}</span>${invoiceBadge(i)}${open}</div>${
               paymentButtons(i) ? `<div class="inv-pay-row">${paymentButtons(i)}</div>` : ''
             }</div>`;
           }

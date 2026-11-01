@@ -17,7 +17,6 @@ const PAGE_ACTIONS = {
     'concern-close': () => window.closeConcernModal(),
     faq: (el) => toggleFaq(el),
     category: (el) => setCategory(el.dataset.cat),
-    'copy-email': () => copyEmail(),
     top: () => window.scrollTo({ top: 0, behavior: 'smooth' }),
 };
 document.querySelectorAll('[data-act]').forEach((el) => {
@@ -249,7 +248,7 @@ function calculateTotal() {
             subtotal += price;
             const li = document.createElement('li');
             li.className = 'flex justify-between items-center text-white border-b border-slate-800 pb-1';
-            li.innerHTML = `<span>${name}</span><span class="font-mono text-[var(--gold-500)]">${price.toLocaleString('de-DE')} $</span>`;
+            li.innerHTML = `<span>${name}</span><span class="num text-[var(--gold-500)]">${price.toLocaleString('de-DE')} $</span>`;
             listElement.appendChild(li);
         });
     }
@@ -324,23 +323,6 @@ function toggleFaq(item) {
 
 /* ---------- Mandantenstimmen: Karussell und echte Bewertungen siehe js/site.js ---------- */
 
-/* ---------- Copy Email ---------- */
-function copyEmail() {
-    const btn = document.getElementById('emailCopyBtn');
-    const email = btn.dataset.email || 'kontakt@pake-scha.ls';
-    const done = () => {
-        btn.textContent = 'E-Mail kopiert ✓';
-        btn.classList.add('copied');
-        showToast('Kopiert', 'Die E-Mail-Adresse wurde in die Zwischenablage übernommen.');
-        setTimeout(() => { btn.textContent = `${email} kopieren`; btn.classList.remove('copied'); }, 2500);
-    };
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(email).then(done).catch(() => { window.location.href = 'mailto:' + email; });
-    } else {
-        window.location.href = 'mailto:' + email;
-    }
-}
-
 /* ---------- Team & Honorarordnung lädt /js/site.js live aus der Datenbank ---------- */
 document.getElementById('footerYear').textContent = new Date().getFullYear();
 
@@ -356,25 +338,7 @@ function updateClock() {
 updateClock();
 setInterval(updateClock, 1000);
 
-/* ---------- Scrollspy Navigation ---------- */
-// Abschnitte kommen aus den Menüpunkten selbst (data-section) – unabhängig von der Reihenfolge auf der Seite.
-// Markiert wird der Menüpunkt des Abschnitts, in dem man gerade liest; ganz unten der letzte (Kontakt).
-const navLinks = document.querySelectorAll('.nav-link[data-section]');
-const spySections = [...navLinks].map(link => document.getElementById(link.dataset.section)).filter(Boolean);
-function updateScrollspy() {
-    const y = window.scrollY + 140;
-    const tops = spySections.map(el => ({ id: el.id, top: el.getBoundingClientRect().top + window.scrollY }));
-    let current = null;
-    let best = -Infinity;
-    tops.forEach(s => {
-        if (s.top <= y && s.top > best) { best = s.top; current = s.id; }
-    });
-    const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
-    if (atBottom && tops.length) current = tops.reduce((a, b) => (b.top > a.top ? b : a)).id;
-    navLinks.forEach(link => {
-        link.classList.toggle('nav-active', link.dataset.section === current);
-    });
-}
+/* ---------- Scrollspy Navigation: goldener Strich unter dem Menüpunkt siehe js/motion.js (nav[data-ink]) ---------- */
 
 /* ---------- Reveal on Scroll ---------- */
 const revealObserver = new IntersectionObserver((entries) => {
@@ -389,7 +353,6 @@ document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
 
 /* ---------- Back to top + Scrollspy on scroll ---------- */
 window.addEventListener('scroll', () => {
-    updateScrollspy();
     document.getElementById('backToTop').classList.toggle('show', window.scrollY > 600);
     syncMobileCta();
 });
@@ -398,7 +361,3 @@ function syncMobileCta() {
     const menuOpen = document.getElementById('mobileMenu').classList.contains('open');
     document.getElementById('mobileCta').classList.toggle('show', window.scrollY > 600 && !menuOpen);
 }
-// Team, Honorarordnung & Co. werden nachgeladen und verschieben die Abschnitte
-window.addEventListener('load', updateScrollspy);
-window.addEventListener('resize', updateScrollspy);
-updateScrollspy();

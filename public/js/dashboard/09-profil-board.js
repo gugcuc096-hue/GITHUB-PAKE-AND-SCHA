@@ -317,7 +317,7 @@ function tierForm(t = null) {
       <form data-form="tier" ${t ? `data-id="${t.id}"` : ''} class="form-grid cols-2">
         <div><label class="label">Name</label><input name="name" class="field" required minlength="2" maxlength="60" value="${esc(t ? t.name : '')}" placeholder="z. B. VIP Gold" autofocus></div>
         <div><label class="label">Art</label><select name="kind" class="field" id="tierKind">${opt('vip', 'VIP (auf Zeit)', kind === 'vip')}${opt('perma', 'Lifetime (unbefristet)', kind === 'perma')}</select></div>
-        <div><label class="label">Preis ($)</label><input name="price" type="number" inputmode="numeric" min="0" step="1000" class="field" required value="${esc(t ? t.price : 250000)}"></div>
+        <div><label class="label">Preis ($)</label><input name="price" data-money type="number" inputmode="numeric" min="0" step="1000" class="field" required value="${esc(t ? t.price : 250000)}"></div>
         <div><label class="label">Rabatt auf alle Leistungen (%)</label><input name="discountPct" type="number" inputmode="decimal" min="0" max="100" step="0.5" class="field" required value="${esc(t ? t.discountPct : 15)}"></div>
         <div id="tierDuration" ${kind === 'perma' ? 'class="hidden"' : ''}><label class="label">Laufzeit (Tage)</label><input name="durationDays" type="number" inputmode="numeric" min="1" max="3650" class="field" value="${esc(t && t.durationDays ? t.durationDays : 30)}"></div>
         <div class="flex items-end"><label class="check"><input type="checkbox" name="active" ${!t || t.active ? 'checked' : ''}> Aktiv (kann vergeben werden)</label></div>
@@ -373,7 +373,7 @@ function offerCardHtml(t, busy) {
   return `<div class="panel panel-pad flex flex-col" style="border-top:2px solid ${life ? 'var(--gold-500)' : 'rgba(56,189,248,.6)'}">
       <div class="flex items-center justify-between mb-3">${memberBadge({ kind: t.kind, name: life ? 'Lifetime' : 'VIP' })}<span class="text-xs text-dim font-mono">${life ? 'unbefristet' : `${t.durationDays} Tage`}</span></div>
       <h3 class="font-serif text-2xl font-semibold">${esc(t.name)}</h3>
-      <div class="font-mono text-2xl text-gold font-semibold mt-1">${money(t.price)}</div>
+      <div class="num text-2xl text-gold font-semibold mt-1">${money(t.price)}</div>
       <div class="text-xs text-dim mb-3">${life ? 'einmalig · gilt unbefristet' : `für ${t.durationDays} Tage · verlängerbar`}</div>
       <div class="text-sm font-semibold mb-2" style="color:var(--gold-light)">${fmtPct(t.discountPct)} % Rabatt auf alle Leistungen</div>
       ${t.benefits ? `<p class="text-sm text-muted whitespace-pre-line mb-4" style="flex:1">${esc(t.benefits)}</p>` : '<div style="flex:1"></div>'}

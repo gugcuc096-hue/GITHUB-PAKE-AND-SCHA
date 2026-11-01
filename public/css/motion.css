@@ -177,10 +177,6 @@ html.ps-leaving body { opacity: 0; transform: scale(0.993); transition: opacity 
 .site-banner.tone-green { --sb: 52, 211, 153; --sb-ink: #a7f3d0; }
 .site-banner.tone-glass { --sb: 255, 255, 255; --sb-ink: #e2e8f0; }
 .site-banner.tone-night { --sb: 129, 140, 248; --sb-ink: #c7d2fe; }
-/* Gold (Standard) bleibt die kräftige Variante wie bisher, nur mit Glanz */
-.site-banner.tone-gold { color: #02050e; background: linear-gradient(90deg, var(--gold-600), var(--gold-light) 50%, var(--gold-600)); border-bottom-color: rgba(0, 0, 0, 0.2); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 10px 30px -18px rgba(var(--accent-rgb), 0.9); }
-.site-banner.tone-gold::after { display: none; }
-.site-banner.tone-gold .sb-shine { background-image: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.45) 48%, transparent 60%); }
 /* Aktionen: Farben des Anlasses */
 .site-banner.is-leaving { opacity: 0; transform: translateY(-6px); }
 .site-banner-text { font-weight: 600; letter-spacing: 0.005em; text-wrap: balance; }
@@ -193,8 +189,6 @@ html.ps-leaving body { opacity: 0; transform: scale(0.993); transition: opacity 
 .sb-count i { display: block; font-style: normal; font-size: 0.5rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.65; line-height: 1.2; }
 .sb-count b.flip { animation: sb-flip 0.42s cubic-bezier(0.2, 0.8, 0.2, 1); }
 @keyframes sb-flip { from { transform: translateY(-70%); opacity: 0; filter: blur(2px); } to { transform: none; opacity: 1; filter: none; } }
-.tone-gold .sb-count { color: #02050e; }
-.tone-gold .sb-count .cd-u { background: rgba(255, 255, 255, 0.4); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12); }
 
 /* Aktionsbanner: Polarlicht in den Farben des Anlasses (--o1/--o2), Ticket mit Prozent, Titel und Zeile, Knopf */
 .site-banner.is-promo {
@@ -290,14 +284,85 @@ body:has(#sidebar) .promo-dock.is-on { translate: 0 0; }
 .site-banner-link:hover { background: rgba(var(--sb), 0.3); transform: translateY(-1px); }
 .site-banner-link span { transition: transform 0.2s ease; }
 .site-banner-link:hover span { transform: translateX(3px); }
-.tone-gold .site-banner-link { background: rgba(0, 0, 0, 0.12); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25); }
 .site-banner-x { position: absolute; right: 0.55rem; top: 50%; transform: translateY(-50%); width: 1.9rem; height: 1.9rem; display: grid; place-items: center; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.08); color: inherit; font-size: 1.15rem; line-height: 1; cursor: pointer; transition: background 0.2s ease, transform 0.2s ease; }
 .site-banner-x:hover { background: rgba(255, 255, 255, 0.18); transform: translateY(-50%) rotate(90deg); }
-.tone-gold .site-banner-x { background: rgba(0, 0, 0, 0.12); }
 .site-banner + .site-banner { border-top: 0; }
 @media (max-width: 640px) { .site-banner { font-size: 0.8rem; gap: 0.35rem 0.6rem; padding-right: 2.6rem; } }
 @keyframes ps-banner-in { from { opacity: 0; transform: translateY(-100%); } to { opacity: 1; transform: none; } }
-.dash-banner { margin: 0.75rem 1rem 0; border-radius: 14px; overflow: hidden; border: 1px solid rgba(var(--sb), 0.4); }
+
+/*
+ * Banner als Siegel-Leiste (alle Töne, auch Gold): dunkles Glas, feine Lichtkanten oben und unten in der Tonfarbe,
+ * Symbol im Siegelkreis, Titel in der Überschriften-Schrift + Zeile, Knopf rechts. Aufmachungen: edel (Standard),
+ * dezent, hinweis, dringend, feierlich. Mehrere Meldungen blenden weich ineinander (Punkte zum Weiterschalten).
+ */
+.site-banner:not(.is-promo) {
+  display: block; padding: 0; text-align: left; color: #e8edf7;
+  background:
+    radial-gradient(70% 240% at 0% 50%, rgba(var(--sb), 0.16), transparent 60%),
+    radial-gradient(50% 240% at 100% 50%, rgba(var(--sb), 0.08), transparent 60%),
+    linear-gradient(180deg, rgba(15, 21, 42, 0.93), rgba(7, 11, 24, 0.95));
+  border-bottom: 0; box-shadow: 0 14px 32px -24px rgba(var(--sb), 0.95);
+}
+.site-banner:not(.is-promo)::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(var(--sb), 0.55), transparent); z-index: -1; }
+.site-banner.tone-gold { --sb-ink: var(--gold-light, #f3e5ab); }
+.sb-inner { position: relative; display: flex; align-items: center; gap: 0.75rem 1.25rem; width: 100%; max-width: 1180px; min-height: 3.4rem; margin: 0 auto; padding: 0.6rem 3.4rem 0.6rem 1.25rem; }
+.sb-stage { position: relative; display: grid; flex: 1 1 auto; min-width: 0; }
+.sb-slide { grid-area: 1 / 1; display: flex; align-items: center; gap: 0.85rem; min-width: 0; transition: opacity 0.55s var(--m-ease, ease), transform 0.55s var(--m-ease, ease), filter 0.55s ease, visibility 0s; }
+.sb-slide:not(.is-on) { opacity: 0; transform: translateY(10px); filter: blur(4px); visibility: hidden; pointer-events: none; transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease, visibility 0s 0.4s; }
+.sb-seal { position: relative; flex: none; display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: 50%; color: var(--sb-ink); background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.16), rgba(var(--sb), 0.2) 60%, rgba(var(--sb), 0.06)); box-shadow: inset 0 0 0 1px rgba(var(--sb), 0.55), 0 0 20px -6px rgba(var(--sb), 0.9); }
+.sb-seal::after { content: ''; position: absolute; inset: -4px; border-radius: inherit; border: 1px dashed rgba(var(--sb), 0.35); animation: sb-spin 30s linear infinite; }
+@keyframes sb-spin { to { transform: rotate(360deg); } }
+.sb-seal .sb-icon { font-size: 1.05rem; filter: none; }
+.site-banner:not(.is-promo) .sb-copy { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.1rem 0.65rem; flex: 1 1 auto; min-width: 0; line-height: 1.3; }
+.site-banner:not(.is-promo) .sb-title { font-family: var(--font-display, 'Cormorant Garamond', Georgia, serif); font-size: 1.16rem; font-weight: 600; letter-spacing: 0.01em; color: #fff; text-shadow: 0 0 22px rgba(var(--sb), 0.35); }
+.site-banner:not(.is-promo) .site-banner-text { font-weight: 450; font-size: 0.86rem; color: rgba(226, 232, 240, 0.84); text-wrap: pretty; }
+.site-banner:not(.is-promo) .sb-copy > .site-banner-text:only-child { font-weight: 500; font-size: 0.9rem; color: #f1f5f9; }
+.site-banner:not(.is-promo) .sb-cta { flex: none; margin-left: auto; padding: 0.42rem 0.95rem; color: var(--sb-ink); background: rgba(var(--sb), 0.1); box-shadow: inset 0 0 0 1px rgba(var(--sb), 0.5); font-size: 0.8rem; letter-spacing: 0.01em; }
+.site-banner:not(.is-promo) .sb-cta:hover { background: rgba(var(--sb), 0.22); box-shadow: inset 0 0 0 1px rgba(var(--sb), 0.8), 0 8px 20px -10px rgba(var(--sb), 1); }
+.site-banner:not(.is-promo) .sb-tail { display: flex; align-items: center; gap: 0.8rem; flex: none; }
+.sb-dots { display: flex; gap: 0.35rem; }
+.sb-dot { width: 0.45rem; height: 0.45rem; padding: 0; border: 0; border-radius: 999px; background: rgba(255, 255, 255, 0.25); cursor: pointer; transition: width 0.35s var(--m-ease, ease), background 0.3s ease; }
+.sb-dot.is-on { width: 1.25rem; background: rgb(var(--sb)); }
+.sb-dot:hover { background: rgba(var(--sb), 0.7); }
+/* dezent: eine schmale Zeile, kein Siegelkreis, kein Glanz */
+.sb-dezent { box-shadow: none; }
+.sb-dezent::before, .sb-dezent .sb-shine, .sb-dezent .sb-seal::after { display: none; }
+.sb-dezent .sb-inner { min-height: 2.4rem; padding-block: 0.3rem; }
+.sb-dezent .sb-seal { width: auto; height: auto; background: none; box-shadow: none; }
+.sb-dezent .sb-title { font-size: 1rem; }
+.sb-dezent .site-banner-text { font-size: 0.8rem; }
+.sb-dezent .sb-cta { padding: 0.25rem 0.75rem; }
+@media (min-width: 768px) { .sb-dezent .sb-copy { flex-wrap: nowrap; } .sb-dezent .site-banner-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } }
+/* hinweis: wie eine Notiz – leuchtender Streifen links, eckiges Siegel */
+.sb-hinweis { background: linear-gradient(90deg, rgba(var(--sb), 0.16), rgba(10, 15, 30, 0.95) 45%); }
+.sb-hinweis .sb-inner::before { content: ''; position: absolute; left: 0.45rem; top: 0.6rem; bottom: 0.6rem; width: 3px; border-radius: 3px; background: rgb(var(--sb)); box-shadow: 0 0 12px rgba(var(--sb), 0.85); }
+.sb-hinweis .sb-seal { border-radius: 10px; }
+.sb-hinweis .sb-seal::after { display: none; }
+/* dringend: immer rot, Siegel mit pulsierendem Ring */
+.sb-dringend { --sb: 239, 68, 68; --sb-ink: #fecaca; background: radial-gradient(70% 240% at 0% 50%, rgba(239, 68, 68, 0.24), transparent 60%), linear-gradient(180deg, rgba(30, 12, 18, 0.94), rgba(14, 7, 12, 0.96)); }
+.sb-dringend .sb-seal::after { inset: -2px; border: 2px solid rgba(var(--sb), 0.7); animation: sb-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite; }
+@keyframes sb-ping { from { transform: scale(0.95); opacity: 0.9; } to { transform: scale(1.65); opacity: 0; } }
+/* feierlich: Polarlicht in der Tonfarbe und ein paar aufsteigende Funken */
+.sb-feierlich { --o1: var(--sb); --o2: var(--accent-light-rgb, 243, 229, 171); }
+.sb-sparks { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.sb-sparks i { position: absolute; bottom: -4px; width: 3px; height: 3px; border-radius: 50%; background: #fff; box-shadow: 0 0 6px 1px rgba(var(--sb), 1); opacity: 0; animation: sb-spark 5s ease-in infinite; }
+.sb-sparks i:nth-child(1) { left: 8%; animation-delay: 0s; }
+.sb-sparks i:nth-child(2) { left: 22%; animation-delay: 1.6s; }
+.sb-sparks i:nth-child(3) { left: 41%; animation-delay: 3.1s; }
+.sb-sparks i:nth-child(4) { left: 63%; animation-delay: 0.8s; }
+.sb-sparks i:nth-child(5) { left: 78%; animation-delay: 2.4s; }
+.sb-sparks i:nth-child(6) { left: 92%; animation-delay: 4s; }
+@keyframes sb-spark { 0% { transform: translateY(0) scale(0.6); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(-70px) scale(1.1); opacity: 0; } }
+@media (max-width: 640px) {
+  .sb-inner { padding: 0.55rem 2.7rem 0.55rem 0.85rem; gap: 0.5rem 0.75rem; }
+  .sb-slide { flex-wrap: wrap; align-items: flex-start; gap: 0.5rem 0.7rem; }
+  .sb-seal { width: 1.95rem; height: 1.95rem; }
+  .site-banner:not(.is-promo) .sb-copy { flex: 1 1 calc(100% - 2.8rem); }
+  .site-banner:not(.is-promo) .sb-cta { margin-left: 2.65rem; }
+  .site-banner:not(.is-promo) .sb-title { font-size: 1.05rem; }
+  .site-banner:not(.is-promo) .sb-tail { position: absolute; right: 2.9rem; bottom: 0.55rem; }
+}
+.dash-banner { margin: 0.75rem 1rem 0; border-radius: min(var(--radius, 18px), 16px); overflow: hidden; border: 1px solid rgba(var(--sb), 0.4); }
 .dash-banner + .dash-banner { margin-top: 0.5rem; }
 @media (min-width: 1024px) { .dash-banner { margin: 1rem 2rem 0; } }
 @media (min-width: 1824px) { .dash-banner { margin-left: auto; margin-right: auto; max-width: 1696px; } }
@@ -393,3 +458,112 @@ body:has(#sidebar) .promo-dock.is-on { translate: 0 0; }
   #content.view-in:not([data-hub-switch="1"]) > .page-head .page-title { animation-duration: var(--m-panel); }
   #modalBody.modal-stagger .case-tabs .jump { animation-delay: 0.08s !important; animation-duration: var(--m-panel); }
 }
+
+/* Website-Navigation: goldener Strich gleitet unter den aktiven Menüpunkt (js/motion.js → siteNavInk) */
+nav[data-ink] { position: relative; }
+nav[data-ink] .nav-link::after { display: none; }
+nav[data-ink] .nav-link { position: relative; transition: color 0.25s ease; }
+nav[data-ink] .nav-link.nav-active { color: var(--gold-light, #f3e5ab) !important; }
+.nav-ink { position: absolute; left: 0; bottom: -9px; width: 0; height: 2px; border-radius: 2px; pointer-events: none; opacity: 0;
+  background: linear-gradient(90deg, var(--gold-600, #b8962e), var(--gold-light, #f3e5ab) 50%, var(--gold-600, #b8962e));
+  box-shadow: 0 0 10px rgba(var(--accent-rgb, 212, 175, 55), 0.75), 0 0 2px rgba(var(--accent-rgb, 212, 175, 55), 1); }
+.nav-ink.is-ready { transition: transform 0.5s cubic-bezier(0.2, 0.9, 0.25, 1.08), width 0.5s cubic-bezier(0.2, 0.9, 0.25, 1.08), opacity 0.3s ease; }
+
+/* Beträge: Inter mit gleich breiten Ziffern (Spalten bleiben bündig) statt Programmierschrift */
+.num { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; font-variant-numeric: tabular-nums lining-nums; font-feature-settings: 'tnum' 1, 'lnum' 1, 'cv11' 1; letter-spacing: -0.01em; }
+.num-total { letter-spacing: -0.025em; font-weight: 800; }
+
+/* Kontrast: graue Tailwind-Töne auf Dunkelblau etwas heller (gut lesbar, WCAG AA) */
+.text-gray-500, .text-slate-500 { color: #9aa5c0; }
+.text-gray-600, .text-slate-600 { color: #8592ae; }
+
+/*
+ * Fokus-Ring (Tastatur): weicher goldener Doppelring statt der harten Browser-Linie – Website und Dashboard.
+ * Felder bekommen den Ring als Leuchten am Rand; Mausklicks zeigen ihn nicht (nur :focus-visible).
+ */
+:where(a, button, summary, [role="button"], [role="tab"], [tabindex]):focus-visible {
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(5, 9, 20, 0.95), 0 0 0 4px rgba(var(--accent-rgb, 212, 175, 55), 0.9), 0 0 18px 2px rgba(var(--accent-rgb, 212, 175, 55), 0.35) !important;
+  transition: box-shadow 0.18s ease;
+}
+:where(input, select, textarea):focus-visible {
+  outline: none !important;
+  border-color: rgba(var(--accent-rgb, 212, 175, 55), 0.85) !important;
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb, 212, 175, 55), 0.22), 0 0 16px -2px rgba(var(--accent-rgb, 212, 175, 55), 0.35) !important;
+}
+:where(input[type="checkbox"], input[type="radio"]):focus-visible { box-shadow: 0 0 0 2px rgba(5, 9, 20, 0.95), 0 0 0 4px rgba(var(--accent-rgb, 212, 175, 55), 0.9) !important; }
+
+/*
+ * Status-Plaketten: feste Bedeutung der Farben, immer mit Symbol – grün = erledigt, bernstein = wartet,
+ * rot = dringend/überfällig, blau = in Arbeit/Info, grau = abgeschlossen/neutral. (Plaketten mit eigenem Symbol bleiben, wie sie sind.)
+ */
+.badge:is(.badge-emerald, .badge-amber, .badge-red, .badge-sky, .badge-slate):not(:has(svg, img))::before {
+  content: ''; flex: none; width: 0.72rem; height: 0.72rem; background: currentColor;
+  -webkit-mask: var(--bi) center / contain no-repeat; mask: var(--bi) center / contain no-repeat;
+}
+.badge-emerald { --bi: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 13l4 4L19 7'/%3E%3C/svg%3E"); }
+.badge-amber { --bi: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E"); }
+.badge-red { --bi: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 8v5M12 17h.01'/%3E%3Ccircle cx='12' cy='12' r='9.5'/%3E%3C/svg%3E"); }
+.badge-sky { --bi: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h11M12 6l6 6-6 6'/%3E%3C/svg%3E"); }
+.badge-slate { --bi: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='5' fill='black'/%3E%3C/svg%3E"); }
+
+/*
+ * Schwebende Beschriftung (js/motion.js → floatLabel): sitzt im Feld wie ein Platzhalter und wandert beim Fokus
+ * bzw. sobald etwas drinsteht klein nach oben ins Feld. Der eigentliche Platzhalter erscheint erst beim Fokus.
+ */
+.fl { position: relative; }
+.fl > .label[data-fl="1"] {
+  position: absolute; z-index: 1; left: calc(0.9rem + 1px); top: calc(0.62rem + 1px); margin: 0; max-width: calc(100% - 1.9rem);
+  font-size: 0.9rem; line-height: 1.5; font-weight: 450; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  pointer-events: none; transform-origin: 0 0; transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), color 0.2s ease, font-weight 0.2s ease;
+}
+.fl > .field { padding-top: 1.2rem; padding-bottom: 0.32rem; min-height: 48px; }
+.fl.fl-area > .field { padding-top: 1.45rem; }
+.fl.is-up > .label[data-fl="1"], .fl:focus-within > .label[data-fl="1"] { transform: translateY(-0.5rem) scale(0.76); font-weight: 600; letter-spacing: 0.02em; }
+.fl:focus-within > .label[data-fl="1"] { color: var(--gold-light, #f3e5ab); }
+.fl:not(.is-up):not(:focus-within) > .field::placeholder { color: transparent; }
+.fl > .field:disabled + .label, .fl:has(> .field:disabled) > .label { opacity: 0.6; }
+/* Geldfelder: Ziffern bündig */
+.money-field { font-variant-numeric: tabular-nums; }
+
+/* Rechtsklick-Menü auf Zeilen (13-kontextmenue.js): Glas, federt vom Klickpunkt auf */
+.ctx-menu {
+  position: fixed; z-index: 400; min-width: 13.5rem; max-width: 18rem; padding: 0.35rem; border-radius: 14px;
+  background: linear-gradient(180deg, rgba(20, 27, 52, 0.94), rgba(10, 15, 32, 0.96)); backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.09); box-shadow: 0 24px 50px -16px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(var(--accent-rgb), 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  opacity: 0; transform: scale(0.92); transition: opacity 0.14s ease, transform 0.2s cubic-bezier(0.2, 0.9, 0.25, 1.15);
+}
+.ctx-menu.is-open { opacity: 1; transform: none; }
+.ctx-item { display: flex; align-items: center; gap: 0.6rem; width: 100%; padding: 0.5rem 0.65rem; border: 0; border-radius: 9px; background: none; color: var(--text-main, #e2e8f0); font: inherit; font-size: 0.85rem; text-align: left; text-decoration: none; cursor: pointer; transition: background 0.15s ease, color 0.15s ease; }
+.ctx-item .ico-sm { color: var(--text-dim); transition: color 0.15s ease; }
+.ctx-item:hover, .ctx-item:focus-visible { background: rgba(var(--accent-rgb), 0.13); color: #fff; box-shadow: none !important; }
+.ctx-item:hover .ico-sm, .ctx-item:focus-visible .ico-sm { color: var(--gold-light); }
+.ctx-item.danger { color: #fca5a5; }
+.ctx-item.danger .ico-sm { color: #f87171; }
+.ctx-item.danger:hover, .ctx-item.danger:focus-visible { background: rgba(239, 68, 68, 0.14); }
+.ctx-sep { height: 1px; margin: 0.3rem 0.4rem; background: rgba(255, 255, 255, 0.08); }
+
+/* ---------------------------------------------------------------- Feinschliff Bewegung (ruhig, nicht überladen) */
+/* Goldknopf: beim Darüberfahren läuft ein feiner Lichtstreif durch */
+.btn-gold {
+  background-image: linear-gradient(110deg, transparent 38%, rgba(255, 255, 255, 0.34) 50%, transparent 62%), linear-gradient(180deg, color-mix(in srgb, var(--gold-500), #fff 18%) 0%, var(--gold-500) 48%, var(--gold-600) 100%);
+  background-size: 260% 100%, 100% 100%; background-position: 135% 0, 0 0; background-repeat: no-repeat;
+}
+@media (hover: hover) {
+  .btn-gold:hover:not(:disabled) { background-position: -35% 0, 0 0; transition: background-position 0.8s cubic-bezier(0.2, 0.8, 0.2, 1), transform var(--m-micro, 0.15s) var(--m-ease, ease), box-shadow var(--m-panel, 0.3s) var(--m-ease, ease); }
+}
+/* Website: Karten in einem Raster erscheinen nacheinander, wenn ihr Abschnitt ins Bild kommt */
+.reveal .grid > :nth-child(-n + 12) { opacity: 0; translate: 0 14px; transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), translate 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+.reveal.in-view .grid > :nth-child(-n + 12) { opacity: 1; translate: 0 0; }
+.reveal.in-view .grid > :nth-child(2) { transition-delay: 0.06s; }
+.reveal.in-view .grid > :nth-child(3) { transition-delay: 0.12s; }
+.reveal.in-view .grid > :nth-child(4) { transition-delay: 0.18s; }
+.reveal.in-view .grid > :nth-child(5) { transition-delay: 0.24s; }
+.reveal.in-view .grid > :nth-child(6) { transition-delay: 0.3s; }
+.reveal.in-view .grid > :nth-child(n + 7) { transition-delay: 0.34s; }
+/* Website-Kopf: sobald man scrollt, wird die Leiste etwas dichter und bekommt eine goldene Haarlinie */
+.glass-nav { transition: background-color 0.35s ease, box-shadow 0.35s ease; }
+.is-scrolled .glass-nav { box-shadow: 0 1px 0 rgba(var(--accent-rgb, 212, 175, 55), 0.18), 0 14px 34px -18px rgba(0, 0, 0, 0.9); }
+.fl.fl-select > .field { padding-top: 1.2rem; }
+.fl > .fl-extra { position: absolute; z-index: 2; top: 0.3rem; right: 2.5rem; font-size: 0.72rem; line-height: 1.2; }
+.fl:not(.fl-select) > .fl-extra { right: 0.8rem; }

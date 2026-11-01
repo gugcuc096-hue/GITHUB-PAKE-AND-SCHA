@@ -85,3 +85,11 @@ html.ps-leaving body { transform: none !important; transition-duration: 90ms !im
 @keyframes count-roll-down { from { opacity: 0; } to { opacity: 1; } }
 details::details-content { transition: none !important; }
 
+
+.sb-seal::after, .sb-sparks i { animation: none !important; }
+.sb-sparks { display: none; }
+.sb-slide { transition: none !important; filter: none !important; transform: none !important; }
+.nav-ink.is-ready { transition-duration: 0.01s !important; }
+.fl > .label[data-fl="1"] { transition: none !important; }
+.reveal .grid > * { opacity: 1 !important; translate: none !important; transition: none !important; }
+.btn-gold:hover { transition: none !important; }

@@ -270,7 +270,7 @@
                 (f) => `
               <div class="price-item ledger-item p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2" data-name="${esc(`${f.name} ${f.description}`.toLowerCase())}" data-category="${key}" data-price="${Number(f.price)}">
                 <div><div class="font-medium text-white text-base">${esc(f.name)}</div><div class="text-xs text-[var(--text-muted)]">${esc(f.description)}</div></div>
-                <div class="font-mono text-[var(--gold-500)] font-semibold text-lg whitespace-nowrap">${money(f.price)}</div>
+                <div class="num text-[var(--gold-500)] font-semibold text-lg whitespace-nowrap">${money(f.price)}</div>
               </div>`
               )
               .join('')}</div>
@@ -324,7 +324,7 @@
             <span class="text-xs text-[var(--text-muted)] font-mono">${life ? 'unbefristet' : `${Number(t.durationDays)} Tage`}</span>
           </div>
           <h3 class="font-serif text-3xl font-semibold text-white mb-2">${esc(t.name)}</h3>
-          <div class="font-mono text-3xl text-[var(--gold-500)] font-semibold">${money(t.price)}</div>
+          <div class="num text-3xl text-[var(--gold-500)] font-semibold">${money(t.price)}</div>
           <div class="text-xs text-[var(--text-muted)] mb-5">${life ? 'einmalig · gilt unbefristet' : `für ${Number(t.durationDays)} Tage · verlängerbar`}</div>
           <div class="text-sm text-[var(--gold-light)] font-semibold mb-3">${pct(t.discountPct)} % Rabatt auf alle Leistungen</div>
           <p class="text-sm text-[var(--text-muted)] leading-relaxed mb-6 whitespace-pre-line flex-grow">${esc(t.benefits || '')}</p>

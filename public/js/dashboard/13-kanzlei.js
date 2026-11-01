@@ -919,7 +919,7 @@ function storageBookModal(kind = 'item', itemId = null, replace = false) {
           <label class="seg-opt"><input type="radio" name="direction" value="in" checked><span>${icon('plus', 'ico-sm')}Einlagern</span></label>
           <label class="seg-opt"><input type="radio" name="direction" value="out"><span>${icon('minus', 'ico-sm')}Entnehmen</span></label>
         </div>
-        <div><label class="label" for="sbAmount">${kind === 'item' ? 'Menge' : 'Betrag ($)'}</label><input id="sbAmount" name="amount" type="number" min="1" max="1000000000" step="1" class="field" required autofocus></div>
+        <div><label class="label" for="sbAmount">${kind === 'item' ? 'Menge' : 'Betrag ($)'}</label><input id="sbAmount" name="amount" data-money type="number" min="1" max="1000000000" step="1" class="field" required autofocus></div>
         <div><label class="label" for="sbNote">Notiz <span class="text-dim font-normal normal-case tracking-normal">(optional)</span></label><input id="sbNote" name="note" class="field" maxlength="300" placeholder="${kind === 'item' ? 'z. B. aus Akte PS-2026-0012' : 'z. B. Honorar Mandat Kowalski'}"></div>
         <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Buchen</span></button></div>
       </form>`;

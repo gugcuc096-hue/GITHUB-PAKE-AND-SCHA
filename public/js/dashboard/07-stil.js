@@ -79,7 +79,8 @@ function cfgBannerMount() {
   if (!host || !f || !PS.siteConfig) return;
   const b = cfgCollectBanner(f);
   const endsAt = b.countdown && b.to ? new Date(`${b.to}T23:59:59`).toISOString() : null;
-  PS.siteConfig.banner({ ...b, id: 'preview', endsAt, dismissible: false, link: b.link ? '#' : '' }, host, { before: false, id: 'cfgBannerLive', className: 'cfg-banner-live' });
+  const slides = [{ title: b.title, text: b.text, icon: b.icon, link: b.link, linkLabel: b.linkLabel }, ...b.slides].filter((x) => x.text).map((x) => ({ ...x, link: x.link ? '#' : '' }));
+  PS.siteConfig.banner({ ...b, slides, id: 'preview', endsAt, dismissible: false, link: b.link ? '#' : '' }, host, { before: false, id: 'cfgBannerLive', className: 'cfg-banner-live' });
 }
 
 /* ---------------------------------------------------------------- Stil & Saison */

@@ -135,7 +135,7 @@ function dealForm(caseId) {
       <p class="modal-sub">Der Mandant bekommt das Angebot im Portal und – mit verknüpftem Discord – als Nachricht mit „Annehmen“ / „Ablehnen“.</p>
       <form data-form="deal" data-case-id="${caseId}" class="form-grid">
         <div><label class="label" for="dealHe">Hafteinheiten</label><input id="dealHe" name="he" type="number" min="0" max="999" inputmode="numeric" class="field" placeholder="z. B. 15"></div>
-        <div><label class="label" for="dealFine">Geldstrafe ($)</label><input id="dealFine" name="fine" type="number" min="0" step="1000" inputmode="numeric" class="field" placeholder="z. B. 5000"></div>
+        <div><label class="label" for="dealFine">Geldstrafe ($)</label><input id="dealFine" name="fine" data-money type="number" min="0" step="1000" inputmode="numeric" class="field" placeholder="z. B. 5000"></div>
         <div class="span-2"><label class="label" for="dealNote">Bedingungen (optional)</label><input id="dealNote" name="note" class="field" maxlength="500" placeholder="z. B. Geständnis zu § 21, Anklage wegen § 30 fällt weg"></div>
         <div class="span-2 form-actions"><button type="button" class="btn-ghost btn-md" data-action="close-modal">Abbrechen</button><button class="btn-gold btn-md">Eintragen &amp; Mandant fragen</button></div>
       </form>`;

@@ -411,4 +411,219 @@
     );
     document.documentElement.addEventListener('pointerleave', () => lit && lit.classList.remove('is-lit')); // Maus verlässt das Fenster
   }
+
+  /*
+   * Website-Navigation: ein goldener Strich gleitet unter den Menüpunkt des Abschnitts, in dem man gerade liest
+   * (Scrollspy), und folgt beim Darüberfahren der Maus. Gilt für jede <nav data-ink> mit .nav-link[data-section].
+   */
+  function siteNavInk() {
+    document.querySelectorAll('nav[data-ink]').forEach((nav) => {
+      const links = [...nav.querySelectorAll('.nav-link')];
+      if (!links.length || nav.querySelector('.nav-ink')) return;
+      const ink = document.createElement('span');
+      ink.className = 'nav-ink';
+      ink.setAttribute('aria-hidden', 'true');
+      nav.appendChild(ink);
+      let hover = null;
+      const place = () => {
+        const active = links.find((l) => l.classList.contains('nav-active'));
+        const target = hover || active;
+        if (!target || !target.getClientRects().length) {
+          ink.style.opacity = '0';
+          return;
+        }
+        const nr = nav.getBoundingClientRect();
+        const r = target.getBoundingClientRect();
+        ink.style.width = `${r.width}px`;
+        ink.style.transform = `translateX(${r.left - nr.left}px)`;
+        ink.style.opacity = hover && hover !== active ? '0.55' : '1';
+      };
+      const spied = links.filter((l) => l.dataset.section && document.getElementById(l.dataset.section));
+      const spy = () => {
+        if (!spied.length) return;
+        const y = window.scrollY + 140;
+        let current = null;
+        let best = -Infinity;
+        for (const l of spied) {
+          const el = document.getElementById(l.dataset.section);
+          if (!el.getClientRects().length) continue;
+          const top = el.getBoundingClientRect().top + window.scrollY;
+          if (top <= y && top > best) {
+            best = top;
+            current = l.dataset.section;
+          }
+        }
+        const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
+        if (atBottom) {
+          const last = spied.filter((l) => document.getElementById(l.dataset.section).getClientRects().length).sort((a, b) => document.getElementById(a.dataset.section).getBoundingClientRect().top - document.getElementById(b.dataset.section).getBoundingClientRect().top).pop();
+          if (last) current = last.dataset.section;
+        }
+        links.forEach((l) => l.classList.toggle('nav-active', !!current && l.dataset.section === current));
+        place();
+      };
+      let queued = false;
+      const onScroll = () => {
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(() => {
+          queued = false;
+          spy();
+        });
+      };
+      links.forEach((l) => {
+        l.addEventListener('pointerenter', () => {
+          hover = l;
+          place();
+        });
+        l.addEventListener('pointerleave', () => {
+          hover = null;
+          place();
+        });
+      });
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', onScroll);
+      window.addEventListener('load', onScroll);
+      document.fonts && document.fonts.ready && document.fonts.ready.then(onScroll);
+      spy();
+      place();
+      requestAnimationFrame(() => ink.classList.add('is-ready')); // erst danach gleiten (nicht von links hereinfliegen)
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', siteNavInk);
+  else siteNavInk();
+  // Website: Kopfleiste „gescrollt“ (dichter, goldene Haarlinie)
+  if (!document.getElementById('sidebar')) {
+    const scrolled = () => document.documentElement.classList.toggle('is-scrolled', window.scrollY > 12);
+    window.addEventListener('scroll', scrolled, { passive: true });
+    scrolled();
+  }
+
+  /*
+   * Felder:
+   *  - Schwebende Beschriftung: Bei „Beschriftung + Feld“ (label.label[for] direkt vor input/textarea.field) sitzt die
+   *    Beschriftung im Feld und wandert beim Tippen/Fokus nach oben. Nur kurze Beschriftungen ohne Knöpfe darin.
+   *  - Geldfelder (input[data-money]): Tausenderpunkte beim Tippen (150000 → 150.000). Lesen (el.value) und Absenden
+   *    liefern weiter die reinen Ziffern – Formulare und Server merken davon nichts.
+   */
+  const FL_TYPES = new Set(['', 'text', 'email', 'number', 'tel', 'url', 'password', 'search']);
+  const NATIVE = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+  const digits = (v) => String(v == null ? '' : v).replace(/\D/g, '');
+  const fmtMoney = (d) => (d ? Number(d).toLocaleString('de-DE') : '');
+  // „150.000“ (Tausenderpunkte) → 150000; „1500.5“ / „1500,50“ → 1500 (ganze Dollar)
+  const moneyDigits = (v) => {
+    const t = String(v == null ? '' : v).trim();
+    return /^\d{1,3}(\.\d{3})+$/.test(t) ? digits(t) : digits(t.split(/[.,]/)[0]);
+  };
+  function upgradeMoney(el) {
+    if (el.dataset.moneyOn) return;
+    el.dataset.moneyOn = '1';
+    const raw = moneyDigits(NATIVE.get.call(el));
+    try {
+      el.type = 'text';
+    } catch {
+      return;
+    }
+    el.inputMode = 'numeric';
+    el.autocomplete = 'off';
+    el.classList.add('money-field');
+    Object.defineProperty(el, 'value', {
+      configurable: true,
+      get() {
+        return digits(NATIVE.get.call(this));
+      },
+      set(v) {
+        NATIVE.set.call(this, fmtMoney(moneyDigits(v)));
+      },
+    });
+    NATIVE.set.call(el, fmtMoney(raw));
+  }
+  document.addEventListener(
+    'input',
+    (e) => {
+      const el = e.target;
+      if (!el || !el.dataset || !el.dataset.moneyOn) return;
+      const shown = NATIVE.get.call(el);
+      const caret = el.selectionStart == null ? shown.length : el.selectionStart;
+      const before = digits(shown.slice(0, caret)).length;
+      const next = fmtMoney(digits(shown));
+      if (next === shown) return;
+      NATIVE.set.call(el, next);
+      let pos = 0;
+      for (let n = 0; pos < next.length && n < before; pos++) if (/\d/.test(next[pos])) n++;
+      try {
+        el.setSelectionRange(pos, pos);
+      } catch {
+        /* egal */
+      }
+    },
+    true
+  );
+  // Absenden: kurz die reinen Ziffern ins Feld (FormData liest den echten Feldinhalt), danach wieder mit Punkten
+  document.addEventListener(
+    'submit',
+    (e) => {
+      const list = e.target.querySelectorAll ? e.target.querySelectorAll('input[data-money-on]') : [];
+      if (!list.length) return;
+      list.forEach((el) => NATIVE.set.call(el, digits(NATIVE.get.call(el))));
+      setTimeout(() => list.forEach((el) => el.isConnected && NATIVE.set.call(el, fmtMoney(digits(NATIVE.get.call(el))))), 400);
+    },
+    true
+  );
+  let flSeq = 0;
+  function floatLabel(label) {
+    label.dataset.fl = '0';
+    const field = label.nextElementSibling;
+    const box = label.parentElement;
+    if (!field || !box || !field.classList.contains('field') || field.disabled) return;
+    if (label.htmlFor && field.id !== label.htmlFor) return;
+    const extras = [...label.children];
+    // Kleine Knöpfe in der Beschriftung („+ neu“) wandern oben rechts ins Feld, alles andere bleibt, wie es ist
+    if (extras.some((c) => c.tagName !== 'BUTTON') || label.textContent.trim().length > 40 || box.classList.contains('fl')) return;
+    const isArea = field.tagName === 'TEXTAREA';
+    const isSelect = field.tagName === 'SELECT' && !field.multiple;
+    if (!isArea && !isSelect && !(field.tagName === 'INPUT' && FL_TYPES.has(field.getAttribute('type') || ''))) return;
+    // Beschriftung ohne for: mit dem Feld verbinden (Klick und Vorlesen)
+    if (!label.htmlFor) {
+      if (!field.id) field.id = `fl-${++flSeq}`;
+      label.htmlFor = field.id;
+    }
+    if (box.closest('.cfg-row, .color-row, table, .ie, .inline-form, .chat-compose, .gs-box, [data-no-fl]') || box.matches('form, .form-grid, .flex, .grid')) return;
+    label.dataset.fl = '1';
+    box.classList.add('fl');
+    if (extras.length) {
+      const holder = document.createElement('span');
+      holder.className = 'fl-extra';
+      extras.forEach((c) => holder.appendChild(c));
+      label.textContent = label.textContent.trim();
+      box.appendChild(holder);
+    }
+    if (isArea) box.classList.add('fl-area');
+    if (isSelect) box.classList.add('fl-select', 'is-up'); // eine Auswahl hat immer einen Wert
+    const sync = () => box.classList.toggle('is-up', isSelect || field.value !== '');
+    field.addEventListener('input', sync);
+    field.addEventListener('change', sync);
+    sync();
+  }
+  let flQueued = false;
+  function fieldScan() {
+    flQueued = false;
+    document.querySelectorAll('input[data-money]:not([data-money-on])').forEach(upgradeMoney);
+    document.querySelectorAll('label.label:not([data-fl])').forEach(floatLabel);
+    // Programmatisch gesetzte Werte (Entwürfe, Vorlagen): Beschriftung oben halten
+    document.querySelectorAll('.fl:not(.fl-select)').forEach((box) => {
+      const f = box.querySelector(':scope > .field');
+      if (f) box.classList.toggle('is-up', f.value !== '');
+    });
+  }
+  const fieldObs = new MutationObserver(() => {
+    if (flQueued) return;
+    flQueued = true;
+    requestAnimationFrame(fieldScan);
+  });
+  const startFields = () => {
+    fieldObs.observe(document.body, { childList: true, subtree: true });
+    fieldScan();
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startFields);
+  else startFields();
 })();

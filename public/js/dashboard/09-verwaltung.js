@@ -284,7 +284,7 @@ const chartLegend = (series) =>
 const chartTable = (head, rows) =>
   `<details class="chart-table"><summary>Werte als Tabelle</summary><div class="tbl-wrap"><table class="tbl">
       <thead><tr>${head.map((h, i) => `<th${i ? ' style="text-align:right"' : ''}>${esc(h)}</th>`).join('')}</tr></thead>
-      <tbody>${rows.map((r) => `<tr>${r.map((c, i) => `<td${i ? ' class="font-mono nowrap" style="text-align:right"' : ''}>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></details>`;
+      <tbody>${rows.map((r) => `<tr>${r.map((c, i) => `<td${i ? ' class="num nowrap" style="text-align:right"' : ''}>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></details>`;
 
 /* Tooltip: eine Blase je Diagramm, über der Spalte; Maus, Tastatur und Tippen */
 function chartTipShow(col) {

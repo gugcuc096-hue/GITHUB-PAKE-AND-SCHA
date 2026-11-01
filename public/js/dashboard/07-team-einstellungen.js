@@ -180,7 +180,7 @@ function feeModal(f, category) {
       <form data-form="fee" data-id="${f ? f.id : ''}" class="form-grid cols-2">
         <div class="span-2"><label class="label">Bezeichnung</label><input name="name" class="field" required minlength="2" maxlength="120" value="${esc(v.name || '')}" autofocus></div>
         <div><label class="label">Kategorie</label><select name="category" class="field">${cats.map((c) => opt(c.key, c.name, v.category === c.key)).join('')}</select></div>
-        <div><label class="label">Preis ($)</label><input name="price" type="number" inputmode="numeric" min="0" step="1" required class="field" value="${esc(v.price)}"></div>
+        <div><label class="label">Preis ($)</label><input name="price" data-money type="number" inputmode="numeric" min="0" step="1" required class="field" value="${esc(v.price)}"></div>
         <div class="span-2"><label class="label">Beschreibung</label><textarea name="description" rows="3" maxlength="400" class="field">${esc(v.description || '')}</textarea></div>
         <div><label class="label">Reihenfolge</label><input name="sortOrder" type="number" min="0" step="1" class="field" value="${esc(v.sortOrder ?? '')}" placeholder="automatisch"></div>
         <div class="flex flex-col justify-end gap-2 pb-1">
@@ -212,7 +212,7 @@ views.fees = {
               ? rows
                   .map(
                     (f) => `<div class="list-row wrap"><div class="main"><div class="title">${esc(f.name)} ${!f.active ? badge('Ausgeblendet', 'slate') : ''} ${f.inCalculator ? badge('Tarifrechner', 'sky') : ''}</div><div class="meta">${esc(f.description)}</div></div>
-                      <div class="flex items-center gap-2 shrink-0"><span class="font-mono text-gold nowrap">${money(f.price)}</span>
+                      <div class="flex items-center gap-2 shrink-0"><span class="num text-gold nowrap">${money(f.price)}</span>
                       <button class="icon-btn sm" data-action="fee-edit" data-id="${f.id}" aria-label="Bearbeiten">${icon('edit', 'ico-sm')}</button>
                       <button class="icon-btn sm" data-action="fee-delete" data-id="${f.id}" aria-label="Löschen">${icon('trash', 'ico-sm')}</button></div></div>`
                   )
