@@ -6,6 +6,7 @@
 const express = require('express');
 const { z } = require('zod');
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth, requireStaff, userAvatarUrl } = require('../core/auth');
 const { wrap, parseBody, idParam } = require('../core/helpers');
 const { logActivity } = require('../db/models');
@@ -30,7 +31,7 @@ const person = (u) => ({
 router.get('/', (req, res) => {
   const me = req.user;
   const owner = perms.isOwner(me);
-  const staff = db.prepare("SELECT * FROM users WHERE role IN ('anwalt','admin') AND active = 1 ORDER BY display_name").all().map(person);
+  const staff = Q.users.listActiveStaff.all().map(person);
   const bot = require('../integrations/discordBot');
   res.json({
     perms: perms.PERMS,
@@ -100,7 +101,7 @@ router.post(
     if (!d) return;
     const t = db.prepare("SELECT * FROM users WHERE id = ? AND role = 'admin' AND active = 1").get(d.userId);
     if (!t) return res.status(400).json({ error: 'Der neue Inhaber muss ein aktives Konto im Board of Partners (Rolle Admin) sein.' });
-    db.prepare('UPDATE users SET is_owner = 0').run();
+    Q.users.clearOwners.run();
     db.prepare('UPDATE users SET is_owner = 1, web_admin = 0 WHERE id = ?').run(t.id);
     configLog.add(req.user, { area: 'webadmin', key: String(t.id), label: `Inhaber übergeben an ${t.display_name}` });
     logActivity(req.user, 'Inhaber übergeben', 'user', t.id, t.display_name);

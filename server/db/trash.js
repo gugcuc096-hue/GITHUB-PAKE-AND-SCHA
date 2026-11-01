@@ -8,6 +8,7 @@
  * Nach 30 Tagen wird endgültig gelöscht (inkl. der Bilddateien, die bis dahin auf der Disk bleiben).
  */
 const { db, tx } = require('./db');
+const Q = require('./queries');
 const { removeFile } = require('../core/uploads');
 
 const KEEP_DAYS = 30;
@@ -17,7 +18,7 @@ const KEEP_DAYS = 30;
 /** Fremdschlüssel-Graph: Elterntabelle → [{ table, column, parentColumn, onDelete }]. */
 function fkGraph() {
   const graph = {};
-  const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all();
+  const tables = Q.sqliteMaster.tableNames.all();
   for (const { name } of tables) {
     for (const fk of db.prepare(`PRAGMA foreign_key_list("${name}")`).all()) {
       (graph[fk.table] ||= []).push({ table: name, column: fk.from, parentColumn: fk.to || 'id', onDelete: String(fk.on_delete || '').toUpperCase() });
@@ -34,7 +35,7 @@ const decode = (v) => (v && typeof v === 'object' && typeof v.__b64 === 'string'
 /** Momentaufnahme einer Akte: Zeilen je Tabelle (Eltern vor Kindern) + Verweise zum Wiederverknüpfen. */
 function snapshot(caseId) {
   const graph = fkGraph();
-  const caseRow = db.prepare('SELECT * FROM cases WHERE id = ?').get(caseId);
+  const caseRow = Q.cases.getById.get(caseId);
   if (!caseRow) return null;
   const order = [['cases', [caseRow]]];
   const seen = new Set([`cases:${caseRow.id}`]);
@@ -70,7 +71,7 @@ function trashCase(caseId, user) {
     if (!snap) return null;
     const c = snap.rows[0][1][0];
     // Name des Mandanten festhalten – falls sein Konto gelöscht wird, solange die Akte im Papierkorb liegt
-    const clientName = c.client_name || (c.client_id && db.prepare('SELECT display_name FROM users WHERE id = ?').get(c.client_id)?.display_name) || '';
+    const clientName = c.client_name || (c.client_id && Q.users.displayNameById.get(c.client_id)?.display_name) || '';
     const files = (snap.rows.find(([t]) => t === 'case_attachments') || [null, []])[1].flatMap((a) => [a.file, a.thumb]).filter(Boolean); // samt Vorschaubild
     const info = db
       .prepare(
@@ -160,7 +161,7 @@ function restore(trashId) {
     }
     // Mandanten-Konto inzwischen gelöscht → Name bleibt in der Akte stehen (wie beim Löschen eines Kontos)
     if (t.client_name) db.prepare("UPDATE cases SET client_name = ? WHERE id = ? AND client_id IS NULL AND client_name = ''").run(t.client_name, t.case_id);
-    db.prepare('DELETE FROM case_trash WHERE id = ?').run(t.id);
+    Q.caseTrash.deleteById.run(t.id);
   });
   return { caseId: t.case_id, caseNumber: t.case_number };
 }
@@ -169,7 +170,7 @@ function restore(trashId) {
 function purge(trashId) {
   const t = db.prepare('SELECT id, case_id, files FROM case_trash WHERE id = ?').get(trashId);
   if (!t) return false;
-  db.prepare('DELETE FROM case_trash WHERE id = ?').run(t.id);
+  Q.caseTrash.deleteById.run(t.id);
   // Google Docs der Verträge und des Aktenauszugs dieser Akte ebenfalls löschen (Drive-Papierkorb)
   require('../integrations/googleDocs').removeForCase(t.case_id);
   for (const f of JSON.parse(t.files || '[]')) {

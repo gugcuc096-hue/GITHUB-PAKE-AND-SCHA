@@ -12,6 +12,7 @@
 const express = require('express');
 const { z } = require('zod');
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth, isStaff } = require('../core/auth');
 const { wrap, parseBody, idParam, isoDateTime } = require('../core/helpers');
 const { getCase, caseAccess, addSystemNote } = require('../db/models');
@@ -69,7 +70,7 @@ router.patch(
     const c = load(req, res);
     if (!c) return;
     const pid = idParam(req, 'pid');
-    const p = pid && db.prepare('SELECT * FROM case_parties WHERE id = ? AND case_id = ?').get(pid, c.id);
+    const p = pid && Q.caseParties.getByIdAndCaseId.get(pid, c.id);
     if (!p) return res.status(404).json({ error: 'Beteiligter nicht gefunden.' });
     const d = parseBody(body.partial(), req, res);
     if (!d) return;
@@ -100,7 +101,7 @@ router.delete(
     const c = load(req, res);
     if (!c) return;
     const pid = idParam(req, 'pid');
-    const p = pid && db.prepare('SELECT * FROM case_parties WHERE id = ? AND case_id = ?').get(pid, c.id);
+    const p = pid && Q.caseParties.getByIdAndCaseId.get(pid, c.id);
     if (!p) return res.status(404).json({ error: 'Beteiligter nicht gefunden.' });
     db.prepare('DELETE FROM case_parties WHERE id = ?').run(p.id);
     addSystemNote(c.id, req.user, `Beteiligter entfernt: ${p.name}`, true);
@@ -115,7 +116,7 @@ router.post(
     const c = load(req, res);
     if (!c) return;
     const pid = idParam(req, 'pid');
-    const p = pid && db.prepare('SELECT * FROM case_parties WHERE id = ? AND case_id = ?').get(pid, c.id);
+    const p = pid && Q.caseParties.getByIdAndCaseId.get(pid, c.id);
     if (!p) return res.status(404).json({ error: 'Beteiligter nicht gefunden.' });
     const d = parseBody(z.object({ text: z.string().trim().min(3).max(1000), ref: z.string().trim().max(80).optional() }), req, res);
     if (!d) return;

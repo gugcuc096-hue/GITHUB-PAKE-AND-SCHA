@@ -13,6 +13,7 @@
  * (GET /guilds/{id}/members/{user}) und die Rollenliste des Servers – dafür braucht der Bot keine Sonderrechte.
  */
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 const tickets = require('../integrations/tickets');
 
 const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Berlin' });
@@ -148,12 +149,12 @@ async function detect({ userId = null, discordIds = [] } = {}) {
 
 /** Kooperationen für die Person hinter einer Akte (Konto und/oder Discord aus „Ticket beitreten“). */
 function detectForCase(c) {
-  const acc = c.client_id ? db.prepare('SELECT id, discord_id FROM users WHERE id = ?').get(c.client_id) : null;
+  const acc = c.client_id ? Q.users.idAndDiscordIdById.get(c.client_id) : null;
   return detect({ userId: acc ? acc.id : null, discordIds: [acc && acc.discord_id, c.discord_client_id].filter(Boolean) });
 }
 
 function detectForUser(userId) {
-  const u = db.prepare('SELECT id, discord_id FROM users WHERE id = ?').get(userId);
+  const u = Q.users.idAndDiscordIdById.get(userId);
   return u ? detect({ userId: u.id, discordIds: [u.discord_id].filter(Boolean) }) : Promise.resolve({ matches: [], best: null, notes: [], checkedDiscord: false });
 }
 

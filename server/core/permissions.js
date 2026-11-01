@@ -7,6 +7,7 @@
  * Beschlüsse, Personal, Statistik und die eigenen Akten hängen nicht an diesen Rechten.
  */
 const { db, getSetting, setSetting } = require('../db/db');
+const Q = require('../db/queries');
 const { isBoard } = require('./helpers');
 
 /** Bereiche der Konfiguration – Schlüssel, Name und was dahinter steckt. */
@@ -81,7 +82,7 @@ function ensureOwner() {
   const byEmail = email && db.prepare("SELECT id FROM users WHERE role = 'admin' AND active = 1 AND (email = ? OR old_email = ?)").get(email, email);
   const first = byEmail || db.prepare("SELECT id FROM users WHERE role = 'admin' AND active = 1 ORDER BY id LIMIT 1").get();
   if (!first) return;
-  db.prepare('UPDATE users SET is_owner = 0').run();
+  Q.users.clearOwners.run();
   db.prepare('UPDATE users SET is_owner = 1 WHERE id = ?').run(first.id);
 }
 
@@ -90,7 +91,7 @@ function ensureOwner() {
  * Liefert { ok, error?, user? }.
  */
 function setWebAdmin(actor, userId, on) {
-  const u = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+  const u = Q.users.getById.get(userId);
   if (!u || !u.active || (u.role !== 'anwalt' && u.role !== 'admin')) return { ok: false, error: 'Web-Admin kann nur ein aktives Mitglied der Kanzlei sein.' };
   if (u.is_owner) return { ok: false, error: 'Der Inhaber hat ohnehin alle Rechte.' };
   if (!!u.web_admin === !!on) return { ok: true, user: u, unchanged: true };

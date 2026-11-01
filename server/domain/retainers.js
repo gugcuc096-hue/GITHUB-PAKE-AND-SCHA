@@ -7,6 +7,7 @@
  */
 const { z } = require('zod');
 const { db, nextInvoiceNumber } = require('../db/db');
+const Q = require('../db/queries');
 const { INVOICE_SELECT, getCase, addSystemNote, logActivity, berlinToday, invoiceRow } = require('../db/models');
 const billing = require('./billing');
 const discord = require('../integrations/discord');
@@ -128,7 +129,7 @@ function invoiceNext(r, today = berlinToday()) {
   const period = periodLabel(r, r.runs);
   const subject = `${r.title} – ${period}`;
   const items = [{ description: `Dauermandat ${r.title} (${period})`, quantity: 1, unitPrice: r.amount, total: r.amount }];
-  const issuer = r.created_by ? db.prepare('SELECT * FROM users WHERE id = ?').get(r.created_by) : null;
+  const issuer = r.created_by ? Q.users.getById.get(r.created_by) : null;
   const kind = t.base;
   const number = nextInvoiceNumber(kind);
   const due = t.dueDays > 0 ? addDays(today, t.dueDays) : null;

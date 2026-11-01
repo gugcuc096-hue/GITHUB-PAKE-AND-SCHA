@@ -18,6 +18,7 @@
  */
 const crypto = require('crypto');
 const { db, getSetting, setSetting } = require('../db/db');
+const Q = require('../db/queries');
 const { truncate, CASE_STATUS, STEPS, URGENCY_LABEL, BOARD_RANKS } = require('../core/helpers');
 const { getCase, caseLawyers } = require('../db/models');
 const discord = require('./discord');
@@ -365,7 +366,7 @@ const channelUrl = (c) => (c.discord_channel_id && isId(config().guildId) ? `htt
 
 /** Discord-IDs des Mandanten: verknüpftes Konto und/oder über die Website („Discord-Ticket beitreten“). */
 function clientDiscordIds(c) {
-  const acc = c.client_id ? db.prepare('SELECT discord_id FROM users WHERE id = ? AND active = 1').get(c.client_id) : null;
+  const acc = c.client_id ? Q.users.activeDiscordIdById.get(c.client_id) : null;
   return [...new Set([acc && acc.discord_id, c.discord_client_id].filter(isId))];
 }
 const clientDiscordId = (c) => clientDiscordIds(c)[0] || null;

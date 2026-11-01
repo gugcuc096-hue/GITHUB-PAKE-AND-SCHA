@@ -12,6 +12,7 @@
  *  /termine    Eigene nächste Termine und Fristen. /hilfe     Übersicht aller Befehle.
  */
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 const { isStaff, hashPassword, generateTempPassword, destroyAllSessions } = require('../core/auth');
 const { truncate, CASE_STATUS, STEPS, EVENT_TYPES, DUTY_STATUS, URGENCY_LABEL, PRIORITY_DISCORD } = require('../core/helpers');
 const { getCase, caseAccess, caseLawyers, onDutyMembers, APPT_SELECT, logActivity } = require('../db/models');
@@ -96,7 +97,7 @@ async function sendNewPassword(body, u, discordId) {
   const before = db.prepare('SELECT password_hash, must_change_password FROM users WHERE id = ?').get(u.id);
   const password = generateTempPassword();
   const newHash = hashPassword(password);
-  db.prepare('UPDATE users SET password_hash = ?, must_change_password = 1 WHERE id = ?').run(newHash, u.id);
+  Q.users.setTempPasswordById.run(newHash, u.id);
   const login = dashboardLink('/login');
   try {
     const dm = await tickets.rest('POST', '/users/@me/channels', { recipient_id: discordId });
@@ -197,7 +198,7 @@ function notizCommand(body, u) {
   const text = String(option(body, 'text') || '').trim();
   if (!text) return fail('Die Notiz ist leer.');
   db.prepare('INSERT INTO notes (case_id, author_id, author_name, author_role, body, internal) VALUES (?, ?, ?, ?, ?, 1)').run(c.id, u.id, u.display_name, u.role, truncate(text, 4000));
-  db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(c.id);
+  Q.cases.touchById.run(c.id);
   logActivity(u, 'Interne Notiz (Discord)', 'case', c.id, c.case_number);
   require('../core/live').caseChanged(c.id);
   return done(`Interne Notiz zu **${c.case_number}** gespeichert – nur für die Kanzlei sichtbar (nicht für den Mandanten, nicht im Ticket).\n\n>>> ${truncate(text, 1500)}`, 'Notiz gespeichert');

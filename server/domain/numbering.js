@@ -9,6 +9,7 @@
  * Bestehende Akten behalten ihr Zeichen; das Muster gilt nur für neue.
  */
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 const siteConfig = require('../web/siteConfig');
 
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -27,7 +28,7 @@ function fill(pattern, ctx = {}) {
   const d = ctx.date || new Date();
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit' }).formatToParts(d).map((p) => [p.type, p.value]));
   const area = ctx.area ? db.prepare('SELECT short FROM areas WHERE key = ?').get(ctx.area) : null;
-  const lawyer = ctx.lawyerId ? db.prepare('SELECT display_name FROM users WHERE id = ?').get(ctx.lawyerId) : null;
+  const lawyer = ctx.lawyerId ? Q.users.displayNameById.get(ctx.lawyerId) : null;
   return pattern
     .replace(/\{JJJJ\}/g, parts.year)
     .replace(/\{JJ\}/g, parts.year.slice(2))

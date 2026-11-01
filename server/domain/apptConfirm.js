@@ -7,13 +7,14 @@
  * Mandant dieses Termins (sein Discord).
  */
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 const { getAppointment, getCase } = require('../db/models');
 const tickets = require('../integrations/tickets');
 
 /** Discord des Mandanten: verknüpftes Konto, sonst sein Discord aus dem Ticket der Akte. */
 function clientDiscordOf(a) {
   const uid = a.client_id || a.case_client_id;
-  const u = uid && db.prepare('SELECT discord_id FROM users WHERE id = ? AND active = 1').get(uid);
+  const u = uid && Q.users.activeDiscordIdById.get(uid);
   if (u && tickets.isId(u.discord_id)) return u.discord_id;
   const c = a.case_id && getCase(a.case_id);
   const id = c && tickets.clientDiscordId(c);

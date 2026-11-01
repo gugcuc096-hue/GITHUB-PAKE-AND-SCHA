@@ -17,6 +17,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { z } = require('zod');
 const { db, tx, nextConcernNumber, randomPin } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth } = require('../core/auth');
 const { wrap, parseBody, idParam, truncate, isBoard, BOARD_RANK_SQL } = require('../core/helpers');
 const { logActivity } = require('../db/models');
@@ -250,7 +251,7 @@ router.get('/:id', (req, res) => {
   const u = req.user;
   const board = isBoard(u);
   const mine = k.author_id === u.id;
-  if (mine) db.prepare("UPDATE concerns SET author_seen_at = datetime('now') WHERE id = ?").run(k.id);
+  if (mine) Q.concerns.markAuthorSeenById.run(k.id);
   const messages = db
     .prepare('SELECT * FROM concern_messages WHERE concern_id = ? ORDER BY created_at ASC, id ASC')
     .all(k.id)
@@ -263,7 +264,7 @@ router.get('/:id', (req, res) => {
         .all()
         .map((b) => ({ id: b.id, name: b.display_name, rank: b.rank }))
     : undefined;
-  const boardReplies = db.prepare('SELECT COUNT(*) AS n FROM concern_messages WHERE concern_id = ? AND from_board = 1').get(k.id).n;
+  const boardReplies = Q.concernMessages.countFromBoardByConcernId.get(k.id).n;
   res.json({
     concern: { ...row(k, u), body: k.body },
     messages,
@@ -382,7 +383,7 @@ router.delete(
     const k = load(req, res);
     if (!k) return;
     const u = req.user;
-    const boardReplies = db.prepare('SELECT COUNT(*) AS n FROM concern_messages WHERE concern_id = ? AND from_board = 1').get(k.id).n;
+    const boardReplies = Q.concernMessages.countFromBoardByConcernId.get(k.id).n;
     const canWithdraw = k.author_id === u.id && k.status === 'offen' && !boardReplies;
     if (!canWithdraw && u.role !== 'admin') {
       return res.status(403).json({ error: 'Zurückziehen geht nur, solange das Board noch nicht reagiert hat.' });
@@ -448,7 +449,7 @@ publicRouter.post(
     if (!d) return;
     const k = publicLoad(res, d);
     if (!k) return;
-    db.prepare("UPDATE concerns SET author_seen_at = datetime('now') WHERE id = ?").run(k.id);
+    Q.concerns.markAuthorSeenById.run(k.id);
     const messages = db
       .prepare('SELECT * FROM concern_messages WHERE concern_id = ? AND internal = 0 ORDER BY created_at ASC, id ASC')
       .all(k.id)

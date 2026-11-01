@@ -3,6 +3,7 @@
 const express = require('express');
 const { z } = require('zod');
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth, requireStaff } = require('../core/auth');
 const { wrap, parseBody, idParam, isBoard, truncate, BOARD_RANK_SQL } = require('../core/helpers');
 const { logActivity } = require('../db/models');
@@ -90,9 +91,9 @@ router.post(
     const d = parseBody(z.object({ label: z.string().trim().min(2).max(160) }), req, res);
     if (!d) return;
     const userId = Number(req.params.userId);
-    if (!db.prepare('SELECT 1 FROM onboarding WHERE user_id = ?').get(userId)) return res.status(404).json({ error: 'Keine Einarbeitung gefunden.' });
+    if (!Q.onboarding.existsByUserId.get(userId)) return res.status(404).json({ error: 'Keine Einarbeitung gefunden.' });
     const sort = db.prepare('SELECT COALESCE(MAX(sort), -1) + 1 AS s FROM onboarding_items WHERE user_id = ?').get(userId).s;
-    db.prepare('INSERT INTO onboarding_items (user_id, label, sort) VALUES (?, ?, ?)').run(userId, d.label, sort);
+    Q.onboardingItems.insert.run(userId, d.label, sort);
     onboarding.refreshDone(userId);
     res.status(201).json({ success: true });
   })

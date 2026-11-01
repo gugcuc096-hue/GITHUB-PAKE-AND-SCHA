@@ -3,6 +3,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { z } = require('zod');
 const { db, tx } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth, isStaff } = require('../core/auth');
 const { wrap, parseBody, idParam, truncate, RANK_ORDER_SQL } = require('../core/helpers');
 const { MESSAGE_SELECT, messageRow, getCase, caseAccess } = require('../db/models');
@@ -75,7 +76,7 @@ router.post(
       if (!recipients.length) return res.status(400).json({ error: 'Es gibt keine weiteren aktiven Teammitglieder.' });
     } else {
       if (!d.recipientId) return res.status(400).json({ error: 'Bitte einen Empfänger auswählen.' });
-      const recipient = db.prepare('SELECT * FROM users WHERE id = ?').get(d.recipientId);
+      const recipient = Q.users.getById.get(d.recipientId);
       if (!recipient || !recipient.active) return res.status(404).json({ error: 'Empfänger nicht gefunden.' });
       if (recipient.id === u.id) return res.status(400).json({ error: 'Sie können sich nicht selbst eine Nachricht senden.' });
       if (u.role === 'mandant' && !isStaff(recipient)) return res.status(403).json({ error: 'Als Mandant können Sie nur an die Kanzlei schreiben.' });
@@ -119,7 +120,7 @@ router.patch(
   '/:id',
   wrap(async (req, res) => {
     const id = idParam(req);
-    const m = id && db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
+    const m = id && Q.messages.getById.get(id);
     if (!m || m.recipient_id !== req.user.id) return res.status(404).json({ error: 'Nachricht nicht gefunden.' });
     const d = parseBody(z.object({ isRead: z.boolean() }), req, res);
     if (!d) return;
@@ -133,7 +134,7 @@ router.delete(
   '/:id',
   wrap(async (req, res) => {
     const id = idParam(req);
-    const m = id && db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
+    const m = id && Q.messages.getById.get(id);
     const uid = req.user.id;
     if (!m || (m.recipient_id !== uid && m.sender_id !== uid)) return res.status(404).json({ error: 'Nachricht nicht gefunden.' });
     tx(() => {

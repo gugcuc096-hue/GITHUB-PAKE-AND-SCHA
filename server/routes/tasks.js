@@ -3,6 +3,7 @@
 const express = require('express');
 const { z } = require('zod');
 const { db, tx } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth, requireStaff } = require('../core/auth');
 const { wrap, parseBody, idParam, dateOnly, truncate, CHECKLISTS } = require('../core/helpers');
 const { TASK_SELECT, taskRow, getCase, addSystemNote } = require('../db/models');
@@ -22,7 +23,7 @@ function getTask(id) {
 }
 
 function touchCase(caseId) {
-  if (caseId) db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(caseId);
+  if (caseId) Q.cases.touchById.run(caseId);
 }
 
 function notifyAssigned(task, assignee, by) {
@@ -115,7 +116,7 @@ router.post(
     const c = getCase(d.caseId);
     if (!c) return res.status(404).json({ error: 'Akte nicht gefunden.' });
     const template = require('../domain/areas').checklistOf(c.area);
-    const existing = new Set(db.prepare('SELECT title FROM tasks WHERE case_id = ?').all(c.id).map((t) => t.title));
+    const existing = new Set(Q.tasks.titlesByCaseId.all(c.id).map((t) => t.title));
     const titles = template.filter((t) => !existing.has(t));
     const assigneeId = c.lawyer_id && activeStaff(c.lawyer_id) ? c.lawyer_id : req.user.id;
     tx(() => {

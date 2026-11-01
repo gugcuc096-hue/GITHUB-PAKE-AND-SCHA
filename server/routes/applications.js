@@ -4,6 +4,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { z } = require('zod');
 const { db, tx, nextApplicationNumber, randomPin } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth, requireAdmin, hashPassword, generateTempPassword, destroyAllSessions } = require('../core/auth');
 const { wrap, parseBody, idParam, isoDateTime, deriveInitials, truncate, APPLICATION_STATUS, rankField, BOARD_RANKS, RANKS, isBoard, firmEmail, EMAIL_HINT } = require('../core/helpers');
 const { applicationRow, positionRow, logActivity, firmPlace } = require('../db/models');
@@ -153,7 +154,7 @@ publicRouter.post(
   wrap(async (req, res) => {
     const d = parseBody(z.object({ number: z.string().trim().min(1).max(30), code: z.string().trim().min(1).max(10) }), req, res);
     if (!d) return;
-    const a = db.prepare('SELECT * FROM applications WHERE number = ? AND access_code = ?').get(d.number.toUpperCase(), d.code);
+    const a = Q.applications.getByNumberAndAccessCode.get(d.number.toUpperCase(), d.code);
     if (!a) return res.status(404).json({ error: 'Keine Bewerbung mit diesen Angaben gefunden.' });
     res.json({
       number: a.number,
@@ -185,7 +186,7 @@ publicRouter.post(
   wrap(async (req, res) => {
     const d = parseBody(z.object({ number: z.string().trim().min(1).max(30), code: z.string().trim().min(1).max(10) }), req, res);
     if (!d) return;
-    const a = db.prepare('SELECT * FROM applications WHERE number = ? AND access_code = ?').get(d.number.toUpperCase(), d.code);
+    const a = Q.applications.getByNumberAndAccessCode.get(d.number.toUpperCase(), d.code);
     if (!a) return res.status(404).json({ error: 'Keine Bewerbung mit diesen Angaben gefunden.' });
     res.json({ token: a.access_token, portal: portalPath(a) });
   })
@@ -280,7 +281,7 @@ const adminRouter = express.Router();
 adminRouter.use(requireAuth, requireBoard);
 
 function load(id) {
-  return db.prepare('SELECT * FROM applications WHERE id = ?').get(id) || null;
+  return Q.applications.getById.get(id) || null;
 }
 /**
  * Hat die Person schon ein Konto (z. B. als Mandant)? Erkannt an der verknüpften Discord-Kennung, an der Kontakt-E-Mail
@@ -519,7 +520,7 @@ adminRouter.post(
     let email = existing ? existing.email : firmEmail(d.email || '');
     if (!existing) {
       if (!email) return res.status(400).json({ error: EMAIL_HINT });
-      if (db.prepare('SELECT id FROM users WHERE email = ?').get(email)) return res.status(409).json({ error: 'Diese E-Mail-Adresse ist bereits vergeben.' });
+      if (Q.users.idByEmail.get(email)) return res.status(409).json({ error: 'Diese E-Mail-Adresse ist bereits vergeben.' });
     }
 
     const password = existing ? null : generateTempPassword();
@@ -540,7 +541,7 @@ adminRouter.post(
       hiredId = userId;
       const hasProfile = db.prepare('SELECT id FROM team_members WHERE user_id = ?').get(userId);
       if (d.createProfile !== false && !hasProfile) {
-        const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order), 0) AS m FROM team_members').get().m;
+        const maxOrder = Q.teamMembers.maxSortOrder.get().m;
         db.prepare(
           'INSERT INTO team_members (name, role_title, description, initials, tier, sort_order, user_id, visible) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
         ).run(a.name, d.rank || 'Mitarbeiter', d.description || '', deriveInitials(a.name), BOARD_RANKS.includes(d.rank) ? 'leitung' : 'anwalt', maxOrder + 1, userId, d.visible === false ? 0 : 1);
@@ -607,7 +608,7 @@ positionsRouter.post(
       .prepare('INSERT INTO positions (title, description, requirements, active, sort_order) VALUES (?, ?, ?, ?, ?)')
       .run(d.title, d.description || '', d.requirements || '', d.active === false ? 0 : 1, d.sortOrder ?? maxOrder + 1);
     logActivity(req.user, 'Stelle ausgeschrieben', 'position', Number(info.lastInsertRowid), d.title);
-    res.status(201).json({ position: positionRow(db.prepare('SELECT * FROM positions WHERE id = ?').get(Number(info.lastInsertRowid))) });
+    res.status(201).json({ position: positionRow(Q.positions.getById.get(Number(info.lastInsertRowid))) });
   })
 );
 
@@ -615,7 +616,7 @@ positionsRouter.patch(
   '/:id',
   wrap(async (req, res) => {
     const id = idParam(req);
-    const p = id && db.prepare('SELECT * FROM positions WHERE id = ?').get(id);
+    const p = id && Q.positions.getById.get(id);
     if (!p) return res.status(404).json({ error: 'Stelle nicht gefunden.' });
     const d = parseBody(positionSchema.partial(), req, res);
     if (!d) return;
@@ -627,7 +628,7 @@ positionsRouter.patch(
       d.sortOrder ?? p.sort_order,
       p.id
     );
-    res.json({ position: positionRow(db.prepare('SELECT * FROM positions WHERE id = ?').get(p.id)) });
+    res.json({ position: positionRow(Q.positions.getById.get(p.id)) });
   })
 );
 
@@ -635,7 +636,7 @@ positionsRouter.delete(
   '/:id',
   wrap(async (req, res) => {
     const id = idParam(req);
-    const p = id && db.prepare('SELECT * FROM positions WHERE id = ?').get(id);
+    const p = id && Q.positions.getById.get(id);
     if (!p) return res.status(404).json({ error: 'Stelle nicht gefunden.' });
     db.prepare('DELETE FROM positions WHERE id = ?').run(p.id);
     logActivity(req.user, 'Stelle gelöscht', 'position', p.id, p.title);

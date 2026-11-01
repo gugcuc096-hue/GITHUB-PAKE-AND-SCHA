@@ -6,6 +6,7 @@
  */
 const fs = require('fs');
 const { db, DB_PATH, UPLOAD_DIR, getSetting } = require('./db');
+const Q = require('./queries');
 
 let bootMs = null;
 /** Der Server nimmt Anfragen an: so lange (seit Prozessstart) hat der Start gedauert. */
@@ -15,7 +16,7 @@ const markReady = () => (bootMs = Math.round(process.uptime() * 1000));
 /** Legt für jede Fremdschlüssel-Spalte ohne Index einen an. Liefert die Zahl neu angelegter Indizes. */
 function ensureIndexes() {
   let created = 0;
-  const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all();
+  const tables = Q.sqliteMaster.tableNames.all();
   for (const { name } of tables) {
     const fks = db.prepare(`PRAGMA foreign_key_list("${name}")`).all();
     if (!fks.length) continue;
@@ -112,7 +113,7 @@ function selfTest({ deep = false } = {}) {
   });
   add('Fremdschlüssel ohne Index', () => {
     let missing = 0;
-    for (const { name } of db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all()) {
+    for (const { name } of Q.sqliteMaster.tableNames.all()) {
       const fks = db.prepare(`PRAGMA foreign_key_list("${name}")`).all();
       const first = new Set(db.prepare(`PRAGMA index_list("${name}")`).all().map((i) => (db.prepare(`PRAGMA index_info("${i.name}")`).all()[0] || {}).name));
       for (const pk of db.prepare(`PRAGMA table_info("${name}")`).all()) if (pk.pk === 1) first.add(pk.name);

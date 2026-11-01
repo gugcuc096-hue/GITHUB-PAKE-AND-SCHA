@@ -8,6 +8,7 @@
  * Knöpfe in der Direktnachricht: disc:yes:<id> / disc:no:<id> (siehe routes/interactions.js).
  */
 const { db, getSetting, setSetting } = require('../db/db');
+const Q = require('../db/queries');
 const { isBoard } = require('../core/helpers');
 const { getCase, addSystemNote, logActivity } = require('../db/models');
 const tickets = require('../integrations/tickets');
@@ -113,7 +114,7 @@ function decide(id, user, approve, { via = 'dashboard', note = '' } = {}) {
 }
 
 async function tellRequester(r) {
-  const u = r.requested_by && db.prepare('SELECT discord_id FROM users WHERE id = ?').get(r.requested_by);
+  const u = r.requested_by && Q.users.discordIdById.get(r.requested_by);
   if (!u || !tickets.isId(u.discord_id) || !tickets.hasToken()) return;
   const ok = r.status === 'genehmigt';
   const ch = await tickets.rest('POST', '/users/@me/channels', { recipient_id: u.discord_id });

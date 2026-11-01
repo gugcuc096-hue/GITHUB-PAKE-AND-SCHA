@@ -2,6 +2,7 @@
 const express = require('express');
 const { z } = require('zod');
 const { db, tx } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth, requireStaff, requireAdmin, userAvatarUrl } = require('../core/auth');
 const { wrap, parseBody, idParam, isoDateTime, DUTY_STATUS } = require('../core/helpers');
 const { DUTY_SELECT, dutySessionRow, onDutyMembers, logActivity } = require('../db/models');
@@ -42,8 +43,8 @@ function setDuty(userId, status, note) {
   setImmediate(() => require('../integrations/dutyChannel').update()); // Live-Anzeige im Discord-Kanalnamen
   return tx(() => {
     if (status === 'off') {
-      db.prepare('UPDATE duty_sessions SET ended_at = ? WHERE user_id = ? AND ended_at IS NULL').run(now, userId);
-      db.prepare("UPDATE users SET duty_status = 'off', duty_note = '', duty_since = NULL WHERE id = ?").run(userId);
+      Q.dutySessions.endOpenByUserId.run(now, userId);
+      Q.users.clearDutyById.run(userId);
       return { started: false, ended: !!open, duration: open ? Date.parse(now) - Date.parse(open.started_at) : 0 };
     }
     let since = now;
@@ -125,7 +126,7 @@ router.get(
     const sessions = db.prepare(`${sql} ORDER BY d.started_at DESC`).all(...params);
 
     const members = admin
-      ? db.prepare("SELECT * FROM users WHERE role IN ('anwalt','admin') AND active = 1 ORDER BY display_name").all()
+      ? Q.users.listActiveStaff.all()
       : [req.user];
     const totals = new Map(members.map((m) => [m.id, { userId: m.id, name: m.display_name, rank: m.rank || null, avatarUrl: userAvatarUrl(m), status: m.duty_status || 'off', minutes: 0, sessions: 0 }]));
     for (const s of sessions) {
@@ -176,7 +177,7 @@ router.patch(
   requireAdmin,
   wrap(async (req, res) => {
     const id = idParam(req);
-    const s = id && db.prepare('SELECT * FROM duty_sessions WHERE id = ?').get(id);
+    const s = id && Q.dutySessions.getById.get(id);
     if (!s) return res.status(404).json({ error: 'Schicht nicht gefunden.' });
     const d = parseBody(z.object({ startedAt: isoDateTime.optional(), endedAt: isoDateTime.optional(), note: z.string().trim().max(120).optional() }), req, res);
     if (!d) return;
@@ -186,7 +187,7 @@ router.patch(
     tx(() => {
       db.prepare('UPDATE duty_sessions SET started_at = ?, ended_at = ?, note = ?, auto_closed = 0 WHERE id = ?').run(start, end, d.note ?? s.note, s.id);
       // Offene Schicht wurde beendet -> Person ist außer Dienst; sonst Beginn nachziehen.
-      if (!s.ended_at && end) db.prepare("UPDATE users SET duty_status = 'off', duty_note = '', duty_since = NULL WHERE id = ?").run(s.user_id);
+      if (!s.ended_at && end) Q.users.clearDutyById.run(s.user_id);
       else if (!s.ended_at) db.prepare('UPDATE users SET duty_since = ? WHERE id = ?').run(start, s.user_id);
     });
     logActivity(req.user, 'Dienstzeit korrigiert', 'duty', s.id);
@@ -199,11 +200,11 @@ router.delete(
   requireAdmin,
   wrap(async (req, res) => {
     const id = idParam(req);
-    const s = id && db.prepare('SELECT * FROM duty_sessions WHERE id = ?').get(id);
+    const s = id && Q.dutySessions.getById.get(id);
     if (!s) return res.status(404).json({ error: 'Schicht nicht gefunden.' });
     tx(() => {
       db.prepare('DELETE FROM duty_sessions WHERE id = ?').run(s.id);
-      if (!s.ended_at) db.prepare("UPDATE users SET duty_status = 'off', duty_note = '', duty_since = NULL WHERE id = ?").run(s.user_id);
+      if (!s.ended_at) Q.users.clearDutyById.run(s.user_id);
     });
     logActivity(req.user, 'Dienstzeit gelöscht', 'duty', s.id);
     res.json({ success: true });
@@ -215,7 +216,7 @@ router.post(
   requireAdmin,
   wrap(async (req, res) => {
     const id = idParam(req);
-    const user = id && db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    const user = id && Q.users.getById.get(id);
     if (!user) return res.status(404).json({ error: 'Teammitglied nicht gefunden.' });
     setDuty(user.id, 'off');
     logActivity(req.user, 'Dienst beendet (durch Leitung)', 'duty', user.id, user.display_name);

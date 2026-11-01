@@ -6,6 +6,7 @@
  * automatisch und wird über Umgebungsvariablen gesteuert.
  */
 const { db, tx, getSetting, setSetting } = require('../db/db');
+const Q = require('../db/queries');
 const { hashPassword, generateStrongPassword, destroyAllSessions } = require('./auth');
 const { deriveInitials, EMAIL_DOMAIN, firmLocalFrom } = require('./helpers');
 const contracts = require('../domain/contracts');
@@ -99,7 +100,7 @@ function migrateLegacyData() {
       .get();
     if (parker) {
       const target = adminEmail();
-      const clash = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(target, parker.id);
+      const clash = Q.users.idByEmailExceptId.get(target, parker.id);
       const email = clash ? parker.email : target;
       db.prepare("UPDATE users SET display_name = 'Dr. Alois Pake', rank = 'Founding Partner', email = ? WHERE id = ?").run(email, parker.id);
       console.log(`Migration: Konto "Dr. Alois Parker" heißt jetzt "Dr. Alois Pake" (Login-E-Mail: ${email}, Passwort unverändert).`);
@@ -175,13 +176,13 @@ function ensureTeamProfiles() {
  * gelöscht), wird das Konto von Dr. Alois Pake automatisch wiederhergestellt.
  */
 function ensureMainAdmin() {
-  const admins = db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'admin' AND active = 1").get().n;
+  const admins = Q.users.countActiveAdmins.get().n;
   if (admins > 0) return;
 
   const email = adminEmail();
   const envPassword = process.env.ADMIN_PASSWORD || '';
   const password = envPassword || generateStrongPassword();
-  const existing = db.prepare('SELECT id FROM users WHERE email = ? OR old_email = ?').get(email, email);
+  const existing = Q.users.idByEmailOrOldEmail.get(email, email);
 
   if (existing) {
     db.prepare(
@@ -212,7 +213,7 @@ function applyEmergencyReset() {
   }
 
   const email = adminEmail();
-  const existing = db.prepare('SELECT id FROM users WHERE email = ? OR old_email = ?').get(email, email);
+  const existing = Q.users.idByEmailOrOldEmail.get(email, email);
   if (existing) {
     db.prepare(
       "UPDATE users SET role = 'admin', active = 1, password_hash = ?, must_change_password = 0 WHERE id = ?"
@@ -288,7 +289,7 @@ function fixCourtWording() {
       'Vertretung Hauptverhandlung (alle Gerichte)',
       'Vertretung Hauptverhandlung (US District Court)'
     );
-    db.prepare('UPDATE positions SET description = ? WHERE description = ?').run(
+    Q.positions.setDescriptionByDescription.run(
       'Eigenständige Mandatsbearbeitung im Tagesgeschäft: Ticketbearbeitung, Beratungsgespräche, Vertretung bei Festnahmen und vor allen Gerichten.',
       'Eigenständige Mandatsbearbeitung im Tagesgeschäft: Ticketbearbeitung, Beratungsgespräche, Vertretung bei Festnahmen und vor dem District Court.'
     );
@@ -303,7 +304,7 @@ function fixCourtWording() {
 function fixMentoringWording() {
   if (getSetting('fixed_mentoring_wording')) return;
   tx(() => {
-    db.prepare('UPDATE positions SET description = ? WHERE description = ?').run(
+    Q.positions.setDescriptionByDescription.run(
       'Einstieg in die Anwaltschaft mit Mentoring durch das Board of Partners: Recherche, Akteneinsicht, Vorbereitung von Beweisanträgen und Begleitung zu Gerichtsterminen.',
       'Einstieg in die Anwaltschaft mit Mentoring durch die Partner: Recherche, Akteneinsicht, Vorbereitung von Beweisanträgen und Begleitung zu Gerichtsterminen.'
     );
@@ -361,10 +362,10 @@ function backfillCaseWork() {
     for (const c of cases) {
       const team = [];
       if (c.lawyer_id) team.push({ id: c.lawyer_id, role: 'lead' });
-      for (const r of db.prepare('SELECT user_id FROM case_lawyers WHERE case_id = ?').all(c.id)) if (r.user_id !== c.lawyer_id) team.push({ id: r.user_id, role: 'co' });
+      for (const r of Q.caseLawyers.userIdsByCaseId.all(c.id)) if (r.user_id !== c.lawyer_id) team.push({ id: r.user_id, role: 'co' });
       const closed = c.status === 'geschlossen';
       for (const m of team) {
-        const u = db.prepare('SELECT display_name FROM users WHERE id = ?').get(m.id);
+        const u = Q.users.displayNameById.get(m.id);
         if (!u) continue;
         // Nur Verlaufseinträge, die eine Zuweisung beschreiben (nicht z. B. eine Vertragsunterschrift).
         const n = u.display_name;

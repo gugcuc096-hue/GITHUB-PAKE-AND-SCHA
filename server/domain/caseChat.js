@@ -20,6 +20,7 @@
  * und als interne Beweise in der Akte gespeichert; im Chat steht dann ein Verweis statt des Links.
  */
 const { db, getSetting } = require('../db/db');
+const Q = require('../db/queries');
 
 /* ---------------------------------------------------------------- Aus dem Discord-Ticket übernehmen */
 // Wird erst beim Aufruf geladen (tickets.js lädt viele Module – so entsteht kein Kreis beim Start)
@@ -150,14 +151,14 @@ function importFromDiscord(d) {
     const account = c.client_id ? db.prepare('SELECT id, display_name FROM users WHERE id = ?').get(c.client_id) : null;
     author = { id: account ? account.id : null, name: account ? account.display_name : c.client_name || d.author.global_name || d.author.username || 'Mandant', role: 'mandant' };
   } else {
-    const u = db.prepare("SELECT * FROM users WHERE discord_id = ? AND active = 1 AND role IN ('anwalt','admin')").get(authorId);
+    const u = Q.users.getActiveStaffByDiscordId.get(authorId);
     if (u && require('../db/models').caseAccess(c, u).canView) author = { id: u.id, name: u.display_name, role: u.role };
   }
   if (!author) return null;
   const info = db
     .prepare('INSERT INTO notes (case_id, author_id, author_name, author_role, body, internal, discord_message_id) VALUES (?, ?, ?, ?, ?, 0, ?)')
     .run(c.id, author.id, author.name, author.role, body, String(d.id));
-  db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(c.id);
+  Q.cases.touchById.run(c.id);
   const id = Number(info.lastInsertRowid);
   if (author.id) markRead(c.id, author.id, id); // eigene Nachricht gilt als gelesen
   require('../core/live').caseChanged(c.id, { chat: true }); // erscheint sofort im offenen Chat auf der Website
@@ -192,7 +193,7 @@ async function keepImages(c, author, noteId, images) {
   let body = db.prepare('SELECT body FROM notes WHERE id = ?').get(noteId)?.body;
   let kept = 0;
   for (const a of images) {
-    const count = db.prepare('SELECT COUNT(*) AS n FROM case_attachments WHERE case_id = ?').get(c.id).n;
+    const count = Q.caseAttachments.countByCaseId.get(c.id).n;
     if (count >= MAX_ATTACHMENTS_PER_CASE) break;
     const buf = await fetchImage(String(a.url || '')).catch(() => null);
     if (!buf) continue;

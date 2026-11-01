@@ -10,6 +10,7 @@
 const express = require('express');
 const { z } = require('zod');
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth } = require('../core/auth');
 const { wrap, parseBody, idParam, isBoard, truncate } = require('../core/helpers');
 const { logActivity } = require('../db/models');
@@ -94,7 +95,7 @@ router.post(
     const c = db.prepare('SELECT id, case_number, title, area, status, client_id FROM cases WHERE id = ?').get(d.caseId);
     if (!c || c.client_id !== u.id) return res.status(404).json({ error: 'Akte nicht gefunden.' });
     if (c.status !== 'geschlossen') return res.status(400).json({ error: 'Bewerten können Sie, sobald die Akte abgeschlossen ist.' });
-    if (db.prepare('SELECT 1 FROM reviews WHERE case_id = ?').get(c.id)) return res.status(409).json({ error: 'Zu dieser Akte haben Sie bereits eine Bewertung abgegeben.' });
+    if (Q.reviews.existsByCaseId.get(c.id)) return res.status(409).json({ error: 'Zu dieser Akte haben Sie bereits eine Bewertung abgegeben.' });
     const info = db
       .prepare('INSERT INTO reviews (case_id, user_id, rating, body, name_mode, author_name, area) VALUES (?, ?, ?, ?, ?, ?, ?)')
       .run(c.id, u.id, d.rating, d.body, d.nameMode, u.display_name, c.area || '');
@@ -118,7 +119,7 @@ router.patch(
   '/:id',
   wrap(async (req, res) => {
     const id = idParam(req);
-    const r = id && db.prepare('SELECT * FROM reviews WHERE id = ?').get(id);
+    const r = id && Q.reviews.getById.get(id);
     if (!r || r.user_id !== req.user.id) return res.status(404).json({ error: 'Bewertung nicht gefunden.' });
     const d = parseBody(schema, req, res);
     if (!d) return;
@@ -136,7 +137,7 @@ router.post(
   wrap(async (req, res) => {
     if (!isBoard(req.user)) return res.status(403).json({ error: 'Nur das Board of Partners gibt Bewertungen frei.' });
     const id = idParam(req);
-    const r = id && db.prepare('SELECT * FROM reviews WHERE id = ?').get(id);
+    const r = id && Q.reviews.getById.get(id);
     if (!r) return res.status(404).json({ error: 'Bewertung nicht gefunden.' });
     const d = parseBody(z.object({ status: z.enum(['freigegeben', 'abgelehnt']) }), req, res);
     if (!d) return;
@@ -151,7 +152,7 @@ router.delete(
   '/:id',
   wrap(async (req, res) => {
     const id = idParam(req);
-    const r = id && db.prepare('SELECT * FROM reviews WHERE id = ?').get(id);
+    const r = id && Q.reviews.getById.get(id);
     if (!r || (r.user_id !== req.user.id && !isBoard(req.user))) return res.status(404).json({ error: 'Bewertung nicht gefunden.' });
     db.prepare('DELETE FROM reviews WHERE id = ?').run(r.id);
     logActivity(req.user, 'Bewertung gelöscht', 'case', r.case_id, `${'★'.repeat(r.rating)} · ${truncate(r.body, 80)}`);

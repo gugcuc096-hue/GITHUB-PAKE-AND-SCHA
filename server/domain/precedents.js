@@ -7,6 +7,7 @@
  */
 const { z } = require('zod');
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 const { OUTCOMES } = require('../core/helpers');
 const areas = require('./areas');
 
@@ -77,7 +78,7 @@ function check(d) {
 function create(data, user) {
   const d = input.parse(data);
   check(d);
-  if (d.caseId && db.prepare('SELECT 1 FROM precedents WHERE case_id = ?').get(d.caseId)) throw Object.assign(new Error('Zu dieser Akte gibt es schon einen Präzedenzfall.'), { status: 409 });
+  if (d.caseId && Q.precedents.existsByCaseId.get(d.caseId)) throw Object.assign(new Error('Zu dieser Akte gibt es schon einen Präzedenzfall.'), { status: 409 });
   const info = db
     .prepare(
       `INSERT INTO precedents (case_id, title, area, summary, arguments, result, lessons, outcome, sentence_he, sentence_fine, paragraphs, tags, created_by, created_by_id)
@@ -89,9 +90,9 @@ function create(data, user) {
 function update(id, data) {
   const d = input.parse(data);
   check(d);
-  const cur = db.prepare('SELECT * FROM precedents WHERE id = ?').get(id);
+  const cur = Q.precedents.getById.get(id);
   const caseId = d.caseId === undefined ? cur.case_id : d.caseId || null;
-  if (caseId && caseId !== cur.case_id && db.prepare('SELECT 1 FROM precedents WHERE case_id = ?').get(caseId)) throw Object.assign(new Error('Zu dieser Akte gibt es schon einen Präzedenzfall.'), { status: 409 });
+  if (caseId && caseId !== cur.case_id && Q.precedents.existsByCaseId.get(caseId)) throw Object.assign(new Error('Zu dieser Akte gibt es schon einen Präzedenzfall.'), { status: 409 });
   db.prepare(
     `UPDATE precedents SET case_id = ?, title = ?, area = ?, summary = ?, arguments = ?, result = ?, lessons = ?, outcome = ?, sentence_he = ?, sentence_fine = ?,
        paragraphs = ?, tags = ?, updated_at = datetime('now') WHERE id = ?`

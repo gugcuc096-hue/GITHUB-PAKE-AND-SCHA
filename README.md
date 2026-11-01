@@ -523,7 +523,7 @@ Der Server-Code liegt nach Bereichen in `server/`:
 | Ordner | Inhalt |
 |---|---|
 | `server/routes/` | API-Routen (je Bereich eine Datei) |
-| `server/db/` | Datenbank: Verbindung, nummerierte Migrationen (`migrations/`), Abfragen, Sicherung, Wartung, Papierkorb |
+| `server/db/` | Datenbank: Verbindung, nummerierte Migrationen (`migrations/`), gemeinsame Abfragen je Bereich (`queries/`: users, cases, money, office – `Q.users.getById.get(id)`), Sicherung, Wartung, Papierkorb |
 | `server/core/` | Grundlagen: Anmeldung, Rechte, Helfer, Uploads, Live-Verbindung, Start-Routinen |
 | `server/domain/` | Fachlogik: Akten, Rechnungen, Verträge, Fristen, Rechtsgebiete, Strafkatalog … |
 | `server/integrations/` | Discord (Bot, Tickets, Webhooks), FiveNet, Google (Drive, Docs, Sheets), Sicherung außer Haus |

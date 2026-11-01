@@ -12,6 +12,7 @@ const { requirePerm } = require('../core/permissions');
 const { wrap, parseBody, RANKS, rankEnum } = require('../core/helpers');
 const { logActivity } = require('../db/models');
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 const bot = require('../integrations/discordBot');
 const msgs = require('../integrations/botMessages');
 const dm = require('../integrations/botDm');
@@ -560,7 +561,7 @@ router.post(
 
 function loadJob(req, res) {
   const jid = idParam(req, 'jid');
-  const j = jid && db.prepare('SELECT * FROM bot_message_jobs WHERE id = ?').get(jid);
+  const j = jid && Q.botMessageJobs.getById.get(jid);
   if (!j) res.status(404).json({ error: 'Automatik nicht gefunden.' });
   return j;
 }

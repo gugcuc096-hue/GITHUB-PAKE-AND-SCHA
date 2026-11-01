@@ -5,6 +5,7 @@
  * dafür lässt sich im Board unter Discord ein eigener Kanal (Webhook) einrichten; die Eingeladenen werden dort erwähnt.
  */
 const { db, tx } = require('../db/db');
+const Q = require('../db/queries');
 const discord = require('../integrations/discord');
 const { truncate } = require('../core/helpers');
 const { userAvatarUrl } = require('../core/auth');
@@ -68,7 +69,7 @@ function invite(a, userIds, by) {
   // Im Dashboard sehen die Eingeladenen es in der Kanzlei-Post und im Kalender
   const stamp = new Date(a.starts_at).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', dateStyle: 'full', timeStyle: 'short' });
   for (const p of fresh) {
-    db.prepare('INSERT INTO messages (sender_id, recipient_id, case_id, subject, body) VALUES (?, ?, ?, ?, ?)').run(
+    Q.messages.insert.run(
       by.id,
       p.id,
       a.case_id || null,

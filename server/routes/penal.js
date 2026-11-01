@@ -11,6 +11,7 @@
 const express = require('express');
 const { z } = require('zod');
 const { db, tx } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth, requireStaff, isStaff } = require('../core/auth');
 const { wrap, parseBody, idParam, isBoard } = require('../core/helpers');
 const { getCase, caseAccess, addSystemNote, logActivity } = require('../db/models');
@@ -82,7 +83,7 @@ router.patch(
   requireBoard,
   wrap(async (req, res) => {
     const id = idParam(req);
-    const o = id && db.prepare('SELECT * FROM penal_offences WHERE id = ?').get(id);
+    const o = id && Q.penalOffences.getById.get(id);
     if (!o) return res.status(404).json({ error: 'Eintrag nicht gefunden.' });
     const d = parseBody(offenceSchema, req, res);
     if (!d) return;
@@ -101,7 +102,7 @@ router.delete(
   requireBoard,
   wrap(async (req, res) => {
     const id = idParam(req);
-    const o = id && db.prepare('SELECT * FROM penal_offences WHERE id = ?').get(id);
+    const o = id && Q.penalOffences.getById.get(id);
     if (!o) return res.status(404).json({ error: 'Eintrag nicht gefunden.' });
     // Anklagepunkte bestehender Akten bleiben (sie tragen ihren eigenen Stand)
     db.prepare('DELETE FROM penal_offences WHERE id = ?').run(id);
@@ -168,22 +169,22 @@ caseRouter.post(
     if (!c) return;
     const d = parseBody(z.object({ offenceId: z.number().int().positive(), count: z.number().int().min(1).max(20).default(1) }), req, res);
     if (!d) return;
-    const o = db.prepare('SELECT * FROM penal_offences WHERE id = ?').get(d.offenceId);
+    const o = Q.penalOffences.getById.get(d.offenceId);
     if (!o) return res.status(400).json({ error: 'Diesen Tatbestand gibt es im Strafkatalog nicht (mehr).' });
     // gleicher Tatbestand noch einmal: Anzahl hochzählen statt einer zweiten Zeile
-    const same = db.prepare('SELECT id, count FROM case_charges WHERE case_id = ? AND offence_id = ? ORDER BY id LIMIT 1').get(c.id, o.id);
+    const same = Q.caseCharges.firstByCaseAndOffence.get(c.id, o.id);
     if (same) {
-      db.prepare('UPDATE case_charges SET count = ? WHERE id = ?').run(Math.min(20, same.count + d.count), same.id);
-      db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(c.id);
+      Q.caseCharges.setCountById.run(Math.min(20, same.count + d.count), same.id);
+      Q.cases.touchById.run(c.id);
       return res.json(payload(c));
     }
-    if (db.prepare('SELECT COUNT(*) AS n FROM case_charges WHERE case_id = ?').get(c.id).n >= 40) return res.status(400).json({ error: 'Höchstens 40 Anklagepunkte je Akte.' });
+    if (Q.caseCharges.countByCaseId.get(c.id).n >= 40) return res.status(400).json({ error: 'Höchstens 40 Anklagepunkte je Akte.' });
     db.prepare(
       `INSERT INTO case_charges (case_id, offence_id, para, paragraph, title, min_he, max_he, fine_mode, fine_max, attempt, severe, count, created_by)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(c.id, o.id, o.para, o.paragraph, o.title, o.min_he, o.max_he, o.fine_mode, o.fine_max, o.attempt, o.severe, d.count, req.user.id);
     addSystemNote(c.id, req.user, `Anklagepunkt: ${penal.citation(o)} – ${o.title}`, true);
-    db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(c.id);
+    Q.cases.touchById.run(c.id);
     res.status(201).json(payload(c));
   })
 );
@@ -197,7 +198,7 @@ caseRouter.post(
     const item = z.object({ offenceId: z.number().int().positive(), count: z.number().int().min(1).max(20).default(1), attempted: z.boolean().optional(), aiding: z.boolean().optional() });
     const d = parseBody(z.object({ items: z.array(item).min(1).max(40) }), req, res);
     if (!d) return;
-    const offences = d.items.map((x) => db.prepare('SELECT * FROM penal_offences WHERE id = ?').get(x.offenceId));
+    const offences = d.items.map((x) => Q.penalOffences.getById.get(x.offenceId));
     if (offences.some((o) => !o)) return res.status(400).json({ error: 'Ein Tatbestand steht nicht (mehr) im Strafkatalog – bitte die Vorschläge neu laden.' });
     // alles oder nichts: passt ein Punkt nicht mehr hinein, bleibt die Akte unverändert
     let added;
@@ -206,10 +207,10 @@ caseRouter.post(
         const list = [];
         d.items.forEach((x, i) => {
           const o = offences[i];
-          const same = db.prepare('SELECT id, count FROM case_charges WHERE case_id = ? AND offence_id = ? ORDER BY id LIMIT 1').get(c.id, o.id);
-          if (same) db.prepare('UPDATE case_charges SET count = ? WHERE id = ?').run(Math.min(20, same.count + x.count), same.id);
+          const same = Q.caseCharges.firstByCaseAndOffence.get(c.id, o.id);
+          if (same) Q.caseCharges.setCountById.run(Math.min(20, same.count + x.count), same.id);
           else {
-            if (db.prepare('SELECT COUNT(*) AS n FROM case_charges WHERE case_id = ?').get(c.id).n >= 40) throw Object.assign(new Error('Höchstens 40 Anklagepunkte je Akte.'), { status: 400 });
+            if (Q.caseCharges.countByCaseId.get(c.id).n >= 40) throw Object.assign(new Error('Höchstens 40 Anklagepunkte je Akte.'), { status: 400 });
             db.prepare(
               `INSERT INTO case_charges (case_id, offence_id, para, paragraph, title, min_he, max_he, fine_mode, fine_max, attempt, severe, count, attempted, aiding, created_by)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -217,7 +218,7 @@ caseRouter.post(
           }
           list.push(`${x.count > 1 ? `${x.count}× ` : ''}${penal.citation(o)} – ${o.title}`);
         });
-        db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(c.id);
+        Q.cases.touchById.run(c.id);
         return list;
       });
     } catch (e) {
@@ -256,7 +257,7 @@ caseRouter.patch(
     const c = loadCase(req, res, { edit: true });
     if (!c) return;
     const cid = Number(req.params.cid);
-    const ch = db.prepare('SELECT * FROM case_charges WHERE id = ? AND case_id = ?').get(cid, c.id);
+    const ch = Q.caseCharges.getByIdAndCaseId.get(cid, c.id);
     if (!ch) return res.status(404).json({ error: 'Anklagepunkt nicht gefunden.' });
     const d = parseBody(z.object({ count: z.number().int().min(1).max(20).optional(), attempted: z.boolean().optional(), aiding: z.boolean().optional() }), req, res);
     if (!d) return;
@@ -276,7 +277,7 @@ caseRouter.delete(
   wrap(async (req, res) => {
     const c = loadCase(req, res, { edit: true });
     if (!c) return;
-    const ch = db.prepare('SELECT * FROM case_charges WHERE id = ? AND case_id = ?').get(Number(req.params.cid), c.id);
+    const ch = Q.caseCharges.getByIdAndCaseId.get(Number(req.params.cid), c.id);
     if (!ch) return res.status(404).json({ error: 'Anklagepunkt nicht gefunden.' });
     db.prepare('DELETE FROM case_charges WHERE id = ?').run(ch.id);
     addSystemNote(c.id, req.user, `Anklagepunkt entfernt: ${penal.citation(ch)} – ${ch.title}`, true);

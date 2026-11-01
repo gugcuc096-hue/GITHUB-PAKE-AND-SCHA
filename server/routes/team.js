@@ -2,6 +2,7 @@
 const express = require('express');
 const { z } = require('zod');
 const { db, tx, getSetting } = require('../db/db');
+const Q = require('../db/queries');
 const { requirePerm } = require('../core/permissions');
 const { requireAuth, hashPassword, generateTempPassword, destroyAllSessions } = require('../core/auth');
 const { wrap, parseBody, idParam, deriveInitials, RANKS, rankEnum, firmEmail, EMAIL_HINT } = require('../core/helpers');
@@ -71,7 +72,7 @@ function createAccount(account, name, rank) {
     err.status = 400;
     throw err;
   }
-  if (db.prepare('SELECT id FROM users WHERE email = ?').get(email)) {
+  if (Q.users.idByEmail.get(email)) {
     const err = new Error('Diese E-Mail-Adresse ist bereits vergeben.');
     err.status = 409;
     throw err;
@@ -84,7 +85,7 @@ function createAccount(account, name, rank) {
 }
 
 function checkLinkTarget(userId, memberId = null) {
-  const user = db.prepare("SELECT id FROM users WHERE id = ? AND role IN ('anwalt','admin')").get(userId);
+  const user = Q.users.staffIdById.get(userId);
   if (!user) return 'Das gewählte Konto existiert nicht oder ist kein Teamkonto.';
   const taken = db.prepare('SELECT id FROM team_members WHERE user_id = ? AND id IS NOT ?').get(userId, memberId);
   if (taken) return 'Dieses Konto ist bereits mit einem anderen Profil verknüpft.';
@@ -109,7 +110,7 @@ adminRouter.post(
     }
 
     // Rang eines verknüpften Kontos vorher (für das Personalprotokoll)
-    const linkedBefore = d.userId ? db.prepare('SELECT rank FROM users WHERE id = ?').get(d.userId) : null;
+    const linkedBefore = d.userId ? Q.users.rankById.get(d.userId) : null;
     let credentials = null;
     const id = tx(() => {
       let userId = d.userId || null;
@@ -117,7 +118,7 @@ adminRouter.post(
         credentials = createAccount(d.createAccount, d.name, d.roleTitle);
         userId = credentials.userId;
       }
-      const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order), 0) AS m FROM team_members').get().m;
+      const maxOrder = Q.teamMembers.maxSortOrder.get().m;
       const info = db
         .prepare(
           `INSERT INTO team_members (name, role_title, description, initials, tier, sort_order, user_id, visible, focus, highlights)
@@ -125,7 +126,7 @@ adminRouter.post(
         )
         .run(d.name, d.roleTitle, d.description || '', d.initials || deriveInitials(d.name), d.tier || 'anwalt', maxOrder + 1, userId, d.visible === false ? 0 : 1, (d.focus || []).join('\n'), (d.highlights || []).join('\n'));
       if (userId && d.userId) {
-        db.prepare('UPDATE users SET display_name = ?, rank = ? WHERE id = ?').run(d.name, d.roleTitle.slice(0, 60), userId);
+        Q.users.setDisplayNameAndRankById.run(d.name, d.roleTitle.slice(0, 60), userId);
       }
       return Number(info.lastInsertRowid);
     });
@@ -157,7 +158,7 @@ adminRouter.patch(
 
     // Rang vorher: der des verknüpften Kontos, sonst der im Profil (für das Personalprotokoll)
     const linkId = d.userId === undefined ? m.user_id : d.userId;
-    const rankBefore = linkId ? db.prepare('SELECT rank FROM users WHERE id = ?').get(linkId)?.rank ?? null : m.role_title;
+    const rankBefore = linkId ? Q.users.rankById.get(linkId)?.rank ?? null : m.role_title;
     let credentials = null;
     tx(() => {
       const name = d.name ?? m.name;
@@ -184,7 +185,7 @@ adminRouter.patch(
         m.id
       );
       // Verknüpftes Login-Konto synchron halten (Name im Dashboard, Rang in Nachrichten/Rechnungen).
-      if (userId) db.prepare('UPDATE users SET display_name = ?, rank = ? WHERE id = ?').run(name, roleTitle.slice(0, 60), userId);
+      if (userId) Q.users.setDisplayNameAndRankById.run(name, roleTitle.slice(0, 60), userId);
     });
 
     logActivity(req.user, 'Teammitglied geändert', 'team', m.id, d.name && d.name !== m.name ? `${m.name} → ${d.name}` : m.name);
@@ -256,7 +257,7 @@ adminRouter.delete(
       db.prepare('DELETE FROM team_members WHERE id = ?').run(m.id);
       if (lockAccount) {
         db.prepare("UPDATE users SET active = 0, duty_status = 'off', duty_since = NULL WHERE id = ?").run(m.user_id);
-        db.prepare("UPDATE duty_sessions SET ended_at = ? WHERE user_id = ? AND ended_at IS NULL").run(new Date().toISOString(), m.user_id);
+        Q.dutySessions.endOpenByUserId.run(new Date().toISOString(), m.user_id);
         destroyAllSessions(m.user_id);
       }
     });

@@ -10,6 +10,7 @@
 const express = require('express');
 const { z } = require('zod');
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth, requireStaff, isStaff } = require('../core/auth');
 const { wrap, parseBody, idParam, isoDateTime } = require('../core/helpers');
 const { getCase, caseAccess, addSystemNote } = require('../db/models');
@@ -114,7 +115,7 @@ router.patch(
     const c = load(req, res);
     if (!c) return;
     const pid = Number(req.params.pid);
-    const cur = db.prepare('SELECT * FROM case_places WHERE id = ? AND case_id = ?').get(pid, c.id);
+    const cur = Q.casePlaces.getByIdAndCaseId.get(pid, c.id);
     if (!cur) return res.status(404).json({ error: 'Ort nicht gefunden.' });
     const d = parseBody(patchBody, req, res);
     if (!d) return;
@@ -148,7 +149,7 @@ router.delete(
   wrap(async (req, res) => {
     const c = load(req, res);
     if (!c) return;
-    const cur = db.prepare('SELECT * FROM case_places WHERE id = ? AND case_id = ?').get(Number(req.params.pid), c.id);
+    const cur = Q.casePlaces.getByIdAndCaseId.get(Number(req.params.pid), c.id);
     if (!cur) return res.status(404).json({ error: 'Ort nicht gefunden.' });
     db.prepare('DELETE FROM case_places WHERE id = ?').run(cur.id);
     addSystemNote(c.id, req.user, `Ort entfernt: ${places.KINDS[cur.kind] || cur.kind}, Postal ${cur.postal}${cur.label ? ` – ${cur.label}` : ''}.`, true);

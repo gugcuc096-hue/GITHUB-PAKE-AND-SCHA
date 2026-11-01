@@ -7,6 +7,7 @@
 const express = require('express');
 const { z } = require('zod');
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth, requireStaff, userAvatarUrl } = require('../core/auth');
 const { wrap, parseBody, idParam, dateOnly } = require('../core/helpers');
 const { logActivity } = require('../db/models');
@@ -96,7 +97,7 @@ router.post(
     let userId = u.id;
     if (d.userId && d.userId !== u.id) {
       if (u.role !== 'admin') return res.status(403).json({ error: 'Nur das Board of Partners kann andere Teammitglieder abmelden.' });
-      const other = db.prepare("SELECT id FROM users WHERE id = ? AND role IN ('anwalt','admin') AND active = 1").get(d.userId);
+      const other = Q.users.activeStaffIdById.get(d.userId);
       if (!other) return res.status(400).json({ error: 'Dieses Teammitglied gibt es nicht.' });
       userId = other.id;
     }

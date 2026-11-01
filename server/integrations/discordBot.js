@@ -15,6 +15,7 @@
  * Alle Rollenänderungen laufen nacheinander in einer Warteschlange und stehen mit Grund im Discord-Audit-Log.
  */
 const { db, getSetting, setSetting } = require('../db/db');
+const Q = require('../db/queries');
 const { ASSOCIATE_RANKS, isBoard, truncate } = require('../core/helpers');
 const tickets = require('./tickets');
 
@@ -312,7 +313,7 @@ function queueMember(discordId, roles, delay = 1500) {
  */
 function syncUser(userId, { previousDiscordId } = {}) {
   if (!tickets.hasToken() || !isId(guildId()) || !anyRoleModule()) return;
-  const u = db.prepare('SELECT discord_id FROM users WHERE id = ?').get(userId);
+  const u = Q.users.discordIdById.get(userId);
   if (u && isId(u.discord_id)) enqueue(() => applyMember(u.discord_id), 'Rang-Sync');
   if (isId(previousDiscordId) && (!u || u.discord_id !== previousDiscordId)) {
     enqueue(() => applyMember(previousDiscordId, { forceRemove: true }), 'Rang-Sync');
@@ -347,7 +348,7 @@ function syncCaseClient(caseOrId, extraDiscordIds = []) {
   const ids = new Set(extraDiscordIds.filter(isId));
   if (c) {
     if (isId(c.discord_client_id)) ids.add(c.discord_client_id);
-    const u = c.client_id && db.prepare('SELECT discord_id FROM users WHERE id = ?').get(c.client_id);
+    const u = c.client_id && Q.users.discordIdById.get(c.client_id);
     if (u && isId(u.discord_id)) ids.add(u.discord_id);
   }
   for (const d of ids) enqueue(() => applyMember(d), 'Mandanten-Rolle');

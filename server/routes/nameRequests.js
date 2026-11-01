@@ -9,6 +9,7 @@
 const express = require('express');
 const { z } = require('zod');
 const { db, tx } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth } = require('../core/auth');
 const { wrap, parseBody, idParam, isBoard } = require('../core/helpers');
 const { logActivity } = require('../db/models');
@@ -46,7 +47,7 @@ function row(r) {
 
 /** Direktnachricht an die antragstellende Person (falls Bot + verknüpftes Discord). */
 async function dmUser(userId, embed) {
-  const u = db.prepare('SELECT discord_id FROM users WHERE id = ?').get(userId);
+  const u = Q.users.discordIdById.get(userId);
   if (!u || !tickets.isId(u.discord_id) || !tickets.hasToken()) return;
   try {
     const ch = await tickets.rest('POST', '/users/@me/channels', { recipient_id: u.discord_id });
@@ -85,14 +86,14 @@ router.post(
       ],
       link: discord.publicUrl('/dashboard#name-requests'),
     });
-    res.status(201).json({ request: row(db.prepare('SELECT * FROM name_requests WHERE id = ?').get(Number(info.lastInsertRowid))) });
+    res.status(201).json({ request: row(Q.nameRequests.getById.get(Number(info.lastInsertRowid))) });
   })
 );
 
 router.delete('/:id', (req, res) => {
   const r = db.prepare("SELECT * FROM name_requests WHERE id = ? AND user_id = ? AND status = 'offen'").get(idParam(req), req.user.id);
   if (!r) return res.status(404).json({ error: 'Kein offener Antrag gefunden.' });
-  db.prepare("UPDATE name_requests SET status = 'zurueckgezogen', decided_at = datetime('now') WHERE id = ?").run(r.id);
+  Q.nameRequests.withdrawById.run(r.id);
   res.json({ success: true });
 });
 
@@ -115,14 +116,14 @@ router.post(
   '/:id/decide',
   wrap(async (req, res) => {
     if (!isBoard(req.user)) return res.status(403).json({ error: 'Nur für das Board of Partners.' });
-    const r = db.prepare('SELECT * FROM name_requests WHERE id = ?').get(idParam(req));
+    const r = Q.nameRequests.getById.get(idParam(req));
     if (!r) return res.status(404).json({ error: 'Antrag nicht gefunden.' });
     if (r.status !== 'offen') return res.status(400).json({ error: 'Über diesen Antrag wurde bereits entschieden.' });
     if (r.user_id === req.user.id) return res.status(403).json({ error: 'Über den eigenen Antrag entscheidet ein anderes Mitglied des Board of Partners.' });
     const d = parseBody(z.object({ approve: z.boolean(), note: z.string().trim().max(500).optional() }), req, res);
     if (!d) return;
     if (!d.approve && !d.note) return res.status(400).json({ error: 'Bitte bei einer Ablehnung kurz den Grund angeben.' });
-    const target = db.prepare('SELECT * FROM users WHERE id = ?').get(r.user_id);
+    const target = Q.users.getById.get(r.user_id);
     tx(() => {
       db.prepare("UPDATE name_requests SET status = ?, decided_by = ?, decided_by_name = ?, decision_note = ?, decided_at = datetime('now') WHERE id = ?").run(
         d.approve ? 'genehmigt' : 'abgelehnt',
@@ -132,9 +133,9 @@ router.post(
         r.id
       );
       if (d.approve) {
-        db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run(r.new_name, r.user_id);
+        Q.users.setDisplayNameById.run(r.new_name, r.user_id);
         // Team-Profil der Website zieht mit
-        db.prepare('UPDATE team_members SET name = ? WHERE user_id = ?').run(r.new_name, r.user_id);
+        Q.teamMembers.setNameByUserId.run(r.new_name, r.user_id);
       }
     });
     logActivity(req.user, d.approve ? 'Namensänderung genehmigt' : 'Namensänderung abgelehnt', 'user', r.user_id, `${r.old_name} → ${r.new_name}${d.note ? ` (${d.note})` : ''}`);
@@ -155,7 +156,7 @@ router.post(
         : `Ihr Antrag auf den Namen **${r.new_name}** wurde abgelehnt.${d.note ? `\n\n**Grund:** ${d.note}` : ''}`,
       color: d.approve ? tickets.COLORS.green : tickets.COLORS.red,
     });
-    res.json({ request: row({ ...db.prepare('SELECT * FROM name_requests WHERE id = ?').get(r.id), current_name: d.approve ? r.new_name : target.display_name }) });
+    res.json({ request: row({ ...Q.nameRequests.getById.get(r.id), current_name: d.approve ? r.new_name : target.display_name }) });
   })
 );
 
@@ -188,15 +189,15 @@ router.post(
       res
     );
     if (!d) return;
-    const target = db.prepare('SELECT * FROM users WHERE id = ?').get(d.userId);
+    const target = Q.users.getById.get(d.userId);
     if (!target) return res.status(404).json({ error: 'Konto nicht gefunden.' });
     const self = target.id === me.id;
     const newName = d.newName.replace(/\s+/g, ' ');
     if (newName === target.display_name) return res.status(400).json({ error: 'Das ist bereits der aktuelle Name.' });
     const note = self ? 'Eigener Name – direkt geändert (Board of Partners)' : 'Direkt durch das Board of Partners geändert';
     tx(() => {
-      db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run(newName, target.id);
-      db.prepare('UPDATE team_members SET name = ? WHERE user_id = ?').run(newName, target.id); // Team-Profil zieht mit
+      Q.users.setDisplayNameById.run(newName, target.id);
+      Q.teamMembers.setNameByUserId.run(newName, target.id); // Team-Profil zieht mit
       const open = db.prepare("SELECT * FROM name_requests WHERE user_id = ? AND status = 'offen'").get(target.id);
       if (open && open.new_name === newName) {
         // Genau der beantragte Name → Antrag gilt als genehmigt
@@ -207,7 +208,7 @@ router.post(
           open.id
         );
       } else {
-        if (open && self) db.prepare("UPDATE name_requests SET status = 'zurueckgezogen', decided_at = datetime('now') WHERE id = ?").run(open.id);
+        if (open && self) Q.nameRequests.withdrawById.run(open.id);
         // Eintrag für die Historie (Profil der Person, Liste „Namensänderungen → Alle“)
         db.prepare(
           `INSERT INTO name_requests (user_id, old_name, new_name, reason, status, decided_by, decided_by_name, decision_note, decided_at, direct)

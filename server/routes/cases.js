@@ -5,6 +5,7 @@ const { z } = require('zod');
 const evidence = require('../domain/evidence');
 const { editConflicts } = require('../core/helpers');
 const { db, tx, randomPin, getSetting } = require('../db/db');
+const Q = require('../db/queries');
 const { nextCaseNumber } = require('../domain/numbering');
 const { requireAuth, requireAdmin, isStaff, findUserByLogin } = require('../core/auth');
 const {
@@ -252,7 +253,7 @@ router.post(
       lawyerId = u.id;
       if (d.lawyerId !== undefined && u.role === 'admin') {
         if (d.lawyerId !== null) {
-          const lawyer = db.prepare("SELECT id FROM users WHERE id = ? AND role IN ('anwalt','admin') AND active = 1").get(d.lawyerId);
+          const lawyer = Q.users.activeStaffIdById.get(d.lawyerId);
           if (!lawyer) return res.status(400).json({ error: 'Der gewählte Anwalt existiert nicht.' });
         }
         lawyerId = d.lawyerId;
@@ -552,7 +553,7 @@ function caseDetail(c, u, { lean = false, all = false } = {}) {
     places: staff ? require('../domain/places').listForCase(c.id) : undefined, // Tatort-Karte (nur Kanzlei)
     // Kanzlei: ähnliche Präzedenzfälle (gleiche Paragraphen/Rechtsgebiet) und der Eintrag zu dieser Akte
     similar: staff ? require('../domain/precedents').similarFor(c) : undefined,
-    precedentId: staff ? ((db.prepare('SELECT id FROM precedents WHERE case_id = ?').get(c.id) || {}).id ?? null) : undefined,
+    precedentId: staff ? ((Q.precedents.idByCaseId.get(c.id) || {}).id ?? null) : undefined,
     overlaps: staff
       ? (() => {
           const p = require('../domain/parties');
@@ -847,7 +848,7 @@ router.patch(
       db.prepare(`UPDATE cases SET ${sets.join(', ')} WHERE id = ?`).run(...values, c.id);
       if (coChanged || lawyerChanged) {
         const keep = new Set(coAfter);
-        coBefore.filter((id) => !keep.has(id)).forEach((id) => db.prepare('DELETE FROM case_lawyers WHERE case_id = ? AND user_id = ?').run(c.id, id));
+        coBefore.filter((id) => !keep.has(id)).forEach((id) => Q.caseLawyers.deleteByCaseIdAndUserId.run(c.id, id));
         const addCo = db.prepare('INSERT OR IGNORE INTO case_lawyers (case_id, user_id, added_by) VALUES (?, ?, ?)');
         coAfter.filter((id) => !coBefore.includes(id)).forEach((id) => addCo.run(c.id, id, u.id));
       }
@@ -1027,7 +1028,7 @@ router.post(
     const c = id && getCase(id);
     if (!c || !caseAccess(c, req.user).canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
     if (c.status === 'geschlossen' && !isStaff(req.user)) return res.status(403).json({ error: 'Die Akte ist geschlossen.' });
-    const count = db.prepare('SELECT COUNT(*) AS n FROM case_attachments WHERE case_id = ?').get(c.id).n;
+    const count = Q.caseAttachments.countByCaseId.get(c.id).n;
     if (count >= MAX_ATTACHMENTS_PER_CASE) {
       return res.status(400).json({ error: `Pro Akte sind höchstens ${MAX_ATTACHMENTS_PER_CASE} Anhänge möglich.` });
     }
@@ -1060,10 +1061,10 @@ router.post(
           crypto.createHash('sha256').update(req.body).digest('hex')
         );
       addSystemNote(c.id, req.user, `Anhang hinzugefügt${caption ? ': ' + caption : ''}.`, internal);
-      db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(c.id);
+      Q.cases.touchById.run(c.id);
       return r;
     });
-    const row = db.prepare('SELECT * FROM case_attachments WHERE id = ?').get(Number(info.lastInsertRowid));
+    const row = Q.caseAttachments.getById.get(Number(info.lastInsertRowid));
     if (!internal) {
       tickets.post(c.id, {
         event: 'attachment',
@@ -1086,7 +1087,7 @@ router.get(
     const attId = idParam(req, 'attId');
     const c = id && getCase(id);
     if (!c || !caseAccess(c, req.user).canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
-    const a = attId && db.prepare('SELECT * FROM case_attachments WHERE id = ? AND case_id = ?').get(attId, c.id);
+    const a = attId && Q.caseAttachments.getByIdAndCaseId.get(attId, c.id);
     if (!a || (a.internal && !isStaff(req.user))) return res.status(404).json({ error: 'Anhang nicht gefunden.' });
     res.set('Cache-Control', 'private, max-age=86400');
     res.type(a.mime);
@@ -1110,14 +1111,14 @@ router.put(
     const attId = idParam(req, 'attId');
     const c = id && getCase(id);
     if (!c || !caseAccess(c, req.user).canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
-    const a = attId && db.prepare('SELECT * FROM case_attachments WHERE id = ? AND case_id = ?').get(attId, c.id);
+    const a = attId && Q.caseAttachments.getByIdAndCaseId.get(attId, c.id);
     if (!a || (a.internal && !isStaff(req.user))) return res.status(404).json({ error: 'Anhang nicht gefunden.' });
     if (!isStaff(req.user) && a.uploader_id !== req.user.id) return res.status(403).json({ error: 'Keine Berechtigung.' });
     if (a.thumb) return res.json({ attachment: attachmentRow(a, c.id, isStaff(req.user)) });
     const saved = saveImage(req, 'evidence');
     const done = db.prepare('UPDATE case_attachments SET thumb = ? WHERE id = ? AND thumb IS NULL').run(saved.file, a.id);
     if (!done.changes) removeFile('evidence', saved.file); // gleichzeitig schon angelegt
-    res.json({ attachment: attachmentRow(db.prepare('SELECT * FROM case_attachments WHERE id = ?').get(a.id), c.id, isStaff(req.user)) });
+    res.json({ attachment: attachmentRow(Q.caseAttachments.getById.get(a.id), c.id, isStaff(req.user)) });
   })
 );
 
@@ -1148,7 +1149,7 @@ router.get(
     const attId = idParam(req, 'attId');
     const c = id && getCase(id);
     if (!c || !caseAccess(c, req.user).canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
-    const a = attId && db.prepare('SELECT * FROM case_attachments WHERE id = ? AND case_id = ?').get(attId, c.id);
+    const a = attId && Q.caseAttachments.getByIdAndCaseId.get(attId, c.id);
     if (!a || (a.internal && !isStaff(req.user))) return res.status(404).json({ error: 'Anhang nicht gefunden.' });
     res.set('Cache-Control', 'private, max-age=604800');
     if (!a.thumb) res.type(a.mime); // Vorschaubild: Typ aus der Dateiendung (.webp/.jpg/.png)
@@ -1178,7 +1179,7 @@ router.patch(
     const access = c ? caseAccess(c, req.user) : null;
     if (!c || !isStaff(req.user) || !access.canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
     if (!access.canEdit) return res.status(403).json({ error: 'Beweismittel beschreiben nur die zuständigen Anwälte.' });
-    const a = attId && db.prepare('SELECT * FROM case_attachments WHERE id = ? AND case_id = ?').get(attId, c.id);
+    const a = attId && Q.caseAttachments.getByIdAndCaseId.get(attId, c.id);
     if (!a) return res.status(404).json({ error: 'Anhang nicht gefunden.' });
     const d = parseBody(evidenceBody, req, res);
     if (!d) return;
@@ -1195,7 +1196,7 @@ router.patch(
     );
     // Wichtige Wechsel stehen im Verlauf (nur Kanzlei)
     if (d.status && d.status !== a.ev_status) addSystemNote(c.id, req.user, `Beweismittel B${a.ev_no}: ${evidence.STATUS[d.status]}`, true);
-    const row = db.prepare('SELECT * FROM case_attachments WHERE id = ?').get(a.id);
+    const row = Q.caseAttachments.getById.get(a.id);
     res.json({ attachment: attachmentRow(row, c.id, true) });
   })
 );
@@ -1207,7 +1208,7 @@ router.delete(
     const attId = idParam(req, 'attId');
     const c = id && getCase(id);
     if (!c || !caseAccess(c, req.user).canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
-    const a = attId && db.prepare('SELECT * FROM case_attachments WHERE id = ? AND case_id = ?').get(attId, c.id);
+    const a = attId && Q.caseAttachments.getByIdAndCaseId.get(attId, c.id);
     if (!a || (a.internal && !isStaff(req.user))) return res.status(404).json({ error: 'Anhang nicht gefunden.' });
     if (a.uploader_id !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Nur die hochladende Person oder das Board of Partners kann den Anhang löschen.' });
@@ -1354,7 +1355,7 @@ router.post(
       const info = db
         .prepare(`INSERT INTO notes (case_id, author_id, author_name, author_role, body, internal) VALUES (?, ?, ?, ?, ?, ?)`)
         .run(c.id, req.user.id, req.user.display_name, req.user.role, d.body, internal ? 1 : 0);
-      db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(c.id);
+      Q.cases.touchById.run(c.id);
       return Number(info.lastInsertRowid);
     });
     if (!internal) caseChat.markRead(c.id, req.user.id, noteId); // eigene Nachricht gilt als gelesen
@@ -1381,7 +1382,7 @@ router.delete(
   wrap(async (req, res) => {
     const caseId = idParam(req);
     const noteId = idParam(req, 'noteId');
-    const n = caseId && noteId && db.prepare('SELECT * FROM notes WHERE id = ? AND case_id = ?').get(noteId, caseId);
+    const n = caseId && noteId && Q.notes.getByIdAndCaseId.get(noteId, caseId);
     if (!n || n.system) return res.status(404).json({ error: 'Notiz nicht gefunden.' });
     if (n.author_id !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Sie können nur eigene Notizen löschen.' });
@@ -1397,7 +1398,7 @@ router.put('/:id/notes/:noteId/pin', (req, res) => {
   const noteId = idParam(req, 'noteId');
   const c = caseId && getCase(caseId);
   if (!c || !caseAccess(c, req.user).canView || !isStaff(req.user)) return res.status(404).json({ error: 'Akte nicht gefunden.' });
-  const n = noteId && db.prepare('SELECT * FROM notes WHERE id = ? AND case_id = ?').get(noteId, caseId);
+  const n = noteId && Q.notes.getByIdAndCaseId.get(noteId, caseId);
   if (!n || n.system || !n.internal) return res.status(404).json({ error: 'Interne Notiz nicht gefunden.' });
   const d = parseBody(z.object({ on: z.boolean() }), req, res);
   if (!d) return;
@@ -1448,7 +1449,7 @@ function claimCase(c, u, via = '') {
   const history = [`Federführend: ${u.display_name}${via}`, ...(newStatus ? [`Status: ${CASE_STATUS[c.status]} → ${CASE_STATUS[newStatus]}`] : [])];
   tx(() => {
     db.prepare("UPDATE cases SET lawyer_id = ?, status = COALESCE(?, status), updated_at = datetime('now') WHERE id = ?").run(u.id, newStatus || null, c.id);
-    db.prepare('DELETE FROM case_lawyers WHERE case_id = ? AND user_id = ?').run(c.id, u.id);
+    Q.caseLawyers.deleteByCaseIdAndUserId.run(c.id, u.id);
     addSystemNote(c.id, u, history.join(' · '));
     syncCaseWork(c.id);
   });

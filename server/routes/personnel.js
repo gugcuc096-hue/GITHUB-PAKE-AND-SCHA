@@ -16,6 +16,7 @@
 const express = require('express');
 const { z } = require('zod');
 const { db, tx } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth, requireStaff, userAvatarUrl, destroyAllSessions } = require('../core/auth');
 const { wrap, parseBody, idParam, isBoard, RANKS, rankEnum, BOARD_RANKS, RANK_ORDER_SQL, truncate } = require('../core/helpers');
 const { logActivity } = require('../db/models');
@@ -37,7 +38,7 @@ function changeType(oldRank, newRank) {
 }
 
 function announce(e) {
-  const person = e.userId ? db.prepare('SELECT discord_id FROM users WHERE id = ?').get(e.userId) : null;
+  const person = e.userId ? Q.users.discordIdById.get(e.userId) : null;
   const fields = [];
   let title;
   let description;
@@ -124,7 +125,7 @@ function promotionError(actor, target, newRank) {
 
 /** Offene Akten, in denen die Person federführend ist (nach einer Kündigung neu zu vergeben). */
 const openCasesOf = (userId) => db.prepare('SELECT COUNT(*) AS n FROM cases WHERE lawyer_id = ? AND closed_at IS NULL').get(userId).n;
-const activeAdminCount = () => db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'admin' AND active = 1").get().n;
+const activeAdminCount = () => Q.users.countActiveAdmins.get().n;
 
 /** Wer darf diese Person kündigen? Liefert eine Fehlermeldung oder null. */
 function terminationError(actor, target) {
@@ -214,7 +215,7 @@ router.post(
       res
     );
     if (!d) return;
-    const target = db.prepare("SELECT * FROM users WHERE id = ? AND active = 1 AND role IN ('anwalt', 'admin')").get(d.userId);
+    const target = Q.users.getActiveStaffById.get(d.userId);
     if (!target) return res.status(404).json({ error: 'Mitarbeiter nicht gefunden.' });
     if ((target.rank || '') === d.rank) return res.status(400).json({ error: `${target.display_name} hat bereits den Rang ${d.rank}.` });
     const err = promotionError(u, target, d.rank);
@@ -222,7 +223,7 @@ router.post(
 
     let id;
     tx(() => {
-      db.prepare('UPDATE users SET rank = ? WHERE id = ?').run(d.rank, target.id);
+      Q.users.setRankById.run(d.rank, target.id);
       // Team-Profil (öffentliche Website) mitziehen: Rang und Gruppe (Board of Partners / Associates)
       db.prepare(
         `UPDATE team_members SET role_title = ?, tier = CASE WHEN ? THEN 'leitung' WHEN tier = 'leitung' THEN 'anwalt' ELSE tier END WHERE user_id = ?`
@@ -245,7 +246,7 @@ router.post(
     if (!isBoard(u)) return res.status(403).json({ error: 'Degradierungen kann nur das Board of Partners vornehmen.' });
     const d = parseBody(z.object({ userId: z.number().int().positive(), rank: rankEnum(), note: z.string().trim().max(500).optional() }), req, res);
     if (!d) return;
-    const target = db.prepare("SELECT * FROM users WHERE id = ? AND active = 1 AND role IN ('anwalt', 'admin')").get(d.userId);
+    const target = Q.users.getActiveStaffById.get(d.userId);
     if (!target) return res.status(404).json({ error: 'Mitarbeiter nicht gefunden.' });
     if (rankIndex(target.rank) < 0) return res.status(400).json({ error: `${target.display_name} hat keinen Rang – es gibt nichts zu degradieren.` });
     if (rankIndex(d.rank) <= rankIndex(target.rank)) return res.status(400).json({ error: `${d.rank} ist nicht niedriger als der bisherige Rang (${target.rank}). Zum Befördern bitte „Befördern“ nutzen.` });
@@ -253,7 +254,7 @@ router.post(
     if (err) return res.status(403).json({ error: err });
     let id;
     tx(() => {
-      db.prepare('UPDATE users SET rank = ? WHERE id = ?').run(d.rank, target.id);
+      Q.users.setRankById.run(d.rank, target.id);
       db.prepare(
         `UPDATE team_members SET role_title = ?, tier = CASE WHEN ? THEN 'leitung' WHEN tier = 'leitung' THEN 'anwalt' ELSE tier END WHERE user_id = ?`
       ).run(d.rank, BOARD_RANKS.includes(d.rank) ? 1 : 0, target.id);
@@ -276,7 +277,7 @@ router.post(
     const u = req.user;
     const d = parseBody(z.object({ userId: z.number().int().positive(), note: z.string().trim().max(500).optional() }), req, res);
     if (!d) return;
-    const target = db.prepare("SELECT * FROM users WHERE id = ? AND active = 1 AND role IN ('anwalt', 'admin')").get(d.userId);
+    const target = Q.users.getActiveStaffById.get(d.userId);
     if (!target) return res.status(404).json({ error: 'Mitarbeiter nicht gefunden.' });
     const err = terminationError(u, target);
     if (err) return res.status(isBoard(u) && target.id !== u.id && err.startsWith('Es muss') ? 400 : 403).json({ error: err });
@@ -284,7 +285,7 @@ router.post(
     let id;
     tx(() => {
       db.prepare('UPDATE users SET active = 0, duty_status = ?, duty_note = ?, duty_since = NULL WHERE id = ?').run('off', '', target.id);
-      db.prepare('UPDATE duty_sessions SET ended_at = ? WHERE user_id = ? AND ended_at IS NULL').run(new Date().toISOString(), target.id);
+      Q.dutySessions.endOpenByUserId.run(new Date().toISOString(), target.id);
       db.prepare('UPDATE team_members SET visible = 0 WHERE user_id = ?').run(target.id);
       id = record({ type: 'kuendigung', userId: target.id, name: target.display_name, oldRank: target.rank, newRank: null, note: d.note, by: u });
     });

@@ -6,6 +6,7 @@
 const express = require('express');
 const { z } = require('zod');
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth, requireStaff } = require('../core/auth');
 const { wrap, parseBody, idParam, dateOnly, isBoard } = require('../core/helpers');
 const { getCase, caseAccess, logActivity } = require('../db/models');
@@ -20,7 +21,7 @@ function requireBoard(req, res, next) {
   next();
 }
 
-const load = (id) => db.prepare('SELECT * FROM cooperations WHERE id = ?').get(id) || null;
+const load = (id) => Q.cooperations.getById.get(id) || null;
 
 function members(id) {
   return db
@@ -214,7 +215,7 @@ router.delete(
     const k = load(idParam(req));
     const userId = idParam(req, 'userId');
     if (!k || !userId) return res.status(404).json({ error: 'Nicht gefunden.' });
-    const u = db.prepare('SELECT display_name FROM users WHERE id = ?').get(userId);
+    const u = Q.users.displayNameById.get(userId);
     db.prepare('DELETE FROM cooperation_members WHERE cooperation_id = ? AND user_id = ?').run(k.id, userId);
     logActivity(req.user, 'Kooperation: Konto entfernt', 'cooperation', k.id, `${k.name}: ${u ? u.display_name : userId}`);
     res.json({ cooperation: await row(k, req.user) });

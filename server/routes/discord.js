@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { db, tx } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth, createSession, publicUser, hashPassword, generateStrongPassword } = require('../core/auth');
 const { wrap } = require('../core/helpers');
 const { getCase, addSystemNote, logActivity } = require('../db/models');
@@ -75,7 +76,7 @@ function createDiscordAccount(profile, name) {
        VALUES (?, ?, ?, 'mandant', ?, ?, ?, 'discord', ?)`
     )
     .run(email, hashPassword(generateStrongPassword()), displayName, profile.id, profile.username, profile.avatar, ic.length >= 2 ? 0 : 1);
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(info.lastInsertRowid));
+  const user = Q.users.getById.get(Number(info.lastInsertRowid));
   logActivity(user, 'Konto per Discord angelegt', 'user', user.id, `${user.display_name} (${user.email})`);
   return user;
 }
@@ -118,7 +119,7 @@ router.post(
   wrap(async (req, res) => {
     const profile = takePending(req, res);
     if (!profile) return res.status(400).json({ error: 'Die Discord-Anmeldung ist abgelaufen. Bitte erneut „Mit Discord anmelden“.' });
-    let user = db.prepare('SELECT * FROM users WHERE discord_id = ?').get(profile.id);
+    let user = Q.users.getByDiscordId.get(profile.id);
     if (user && !user.active) return res.status(403).json({ error: 'Dieser Zugang wurde gesperrt. Bitte wenden Sie sich an das Board of Partners.' });
     if (!user) user = createDiscordAccount(profile, '');
     createSession(res, user.id);
@@ -161,7 +162,7 @@ router.post('/case-join', express.urlencoded({ extended: false, limit: '2kb' }),
   const number = String(req.body?.caseNumber || '').trim().toUpperCase().slice(0, 30);
   const pin = String(req.body?.pin || '').trim().slice(0, 10);
   if (!tickets.active()) return res.redirect('/?ticket=disabled');
-  const c = number && pin ? db.prepare('SELECT id FROM cases WHERE case_number = ? AND access_pin = ?').get(number, pin) : null;
+  const c = number && pin ? Q.cases.idByCaseNumberAndAccessPin.get(number, pin) : null;
   if (!c) return res.redirect('/?ticket=notfound');
   startFlow(req, res, 'case', String(c.id));
 });
@@ -171,7 +172,7 @@ router.get('/case-join', joinLimiter, (req, res) => {
   const number = String(req.query.c || '').trim().toUpperCase().slice(0, 30);
   const pin = String(req.query.p || '').trim().slice(0, 10);
   if (!tickets.active()) return res.redirect('/?ticket=disabled');
-  const c = number && pin ? db.prepare('SELECT id FROM cases WHERE case_number = ? AND access_pin = ?').get(number, pin) : null;
+  const c = number && pin ? Q.cases.idByCaseNumberAndAccessPin.get(number, pin) : null;
   if (!c) return res.redirect('/?ticket=notfound');
   startFlow(req, res, 'case', String(c.id));
 });
@@ -181,7 +182,7 @@ router.post('/case-account', express.urlencoded({ extended: false, limit: '2kb' 
   if (!fromOwnSite(req)) return res.redirect('/?ticket=error');
   const number = String(req.body?.caseNumber || '').trim().toUpperCase().slice(0, 30);
   const pin = String(req.body?.pin || '').trim().slice(0, 10);
-  const c = number && pin ? db.prepare('SELECT id FROM cases WHERE case_number = ? AND access_pin = ?').get(number, pin) : null;
+  const c = number && pin ? Q.cases.idByCaseNumberAndAccessPin.get(number, pin) : null;
   if (!c) return res.redirect('/?ticket=notfound');
   startFlow(req, res, 'signup', String(c.id));
 });
@@ -230,14 +231,14 @@ router.get(
     }
 
     if (mode === 'login') {
-      const user = db.prepare('SELECT * FROM users WHERE discord_id = ?').get(profile.id);
+      const user = Q.users.getByDiscordId.get(profile.id);
       if (!user) {
         // Noch kein Konto: auf der Login-Seite nachfragen (neues Mandantenkonto oder mit E-Mail anmelden und verknüpfen)
         rememberPending(res, profile);
         return res.redirect('/login?discord=neu');
       }
       if (!user.active) return fail('locked');
-      db.prepare('UPDATE users SET discord_username = ?, discord_avatar = ? WHERE id = ?').run(profile.username, profile.avatar, user.id);
+      Q.users.setDiscordUsernameAndDiscordAvatarById.run(profile.username, profile.avatar, user.id);
       createSession(res, user.id);
       return res.redirect('/dashboard');
     }
@@ -246,11 +247,11 @@ router.get(
     if (mode === 'signup') {
       const caseId = Number(extra) || null;
       const c = caseId ? getCase(caseId) : null;
-      let user = db.prepare('SELECT * FROM users WHERE discord_id = ?').get(profile.id);
+      let user = Q.users.getByDiscordId.get(profile.id);
       if (user && !user.active) return fail('locked');
       // Name aus der Mandatsanfrage nur, solange die Akte noch keinem Konto gehört
       if (!user) user = createDiscordAccount(profile, c && !c.client_id ? c.client_name : '');
-      else db.prepare('UPDATE users SET discord_username = ?, discord_avatar = ? WHERE id = ?').run(profile.username, profile.avatar, user.id);
+      else Q.users.setDiscordUsernameAndDiscordAvatarById.run(profile.username, profile.avatar, user.id);
       const attached = c ? attachCase(c.id, user, profile.id) : null;
       createSession(res, user.id);
       await afterDiscordLogin(user, profile);
@@ -266,7 +267,7 @@ router.get(
       db.prepare('UPDATE cases SET discord_client_id = ? WHERE id = ?').run(profile.id, c.id);
       if (profile.scope.includes('guilds.join')) await tickets.joinGuild(profile.id, profile.accessToken);
       await within(tickets.syncCase(c.id), 8000);
-      const info = tickets.ticketInfo(db.prepare('SELECT * FROM cases WHERE id = ?').get(c.id), null);
+      const info = tickets.ticketInfo(Q.cases.getById.get(c.id), null);
       if (info && info.url && info.clientInTicket) return res.redirect(info.url);
       return res.redirect('/?ticket=pending');
     }
@@ -281,7 +282,7 @@ router.get(
     // Bewerber: Discord an der Bewerbung merken (für Direktnachrichten), dem Server beitreten, Bestätigung schicken
     if (mode === 'application') {
       const appId = Number(extra);
-      const a = Number.isInteger(appId) && appId > 0 ? db.prepare('SELECT * FROM applications WHERE id = ?').get(appId) : null;
+      const a = Number.isInteger(appId) && appId > 0 ? Q.applications.getById.get(appId) : null;
       if (!a) return fail('error');
       db.prepare('UPDATE applications SET discord_user_id = ? WHERE id = ?').run(profile.id, a.id);
       if (profile.scope.includes('guilds.join') && tickets.active()) await within(tickets.joinGuild(profile.id, profile.accessToken), 8000);
@@ -329,7 +330,7 @@ router.post('/unlink', requireAuth, async (req, res) => {
   require('../integrations/discordBot').syncUser(req.user.id, { previousDiscordId: req.user.discord_id }); // Rang-Rollen entfernen
   tickets.syncUser(req.user.id); // aus den Tickets entfernen
   tickets.syncBoardAll();
-  res.json({ user: publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id)) });
+  res.json({ user: publicUser(Q.users.getById.get(req.user.id)) });
 });
 
 module.exports = router;

@@ -11,6 +11,7 @@
 const express = require('express');
 const { z } = require('zod');
 const { db, tx } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth, requireStaff } = require('../core/auth');
 const { wrap, parseBody, idParam, isBoard, AREAS } = require('../core/helpers');
 const { getCase, caseAccess } = require('../db/models');
@@ -60,7 +61,7 @@ router.post(
     if (!parseItems(d.items).length) return res.status(400).json({ error: 'Bitte mindestens eine Aufgabe eintragen.' });
     if (db.prepare('SELECT COUNT(*) AS n FROM task_packages').get().n >= 40) return res.status(400).json({ error: 'Höchstens 40 Pakete.' });
     const info = db.prepare('INSERT INTO task_packages (name, area, items) VALUES (?, ?, ?)').run(d.name, d.area, d.items);
-    res.status(201).json({ package: row(db.prepare('SELECT * FROM task_packages WHERE id = ?').get(Number(info.lastInsertRowid))) });
+    res.status(201).json({ package: row(Q.taskPackages.getById.get(Number(info.lastInsertRowid))) });
   })
 );
 
@@ -69,14 +70,14 @@ router.patch(
   wrap(async (req, res) => {
     if (!requireBoard(req, res)) return;
     const id = idParam(req);
-    const p = id && db.prepare('SELECT * FROM task_packages WHERE id = ?').get(id);
+    const p = id && Q.taskPackages.getById.get(id);
     if (!p) return res.status(404).json({ error: 'Paket nicht gefunden.' });
     const d = parseBody(schema.partial(), req, res);
     if (!d) return;
     const items = d.items ?? p.items;
     if (!parseItems(items).length) return res.status(400).json({ error: 'Bitte mindestens eine Aufgabe eintragen.' });
     db.prepare('UPDATE task_packages SET name = ?, area = ?, items = ? WHERE id = ?').run(d.name ?? p.name, d.area ?? p.area, items, p.id);
-    res.json({ package: row(db.prepare('SELECT * FROM task_packages WHERE id = ?').get(p.id)) });
+    res.json({ package: row(Q.taskPackages.getById.get(p.id)) });
   })
 );
 
@@ -96,7 +97,7 @@ router.post(
   '/:id/apply',
   wrap(async (req, res) => {
     const id = idParam(req);
-    const p = id && db.prepare('SELECT * FROM task_packages WHERE id = ?').get(id);
+    const p = id && Q.taskPackages.getById.get(id);
     if (!p) return res.status(404).json({ error: 'Paket nicht gefunden.' });
     const d = parseBody(z.object({ caseId: z.number().int().positive() }), req, res);
     if (!d) return;
@@ -104,16 +105,16 @@ router.post(
     const access = c ? caseAccess(c, req.user) : null;
     if (!c || !access.canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
     if (!access.canEdit) return res.status(403).json({ error: 'Nur die zuständigen Anwälte können Aufgaben-Pakete übernehmen.' });
-    const existing = new Set(db.prepare('SELECT title FROM tasks WHERE case_id = ?').all(c.id).map((t) => t.title));
+    const existing = new Set(Q.tasks.titlesByCaseId.all(c.id).map((t) => t.title));
     const total = existing.size;
     const items = parseItems(p.items).filter((i) => !existing.has(i.title));
     if (total + items.length > MAX_TASKS_PER_CASE) return res.status(400).json({ error: `Höchstens ${MAX_TASKS_PER_CASE} Aufgaben pro Akte.` });
-    const assignee = c.lawyer_id && db.prepare("SELECT id FROM users WHERE id = ? AND role IN ('anwalt','admin') AND active = 1").get(c.lawyer_id) ? c.lawyer_id : req.user.id;
+    const assignee = c.lawyer_id && Q.users.activeStaffIdById.get(c.lawyer_id) ? c.lawyer_id : req.user.id;
     const due = (days) => (days == null ? null : new Date(Date.now() + days * 864e5).toISOString().slice(0, 10));
     tx(() => {
       const ins = db.prepare('INSERT INTO tasks (case_id, title, due_date, assigned_to, created_by) VALUES (?, ?, ?, ?, ?)');
       items.forEach((i) => ins.run(c.id, i.title, due(i.days), assignee, req.user.id));
-      if (items.length) db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(c.id);
+      if (items.length) Q.cases.touchById.run(c.id);
     });
     res.status(201).json({ added: items.length, skipped: parseItems(p.items).length - items.length });
   })

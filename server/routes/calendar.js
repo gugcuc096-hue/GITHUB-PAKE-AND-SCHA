@@ -2,6 +2,7 @@
 const express = require('express');
 const { z } = require('zod');
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth, isStaff } = require('../core/auth');
 const { wrap, parseBody, idParam, isoDateTime, EVENT_TYPES, truncate } = require('../core/helpers');
 const { getCase, caseAccess, APPT_SELECT, getAppointment, apptVisible, apptRow, firmPlace } = require('../db/models');
@@ -96,7 +97,7 @@ router.post(
     } else {
       let assignedTo = d.assignedTo === undefined ? u.id : d.assignedTo;
       if (assignedTo) {
-        const a = db.prepare("SELECT id FROM users WHERE id = ? AND role IN ('anwalt','admin')").get(assignedTo);
+        const a = Q.users.staffIdById.get(assignedTo);
         if (!a) return res.status(400).json({ error: 'Die zuständige Person existiert nicht.' });
       }
       // Terminvorschlag: bis zu drei Zeiten, der Mandant wählt eine (Termin ist bis dahin „angefragt“)
@@ -220,7 +221,7 @@ router.patch(
     if (d.clientVisible !== undefined) set('client_visible', d.clientVisible ? 1 : 0);
     if (d.assignedTo !== undefined) {
       if (d.assignedTo) {
-        const person = db.prepare("SELECT id FROM users WHERE id = ? AND role IN ('anwalt','admin')").get(d.assignedTo);
+        const person = Q.users.staffIdById.get(d.assignedTo);
         if (!person) return res.status(400).json({ error: 'Die zuständige Person existiert nicht.' });
       }
       set('assigned_to', d.assignedTo);

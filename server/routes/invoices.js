@@ -2,6 +2,7 @@
 const express = require('express');
 const { z } = require('zod');
 const { db, nextInvoiceNumber, getSetting } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth, requireStaff, requireAdmin, isStaff } = require('../core/auth');
 const { wrap, parseBody, idParam, dateOnly, truncate } = require('../core/helpers');
 const { imageBody, saveImage, removeFile, evidencePath } = require('../core/uploads');
@@ -154,7 +155,7 @@ router.post(
     let k = null;
     let via = '';
     if (d.cooperationId) {
-      k = db.prepare('SELECT * FROM cooperations WHERE id = ?').get(d.cooperationId);
+      k = Q.cooperations.getById.get(d.cooperationId);
       if (!k || !coop.isValid(k)) return res.status(400).json({ error: 'Die gewählte Kooperation gibt es nicht oder sie ist nicht (mehr) aktiv.' });
       via = 'manuell';
       if (c) {
@@ -306,7 +307,7 @@ router.patch(
         req.user
       );
     } else if (inv.payment_reported_at && inv.status !== 'offen' && d.status === 'offen') {
-      db.prepare("UPDATE invoices SET payment_reported_at = NULL, payment_note = '', payment_proof = '', payment_reported_by = NULL WHERE id = ?").run(inv.id);
+      Q.invoices.clearPaymentReportById.run(inv.id);
       if (inv.payment_proof) removeFile('evidence', inv.payment_proof);
     }
     // VIP/Lifetime-Anfrage: bezahlt → Mitgliedschaft freischalten, storniert → Anfrage abgelehnt
@@ -342,7 +343,7 @@ function tellClient(inv, msg, by) {
 function paymentPingIds(inv, c) {
   const ids = c ? caseLawyers(c).map((l) => l.discordId) : [];
   if (!ids.length && inv.issued_by) {
-    const issuer = db.prepare('SELECT discord_id FROM users WHERE id = ?').get(inv.issued_by);
+    const issuer = Q.users.discordIdById.get(inv.issued_by);
     if (issuer && issuer.discord_id) ids.push(issuer.discord_id);
   }
   return ids.filter(Boolean);
@@ -441,7 +442,7 @@ router.post(
     if (inv.status !== 'offen' || !inv.payment_reported_at) return res.status(400).json({ error: 'Zu dieser Rechnung liegt keine offene Zahlungsmeldung vor.' });
     const d = parseBody(z.object({ reason: z.string().trim().max(300).optional() }), req, res);
     if (!d) return;
-    db.prepare("UPDATE invoices SET payment_reported_at = NULL, payment_note = '', payment_proof = '', payment_reported_by = NULL WHERE id = ?").run(inv.id);
+    Q.invoices.clearPaymentReportById.run(inv.id);
     if (inv.payment_proof) removeFile('evidence', inv.payment_proof);
     const label = docLabel(inv);
     // Für den Mandanten sichtbar in der Akte – der Hinweis richtet sich an ihn

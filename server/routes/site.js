@@ -7,6 +7,7 @@
 const express = require('express');
 const { z } = require('zod');
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth } = require('../core/auth');
 const { requirePerm } = require('../core/permissions');
 const configLog = require('../core/configLog');
@@ -101,12 +102,12 @@ router.put(
     const original = sitePages.texts(d.page).get(d.key);
     if (original === undefined) return res.status(404).json({ error: 'Diesen Text gibt es auf der Seite nicht mehr – bitte neu laden.' });
     const text = d.text.replace(/\s+/g, ' ').trim();
-    const prev = db.prepare('SELECT original, text FROM site_texts WHERE page = ? AND key = ?').get(d.page, d.key);
+    const prev = Q.siteTexts.originalAndTextByPageAndKey.get(d.page, d.key);
     const logText = (after) =>
       configLog.add(req.user, { area: 'site_text', key: `${d.page}:${d.key}`, label: `Website-Text (${PAGE_LABEL[d.page]})`, perm: 'site.edit', before: prev ? { original: prev.original, text: prev.text } : null, after, revertible: true });
     if (!text || text === original) {
       if (prev) logText(null);
-      db.prepare('DELETE FROM site_texts WHERE page = ? AND key = ?').run(d.page, d.key);
+      Q.siteTexts.deleteByPageAndKey.run(d.page, d.key);
       return res.json({ text: original, original, changed: false });
     }
     db.prepare(
@@ -124,10 +125,10 @@ router.delete(
   boardOnly,
   wrap(async (req, res) => {
     const { page, key } = req.params;
-    const row = db.prepare('SELECT original, text FROM site_texts WHERE page = ? AND key = ?').get(page, key);
+    const row = Q.siteTexts.originalAndTextByPageAndKey.get(page, key);
     if (!row) return res.status(404).json({ error: 'Der Text ist nicht geändert.' });
     configLog.add(req.user, { area: 'site_text', key: `${page}:${key}`, label: `Website-Text (${PAGE_LABEL[page] || page}) zurückgesetzt`, perm: 'site.edit', before: { original: row.original, text: row.text }, after: null, revertible: true });
-    db.prepare('DELETE FROM site_texts WHERE page = ? AND key = ?').run(page, key);
+    Q.siteTexts.deleteByPageAndKey.run(page, key);
     logActivity(req.user, 'Website-Text zurückgesetzt', 'settings', null, `${PAGE_LABEL[page] || page}: „${truncate(row.original, 60)}“`);
     res.json({ text: row.original });
   })

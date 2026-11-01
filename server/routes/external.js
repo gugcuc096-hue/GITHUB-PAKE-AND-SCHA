@@ -18,6 +18,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { z } = require('zod');
 const { db, tx } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth, requireStaff, isStaff } = require('../core/auth');
 const { wrap, parseBody, idParam, dateOnly, truncate, MAX_ATTACHMENTS_PER_CASE } = require('../core/helpers');
 const { getCase, caseAccess, addSystemNote, externalDocRow, logActivity } = require('../db/models');
@@ -73,7 +74,7 @@ const PROVIDERS = {
 const providerOf = (link) => PROVIDERS[link.provider] || PROVIDERS.fivenet;
 
 const sha256 = (buf) => crypto.createHash('sha256').update(buf).digest('hex');
-const touchCase = (caseId) => db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(caseId);
+const touchCase = (caseId) => Q.cases.touchById.run(caseId);
 
 /** Andere Akten mit demselben Dokument (für Dublettenwarnung und Querverweise). */
 function linksTo(provider, externalId) {
@@ -287,7 +288,7 @@ caseRouter.post(
           );
         addSystemNote(c.id, req.user, `${p.noun} verknüpft: ${p.label(ref.documentId, d.title)}.`, internal);
         touchCase(c.id);
-        return db.prepare('SELECT * FROM case_external_docs WHERE id = ?').get(Number(info.lastInsertRowid));
+        return Q.caseExternalDocs.getById.get(Number(info.lastInsertRowid));
       });
     } catch (err) {
       // Gleichzeitiges Doppel-Verknüpfen: die UNIQUE-Regel der Tabelle greift.
@@ -369,7 +370,7 @@ caseRouter.patch(
         }
       });
     }
-    res.json({ document: externalDocRow(db.prepare('SELECT * FROM case_external_docs WHERE id = ?').get(link.id), req.user) });
+    res.json({ document: externalDocRow(Q.caseExternalDocs.getById.get(link.id), req.user) });
   })
 );
 
@@ -421,7 +422,7 @@ caseRouter.post(
     const existing = db.prepare('SELECT source_url, content_hash FROM case_attachments WHERE external_doc_id = ?').all(link.id);
     const knownUrls = new Set(existing.map((r) => r.source_url).filter(Boolean));
     const knownHashes = new Set(existing.map((r) => r.content_hash).filter(Boolean));
-    let free = MAX_ATTACHMENTS_PER_CASE - db.prepare('SELECT COUNT(*) AS n FROM case_attachments WHERE case_id = ?').get(c.id).n;
+    let free = MAX_ATTACHMENTS_PER_CASE - Q.caseAttachments.countByCaseId.get(c.id).n;
     const caption = truncate(`${p.noun} ${p.label(link.external_id, link.title)}`, 180);
     const result = { imported: 0, skipped: 0, failed: [], map: [] };
     // Beweismittel-Nummer eines (bereits vorhandenen oder neuen) Bildes dieses Dokuments – für die Marker im Text

@@ -1,5 +1,6 @@
 'use strict';
 const { db, getSetting, setSetting } = require('./db');
+const Q = require('./queries');
 const { isStaff, userAvatarUrl } = require('../core/auth');
 const { STEPS, CASE_STATUS, EVENT_TYPES, APPLICATION_STATUS, DUTY_STATUS, truncate } = require('../core/helpers');
 const { avatarUrl, teamPhotoUrl } = require('../core/uploads');
@@ -73,7 +74,7 @@ function syncCaseWork(caseId, reason = 'nicht mehr zuständig') {
   const want = new Map();
   if (!closed) {
     if (c.lawyer_id) want.set(c.lawyer_id, 'lead');
-    for (const r of db.prepare('SELECT user_id FROM case_lawyers WHERE case_id = ?').all(caseId)) if (!want.has(r.user_id)) want.set(r.user_id, 'co');
+    for (const r of Q.caseLawyers.userIdsByCaseId.all(caseId)) if (!want.has(r.user_id)) want.set(r.user_id, 'co');
   }
   const open = db.prepare('SELECT * FROM case_work WHERE case_id = ? AND ended_at IS NULL').all(caseId);
   for (const w of open) {

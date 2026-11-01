@@ -5,6 +5,7 @@
  * erfasst (db.settingHooks), andere Bereiche tragen sich mit add() ein.
  */
 const { db, getSetting, setSetting, settingHooks } = require('../db/db');
+const Q = require('../db/queries');
 
 /** Einstellungen, die der Mensch ändert – Schlüssel → Bezeichnung und nötiges Recht. Alles andere (Zeitstempel, Merker) bleibt draußen. */
 const SETTINGS = [
@@ -76,7 +77,7 @@ function list(limit = 150) {
 
 /** Zurücksetzen auf den Wert vor der Änderung. Wirft einen Fehler mit status, wenn es nicht geht. */
 function revert(id, user) {
-  const r = db.prepare('SELECT * FROM config_log WHERE id = ?').get(id);
+  const r = Q.configLog.getById.get(id);
   if (!r) throw Object.assign(new Error('Eintrag nicht gefunden.'), { status: 404 });
   if (!r.revertible || r.reverted_at) throw Object.assign(new Error('Diese Änderung lässt sich nicht zurücksetzen.'), { status: 400 });
   const before = r.old_value === null ? null : JSON.parse(r.old_value);
@@ -89,7 +90,7 @@ function revert(id, user) {
     else setSetting(r.key, before);
   } else if (r.area === 'site_text') {
     const [page, key] = r.key.split(':');
-    if (before === null) db.prepare('DELETE FROM site_texts WHERE page = ? AND key = ?').run(page, key);
+    if (before === null) Q.siteTexts.deleteByPageAndKey.run(page, key);
     else {
       const o = db.prepare('SELECT original FROM site_texts WHERE page = ? AND key = ?').get(page, key);
       db.prepare(
@@ -107,7 +108,7 @@ function revert(id, user) {
   db.prepare("UPDATE config_log SET reverted_at = datetime('now') WHERE id = ?").run(id);
   // Einstellungen trägt der Hook selbst ein (setSetting) – nur das Löschen ohne Vorgänger nicht
   if (r.area !== 'settings' || before === null) add(user, { area: r.area, key: r.key, label: `${r.label} zurückgesetzt`, perm: r.perm, before: after, after: before });
-  return row(db.prepare('SELECT * FROM config_log WHERE id = ?').get(id));
+  return row(Q.configLog.getById.get(id));
 }
 
 /** Einstellung aus der Tabelle `settings`, die ein Mensch ändert (für Export/Import) – sonst null. */

@@ -9,6 +9,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { db, getSetting, setSetting } = require('../db/db');
+const Q = require('../db/queries');
 const { RANKS, BOARD_RANKS, ASSOCIATE_RANKS } = require('../core/helpers');
 
 const LEVELS = { board: 'Board of Partners', associate: 'Associate Attorneys' };
@@ -47,7 +48,7 @@ function seed() {
   const re = /<span[^>]*uppercase font-semibold">([^<]*)<\/span>[\s\S]*?<h4[^>]*>([^<]*)<\/h4>\s*<p[^>]*>([^<]*)<\/p>[\s\S]*?font-mono[^"]*">([^<]*)<\/div>/g;
   let m;
   while ((m = re.exec(html))) cards[clean(m[2])] = { badge: clean(m[1]), description: clean(m[3]), footer: clean(m[4]) };
-  const ins = db.prepare('INSERT INTO ranks (name, level, badge, description, footer, sort) VALUES (?, ?, ?, ?, ?, ?)');
+  const ins = Q.ranks.insert;
   defaults.forEach(([name, level], i) => {
     const c = cards[name] || {};
     ins.run(name, level, c.badge || '', c.description || '', c.footer || '', i);
@@ -67,7 +68,7 @@ function create(d) {
   if (db.prepare('SELECT 1 FROM ranks WHERE name = ?').get(d.name)) throw Object.assign(new Error('Diesen Rang gibt es schon.'), { status: 409 });
   const sort = db.prepare('SELECT COALESCE(MAX(sort), -1) + 1 AS s FROM ranks WHERE level = ?').get(d.level).s;
   const id = Number(
-    db.prepare('INSERT INTO ranks (name, level, badge, description, footer, sort) VALUES (?, ?, ?, ?, ?, ?)').run(d.name, d.level, d.badge, d.description, d.footer, sort).lastInsertRowid
+    Q.ranks.insert.run(d.name, d.level, d.badge, d.description, d.footer, sort).lastInsertRowid
   );
   refresh();
   return byId(id);

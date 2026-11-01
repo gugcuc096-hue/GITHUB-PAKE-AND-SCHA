@@ -8,6 +8,7 @@
  * und nur, solange es zu der Akte noch keine Bewertung gibt. Das Ergebnis der Akte steht nicht in der Nachricht.
  */
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 const tickets = require('../integrations/tickets');
 const features = require('../core/features');
 
@@ -26,7 +27,7 @@ async function afterClose(caseId) {
     )
     .get(caseId);
   if (!c || c.status !== 'geschlossen' || c.review_requested_at || !c.user_id || c.role !== 'mandant' || !c.active) return false;
-  if (db.prepare('SELECT 1 FROM reviews WHERE case_id = ?').get(c.id)) return false;
+  if (Q.reviews.existsByCaseId.get(c.id)) return false;
   db.prepare("UPDATE cases SET review_requested_at = datetime('now') WHERE id = ?").run(c.id);
   if (!tickets.hasToken() || !tickets.isId(c.discord_id)) return false;
   const url = reviewUrl(c.id);

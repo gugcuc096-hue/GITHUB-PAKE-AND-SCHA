@@ -12,6 +12,7 @@
  * Erwähnungen (@everyone, Rollen, Personen) pingen nur, wenn die Vorlage das ausdrücklich erlaubt.
  */
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 const { truncate } = require('../core/helpers');
 const tickets = require('./tickets');
 
@@ -180,7 +181,7 @@ async function updateSent(t, sent) {
     await tickets.rest('PATCH', `/channels/${sent.channel_id}/messages/${sent.discord_message_id}`, msg);
   } catch (err) {
     if (err.code === 10008 || err.code === 10003) {
-      db.prepare('DELETE FROM bot_message_sent WHERE id = ?').run(sent.id);
+      Q.botMessageSent.deleteById.run(sent.id);
       throw Object.assign(new Error('Die Nachricht gibt es in Discord nicht mehr – sie wurde aus der Liste entfernt.'), { status: 404 });
     }
     throw err;
@@ -192,13 +193,13 @@ async function deleteSent(sent) {
   await tickets.rest('DELETE', `/channels/${sent.channel_id}/messages/${sent.discord_message_id}`).catch((err) => {
     if (err.status !== 404) throw err;
   });
-  db.prepare('DELETE FROM bot_message_sent WHERE id = ?').run(sent.id);
+  Q.botMessageSent.deleteById.run(sent.id);
 }
 
 /* ---------------------------------------------------------------- Automatik */
 /** Eine Automatik ausführen: neu posten, danach (falls gewünscht) die vorige Kopie löschen. */
 async function postJob(jobId) {
-  const job = db.prepare('SELECT * FROM bot_message_jobs WHERE id = ?').get(jobId);
+  const job = Q.botMessageJobs.getById.get(jobId);
   const t = job && getTemplate(job.template_id);
   if (!job || !t || !job.enabled) return;
   try {

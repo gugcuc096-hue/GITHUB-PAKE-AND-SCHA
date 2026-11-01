@@ -11,6 +11,7 @@
  *    Rolle und erinnert den Mandanten 3 Tage vorher per Discord-Direktnachricht.
  */
 const { db, tx, nextInvoiceNumber } = require('../db/db');
+const Q = require('../db/queries');
 const { logActivity } = require('../db/models');
 const discord = require('../integrations/discord');
 const tickets = require('../integrations/tickets');
@@ -73,7 +74,7 @@ const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('de-DE', { time
 
 /** Webhook „VIP / Lifetime“ ans Team. */
 function notify(title, m, extra = []) {
-  const u = db.prepare('SELECT display_name FROM users WHERE id = ?').get(m.user_id);
+  const u = Q.users.displayNameById.get(m.user_id);
   discord.notify('membership.changed', {
     title,
     fields: [
@@ -153,7 +154,7 @@ async function grant({ target, tier, by, note = '', startsOn = null }) {
   const expires = tier.duration_days ? plusDays(start, tier.duration_days) : null;
   const id = tx(() => {
     if (current) {
-      db.prepare("UPDATE memberships SET status = 'beendet', ended_at = ?, ended_by_name = ?, end_reason = ? WHERE id = ?").run(now(), by.display_name, `ersetzt durch ${tier.name}`, current.id);
+      Q.memberships.endById.run(now(), by.display_name, `ersetzt durch ${tier.name}`, current.id);
     }
     const info = db
       .prepare(
@@ -163,7 +164,7 @@ async function grant({ target, tier, by, note = '', startsOn = null }) {
       .run(target.id, tier.id || null, tier.name, tier.kind, tier.discount_pct, tier.price, start, expires, note || '', tier.discord_role_id || '', by.id || null, by.display_name);
     return Number(info.lastInsertRowid);
   });
-  const m = db.prepare('SELECT * FROM memberships WHERE id = ?').get(id);
+  const m = Q.memberships.getById.get(id);
   logActivity(by.id ? by : null, `${KIND_LABEL[tier.kind] || 'Mitgliedschaft'} vergeben`, 'membership', id, `${target.display_name}: ${tier.name}${expires ? ` bis ${fmtDate(expires)}` : ' (unbefristet)'}${current ? ` – ersetzt ${current.tier_name}` : ''}`);
   const warnings = [];
   if (current && current.discord_role_id && current.discord_role_id !== m.discord_role_id) {
@@ -174,7 +175,7 @@ async function grant({ target, tier, by, note = '', startsOn = null }) {
     const w = await setRole(target.id, m.discord_role_id, true);
     if (w) warnings.push(w);
   }
-  const benefits = tier.benefits ?? (tier.id ? db.prepare('SELECT benefits FROM membership_tiers WHERE id = ?').get(tier.id)?.benefits : '') ?? '';
+  const benefits = tier.benefits ?? (tier.id ? Q.membershipTiers.benefitsById.get(tier.id)?.benefits : '') ?? '';
   dm(target.id, {
     title: tier.kind === 'perma' ? '👑 Willkommen bei Lifetime' : `⭐ Willkommen bei ${tier.name}`,
     description: `Ihre Mitgliedschaft **${tier.name}** bei Pake & Scha ist aktiv${expires ? ` bis **${fmtDate(expires)}**` : ' – **unbefristet**'}.${tier.discount_pct ? ` Sie erhalten **${tier.discount_pct} % Rabatt** auf alle Leistungen der Kanzlei.` : ''}${benefits ? `\n\n**Ihre Vorteile:**\n${benefits}` : ''}`,
@@ -189,7 +190,7 @@ async function extend(m, tier, by) {
   const base = m.status === 'aktiv' && m.expires_at > now() ? m.expires_at : now();
   const expires = plusDays(base, tier.duration_days);
   db.prepare("UPDATE memberships SET status = 'aktiv', expires_at = ?, reminded_at = NULL, ended_at = NULL, price_paid = price_paid + ? WHERE id = ?").run(expires, tier.price, m.id);
-  const target = db.prepare('SELECT display_name FROM users WHERE id = ?').get(m.user_id);
+  const target = Q.users.displayNameById.get(m.user_id);
   logActivity(by.id ? by : null, 'VIP verlängert', 'membership', m.id, `${target ? target.display_name : ''}: ${m.tier_name} bis ${fmtDate(expires)}`);
   const warnings = [];
   if (m.status !== 'aktiv' && m.discord_role_id) {
@@ -209,7 +210,7 @@ async function extend(m, tier, by) {
 async function activateRequestByInvoice(invoiceId, by) {
   const r = db.prepare("SELECT * FROM membership_requests WHERE invoice_id = ? AND status = 'angenommen'").get(invoiceId);
   if (!r) return null;
-  const target = db.prepare('SELECT * FROM users WHERE id = ?').get(r.user_id);
+  const target = Q.users.getById.get(r.user_id);
   if (!target) return null;
   const tier = { id: r.tier_id, name: r.tier_name, kind: r.kind, price: r.price, duration_days: r.duration_days, discount_pct: r.discount_pct, discord_role_id: r.discord_role_id };
   const current = activeFor(target.id);

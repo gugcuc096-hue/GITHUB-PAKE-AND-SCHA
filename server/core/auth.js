@@ -2,6 +2,7 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 const { EMAIL_DOMAIN, isBoard } = require('./helpers');
 const { avatarUrl } = require('./uploads');
 const permissions = require('./permissions');
@@ -74,7 +75,7 @@ function createSession(res, userId) {
 
 function destroySession(req, res) {
   const token = req.cookies?.[SESSION_COOKIE];
-  if (token) db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+  if (token) Q.sessions.deleteByToken.run(token);
   res.clearCookie(SESSION_COOKIE, cookieOptions());
 }
 
@@ -155,11 +156,11 @@ function loadUser(req, res, next) {
 
   const session = db.prepare('SELECT * FROM sessions WHERE token = ?').get(token);
   if (!session || new Date(session.expires_at) < new Date()) {
-    if (session) db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+    if (session) Q.sessions.deleteByToken.run(token);
     res.clearCookie(SESSION_COOKIE, cookieOptions());
     return next();
   }
-  const row = db.prepare('SELECT * FROM users WHERE id = ?').get(session.user_id);
+  const row = Q.users.getById.get(session.user_id);
   if (!row || !row.active) return next();
   req.user = row;
   // Wer die Seite nutzt, bleibt angemeldet: Ablauf (7 Tage) zählt ab der letzten Nutzung – höchstens einmal am Tag verlängert

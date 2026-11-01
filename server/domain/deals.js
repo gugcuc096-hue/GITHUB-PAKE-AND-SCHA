@@ -6,6 +6,7 @@
  * Knöpfe in der Direktnachricht: deal:yes:<id> / deal:no:<id> – antworten kann nur der Mandant der Akte.
  */
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 const { getCase, addSystemNote } = require('../db/models');
 const tickets = require('../integrations/tickets');
 
@@ -30,7 +31,7 @@ const load = (id) => db.prepare('SELECT * FROM case_deals WHERE id = ?').get(id)
 
 /** Discord des Mandanten: verknüpftes Konto, sonst sein Discord aus dem Ticket. */
 function clientDiscord(c) {
-  const u = c.client_id && db.prepare('SELECT discord_id FROM users WHERE id = ? AND active = 1').get(c.client_id);
+  const u = c.client_id && Q.users.activeDiscordIdById.get(c.client_id);
   if (u && tickets.isId(u.discord_id)) return u.discord_id;
   const id = tickets.clientDiscordId(c);
   return tickets.isId(id) ? id : null;

@@ -17,6 +17,7 @@
 const crypto = require('crypto');
 const express = require('express');
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 const { isStaff } = require('../core/auth');
 const { isBoard } = require('../core/helpers');
 const { getCase, caseAccess, logActivity, addSystemNote } = require('../db/models');
@@ -270,7 +271,7 @@ router.post('/', express.raw({ type: '*/*', limit: '100kb' }), (req, res) => {
     // Rabatt-Freigabe: Genehmigen / Ablehnen in der Direktnachricht an das Board
     const disc = /^disc:(yes|no):(\d+)$/.exec(String(body.data?.custom_id || ''));
     if (body.type === 3 && disc) {
-      const boardUser = tickets.isId(discordId) ? db.prepare('SELECT * FROM users WHERE discord_id = ? AND active = 1').get(discordId) : null;
+      const boardUser = tickets.isId(discordId) ? Q.users.getActiveByDiscordId.get(discordId) : null;
       if (!boardUser) return res.json(fail(NOT_LINKED, 'Kein verknüpftes Konto'));
       try {
         const r = require('../domain/discountApprovals').decide(Number(disc[2]), boardUser, disc[1] === 'yes', { via: 'discord' });
@@ -285,7 +286,7 @@ router.post('/', express.raw({ type: '*/*', limit: '100kb' }), (req, res) => {
       return res.json(r.error ? fail(r.error) : done(r.text, appt[1] === 'yes' ? 'Zugesagt' : 'Passt nicht'));
     }
     if (String(body.guild_id || '') !== tickets.config().guildId) return res.json(fail('Dieser Server ist nicht für den Kanzlei-Bot eingerichtet.'));
-    const u = tickets.isId(discordId) ? db.prepare('SELECT * FROM users WHERE discord_id = ? AND active = 1').get(discordId) : null;
+    const u = tickets.isId(discordId) ? Q.users.getActiveByDiscordId.get(discordId) : null;
 
     if (body.type === 2) {
       // Slash-Command

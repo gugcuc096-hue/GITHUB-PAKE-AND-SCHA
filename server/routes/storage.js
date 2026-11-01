@@ -14,6 +14,7 @@
 const express = require('express');
 const { z } = require('zod');
 const { db, getSetting, setSetting, tx } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth, requireStaff } = require('../core/auth');
 const { requirePerm } = require('../core/permissions');
 const { wrap, parseBody, idParam, isBoard } = require('../core/helpers');
@@ -47,7 +48,7 @@ const balance = (kind) => db.prepare('SELECT COALESCE(SUM(amount), 0) AS n FROM 
 const itemStock = (id) => db.prepare("SELECT COALESCE(SUM(amount), 0) AS n FROM storage_entries WHERE kind = 'item' AND item_id = ?").get(id).n;
 
 function payload(u) {
-  const stock = new Map(db.prepare("SELECT item_id, SUM(amount) AS n FROM storage_entries WHERE kind = 'item' GROUP BY item_id").all().map((r) => [r.item_id, r.n]));
+  const stock = new Map(Q.storageEntries.itemStock.all().map((r) => [r.item_id, r.n]));
   const black = blackAllowed(u);
   const items = db
     .prepare('SELECT * FROM storage_items ORDER BY sort_order ASC, name COLLATE NOCASE ASC')
@@ -90,7 +91,7 @@ router.post(
     if (d.kind === 'schwarzgeld' && !blackAllowed(u)) return res.status(403).json({ error: 'Schwarzgeld buchen darf nur das Board of Partners.' });
     let item = null;
     if (d.kind === 'item') {
-      item = d.itemId && db.prepare('SELECT * FROM storage_items WHERE id = ?').get(d.itemId);
+      item = d.itemId && Q.storageItems.getById.get(d.itemId);
       if (!item) return res.status(400).json({ error: 'Bitte einen Gegenstand auswählen.' });
       if (!item.active && d.direction === 'in') return res.status(400).json({ error: 'Dieser Gegenstand wurde entfernt und kann nicht mehr eingelagert werden.' });
     }
@@ -129,7 +130,7 @@ router.delete(
 
 /* ---------------------------------------------------------------- Gegenstände (Einstellungen) */
 router.get('/items', requirePerm('system.edit'), (req, res) => {
-  const stock = new Map(db.prepare("SELECT item_id, SUM(amount) AS n FROM storage_entries WHERE kind = 'item' GROUP BY item_id").all().map((r) => [r.item_id, r.n]));
+  const stock = new Map(Q.storageEntries.itemStock.all().map((r) => [r.item_id, r.n]));
   res.json({
     items: db
       .prepare('SELECT * FROM storage_items WHERE active = 1 ORDER BY sort_order ASC, name COLLATE NOCASE ASC')
@@ -151,7 +152,7 @@ router.post(
     const order = db.prepare('SELECT COALESCE(MAX(sort_order), 0) + 1 AS n FROM storage_items').get().n;
     const info = db.prepare('INSERT INTO storage_items (name, sort_order) VALUES (?, ?)').run(d.name, order);
     logActivity(req.user, 'Lager: Gegenstand angelegt', 'storage_item', Number(info.lastInsertRowid), d.name);
-    res.status(201).json({ item: itemRow(db.prepare('SELECT * FROM storage_items WHERE id = ?').get(Number(info.lastInsertRowid))) });
+    res.status(201).json({ item: itemRow(Q.storageItems.getById.get(Number(info.lastInsertRowid))) });
   })
 );
 
@@ -160,7 +161,7 @@ router.patch(
   requirePerm('system.edit'),
   wrap(async (req, res) => {
     const id = idParam(req);
-    const item = id && db.prepare('SELECT * FROM storage_items WHERE id = ? AND active = 1').get(id);
+    const item = id && Q.storageItems.getActiveById.get(id);
     if (!item) return res.status(404).json({ error: 'Gegenstand nicht gefunden.' });
     const d = parseBody(z.object({ name: z.string().trim().min(1).max(60).optional(), sortOrder: z.number().int().min(0).max(100000).optional() }), req, res);
     if (!d) return;
@@ -168,7 +169,7 @@ router.patch(
       return res.status(400).json({ error: 'Diesen Gegenstand gibt es schon.' });
     }
     db.prepare('UPDATE storage_items SET name = COALESCE(?, name), sort_order = COALESCE(?, sort_order) WHERE id = ?').run(d.name ?? null, d.sortOrder ?? null, id);
-    res.json({ item: itemRow(db.prepare('SELECT * FROM storage_items WHERE id = ?').get(id), itemStock(id)) });
+    res.json({ item: itemRow(Q.storageItems.getById.get(id), itemStock(id)) });
   })
 );
 
@@ -178,12 +179,12 @@ router.post(
   imageBody,
   wrap(async (req, res) => {
     const id = idParam(req);
-    const item = id && db.prepare('SELECT * FROM storage_items WHERE id = ? AND active = 1').get(id);
+    const item = id && Q.storageItems.getActiveById.get(id);
     if (!item) return res.status(404).json({ error: 'Gegenstand nicht gefunden.' });
     const saved = saveImage(req, 'items');
     db.prepare('UPDATE storage_items SET image = ? WHERE id = ?').run(saved.file, id);
     removeFile('items', item.image);
-    res.json({ item: itemRow(db.prepare('SELECT * FROM storage_items WHERE id = ?').get(id), itemStock(id)) });
+    res.json({ item: itemRow(Q.storageItems.getById.get(id), itemStock(id)) });
   })
 );
 
@@ -192,7 +193,7 @@ router.delete(
   requirePerm('system.edit'),
   wrap(async (req, res) => {
     const id = idParam(req);
-    const item = id && db.prepare('SELECT * FROM storage_items WHERE id = ? AND active = 1').get(id);
+    const item = id && Q.storageItems.getActiveById.get(id);
     if (!item) return res.status(404).json({ error: 'Gegenstand nicht gefunden.' });
     const used = db.prepare('SELECT 1 FROM storage_entries WHERE item_id = ? LIMIT 1').get(id);
     if (used) db.prepare('UPDATE storage_items SET active = 0 WHERE id = ?').run(id);

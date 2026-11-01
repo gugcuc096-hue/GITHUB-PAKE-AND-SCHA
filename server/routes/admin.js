@@ -2,6 +2,7 @@
 const express = require('express');
 const { z } = require('zod');
 const { db, tx, getSetting, setSetting } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth, requireAdmin, requireStaff, hashPassword, generateTempPassword, destroyAllSessions, userAvatarUrl } = require('../core/auth');
 const { wrap, parseBody, idParam, DUTY_STATUS, rankField, RANK_ORDER_SQL, BOARD_RANKS, firmEmail, EMAIL_HINT } = require('../core/helpers');
 const { logActivity, idleLimit, setIdleLimit } = require('../db/models');
@@ -70,7 +71,7 @@ function userRow(u) {
 }
 
 function activeAdminCount() {
-  return db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'admin' AND active = 1").get().n;
+  return Q.users.countActiveAdmins.get().n;
 }
 
 router.get('/users', (req, res) => {
@@ -94,14 +95,14 @@ router.post(
     if (!d) return;
     const email = firmEmail(d.email);
     if (!email) return res.status(400).json({ error: EMAIL_HINT });
-    if (db.prepare('SELECT id FROM users WHERE email = ?').get(email)) {
+    if (Q.users.idByEmail.get(email)) {
       return res.status(409).json({ error: 'Diese E-Mail-Adresse ist bereits vergeben.' });
     }
     const password = generateTempPassword();
     const info = db
       .prepare('INSERT INTO users (email, password_hash, display_name, role, rank, phone, must_change_password) VALUES (?, ?, ?, ?, ?, ?, 1)')
       .run(email, hashPassword(password), d.displayName, d.role, d.rank || null, d.phone || null);
-    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(info.lastInsertRowid));
+    const user = Q.users.getById.get(Number(info.lastInsertRowid));
     logActivity(req.user, 'Konto angelegt', 'user', user.id, `${user.display_name} (${ROLE_LABEL[user.role]})`);
     // Neues Mitarbeiterkonto = Einstellung (Personalprotokoll)
     if (user.role !== 'mandant') personnel.recordHire({ userId: user.id, name: user.display_name, rank: user.rank, by: req.user });
@@ -115,7 +116,7 @@ router.patch(
   '/users/:id',
   wrap(async (req, res) => {
     const id = idParam(req);
-    const target = id && db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    const target = id && Q.users.getById.get(id);
     if (!target) return res.status(404).json({ error: 'Nutzer nicht gefunden.' });
     const schema = z.object({
       role: z.enum(['mandant', 'anwalt', 'admin']).optional(),
@@ -139,7 +140,7 @@ router.patch(
       if (!d.email) return res.status(400).json({ error: EMAIL_HINT });
     }
     if (d.email && d.email !== target.email) {
-      if (db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(d.email, id)) {
+      if (Q.users.idByEmailExceptId.get(d.email, id)) {
         return res.status(409).json({ error: 'Diese E-Mail-Adresse ist bereits vergeben.' });
       }
     }
@@ -162,11 +163,11 @@ router.patch(
       if (d.active === false || (d.role && d.role !== target.role)) destroyAllSessions(id);
       // Gesperrte oder zu Mandanten herabgestufte Konten werden ausgestempelt.
       if (d.active === false || d.role === 'mandant') {
-        db.prepare('UPDATE duty_sessions SET ended_at = ? WHERE user_id = ? AND ended_at IS NULL').run(new Date().toISOString(), id);
-        db.prepare("UPDATE users SET duty_status = 'off', duty_note = '', duty_since = NULL WHERE id = ?").run(id);
+        Q.dutySessions.endOpenByUserId.run(new Date().toISOString(), id);
+        Q.users.clearDutyById.run(id);
       }
       // Name/Rang im verknüpften Team-Profil mitziehen.
-      if (d.displayName !== undefined) db.prepare('UPDATE team_members SET name = ? WHERE user_id = ?').run(d.displayName, id);
+      if (d.displayName !== undefined) Q.teamMembers.setNameByUserId.run(d.displayName, id);
       if (d.rank) {
         db.prepare(
           "UPDATE team_members SET role_title = ?, tier = CASE WHEN ? THEN 'leitung' WHEN tier = 'leitung' THEN 'anwalt' ELSE tier END WHERE user_id = ?"
@@ -190,7 +191,7 @@ router.patch(
     if (changes.length) logActivity(req.user, 'Konto geändert', 'user', id, `${target.display_name}: ${changes.join(', ')}`);
     // Rolle, Rang oder Sperre ändern ggf. die Zugehörigkeit zum Board → Board-Tickets abgleichen
     if (d.role !== undefined || d.rank !== undefined || d.active !== undefined) tickets.syncBoardAll();
-    res.json({ user: userRow(db.prepare('SELECT * FROM users WHERE id = ?').get(id)) });
+    res.json({ user: userRow(Q.users.getById.get(id)) });
   })
 );
 
@@ -199,11 +200,11 @@ router.post(
   '/users/:id/reset-password',
   wrap(async (req, res) => {
     const id = idParam(req);
-    const target = id && db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    const target = id && Q.users.getById.get(id);
     if (!target) return res.status(404).json({ error: 'Nutzer nicht gefunden.' });
     if (id === req.user.id) return res.status(400).json({ error: 'Ihr eigenes Passwort ändern Sie unter "Profil".' });
     const password = generateTempPassword();
-    db.prepare('UPDATE users SET password_hash = ?, must_change_password = 1 WHERE id = ?').run(hashPassword(password), id);
+    Q.users.setTempPasswordById.run(hashPassword(password), id);
     destroyAllSessions(id);
     logActivity(req.user, 'Passwort zurückgesetzt', 'user', id, target.display_name);
     res.json({ credentials: { email: target.email, password } });
@@ -215,7 +216,7 @@ router.delete(
   wrap(async (req, res) => {
     const id = idParam(req);
     if (id === req.user.id) return res.status(400).json({ error: 'Sie können sich nicht selbst löschen.' });
-    const target = id && db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    const target = id && Q.users.getById.get(id);
     if (!target) return res.status(404).json({ error: 'Nutzer nicht gefunden.' });
     if (target.role === 'admin' && target.active && activeAdminCount() <= 1) {
       return res.status(400).json({ error: 'Der letzte aktive Admin kann nicht gelöscht werden.' });

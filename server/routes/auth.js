@@ -3,6 +3,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { z } = require('zod');
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 const {
   hashPassword,
   hashPasswordAsync,
@@ -57,7 +58,7 @@ router.post(
     if (!data) return;
     const email = firmEmail(data.email);
     if (!email) return res.status(400).json({ error: EMAIL_HINT });
-    if (db.prepare('SELECT id FROM users WHERE email = ?').get(email)) {
+    if (Q.users.idByEmail.get(email)) {
       return res.status(409).json({ error: 'Diese E-Mail-Adresse ist bereits registriert.', fields: { email: 'Diese Adresse ist bereits registriert – bitte anmelden.' } });
     }
     const info = db
@@ -149,7 +150,7 @@ router.patch(
     db.prepare('UPDATE users SET two_factor = ? WHERE id = ?').run(data.enabled ? 1 : 0, req.user.id);
     if (!data.enabled) twoFactor.forgetDevices(req.user.id);
     logActivity(req.user, data.enabled ? 'Zwei-Faktor-Anmeldung eingeschaltet' : 'Zwei-Faktor-Anmeldung ausgeschaltet', 'user', req.user.id);
-    res.json(twoFactor.status(db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id)));
+    res.json(twoFactor.status(Q.users.getById.get(req.user.id)));
   })
 );
 
@@ -207,7 +208,7 @@ router.patch(
     if (data.displayName !== undefined && data.displayName !== req.user.display_name) {
       return res.status(400).json({ error: 'Namensänderungen bitte im Profil beim Board of Partners beantragen.' });
     }
-    res.json({ user: publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id)) });
+    res.json({ user: publicUser(Q.users.getById.get(req.user.id)) });
   })
 );
 
@@ -226,7 +227,7 @@ router.post(
     if (!/\S+\s+\S+/.test(name)) return res.status(400).json({ error: 'Bitte Vor- und Nachnamen Ihres Charakters angeben (z. B. „John Doe“).' });
     db.prepare('UPDATE users SET display_name = ?, needs_name = 0 WHERE id = ?').run(name, req.user.id);
     logActivity(req.user, 'Name beim ersten Login festgelegt', 'user', req.user.id, `${req.user.display_name} → ${name}`);
-    res.json({ user: publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id)) });
+    res.json({ user: publicUser(Q.users.getById.get(req.user.id)) });
   })
 );
 
@@ -239,14 +240,14 @@ router.post(
     const saved = saveImage(req, 'avatars');
     db.prepare('UPDATE users SET avatar = ? WHERE id = ?').run(saved.file, req.user.id);
     removeFile('avatars', req.user.avatar);
-    res.json({ user: publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id)) });
+    res.json({ user: publicUser(Q.users.getById.get(req.user.id)) });
   })
 );
 
 router.delete('/avatar', requireAuth, (req, res) => {
   db.prepare('UPDATE users SET avatar = NULL WHERE id = ?').run(req.user.id);
   removeFile('avatars', req.user.avatar);
-  res.json({ user: publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id)) });
+  res.json({ user: publicUser(Q.users.getById.get(req.user.id)) });
 });
 
 router.post(

@@ -15,6 +15,7 @@
  */
 const fs = require('fs');
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 const drive = require('./googleDrive');
 const render = require('../web/docxRender');
 
@@ -180,7 +181,7 @@ async function sync(kind, refId) {
     const doc = await build(kind, refId, { options: parseOptions(r), viewer: kind === 'extract' ? viewerFor(r) : null });
     if (!doc) {
       // Rechnung/Vertrag gibt es nicht mehr → auch in Drive aufräumen
-      db.prepare('DELETE FROM google_docs WHERE id = ?').run(r.id);
+      Q.googleDocs.deleteById.run(r.id);
       await drive.trashDoc(r.file_id).catch(() => {});
       return;
     }
@@ -234,7 +235,7 @@ function touchKind(kind) {
 function remove(kind, refId) {
   const r = rowFor(kind, Number(refId));
   if (!r) return Promise.resolve(false);
-  db.prepare('DELETE FROM google_docs WHERE id = ?').run(r.id);
+  Q.googleDocs.deleteById.run(r.id);
   if (kind !== 'extract' && r.case_id) touchExtract(r.case_id);
   return serial(() => drive.trashDoc(r.file_id))
     .then(() => true)

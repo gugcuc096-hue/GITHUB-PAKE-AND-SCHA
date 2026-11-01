@@ -4,6 +4,7 @@
  * dazu einen Mentor aus dem Board of Partners. Abhaken dürfen die Person selbst, ihr Mentor und das Board.
  */
 const { db, getSetting, setSetting } = require('../db/db');
+const Q = require('../db/queries');
 
 const DEFAULT_TEMPLATE = [
   'Discord-Rollen erhalten und Kanzlei-Server eingerichtet',
@@ -26,8 +27,8 @@ const setTemplate = (text) => setSetting('onboarding_template', String(text || '
 
 /** Einarbeitung beginnen (einmal je Person). */
 function start(userId, mentorId = null) {
-  if (!userId || db.prepare('SELECT 1 FROM onboarding WHERE user_id = ?').get(userId)) return false;
-  const ins = db.prepare('INSERT INTO onboarding_items (user_id, label, sort) VALUES (?, ?, ?)');
+  if (!userId || Q.onboarding.existsByUserId.get(userId)) return false;
+  const ins = Q.onboardingItems.insert;
   db.prepare('INSERT INTO onboarding (user_id, mentor_id) VALUES (?, ?)').run(userId, mentorId);
   templateItems().forEach((label, i) => ins.run(userId, label, i));
   return true;

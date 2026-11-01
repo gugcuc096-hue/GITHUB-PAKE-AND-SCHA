@@ -14,6 +14,7 @@
 const express = require('express');
 const { z } = require('zod');
 const { db, tx, getSetting, setSetting } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth, requireStaff, requireAdmin, isStaff } = require('../core/auth');
 const { requirePerm } = require('../core/permissions');
 const { wrap, parseBody, idParam, truncate } = require('../core/helpers');
@@ -313,7 +314,7 @@ templatesRouter.post(
       .prepare('INSERT INTO contract_templates (name, body, active, sort_order, updated_by_name, kind) VALUES (?, ?, ?, ?, ?, ?)')
       .run(d.name, d.body, d.active === false ? 0 : 1, order, req.user.display_name, d.kind || 'vertrag');
     logActivity(req.user, d.kind === 'schriftsatz' ? 'Schriftsatz-Vorlage angelegt' : 'Vertragsvorlage angelegt', 'contract_template', Number(info.lastInsertRowid), d.name);
-    res.status(201).json({ template: templateRow(db.prepare('SELECT * FROM contract_templates WHERE id = ?').get(Number(info.lastInsertRowid))) });
+    res.status(201).json({ template: templateRow(Q.contractTemplates.getById.get(Number(info.lastInsertRowid))) });
   })
 );
 
@@ -322,7 +323,7 @@ templatesRouter.patch(
   requirePerm('templates.edit'),
   wrap(async (req, res) => {
     const tid = idParam(req, 'tid');
-    const t = tid && db.prepare('SELECT * FROM contract_templates WHERE id = ?').get(tid);
+    const t = tid && Q.contractTemplates.getById.get(tid);
     if (!t) return res.status(404).json({ error: 'Vorlage nicht gefunden.' });
     const d = parseBody(templateSchema.partial(), req, res);
     if (!d) return;
@@ -331,7 +332,7 @@ templatesRouter.patch(
       "UPDATE contract_templates SET name = ?, body = ?, active = ?, kind = ?, updated_by_name = ?, updated_at = datetime('now') WHERE id = ?"
     ).run(d.name ?? t.name, d.body ?? t.body, d.active === undefined ? t.active : d.active ? 1 : 0, d.kind ?? t.kind ?? 'vertrag', req.user.display_name, t.id);
     logActivity(req.user, 'Vertragsvorlage geändert', 'contract_template', t.id, d.name ?? t.name);
-    res.json({ template: templateRow(db.prepare('SELECT * FROM contract_templates WHERE id = ?').get(t.id)) });
+    res.json({ template: templateRow(Q.contractTemplates.getById.get(t.id)) });
   })
 );
 
@@ -341,7 +342,7 @@ templatesRouter.post(
   requirePerm('templates.edit'),
   wrap(async (req, res) => {
     const tid = idParam(req, 'tid');
-    const t = tid && db.prepare('SELECT * FROM contract_templates WHERE id = ?').get(tid);
+    const t = tid && Q.contractTemplates.getById.get(tid);
     const def = t && contracts.DEFAULT_TEMPLATES.find((x) => x.key === t.key);
     if (!def) return res.status(404).json({ error: 'Nur mitgelieferte Vorlagen lassen sich zurücksetzen.' });
     db.prepare("UPDATE contract_templates SET name = ?, body = ?, kind = ?, updated_by_name = ?, updated_at = datetime('now') WHERE id = ?").run(
@@ -352,7 +353,7 @@ templatesRouter.post(
       t.id
     );
     logActivity(req.user, 'Vertragsvorlage zurückgesetzt', 'contract_template', t.id, def.name);
-    res.json({ template: templateRow(db.prepare('SELECT * FROM contract_templates WHERE id = ?').get(t.id)) });
+    res.json({ template: templateRow(Q.contractTemplates.getById.get(t.id)) });
   })
 );
 
@@ -361,7 +362,7 @@ templatesRouter.delete(
   requirePerm('templates.edit'),
   wrap(async (req, res) => {
     const tid = idParam(req, 'tid');
-    const t = tid && db.prepare('SELECT * FROM contract_templates WHERE id = ?').get(tid);
+    const t = tid && Q.contractTemplates.getById.get(tid);
     if (!t) return res.status(404).json({ error: 'Vorlage nicht gefunden.' });
     // Bestehende Verträge behalten ihren Text – er ist beim Erstellen kopiert worden.
     db.prepare('DELETE FROM contract_templates WHERE id = ?').run(t.id);
@@ -554,7 +555,7 @@ caseRouter.post(
       saveCoLawyers(Number(info.lastInsertRowid), co.list);
       const who = kind === 'schriftsatz' ? (needs.lawyer ? `Anwalt: ${names.join(', ')}` : `für ${d.data.mandant || 'den Mandanten'}`) : names.length > 1 ? `unterzeichnende Anwälte: ${names.join(', ')}` : `unterzeichnender Anwalt: ${lawyer.display_name}`;
       addSystemNote(c.id, req.user, `${t.name} erstellt (${who}${internal ? ', nur intern' : ''}).`, internal);
-      db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(c.id);
+      Q.cases.touchById.run(c.id);
       return Number(info.lastInsertRowid);
     });
     logActivity(req.user, kind === 'schriftsatz' ? 'Schriftsatz erstellt' : 'Vertrag erstellt', 'case', c.id, `${c.case_number}: ${t.name}`);
@@ -786,7 +787,7 @@ function afterSign(k, c, who, u, note) {
   const full = fullySigned(updated);
   tx(() => {
     addSystemNote(c.id, u && u.id ? u : null, note + (full ? ` ${k.kind === 'schriftsatz' ? 'Das Dokument' : 'Der Vertrag'} ist vollständig unterschrieben.` : ''), !!updated.internal);
-    db.prepare("UPDATE cases SET updated_at = datetime('now') WHERE id = ?").run(c.id);
+    Q.cases.touchById.run(c.id);
   });
   const needs = needsOf(updated);
   const lawyers = needs.lawyer ? allLawyers(updated) : [];
@@ -834,7 +835,7 @@ function signButtons(kid) {
  */
 function discordViewer(c, discordId) {
   if (tickets.clientDiscordIds(c).includes(discordId)) return 'mandant';
-  const u = db.prepare("SELECT * FROM users WHERE discord_id = ? AND active = 1 AND role IN ('anwalt','admin')").get(discordId);
+  const u = Q.users.getActiveStaffByDiscordId.get(discordId);
   return u && caseAccess(c, u).canView ? 'kanzlei' : null;
 }
 
@@ -873,7 +874,7 @@ function signViaDiscord(kid, discordId, channelId, typedName, discordName) {
   if (r.data.mandant && normName(typed) !== normName(r.data.mandant)) return { error: `Der eingetippte Name stimmt nicht mit dem Namen im Vertrag überein („${r.data.mandant}“).` };
   const signature = r.data.mandant || typed;
   db.prepare("UPDATE case_contracts SET client_signature = ?, client_signed_at = datetime('now'), client_signed_via = 'discord', updated_at = datetime('now') WHERE id = ?").run(signature, r.k.id);
-  const account = r.c.client_id ? db.prepare('SELECT * FROM users WHERE id = ?').get(r.c.client_id) : null;
+  const account = r.c.client_id ? Q.users.getById.get(r.c.client_id) : null;
   const actor = account && account.discord_id === discordId ? account : { id: null, display_name: signature, role: 'mandant', discord_id: discordId };
   afterSign(r.k, r.c, 'mandant', actor, `${r.k.template_name} vom Mandanten über Discord unterschrieben (${signature}${discordName ? `, Discord: ${discordName}` : ''}).`);
   require('../core/live').caseChanged(r.c.id); // Akte auf der Website zeigt die Unterschrift sofort

@@ -7,6 +7,7 @@
 const express = require('express');
 const { z } = require('zod');
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth, requireStaff } = require('../core/auth');
 const { wrap, parseBody, idParam, isBoard, dateOnly } = require('../core/helpers');
 const { getCase, caseAccess, logActivity } = require('../db/models');
@@ -87,7 +88,7 @@ router.post(
     const info = db
       .prepare('INSERT INTO membership_tiers (name, kind, price, duration_days, discount_pct, benefits, discord_role_id, active, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
       .run(d.name, d.kind, d.price, d.durationDays ?? null, d.discountPct, d.benefits || '', d.discordRoleId || '', d.active === false ? 0 : 1, order);
-    const t = db.prepare('SELECT * FROM membership_tiers WHERE id = ?').get(Number(info.lastInsertRowid));
+    const t = Q.membershipTiers.getById.get(Number(info.lastInsertRowid));
     logActivity(req.user, 'VIP-Stufe angelegt', 'membership_tier', t.id, `${t.name}: ${money(t.price)}, ${t.discount_pct} %, ${t.duration_days ? `${t.duration_days} Tage` : 'unbefristet'}`);
     res.status(201).json({ tier: tierRow(t) });
   })
@@ -97,7 +98,7 @@ router.patch(
   '/tiers/:id',
   requireBoard,
   wrap(async (req, res) => {
-    const t = db.prepare('SELECT * FROM membership_tiers WHERE id = ?').get(idParam(req));
+    const t = Q.membershipTiers.getById.get(idParam(req));
     if (!t) return res.status(404).json({ error: 'Stufe nicht gefunden.' });
     const d = parseBody(z.object(tierFields).partial(), req, res);
     if (!d) return;
@@ -112,7 +113,7 @@ router.patch(
       vals.push(typeof d[k] === 'boolean' ? (d[k] ? 1 : 0) : d[k]);
     }
     db.prepare(`UPDATE membership_tiers SET ${sets.join(', ')}, updated_at = datetime('now') WHERE id = ?`).run(...vals, t.id);
-    const fresh = db.prepare('SELECT * FROM membership_tiers WHERE id = ?').get(t.id);
+    const fresh = Q.membershipTiers.getById.get(t.id);
     logActivity(req.user, 'VIP-Stufe geändert', 'membership_tier', t.id, `${fresh.name}: ${money(fresh.price)}, ${fresh.discount_pct} %, ${fresh.duration_days ? `${fresh.duration_days} Tage` : 'unbefristet'}${fresh.active ? '' : ', inaktiv'}`);
     res.json({ tier: tierRow(fresh) });
   })
@@ -122,7 +123,7 @@ router.delete(
   '/tiers/:id',
   requireBoard,
   wrap(async (req, res) => {
-    const t = db.prepare('SELECT * FROM membership_tiers WHERE id = ?').get(idParam(req));
+    const t = Q.membershipTiers.getById.get(idParam(req));
     if (!t) return res.status(404).json({ error: 'Stufe nicht gefunden.' });
     db.prepare('DELETE FROM membership_tiers WHERE id = ?').run(t.id); // Mitgliedschaften behalten Name und Rabatt
     logActivity(req.user, 'VIP-Stufe gelöscht', 'membership_tier', t.id, t.name);
@@ -189,9 +190,9 @@ router.post(
       res
     );
     if (!d) return;
-    const target = db.prepare("SELECT * FROM users WHERE id = ? AND role = 'mandant' AND active = 1").get(d.userId);
+    const target = Q.users.getActiveClientById.get(d.userId);
     if (!target) return res.status(400).json({ error: 'VIP und Lifetime gibt es nur für aktive Mandantenkonten.' });
-    const tier = db.prepare('SELECT * FROM membership_tiers WHERE id = ? AND active = 1').get(d.tierId);
+    const tier = Q.membershipTiers.getActiveById.get(d.tierId);
     if (!tier) return res.status(400).json({ error: 'Diese Stufe gibt es nicht oder sie ist deaktiviert.' });
     const current = ms.activeFor(target.id);
     if (current && !d.replace) {
@@ -208,15 +209,15 @@ router.post(
   '/:id/renew',
   requireBoard,
   wrap(async (req, res) => {
-    const m = db.prepare('SELECT * FROM memberships WHERE id = ?').get(idParam(req));
+    const m = Q.memberships.getById.get(idParam(req));
     if (!m) return res.status(404).json({ error: 'Mitgliedschaft nicht gefunden.' });
     if (m.kind === 'perma' || !m.expires_at) return res.status(400).json({ error: 'Lifetime ist unbefristet – es muss nicht verlängert werden.' });
     if (m.status === 'beendet') return res.status(400).json({ error: 'Beendete Mitgliedschaften lassen sich nicht verlängern – bitte neu vergeben.' });
     const d = parseBody(z.object({ invoice: z.boolean().optional() }), req, res);
     if (!d) return;
-    const tier = m.tier_id ? db.prepare('SELECT * FROM membership_tiers WHERE id = ?').get(m.tier_id) : null;
+    const tier = m.tier_id ? Q.membershipTiers.getById.get(m.tier_id) : null;
     if (!tier || !tier.duration_days) return res.status(400).json({ error: 'Die Stufe gibt es nicht mehr – bitte eine neue Mitgliedschaft vergeben.' });
-    const target = db.prepare('SELECT * FROM users WHERE id = ?').get(m.user_id);
+    const target = Q.users.getById.get(m.user_id);
     const invoice = d.invoice !== false && tier.price > 0 ? ms.membershipInvoice(req.user, target, tier, `Verlängerung ${ms.tierLabel(tier)}`) : null;
     const { warnings } = await ms.extend(m, tier, req.user);
     res.json({ membership: memberRow(db.prepare(`${MEMBER_SELECT} WHERE m.id = ?`).get(m.id)), invoice, warnings });
@@ -227,13 +228,13 @@ router.post(
   '/:id/end',
   requireBoard,
   wrap(async (req, res) => {
-    const m = db.prepare('SELECT * FROM memberships WHERE id = ?').get(idParam(req));
+    const m = Q.memberships.getById.get(idParam(req));
     if (!m) return res.status(404).json({ error: 'Mitgliedschaft nicht gefunden.' });
     if (m.status !== 'aktiv') return res.status(400).json({ error: 'Die Mitgliedschaft ist nicht mehr aktiv.' });
     const d = parseBody(z.object({ reason: z.string().trim().max(300).optional() }), req, res);
     if (!d) return;
-    db.prepare("UPDATE memberships SET status = 'beendet', ended_at = ?, ended_by_name = ?, end_reason = ? WHERE id = ?").run(nowIso(), req.user.display_name, d.reason || '', m.id);
-    const target = db.prepare('SELECT display_name FROM users WHERE id = ?').get(m.user_id);
+    Q.memberships.endById.run(nowIso(), req.user.display_name, d.reason || '', m.id);
+    const target = Q.users.displayNameById.get(m.user_id);
     logActivity(req.user, `${ms.KIND_LABEL[m.kind] || 'Mitgliedschaft'} beendet`, 'membership', m.id, `${target ? target.display_name : ''}: ${m.tier_name}${d.reason ? ` – ${d.reason}` : ''}`);
     const warnings = [];
     if (m.discord_role_id) {
@@ -266,7 +267,7 @@ router.get('/active', requireStaff, (req, res) => {
 /** Mandant: eigene Mitgliedschaft (Profil). */
 router.get('/mine', (req, res) => {
   const m = ms.activeFor(req.user.id);
-  const tier = m && m.tier_id ? db.prepare('SELECT benefits FROM membership_tiers WHERE id = ?').get(m.tier_id) : null;
+  const tier = m && m.tier_id ? Q.membershipTiers.benefitsById.get(m.tier_id) : null;
   res.json({ membership: m ? { ...ms.brief(m), benefits: tier ? tier.benefits : '' } : null });
 });
 
@@ -324,7 +325,7 @@ const loadRequest = (id) => db.prepare(`${REQ_SELECT} WHERE r.id = ?`).get(id) |
 router.get('/offers', (req, res) => {
   if (!features.on('vip')) return res.json({ tiers: [], membership: null, requests: [] });
   const m = ms.activeFor(req.user.id);
-  const tier = m && m.tier_id ? db.prepare('SELECT benefits FROM membership_tiers WHERE id = ?').get(m.tier_id) : null;
+  const tier = m && m.tier_id ? Q.membershipTiers.benefitsById.get(m.tier_id) : null;
   res.json({
     tiers: activeTiers().map(publicTier),
     membership: m ? { ...ms.brief(m), benefits: tier ? tier.benefits : '' } : null,
@@ -340,7 +341,7 @@ router.post(
     if (u.role !== 'mandant') return res.status(403).json({ error: 'VIP und Lifetime können nur Mandantenkonten anfragen.' });
     const d = parseBody(z.object({ tierId: z.number().int().positive(), message: z.string().trim().max(500).optional() }), req, res);
     if (!d) return;
-    const tier = db.prepare('SELECT * FROM membership_tiers WHERE id = ? AND active = 1').get(d.tierId);
+    const tier = Q.membershipTiers.getActiveById.get(d.tierId);
     if (!tier) return res.status(400).json({ error: 'Dieses Angebot gibt es nicht (mehr).' });
     if (db.prepare("SELECT id FROM membership_requests WHERE user_id = ? AND status IN ('offen', 'angenommen')").get(u.id)) {
       return res.status(409).json({ error: 'Sie haben bereits eine laufende Anfrage. Den Stand sehen Sie im Portal unter „VIP & Lifetime“.' });
@@ -391,12 +392,12 @@ router.post(
   '/requests/:id/accept',
   requireBoard,
   wrap(async (req, res) => {
-    const r = db.prepare('SELECT * FROM membership_requests WHERE id = ?').get(idParam(req));
+    const r = Q.membershipRequests.getById.get(idParam(req));
     if (!r) return res.status(404).json({ error: 'Anfrage nicht gefunden.' });
     if (r.status !== 'offen') return res.status(400).json({ error: 'Über diese Anfrage wurde bereits entschieden.' });
     const d = parseBody(z.object({ paid: z.boolean().optional(), note: z.string().trim().max(500).optional() }), req, res);
     if (!d) return;
-    const target = db.prepare("SELECT * FROM users WHERE id = ? AND role = 'mandant' AND active = 1").get(r.user_id);
+    const target = Q.users.getActiveClientById.get(r.user_id);
     if (!target) return res.status(400).json({ error: 'Das Mandantenkonto ist nicht mehr aktiv.' });
     const snap = { name: r.tier_name, price: r.price, duration_days: r.duration_days };
     const invoice = ms.membershipInvoice(req.user, target, snap, ms.tierLabel(snap), { paid: !!d.paid });
@@ -426,13 +427,13 @@ router.post(
   '/requests/:id/decline',
   requireBoard,
   wrap(async (req, res) => {
-    const r = db.prepare('SELECT * FROM membership_requests WHERE id = ?').get(idParam(req));
+    const r = Q.membershipRequests.getById.get(idParam(req));
     if (!r) return res.status(404).json({ error: 'Anfrage nicht gefunden.' });
     if (r.status !== 'offen') return res.status(400).json({ error: 'Über diese Anfrage wurde bereits entschieden.' });
     const d = parseBody(z.object({ reason: z.string().trim().min(2).max(500) }), req, res);
     if (!d) return;
     db.prepare("UPDATE membership_requests SET status = 'abgelehnt', decided_by_name = ?, decision_note = ?, decided_at = datetime('now') WHERE id = ?").run(req.user.display_name, d.reason, r.id);
-    const target = db.prepare('SELECT display_name FROM users WHERE id = ?').get(r.user_id);
+    const target = Q.users.displayNameById.get(r.user_id);
     logActivity(req.user, 'VIP/Lifetime-Anfrage abgelehnt', 'membership_request', r.id, `${target ? target.display_name : ''}: ${r.tier_name} – ${d.reason}`);
     ms.dm(r.user_id, { title: `❌ Anfrage abgelehnt: ${r.tier_name}`, description: `Ihre Anfrage für **${r.tier_name}** wurde abgelehnt.\n\n**Grund:** ${d.reason}`, color: tickets.COLORS.red });
     res.json({ request: requestRow(loadRequest(r.id)) });

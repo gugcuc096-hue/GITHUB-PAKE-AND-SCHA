@@ -5,6 +5,7 @@
  * Kanzlei-Konten (nie Mandanten); ein Vorname, den mehrere tragen, braucht den Nachnamen dazu.
  */
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 
 const TITLES = new Set(['dr', 'prof', 'jur', 'med', 'rer', 'nat', 'mag', 'll', 'mba', 'von', 'van', 'de']);
 const parts = (name) =>
@@ -54,7 +55,7 @@ async function notify(c, author, body) {
       color: discord.GOLD,
     });
     if (!sent) {
-      db.prepare('INSERT INTO messages (sender_id, recipient_id, case_id, subject, body) VALUES (?, ?, ?, ?, ?)').run(
+      Q.messages.insert.run(
         author.id,
         u.id,
         c.id,

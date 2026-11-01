@@ -8,6 +8,7 @@
  * Akten, Notizen, Rechnungen und das Protokoll bleiben unangetastet.
  */
 const { db, getSetting, setSetting } = require('./db');
+const Q = require('./queries');
 
 const DAY = 24 * 60 * 60 * 1000;
 const VACUUM_EVERY = 30 * DAY;
@@ -16,7 +17,7 @@ function run() {
   const now = new Date().toISOString();
   const removed = {
     sessions: db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now).changes,
-    challenges: db.prepare('DELETE FROM login_challenges WHERE expires_at < ?').run(now).changes,
+    challenges: Q.loginChallenges.deleteExpired.run(now).changes,
     devices: db.prepare('DELETE FROM trusted_devices WHERE expires_at < ?').run(now).changes,
   };
   db.exec('PRAGMA optimize;');

@@ -11,6 +11,7 @@
  */
 const express = require('express');
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth, requireStaff } = require('../core/auth');
 const { wrap, idParam, isBoard } = require('../core/helpers');
 const { getCase, caseAccess, logActivity, addSystemNote } = require('../db/models');
@@ -44,7 +45,7 @@ const brief = (r, user) => {
 const canChange = (r, user) => isBoard(user) || r.created_by_id === user.id;
 const load = (req, res) => {
   const id = idParam(req);
-  const r = id && db.prepare('SELECT * FROM precedents WHERE id = ?').get(id);
+  const r = id && Q.precedents.getById.get(id);
   if (!r) res.status(404).json({ error: 'Präzedenzfall nicht gefunden.' });
   return r || null;
 };
@@ -60,7 +61,7 @@ router.get(
   guard((req, res) => {
     const c = getCase(Number(req.params.caseId));
     if (!c || !caseAccess(c, req.user).canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
-    const existing = db.prepare('SELECT id FROM precedents WHERE case_id = ?').get(c.id);
+    const existing = Q.precedents.idByCaseId.get(c.id);
     res.json({ draft: precedents.draftFromCase(c), existingId: existing ? existing.id : null });
   })
 );
@@ -79,7 +80,7 @@ router.post(
       if (!c || !caseAccess(c, req.user).canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
     }
     const id = precedents.create(req.body, req.user);
-    const r = db.prepare('SELECT * FROM precedents WHERE id = ?').get(id);
+    const r = Q.precedents.getById.get(id);
     logActivity(req.user, 'Präzedenzfall angelegt', 'precedent', id, r.title);
     if (r.case_id) addSystemNote(r.case_id, req.user, 'Als Präzedenzfall festgehalten.', true);
     res.status(201).json({ precedent: full(r, req.user), canEdit: true });
@@ -97,7 +98,7 @@ router.patch(
       if (!c || !caseAccess(c, req.user).canView) return res.status(404).json({ error: 'Akte nicht gefunden.' });
     }
     precedents.update(r.id, req.body);
-    const next = db.prepare('SELECT * FROM precedents WHERE id = ?').get(r.id);
+    const next = Q.precedents.getById.get(r.id);
     res.json({ precedent: full(next, req.user), canEdit: true });
   })
 );

@@ -15,6 +15,7 @@
 const express = require('express');
 const { z } = require('zod');
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 const { requireAuth, isStaff, userAvatarUrl } = require('../core/auth');
 const { wrap, parseBody, isBoard, truncate } = require('../core/helpers');
 const { CASE_SELECT, caseRow, INVOICE_SELECT, invoiceRow, logActivity } = require('../db/models');
@@ -105,7 +106,7 @@ function flagOf(keys) {
 function flagForCase(c) {
   if (!c) return null;
   if (c.client_id) {
-    const u = db.prepare('SELECT display_name FROM users WHERE id = ?').get(c.client_id);
+    const u = Q.users.displayNameById.get(c.client_id);
     return flagOf([`u${c.client_id}`, ...(u ? [nameKey(u.display_name)] : [])]);
   }
   if (!norm(c.client_name)) return null;
@@ -128,7 +129,7 @@ function keysFor(c, name) {
   const keys = [];
   if (c && c.client_id) {
     keys.push(`u${c.client_id}`);
-    const u = db.prepare('SELECT display_name FROM users WHERE id = ?').get(c.client_id);
+    const u = Q.users.displayNameById.get(c.client_id);
     if (u) keys.push(nameKey(u.display_name));
   }
   for (const n of [name, c && c.client_name]) if (norm(n)) keys.push(resolve(nameKey(n), byName), nameKey(n));

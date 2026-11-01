@@ -15,6 +15,7 @@
  */
 const crypto = require('crypto');
 const { db } = require('../db/db');
+const Q = require('../db/queries');
 const { isBoard } = require('./helpers');
 const tickets = require('../integrations/tickets');
 
@@ -116,7 +117,7 @@ function deliveryError(err) {
 
 /** Code verschicken und Anmeldung offen halten. Liefert { challenge, to, minutes }. */
 async function start(u, req) {
-  db.prepare('DELETE FROM login_challenges WHERE expires_at < ?').run(nowIso());
+  Q.loginChallenges.deleteExpired.run(nowIso());
   const token = crypto.randomBytes(32).toString('base64url');
   const code = newCode();
   try {
@@ -151,7 +152,7 @@ function verify(token, code) {
     throw fail(`Der Code stimmt nicht. Noch ${left === 1 ? 'ein Versuch' : `${left} Versuche`}.`);
   }
   db.prepare('DELETE FROM login_challenges WHERE token_hash = ?').run(row.token_hash);
-  const u = db.prepare('SELECT * FROM users WHERE id = ?').get(row.user_id);
+  const u = Q.users.getById.get(row.user_id);
   if (!u || !u.active) throw fail('Dieser Zugang wurde gesperrt. Bitte wenden Sie sich an das Board of Partners.', 403);
   return u;
 }
@@ -163,7 +164,7 @@ async function resend(token, req) {
   if (row.sends >= MAX_SENDS) throw fail('Es wurden schon mehrere Codes verschickt. Bitte noch einmal anmelden.', 429);
   const wait = Math.ceil((new Date(row.sent_at).getTime() + RESEND_AFTER_MS - Date.now()) / 1000);
   if (wait > 0) throw fail(`Bitte noch ${wait} Sekunden warten.`, 429);
-  const u = db.prepare('SELECT * FROM users WHERE id = ?').get(row.user_id);
+  const u = Q.users.getById.get(row.user_id);
   const code = newCode();
   try {
     await sendCode(u, code, req);
