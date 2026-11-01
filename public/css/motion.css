@@ -366,10 +366,11 @@ body:has(#sidebar) .promo-dock.is-on { translate: 0 0; }
 @keyframes tab-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
 
 /* ================================================================ 13. Aufklappen mit echter Höhe (moderne Browser), Zähler rollen, Platzhalter blendet aus */
+/* nur Aufklapp-Bereiche zum Lesen – Menüs („⋯ Mehr“, Chip-Menü) und Formulare klappen wie bisher sofort auf */
 @supports selector(::details-content) {
-  details { interpolate-size: allow-keywords; }
-  details::details-content { height: 0; overflow: clip; transition: height var(--m-panel) var(--m-ease), content-visibility var(--m-panel) allow-discrete; }
-  details[open]::details-content { height: auto; }
+  :is(details.case-details, details.phase, details.kfaq, details.work-list, details.prec-strip, details.chart-table, details.fn-text, details.wit-block) { interpolate-size: allow-keywords; }
+  :is(details.case-details, details.phase, details.kfaq, details.work-list, details.prec-strip, details.chart-table, details.fn-text, details.wit-block)::details-content { height: 0; overflow: clip; transition: height var(--m-panel) var(--m-ease), content-visibility var(--m-panel) allow-discrete; }
+  :is(details.case-details, details.phase, details.kfaq, details.work-list, details.prec-strip, details.chart-table, details.fn-text, details.wit-block)[open]::details-content { height: auto; }
 }
 .count-roll { display: inline-block; animation: count-roll var(--m-panel) var(--m-ease); }
 .count-roll[data-roll="down"] { animation-name: count-roll-down; }

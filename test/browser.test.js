@@ -1031,6 +1031,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         assert.match(await page.textContent('#modalBody [data-action="case-tab"][data-tab="dokumente"]'), /Dokumente\s*1/);
         await pickTab(page, '#modalBody [data-action="case-tab"][data-tab="dokumente"]');
         await page.waitForSelector('#secInvoices');
+        await page.waitForFunction(() => !document.querySelector('#modalBody .case-root').getAnimations().length); // Höhe hat fertig geglitten
         await page.$eval('#modalBody', (b) => (b.scrollTop = b.scrollHeight));
         await page.waitForTimeout(300);
         const pos = await page.evaluate(() => {
@@ -1914,7 +1915,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         document.body.appendChild(box);
         window.PS.countUp(box);
         const first = box.textContent;
-        await new Promise((r) => setTimeout(r, 1100));
+        // Zählen dauert ~1 s; auf ausgelasteten Rechnern etwas länger – höchstens 3 s warten
+        for (let i = 0; i < 30 && box.textContent !== '1.234 $'; i++) await new Promise((r) => setTimeout(r, 100));
         box.remove();
         return [first, box.textContent];
       });

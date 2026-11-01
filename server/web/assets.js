@@ -76,7 +76,7 @@ function minify(key, text, type) {
       code =
         type === 'css'
           ? esbuild.transformSync(text, { loader: 'css', minify: true, legalComments: 'none' }).code
-          : esbuild.transformSync(text, { loader: 'js', minifyWhitespace: true, minifySyntax: true, legalComments: 'none' }).code;
+          : esbuild.transformSync(text, { loader: 'js', minify: true, legalComments: 'none' }).code; // Namen auf oberster Ebene bleiben (klassische Skripte teilen sie)
     } catch (err) {
       console.warn(`Verkleinern von ${key} fehlgeschlagen – wird unverkleinert ausgeliefert:`, err.message);
     }
