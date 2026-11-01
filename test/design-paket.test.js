@@ -38,6 +38,9 @@ describe('Design-Paket', () => {
       const html = fs.readFileSync(path.join(root, f), 'utf8');
       if (/href="\/css\/fonts\.css"/.test(html)) assert.match(html, /href="\/css\/scrollbar\.css"/, `${f} lädt scrollbar.css`);
     }
+    // <datalist> zeichnet der Browser selbst (weiße Standardleiste, nicht gestaltbar) → eigene Vorschlagsliste (comboField)
+    const walk = (d) => fs.readdirSync(path.join(root, d), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]));
+    for (const f of walk('public/js').filter((n) => n.endsWith('.js'))) assert.doesNotMatch(fs.readFileSync(path.join(root, f), 'utf8'), /<datalist/, `${f}: <datalist> statt comboField`);
     const css = fs.readFileSync(path.join(root, 'public/css/scrollbar.css'), 'utf8');
     assert.match(css, /::-webkit-scrollbar-thumb/);
     assert.match(css, /gradient/);

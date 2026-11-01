@@ -158,8 +158,7 @@ function wikiEditor(a) {
       <p class="modal-sub">Für die ganze Kanzlei sichtbar. Formatierung: <code>## Überschrift</code> · <code>- Aufzählung</code> · <code>1. Schritt</code> · <code>**fett**</code> · <code>&gt; Hinweis</code></p>
       <form data-form="wiki" data-id="${a ? a.id : ''}" class="form-grid cols-2">
         <div class="span-2"><label class="label" for="wkTitle">Titel</label><input id="wkTitle" name="title" class="field" required minlength="2" maxlength="120" value="${esc(v.title)}" placeholder="z. B. Ablauf einer Haftprüfung" autofocus></div>
-        <div><label class="label" for="wkCat">Kategorie</label><input id="wkCat" name="category" class="field" required minlength="2" maxlength="40" list="wkCats" value="${esc(v.category)}">
-          <datalist id="wkCats">${(st.wiki?.categories || []).map((c) => `<option value="${esc(c)}"></option>`).join('')}</datalist></div>
+        <div><label class="label" for="wkCat">Kategorie</label>${comboField({ id: 'wkCat', name: 'category', value: v.category, options: st.wiki?.categories || [], maxlength: 40, attrs: 'required minlength="2"' })}</div>
         <div class="flex items-end"><label class="check"><input type="checkbox" name="pinned" ${v.pinned ? 'checked' : ''}> Oben anheften</label></div>
         <div class="span-2"><label class="label" for="wkBody">Text</label><textarea id="wkBody" name="body" rows="16" class="field wiki-editor" required maxlength="20000">${esc(v.body)}</textarea></div>
         <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button></div>

@@ -52,7 +52,7 @@ function witnessCard(c, p, refs) {
         <button type="button" class="icon-btn sm push" data-action="party-del" data-case-id="${c.id}" data-id="${p.id}" aria-label="Zeugen entfernen" title="Entfernen">${icon('trash', 'ico-sm')}</button></div>
         <form data-form="wit-contra" data-case-id="${c.id}" data-id="${p.id}" class="wit-contra-form hidden" id="witContra${p.id}">
           <input name="text" class="field" required minlength="3" maxlength="1000" placeholder="Widerspruch oder Vorhalt, z. B. „sagt 22 Uhr, Bodycam zeigt 22:14“" aria-label="Vorhalt">
-          <input name="ref" class="field" maxlength="80" list="witRefs${p.id}" placeholder="Bezug (optional): B3, Aussage …" aria-label="Bezug"><datalist id="witRefs${p.id}">${refs.filter((r) => r !== `Aussage ${p.name}`).map((r) => `<option value="${esc(r)}">`).join('')}</datalist>
+          ${comboField({ id: `witRef${p.id}`, name: 'ref', options: refs.filter((r) => r !== `Aussage ${p.name}`), maxlength: 80, placeholder: 'Bezug (optional): B3, Aussage …', attrs: 'aria-label="Bezug"' })}
           <button type="submit" class="btn-outline btn-sm">${icon('check', 'ico-sm')}<span>Speichern</span></button></form>`
           : ''
       }

@@ -150,7 +150,7 @@ describe('Zeugenverwaltung in der Akte (Browser)', { skip: chromium ? false : 'P
       await page.fill('#witExpected', 'Hat die Geschwindigkeit geschätzt.');
       await page.click('form[data-form="wit-save"] button[type=submit]');
       await page.waitForSelector('.wit-card .wit-name strong');
-      const card = page.locator('.wit-card', { hasText: nm });
+      const card = page.locator('.wit-card').filter({ has: page.locator('.wit-name strong', { hasText: nm }) });
       assert.ok((await card.textContent()).includes('Geladen'));
       assert.ok((await card.textContent()).includes('belastend'));
       assert.ok((await card.textContent()).includes('Hat die Geschwindigkeit geschätzt.'));
@@ -160,9 +160,9 @@ describe('Zeugenverwaltung in der Akte (Browser)', { skip: chromium ? false : 'P
       await card.locator('form[data-form="wit-contra"] input[name="ref"]').fill('B1');
       await card.locator('form[data-form="wit-contra"] button[type=submit]').click();
       await page.waitForSelector('.wit-contra li');
-      assert.match(await page.locator('.wit-card', { hasText: nm }).locator('.wit-contra').textContent(), /61.*B1/);
+      assert.match(await page.locator('.wit-card').filter({ has: page.locator('.wit-name strong', { hasText: nm }) }).locator('.wit-contra').textContent(), /61.*B1/);
       // bearbeiten: Aussage
-      await page.locator('.wit-card', { hasText: nm }).locator('[data-action="wit-edit"]').click();
+      await page.locator('.wit-card').filter({ has: page.locator('.wit-name strong', { hasText: nm }) }).locator('[data-action="wit-edit"]').click();
       await page.selectOption('#witStatus', 'ausgesagt');
       await page.fill('#witStatement', 'Das Fahrzeug fuhr deutlich zu schnell.');
       await page.click('form[data-form="wit-save"] button[type=submit]');
@@ -173,7 +173,7 @@ describe('Zeugenverwaltung in der Akte (Browser)', { skip: chromium ? false : 'P
       );
       assert.deepEqual(bad, [], 'nichts ragt über den Rand');
       // Ladung in den Kalender: Formular mit Zeugen, Titel und Zeit vorbelegt
-      await page.locator('.wit-card', { hasText: nm }).locator('[data-action="wit-summon"]').click();
+      await page.locator('.wit-card').filter({ has: page.locator('.wit-name strong', { hasText: nm }) }).locator('[data-action="wit-summon"]').click();
       await page.waitForSelector('#evTitle');
       assert.equal(await page.inputValue('#evTitle'), `Zeugenladung: ${nm}`);
       assert.equal(await page.inputValue('#evStart'), '2026-12-01T10:00');
