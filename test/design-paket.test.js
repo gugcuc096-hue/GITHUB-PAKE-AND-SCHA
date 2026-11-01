@@ -29,6 +29,24 @@ describe('Design-Paket', () => {
     if (srv) await srv.stop();
   });
 
+  it('Scrollleisten: jede Seite lädt die goldene Leiste, nirgends wird die Browser-Standardleiste erzwungen', () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const root = path.join(__dirname, '..');
+    const pages = [...fs.readdirSync(path.join(root, 'public')).filter((f) => f.endsWith('.html')).map((f) => path.join('public', f)), path.join('views', 'anwalt.html')];
+    for (const f of pages) {
+      const html = fs.readFileSync(path.join(root, f), 'utf8');
+      if (/href="\/css\/fonts\.css"/.test(html)) assert.match(html, /href="\/css\/scrollbar\.css"/, `${f} lädt scrollbar.css`);
+    }
+    const css = fs.readFileSync(path.join(root, 'public/css/scrollbar.css'), 'utf8');
+    assert.match(css, /::-webkit-scrollbar-thumb/);
+    assert.match(css, /gradient/);
+    for (const f of fs.readdirSync(path.join(root, 'public/css')).filter((n) => n.endsWith('.css') && n !== 'tailwind.css')) {
+      const txt = fs.readFileSync(path.join(root, 'public/css', f), 'utf8').replace(/@supports not selector\(::-webkit-scrollbar\)[^\n]*/g, '');
+      assert.doesNotMatch(txt, /scrollbar-width:\s*thin|scrollbar-color/, `${f}: erzwingt die Standardleiste (zeigt dann weiß statt Gold)`);
+    }
+  });
+
   it('Banner: Titel, Aufmachung und weitere Meldungen kommen bei allen an; ungültige Werte werden abgelehnt', async () => {
     assert.equal((await owner.put('/api/config/banner/draft', { ...BANNER, style: 'grell' })).status, 400);
     assert.equal((await owner.put('/api/config/banner/draft', { ...BANNER, slides: [BANNER.slides[0], BANNER.slides[0], BANNER.slides[0]] })).status, 400, 'höchstens drei Meldungen');
