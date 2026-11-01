@@ -115,6 +115,11 @@ select.field, select.field:focus { background-image: url("data:image/svg+xml,%3C
 /* ---------------------------------------------------------------- 1. Bestehende Bewegungen auf die gemeinsamen Zeiten gelegt */
 #content.view-in > * { animation-duration: var(--m-page); animation-timing-function: var(--m-ease); }
 #modalBody.swap-in, .swap-in, .modal.open { animation-duration: var(--m-panel); }
+/* Fenster öffnen: Der Hintergrund dunkelt ein, die Unschärfe wächst stufenlos – und die Seite dahinter tritt minimal zurück */
+@keyframes modal-blur-in { from { backdrop-filter: blur(0px) saturate(1); -webkit-backdrop-filter: blur(0px) saturate(1); } }
+.modal.open { animation-name: swap-in, modal-blur-in; animation-duration: var(--m-panel), 0.5s; animation-timing-function: ease-out; }
+#content { transition: scale 0.45s var(--m-ease, cubic-bezier(0.2, 0.8, 0.2, 1)); }
+body.modal-open #content { scale: 0.992; transform-origin: 50% 12vh; }
 .nav-group.nav-reveal { animation-duration: var(--m-panel); animation-timing-function: var(--m-ease); }
 body.page-in { animation-duration: var(--m-page); }
 .ps-toast { animation-duration: var(--m-panel); animation-timing-function: var(--m-ease); }
@@ -452,6 +457,20 @@ body:has(#sidebar) .promo-dock.is-on { translate: 0 0; }
 .page-title { letter-spacing: -0.006em; }
 /* Schriftwechsel unter Stil (Vorschau, 07-stil.js): die Oberfläche blendet weich über */
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: var(--m-page); animation-timing-function: var(--m-ease); }
+
+/* Weiche Wechsel (13-weich.js): Seiten und Bereiche blenden ineinander über; was stehen bleibt, bekommt einen eigenen Namen */
+html[data-wch] #content { view-transition-name: wch-content; }
+html[data-wch] #content > .hub-tabs { view-transition-name: wch-tabs; }
+html[data-wch] .set-side { view-transition-name: wch-side; }
+html[data-wch] #modalBody .case-root { view-transition-name: wch-case; }
+html[data-wch] #modalBody .case-root .case-jump { view-transition-name: wch-casejump; }
+html:active-view-transition-type(wch)::view-transition-old(root), html:active-view-transition-type(wch)::view-transition-new(root) { animation-duration: 0.2s; }
+::view-transition-group(wch-content), ::view-transition-group(wch-case) { animation-duration: 0.26s; animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1); }
+::view-transition-old(wch-content), ::view-transition-old(wch-case) { animation: wch-out 0.14s ease-out both; }
+::view-transition-new(wch-content), ::view-transition-new(wch-case) { animation: wch-in 0.26s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+::view-transition-group(wch-tabs), ::view-transition-group(wch-side), ::view-transition-group(wch-casejump) { animation-duration: 0.22s; animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes wch-out { to { opacity: 0; } }
+@keyframes wch-in { from { opacity: 0; transform: translateY(6px); } }
 
 /* ================================================================ 15. Handy: kürzere Wege */
 @media (max-width: 639px) {

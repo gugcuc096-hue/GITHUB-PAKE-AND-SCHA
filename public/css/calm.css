@@ -94,3 +94,8 @@ details::details-content { transition: none !important; }
 .reveal .grid > * { opacity: 1 !important; translate: none !important; transition: none !important; }
 .btn-gold:hover { transition: none !important; }
 .tour-spot, .tour-card { transition: none !important; animation: none !important; }
+
+/* Weiche Wechsel: bei „Bewegung reduzieren“ nichts verschieben, Fenster ohne Zurücktreten der Seite */
+#content { transition: none; }
+body.modal-open #content { scale: 1; }
+@keyframes modal-blur-in { from { opacity: 1; } }
