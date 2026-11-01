@@ -15,6 +15,8 @@ function witnessesSection(c, parties = []) {
   const list = parties.filter((p) => p.role === 'zeuge');
   if (!list.length && !c.canEdit) return '';
   const add = c.canEdit ? `<button type="button" class="btn-outline btn-sm" data-action="wit-add" data-case-id="${c.id}">${icon('plus', 'ico-sm')}<span>Zeuge hinzufügen</span></button>` : '';
+  // ohne Zeugen eine kurze Zeile wie die übrigen leeren Abschnitte (Anklagepunkte, Beweismittel …)
+  if (!list.length) return emptySection('secWitnesses', 'Zeugen', 'noch keine', add, 'Zeugen mit Kontakt, Ladung, Aussage und Vorhalten verwalten – damit nichts vor der Verhandlung offen bleibt.');
   const refs = [...list.map((p) => `Aussage ${p.name}`), ...(st.caseAttachments || []).map((a) => `B${a.no}`)];
   return `<div class="section" id="secWitnesses"><div class="section-head"><h3 class="section-title">Zeugen <span class="text-xs text-dim font-normal sec-meta">${list.length ? `${list.length} erfasst` : 'noch keine'}</span></h3>${add}</div>
       ${list.length ? `<div class="wit-list">${list.map((p) => witnessCard(c, p, refs)).join('')}</div>` : '<p class="text-sm text-dim">Zeugen mit Kontakt, Ladung, Aussage und Vorhalten verwalten – damit nichts vor der Verhandlung offen bleibt.</p>'}

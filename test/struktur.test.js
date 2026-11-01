@@ -38,6 +38,9 @@ describe('Aufgeräumte Bedienung (Browser)', { skip: chromium ? false : 'Playwri
     await page.click('button[type=submit]');
     await page.waitForURL(/dashboard/);
     await page.waitForFunction(() => st.user && st.user.id, null, { timeout: 15000 });
+    // erst wenn das Dashboard fertig gestartet ist – sonst schließt der Start ein gerade geöffnetes Fenster wieder
+    await page.waitForSelector('#nav a.nav-item');
+    await page.waitForFunction(() => document.querySelector('#content .page-title'), null, { timeout: 15000 });
   };
 
   it('Menü: Arbeit, Mandanten & Geld, Kanzlei, Board – jede Seite einmal; Einstellungen und Profil unten', async () => {

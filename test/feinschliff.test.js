@@ -55,6 +55,9 @@ describe('Reiterleisten, Akte und Handy (Browser)', { skip: chromium ? false : '
     await page.click('button[type=submit]');
     await page.waitForURL(/dashboard/);
     await page.waitForFunction(() => st.user && st.user.id, null, { timeout: 15000 });
+    // erst wenn das Dashboard fertig gestartet ist – sonst schließt der Start ein gerade geöffnetes Fenster wieder
+    await page.waitForSelector('#nav a.nav-item');
+    await page.waitForFunction(() => document.querySelector('#content .page-title'), null, { timeout: 15000 });
   };
 
   it('PC: Reiter (Board-Eingang) brechen um statt abgeschnitten zu werden; Auswahllisten haben einen Pfeil', async () => {

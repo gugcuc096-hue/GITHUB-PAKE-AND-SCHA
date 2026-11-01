@@ -370,7 +370,7 @@ const IE_OPTIONS = { area: (current) => areaOptions(current) };
 function ieShow(el, value) {
   el.dataset.value = value;
   const shown = el.dataset.ie === 'area' ? AREAS[value] || value : value;
-  el.innerHTML = shown ? esc(shown) : `<span class="ie-empty">${esc(el.dataset.placeholder || '')}</span>`;
+  el.innerHTML = shown ? (el.dataset.ie === 'incident' ? storyHtml(shown) : esc(shown)) : `<span class="ie-empty">${esc(el.dataset.placeholder || '')}</span>`;
   el.classList.remove('is-editing');
 }
 function ieSync(id, key, value) {
@@ -395,7 +395,7 @@ function ieOpen(el) {
     input.innerHTML = IE_OPTIONS[el.dataset.ie](old).map(([k, l]) => opt(k, l, k === old)).join('');
   } else if (type === 'textarea') {
     input = document.createElement('textarea');
-    input.rows = Math.min(10, Math.max(3, old.split('\n').length + 1));
+    input.rows = el.dataset.ie === 'incident' ? Math.min(16, Math.max(7, old.split('\n').length + 2)) : Math.min(10, Math.max(3, old.split('\n').length + 1));
     input.value = old;
   } else {
     input = document.createElement('input');
@@ -403,7 +403,7 @@ function ieOpen(el) {
     input.value = old;
   }
   input.className = 'field ie-input';
-  input.maxLength = { title: 120, clientName: 80, clientPhone: 40, opponent: 120, courtRef: 60, description: 4000, publicNote: 500 }[el.dataset.ie] || 200;
+  input.maxLength = { title: 120, clientName: 80, clientPhone: 40, opponent: 120, courtRef: 60, description: 4000, incident: 8000, publicNote: 500 }[el.dataset.ie] || 200;
   input.setAttribute('aria-label', IE_LABEL[el.dataset.ie] || 'Feld');
   el.textContent = '';
   el.appendChild(input);

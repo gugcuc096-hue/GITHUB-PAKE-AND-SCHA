@@ -153,6 +153,7 @@ function caseRow(c, u) {
     area: c.area,
     urgency: c.urgency,
     description: c.description,
+    incident: staff ? c.incident || '' : undefined, // Tathergang (intern)
     clientId: c.client_id,
     clientName: c.client_account_name || c.client_name || '—',
     clientEmail: staff ? c.client_email || null : undefined,

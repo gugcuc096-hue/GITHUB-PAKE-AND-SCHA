@@ -644,6 +644,7 @@ const updateSchema = z.object({
   area: areas.keySchema.optional(),
   urgency: z.enum(URGENCIES).optional(),
   description: z.string().trim().max(4000).optional(),
+  incident: z.string().trim().max(8000).optional(), // Tathergang – nur Kanzlei, intern
   clientName: z.string().trim().max(80).optional(),
   clientPhone: z.string().trim().max(40).optional(),
   opponent: z.string().trim().max(120).optional(),
@@ -666,6 +667,7 @@ const FIELD_COLUMNS = {
   area: 'area',
   urgency: 'urgency',
   description: 'description',
+  incident: 'incident',
   clientName: 'client_name',
   clientPhone: 'client_phone',
   opponent: 'opponent',
@@ -694,6 +696,7 @@ router.patch(
       area: c.area,
       urgency: c.urgency,
       description: c.description,
+      incident: c.incident || '',
       clientName: c.client_name,
       clientPhone: c.client_phone,
       opponent: c.opponent,
@@ -796,6 +799,7 @@ router.patch(
     const editFields = Object.keys(FIELD_COLUMNS).filter((k) => d[k] !== undefined);
     const wantsEdit = editFields.length > 0 || d.status !== undefined || d.priority !== undefined || d.outcome !== undefined || d.actualHe !== undefined || d.actualFine !== undefined;
     if (d.priority !== undefined && !isStaff(u)) return res.status(403).json({ error: 'Die Priorität legen nur die Anwälte fest.' });
+    if (d.incident !== undefined && !isStaff(u)) return res.status(403).json({ error: 'Den Tathergang hält die Kanzlei fest.' });
     if (d.outcome !== undefined && !isStaff(u)) return res.status(403).json({ error: 'Das Ergebnis hält die Kanzlei fest.' });
     if ((d.actualHe !== undefined || d.actualFine !== undefined) && !isStaff(u)) return res.status(403).json({ error: 'Das Strafmaß hält die Kanzlei fest.' });
     // Ergebnis: beim Abschließen oder an einer bereits abgeschlossenen Akte (Korrektur)

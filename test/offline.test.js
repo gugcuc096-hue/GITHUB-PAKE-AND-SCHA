@@ -93,9 +93,13 @@ describe('Offline-Modus (Browser)', { skip: chromium ? false : 'Playwright nicht
         assert.ok((await page.textContent('#secTasks')).includes(`Aufgabe offline ${name}`), 'Akte mit Aufgabe aus dem Zwischenspeicher');
 
         // Offline: Aufgabe abhaken und interne Notiz schreiben → warten auf die Verbindung
+        const queued = () => page.evaluate(async () => (await PS.offline.stats()).queued);
         await caseShow(page, `#secTasks [data-action="task-toggle"][data-id="${task.id}"]`); await page.click(`#secTasks [data-action="task-toggle"][data-id="${task.id}"]`);
+        // erst wenn der Haken vorgemerkt ist, die Notiz schreiben (sonst überholt die Notiz den Haken auf langsamen Rechnern)
+        await page.waitForFunction(async () => (await PS.offline.stats()).queued >= 1, null, { timeout: 15000 }).catch(async () => assert.fail(`Haken nicht vorgemerkt (wartend: ${await queued()})`));
         await page.fill('form[data-form="add-note"] textarea[name="body"]', `Notiz im Zug (${name})`);
         await page.click('form[data-form="add-note"] button[type=submit]');
+        await page.waitForFunction(async () => (await PS.offline.stats()).queued >= 2, null, { timeout: 15000 }).catch(async () => assert.fail(`Notiz nicht vorgemerkt (wartend: ${await queued()}, Leiste: ${await page.textContent('#offlineBar').catch(() => '?')})`));
         await page.waitForFunction(() => /2 Änderungen warten/.test(document.querySelector('#offlineBar')?.textContent || ''), null, { timeout: 15000 });
         // etwas, das Verbindung braucht, sagt das klar
         const err = await page.evaluate(() => PS.api.post('/api/cases', { title: 'geht nicht', area: 'zivilrecht', clientName: 'X' }).then(() => 'ok', (e) => e.message));

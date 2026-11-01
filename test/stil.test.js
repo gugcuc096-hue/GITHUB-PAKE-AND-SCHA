@@ -212,7 +212,15 @@ describe('Rabattaktionen, Aktenzeichen und Stil (API)', () => {
     assert.equal(png.readUInt32BE(16), png0.readUInt32BE(16), 'gleiche Größe');
     const etag = res.headers.get('etag');
     assert.equal((await fetch(`${srv.base}/img/logo.png`, { headers: { 'If-None-Match': etag } })).status, 304);
-    assert.match(await (await fetch(`${srv.base}/`)).text(), /<meta name="theme-color" content="#2db584">/);
+    const home = await (await fetch(`${srv.base}/`)).text();
+    assert.match(home, /<meta name="theme-color" content="#2db584">/);
+    // Logo-Adresse trägt die Farbe: ein altes (goldenes) Logo aus dem Zwischenspeicher bleibt nicht stehen
+    assert.match(home, /src="\/img\/logo\.svg\?c=34d399"/);
+    assert.doesNotMatch(home, /src="\/img\/logo\.svg"/);
+    assert.match(await (await fetch(`${srv.base}/dashboard`)).text(), /src="\/img\/logo\.svg\?c=34d399"/);
+    const byColor = await fetch(`${srv.base}/img/logo.svg?c=e8a0b4`);
+    assert.match(await byColor.text(), /stroke="#dc98ab"/, 'Farbe aus der Adresse (Vorschau im Dashboard)');
+    assert.match(byColor.headers.get('cache-control'), /immutable/);
     // Discord: Gold wird zur Kanzleifarbe, andere Farben bleiben (der Server läuft in einem eigenen Prozess – Farbe hier übergeben)
     const out = require('../server/integrations/discord').brandColors({ embeds: [{ color: 0xd4af37 }, { color: 0xef4444 }] }, { isDefault: false, int: 0x34d399 });
     assert.deepEqual(out.embeds.map((e) => e.color), [0x34d399, 0xef4444]);
@@ -220,6 +228,7 @@ describe('Rabattaktionen, Aktenzeichen und Stil (API)', () => {
     await owner.put('/api/config/style/draft', { preset: 'gold', accent: '#d4af37', glass: 50, radius: 50, font: 'klassisch', motion: 'normal', season: 'aus', seasonDash: true });
     await owner.post('/api/config/style/publish', {});
     assert.match(await (await fetch(`${srv.base}/img/logo.svg`)).text(), /#caa32f/);
+    assert.match(await (await fetch(`${srv.base}/`)).text(), /src="\/img\/logo\.svg\?c=d4af37"/, 'zurück auf Gold: neue Adresse');
     assert.deepEqual(require('../server/integrations/discord').brandColors({ embeds: [{ color: 0xd4af37 }] }, { isDefault: true }).embeds[0].color, 0xd4af37);
   });
 

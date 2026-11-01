@@ -19,15 +19,17 @@ const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
 const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
 const toHex = (rgb) => `#${rgb.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
 
-/** Akzentfarbe (veröffentlicht) samt hellen/dunklen Tönen. */
-function accent() {
+/** Akzentfarbe (veröffentlicht oder override „#rrggbb“) samt hellen/dunklen Tönen. */
+function accent(override) {
   let hex = DEFAULT;
-  try {
-    const s = siteConfig.get('style');
-    if (/^#[0-9a-f]{6}$/i.test(s.accent)) hex = s.accent.toLowerCase();
-  } catch {
-    /* ohne Datenbank: Standard */
-  }
+  if (/^#[0-9a-f]{6}$/i.test(override || '')) hex = override.toLowerCase();
+  else
+    try {
+      const s = siteConfig.get('style');
+      if (/^#[0-9a-f]{6}$/i.test(s.accent)) hex = s.accent.toLowerCase();
+    } catch {
+      /* ohne Datenbank: Standard */
+    }
   const rgb = hexRgb(hex);
   const isDefault = hex === DEFAULT;
   return {
@@ -46,9 +48,9 @@ const docx = (hex) => hex.slice(1).toUpperCase();
 
 /* ---------------------------------------------------------------- Logo als SVG */
 let svgRaw = null;
-function logoSvg() {
+function logoSvg(color) {
   if (!svgRaw) svgRaw = fs.readFileSync(path.join(IMG, 'logo.svg'), 'utf8');
-  const a = accent();
+  const a = accent(color);
   return a.isDefault ? svgRaw : svgRaw.split(LOGO_GOLD).join(a.logo);
 }
 
@@ -121,9 +123,9 @@ function recolorPng(buf, rgb) {
   }
   return Buffer.concat([buf.subarray(0, 8), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(out, { level: 9 })), chunk('IEND', Buffer.alloc(0))]);
 }
-function logoPng() {
+function logoPng(color) {
   if (!pngRaw) pngRaw = fs.readFileSync(path.join(IMG, 'logo.png'));
-  const a = accent();
+  const a = accent(color);
   if (a.isDefault) return pngRaw;
   if (!pngCache.has(a.logo)) {
     if (pngCache.size > 8) pngCache.clear();
@@ -132,16 +134,26 @@ function logoPng() {
   return pngCache.get(a.logo);
 }
 
-/** Express: /img/logo.svg und /img/logo.png in der Kanzleifarbe (kurz zwischengespeichert, mit ETag). */
+/**
+ * Express: /img/logo.svg und /img/logo.png in der Kanzleifarbe. Die Seiten hängen die Farbe an (?c=34d399, theme.js bzw.
+ * PS.theme im Browser) – so bekommt jede Farbe ihre eigene Adresse und ein zwischengespeichertes Logo in der alten Farbe
+ * bleibt nach einem Farbwechsel nicht stehen. Mit Farbe: ein Jahr im Browser; ohne: kurz, mit ETag.
+ */
 function logoHandler(kind) {
   return (req, res) => {
-    const body = kind === 'svg' ? logoSvg() : logoPng();
-    const tag = `"logo-${accent().logo.slice(1)}"`;
+    const c = /^[0-9a-f]{6}$/i.test(String(req.query.c || '')) ? `#${String(req.query.c).toLowerCase()}` : null;
+    const body = kind === 'svg' ? logoSvg(c) : logoPng(c);
+    const tag = `"logo-${accent(c).logo.slice(1)}"`;
     res.set('ETag', tag);
-    res.set('Cache-Control', 'public, max-age=300, must-revalidate');
+    res.set('Cache-Control', c ? 'public, max-age=31536000, immutable' : 'public, max-age=60, must-revalidate');
     if (req.headers['if-none-match'] === tag) return res.status(304).end();
     res.type(kind === 'svg' ? 'image/svg+xml' : 'image/png').send(body);
   };
 }
+/** Logo-Adressen in einer HTML-Seite auf die aktuelle Farbe umstellen. */
+function logoUrls(html) {
+  const c = accent().hex.slice(1);
+  return html.replace(/(["'(])\/img\/logo\.(svg|png)(?:\?c=[0-9a-f]{6})?(?=["')])/gi, `$1/img/logo.$2?c=${c}`);
+}
 
-module.exports = { accent, docx, logoSvg, logoPng, recolorPng, logoHandler };
+module.exports = { accent, docx, logoSvg, logoPng, recolorPng, logoHandler, logoUrls };
