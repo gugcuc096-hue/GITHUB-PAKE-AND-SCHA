@@ -1402,6 +1402,7 @@ function calendarStaff() {
   const requests = st.events.filter((e) => e.status === 'angefragt').sort(byStart);
   const invited = st.events.filter((e) => e.myInvite === 'offen' && !['abgesagt', 'erledigt'].includes(e.status) && (parseDate(e.startsAt) || 0) > Date.now()).sort(byStart);
 
+  requestAnimationFrame(() => calRing(false)); // Rahmen um den gewählten Tag, sobald das Raster steht
   return `
       <div class="page-head">
         <div><h1 class="page-title">Kalender & Fristen</h1><p class="page-sub">Gerichtstermine, Mandantengespräche und Fristen des ganzen Teams – mit Live-Countdown.</p></div>
@@ -1417,23 +1418,71 @@ function calendarStaff() {
             <button class="icon-btn" data-action="cal-nav" data-dir="1" aria-label="Nächster Monat">${icon('chevronRight')}</button>
             <button class="btn-outline btn-sm" data-action="cal-today">Heute</button>
           </div>
-          <div class="cal-grid">${grid}</div>
+          <div class="cal-grid"><i class="cal-ring" aria-hidden="true"></i>${grid}</div>
           <div class="chip-row mt-3">${Object.entries(EVENT_TYPES)
           .map(([k, l]) => `<button class="chip ${st.cal.types[k] ? 'active' : ''}" data-action="cal-type" data-type="${k}" aria-pressed="${st.cal.types[k]}"><i class="cal-dot" style="background:${EVENT_COLORS[k]}"></i>${esc(l)}</button>`)
           .join('')}</div>
         </section>
         <aside class="stack">
-          <section id="dayAgenda" class="panel panel-pad">
-            <div class="panel-head"><h2 class="panel-title">${esc(selDate.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }))}</h2>
-              <button class="btn-outline btn-sm" data-action="new-event" data-day="${st.cal.selected}">${icon('plus', 'ico-sm')}<span>Eintrag</span></button></div>
-            ${selected.length ? selected.map((e) => eventRow(e, { date: false })).join('') : empty('Keine Einträge an diesem Tag.', 'calendar', nextStep('Eintrag anlegen', 'new-event', { day: st.cal.selected }))}
-          </section>
+          <section id="dayAgenda" class="panel panel-pad">${calAgendaInner()}</section>
           <section class="panel panel-pad">
             <div class="panel-head"><h2 class="panel-title">Offene Fristen</h2></div>
             ${deadlines.length ? deadlines.map((e) => eventRow(e)).join('') : empty('Keine offenen Fristen.', 'clock')}
           </section>
         </aside>
       </div>`;
+}
+
+/** Einträge eines Tages (sichtbare Arten, ohne abgesagte), nach Beginn sortiert. */
+function calDayEvents(key) {
+  return st.events
+    .filter((e) => st.cal.types[e.type] && e.status !== 'abgesagt')
+    .filter((e) => {
+      const d = parseDate(e.startsAt);
+      return d && dayKey(d) === key;
+    })
+    .sort(byStart);
+}
+/** Inhalt der Tagesliste neben dem Kalender (Überschrift mit Datum, Einträge oder Leerzustand). */
+function calAgendaInner() {
+  const key = st.cal.selected;
+  const selDate = new Date(`${key}T12:00:00`);
+  const selected = calDayEvents(key);
+  return `<div class="panel-head"><h2 class="panel-title">${esc(selDate.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }))}</h2>
+              <button class="btn-outline btn-sm" data-action="new-event" data-day="${key}">${icon('plus', 'ico-sm')}<span>Eintrag</span></button></div>
+            ${selected.length ? selected.map((e) => eventRow(e, { date: false })).join('') : empty('Keine Einträge an diesem Tag.', 'calendar', nextStep('Eintrag anlegen', 'new-event', { day: key }))}`;
+}
+/** Goldener Rahmen um den gewählten Tag: gleitet von Tag zu Tag, statt zu springen. */
+function calRing(animate) {
+  const grid = document.querySelector('#content .cal-grid');
+  const ring = grid && grid.querySelector('.cal-ring');
+  if (!ring) return;
+  const sel = grid.querySelector('.cal-day.selected');
+  if (!sel) {
+    ring.style.opacity = '0';
+    return;
+  }
+  const glide = animate && !window.PS.motion.calm();
+  ring.style.transition = glide ? '' : 'none';
+  ring.style.opacity = '1';
+  ring.style.width = `${sel.offsetWidth}px`;
+  ring.style.height = `${sel.offsetHeight}px`;
+  ring.style.transform = `translate(${sel.offsetLeft}px, ${sel.offsetTop}px)`;
+  if (!glide) {
+    void ring.offsetWidth; // ohne Übergang setzen, danach wieder freigeben
+    ring.style.transition = '';
+  }
+}
+window.addEventListener('resize', () => st.view === 'calendar' && calRing(false));
+/** Tagesliste austauschen: neuer Inhalt gleitet gestaffelt ein, die Höhe gleitet mit. */
+function calAgendaSwap() {
+  const box = document.getElementById('dayAgenda');
+  if (!box) return;
+  const h0 = box.offsetHeight;
+  box.innerHTML = calAgendaInner();
+  if (window.PS.motion.calm() || typeof box.animate !== 'function') return;
+  [...box.children].forEach((k, i) => k.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 300, delay: Math.min(i, 6) * 45, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)', fill: 'backwards' }));
+  heightGlide(box, h0);
 }
 
 /*
@@ -1571,6 +1620,8 @@ function calSlide(dir) {
   const grid = $('#content .cal-grid');
   if (!grid || window.PS.motion.calm() || typeof grid.animate !== 'function') return;
   grid.animate([{ transform: `translateX(${dir * 36}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+  const label = $('#content .cal-month');
+  if (label) label.animate([{ transform: `translateX(${dir * 18}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
 }
 // Am Handy: über den Kalender wischen wechselt den Monat
 let calTouch = null;
@@ -2002,20 +2053,38 @@ Object.assign(actions, {
     calSlide(Number(el.dataset.dir));
   },
   'cal-today': () => {
+    const before = st.cal.month;
     st.cal.month = monthStart(new Date());
     st.cal.selected = dayKey(new Date());
     renderView();
+    if (before.getTime() !== st.cal.month.getTime()) calSlide(before > st.cal.month ? -1 : 1);
   },
   'cal-select': (el) => {
-    st.cal.selected = el.dataset.day;
-    const d = new Date(`${el.dataset.day}T12:00:00`);
-    if (d.getMonth() !== st.cal.month.getMonth()) st.cal.month = monthStart(d);
-    renderView();
+    const key = el.dataset.day;
+    const d = new Date(`${key}T12:00:00`);
+    const grid = $('#content .cal-grid');
+    const sameMonth = d.getMonth() === st.cal.month.getMonth();
+    st.cal.selected = key;
+    // Im selben Monat nichts neu zeichnen: der Rahmen gleitet zum neuen Tag, die Tagesliste wechselt weich
+    if (grid && grid.contains(el) && grid.querySelector('.cal-ring') && $('#dayAgenda') && sameMonth) {
+      grid.querySelectorAll('.cal-day.selected').forEach((b) => b.classList.remove('selected'));
+      el.classList.add('selected');
+      calRing(true);
+      calAgendaSwap();
+      document.querySelectorAll('#content [data-action="new-event"][data-day]').forEach((b) => (b.dataset.day = key));
+    } else {
+      const before = st.cal.month;
+      if (!sameMonth) st.cal.month = monthStart(d);
+      renderView();
+      if (!sameMonth) calSlide(before > st.cal.month ? -1 : 1);
+    }
     if (window.matchMedia('(max-width: 1279px)').matches) $('#dayAgenda')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   },
   'cal-type': (el) => {
     st.cal.types[el.dataset.type] = !st.cal.types[el.dataset.type];
     renderView();
+    const grid = $('#content .cal-grid');
+    if (grid && !window.PS.motion.calm() && typeof grid.animate === 'function') grid.animate([{ opacity: 0.55 }, { opacity: 1 }], { duration: 240, easing: 'ease-out' });
   },
 
   // Kanzlei-Post
