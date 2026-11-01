@@ -17,9 +17,9 @@ const inDays = (n) => new Date(Date.now() + n * 864e5).toISOString();
 function run(srv, script) {
   const wrapper = `
     const posts = [];
-    const tickets = require('./tickets');
+    const tickets = require('./server/integrations/tickets');
     tickets.post = (id, msg) => { posts.push({ id, msg }); return Promise.resolve(); };
-    const ta = require('./ticketAssistant');
+    const ta = require('./server/integrations/ticketAssistant');
     const send = (c, content, extra = {}) => ta.onClientMessage(c, { content, mentions: [], ...extra });
     const out = (v) => console.log('@@' + JSON.stringify(v));
     ${script}
@@ -45,7 +45,7 @@ describe('Assistent im Discord-Ticket', () => {
   });
   after(() => srv.stop());
 
-  const prelude = (id) => `const { getCase } = require('./models'); const c = getCase(${id}); const { setSetting } = require('./db');`;
+  const prelude = (id) => `const { getCase } = require('./server/db/models'); const c = getCase(${id}); const { setSetting } = require('./server/db/db');`;
 
   it('standardmäßig aus: keine Antwort, solange das Board den Schalter nicht einschaltet', () => {
     const r = run(srv, `${prelude(kase.id)} out({ r: send(c, 'Wann ist mein nächster Termin?'), posts: posts.length });`);
