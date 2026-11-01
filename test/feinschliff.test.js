@@ -100,7 +100,7 @@ describe('Reiterleisten, Akte und Handy (Browser)', { skip: chromium ? false : '
       await page.selectOption('.tabrow-pick select', String(idx));
       await page.waitForFunction(() => st.view === 'applications');
       await page.waitForFunction(() => /^Bewerbungen/.test(document.querySelector('.tabrow-pick select')?.selectedOptions[0]?.text || ''));
-      assert.equal(await page.$$eval('.tabrow-pick + .hub-tabs', (l) => l.length), 1, 'genau eine Liste für die Reiter');
+      await page.waitForFunction(() => document.querySelectorAll('.tabrow-pick + .hub-tabs').length === 1, null, { timeout: 5000 }); // genau eine Liste für die Reiter
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0, 'nichts ragt seitlich heraus');
       // Akte: Reiter als Auswahlliste, der gewählte Reiter steht drin
       await page.evaluate((id) => openCase(id), kase.id);
