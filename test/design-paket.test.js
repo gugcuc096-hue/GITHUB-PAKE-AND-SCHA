@@ -42,7 +42,7 @@ describe('Design-Paket', () => {
     assert.match(css, /::-webkit-scrollbar-thumb/);
     assert.match(css, /gradient/);
     for (const f of fs.readdirSync(path.join(root, 'public/css')).filter((n) => n.endsWith('.css') && n !== 'tailwind.css')) {
-      const txt = fs.readFileSync(path.join(root, 'public/css', f), 'utf8').replace(/@supports not selector\(::-webkit-scrollbar\)[^\n]*/g, '');
+      const txt = fs.readFileSync(path.join(root, 'public/css', f), 'utf8').replace(/@supports not selector\(::-webkit-scrollbar\)[^\n]*/g, '').replace(/::picker\(select\) \{[^}]*\}/g, ''); // die geöffnete Auswahlliste braucht die Standard-Eigenschaften (eigenes Element)
       assert.doesNotMatch(txt, /scrollbar-width:\s*thin|scrollbar-color/, `${f}: erzwingt die Standardleiste (zeigt dann weiß statt Gold)`);
     }
   });
@@ -121,6 +121,11 @@ describe('Design-Paket', () => {
       await page.waitForFunction(() => document.querySelector('#ncTitle').parentElement.classList.contains('fl'));
       assert.equal(await page.evaluate(() => document.querySelector('#ncTitle').parentElement.classList.contains('is-up')), false);
       await page.fill('#ncTitle', 'Schwebend');
+      // Die geöffnete Auswahlliste ist ein eigenes Browser-Element und braucht ihre schmale Gold-Leiste direkt
+      assert.deepEqual(
+        await page.evaluate(() => { const c = getComputedStyle(document.querySelector('#modal select'), '::picker(select)'); return [c.scrollbarWidth, /212, 175, 55|\d/.test(c.scrollbarColor) && c.scrollbarColor !== 'auto']; }),
+        ['thin', true]
+      );
       assert.equal(await page.evaluate(() => document.querySelector('#ncTitle').parentElement.classList.contains('is-up')), true);
       await page.evaluate(() => closeModal());
       await page.waitForFunction(() => !document.querySelector('#modal.open'));
