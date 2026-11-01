@@ -3163,6 +3163,16 @@ describe('Browser: Update-Hinweis, Merkliste, Kopieren, Anpinnen, Lesefortschrit
       });
       assert.ok(scrolled, 'Akte ist lang genug');
       await page.waitForFunction(() => document.querySelector('.read-bar')?.style.opacity === '1');
+      // Wächst die Akte nach dem Scrollen noch (späte Inhalte), stimmt die Linie erst nach dem nächsten Scroll-Ereignis: auf die Mitte nachführen, bis sie steht
+      await page
+        .waitForFunction(() => {
+          const el = [...document.querySelectorAll('#modal[data-readbar], #modalBody[data-readbar]')].find((e) => e.scrollHeight > e.clientHeight * 1.8);
+          if (!el) return false;
+          el.scrollTop = (el.scrollHeight - el.clientHeight) / 2;
+          const m = (document.querySelector('.read-bar')?.style.transform || '').match(/scaleX\(([\d.]+)\)/);
+          return !!m && Number(m[1]) > 0.3 && Number(m[1]) < 0.7;
+        }, null, { timeout: 5000 })
+        .catch(() => {});
       const scale = await page.$eval('.read-bar', (b) => Number(b.style.transform.match(/scaleX\(([\d.]+)\)/)[1]));
       assert.ok(scale > 0.3 && scale < 0.7, `Linie etwa halb: ${scale}`);
       await page.keyboard.press('Escape');
