@@ -1322,10 +1322,10 @@ function showCredentials(cred, name) {
  * Freitext-Feld mit eigener Vorschlagsliste im Stil der Auswahllisten (statt <datalist>, das sich nicht gestalten lässt).
  * Tippen filtert, Pfeiltasten wählen, Enter übernimmt, Esc schließt – eigener Text bleibt erlaubt.
  */
-function comboField({ id, name, value = '', options = [], maxlength = 120, placeholder = '' }) {
+function comboField({ id, name, value = '', options = [], maxlength = 120, placeholder = '', attrs = '' }) {
   return `<div class="combo">
       <input id="${esc(id)}" name="${esc(name)}" class="field combo-input" maxlength="${maxlength}" value="${esc(value || '')}" placeholder="${esc(placeholder)}"
-        autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="${esc(id)}List" data-combo>
+        autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="${esc(id)}List" data-combo ${attrs}>
       <button type="button" class="combo-toggle" tabindex="-1" aria-label="Vorschläge zeigen" data-combo-toggle>${icon('chevronDown', 'ico-sm')}</button>
       <ul class="combo-list" id="${esc(id)}List" role="listbox" hidden>${options
         .map((o) => `<li role="option" data-value="${esc(o)}">${esc(o)}</li>`)
