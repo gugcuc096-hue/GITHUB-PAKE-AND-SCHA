@@ -300,12 +300,13 @@ function processTicketForm(c) {
  * Felder direkt in der Akte ändern: Klick auf den Wert → Eingabe, Enter oder Verlassen speichert (Esc verwirft), danach
  * „Rückgängig“. Die Akte wird dabei nicht neu geladen. Nur für zuständige Anwälte und das Board (c.canEdit).
  */
-const IE_LABEL = { title: 'Titel', clientName: 'Mandant', clientPhone: 'Telefon', opponent: 'Gegenpartei', courtRef: 'Gerichtsaktenzeichen', area: 'Rechtsgebiet', description: 'Sachverhalt', publicNote: 'Statushinweis' };
+const IE_LABEL = { incident: 'Tathergang', title: 'Titel', clientName: 'Mandant', clientPhone: 'Telefon', opponent: 'Gegenpartei', courtRef: 'Gerichtsaktenzeichen', area: 'Rechtsgebiet', description: 'Sachverhalt', publicNote: 'Statushinweis' };
 function ie(c, key, value, { type = 'text', placeholder = '', cls = '' } = {}) {
   const v = String(value ?? '');
   const shown = key === 'area' ? AREAS[v] || v : v;
-  if (!c.canEdit) return shown ? esc(shown) : '';
-  return `<span class="ie ${cls}" role="button" tabindex="0" data-ie="${key}" data-type="${type}" data-id="${c.id}" data-value="${esc(v)}" data-placeholder="${esc(placeholder)}" title="Zum Ändern anklicken">${shown ? esc(shown) : `<span class="ie-empty">${esc(placeholder)}</span>`}</span>`;
+  const view = (x) => (key === 'incident' ? storyHtml(x) : esc(x)); // Tathergang: gegliedert (Absätze, Zeitleiste)
+  if (!c.canEdit) return shown ? view(shown) : '';
+  return `<span class="ie ${cls}" role="button" tabindex="0" data-ie="${key}" data-type="${type}" data-id="${c.id}" data-value="${esc(v)}" data-placeholder="${esc(placeholder)}" title="Zum Ändern anklicken">${shown ? view(shown) : `<span class="ie-empty">${esc(placeholder)}</span>`}</span>`;
 }
 
 /** Beteiligte (Gegenpartei, Zeugen …) mit Hinweis auf Überschneidungen mit anderen Akten. */
@@ -1105,6 +1106,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
   const contractList = contracts.filter((k) => k.kind !== 'schriftsatz');
   const briefList = contracts.filter((k) => k.kind === 'schriftsatz');
   const parts = {
+    tathergang: tathergangSection(c),
     charges: staff ? chargesSection(c, charges, deals) : dealClientCard(c, deals),
     chat: chatSection(c, chat, ticket),
     witnesses: witnessesSection(c, parties),
@@ -1122,6 +1124,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
   };
   const openTasks = tasks.filter((t) => !t.done).length;
   const jumps = [
+    ['secTathergang', 'Tathergang', storySteps(c.incident).length, parts.tathergang],
     ['secCharges', 'Anklage', charges ? charges.charges.length : 0, parts.charges],
     ['secChat', 'Nachrichten', chat ? chat.messages.length : 0, parts.chat],
     ['secEvents', 'Termine', appointments.length, true],
@@ -1168,7 +1171,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
         : ''}
       </div>`;
   // Abschnitte der Akte: Reihenfolge, Ausblenden und Einklappen je Person (12-akte-ansicht.js); Mandanten sehen die feste Reihenfolge
-  const secMap = { charges: parts.charges, chat: parts.chat, events: eventsSection, witnesses: parts.witnesses, karte: parts.karte, contracts: parts.contracts, briefs: parts.briefs, external: parts.external, evidence: parts.evidence, requests: parts.requests, tasks: parts.tasks, invoices: parts.invoices, work: parts.work, notes: notesHtml };
+  const secMap = { tathergang: parts.tathergang, charges: parts.charges, chat: parts.chat, events: eventsSection, witnesses: parts.witnesses, karte: parts.karte, contracts: parts.contracts, briefs: parts.briefs, external: parts.external, evidence: parts.evidence, requests: parts.requests, tasks: parts.tasks, invoices: parts.invoices, work: parts.work, notes: notesHtml };
   const secMeta = Object.fromEntries(jumps.map(([id, label, n]) => [caseSecKey(id), { label, n }]));
   return `<div class="case-root" data-case-tab="${caseTab}">
       <div class="case-head case-cover mb-5" data-case-head="${c.id}">

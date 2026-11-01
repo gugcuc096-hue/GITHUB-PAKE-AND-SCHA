@@ -9,6 +9,7 @@
 
 // [Schlüssel, Anker in der Akte, Bezeichnung]
 const CASE_SEC = [
+  ['tathergang', 'secTathergang', 'Tathergang'],
   ['charges', 'secCharges', 'Anklage'],
   ['chat', 'secChat', 'Nachrichten'],
   ['events', 'secEvents', 'Termine & Fristen'],
@@ -33,7 +34,7 @@ const SEC_KEYS = CASE_SEC.map((s) => s[0]);
 const CASE_TABS = [
   ['ueberblick', 'Überblick', ['tasks', 'work', 'notes']],
   ['kommunikation', 'Kommunikation', ['chat', 'events', 'requests']],
-  ['fall', 'Fall', ['charges', 'witnesses', 'evidence', 'karte']],
+  ['fall', 'Fall', ['tathergang', 'charges', 'witnesses', 'evidence', 'karte']],
   ['dokumente', 'Dokumente', ['contracts', 'briefs', 'external', 'invoices']],
 ];
 const casePaneOf = (key) => (CASE_TABS.find((t) => t[2].includes(key)) || CASE_TABS[0])[0];
@@ -86,7 +87,13 @@ async function caseSecLoad() {
 function caseSecLayout(area) {
   const mine = kSecPrefs && kSecPrefs.mine;
   const view = mine || (kSecPrefs && kSecPrefs.defaults && kSecPrefs.defaults[area]) || null;
-  const order = [...new Set([...(view ? view.order : []), ...SEC_KEYS])].filter((k) => SEC_KEYS.includes(k));
+  const order = (view ? view.order : []).filter((k) => SEC_KEYS.includes(k));
+  // Abschnitte, die es bei der gespeicherten Ansicht noch nicht gab (z. B. Tathergang): an ihrem Standardplatz einfügen
+  SEC_KEYS.forEach((k, i) => {
+    if (order.includes(k)) return;
+    const next = SEC_KEYS.slice(i + 1).find((x) => order.includes(x));
+    order.splice(next ? order.indexOf(next) : order.length, 0, k);
+  });
   return { order, hidden: new Set(view ? view.hidden : []), collapsed: new Set(view ? view.collapsed : []), source: mine ? 'mine' : view ? 'default' : 'standard' };
 }
 const caseSecIsHidden = (c, anchor) => isStaff() && caseSecLayout(c.area).hidden.has(caseSecKey(anchor));
@@ -281,5 +288,61 @@ Object.assign(actions, {
     if (kSecPrefs) delete kSecPrefs.defaults[box.dataset.area];
     toast('Standardansicht entfernt.');
     if (st.modalCaseId) await reloadCase(st.modalCaseId);
+  },
+});
+
+/* ================================================================
+   Tathergang (Reiter „Fall“, nur Kanzlei): was ist passiert – gut lesbar gegliedert. Absätze bleiben Absätze; Zeilen mit
+   Uhrzeit („14:20 – Festnahme vor dem Juwelier“) oder Aufzählungszeichen („- …“) werden zu einer Zeitleiste.
+   ================================================================ */
+const STORY_STEP = /^\s*(?:(?:[-–•*]\s*)?(\d{1,2}[:.]\d{2})\s*(?:Uhr)?\s*[-–:|]?\s*|[-–•*]\s+)(.+)$/;
+/** Schritte der Zeitleiste (für die Zahl im Reiter). */
+function storySteps(text) {
+  return String(text || '')
+    .split('\n')
+    .map((l) => l.match(STORY_STEP))
+    .filter(Boolean);
+}
+function storyHtml(text) {
+  const blocks = String(text || '').trim().split(/\n\s*\n/);
+  return `<div class="story">${blocks
+    .map((b) => {
+      const lines = b.split('\n').filter((l) => l.trim());
+      const steps = lines.map((l) => l.match(STORY_STEP));
+      if (steps.length && steps.every(Boolean)) {
+        return `<ol class="story-steps">${steps.map((m) => `<li>${m[1] ? `<time>${esc(m[1].replace('.', ':'))}</time>` : '<i class="story-dot" aria-hidden="true"></i>'}<span>${esc(m[2].trim())}</span></li>`).join('')}</ol>`;
+      }
+      return `<p>${lines.map(esc).join('<br>')}</p>`;
+    })
+    .join('')}</div>`;
+}
+function tathergangSection(c) {
+  if (!isStaff()) return '';
+  const v = c.incident || '';
+  if (!v && !c.canEdit) return '';
+  const tip = 'Was ist passiert – Schritt für Schritt. Eine Zeile je Schritt, gern mit Uhrzeit („14:20 – Festnahme vor dem Juwelier“); Absätze für längere Schilderungen.';
+  if (!v) return emptySection('secTathergang', 'Tathergang', 'noch nicht beschrieben', `<button type="button" class="btn-outline btn-sm" data-action="story-edit" data-case-id="${c.id}">${icon('edit', 'ico-sm')}<span>Tathergang beschreiben</span></button>`, tip);
+  return storySection(c, v);
+}
+function storySection(c, v) {
+  const n = storySteps(v).length;
+  return `<div class="section" id="secTathergang"><div class="section-head"><h3 class="section-title">Tathergang <span class="text-xs text-dim font-normal sec-meta">${n ? `${n} Schritt${n === 1 ? '' : 'e'}` : ''}</span></h3>
+      ${c.canEdit ? `<button type="button" class="btn-ghost btn-sm story-edit-btn" data-action="story-open">${icon('edit', 'ico-sm')}<span>Bearbeiten</span></button>` : ''}</div>
+      ${c.canEdit ? `<p class="story-hint">Eine Zeile je Schritt, gern mit Uhrzeit („14:20 – Festnahme vor dem Juwelier“); Absätze für längere Schilderungen. Strg+Enter speichert.</p>` : ''}
+      <div class="ie-block story-box">${ie(c, 'incident', v, { type: 'textarea', placeholder: 'Tathergang beschreiben …', cls: 'ie-story' })}</div></div>`;
+}
+Object.assign(actions, {
+  'story-open': () => {
+    const field = $('#secTathergang .ie[data-ie="incident"]');
+    if (field) ieOpen(field);
+  },
+  // Leerer Tathergang: Abschnitt zum Schreiben aufklappen und das Feld öffnen
+  'story-edit': (el) => {
+    const c = st.caseInfo;
+    const row = el.closest('#secTathergang');
+    if (!c || !row) return;
+    row.outerHTML = storySection(c, '');
+    const field = $('#secTathergang .ie[data-ie="incident"]');
+    if (field) ieOpen(field);
   },
 });
