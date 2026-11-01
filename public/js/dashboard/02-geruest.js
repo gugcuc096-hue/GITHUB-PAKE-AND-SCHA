@@ -1409,81 +1409,195 @@ document.addEventListener(
   true
 );
 
-/* ---------------------------------------------------------------- Kalender für Datums- und Terminfelder */
+/* ---------------------------------------------------------------- Kalender, Uhrzeit und Farbe für Felder */
 /**
- * Eigener Kalender im Stil der Kanzlei für alle Datums- und Uhrzeitfelder (input.field type="date" / "datetime-local").
- * Die Felder bleiben echte Datumsfelder (gleicher Wert, Tippen am PC geht weiter) – nur das Aufklapp-Fenster ist unseres.
- * Datum: Tag anklicken = übernommen. Termin: Tag + Uhrzeit wählen, „Übernehmen“.
+ * Eigene Auswahl im Stil der Kanzlei für alle Datums-, Termin-, Uhrzeit- und Farbfelder (input type="date" / "datetime-local" /
+ * "time" mit Klasse field, sowie type="color"). Die Felder bleiben echte Felder (gleicher Wert, Tippen am PC geht weiter) – nur das
+ * Aufklapp-Fenster ist unseres (die des Browsers lassen sich nicht gestalten, auch ihre Leisten nicht).
+ * Datum: Tag anklicken = übernommen. Termin: Tag + Uhrzeit wählen, „Übernehmen“. Uhrzeit: Stunde + Minute wählen, „Übernehmen“.
+ * Bewegung: Monate gleiten, der goldene Tag-Rahmen wandert von Tag zu Tag, Uhrzeit-Spalten rollen zum Wert.
  */
 const DP_MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
-const DP_SEL = 'input.field[type="date"], input.field[type="datetime-local"]';
+const DP_SEL = 'input.field[type="date"], input.field[type="datetime-local"], input.field[type="time"]';
+const CP_SEL = 'input[type="color"]';
 const pad2 = (n) => String(n).padStart(2, '0');
 const dpKey = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 const dp = { el: null, input: null, view: null, day: '', hh: '', mm: '' };
+const dpKind = (input) => (input.type === 'datetime-local' ? 'dt' : input.type === 'time' ? 'time' : 'date');
+const dpMotion = () => !window.PS.motion.calm() && typeof Element.prototype.animate === 'function';
+const DP_EASE = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
 
 function dpParse(input) {
+  if (input.type === 'time') {
+    const [hh = '', mm = ''] = String(input.value || '').split(':');
+    return { date: '', hh, mm: mm.slice(0, 2) };
+  }
   const [date, time = ''] = String(input.value || '').split('T');
   const [hh = '', mm = ''] = time.split(':');
   return { date, hh, mm };
 }
 
-function dpRender() {
+/** Die 42 Tage (sechs Wochen, Montag zuerst) des gezeigten Monats. */
+function dpGridHtml() {
   const input = dp.input;
-  const withTime = input.type === 'datetime-local';
   const min = String(input.min || '').slice(0, 10);
   const max = String(input.max || '').slice(0, 10);
   const y = dp.view.getFullYear();
   const m = dp.view.getMonth();
   const first = new Date(y, m, 1);
-  const start = new Date(y, m, 1 - ((first.getDay() + 6) % 7)); // Woche beginnt Montag
+  const start = new Date(y, m, 1 - ((first.getDay() + 6) % 7));
   const today = dpKey(new Date());
   const days = Array.from({ length: 42 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
   const cell = (d) => {
     const k = dpKey(d);
     const off = (min && k < min) || (max && k > max);
-    return `<button type="button" class="dp-day${d.getMonth() !== m ? ' out' : ''}${k === today ? ' today' : ''}${k === dp.day ? ' sel' : ''}" data-dp-day="${k}" ${off ? 'disabled' : ''} aria-label="${d.getDate()}. ${DP_MONTHS[d.getMonth()]} ${d.getFullYear()}" aria-pressed="${k === dp.day}">${d.getDate()}</button>`;
+    return `<button type="button" class="dp-day${d.getMonth() !== m ? ' out' : ''}${k === today ? ' today' : ''}${k === dp.day ? ' sel' : ''}" data-dp-day="${k}" ${off ? 'disabled' : ''} aria-label="${d.getDate()}. ${DP_MONTHS[d.getMonth()]} ${d.getFullYear()}">${d.getDate()}</button>`;
   };
+  return `<i class="dp-ring" aria-hidden="true"></i>${['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((w) => `<span class="dp-wd">${w}</span>`).join('')}${days.map(cell).join('')}`;
+}
+
+/** Stunden- und Minutenspalte: Stunden einzeln, Minuten in Fünferschritten (ein anderer Wert bleibt zusätzlich stehen). */
+function dpTimeHtml() {
   const mins = Array.from({ length: 12 }, (_, i) => pad2(i * 5));
   if (dp.mm && !mins.includes(dp.mm)) mins.push(dp.mm), mins.sort();
+  const items = (list, kind, cur) => list.map((x) => `<button type="button" class="dp-tv${x === cur ? ' sel' : ''}" data-dp-${kind}="${x}" aria-label="${kind === 'hh' ? 'Stunde' : 'Minute'} ${x}">${x}</button>`).join('');
+  return `<div class="dp-time"><span class="dp-time-label">${icon('clock', 'ico-sm')}Uhrzeit</span>
+      <div class="dp-cols"><div class="dp-col" data-dp-col="hh" role="listbox" aria-label="Stunde">${items(Array.from({ length: 24 }, (_, h) => pad2(h)), 'hh', dp.hh)}</div>
+      <span class="dp-colon">:</span>
+      <div class="dp-col" data-dp-col="mm" role="listbox" aria-label="Minute">${items(mins, 'mm', dp.mm)}</div></div></div>`;
+}
+
+function dpRender() {
+  const input = dp.input;
+  const kind = dpKind(input);
+  const m = dp.view.getMonth();
+  const y = dp.view.getFullYear();
   dp.el.innerHTML = `
-    <div class="dp-head">
+    ${
+      kind === 'time'
+        ? ''
+        : `<div class="dp-head">
       <button type="button" class="dp-nav" data-dp-nav="-1" aria-label="Voriger Monat">${icon('chevronLeft', 'ico-sm')}</button>
-      <div class="dp-title">${DP_MONTHS[m]} ${y}</div>
+      <div class="dp-title" aria-live="polite">${DP_MONTHS[m]} ${y}</div>
       <button type="button" class="dp-nav" data-dp-nav="1" aria-label="Nächster Monat">${icon('chevronRight', 'ico-sm')}</button>
     </div>
-    <div class="dp-grid">${['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((w) => `<span class="dp-wd">${w}</span>`).join('')}${days.map(cell).join('')}</div>
-    ${
-      withTime
-        ? `<div class="dp-time"><span class="dp-time-label">${icon('clock', 'ico-sm')}Uhrzeit</span>
-            <select class="field field-sm" data-dp-time="hh" aria-label="Stunde">${Array.from({ length: 24 }, (_, h) => pad2(h))
-              .map((h) => `<option ${h === dp.hh ? 'selected' : ''}>${h}</option>`)
-              .join('')}</select><span class="dp-colon">:</span>
-            <select class="field field-sm" data-dp-time="mm" aria-label="Minute">${mins.map((x) => `<option ${x === dp.mm ? 'selected' : ''}>${x}</option>`).join('')}</select></div>`
-        : ''
+    <div class="dp-body"><div class="dp-grid">${dpGridHtml()}</div></div>`
     }
+    ${kind === 'date' ? '' : dpTimeHtml()}
     <div class="dp-foot">
-      <button type="button" class="btn-ghost btn-sm" data-dp-act="today">${withTime ? 'Jetzt' : 'Heute'}</button>
+      <button type="button" class="btn-ghost btn-sm" data-dp-act="today">${kind === 'date' ? 'Heute' : 'Jetzt'}</button>
       ${input.required ? '' : '<button type="button" class="btn-ghost btn-sm" data-dp-act="clear">Leeren</button>'}
-      ${withTime ? '<button type="button" class="btn-gold btn-sm" data-dp-act="ok">Übernehmen</button>' : ''}
+      ${kind === 'date' ? '' : '<button type="button" class="btn-gold btn-sm" data-dp-act="ok">Übernehmen</button>'}
     </div>`;
+  dpRing(false);
+  dpScrollCols(false);
   dpPlace();
 }
 
-function dpPlace() {
-  if (!dp.el || !dp.input) return;
-  const r = dp.input.getBoundingClientRect();
-  const w = dp.el.offsetWidth;
-  const h = dp.el.offsetHeight;
+/** Goldener Rahmen unter dem gewählten Tag – gleitet beim Wechsel von Tag zu Tag. */
+function dpRing(animate) {
+  const grid = dp.el && dp.el.querySelector('.dp-grid:not(.dp-leave)');
+  const ring = grid && grid.querySelector('.dp-ring');
+  if (!ring) return;
+  const sel = grid.querySelector('.dp-day.sel');
+  if (!sel) {
+    ring.style.opacity = '0';
+    return;
+  }
+  ring.style.transition = animate && dpMotion() ? '' : 'none';
+  ring.style.opacity = '1';
+  ring.style.width = `${sel.offsetWidth}px`;
+  ring.style.height = `${sel.offsetHeight}px`;
+  ring.style.transform = `translate(${sel.offsetLeft}px, ${sel.offsetTop}px)`;
+  if (!animate) void ring.offsetWidth; // ohne Übergang setzen, dann wieder freigeben
+  if (!animate) ring.style.transition = '';
+}
+
+/** Spalten auf den gewählten Wert rollen (beim Öffnen sofort, danach weich). */
+function dpScrollCols(smooth) {
+  if (!dp.el) return;
+  dp.el.querySelectorAll('.dp-col').forEach((col) => {
+    const sel = col.querySelector('.dp-tv.sel');
+    if (!sel) return;
+    const top = sel.offsetTop - (col.clientHeight - sel.offsetHeight) / 2;
+    if (smooth && dpMotion()) col.scrollTo({ top, behavior: 'smooth' });
+    else col.scrollTop = top;
+  });
+}
+
+/** Monat wechseln: das alte Raster gleitet hinaus, das neue herein; der Titel rollt mit. */
+function dpMonth(dir, to) {
+  if (!dp.el) return;
+  const body = dp.el.querySelector('.dp-body');
+  const title = dp.el.querySelector('.dp-title');
+  if (!body || !title) return;
+  dp.view = to || new Date(dp.view.getFullYear(), dp.view.getMonth() + dir, 1);
+  title.textContent = `${DP_MONTHS[dp.view.getMonth()]} ${dp.view.getFullYear()}`;
+  const old = body.querySelector('.dp-grid:not(.dp-leave)');
+  const fresh = document.createElement('div');
+  fresh.className = 'dp-grid';
+  fresh.innerHTML = dpGridHtml();
+  if (!dpMotion() || !old) {
+    (old || body).replaceWith(fresh);
+    dpRing(false);
+    return;
+  }
+  body.append(fresh);
+  old.classList.add('dp-leave');
+  old.inert = true;
+  // Das hinausgleitende Raster ist nur noch Bild: seine Tage zählen nicht mehr als Tage (Suche, Tastatur, Vorlesen)
+  old.setAttribute('aria-hidden', 'true');
+  old.querySelectorAll('.dp-day').forEach((b) => {
+    b.classList.replace('dp-day', 'dp-gd');
+    b.removeAttribute('data-dp-day');
+  });
+  const slide = dir || 1;
+  old.animate([{ transform: 'none', opacity: 1 }, { transform: `translateX(${-slide * 34}px)`, opacity: 0 }], { duration: 240, easing: DP_EASE }).finished.then(() => old.remove(), () => old.remove());
+  fresh.animate([{ transform: `translateX(${slide * 34}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: DP_EASE });
+  title.animate([{ transform: `translateX(${slide * 14}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 240, easing: DP_EASE });
+  dpRing(false);
+}
+
+/** Tag wählen, ohne das Fenster neu zu zeichnen (der Rahmen gleitet). */
+function dpPick(day) {
+  dp.day = day;
+  const grid = dp.el.querySelector('.dp-grid:not(.dp-leave)');
+  grid.querySelectorAll('.dp-day.sel').forEach((b) => b.classList.remove('sel'));
+  const btn = grid.querySelector(`[data-dp-day="${day}"]`);
+  if (btn) btn.classList.add('sel');
+  dpRing(true);
+}
+
+/** Stunde oder Minute wählen. */
+function dpPickTime(kind, value) {
+  dp[kind] = value;
+  const col = dp.el.querySelector(`[data-dp-col="${kind}"]`);
+  if (!col) return;
+  col.querySelectorAll('.dp-tv.sel').forEach((b) => b.classList.remove('sel'));
+  const btn = col.querySelector(`[data-dp-${kind}="${value}"]`);
+  if (btn) btn.classList.add('sel');
+  dpScrollCols(true);
+}
+
+/** Fenster unter (oder über) das Feld setzen. */
+function popPlace(el, input) {
+  if (!el || !input) return;
+  const r = input.getBoundingClientRect();
+  const w = el.offsetWidth;
+  const h = el.offsetHeight;
   const left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
   const below = r.bottom + 6;
   const top = below + h > window.innerHeight - 8 && r.top - h - 6 > 8 ? r.top - h - 6 : Math.max(8, Math.min(below, window.innerHeight - h - 8));
-  dp.el.style.left = `${left}px`;
-  dp.el.style.top = `${top}px`;
+  el.style.left = `${left}px`;
+  el.style.top = `${top}px`;
 }
+const dpPlace = () => popPlace(dp.el, dp.input);
 
 function dpOpen(input) {
   if (dp.input === input) return;
   dpClose();
+  cpClose();
+  const kind = dpKind(input);
   const v = dpParse(input);
   dp.input = input;
   dp.day = v.date;
@@ -1493,15 +1607,15 @@ function dpOpen(input) {
   const base = v.date ? new Date(`${v.date}T00:00`) : input.min ? new Date(`${String(input.min).slice(0, 10)}T00:00`) : now;
   dp.view = new Date(base.getFullYear(), base.getMonth(), 1);
   dp.el = document.createElement('div');
-  dp.el.className = 'dp';
+  dp.el.className = `dp dp-${kind}`;
   dp.el.setAttribute('role', 'dialog');
-  dp.el.setAttribute('aria-label', input.type === 'datetime-local' ? 'Datum und Uhrzeit wählen' : 'Datum wählen');
-  dp.el.style.width = `${Math.min(360, Math.max(304, input.offsetWidth))}px`; // so breit wie das Feld
+  dp.el.setAttribute('aria-label', kind === 'dt' ? 'Datum und Uhrzeit wählen' : kind === 'time' ? 'Uhrzeit wählen' : 'Datum wählen');
+  dp.el.style.width = kind === 'time' ? '232px' : `${Math.min(360, Math.max(304, input.offsetWidth))}px`; // Kalender so breit wie das Feld
   document.body.appendChild(dp.el);
   input.setAttribute('aria-expanded', 'true');
   if (input.dataset.dpRo) input.blur(); // am Handy keine Eingabe-Markierung im Feld
   dpRender();
-  // Passt der Kalender weder unter noch über das Feld (Handy), Feld nach oben holen statt es zu verdecken
+  // Passt das Fenster weder unter noch über das Feld (Handy), Feld nach oben holen statt es zu verdecken
   const r = input.getBoundingClientRect();
   const h = dp.el.offsetHeight;
   if (r.bottom + h + 14 > window.innerHeight && r.top - h - 14 < 0) {
@@ -1512,7 +1626,13 @@ function dpOpen(input) {
 
 function dpClose() {
   if (!dp.el) return;
-  dp.el.remove();
+  const el = dp.el;
+  if (dpMotion()) {
+    // Das Fenster blendet aus (als Kopie ohne Klasse „dp“, damit es nicht mehr als geöffnet zählt)
+    el.className = 'dp-ghost';
+    el.inert = true;
+    el.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-4px)' }], { duration: 130, easing: 'ease-in' }).finished.then(() => el.remove(), () => el.remove());
+  } else el.remove();
   if (dp.input) {
     dp.input.removeAttribute('aria-expanded');
     if (dp.input.dataset.dpRo) {
@@ -1532,10 +1652,141 @@ function dpSet(value) {
 }
 
 function dpCommit() {
-  if (!dp.day) return;
-  dpSet(dp.input.type === 'datetime-local' ? `${dp.day}T${dp.hh}:${dp.mm}` : dp.day);
+  const kind = dpKind(dp.input);
+  if (kind !== 'time' && !dp.day) return;
+  dpSet(kind === 'dt' ? `${dp.day}T${dp.hh}:${dp.mm}` : kind === 'time' ? `${dp.hh}:${dp.mm}` : dp.day);
   dpClose();
 }
+
+/* ---- Farbe ---- */
+const CP_SWATCHES = ['#d4af37', '#f3e5ab', '#b8962e', '#10b981', '#3b82f6', '#8b5cf6', '#ef4444', '#f59e0b', '#ec4899', '#14b8a6', '#94a3b8', '#ffffff'];
+const cp = { el: null, input: null, h: 0, s: 0, v: 1 };
+
+function cpHsv(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim());
+  const n = m ? parseInt(m[1], 16) : 0xd4af37;
+  const r = ((n >> 16) & 255) / 255;
+  const g = ((n >> 8) & 255) / 255;
+  const b = (n & 255) / 255;
+  const max = Math.max(r, g, b);
+  const d = max - Math.min(r, g, b);
+  let h = 0;
+  if (d) h = max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return { h: h * 60, s: max ? d / max : 0, v: max };
+}
+function cpHex(h, s, v) {
+  const f = (n) => {
+    const k = (n + h / 60) % 6;
+    const c = v - v * s * Math.max(0, Math.min(k, 4 - k, 1));
+    return pad2(Math.round(c * 255).toString(16));
+  };
+  return `#${f(5)}${f(3)}${f(1)}`;
+}
+
+function cpRender() {
+  const sw = CP_SWATCHES.map((c) => `<button type="button" class="cp-sw" style="background:${c}" data-cp-sw="${c}" aria-label="Farbe ${c}"></button>`).join('');
+  cp.el.innerHTML = `
+    <div class="cp-sv" data-cp-drag="sv"><i class="cp-sv-thumb"></i></div>
+    <div class="cp-hue" data-cp-drag="hue"><i class="cp-hue-thumb"></i></div>
+    <div class="cp-row"><span class="cp-prev"></span><input class="field field-sm cp-hex" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Farbwert, z. B. #d4af37"></div>
+    <div class="cp-sws">${sw}</div>
+    <div class="dp-foot"><button type="button" class="btn-gold btn-sm" data-cp-act="ok">Fertig</button></div>`;
+  cpPaint(true);
+  popPlace(cp.el, cp.input);
+}
+
+/** Alles passend zur gewählten Farbe zeichnen; typing=true lässt das Hex-Feld in Ruhe, solange man darin tippt. */
+function cpPaint(refreshHex) {
+  const hex = cpHex(cp.h, cp.s, cp.v);
+  const sv = cp.el.querySelector('.cp-sv');
+  sv.style.setProperty('--cp-hue', `hsl(${cp.h}, 100%, 50%)`);
+  const t = sv.querySelector('.cp-sv-thumb');
+  t.style.left = `${cp.s * 100}%`;
+  t.style.top = `${(1 - cp.v) * 100}%`;
+  t.style.background = hex;
+  const ht = cp.el.querySelector('.cp-hue-thumb');
+  ht.style.left = `${(cp.h / 360) * 100}%`;
+  ht.style.background = `hsl(${cp.h}, 100%, 50%)`;
+  cp.el.querySelector('.cp-prev').style.background = hex;
+  if (refreshHex) cp.el.querySelector('.cp-hex').value = hex;
+  cp.el.querySelectorAll('.cp-sw').forEach((b) => b.classList.toggle('sel', b.dataset.cpSw.toLowerCase() === hex));
+  return hex;
+}
+
+function cpApply(fire) {
+  const hex = cp.el.querySelector('.cp-hex') === document.activeElement ? cpHex(cp.h, cp.s, cp.v) : cpPaint(true);
+  if (cp.input.value !== hex) {
+    cp.input.value = hex;
+    cp.input.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  if (fire) cp.input.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function cpOpen(input) {
+  if (cp.input === input) return;
+  cpClose();
+  dpClose();
+  Object.assign(cp, cpHsv(input.value), { input });
+  cp.el = document.createElement('div');
+  cp.el.className = 'cp';
+  cp.el.setAttribute('role', 'dialog');
+  cp.el.setAttribute('aria-label', 'Farbe wählen');
+  document.body.appendChild(cp.el);
+  input.setAttribute('aria-expanded', 'true');
+  cpRender();
+}
+
+function cpClose() {
+  if (!cp.el) return;
+  const el = cp.el;
+  if (dpMotion()) {
+    el.className = 'dp-ghost';
+    el.inert = true;
+    el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 120, easing: 'ease-in' }).finished.then(() => el.remove(), () => el.remove());
+  } else el.remove();
+  if (cp.input) cp.input.removeAttribute('aria-expanded');
+  cp.el = null;
+  cp.input = null;
+}
+
+// Ziehen im Farbfeld und auf dem Farbband
+let cpDrag = null;
+function cpMove(e) {
+  if (!cpDrag) return;
+  const r = cpDrag.box.getBoundingClientRect();
+  const x = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+  const y = Math.max(0, Math.min(1, (e.clientY - r.top) / r.height));
+  if (cpDrag.kind === 'sv') {
+    cp.s = x;
+    cp.v = 1 - y;
+  } else cp.h = Math.min(359.99, x * 360);
+  cpApply(false);
+}
+document.addEventListener('pointerdown', (e) => {
+  const box = e.target.closest && e.target.closest('[data-cp-drag]');
+  if (!box || !cp.el || !cp.el.contains(box)) return;
+  e.preventDefault();
+  cpDrag = { box, kind: box.dataset.cpDrag };
+  box.setPointerCapture && box.setPointerCapture(e.pointerId);
+  cpMove(e);
+});
+document.addEventListener('pointermove', (e) => cpDrag && cpMove(e));
+const cpDragEnd = () => {
+  if (!cpDrag) return;
+  cpDrag = null;
+  if (cp.el) cpApply(true);
+};
+document.addEventListener('pointerup', cpDragEnd);
+document.addEventListener('pointercancel', cpDragEnd);
+// Hex-Feld: tippen übernimmt eine gültige Farbe sofort
+document.addEventListener('input', (e) => {
+  if (!cp.el || !e.target.matches || !e.target.matches('.cp-hex')) return;
+  const v = e.target.value.trim();
+  if (!/^#?[0-9a-f]{6}$/i.test(v)) return;
+  Object.assign(cp, cpHsv(v));
+  cpApply(true);
+  cpPaint(false);
+});
 
 // Antippen am Handy: kurz schreibschützen, damit nicht das System-Rad aufgeht
 document.addEventListener('pointerdown', (e) => {
@@ -1545,57 +1796,97 @@ document.addEventListener('pointerdown', (e) => {
     input.dataset.dpRo = '1';
   }
 });
+document.addEventListener(
+  'click',
+  (e) => {
+    // Farbfelder: nicht das Fenster des Browsers öffnen, sondern unseres
+    const color = e.target.closest && e.target.closest(CP_SEL);
+    if (color && !color.disabled) {
+      e.preventDefault();
+      return cpOpen(color);
+    }
+  },
+  true
+);
 document.addEventListener('click', (e) => {
   const input = e.target.closest && e.target.closest(DP_SEL);
   if (input && !input.disabled && (!input.readOnly || input.dataset.dpRo)) return dpOpen(input);
+  if (cp.el && !cp.el.contains(e.target) && !(e.target.closest && e.target.closest(CP_SEL))) cpClose();
+  if (cp.el && cp.el.contains(e.target)) {
+    const swatch = e.target.closest('[data-cp-sw]');
+    if (swatch) {
+      Object.assign(cp, cpHsv(swatch.dataset.cpSw));
+      cpApply(true);
+    } else if (e.target.closest('[data-cp-act="ok"]')) cpClose();
+    return;
+  }
   if (!dp.el) return;
   if (!dp.el.contains(e.target)) return dpClose();
   const nav = e.target.closest('[data-dp-nav]');
   const day = e.target.closest('[data-dp-day]');
+  const hh = e.target.closest('[data-dp-hh]');
+  const mm = e.target.closest('[data-dp-mm]');
   const act = e.target.closest('[data-dp-act]');
-  if (nav) {
-    dp.view = new Date(dp.view.getFullYear(), dp.view.getMonth() + Number(nav.dataset.dpNav), 1);
-    dpRender();
-  } else if (day && !day.disabled) {
-    dp.day = day.dataset.dpDay;
-    if (dp.input.type === 'datetime-local') dpRender();
-    else dpCommit();
-  } else if (act) {
+  const kind = dpKind(dp.input);
+  if (nav) dpMonth(Number(nav.dataset.dpNav));
+  else if (day && !day.disabled) {
+    dpPick(day.dataset.dpDay);
+    if (kind === 'date') dpCommit();
+  } else if (hh) dpPickTime('hh', hh.dataset.dpHh);
+  else if (mm) dpPickTime('mm', mm.dataset.dpMm);
+  else if (act) {
     const a = act.dataset.dpAct;
     if (a === 'clear') {
       dpSet('');
       dpClose();
     } else if (a === 'today') {
       const n = new Date();
-      dp.day = dpKey(n);
-      dp.view = new Date(n.getFullYear(), n.getMonth(), 1);
-      if (dp.input.type === 'datetime-local') {
-        dp.hh = pad2(n.getHours());
-        dp.mm = pad2(Math.floor(n.getMinutes() / 5) * 5);
-        dpRender();
+      if (kind !== 'time') {
+        const same = dp.view.getFullYear() === n.getFullYear() && dp.view.getMonth() === n.getMonth();
+        if (!same) dpMonth(n > dp.view ? 1 : -1, new Date(n.getFullYear(), n.getMonth(), 1));
+        dpPick(dpKey(n));
+      }
+      if (kind !== 'date') {
+        dpPickTime('hh', pad2(n.getHours()));
+        const m5 = pad2(Math.floor(n.getMinutes() / 5) * 5);
+        if (!dp.el.querySelector(`[data-dp-mm="${m5}"]`)) dp.mm = '00';
+        dpPickTime('mm', m5);
       } else dpCommit();
     } else if (a === 'ok') dpCommit();
   }
 });
-document.addEventListener('change', (e) => {
-  const t = e.target.closest && e.target.closest('[data-dp-time]');
-  if (t) dp[t.dataset.dpTime] = t.value;
-});
 // Fenster offen lassen, wenn man darin klickt (Fokus bleibt im Feld)
 document.addEventListener('mousedown', (e) => {
-  if (dp.el && dp.el.contains(e.target) && !e.target.closest('select')) e.preventDefault();
+  const inside = (dp.el && dp.el.contains(e.target)) || (cp.el && cp.el.contains(e.target));
+  if (inside && !e.target.closest('select, .cp-hex')) e.preventDefault();
 });
 document.addEventListener(
   'keydown',
   (e) => {
-    if (!dp.el) return;
+    if (!dp.el && !cp.el) return;
     if (e.key === 'Escape') {
       e.preventDefault();
-      e.stopPropagation(); // nur den Kalender schließen, nicht das Fenster dahinter
+      e.stopPropagation(); // nur die Auswahl schließen, nicht das Fenster dahinter
       dpClose();
-    } else if (e.key === 'Tab' && e.target === dp.input) dpClose();
+      cpClose();
+    } else if (e.key === 'Tab' && dp.el && e.target === dp.input) dpClose();
+    else if (e.key === 'Enter' && cp.el && e.target.matches && e.target.matches('.cp-hex')) {
+      e.preventDefault();
+      cpClose();
+    }
   },
   true
 );
-window.addEventListener('resize', () => dpPlace());
-document.addEventListener('scroll', () => dpPlace(), true);
+window.addEventListener('resize', () => {
+  dpPlace();
+  popPlace(cp.el, cp.input);
+});
+document.addEventListener(
+  'scroll',
+  (e) => {
+    if (e.target && e.target.closest && (e.target.closest('.dp') || e.target.closest('.cp'))) return; // Spalten rollen im Fenster selbst
+    dpPlace();
+    popPlace(cp.el, cp.input);
+  },
+  true
+);
