@@ -88,6 +88,13 @@ describe('Design-Paket', () => {
       await page.waitForURL(/dashboard/);
       await page.waitForSelector('#nav a.nav-item');
       await page.waitForSelector('#content .page-title');
+      // Scrollleisten in Gold: kein Element darf die Browser-Standardleiste erzwingen (sonst weiß mit Pfeilen)
+      await page.evaluate(() => (location.hash = '#settings'));
+      await page.waitForSelector('.set-nav');
+      assert.deepEqual(
+        await page.evaluate(() => ['.set-nav', 'html'].map((q) => { const c = getComputedStyle(document.querySelector(q)); return [c.scrollbarWidth, c.scrollbarColor]; })),
+        [['auto', 'auto'], ['auto', 'auto']]
+      );
       // Schwebende Beschriftung im Formular „Neue Akte“
       await page.evaluate(() => (location.hash = '#cases'));
       await page.waitForSelector('[data-action="new-case"]');
