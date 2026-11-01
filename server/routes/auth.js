@@ -185,12 +185,12 @@ router.post('/logout-others', requireAuth, (req, res) => {
 });
 
 router.get('/me', requireAuth, (req, res) => {
-  res.json({ user: publicUser(req.user), twoFactor: twoFactor.status(req.user), ranks: require('../domain/ranks').groups(), features: require('../core/features').all(), siteConfig: require('../web/siteConfig').publicPayload(req.user), areas: require('../domain/areas').clientPayload() });
+  res.json({ user: publicUser(req.user), twoFactor: twoFactor.status(req.user), ranks: require('../domain/ranks').groups(), features: require('../core/features').all(), siteConfig: require('../web/siteConfig').publicPayload(req.user), areas: require('../domain/areas').clientPayload(require('../core/auth').isStaff(req.user)) });
 });
 
 // Für öffentliche Seiten: liefert ohne Anmeldung { user: null } statt 401.
 router.get('/session', (req, res) => {
-  res.json({ user: publicUser(req.user), features: require('../core/features').all(), siteConfig: require('../web/siteConfig').publicPayload(req.user), areas: require('../domain/areas').clientPayload() });
+  res.json({ user: publicUser(req.user), features: require('../core/features').all(), siteConfig: require('../web/siteConfig').publicPayload(req.user), areas: require('../domain/areas').clientPayload(require('../core/auth').isStaff(req.user)) });
 });
 
 router.patch(

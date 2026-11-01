@@ -517,6 +517,8 @@ const SETTINGS_SECTIONS = [
   ['numbering', 'Aktenzeichen', 'Kanzlei', 'folder', 'cfg', 'Muster Nummern Kürzel Bereich'],
   ['listen', 'Listen', 'Kanzlei', 'tag', ['settings.edit'], 'Rechtsgebiete Terminarten Fristenarten Rechnungsarten Gebühren Mandatsformular'],
   ['documents', 'Dokumente', 'Kanzlei', 'doc', 'cfg', 'Rechnung Aktenauszug Vertrag Logo Fußzeile Unterschrift Wasserzeichen PDF'],
+  ['statuses', 'Status', 'Kanzlei', 'tag', 'cfg', 'Status Offen In Bearbeitung Abgeschlossen Farben Namen Verfahrensschritte'],
+  ['automation', 'Automatik', 'Kanzlei', 'star', ['settings.edit'], 'Automatik Regeln Wenn Dann Aufgabe Priorität liegengeblieben Rechnung bezahlt'],
   ['nav', 'Navigation', 'Dashboard', 'list', 'cfg', 'Menü Reihenfolge ausblenden umbenennen Links Rang'],
   ['start', 'Dashboard-Start', 'Dashboard', 'home', 'cfg', 'Übersicht Kacheln Kästen Startseite Rang Reihenfolge'],
   ['site', 'Website & Ränge', 'Website', 'globe', ['site.edit'], 'Ränge Anwalt des Monats Website-Texte Team'],
@@ -591,6 +593,7 @@ function settingsBody(key, s) {
     return ({ banner: cfgBanner, home: cfgHome, labels: cfgLabels, messages: cfgMessages, style: cfgStyle, promos: cfgPromos, numbering: cfgNumbering, ...CFG_PANELS }[key] || (() => ''))();
   }
   if (key === 'access') return accessPanels();
+  if (key === 'automation') return automationPanel();
   if (key === 'listen') return listsPanels();
   if (key === 'bot') return botSettings();
   if (key === 'integrations') return `${fivenetSettingsPanel(s)}${googleDocsPanel(st.google)}`;

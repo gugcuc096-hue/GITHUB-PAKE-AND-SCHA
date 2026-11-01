@@ -93,3 +93,4 @@ details::details-content { transition: none !important; }
 .fl > .label[data-fl="1"] { transition: none !important; }
 .reveal .grid > * { opacity: 1 !important; translate: none !important; transition: none !important; }
 .btn-gold:hover { transition: none !important; }
+.tour-spot, .tour-card { transition: none !important; animation: none !important; }

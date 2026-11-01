@@ -443,7 +443,7 @@ async function setCaseStatus(sel) {
     throw notSaved(err);
   }
   const back = was.startsWith('step:') ? { status: 'in_bearbeitung', step: Number(was.slice(5)) } : { status: was };
-  toast(`Stand: ${v.startsWith('step:') ? STEPS[Number(v.slice(5))] : CASE_STATUS[v][0]}`, 'ok', { duration: 6000, action: undoPatch(id, back) });
+  toast(`Stand: ${v.startsWith('step:') ? stepsOf(st.caseInfo && st.caseInfo.id === id ? st.caseInfo.area : '')[Number(v.slice(5))] || STEPS[Number(v.slice(5))] : CASE_STATUS[v][0]}`, 'ok', { duration: 6000, action: undoPatch(id, back) });
   await reloadCase(id);
 }
 
@@ -1240,11 +1240,35 @@ document.addEventListener('change', (e) => {
   box.innerHTML = areaFieldsHtml(sel.value, saved, isStaff());
 });
 /** Antworten auf die Zusatzfelder in der Akte (Bezeichnung zum Zeitpunkt des Einreichens). */
+/**
+ * Angaben zum Mandat (Zusatzfelder des Rechtsgebiets). Kanzlei: alle Felder (auch leere und „nur Kanzlei“), mit
+ * „Bearbeiten“ für alle, die die Akte bearbeiten dürfen; Mandant: nur ausgefüllte, ohne interne.
+ */
 function intakeAnswersHtml(c) {
-  const rows = Object.values(c.intakeAnswers || {});
-  if (!rows.length) return '';
-  return `<div class="section"><h3 class="section-title">Angaben zum Mandat</h3><dl class="intake-answers">${rows.map((r) => `<div><dt>${esc(r.label)}</dt><dd>${esc(r.value)}</dd></div>`).join('')}</dl></div>`;
+  const saved = c.intakeAnswers || {};
+  const area = isStaff() ? AREA_META.list.find((x) => x.key === c.area) : null;
+  const defs = area && area.fields && area.fields.length ? area.fields : null;
+  const rows = defs
+    ? [...defs.map((f) => ({ key: f.key, label: f.label, value: saved[f.key] ? saved[f.key].value : '', internal: !!f.internal })), ...Object.entries(saved).filter(([k]) => !defs.some((f) => f.key === k)).map(([k, r]) => ({ key: k, ...r }))]
+    : Object.entries(saved).map(([k, r]) => ({ key: k, ...r }));
+  if (!rows.length || (!defs && !rows.some((r) => r.value))) return '';
+  const edit = defs && c.canEdit ? `<button type="button" class="btn-ghost btn-sm" data-action="case-answers" data-id="${c.id}">${icon('edit', 'ico-sm')}<span>Bearbeiten</span></button>` : '';
+  return `<div class="section"><h3 class="section-title"><span>Angaben zum Mandat</span>${edit}</h3><dl class="intake-answers">${rows
+    .filter((r) => r.value || isStaff())
+    .map((r) => `<div><dt>${esc(r.label)}${r.internal ? ' <span class="badge badge-slate" title="Nur für die Kanzlei sichtbar">intern</span>' : ''}</dt><dd>${r.value ? esc(r.value) : '<span class="text-dim">—</span>'}</dd></div>`)
+    .join('')}</dl></div>`;
 }
+actions['case-answers'] = async (el) => {
+  const id = Number(el.dataset.id);
+  const c = st.caseInfo && st.caseInfo.id === id ? st.caseInfo : null;
+  if (!c) return;
+  const values = Object.fromEntries(Object.entries(c.intakeAnswers || {}).map(([k, r]) => [k, r.value]));
+  st.returnCase = id;
+  openModal(`<h2 class="modal-title">Angaben zum Mandat</h2>
+      <p class="modal-sub">Akte <span class="font-mono text-gold">${esc(c.caseNumber)}</span> · Felder mit „intern“ sieht nur die Kanzlei. Die Felder legt das Board unter Einstellungen → Listen → Rechtsgebiete fest.</p>
+      <form data-form="case-answers" data-id="${id}" class="form-grid cols-2">${areaFieldsHtml(c.area, values, true)}
+        <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button><button type="button" class="btn-ghost btn-md" data-action="back-to-case">Abbrechen</button></div></form>`);
+};
 
 /* ---------------------------------------------------------------- Mandanten-Konto beim Tippen des Namens vorschlagen */
 let ncTimer = 0;

@@ -272,7 +272,7 @@ router.post(
     }
 
     // Zusatzfelder des Rechtsgebiets: von Mandanten Pflicht, wo so eingestellt; die Kanzlei darf Lücken lassen
-    const checked = areas.checkAnswers(d.area, d.answers, { enforceRequired: u.role === 'mandant' });
+    const checked = areas.checkAnswers(d.area, d.answers, { enforceRequired: u.role === 'mandant', staff: isStaff(u) });
     if (checked.error) return res.status(400).json({ error: checked.error });
 
     const id = tx(() => {
@@ -315,7 +315,8 @@ router.post(
     tickets.caseCreated(id);
     require('../integrations/discordBot').syncCaseClient(c);
     if (isStaff(u)) logActivity(u, 'Akte angelegt', 'case', id, `${c.case_number} – ${c.title}`);
-    res.status(201).json({ case: caseRow(c, u) });
+    require('../domain/automations').fire('case.created', { caseId: id }, 'created'); // Einstellungen → Automatik
+    res.status(201).json({ case: caseRow(getCase(id), u) });
   })
 );
 
@@ -657,7 +658,7 @@ const updateSchema = z.object({
   opponent: z.string().trim().max(120).optional(),
   courtRef: z.string().trim().max(60).optional(),
   status: z.enum(Object.keys(CASE_STATUS)).optional(),
-  step: z.number().int().min(0).max(3).optional(),
+  step: z.number().int().min(0).max(7).optional(), // je Rechtsgebiet 2–8 Schritte (geprüft gegen das Rechtsgebiet)
   priority: z.number().int().min(1).max(4).optional(), // nur Kanzlei, intern
   outcome: z.enum(Object.keys(OUTCOMES)).optional(), // Ergebnis beim Abschluss – nur Kanzlei, intern
   actualHe: z.number().int().min(0).max(100000).nullable().optional(), // tatsächliches Strafmaß (HE) – nur Kanzlei, intern
@@ -668,6 +669,7 @@ const updateSchema = z.object({
   // Vollständige Liste der weiteren Anwälte (ersetzt die bisherige)
   coLawyerIds: z.array(z.number().int().positive()).max(MAX_CO_LAWYERS).optional(),
   boardOnly: z.boolean().optional(), // geheimes Mandat – nur das Board of Partners stellt das um
+  answers: z.record(z.any()).optional(), // Zusatzangaben (eigene Felder des Rechtsgebiets) – nur Kanzlei
 });
 
 const FIELD_COLUMNS = {
@@ -809,6 +811,9 @@ router.patch(
     if (d.priority !== undefined && !isStaff(u)) return res.status(403).json({ error: 'Die Priorität legen nur die Anwälte fest.' });
     if (d.incident !== undefined && !isStaff(u)) return res.status(403).json({ error: 'Den Tathergang hält die Kanzlei fest.' });
     if (d.boardOnly !== undefined && !isBoard(u)) return res.status(403).json({ error: 'Nur das Board of Partners legt fest, ob eine Akte geheim ist.' });
+    if (d.answers !== undefined && !isStaff(u)) return res.status(403).json({ error: 'Die Zusatzangaben pflegt die Kanzlei.' });
+    if (d.step !== undefined && d.step >= areas.stepsOf(c.area).length) return res.status(400).json({ error: 'Diesen Verfahrensschritt gibt es in diesem Rechtsgebiet nicht.' });
+    if (d.answers !== undefined && !access.canEdit) return res.status(403).json({ error: 'Nur der zuständige Anwalt oder das Board of Partners kann diese Akte bearbeiten.' });
     if (d.outcome !== undefined && !isStaff(u)) return res.status(403).json({ error: 'Das Ergebnis hält die Kanzlei fest.' });
     if ((d.actualHe !== undefined || d.actualFine !== undefined) && !isStaff(u)) return res.status(403).json({ error: 'Das Strafmaß hält die Kanzlei fest.' });
     // Ergebnis: beim Abschließen oder an einer bereits abgeschlossenen Akte (Korrektur)
@@ -834,6 +839,16 @@ router.patch(
       internalHistory.push(`Priorität: ${PRIORITIES[d.priority]}`);
     }
     // Geheimes Mandat (nur Board): interner Verlaufseintrag
+    if (d.answers !== undefined) {
+      const checked = areas.checkAnswers(c.area, d.answers, { enforceRequired: false, staff: true });
+      if (checked.error) return res.status(400).json({ error: checked.error });
+      const json = Object.keys(checked.answers).length ? JSON.stringify(checked.answers) : null;
+      if (json !== (c.intake_answers || null)) {
+        sets.push('intake_answers = ?');
+        values.push(json);
+        internalHistory.push('Zusatzangaben geändert');
+      }
+    }
     if (d.boardOnly !== undefined && d.boardOnly !== !!c.board_only) {
       sets.push('board_only = ?');
       values.push(d.boardOnly ? 1 : 0);
@@ -910,6 +925,7 @@ router.patch(
     }
     ticketUpdate(c, updated, u, { history, editFields, d, newStatus, newlyAssigned });
     if (newStatus && newStatus !== c.status) require('../integrations/discordBot').syncCaseClient(updated); // Rolle „Mandant mit offener Akte“
+    if (newStatus && newStatus !== c.status) require('../domain/automations').fire('case.status', { caseId: c.id, status: newStatus }, `status:${newStatus}:${Date.now()}`);
     // Aktenzeichen, Titel, Gericht und Gegenpartei stehen in den Verträgen → deren Google Docs neu schreiben
     require('../integrations/googleDocs').touchCase(c.id);
     res.json({ case: { ...caseRow(updated, u), ...caseAccess(updated, u) } });
@@ -1434,6 +1450,7 @@ router.put('/:id/notes/:noteId/pin', (req, res) => {
 // Rechte prüft der Aufrufer (routes/interactions.js); hier nur die Änderung samt Verlauf und Meldungen.
 
 function notifyStatus(c, u, newStatus) {
+  setImmediate(() => require('../domain/automations').fire('case.status', { caseId: c.id, status: newStatus }, `status:${newStatus}:${Date.now()}`));
   discord.notify('case.status', {
     caseId: c.id,
     title: `${c.case_number}: ${CASE_STATUS[newStatus]}`,

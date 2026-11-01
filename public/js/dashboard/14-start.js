@@ -1438,6 +1438,7 @@ document.addEventListener('ps:form-ok', () => buzz());
     st.features = me.features || null;
     setAreas(me.areas);
     st.siteConfig = me.siteConfig || null;
+    applyStatuses(st.siteConfig && st.siteConfig.statuses);
     st.twoFactor = me.twoFactor;
     setRanks(me.ranks);
   } catch {
@@ -1459,6 +1460,7 @@ document.addEventListener('ps:form-ok', () => buzz());
   }
   // Angefangene Texte je Konto im Browser behalten (Rechnungs-Entwurf eigens, siehe 06-rechnungen)
   window.PS.drafts.watch({ scope: `u${st.user.id}`, onRestore: () => toast('Angefangene Eingaben wiederhergestellt.') });
+  tourMaybe(); // Einführungstour beim ersten Login (13-tour.js)
 
   const params = new URLSearchParams(location.search);
   const discordState = params.get('discord');

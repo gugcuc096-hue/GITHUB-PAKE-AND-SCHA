@@ -9,7 +9,7 @@
  */
 'use strict';
 
-CFG_TABS.push(['nav', 'Navigation', 'site.edit'], ['start', 'Dashboard-Start', 'site.edit'], ['calculator', 'Tarifrechner', 'site.edit'], ['documents', 'Dokumente', 'settings.edit'], ['discordLook', 'Discord-Meldungen', 'discord.edit']);
+CFG_TABS.push(['statuses', 'Status', 'settings.edit'], ['nav', 'Navigation', 'site.edit'], ['start', 'Dashboard-Start', 'site.edit'], ['calculator', 'Tarifrechner', 'site.edit'], ['documents', 'Dokumente', 'settings.edit'], ['discordLook', 'Discord-Meldungen', 'discord.edit']);
 const CFG_PROFILES = { team: 'Team', board: 'Board of Partners', mandant: 'Mandanten' };
 const START_LABELS = {
   'kpi-requests': ['Kennzahl „Neue Anfragen“', 'team'],
@@ -266,16 +266,149 @@ function cfgDiscordRead(f) {
   return look;
 }
 
+/* ---------------------------------------------------------------- Status */
+const STATUS_COLORS = { amber: 'Bernstein', sky: 'Blau', emerald: 'Grün', gold: 'Gold', red: 'Rot', slate: 'Grau' };
+function cfgStatuses() {
+  const s = cfgWork('statuses');
+  const row = (k, hint) => `<div class="status-row"><span class="status-prev" data-prev="${k}">${badge(s[k].label, s[k].color)}</span>
+      <input class="field" name="${k}-label" maxlength="30" value="${esc(s[k].label)}" aria-label="Name für ${esc(hint)}">
+      <select class="field" name="${k}-color" aria-label="Farbe für ${esc(hint)}">${Object.entries(STATUS_COLORS).map(([c, l]) => opt(c, l, s[k].color === c)).join('')}</select>
+      <span class="text-xs text-dim">${esc(hint)}</span></div>`;
+  return `<section class="panel panel-pad">
+      <div class="panel-head"><h2 class="panel-title">Status</h2></div>
+      <p class="text-sm text-muted mb-4">Namen und Farben der drei Status einer Akte – im Dashboard, im Verlauf und in Discord. Die <strong>Verfahrensschritte</strong> (z. B. Eingang → Akteneinsicht → Verhandlung, zwei bis acht) legen Sie je Rechtsgebiet unter <button type="button" class="link-btn" data-action="settings-tab" data-tab="listen">Listen → Rechtsgebiete</button> fest. Farben: grün = erledigt, bernstein = wartet, rot = dringend, blau = in Arbeit.</p>
+      <form data-form="cfg-statuses" class="form-grid">
+        ${row('offen', 'neu, noch ohne Anwalt')}${row('in_bearbeitung', 'mit Anwalt (zeigt sonst den Verfahrensschritt)')}${row('geschlossen', 'abgeschlossen')}
+        ${cfgBar('statuses')}
+      </form>
+    </section>`;
+}
+function cfgCollectStatuses(f) {
+  const fd = new FormData(f);
+  return Object.fromEntries(['offen', 'in_bearbeitung', 'geschlossen'].map((k) => [k, { label: val(fd, `${k}-label`) || CASE_STATUS[k][0], color: val(fd, `${k}-color`) || CASE_STATUS[k][1] }]));
+}
+document.addEventListener('input', (e) => {
+  const f = e.target.closest && e.target.closest('form[data-form="cfg-statuses"]');
+  if (!f) return;
+  const v = cfgCollectStatuses(f);
+  for (const k of Object.keys(v)) {
+    const box = f.querySelector(`[data-prev="${k}"]`);
+    if (box) box.innerHTML = badge(v[k].label, v[k].color);
+  }
+});
+
+/* ---------------------------------------------------------------- Automatik („Wenn … dann …“) */
+function automationPanel() {
+  if (!st.automations) {
+    api.get('/api/automations').then((r) => {
+      st.automations = r;
+      if (st.settingsTab === 'automation') renderView();
+    }, () => (st.automations = { rules: [], triggers: {}, actions: {}, canEdit: false }));
+    return '<div class="panel panel-pad"><p class="text-sm text-muted">Wird geladen …</p></div>';
+  }
+  const a = st.automations;
+  return `<section class="panel panel-pad">
+      <div class="panel-head"><h2 class="panel-title">Automatik</h2>${a.canEdit ? `<button type="button" class="btn-gold btn-sm" data-action="auto-edit">${icon('plus', 'ico-sm')}<span>Neue Regel</span></button>` : ''}</div>
+      <p class="text-sm text-muted mb-4">„Wenn … dann …“ – wiederkehrende Handgriffe macht das Dashboard selbst, z. B. „Neue Strafsache → Priorität hoch“ oder „Akte liegt 7 Tage → Aufgabe an den Federführenden“. Jede Regel läuft je Akte und Anlass einmal; was sie getan hat, steht als interner Eintrag „Automatik: …“ im Verlauf der Akte.</p>
+      ${
+        a.rules.length
+          ? `<div class="auto-list">${a.rules
+              .map(
+                (r) => `<div class="auto-rule ${r.active ? '' : 'is-off'}">
+            <span class="auto-when">${icon('bell', 'ico-sm')}<span>Wenn <strong>${esc(a.triggers[r.trigger] || r.trigger)}</strong>${r.conditions.days ? ` (${r.conditions.days} Tage)` : ''}${r.conditions.status ? ` → ${esc(CASE_STATUS[r.conditions.status][0])}` : ''}${r.conditions.area ? ` · nur ${esc(AREAS[r.conditions.area] || r.conditions.area)}` : ''}</span></span>
+            <span class="auto-then">${icon('chevronRight', 'ico-sm')}<span>${esc(r.summary)}</span></span>
+            <span class="auto-meta text-xs text-dim">${esc(r.name)} · ${r.runs ? `${r.runs}× ausgeführt` : 'noch nicht ausgeführt'}${r.active ? '' : ' · aus'}</span>
+            ${a.canEdit ? `<span class="auto-btns"><button type="button" class="btn-ghost btn-sm" data-action="auto-edit" data-id="${r.id}">${icon('edit', 'ico-sm')}<span>Bearbeiten</span></button><button type="button" class="icon-btn sm" data-action="auto-del" data-id="${r.id}" aria-label="Regel löschen">${icon('trash', 'ico-sm')}</button></span>` : ''}
+          </div>`
+              )
+              .join('')}</div>`
+          : `<div class="auto-empty">${emptyLine('Noch keine Regel. Vorschläge:', 'star')}<div class="chip-row chip-wrap mt-2">${AUTO_EXAMPLES.map((x, i) => `<button type="button" class="chip" data-action="auto-edit" data-example="${i}"><span>${esc(x.name)}</span></button>`).join('')}</div></div>`
+      }
+    </section>`;
+}
+const AUTO_EXAMPLES = [
+  { name: 'Liegt 7 Tage → Aufgabe', trigger: 'case.idle', conditions: { days: 7 }, action: 'task', params: { title: 'Akte prüfen – seit 7 Tagen keine Aktivität', dueDays: 1, to: 'lead' } },
+  { name: 'Neue Strafsache → Priorität hoch', trigger: 'case.created', conditions: { area: 'strafrecht' }, action: 'priority', params: { priority: 3 } },
+  { name: 'Rechnung bezahlt → Akte schließen', trigger: 'invoice.paid', conditions: {}, action: 'status', params: { status: 'geschlossen' } },
+  { name: 'Neue Akte → Erstgespräch', trigger: 'case.created', conditions: {}, action: 'task', params: { title: 'Erstgespräch mit dem Mandanten führen', dueDays: 2, to: 'lead' } },
+];
+function autoForm(r) {
+  const a = st.automations;
+  const c = r.conditions || {};
+  const p = r.params || {};
+  return `<h2 class="modal-title">${r.id ? 'Regel bearbeiten' : 'Neue Regel'}</h2>
+    <p class="modal-sub">Wenn das Ereignis eintritt (und die Bedingung passt), führt das Dashboard die Aktion aus.</p>
+    <form data-form="auto-save" ${r.id ? `data-id="${r.id}"` : ''} class="form-grid cols-2">
+      <div class="span-2"><label class="label" for="auName">Name</label><input id="auName" name="name" class="field" required minlength="2" maxlength="80" value="${esc(r.name || '')}" placeholder="z. B. Liegt 7 Tage → Aufgabe"></div>
+      <div class="span-2 auto-step-head">${icon('bell', 'ico-sm')}<span>Wenn …</span></div>
+      <div><label class="label" for="auTrig">Ereignis</label><select id="auTrig" name="trigger" class="field" data-auto-sync>${Object.entries(a.triggers).map(([k, l]) => opt(k, l, r.trigger === k)).join('')}</select></div>
+      <div><label class="label" for="auArea">Rechtsgebiet</label><select id="auArea" name="area" class="field"><option value="">alle</option>${areaOptions().map(([k, l]) => opt(k, l, c.area === k)).join('')}</select></div>
+      <div data-auto-if="case.idle"><label class="label" for="auDays">Tage ohne Aktivität</label><input id="auDays" name="days" type="number" min="1" max="90" class="field" value="${esc(c.days || 7)}"></div>
+      <div data-auto-if="case.status"><label class="label" for="auStat">neuer Status</label><select id="auStat" name="condStatus" class="field">${Object.entries(CASE_STATUS).map(([k, [l]]) => opt(k, l, c.status === k)).join('')}</select></div>
+      <div class="span-2 auto-step-head">${icon('chevronRight', 'ico-sm')}<span>… dann</span></div>
+      <div><label class="label" for="auAct">Aktion</label><select id="auAct" name="action" class="field" data-auto-sync>${Object.entries(a.actions).map(([k, l]) => opt(k, l, r.action === k)).join('')}</select></div>
+      <div data-auto-do="task"><label class="label" for="auTo">an</label><select id="auTo" name="to" class="field">${opt('lead', 'Federführenden Anwalt', p.to !== 'creator')}${opt('creator', 'Wer die Akte angelegt hat', p.to === 'creator')}</select></div>
+      <div class="span-2" data-auto-do="task"><label class="label" for="auTitle">Titel der Aufgabe</label><input id="auTitle" name="title" class="field" maxlength="160" value="${esc(p.title || '')}"></div>
+      <div data-auto-do="task"><label class="label" for="auDue">fällig in … Tagen</label><input id="auDue" name="dueDays" type="number" min="0" max="60" class="field" value="${esc(p.dueDays ?? 1)}"></div>
+      <div data-auto-do="priority"><label class="label" for="auPrio">Priorität</label><select id="auPrio" name="priority" class="field">${Object.entries(PRIORITY).map(([k, [l]]) => opt(k, l, String(p.priority || 3) === k)).join('')}</select></div>
+      <div data-auto-do="status"><label class="label" for="auSet">Status</label><select id="auSet" name="setStatus" class="field">${Object.entries(CASE_STATUS).map(([k, [l]]) => opt(k, l, p.status === k)).join('')}</select></div>
+      <div class="span-2" data-auto-do="note"><label class="label" for="auText">Text der Notiz</label><textarea id="auText" name="text" class="field" rows="3" maxlength="1000">${esc(p.text || '')}</textarea></div>
+      <label class="check span-2"><input type="checkbox" name="active" ${r.active === false ? '' : 'checked'}> Regel ist eingeschaltet</label>
+      <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button><button type="button" class="btn-ghost btn-md" data-action="close-modal">Abbrechen</button></div>
+    </form>`;
+}
+function autoSync(f) {
+  const t = f.elements.trigger.value;
+  const a = f.elements.action.value;
+  f.querySelectorAll('[data-auto-if]').forEach((el) => (el.hidden = el.dataset.autoIf !== t));
+  f.querySelectorAll('[data-auto-do]').forEach((el) => (el.hidden = el.dataset.autoDo !== a));
+}
+document.addEventListener('change', (e) => e.target.matches && e.target.matches('[data-auto-sync]') && autoSync(e.target.form));
+Object.assign(actions, {
+  'auto-edit': (el) => {
+    const r = el.dataset.id ? st.automations.rules.find((x) => x.id === Number(el.dataset.id)) : el.dataset.example !== undefined ? AUTO_EXAMPLES[Number(el.dataset.example)] : { trigger: 'case.created', action: 'task', conditions: {}, params: {} };
+    openModal(autoForm(r || {}));
+    autoSync($('form[data-form="auto-save"]'));
+  },
+  'auto-del': async (el) => {
+    if (!(await ask('Die Regel wird gelöscht; was sie schon getan hat, bleibt.', { title: 'Regel löschen?', confirmText: 'Löschen', danger: true }))) return;
+    await api.del('/api/automations/' + el.dataset.id);
+    st.automations = null;
+    toast('Regel gelöscht.');
+    renderView();
+  },
+});
+forms['auto-save'] = async (f) => {
+  const fd = new FormData(f);
+  const trigger = val(fd, 'trigger');
+  const action = val(fd, 'action');
+  const conditions = { area: val(fd, 'area') };
+  if (trigger === 'case.idle') conditions.days = Number(val(fd, 'days')) || 7;
+  if (trigger === 'case.status') conditions.status = val(fd, 'condStatus');
+  const params = {};
+  if (action === 'task') Object.assign(params, { title: val(fd, 'title'), dueDays: val(fd, 'dueDays') === '' ? undefined : Number(val(fd, 'dueDays')), to: val(fd, 'to') });
+  if (action === 'priority') params.priority = Number(val(fd, 'priority'));
+  if (action === 'status') params.status = val(fd, 'setStatus');
+  if (action === 'note') params.text = val(fd, 'text');
+  const body = { name: val(fd, 'name'), active: fd.has('active'), trigger, conditions, action, params };
+  if (f.dataset.id) await api.put('/api/automations/' + f.dataset.id, body);
+  else await api.post('/api/automations', body);
+  st.automations = null;
+  closeModal();
+  toast('Regel gespeichert.');
+  renderView();
+};
+
 /* ---------------------------------------------------------------- Einhängen */
-Object.assign(CFG_PANELS, { nav: cfgNav, start: cfgStart, calculator: cfgCalculator, documents: cfgDocuments, discordLook: cfgDiscordLook });
-Object.assign(CFG_COLLECT, { nav: cfgNavRead, start: cfgStartRead, calculator: cfgCollectCalculator, documents: cfgCollectDocuments, discordLook: cfgDiscordRead });
+Object.assign(CFG_PANELS, { statuses: cfgStatuses, nav: cfgNav, start: cfgStart, calculator: cfgCalculator, documents: cfgDocuments, discordLook: cfgDiscordLook });
+Object.assign(CFG_COLLECT, { statuses: cfgCollectStatuses, nav: cfgNavRead, start: cfgStartRead, calculator: cfgCollectCalculator, documents: cfgCollectDocuments, discordLook: cfgDiscordRead });
 const cfgPanelsMore = configPanels;
 // eslint-disable-next-line no-global-assign
 configPanels = function () {
   if (st.cfg && CFG_PANELS[st.cfgTab]) return CFG_PANELS[st.cfgTab]();
   return cfgPanelsMore();
 };
-for (const key of ['nav', 'start', 'calculator', 'documents', 'discordLook']) {
+for (const key of ['statuses', 'nav', 'start', 'calculator', 'documents', 'discordLook']) {
   forms[`cfg-${key}`] = async (f) => {
     await cfgSave(key, f);
     cfgEditDone(key);

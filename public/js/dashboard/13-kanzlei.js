@@ -577,6 +577,17 @@ async function loadSnippets(force = false) {
   return st.snippets;
 }
 
+/** Nächste Frist bzw. nächster Termin der Akte („14.11.2026 – Klageerwiderung“), sonst leer. */
+function snippetNext(caseId, deadline) {
+  if (!caseId) return '';
+  const now = Date.now() - 60 * 60 * 1000;
+  const e = (st.events || [])
+    .filter((x) => x.caseId === caseId && x.status !== 'abgelehnt' && x.status !== 'abgesagt' && (deadline ? x.type === 'frist' : x.type !== 'frist') && (parseDate(x.startsAt) || 0) >= now)
+    .sort((a, b) => (parseDate(a.startsAt) || 0) - (parseDate(b.startsAt) || 0))[0];
+  if (!e) return '';
+  const d = parseDate(e.startsAt);
+  return `${d.toLocaleDateString('de-DE')}${deadline ? '' : `, ${d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr`} – ${e.title}`;
+}
 /** Werte der Platzhalter aus der offenen Akte (st.caseInfo) und dem eigenen Konto. */
 function snippetValues() {
   const c = st.caseInfo || {};
@@ -595,6 +606,8 @@ function snippetValues() {
     gegenpartei: c.opponent || '',
     anklagepunkte: charges.map((x) => `${x.count > 1 ? `${x.count}× ` : ''}${x.citation} – ${x.title}${x.attempted ? ' (Versuch)' : ''}${x.aiding ? ' (Beihilfe)' : ''}`).join('\n'),
     kanzlei: 'Pake & Scha Legal Consulting',
+    frist: snippetNext(c.id, true),
+    termin: snippetNext(c.id, false),
     datum: now.toLocaleDateString('de-DE'),
     uhrzeit: now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
     ort: 'Los Santos, San Andreas',

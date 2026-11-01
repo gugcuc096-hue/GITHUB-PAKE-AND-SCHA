@@ -56,8 +56,8 @@ const row = (r) => ({
   intakeTitle: r.intake_title || r.name,
   sortOrder: r.sort_order,
   active: !!r.active,
-  steps: json(r.steps, []).length === 4 ? json(r.steps, []) : DEFAULT_STEPS,
-  customSteps: json(r.steps, []).length === 4,
+  steps: json(r.steps, []).length >= 2 ? json(r.steps, []) : DEFAULT_STEPS, // eigene Schritte (2–8), sonst Standard
+  customSteps: json(r.steps, []).length >= 2,
   checklist: json(r.checklist, []),
   outcomes: json(r.outcomes, []),
   fields: json(r.fields, []),
@@ -102,6 +102,7 @@ const fieldSchema = z.object({
   required: z.boolean().default(false),
   hint: z.string().trim().max(200).default(''),
   options: z.array(z.string().trim().min(1).max(60)).max(20).default([]),
+  internal: z.boolean().default(false), // nur Kanzlei: erscheint nicht im Mandatsformular und nicht beim Mandanten
 });
 const input = z.object({
   name: z.string().trim().min(2).max(50),
@@ -110,7 +111,7 @@ const input = z.object({
   icon: z.enum(ICONS).default('scale'),
   intakeTitle: z.string().trim().max(80).default(''),
   active: z.boolean().default(true),
-  steps: z.array(z.string().trim().min(2).max(30)).length(4).nullable().default(null),
+  steps: z.array(z.string().trim().min(2).max(30)).min(2).max(8).nullable().default(null), // Verfahrensschritte (2–8), danach „Abgeschlossen“
   checklist: z.array(z.string().trim().min(2).max(160)).max(20).default([]),
   outcomes: z.array(z.string()).max(20).default([]),
   fields: z
@@ -183,11 +184,12 @@ function remove(key) {
  * Prüft die Antworten zu den Zusatzfeldern eines Rechtsgebiets. Liefert { answers, error }: answers = { key: { label, value } }
  * (die Bezeichnung wird mitgespeichert, damit spätere Änderungen alte Akten nicht verfälschen).
  */
-function checkAnswers(areaKey, given, { enforceRequired = true } = {}) {
+function checkAnswers(areaKey, given, { enforceRequired = true, staff = true } = {}) {
   const area = get(areaKey);
   const answers = {};
   const src = given && typeof given === 'object' ? given : {};
   for (const f of area ? area.fields : []) {
+    if (f.internal && !staff) continue; // interne Felder füllt nur die Kanzlei
     let v = src[f.key];
     if (f.type === 'checkbox') v = v === true || v === 'true' || v === 'ja' ? 'Ja' : v === false || v === 'false' || v === 'nein' ? 'Nein' : '';
     v = v === undefined || v === null ? '' : String(v).trim();
@@ -197,16 +199,16 @@ function checkAnswers(areaKey, given, { enforceRequired = true } = {}) {
     if (f.type === 'number' && !Number.isFinite(Number(v.replace(',', '.')))) return { answers, error: `„${f.label}“ muss eine Zahl sein.` };
     if (f.type === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(v)) return { answers, error: `„${f.label}“ muss ein Datum sein.` };
     if (f.type === 'select' && !f.options.includes(v)) return { answers, error: `„${f.label}“: bitte eine der angebotenen Möglichkeiten wählen.` };
-    answers[f.key] = { label: f.label, value: v };
+    answers[f.key] = { label: f.label, value: v, ...(f.internal ? { internal: true } : {}) };
   }
   return { answers, error: null };
 }
 
 /** Für Website und Dashboard (öffentlich lesbar): nur, was zum Ausfüllen gebraucht wird. */
-const publicList = () =>
-  list({ activeOnly: true }).map((a) => ({ key: a.key, name: a.name, short: a.short, color: a.color, icon: a.icon, intakeTitle: a.intakeTitle, fields: a.fields }));
+const publicList = (staff = false) =>
+  list({ activeOnly: true }).map((a) => ({ key: a.key, name: a.name, short: a.short, color: a.color, icon: a.icon, intakeTitle: a.intakeTitle, fields: staff ? a.fields : a.fields.filter((f) => !f.internal) }));
 
 /** Für Dashboard und Startseite beim Start: eingeschaltete mit Feldern, dazu alle Namen/Schritte (auch ausgeblendete) zum Anzeigen alter Akten. */
-const clientPayload = () => ({ list: publicList(), names: names(), steps: Object.fromEntries(all().map((a) => [a.key, a.steps])), outcomes: Object.fromEntries(all().filter((a) => a.outcomes.length).map((a) => [a.key, a.outcomes])), colors: Object.fromEntries(all().map((a) => [a.key, a.color])) });
+const clientPayload = (staff = false) => ({ list: publicList(staff), names: names(), steps: Object.fromEntries(all().map((a) => [a.key, a.steps])), outcomes: Object.fromEntries(all().filter((a) => a.outcomes.length).map((a) => [a.key, a.outcomes])), colors: Object.fromEntries(all().map((a) => [a.key, a.color])) });
 
 module.exports = { clientPayload, activeKeySchema, DEFAULT_STEPS, COLORS, ICONS, FIELD_TYPES, list, get, exists, name, names, intakeTitleOf, checklistOf, stepsOf, keySchema, create, update, reorder, remove, usage, checkAnswers, publicList, bump };

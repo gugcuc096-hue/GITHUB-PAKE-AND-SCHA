@@ -325,6 +325,7 @@ router.patch(
     if (d.status !== inv.status && d.status === 'bezahlt') {
       const a = await memberships.activateRequestByInvoice(inv.id, req.user);
       if (a) warnings = a.warnings;
+      if (inv.case_id) require('../domain/automations').fire('invoice.paid', { caseId: inv.case_id }, `invoice:${inv.id}`); // Einstellungen → Automatik
     } else if (d.status !== inv.status && d.status === 'storniert') {
       memberships.cancelRequestByInvoice(inv.id, req.user);
     }

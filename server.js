@@ -173,6 +173,8 @@ app.use('/api/team', team.publicRouter);
 app.use('/api/directory', admin.directoryRouter);
 app.use('/api/prefs', require('./server/routes/prefs').router); // persönliche Ansicht der Akte (Reihenfolge der Abschnitte)
 app.use('/api/notify-prefs', require('./server/routes/notifyPrefs').router); // Benachrichtigungen je Person (Discord-DMs, Ruhezeiten)
+app.use('/api/automations', require('./server/routes/automations').router); // Automatik-Regeln „Wenn … dann …“
+app.use('/api/tour', require('./server/routes/tour').router); // Einführungstour: schon gesehen?
 app.use('/api/duty', dutyRoutes);
 app.use('/api/admin/team', team.adminRouter);
 app.use('/api/admin/fees', fees.adminRouter);
@@ -286,6 +288,12 @@ const reminderTimer = setInterval(() => {
     require('./server/domain/docRequests').sweep().catch((err) => console.warn('Erinnerung an fehlende Unterlagen fehlgeschlagen:', err.message));
     // Liegengebliebene Akten: zuständigen Anwalt einmal je Ruhephase erinnern
     require('./server/domain/idleCases').sweep().catch((err) => console.warn('Hinweis auf liegengebliebene Akten fehlgeschlagen:', err.message));
+    // Automatik-Regeln „Akte liegt X Tage“
+    try {
+      require('./server/domain/automations').sweep();
+    } catch (err) {
+      console.warn('Automatik-Regeln fehlgeschlagen:', err.message);
+    }
     // Abgelehnte Bewerbungen und erledigte Anliegen nach X Tagen löschen (Einstellung, 0 = aus)
     require('./server/db/cleanup').sweep();
     // Wochenbericht fürs Board: montags ab 10 Uhr einmal per Discord-DM

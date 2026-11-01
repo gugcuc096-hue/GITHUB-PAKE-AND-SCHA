@@ -2946,3 +2946,19 @@ body.hint-edit .form-hint[data-hint-key]:hover { background: rgba(var(--accent-r
 .calc-ex-total { margin-top: 0.3rem; padding-top: 0.45rem; border-top: 1px solid var(--glass-border); font-weight: 700; color: var(--gold-light); }
 /* Dokumente: Vorschau der Beispielrechnung */
 .doc-preview { width: 100%; height: 34rem; border: 1px solid var(--glass-border); border-radius: 12px; background: #fff; }
+/* Einstellungen → Status */
+.status-row { display: grid; grid-template-columns: 9rem minmax(0, 1fr) 10rem minmax(0, 1fr); align-items: center; gap: 0.6rem; }
+@media (max-width: 760px) { .status-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .status-row .text-xs { grid-column: 1 / -1; } }
+/* Einstellungen → Automatik */
+.auto-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.auto-rule { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; grid-template-areas: 'when then btns' 'meta meta btns'; gap: 0.3rem 1rem; align-items: center; padding: 0.75rem 0.9rem; border: 1px solid var(--glass-border); border-radius: 14px; background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.01)); transition: border-color 0.2s, opacity 0.2s; }
+.auto-rule:hover { border-color: rgba(var(--accent-rgb), 0.35); }
+.auto-rule.is-off { opacity: 0.55; }
+.auto-when, .auto-then { display: flex; align-items: flex-start; gap: 0.45rem; font-size: 0.88rem; min-width: 0; }
+.auto-when { grid-area: when; }
+.auto-then { grid-area: then; color: var(--gold-light); }
+.auto-when .ico-sm, .auto-then .ico-sm { flex: none; margin-top: 0.15rem; color: var(--gold-500); }
+.auto-meta { grid-area: meta; }
+.auto-btns { grid-area: btns; display: flex; gap: 0.3rem; align-items: center; }
+@media (max-width: 760px) { .auto-rule { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'when' 'then' 'meta' 'btns'; } }
+.auto-step-head { display: flex; align-items: center; gap: 0.45rem; margin-top: 0.4rem; font-family: var(--font-display); font-size: 1.15rem; font-weight: 600; color: var(--gold-light); }

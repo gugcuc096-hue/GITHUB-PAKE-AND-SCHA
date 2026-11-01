@@ -441,6 +441,7 @@ Object.assign(forms, {
 async function refreshSiteConfig() {
   const me = await api.get('/api/auth/me');
   st.siteConfig = me.siteConfig;
+  applyStatuses(st.siteConfig && st.siteConfig.statuses);
   if (window.PS.siteConfig && st.siteConfig) {
     PS.siteConfig.setLabels(st.siteConfig.labels);
     PS.siteConfig.banners(st.siteConfig, $('#content'), { className: 'dash-banner' });

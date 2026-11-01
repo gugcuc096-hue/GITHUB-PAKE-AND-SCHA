@@ -119,7 +119,8 @@ views.profile = {
         : `<p class="text-sm text-muted">Das Board of Partners hat die Discord-Anmeldung noch nicht eingerichtet.${isAdmin() ? ' <a href="/dashboard?tab=bot&amp;modul=login#settings" class="text-gold underline">Einstellungen → Discord → Discord-Login</a> zeigt, was fehlt.' : ''}</p>`;
     return `
         ${u.mustChangePassword ? `<div class="banner banner-amber">${icon('alert')}<div><strong>Bitte jetzt ein eigenes Passwort festlegen.</strong> Ihr aktuelles Passwort wurde automatisch erzeugt oder vom Board of Partners zurückgesetzt.</div></div>` : ''}
-        <div class="page-head"><div><h1 class="page-title">Mein Profil</h1><p class="page-sub">Kontaktdaten, Passwort, Discord${isStaff() ? ' und FiveNet' : ''}.</p></div></div>
+        <div class="page-head"><div><h1 class="page-title">Mein Profil</h1><p class="page-sub">Kontaktdaten, Passwort, Discord${isStaff() ? ' und FiveNet' : ''}.</p></div>
+          <div class="page-actions"><button type="button" class="btn-outline btn-md" data-action="tour-start">${icon('star', 'ico-sm')}<span>Einführung ansehen</span></button></div></div>
         <div class="grid-2">
           <section class="panel panel-pad">
             <div class="flex items-center gap-5 mb-5">

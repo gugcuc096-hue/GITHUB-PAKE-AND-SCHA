@@ -567,3 +567,23 @@ nav[data-ink] .nav-link.nav-active { color: var(--gold-light, #f3e5ab) !importan
 .fl.fl-select > .field { padding-top: 1.2rem; }
 .fl > .fl-extra { position: absolute; z-index: 2; top: 0.3rem; right: 2.5rem; font-size: 0.72rem; line-height: 1.2; }
 .fl:not(.fl-select) > .fl-extra { right: 0.8rem; }
+
+/* Einführungstour (13-tour.js): Lichtkegel um das Element, Karte daneben – gleitet von Schritt zu Schritt */
+.tour-root { position: fixed; inset: 0; z-index: 500; pointer-events: none; opacity: 0; transition: opacity 0.25s ease; }
+.tour-root.is-open { opacity: 1; pointer-events: auto; }
+.tour-spot { position: fixed; border-radius: 14px; box-shadow: 0 0 0 9999px rgba(3, 6, 15, 0.72), 0 0 0 2px rgba(var(--accent-rgb), 0.9), 0 0 30px 4px rgba(var(--accent-rgb), 0.45); transition: left 0.45s cubic-bezier(0.2, 0.9, 0.25, 1), top 0.45s cubic-bezier(0.2, 0.9, 0.25, 1), width 0.45s cubic-bezier(0.2, 0.9, 0.25, 1), height 0.45s cubic-bezier(0.2, 0.9, 0.25, 1), opacity 0.3s ease; pointer-events: none; }
+.tour-root:has(.tour-spot[style*="opacity: 0"]) { background: rgba(3, 6, 15, 0.72); }
+.tour-card { position: fixed; padding: 1.15rem 1.2rem 1rem; border-radius: 16px; color: var(--text-main, #e2e8f0);
+  background: linear-gradient(180deg, rgba(20, 27, 52, 0.97), rgba(10, 15, 32, 0.98)); border: 1px solid rgba(var(--accent-rgb), 0.35);
+  box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: left 0.45s cubic-bezier(0.2, 0.9, 0.25, 1), top 0.45s cubic-bezier(0.2, 0.9, 0.25, 1); }
+.tour-card.is-center { left: 50% !important; top: 50% !important; translate: -50% -50%; }
+.tour-card.is-in { animation: tour-in 0.38s cubic-bezier(0.2, 0.9, 0.25, 1.1); }
+@keyframes tour-in { from { opacity: 0; transform: translateY(8px) scale(0.97); } to { opacity: 1; transform: none; } }
+.tour-count { font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold-500); font-weight: 600; }
+.tour-title { margin: 0.2rem 0 0.35rem; font-family: var(--font-display); font-size: 1.5rem; font-weight: 600; line-height: 1.15; color: #fff; }
+.tour-text { margin: 0; font-size: 0.9rem; line-height: 1.5; color: var(--text-muted); }
+.tour-dots { display: flex; gap: 0.3rem; margin: 0.85rem 0 0.7rem; }
+.tour-dots i { width: 0.4rem; height: 0.4rem; border-radius: 999px; background: rgba(255, 255, 255, 0.2); transition: width 0.3s, background 0.3s; }
+.tour-dots i.on { width: 1.2rem; background: var(--gold-500); }
+.tour-btns { display: flex; align-items: center; gap: 0.4rem; }

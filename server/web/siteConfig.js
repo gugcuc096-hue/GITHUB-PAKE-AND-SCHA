@@ -66,6 +66,7 @@ const NAV_EMPTY = { order: [], hidden: [], labels: {} };
 const START_BLOCKS = ['kpi-requests', 'kpi-work', 'kpi-deadline', 'kpi-mail', 'kpi-cases', 'kpi-next', 'kpi-invoices', 'attention', 'requests', 'events', 'recent', 'pinboard', 'todo', 'duty', 'absence'];
 const startProfile = z.object({ order: z.array(z.enum(START_BLOCKS)).max(START_BLOCKS.length).default([]), hidden: z.array(z.enum(START_BLOCKS)).max(START_BLOCKS.length).default([]) });
 const START_EMPTY = { order: [], hidden: [] };
+const statusDef = z.object({ label: z.string().trim().min(2).max(30), color: z.enum(['amber', 'sky', 'emerald', 'gold', 'red', 'slate']) });
 
 const SPECS = {
   banner: {
@@ -197,6 +198,13 @@ const SPECS = {
     }),
     defaults: { bundleMin: 3, bundlePct: 10, priorityPct: 15, priorityLabel: 'Priorisierte Bearbeitung', prioritySub: 'Vorrangige Terminierung innerhalb von 2 Stunden' },
   },
+  // Namen und Farben der drei Status einer Akte (Verfahrensschritte stehen je Rechtsgebiet unter Listen)
+  statuses: {
+    perm: 'settings.edit',
+    label: 'Status',
+    schema: z.object({ offen: statusDef, in_bearbeitung: statusDef, geschlossen: statusDef }),
+    defaults: { offen: { label: 'Offen', color: 'amber' }, in_bearbeitung: { label: 'In Bearbeitung', color: 'sky' }, geschlossen: { label: 'Abgeschlossen', color: 'slate' } },
+  },
   // Rechnungen, Aktenauszug, Verträge: Logo-Position, Zeile unter dem Namen, Fußzeile, Unterschrift, Wasserzeichen
   documents: {
     perm: 'settings.edit',
@@ -264,14 +272,27 @@ function publish(key, user, value) {
   if (JSON.stringify(before) !== JSON.stringify(next)) {
     configLog.add(user, { area: 'site_config', key, label: `${spec.label} veröffentlicht`, perm: spec.perm, before, after: next, revertible: true });
   }
+  if (key === 'statuses') applyStatuses();
   return next;
 }
+/** Status-Namen auch für Discord, Ticket und Verlauf (helpers.CASE_STATUS wird überall gelesen). */
+function applyStatuses() {
+  try {
+    const s = get('statuses');
+    const CASE_STATUS = require('../core/helpers').CASE_STATUS;
+    for (const k of Object.keys(CASE_STATUS)) if (s[k] && s[k].label) CASE_STATUS[k] = s[k].label;
+  } catch {
+    /* Standardnamen */
+  }
+}
+setImmediate(applyStatuses);
 /** Für das Zurücksetzen im Änderungsprotokoll. */
 function setPublished(key, value) {
   db.prepare(
     `INSERT INTO site_config (key, published, published_at, updated_at) VALUES (?, ?, datetime('now'), datetime('now'))
      ON CONFLICT(key) DO UPDATE SET published = excluded.published, published_at = excluded.published_at, updated_at = excluded.updated_at`
   ).run(key, JSON.stringify({ ...SPECS[key].defaults, ...SPECS[key].schema.parse(value) }));
+  if (key === 'statuses') applyStatuses();
 }
 
 /* ---------------------------------------------------------------- Banner */
@@ -342,6 +363,7 @@ function publicPayload(user, { draft = false } = {}) {
     nav: navMine,
     start: startMine,
     calculator: pick('calculator'),
+    statuses: user ? pick('statuses') : null,
     documents: pick('documents'),
     draft,
   };
