@@ -91,7 +91,7 @@ function renderNav() {
   const prefs = st.navClosed || (st.navClosed = navClosedPrefs());
   const groups = []; // [{ name, items: [key] }]
   for (const [key, v] of Object.entries(VIEWS)) {
-    if (v.hidden || !allowed(key)) continue;
+    if (v.hidden || v.navHidden || !allowed(key)) continue;
     if (key === 'concerns' && concernsMerged()) continue; // steckt im Board-Punkt „Anliegen“
     const h = hubOf(key);
     if (h && h.members[0][0] !== key) continue; // steckt im Menüpunkt des Bündels
@@ -137,7 +137,15 @@ function renderNav() {
         <span>${esc(g.name)}</span>${closed && total ? `<span class="nav-count">${total > 99 ? '99+' : total}</span>` : ''}${icon('chevronDown', 'ico-sm nav-chev')}</button>
       <div class="nav-group" id="navGroup${i}" ${closed ? 'hidden' : ''}>${items}</div>`;
   });
-  $('#nav').innerHTML = html;
+  // Unten: Einstellungen (Zahnrad, inkl. Systemzustand) und Mein Profil – nicht als eigene Menügruppe
+  const foot = [['settings', ['settings', 'system']], ['profile', ['profile']]]
+    .filter(([k]) => allowed(k))
+    .map(([k, views]) => {
+      const active = views.includes(st.view);
+      return `<a href="#${k}" class="nav-item nav-foot-item ${active ? 'active' : ''}" ${active ? 'aria-current="page"' : ''}>${icon(VIEWS[k].icon)}<span>${esc(viewLabel(k))}</span></a>`;
+    })
+    .join('');
+  $('#nav').innerHTML = html + (foot ? `<div class="nav-foot">${foot}</div>` : '');
   st.navOpenedFor = st.view;
 
   // Handy-Leiste: Mitarbeiter haben Aufgaben statt Post (Post steht ohnehin oben als Briefsymbol)

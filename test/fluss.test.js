@@ -6,7 +6,7 @@
  */
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const { startServer, client, TEAM, PASSWORD } = require('./helpers');
+const { startServer, client, TEAM, PASSWORD, caseShow } = require('./helpers');
 
 let chromium = null;
 try {
@@ -140,7 +140,7 @@ describe('Ziehen im Kalender und Abhaken (Browser)', { skip: chromium ? false : 
         await page.evaluate((id) => openCase(id), kase.id);
         if (await page.waitForSelector('#secTasks', { timeout: 10000 }).then(() => true, () => false)) break;
       }
-      await page.click(`#secTasks [data-action="task-toggle"][data-id="${t1.id}"]`);
+      await caseShow(page, `#secTasks [data-action="task-toggle"][data-id="${t1.id}"]`); await page.click(`#secTasks [data-action="task-toggle"][data-id="${t1.id}"]`);
       await page.waitForFunction((id) => document.querySelector(`#secTasks [data-action="task-toggle"][data-id="${id}"]`)?.classList.contains('pop'), t1.id, { timeout: 8000 });
       await page.waitForFunction((id) => {
         const rows = [...document.querySelectorAll('#secTasks .task-row')];

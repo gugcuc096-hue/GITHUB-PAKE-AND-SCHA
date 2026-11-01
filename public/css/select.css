@@ -19,7 +19,7 @@
   select:open::picker-icon { rotate: 180deg; }
   .prop-v select::picker-icon { display: none; }
   /* .field: Pfeil rechts außen (statt des Hintergrundbilds, motion.css) */
-  select.field:not([multiple]):not([size]), select.field.field-sm:not([multiple]):not([size]) { padding-right: 0.8rem; gap: 0.5rem; }
+  select.field:not([multiple]):not([size]), select.field.field-sm:not([multiple]):not([size]) { display: flex; padding-right: 0.8rem; gap: 0.5rem; }
   select.field::picker-icon { margin-left: auto; }
   select.field:open { border-color: var(--gold-500, #d4af37); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15); }
 

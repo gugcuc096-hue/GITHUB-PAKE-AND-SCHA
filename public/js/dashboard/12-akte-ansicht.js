@@ -25,6 +25,41 @@ const CASE_SEC = [
   ['notes', 'secNotes', 'Verlauf & Notizen'],
 ];
 const SEC_KEYS = CASE_SEC.map((s) => s[0]);
+/*
+ * Die Akte in vier Reitern statt einer langen Seite: Überblick (Stand, Details, Sachverhalt, Aufgaben, Zeiten, Verlauf),
+ * Kommunikation, Fall und Dokumente. Kopf und wichtige Hinweise stehen über allen Reitern. Innerhalb eines Reiters gelten
+ * Reihenfolge, Ausblenden und Einklappen wie gehabt („Ansicht anpassen“ zeigt alle Abschnitte auf einmal).
+ */
+const CASE_TABS = [
+  ['ueberblick', 'Überblick', ['tasks', 'work', 'notes']],
+  ['kommunikation', 'Kommunikation', ['chat', 'events', 'requests']],
+  ['fall', 'Fall', ['charges', 'witnesses', 'evidence', 'karte']],
+  ['dokumente', 'Dokumente', ['contracts', 'briefs', 'external', 'invoices']],
+];
+const casePaneOf = (key) => (CASE_TABS.find((t) => t[2].includes(key)) || CASE_TABS[0])[0];
+/** Reiter der offenen Akte wechseln (ohne neu zu zeichnen). */
+function caseTabSet(tab) {
+  const root = $('#modalBody .case-root');
+  if (!root || !CASE_TABS.some((t) => t[0] === tab)) return;
+  st.caseTab = tab;
+  if (root.dataset.caseTab === tab) return;
+  root.dataset.caseTab = tab;
+  root.querySelectorAll('.case-jump [data-action="case-tab"]').forEach((b) => {
+    const on = b.dataset.tab === tab;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', String(on));
+  });
+  const pick = root.querySelector('.case-jump .tabrow-pick select');
+  if (pick) pick.value = String(CASE_TABS.findIndex((t) => t[0] === tab));
+}
+/** Abschnitt sichtbar machen (passenden Reiter öffnen) – für Sprünge aus Kacheln, Hinweisen und Links. */
+function caseReveal(id) {
+  const el = document.getElementById(id);
+  if (!el) return null;
+  const pane = el.closest('[data-pane]');
+  if (pane) caseTabSet(pane.dataset.pane);
+  return el;
+}
 const caseSecKey = (anchor) => (CASE_SEC.find((s) => s[1] === anchor) || [anchor])[0];
 let kSecPrefs = null; // { mine, defaults: { Rechtsgebiet: Ansicht }, board }
 
@@ -58,7 +93,7 @@ const SEC_SOURCE = { mine: 'Deine Ansicht', default: 'Standardansicht des Rechts
 
 /** Die Abschnitte der Akte in der gewählten Reihenfolge – jeder mit Leiste (Griff, Pfeile, Ausblenden, Einklappen). */
 function caseSecHtml(c, map, meta, staff) {
-  if (!staff) return SEC_KEYS.map((k) => map[k] || '').join('\n');
+  if (!staff) return SEC_KEYS.map((k) => (map[k] ? `<div class="sec-plain" data-sec="${k}" data-pane="${casePaneOf(k)}">${map[k]}</div>` : '')).join('\n');
   const L = caseSecLayout(c.area);
   const items = L.order
     .filter((k) => map[k])
@@ -67,7 +102,7 @@ function caseSecHtml(c, map, meta, staff) {
       const hidden = L.hidden.has(k);
       const folded = L.collapsed.has(k);
       const count = m.n ? `<span class="jump-n">${m.n}</span>` : '';
-      return `<div class="sec-wrap${hidden ? ' is-hidden-sec' : ''}${folded ? ' is-collapsed' : ''}" data-sec="${k}">
+      return `<div class="sec-wrap${hidden ? ' is-hidden-sec' : ''}${folded ? ' is-collapsed' : ''}" data-sec="${k}" data-pane="${casePaneOf(k)}">
         <div class="sec-bar"><button type="button" class="sec-grip" aria-label="Verschieben: ${esc(m.label)}" title="Ziehen zum Verschieben">${icon('grip', 'ico-sm')}</button>
           <span class="sec-name">${esc(m.label)}${count}</span>
           <span class="sec-ctl">

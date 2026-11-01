@@ -6,7 +6,7 @@
  */
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const { startServer, client, TEAM, PASSWORD } = require('./helpers');
+const { startServer, client, TEAM, PASSWORD, caseShow } = require('./helpers');
 
 let chromium = null;
 try {
@@ -93,7 +93,7 @@ describe('Offline-Modus (Browser)', { skip: chromium ? false : 'Playwright nicht
         assert.ok((await page.textContent('#secTasks')).includes(`Aufgabe offline ${name}`), 'Akte mit Aufgabe aus dem Zwischenspeicher');
 
         // Offline: Aufgabe abhaken und interne Notiz schreiben → warten auf die Verbindung
-        await page.click(`#secTasks [data-action="task-toggle"][data-id="${task.id}"]`);
+        await caseShow(page, `#secTasks [data-action="task-toggle"][data-id="${task.id}"]`); await page.click(`#secTasks [data-action="task-toggle"][data-id="${task.id}"]`);
         await page.fill('form[data-form="add-note"] textarea[name="body"]', `Notiz im Zug (${name})`);
         await page.click('form[data-form="add-note"] button[type=submit]');
         await page.waitForFunction(() => /2 Änderungen warten/.test(document.querySelector('#offlineBar')?.textContent || ''), null, { timeout: 15000 });

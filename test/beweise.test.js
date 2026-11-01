@@ -5,7 +5,7 @@
  */
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const { startServer, client, TEAM, PASSWORD, pickTab } = require('./helpers');
+const { startServer, client, TEAM, PASSWORD, pickTab, caseShow } = require('./helpers');
 
 let chromium = null;
 try {
@@ -152,7 +152,7 @@ describe('Beweismittel in der Akte (Browser)', { skip: chromium ? false : 'Playw
         const row = await page.textContent('.ev-table tbody tr:nth-child(2)');
         assert.ok(row.includes('Tatort von Norden') && row.includes('entlastend') && row.includes('Herkunft: Mandant'), row);
         // Klick auf den Verweis im Chat öffnet die Großansicht von B2 mit der Beschreibung
-        await page.click('#chatList .ev-ref');
+        await caseShow(page, '#chatList .ev-ref'); await page.click('#chatList .ev-ref');
         await page.waitForSelector('.lightbox-img');
         const box = await page.textContent('#modalBody');
         assert.ok(box.includes('Beweismittel B2') && box.includes('Zeigt freie Sicht auf die Kreuzung.') && box.includes('Herkunft: Mandant'), box);

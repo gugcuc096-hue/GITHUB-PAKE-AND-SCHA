@@ -2,7 +2,7 @@
 /*
  * Mitteilungstexte: die Nachrichten, die der Bot und die Website an Mandanten schicken (Zahlungserinnerung, fehlende
  * Unterlagen, Terminerinnerung, Bewertungsbitte, Eingangsbestätigung im Ticket). Die Kanzlei ändert sie unter
- * Einstellungen → Texte & Banner → Mitteilungen – mit Platzhaltern wie {mandant} oder {aktenzeichen}. Leer = Standardtext.
+ * Einstellungen → Kommunikation → Mitteilungen – mit Platzhaltern wie {mandant} oder {aktenzeichen}. Leer = Standardtext.
  * Ton „Sie“ oder „Du“ gilt für alle Standardtexte; eigene Texte gelten, wie sie geschrieben sind.
  */
 const siteConfig = require('./siteConfig');

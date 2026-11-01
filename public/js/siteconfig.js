@@ -1,5 +1,5 @@
 /*
- * Konfiguration aus dem Dashboard (Einstellungen → Texte & Banner): Banner, Startseite (Abschnitte, FAQ, Links, Kennzahlen),
+ * Konfiguration aus dem Dashboard (Einstellungen → Website): Banner, Startseite (Abschnitte, FAQ, Links, Kennzahlen),
  * Beschriftungen und Hinweise. Gilt für Website, Karriere und Dashboard; ohne Konfiguration sieht alles aus wie bisher.
  *   PS.siteConfig.apply(cfg, { page })   alles anwenden (cfg = { banner, home, labels })
  *   PS.siteConfig.labels(root)           Begriffe und Hinweise in einem Teil der Seite ersetzen (Dashboard: nach jedem Zeichnen)

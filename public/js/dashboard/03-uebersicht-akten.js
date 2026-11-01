@@ -567,7 +567,11 @@ function markInModal(q) {
   // Der erste Treffer unterhalb des Aktenkopfs (dort steht meist nur der Titel) wird sichtbar gescrollt
   const marks = $$('mark.hl-mark', body);
   const target = marks.find((m) => !m.closest('.case-head')) || marks[0];
-  if (target && !target.closest('.case-head')) setTimeout(() => target.scrollIntoView({ block: 'center', behavior: window.PS.motion.calm() ? 'auto' : 'smooth' }), 420);
+  if (target && !target.closest('.case-head')) {
+    const pane = target.closest('[data-pane]'); // Treffer in einem anderen Reiter der Akte: den Reiter öffnen
+    if (pane) caseTabSet(pane.dataset.pane);
+    setTimeout(() => target.scrollIntoView({ block: 'center', behavior: window.PS.motion.calm() ? 'auto' : 'smooth' }), 420);
+  }
 }
 function gsItem(type, x, q) {
   const line = (title, meta) => `<span class="main"><span class="title">${title}</span>${meta ? `<span class="meta">${meta}</span>` : ''}</span>`;
@@ -671,7 +675,10 @@ async function openSearchResult(type, id) {
   if (type === 'wiki') return modalInstead(() => openWikiArticle(id));
   if (type === 'precedents') return modalInstead(() => openPrecedent(id));
   if (type === 'witnesses')
-    return modalInstead(() => openCase(x.caseId)).then(() => setTimeout(() => $(`#wit${id}`)?.scrollIntoView({ block: 'center', behavior: window.PS.motion.calm() ? 'auto' : 'smooth' }), 420));
+    return modalInstead(() => openCase(x.caseId)).then(() => {
+      caseReveal('secWitnesses'); // Zeugen stehen im Reiter „Fall“
+      setTimeout(() => $(`#wit${id}`)?.scrollIntoView({ block: 'center', behavior: window.PS.motion.calm() ? 'auto' : 'smooth' }), 420);
+    });
   if (type === 'evidence') return modalInstead(() => openCase(x.caseId)).then(() => actions['ev-open']({ dataset: { no: String(x.no) } }));
   if (type === 'penal') return modalInstead(() => openLaw(x.para));
   if (type === 'clients') return modalInstead(() => openClient(`u${id}`)); // Mandantenkartei

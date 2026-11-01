@@ -7,7 +7,7 @@
  *  - Bilder (Profilbilder, Team-Fotos, Beweismittel): einmal pro Woche als .tar.gz
  * Aufbewahrung im Drive wie auf der Disk (7 Tage alle, bis 5 Wochen eine je Woche), von den Bildern die letzten 4.
  * Klappt das Hochladen dreimal hintereinander nicht, bekommt das Board eine Systemwarnung (Discord + Übersicht).
- * Wiederherstellen: Datei im Drive herunterladen und unter Einstellungen → System → „Sicherung hochladen …“ einspielen.
+ * Wiederherstellen: Datei im Drive herunterladen und unter Einstellungen → Rechte & System → Sicherung & Notfall → „Sicherung hochladen …“ einspielen.
  */
 const fs = require('fs');
 const path = require('path');
@@ -144,7 +144,7 @@ function afterConnect() {
   });
 }
 
-/** Stand für Einstellungen → System → Datensicherung. */
+/** Stand für Einstellungen → Sicherung & Notfall. */
 function status() {
   const s = readState();
   return {

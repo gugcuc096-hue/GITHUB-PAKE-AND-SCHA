@@ -9,7 +9,7 @@ const { getCase } = require('./models');
 const tickets = require('./tickets');
 const { dm } = require('./memberships');
 
-const REMIND_DAYS = 3; // Standard; einstellbar unter Einstellungen → Texte & Banner → Mitteilungen
+const REMIND_DAYS = 3; // Standard; einstellbar unter Einstellungen → Kommunikation → Mitteilungen
 const remindDays = () => require('./siteConfig').get('messages').docsAfterDays || REMIND_DAYS;
 
 const row = (r) => ({ id: r.id, title: r.title, note: r.note, createdBy: r.created_by, createdAt: r.created_at, done: !!r.done_at, doneAt: r.done_at, doneBy: r.done_by });

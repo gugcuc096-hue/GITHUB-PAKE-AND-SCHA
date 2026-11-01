@@ -1,5 +1,5 @@
 /*
- * Kanzlei-Dashboard – Einstellungen → Texte & Banner: Stil & Saison, Rabattaktionen und Aktenzeichen.
+ * Kanzlei-Dashboard – Einstellungen: Stil & Saison, Rabattaktionen und Aktenzeichen.
  *  - Stil & Saison: Vorlagen, Akzentfarbe, Glas, Rundung, Schrift, Bewegung, Saison-Deko (Entwurf → Veröffentlichen);
  *    jede Änderung zeigt sich sofort im ganzen Dashboard (PS.theme), bis man den Bereich verlässt
  *  - Rabattaktionen: für alle, mit Anlass, Zeitraum (auch jährlich), Ankündigung im Banner (routes/promotions.js)

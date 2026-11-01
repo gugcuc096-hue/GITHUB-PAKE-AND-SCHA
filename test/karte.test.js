@@ -5,7 +5,7 @@
  */
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const { startServer, client, TEAM, PASSWORD } = require('./helpers');
+const { startServer, client, TEAM, PASSWORD, caseShow } = require('./helpers');
 
 let chromium = null;
 try {
@@ -146,13 +146,17 @@ describe('Tatort-Karte (Browser)', { skip: chromium ? false : 'Playwright nicht 
         // Beweisverweis in der Notiz wird anklickbar (kein B1 in dieser Akte → bleibt Text)
         assert.match(await page.textContent('#secKarte .place-note'), /B1/);
         // Zeichenfläche ist nicht leer
-        const painted = await page.evaluate(() => {
+        const litPx = () => {
           const cv = document.getElementById('kmapMini');
+          if (!cv.width || !cv.height) return 0;
           const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
           let lit = 0;
           for (let i = 0; i < d.length; i += 4 * 97) if (d[i] > 120 || d[i + 1] > 120) lit += 1;
           return lit;
-        });
+        };
+        // erst sichtbar (Reiter „Fall“), dann gezeichnet – kurz warten statt sofort messen
+        await page.waitForFunction(litPx, null, { timeout: 5000 }).catch(() => {});
+        const painted = await page.evaluate(litPx);
         assert.ok(painted > 5, `Karte gezeichnet (${painted})`);
         // Zeitregler: auf 1 → zwei Orte ausgegraut
         await page.$eval('#kmapTime', (r) => {
@@ -181,9 +185,9 @@ describe('Tatort-Karte (Browser)', { skip: chromium ? false : 'Playwright nicht 
         await page.waitForSelector('#kmapWrap .kmap-card:not([hidden])', { timeout: 5000 });
         assert.match(await page.textContent('#kmapWrap .kmap-card'), /Tankstelle/);
         assert.equal(await page.locator('#secKarte [data-action="kmap-play"]').count(), 1);
-        await page.click('#secKarte [data-action="kmap-style"][data-style="karte"]');
+        await caseShow(page, '#secKarte [data-action="kmap-style"][data-style="karte"]'); await page.click('#secKarte [data-action="kmap-style"][data-style="karte"]');
         await page.waitForFunction(() => karteBase() && karteBase().style === 'karte', null, { timeout: 15000 });
-        await page.click('#secKarte [data-action="kmap-style"][data-style="sat"]');
+        await caseShow(page, '#secKarte [data-action="kmap-style"][data-style="sat"]'); await page.click('#secKarte [data-action="kmap-style"][data-style="sat"]');
         await page.waitForFunction(() => karteBase() && karteBase().style === 'sat', null, { timeout: 15000 });
         // Hinzufügen per Postleitzahl
         await page.click('[data-action="place-add"]');
