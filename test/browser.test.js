@@ -1037,9 +1037,11 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
           const scroller = document.querySelector('#modalBody');
           const top = scroller.getBoundingClientRect().top;
           const bar = document.querySelector('#modalBody .case-jump').getBoundingClientRect();
-          return { barTop: Math.round(bar.top - top) };
+          const sticky = getComputedStyle(document.querySelector('#modalBody .case-jump')).position;
+          return { barTop: Math.round(bar.top - top), scrolled: Math.round(scroller.scrollTop), sticky };
         });
-        assert.ok(Math.abs(pos.barTop) <= 2, `Leiste klebt oben (${pos.barTop})`);
+        assert.equal(pos.sticky, 'sticky', 'Reiterleiste klebt');
+        assert.ok(pos.barTop <= 2 || pos.scrolled < pos.barTop, `Leiste klebt oben (${pos.barTop}, gescrollt ${pos.scrolled})`);
         const closeFree = await page.$eval('.modal-close', (x) => {
           const r = x.getBoundingClientRect();
           return r.bottom < 0 || x.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
@@ -2197,6 +2199,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       assert.equal((await A.page.textContent('#caseHere')).includes('Mia'), false);
 
       // Anwalt tippt: Kollege sieht den Namen, Mandant „Die Kanzlei schreibt gerade …“
+      await caseShow(A.page, '#modalBody #secChat .chat-input');
+      await caseShow(B.page, '#modalBody #secChat .chat-input');
       await A.page.locator('#secChat .chat-input').pressSequentially('Guten Tag', { delay: 40 });
       await B.page.waitForFunction((n) => (document.querySelector('#chatTyping')?.textContent || '').includes(`${n} schreibt gerade`), anwaltMe.displayName, { timeout: 5000 });
       await M.page.waitForFunction(() => (document.querySelector('#chatTyping')?.textContent || '').includes('Die Kanzlei schreibt gerade'), null, { timeout: 5000 });
