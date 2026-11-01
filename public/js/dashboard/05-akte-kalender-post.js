@@ -1025,6 +1025,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       // Strafsachen haben den Abschnitt „Anklagepunkte“ immer – sonst kommt er von hier
       c.area !== 'strafrecht' && c.canEdit && charges && !charges.charges.length ? `<button type="button" class="more-item" data-action="charge-pick" data-id="${c.id}">${icon('scale', 'ico-sm')}<span>Anklagepunkte</span></button>` : '',
       c.area !== 'strafrecht' && !(charges && charges.charges.length) ? `<button type="button" class="more-item" data-action="hearing-start" data-id="${c.id}">${icon('scale', 'ico-sm')}<span>Verhandlungsmodus</span></button>` : '',
+      isBoard() ? `<button type="button" class="more-item" data-action="case-secret" data-id="${c.id}" data-on="${c.boardOnly ? '0' : '1'}">${icon(c.boardOnly ? 'unlock' : 'lock', 'ico-sm')}<span>${c.boardOnly ? 'Für die Kanzlei freigeben' : 'Nur für das Board (geheim)'}</span></button>` : '',
       c.canEdit ? `<button type="button" class="more-item" data-action="case-link" data-id="${c.id}">${icon('link', 'ico-sm')}<span>Akte verknüpfen</span></button>` : '',
       c.lawyerId === me ? `<button type="button" class="more-item" data-action="release-case" data-id="${c.id}">${icon('logout', 'ico-sm')}<span>Akte abgeben</span></button>` : '',
       c.isCoLawyer ? `<button type="button" class="more-item" data-action="leave-case" data-id="${c.id}">${icon('logout', 'ico-sm')}<span>Mitarbeit beenden</span></button>` : '',
@@ -1177,7 +1178,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       <div class="case-head case-cover mb-5" data-case-head="${c.id}">
         <span class="cover-tab" aria-hidden="true">${staff && c.priority >= 3 && !c.closed ? `<i class="cover-tab-dot p${c.priority}"></i>` : ''}Akte</span>
         ${c.closed ? '<span class="cover-stamp" aria-hidden="true">Abgeschlossen</span>' : ''}
-        <div class="pr-12"><div class="case-num-row"><button type="button" class="font-mono text-gold text-sm case-emboss copy-az" data-action="copy" data-text="${esc(c.caseNumber)}" title="Aktenzeichen kopieren" aria-label="Aktenzeichen ${esc(c.caseNumber)} kopieren">${esc(c.caseNumber)}</button>${staff ? starBtn(c) : ''}<span class="case-area">${esc(AREAS[c.area] || c.area)}</span>${staff ? hereStrip(c.id) : ''}</div>
+        <div class="pr-12"><div class="case-num-row"><button type="button" class="font-mono text-gold text-sm case-emboss copy-az" data-action="copy" data-text="${esc(c.caseNumber)}" title="Aktenzeichen kopieren" aria-label="Aktenzeichen ${esc(c.caseNumber)} kopieren">${esc(c.caseNumber)}</button>${staff ? starBtn(c) : ''}<span class="case-area">${esc(AREAS[c.area] || c.area)}</span>${staff && c.boardOnly ? secretBadge() : ''}${staff ? hereStrip(c.id) : ''}</div>
           <h2 id="modalTitle" class="case-title" title="${esc(c.title)}">${c.canEdit ? ie(c, 'title', c.title, { placeholder: 'Titel eintragen', cls: 'ie-title' }) : esc(c.title)}</h2>
           ${staff ? ticketChips(c, ticket, transcripts) : ''}</div>
         <div class="case-props">${headProps}</div>
@@ -1323,6 +1324,7 @@ async function newCaseModal() {
           : `<div><label class="label">Dringlichkeit</label><select name="urgency" class="field">${Object.entries(URGENCY).map(([k, [l]]) => opt(k, l)).join('')}</select></div>`}
         ${staff ? `<div><label class="label">Gegenpartei</label><input name="opponent" class="field" maxlength="120" placeholder="optional"></div>
           <div><label class="label">Gerichtsaktenzeichen</label><input name="courtRef" class="field" maxlength="60" placeholder="optional"></div>` : ''}
+        ${isBoard() ? `<label class="check span-2 secret-check"><input type="checkbox" name="boardOnly"> ${icon('lock', 'ico-sm')} Geheimes Mandat – nur für das Board of Partners und die zugewiesenen Anwälte sichtbar</label>` : ''}
         ${staff ? lawyerPicker({ leadId: st.user.id, withLead: isAdmin(), emptyLead: 'Noch niemand (offene Anfrage)' }) : ''}
         <div class="span-2 area-fields" id="ncAreaFields">${areaFieldsHtml((areaOptions()[0] || [''])[0], {}, staff)}</div>
         <div class="span-2"><label class="label">Sachverhalt</label><textarea name="description" rows="5" class="field" ${staff ? '' : 'required minlength="10"'} maxlength="4000" placeholder="Was ist passiert? Wer ist beteiligt? Gibt es bereits Fristen oder Termine?"></textarea></div>

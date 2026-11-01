@@ -2,7 +2,7 @@
 const { db, getSetting, setSetting } = require('./db');
 const Q = require('./queries');
 const { isStaff, userAvatarUrl } = require('../core/auth');
-const { STEPS, CASE_STATUS, EVENT_TYPES, APPLICATION_STATUS, DUTY_STATUS, truncate } = require('../core/helpers');
+const { STEPS, CASE_STATUS, EVENT_TYPES, APPLICATION_STATUS, DUTY_STATUS, truncate, isBoard } = require('../core/helpers');
 const { avatarUrl, teamPhotoUrl } = require('../core/uploads');
 
 /* ================================================================
@@ -111,16 +111,35 @@ function caseAccess(c, u) {
   const owner = u.role === 'mandant' && c.client_id === u.id;
   const isLead = staff && c.lawyer_id === u.id;
   const isCoLawyer = staff && coLawyersOf(c).some((l) => l.id === u.id);
+  // Geheimes Mandat: nur das Board of Partners und die zugewiesenen Anwälte (der Mandant sieht seine Akte wie gewohnt)
+  const secret = !!c.board_only && staff && !isBoard(u) && !isLead && !isCoLawyer;
   return {
-    canView: staff || owner,
+    canView: (staff && !secret) || owner,
     // Bearbeiten dürfen alle zuständigen Anwälte; das Team zusammenstellen der federführende Anwalt und das Board of Partners.
     canEdit: admin || isLead || isCoLawyer,
-    canClaim: staff && !c.lawyer_id,
+    canClaim: staff && !c.lawyer_id && !secret,
     canManageLawyers: admin || isLead,
     isLead,
     isCoLawyer,
     canDelete: admin,
   };
+}
+
+/**
+ * Geheime Mandate (nur Board of Partners), die diese Person nicht sehen darf – für Listen (Akten, Aufgaben, Termine,
+ * Rechnungen, Suche …). Board und Mandanten: leer; Anwälte sehen nur die geheimen Akten, denen sie zugewiesen sind.
+ */
+function hiddenCaseIds(u) {
+  if (!u || !isStaff(u) || isBoard(u)) return new Set();
+  return new Set(
+    db
+      .prepare(
+        `SELECT c.id FROM cases c WHERE c.board_only = 1 AND (c.lawyer_id IS NULL OR c.lawyer_id != ?)
+           AND NOT EXISTS (SELECT 1 FROM case_lawyers cl WHERE cl.case_id = c.id AND cl.user_id = ?)`
+      )
+      .all(u.id, u.id)
+      .map((r) => r.id)
+  );
 }
 
 /* Liegengebliebene Akten: offen und seit X Tagen ohne Aktivität (Einstellung, Standard 5 Tage, 0 = aus) */
@@ -154,6 +173,7 @@ function caseRow(c, u) {
     urgency: c.urgency,
     description: c.description,
     incident: staff ? c.incident || '' : undefined, // Tathergang (intern)
+    boardOnly: staff ? !!c.board_only : undefined, // geheimes Mandat (nur Board of Partners)
     clientId: c.client_id,
     clientName: c.client_account_name || c.client_name || '—',
     clientEmail: staff ? c.client_email || null : undefined,
@@ -341,7 +361,7 @@ function getAppointment(id) {
 }
 
 function apptVisible(a, u) {
-  if (isStaff(u)) return true;
+  if (isStaff(u)) return !a.case_id || !hiddenCaseIds(u).has(a.case_id); // geheimes Mandat: nur Board und Zugewiesene
   return !!a.client_visible && (a.client_id === u.id || a.case_client_id === u.id);
 }
 
@@ -657,6 +677,7 @@ const firmSeat = () => getSetting('firm_seat', 'Würfelpark, Los Santos') || 'W�
 const firmPlace = () => firmSeat().split(',')[0].trim() || 'Würfelpark';
 
 module.exports = {
+  hiddenCaseIds,
   firmSeat,
   firmPlace,
   idleLimit,

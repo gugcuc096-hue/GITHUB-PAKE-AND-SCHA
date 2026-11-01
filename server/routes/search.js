@@ -11,7 +11,7 @@
 const express = require('express');
 const { db } = require('../db/db');
 const { requireAuth, isStaff } = require('../core/auth');
-const { CASE_SELECT, caseRow, APPT_SELECT, apptRow, apptVisible, INVOICE_SELECT, invoiceRow, TASK_SELECT, taskRow, MESSAGE_SELECT, messageRow } = require('../db/models');
+const { CASE_SELECT, caseRow, APPT_SELECT, apptRow, apptVisible, INVOICE_SELECT, invoiceRow, TASK_SELECT, taskRow, MESSAGE_SELECT, messageRow, hiddenCaseIds } = require('../db/models');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -283,7 +283,27 @@ router.get('/', (req, res) => {
       .map((r) => ({ id: r.id, caseId: r.case_id, no: r.ev_no, caption: r.caption, kindLabel: require('../domain/evidence').KINDS[r.kind] || '', source: r.source, caseNumber: r.case_number, caseTitle: r.case_title, preview: snippet(r.description, terms) }));
   }
 
-  res.json({ q, terms: [...hitWords], results: { cases, clients, notes, invoices, tasks, events, messages, wiki, penal, precedents, witnesses, evidence } });
+  // Geheime Mandate (nur Board of Partners): Treffer daraus nur für Board und zugewiesene Anwälte
+  const hidden = hiddenCaseIds(u);
+  const ok = (x) => !hidden.size || !hidden.has(x.caseId ?? x.case_id);
+  res.json({
+    q,
+    terms: [...hitWords],
+    results: {
+      cases: cases.filter((c) => !hidden.has(c.id)),
+      clients,
+      notes: notes.filter(ok),
+      invoices: invoices.filter(ok),
+      tasks: tasks.filter(ok),
+      events: events.filter(ok),
+      messages,
+      wiki,
+      penal,
+      precedents: precedents.filter(ok),
+      witnesses: witnesses.filter(ok),
+      evidence: evidence.filter(ok),
+    },
+  });
 });
 
 module.exports = router;

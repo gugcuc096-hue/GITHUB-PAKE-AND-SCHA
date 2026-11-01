@@ -46,6 +46,7 @@ const {
   TASK_SELECT,
   taskRow,
   logActivity,
+  hiddenCaseIds,
 } = require('../db/models');
 const features = require('../core/features');
 const areas = require('../domain/areas');
@@ -88,6 +89,7 @@ function activeLawyers(ids) {
 
 function notifyCreated(c, user) {
   discord.notify('case.created', {
+    caseId: c.id,
     title: `Neue Akte ${c.case_number}`,
     description: truncate(c.title, 300),
     color: c.priority >= 4 ? discord.RED : discord.GOLD,
@@ -113,6 +115,7 @@ function notifyAssigned(c, user, newIds) {
     .map((l) => l.name)
     .join(', ');
   discord.notify('case.assigned', {
+    caseId: c.id,
     title: `${c.case_number}: ${newIds.length === 1 ? 'Anwalt' : 'Anwälte'} zugewiesen`,
     description: truncate(c.title, 300),
     fields: [
@@ -169,8 +172,9 @@ router.get('/', (req, res) => {
     : db.prepare(`${CASE_SELECT} WHERE c.client_id = ? ORDER BY c.updated_at DESC`).all(u.id);
   const unread = caseChat.unreadFor(u).cases;
   const stars = starredIds(u.id);
+  const hidden = hiddenCaseIds(u); // geheime Mandate (nur Board)
   // Liste ohne Sachverhalt (steht in der Akte selbst) – bei vielen Akten deutlich weniger zu laden
-  res.json({ cases: rows.map((c) => ({ ...caseRow(c, u), description: undefined, chatUnread: unread[c.id] || 0, starred: stars.has(c.id) })) });
+  res.json({ cases: rows.filter((c) => !hidden.has(c.id)).map((c) => ({ ...caseRow(c, u), description: undefined, chatUnread: unread[c.id] || 0, starred: stars.has(c.id) })) });
 });
 
 /* ---------------------------------------------------------------- Nachrichten (Chat Kanzlei ↔ Mandant) */
@@ -222,6 +226,7 @@ const createSchema = z.object({
   lawyerId: z.number().int().positive().nullable().optional(),
   coLawyerIds: z.array(z.number().int().positive()).max(MAX_CO_LAWYERS).optional(),
   priority: z.number().int().min(1).max(4).optional(), // nur Kanzlei; sonst aus der Dringlichkeit
+  boardOnly: z.boolean().optional(), // geheimes Mandat: nur Board of Partners (und zugewiesene Anwälte) – setzt nur das Board
 });
 
 router.post(
@@ -296,9 +301,11 @@ router.post(
           Object.keys(checked.answers).length ? JSON.stringify(checked.answers) : null
         );
       const newId = Number(info.lastInsertRowid);
+      if (d.boardOnly && isBoard(u)) db.prepare('UPDATE cases SET board_only = 1 WHERE id = ?').run(newId);
       const addCo = db.prepare('INSERT INTO case_lawyers (case_id, user_id, added_by) VALUES (?, ?, ?)');
       coIds.forEach((cid) => addCo.run(newId, cid, u.id));
       addSystemNote(newId, u, 'Akte angelegt.');
+      if (d.boardOnly && isBoard(u)) addSystemNote(newId, u, 'Geheimes Mandat: nur für das Board of Partners und die zugewiesenen Anwälte sichtbar.', true);
       syncCaseWork(newId);
       return newId;
     });
@@ -660,6 +667,7 @@ const updateSchema = z.object({
   handover: z.string().trim().max(1000).optional(), // Übergabe an den neuen federführenden Anwalt (intern)
   // Vollständige Liste der weiteren Anwälte (ersetzt die bisherige)
   coLawyerIds: z.array(z.number().int().positive()).max(MAX_CO_LAWYERS).optional(),
+  boardOnly: z.boolean().optional(), // geheimes Mandat – nur das Board of Partners stellt das um
 });
 
 const FIELD_COLUMNS = {
@@ -800,6 +808,7 @@ router.patch(
     const wantsEdit = editFields.length > 0 || d.status !== undefined || d.priority !== undefined || d.outcome !== undefined || d.actualHe !== undefined || d.actualFine !== undefined;
     if (d.priority !== undefined && !isStaff(u)) return res.status(403).json({ error: 'Die Priorität legen nur die Anwälte fest.' });
     if (d.incident !== undefined && !isStaff(u)) return res.status(403).json({ error: 'Den Tathergang hält die Kanzlei fest.' });
+    if (d.boardOnly !== undefined && !isBoard(u)) return res.status(403).json({ error: 'Nur das Board of Partners legt fest, ob eine Akte geheim ist.' });
     if (d.outcome !== undefined && !isStaff(u)) return res.status(403).json({ error: 'Das Ergebnis hält die Kanzlei fest.' });
     if ((d.actualHe !== undefined || d.actualFine !== undefined) && !isStaff(u)) return res.status(403).json({ error: 'Das Strafmaß hält die Kanzlei fest.' });
     // Ergebnis: beim Abschließen oder an einer bereits abgeschlossenen Akte (Korrektur)
@@ -823,6 +832,12 @@ router.patch(
       sets.push('priority = ?');
       values.push(d.priority);
       internalHistory.push(`Priorität: ${PRIORITIES[d.priority]}`);
+    }
+    // Geheimes Mandat (nur Board): interner Verlaufseintrag
+    if (d.boardOnly !== undefined && d.boardOnly !== !!c.board_only) {
+      sets.push('board_only = ?');
+      values.push(d.boardOnly ? 1 : 0);
+      internalHistory.push(d.boardOnly ? 'Geheimes Mandat: nur noch für das Board of Partners und die zugewiesenen Anwälte sichtbar' : 'Für die ganze Kanzlei freigegeben');
     }
     // Ergebnis ist ebenfalls intern (Statistik der Kanzlei) – nicht im Ticket, nicht für den Mandanten
     if (d.outcome !== undefined && d.outcome !== c.outcome) {
@@ -872,6 +887,7 @@ router.patch(
     if (history.length || internalHistory.length) logActivity(u, 'Akte geändert', 'case', c.id, `${c.case_number}: ${[...history, ...internalHistory].join(' · ')}`);
     if (newStatus && newStatus !== c.status) {
       discord.notify('case.status', {
+        caseId: updated.id,
         title: `${updated.case_number}: ${CASE_STATUS[newStatus]}`,
         description: truncate(updated.title, 300),
         fields: [
@@ -886,6 +902,7 @@ router.patch(
     if (newStatus === 'geschlossen' && c.status !== 'geschlossen' && OUTCOMES[updated.outcome]?.success) {
       const AREA = { [updated.area]: updated.area === 'sonstiges' ? '' : areas.name(updated.area) };
       discord.notify('case.victory', {
+        caseId: updated.id,
         title: `🏆 ${OUTCOMES[updated.outcome].label}!`,
         description: `Ein ${AREA[updated.area] ? `${AREA[updated.area]}s-` : ''}Mandat wurde erfolgreich abgeschlossen. Starke Arbeit, Team!`,
         fields: [{ name: 'Erreicht von', value: caseLawyers(updated).map((l) => l.name).join(', ') || u.display_name }],
@@ -1418,6 +1435,7 @@ router.put('/:id/notes/:noteId/pin', (req, res) => {
 
 function notifyStatus(c, u, newStatus) {
   discord.notify('case.status', {
+    caseId: c.id,
     title: `${c.case_number}: ${CASE_STATUS[newStatus]}`,
     description: truncate(c.title, 300),
     fields: [

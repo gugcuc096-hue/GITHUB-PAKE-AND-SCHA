@@ -2387,6 +2387,10 @@ tr.pin-drop > td, .list-row.pin-drop { animation: pin-drop 0.9s ease-out; }
 
 /* Aktenkopf: Zeile mit Aktenzeichen, Rechtsgebiet und Tickets, darunter der Titel in einer Zeile */
 .case-area { font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); }
+.secret-badge { display: inline-flex; align-items: center; gap: 0.3rem; margin-left: 0.6rem; padding: 0.12rem 0.55rem; border: 1px solid rgba(248, 113, 113, 0.45); border-radius: 999px; background: rgba(248, 113, 113, 0.1); color: var(--red); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; vertical-align: middle; }
+.secret-mark { display: inline-grid; place-items: center; margin-right: 0.35rem; color: var(--red); vertical-align: -2px; }
+.secret-check { color: var(--text-dim); }
+.secret-check .ico-sm { color: var(--red); vertical-align: -2px; }
 /* Aktentitel: bis zu zwei Zeilen (auch am PC), erst danach „…“ */
 .case-title { margin: 0.2rem 0 0; font-family: var(--font-display); font-size: clamp(1.35rem, 2.2vw + 0.7rem, 1.95rem); font-weight: 600; line-height: 1.25; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
 .case-title .ie-title { display: inline; }

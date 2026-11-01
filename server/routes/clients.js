@@ -18,7 +18,7 @@ const { db } = require('../db/db');
 const Q = require('../db/queries');
 const { requireAuth, isStaff, userAvatarUrl } = require('../core/auth');
 const { wrap, parseBody, isBoard, truncate } = require('../core/helpers');
-const { CASE_SELECT, caseRow, INVOICE_SELECT, invoiceRow, logActivity } = require('../db/models');
+const { CASE_SELECT, caseRow, INVOICE_SELECT, invoiceRow, logActivity, hiddenCaseIds } = require('../db/models');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -184,7 +184,8 @@ const inList = (ids) => ids.map(() => '?').join(',');
 /* ---------------------------------------------------------------- Liste */
 router.get('/', (req, res) => {
   const { index } = buildIndex();
-  const cases = new Map(db.prepare('SELECT id, status, created_at, updated_at FROM cases').all().map((c) => [c.id, c]));
+  const hidden = hiddenCaseIds(req.user); // geheime Mandate zählen für Nicht-Board nicht mit
+  const cases = new Map(db.prepare('SELECT id, status, created_at, updated_at FROM cases').all().filter((c) => !hidden.has(c.id)).map((c) => [c.id, c]));
   const invoices = new Map(db.prepare('SELECT id, status, total, due_date, created_at, paid_at FROM invoices').all().map((i) => [i.id, i]));
   const flags = new Map(db.prepare('SELECT * FROM client_flags').all().map((f) => [f.client_key, f]));
   const memberships = new Map(
@@ -236,8 +237,9 @@ function card(key, u) {
   const e = k && index.get(k);
   if (!e) return null;
   const keys = aliasKeys(e);
-  const cases = e.caseIds.length ? db.prepare(`${CASE_SELECT} WHERE c.id IN (${inList(e.caseIds)}) ORDER BY c.updated_at DESC`).all(...e.caseIds).map((c) => caseRow(c, u)) : [];
-  const invRows = e.invoiceIds.length ? db.prepare(`${INVOICE_SELECT} WHERE i.id IN (${inList(e.invoiceIds)}) ORDER BY i.created_at DESC, i.id DESC`).all(...e.invoiceIds) : [];
+  const hidden = hiddenCaseIds(u); // geheime Mandate (nur Board)
+  const cases = e.caseIds.length ? db.prepare(`${CASE_SELECT} WHERE c.id IN (${inList(e.caseIds)}) ORDER BY c.updated_at DESC`).all(...e.caseIds).filter((c) => !hidden.has(c.id)).map((c) => caseRow(c, u)) : [];
+  const invRows = e.invoiceIds.length ? db.prepare(`${INVOICE_SELECT} WHERE i.id IN (${inList(e.invoiceIds)}) ORDER BY i.created_at DESC, i.id DESC`).all(...e.invoiceIds).filter((i) => !hidden.has(i.case_id)) : [];
   const gdocs = require('../integrations/googleDocs');
   const invDocs = gdocs.urls('invoice', invRows.map((i) => i.id));
   const invoices = invRows.map((i) => ({ ...invoiceRow(i), googleDoc: invDocs.get(i.id) }));

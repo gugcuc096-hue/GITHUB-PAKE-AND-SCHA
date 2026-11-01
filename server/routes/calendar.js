@@ -5,7 +5,7 @@ const { db } = require('../db/db');
 const Q = require('../db/queries');
 const { requireAuth, isStaff } = require('../core/auth');
 const { wrap, parseBody, idParam, isoDateTime, EVENT_TYPES, truncate } = require('../core/helpers');
-const { getCase, caseAccess, APPT_SELECT, getAppointment, apptVisible, apptRow, firmPlace } = require('../db/models');
+const { getCase, caseAccess, APPT_SELECT, getAppointment, apptVisible, apptRow, firmPlace, hiddenCaseIds } = require('../db/models');
 const features = require('../core/features');
 const eventKinds = require('../domain/eventKinds');
 const kindLabel = (a) => (a.kind && eventKinds.nameOf(a.kind)) || EVENT_TYPES[a.type];
@@ -48,7 +48,8 @@ router.get('/', (req, res) => {
     : db
         .prepare(`${APPT_SELECT} WHERE a.client_visible = 1 AND (a.client_id = ? OR c.client_id = ?) ORDER BY a.starts_at ASC`)
         .all(u.id, u.id);
-  res.json({ events: rows.map((a) => apptRow(a, u)), kinds: isStaff(u) ? eventKinds.list({ activeOnly: true }) : [] });
+  const hidden = hiddenCaseIds(u); // geheime Mandate (nur Board)
+  res.json({ events: rows.filter((a) => !hidden.has(a.case_id)).map((a) => apptRow(a, u)), kinds: isStaff(u) ? eventKinds.list({ activeOnly: true }) : [] });
 });
 
 const createSchema = z.object({
@@ -144,6 +145,7 @@ router.post(
     } else ticketAppointment(a, a.status === 'angefragt' ? '📅 Terminvorschlag' : a.type === 'frist' ? '⏳ Neue Frist' : '📅 Neuer Termin', { by: u });
     if (u.role === 'mandant') {
       discord.notify('appointment.requested', {
+        caseId: a.case_id,
         title: `${TYPE_ICON.mandant} Terminanfrage: ${a.title}`,
         description: `${u.display_name} bittet um einen Termin.`,
         fields: [
@@ -155,6 +157,7 @@ router.post(
       });
     } else if (a.type === 'gericht' || a.type === 'frist') {
       discord.notify('calendar.created', {
+        caseId: a.case_id,
         title: `${TYPE_ICON[a.type]} ${kindLabel(a)}: ${truncate(a.title, 200)}`,
         fields: [
           { name: a.type === 'frist' ? 'Fällig' : 'Beginn', value: fmtDiscordTime(a.starts_at), inline: false },
@@ -297,6 +300,7 @@ router.post(
     const updated = getAppointment(a.id);
     ticketAppointment(updated, '✅ Termin vom Mandanten gewählt', { by: u, mention: 'lawyers' });
     discord.notify('appointment.requested', {
+      caseId: updated.case_id,
       title: `✅ Termin gewählt: ${truncate(updated.title, 200)}`,
       description: `${u.display_name} hat eine Zeit gewählt.`,
       fields: [{ name: 'Wann', value: fmtDiscordTime(updated.starts_at), inline: false }, { name: 'Akte', value: updated.case_number || '—' }],
@@ -341,6 +345,7 @@ function sendDueReminders() {
     db.prepare('UPDATE appointments SET reminded = 1 WHERE id = ?').run(a.id);
     ticketAppointment(a, `⏰ Erinnerung – ${kindLabel(a)} in weniger als 24 Stunden`);
     discord.notify('calendar.reminder', {
+      caseId: a.case_id,
       title: `⏰ Erinnerung – ${kindLabel(a)}: ${truncate(a.title, 200)}`,
       color: discord.RED,
       fields: [

@@ -6,7 +6,7 @@ const Q = require('../db/queries');
 const { requireAuth, requireStaff, requireAdmin, isStaff } = require('../core/auth');
 const { wrap, parseBody, idParam, dateOnly, truncate } = require('../core/helpers');
 const { imageBody, saveImage, removeFile, evidencePath } = require('../core/uploads');
-const { INVOICE_SELECT, berlinToday, invoiceRow, getCase, caseLawyers, addSystemNote, logActivity } = require('../db/models');
+const { INVOICE_SELECT, berlinToday, invoiceRow, getCase, caseLawyers, addSystemNote, logActivity, hiddenCaseIds } = require('../db/models');
 const discord = require('../integrations/discord');
 const tickets = require('../integrations/tickets');
 const coop = require('../domain/cooperations');
@@ -31,7 +31,8 @@ function firmInfo() {
 }
 
 function visibleTo(inv, u) {
-  return isStaff(u) || (inv.case_client_id && inv.case_client_id === u.id) || (inv.client_user_id && inv.client_user_id === u.id);
+  if (isStaff(u)) return !inv.case_id || !hiddenCaseIds(u).has(inv.case_id); // geheimes Mandat: nur Board und Zugewiesene
+  return (inv.case_client_id && inv.case_client_id === u.id) || (inv.client_user_id && inv.client_user_id === u.id);
 }
 
 router.get('/', (req, res) => {
@@ -43,7 +44,8 @@ router.get('/', (req, res) => {
   const docs = isStaff(u) ? require('../integrations/googleDocs').urls('invoice', rows.map((r) => r.id)) : new Map();
   // Kanzlei: Schlüssel der Mandantenkartei (Empfänger in der Liste öffnet sie)
   const clientKey = (r) => (r.client_user_id ? `u${r.client_user_id}` : r.case_client_id ? `u${r.case_client_id}` : r.client_name ? `n:${r.client_name}` : null);
-  res.json({ invoices: rows.map((r) => ({ ...invoiceRow(r), googleDoc: docs.get(r.id), clientKey: isStaff(u) ? clientKey(r) : undefined })) });
+  const hidden = hiddenCaseIds(u); // geheime Mandate (nur Board)
+  res.json({ invoices: rows.filter((r) => !hidden.has(r.case_id)).map((r) => ({ ...invoiceRow(r), googleDoc: docs.get(r.id), clientKey: isStaff(u) ? clientKey(r) : undefined })) });
 });
 
 /** Briefkopf der Kanzlei (Anschrift, Kontakt) – z. B. für den Aktenauszug. */
@@ -239,6 +241,7 @@ router.post(
     if (c) addSystemNote(c.id, u, `${label} ${number} über ${money(t.total)} erstellt.${coopText ? ` ${coopText}.` : ''}`, true);
     logActivity(u, `${label} erstellt`, 'invoice', Number(info.lastInsertRowid), `${number} · ${clientName} · ${money(t.total)}${coopText ? ` · ${coopText}` : ''}`);
     discord.notify('invoice.created', {
+      caseId: c ? c.id : null,
       title: `🧾 ${label} ${number}`,
       description: d.subject ? truncate(d.subject, 300) : undefined,
       fields: [
@@ -378,6 +381,7 @@ router.post(
     if (c) addSystemNote(c.id, u, `${label} ${inv.number} als bezahlt gemeldet – bitte den Zahlungseingang prüfen.${d.note ? ` Hinweis: ${truncate(d.note, 300)}` : ''}`, true);
     logActivity(u, 'Zahlung gemeldet', 'invoice', inv.id, `${inv.number} · ${money(inv.total)}`);
     discord.notify('invoice.payment', {
+      caseId: inv.case_id,
       title: `💸 Zahlung gemeldet: ${label} ${inv.number}`,
       description: 'Der Mandant meldet die Zahlung. Bitte den Eingang prüfen und die Rechnung im Dashboard als „Bezahlt“ bestätigen.',
       fields: [{ name: 'Empfänger', value: inv.client_name || '—' }, ...fields],
