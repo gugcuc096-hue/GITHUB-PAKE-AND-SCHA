@@ -1035,3 +1035,391 @@ async function handleUpload(input) {
     await reloadCase(caseId);
   }
 }
+
+/* ================================================================
+   Aktionen: Profil, Team & Board (Klicks auf data-action)
+   ================================================================ */
+Object.assign(actions, {
+  // Mein Profil → Animationen (je Gerät)
+  'motion-set': (el) => {
+    window.PS.motion.set(el.dataset.value);
+    window.PS.season && window.PS.season.refresh();
+    renderView();
+    toast({ on: 'Animationen sind auf diesem Gerät jetzt immer an.', off: 'Animationen sind auf diesem Gerät aus.' }[el.dataset.value] || 'Animationen folgen jetzt der Einstellung des Systems.');
+  },
+  // Zwei-Faktor-Anmeldung (Profil)
+  'tf-on': async () => {
+    st.twoFactor = await api.patch('/api/auth/two-factor', { enabled: true });
+    toast('Zwei-Faktor-Anmeldung ist aktiv – beim nächsten Login kommt der Code per Discord.');
+    renderView();
+  },
+  'tf-off': () =>
+    openModal(`
+      <h2 class="modal-title">Zwei-Faktor-Anmeldung ausschalten?</h2>
+      <p class="modal-sub">Dann reicht beim Login wieder das Passwort. Zur Sicherheit bitte Ihr Passwort eingeben.</p>
+      <form data-form="tf-off" class="form-grid">
+        <div><label class="label" for="tfPw">Passwort</label><input id="tfPw" name="password" type="password" autocomplete="current-password" required class="field" autofocus></div>
+        <div class="form-actions"><button type="submit" class="btn-danger btn-md">Ausschalten</button><button type="button" class="btn-ghost btn-md" data-action="close-modal">Abbrechen</button></div>
+      </form>`),
+  'tf-forget': async () => {
+    if (!(await ask('Alle Geräte – auch dieses – brauchen beim nächsten Login wieder den Code.', { title: 'Vertraute Geräte vergessen?', confirmText: 'Vergessen' }))) return;
+    st.twoFactor = await api.del('/api/auth/two-factor/devices');
+    toast('Vertraute Geräte vergessen.');
+    renderView();
+  },
+  'logout-others': async () => {
+    if (!(await ask('Alle anderen Anmeldungen (andere Browser, Handy, App) werden beendet. Dieses Gerät bleibt angemeldet.', { title: 'Auf allen anderen Geräten abmelden?', confirmText: 'Abmelden' }))) return;
+    const r = await api.post('/api/auth/logout-others', {});
+    st.otherSessions = r.others;
+    toast(r.ended ? `Auf ${r.ended === 1 ? 'einem weiteren Gerät' : `${r.ended} weiteren Geräten`} abgemeldet.` : 'Es gab keine weiteren Anmeldungen.');
+    renderView();
+  },
+  'reviews-filter': async (el) => {
+    st.reviewFilter = el.dataset.value;
+    await refreshBehind();
+  },
+  'review-decide': async (el) => {
+    await api.post(`/api/reviews/${el.dataset.id}/decide`, { status: el.dataset.status });
+    toast(el.dataset.status === 'freigegeben' ? 'Veröffentlicht – erscheint auf der Startseite.' : 'Nicht (mehr) auf der Website.');
+    await refreshBehind();
+  },
+  'review-delete': async (el) => {
+    if (!(await askDelete('Bewertung löschen?', 'Die Bewertung wird endgültig entfernt.'))) return;
+    await api.del('/api/reviews/' + el.dataset.id);
+    toast('Bewertung gelöscht.');
+    if (el.dataset.caseId) await reloadCase(Number(el.dataset.caseId));
+    else await refreshBehind();
+  },
+  'review-edit': async (el) => {
+    st.reviewEdit = Number(el.dataset.id);
+    if (st.modalCaseId) await reloadCase(st.modalCaseId);
+  },
+  'review-cancel': async () => {
+    st.reviewEdit = null;
+    if (st.modalCaseId) await reloadCase(st.modalCaseId);
+  },
+
+  // Pinnwand
+  'board-new': () => noteModal(null),
+  'board-edit': (el) => noteModal(st.board.find((n) => n.id === Number(el.dataset.id))),
+  'board-pin': async (el) => {
+    const n = st.board.find((x) => x.id === Number(el.dataset.id));
+    if (!n) return;
+    await api.patch('/api/board/' + n.id, { pinned: !n.pinned });
+    await refreshBehind();
+  },
+  'board-delete': async (el) => {
+    if (!(await askDelete('Notiz entfernen?', 'Die Notiz wird von der Pinnwand entfernt.', 'Entfernen'))) return;
+    await api.del('/api/board/' + el.dataset.id);
+    toast('Notiz entfernt.');
+    await refreshBehind();
+  },
+
+  // Team
+  'team-new': () => memberModal(null),
+  'team-edit': (el) => memberModal(st.team.find((m) => m.id === Number(el.dataset.id))),
+  'team-move': async (el) => {
+    const ids = st.team.map((t) => t.id);
+    const i = ids.indexOf(Number(el.dataset.id));
+    const j = i + Number(el.dataset.dir);
+    if (i < 0 || j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    await api.post('/api/admin/team/reorder', { ids });
+    await refreshBehind();
+  },
+  'team-delete': (el) => {
+    const m = st.team.find((x) => x.id === Number(el.dataset.id));
+    if (!m) return;
+    const canLock = m.userId && m.userId !== st.user.id && m.userActive;
+    openModal(`
+        <h2 class="modal-title">Profil entfernen?</h2>
+        <p class="modal-sub"><strong>${esc(m.name)}</strong> wird sofort aus dem Bereich „Unser Team“ der Website entfernt.</p>
+        <form data-form="team-delete" data-id="${m.id}" class="form-grid">
+          ${canLock ? `<label class="check"><input type="checkbox" name="lock"> Zugehöriges Login-Konto (${esc(m.userEmail)}) ebenfalls sperren</label>` : ''}
+          <div class="form-actions"><button type="submit" class="btn-danger btn-md">${icon('trash', 'ico-sm')}<span>Endgültig entfernen</span></button><button type="button" class="btn-ghost btn-md" data-action="close-modal">Abbrechen</button></div>
+        </form>`);
+  },
+
+  // Benutzer
+  'user-filter': (el) => {
+    st.userFilter = el.dataset.value;
+    renderView();
+  },
+  'user-new': () => {
+    openModal(`
+        <h2 class="modal-title">Konto anlegen</h2>
+        <p class="modal-sub">Es wird ein Einmal-Passwort erzeugt. Für Teammitglieder mit Website-Profil besser unter „Team“ anlegen.</p>
+        <form data-form="user-new" class="form-grid cols-2">
+          <div class="span-2"><label class="label">Name</label><input name="displayName" class="field" required minlength="2" maxlength="80" autofocus></div>
+          <div class="span-2"><label class="label">E-Mail (Login)</label>${emailField('email', { required: true })}</div>
+          <div><label class="label">Rolle</label><select name="role" class="field">${Object.entries(ROLES).map(([k, l]) => opt(k, l, k === 'anwalt')).join('')}</select></div>
+          <div><label class="label">Rang (optional)</label>${rankSelect('rank', '')}</div>
+          <div class="span-2"><label class="label">Telefon (optional)</label><input name="phone" class="field" maxlength="40"></div>
+          <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Konto anlegen</span></button></div>
+        </form>`);
+  },
+  'user-reset': async (el) => {
+    const u = st.users.find((x) => x.id === Number(el.dataset.id));
+    if (!u || !(await ask(`Für ${u.displayName} wird ein neues Einmal-Passwort erzeugt. Das bisherige Passwort wird sofort ungültig.`, { title: 'Passwort zurücksetzen?', confirmText: 'Neues Passwort erzeugen' }))) return;
+    const res = await api.post(`/api/admin/users/${u.id}/reset-password`);
+    showCredentials(res.credentials, u.displayName);
+    refreshBehind();
+  },
+  'user-toggle': async (el) => {
+    const u = st.users.find((x) => x.id === Number(el.dataset.id));
+    if (!u) return;
+    if (u.active && !(await askDelete('Konto sperren?', `${u.displayName} wird sofort abgemeldet und kann sich nicht mehr anmelden.`, 'Sperren'))) return;
+    await api.patch('/api/admin/users/' + u.id, { active: !u.active });
+    toast(u.active ? 'Konto gesperrt.' : 'Konto entsperrt.');
+    await refreshBehind();
+  },
+  'user-delete': async (el) => {
+    const u = st.users.find((x) => x.id === Number(el.dataset.id));
+    if (!u || !(await askDelete('Konto löschen?', `Das Konto von ${u.displayName} wird endgültig gelöscht. Akten bleiben erhalten.`, 'Endgültig löschen'))) return;
+    await api.del('/api/admin/users/' + u.id);
+    toast('Konto gelöscht.');
+    await refreshBehind();
+  },
+
+  // Dienststatus & Stempeluhr
+  'duty-menu': () => {
+    if ($('#dutyPop').classList.contains('open')) closeDutyPop();
+    else openDutyPop();
+  },
+  'duty-set': (el) => setDutyStatus(el.dataset.status),
+  'duty-force-off': async (el) => {
+    if (!(await ask(`${el.dataset.name} wird jetzt ausgestempelt.`, { title: 'Ausstempeln?', confirmText: 'Ausstempeln' }))) return;
+    st.duty = await api.post('/api/duty/force-off/' + el.dataset.id);
+    toast(`${el.dataset.name} wurde ausgestempelt.`);
+    await refreshBehind();
+  },
+  'duty-week': async (el) => {
+    const dir = Number(el.dataset.dir);
+    const w = st.dutyWeek;
+    st.dutyWeek = dir === 0 ? mondayOf(new Date()) : new Date(w.getFullYear(), w.getMonth(), w.getDate() + dir * 7);
+    await refreshBehind();
+  },
+  'duty-select': (el) => {
+    st.dutyUser = Number(el.dataset.id);
+    renderView();
+  },
+  'duty-session-new': () => dutySessionModal(null),
+  'duty-session-edit': (el) => dutySessionModal(st.dutyData.sessions.find((s) => s.id === Number(el.dataset.id))),
+  'duty-session-delete': async (el) => {
+    if (!(await askDelete('Schicht löschen?', 'Die Dienstzeit wird endgültig gelöscht.'))) return;
+    await api.del('/api/duty/sessions/' + el.dataset.id);
+    toast('Schicht gelöscht.');
+    await refreshBehind();
+  },
+
+  // Bilder
+  'avatar-remove': async () => {
+    const res = await api.del('/api/auth/avatar');
+    st.user = res.user;
+    renderUser();
+    renderView();
+    toast('Profilbild entfernt.');
+  },
+  'team-photo-remove': async (el) => {
+    const res = await api.del(`/api/admin/team/${el.dataset.id}/photo`);
+    const m = res.member;
+    const photo = $('#tmPhoto');
+    if (photo) photo.innerHTML = m.photoUrl ? avatarImg(m.photoUrl, m.name) : esc(m.initials);
+    const ctl = $('#tmPhotoCtl');
+    if (ctl) ctl.innerHTML = teamPhotoControls(m);
+    toast('Foto entfernt.');
+    await refreshBehind();
+  },
+
+  // Namensänderung
+  'name-withdraw': async (el) => {
+    if (!(await ask('Der Antrag wird zurückgezogen.', { title: 'Antrag zurückziehen?', confirmText: 'Zurückziehen' }))) return;
+    await api.del(`/api/name-requests/${el.dataset.id}`);
+    toast('Antrag zurückgezogen.');
+    await refreshBehind();
+  },
+  'name-direct': (el) => {
+    st.returnCase = el.dataset.returnCase ? Number(el.dataset.returnCase) : null;
+    nameDirectModal({ userId: el.dataset.userId, name: el.dataset.name, email: el.dataset.email, role: el.dataset.role || 'mandant', rank: el.dataset.rank || '', returnCase: st.returnCase });
+  },
+  'names-filter': async (el) => {
+    st.namesAll = el.dataset.value === 'alle';
+    await refreshBehind();
+  },
+  'name-approve': async (el) => {
+    const r = st.names.requests.find((x) => x.id === Number(el.dataset.id));
+    if (!r || !(await ask(`${r.oldName} heißt danach überall „${r.newName}“ – im Konto, in Akten und (falls vorhanden) im Team-Profil der Website.`, { title: 'Namensänderung genehmigen?', confirmText: 'Genehmigen' }))) return;
+    await api.post(`/api/name-requests/${r.id}/decide`, { approve: true });
+    toast(`Genehmigt – ${r.newName}.`);
+    st.lawyers = [];
+    st.contacts = null;
+    await refreshBehind();
+  },
+  'name-reject': (el) => {
+    const r = st.names.requests.find((x) => x.id === Number(el.dataset.id));
+    if (!r) return;
+    openModal(`
+        <h2 class="modal-title">Namensänderung ablehnen</h2>
+        <p class="modal-sub">${esc(r.oldName)} → ${esc(r.newName)}. Der Grund wird der Person angezeigt.</p>
+        <form data-form="name-reject" data-id="${r.id}" class="form-grid">
+          <div><label class="label">Grund</label><input name="note" class="field" required maxlength="500" autofocus placeholder="z. B. Name bereits vergeben, bitte Vor- und Nachname"></div>
+          <div class="form-actions"><button type="submit" class="btn-danger btn-md">Ablehnen</button></div>
+        </form>`);
+  },
+  'email-notice-ok': async () => {
+    await api.post('/api/auth/email-notice');
+    st.user.emailNotice = null;
+    renderView();
+  },
+  'rank-edit': (el) => openModal(rankForm(el.dataset.id ? (st.siteRanks || []).find((r) => r.id === Number(el.dataset.id)) : null)),
+  'rank-move': async (el) => {
+    st.siteRanks = (await api.post(`/api/site/ranks/${el.dataset.id}/move`, { dir: Number(el.dataset.dir) })).ranks;
+    await refreshRanks();
+    renderView();
+  },
+  'rank-delete': async (el) => {
+    const r = (st.siteRanks || []).find((x) => x.id === Number(el.dataset.id));
+    if (!r || !(await askDelete(`Rang „${r.name}“ löschen?`, 'Er verschwindet von der Startseite und aus allen Auswahllisten. Löschen geht nur, wenn niemand mehr diesen Rang hat.'))) return;
+    st.siteRanks = (await api.del(`/api/site/ranks/${r.id}`)).ranks;
+    await refreshRanks();
+    toast('Rang gelöscht.');
+    renderView();
+  },
+  'onboarding-tick': async (el) => {
+    await api.patch(`/api/onboarding/items/${el.dataset.id}`, { done: el.checked });
+    await refreshOnboarding();
+  },
+  'onboarding-start': async () => {
+    const sel = $('#obCandidate');
+    if (!sel || !sel.value) return;
+    await api.post('/api/onboarding', { userId: Number(sel.value) });
+    toast('Einarbeitung begonnen.');
+    await refreshOnboarding();
+  },
+  'onboarding-mentor': async (el) => {
+    await api.patch(`/api/onboarding/${el.dataset.user}`, { mentorId: el.value ? Number(el.value) : null });
+    toast('Mentor gespeichert.');
+    await refreshOnboarding();
+  },
+  'onboarding-end': async (el) => {
+    if (!(await askDelete(`Einarbeitung von ${el.dataset.name} beenden?`, 'Die Checkliste wird entfernt.'))) return;
+    await api.del(`/api/onboarding/${el.dataset.user}`);
+    await refreshOnboarding();
+  },
+  // Board-Ticket einer Bewerbung / eines Anliegens
+  'board-ticket-sync': async (el) => {
+    el.disabled = true;
+    const { kind, id } = el.dataset;
+    try {
+      await api.post(`/api/tickets/board/${kind}/${id}/sync`, {});
+      toast('Board-Ticket abgeglichen.');
+    } finally {
+      if (kind === 'application') await openApplication(Number(id));
+      else await openConcern(Number(id));
+    }
+  },
+
+  // Anliegen an das Board of Partners
+  'concern-new': () => concernNewModal(),
+  'concern-open': (el) => openConcern(Number(el.dataset.id)),
+  'concern-filter': (el) => {
+    st.concernFilter = el.dataset.value;
+    renderView();
+  },
+  'concern-group': (el) => {
+    st.concernGroup = el.dataset.value;
+    renderView();
+  },
+  'concern-withdraw': async (el) => {
+    if (!(await ask('Das Anliegen wird gelöscht – das Board hat noch nicht darauf reagiert.', { title: 'Anliegen zurückziehen?', confirmText: 'Zurückziehen', danger: true }))) return;
+    await api.del('/api/concerns/' + el.dataset.id);
+    toast('Anliegen zurückgezogen.');
+    await modalBack();
+    await Promise.all([refreshBehind(), load.concernCount().then(renderNav)]);
+  },
+  'concern-delete': async (el) => {
+    if (!(await ask('Das Anliegen samt Verlauf wird endgültig gelöscht.', { title: 'Anliegen löschen?', confirmText: 'Löschen', danger: true }))) return;
+    await api.del('/api/concerns/' + el.dataset.id);
+    toast('Anliegen gelöscht.');
+    await modalBack();
+    await Promise.all([refreshBehind(), load.concernCount().then(renderNav)]);
+  },
+  // Beförderungen & Einstellungen
+  'personnel-promote': () => promoteModal(),
+  'personnel-demote': () => demoteModal(),
+  'personnel-terminate': () => terminateModal(),
+  'personnel-delete': async (el) => {
+    if (!(await ask('Der Eintrag verschwindet aus dem Protokoll. Der aktuelle Rang bleibt unverändert.', { title: 'Eintrag entfernen?', confirmText: 'Entfernen', danger: true }))) return;
+    await api.del('/api/personnel/' + el.dataset.id);
+    toast('Eintrag entfernt.');
+    await refreshBehind();
+  },
+
+  'absence-new': async () => {
+    closeDutyPop();
+    await absenceModal();
+  },
+  'absence-return': async (el) => {
+    if (!(await ask('Die Abmeldung endet heute.', { title: 'Zurückmelden?', confirmText: 'Zurückmelden' }))) return;
+    await api.post(`/api/absences/${el.dataset.id}/return`, {});
+    toast('Willkommen zurück – Rückmeldung eingetragen.');
+    await afterAbsenceChange();
+  },
+  'absence-delete': async (el) => {
+    if (!(await ask('Die Abmeldung wird entfernt.', { title: 'Abmeldung zurückziehen?', confirmText: 'Zurückziehen' }))) return;
+    await api.del(`/api/absences/${el.dataset.id}`);
+    toast('Abmeldung zurückgezogen.');
+    await afterAbsenceChange();
+  },
+
+  // Bewerbungen
+  'app-tab': (el) => {
+    st.appTab = el.dataset.value;
+    renderView();
+  },
+  'app-filter': (el) => {
+    st.appFilter = el.dataset.value;
+    renderView();
+  },
+  'app-open': (el) => openApplication(Number(el.dataset.id)),
+  'app-back': (el) => modalDismiss(() => (st.modalStack.length ? modalBack() : openApplication(Number(el.dataset.id)))),
+  'app-rate': async (el) => {
+    const data = await api.patch('/api/admin/applications/' + el.dataset.id, { rating: Number(el.dataset.value) });
+    await reloadApplication(data);
+  },
+  'app-status': async (el) => {
+    const data = await api.patch('/api/admin/applications/' + el.dataset.id, { status: el.dataset.status });
+    toast(`Status: ${APP_STATUS[el.dataset.status][0]}`);
+    await reloadApplication(data);
+  },
+  'app-hire': async (el) => {
+    const data = await api.get('/api/admin/applications/' + el.dataset.id);
+    hireModal(data.application, data.existingUser && data.existingUser.role === 'mandant' ? data.existingUser : null);
+  },
+  'app-hire-new': async (el) => {
+    const data = await api.get('/api/admin/applications/' + el.dataset.id);
+    hireModal({ ...data.application, __newAccount: true }, null);
+  },
+  'app-delete': async (el) => {
+    if (!(await askDelete(`Bewerbung ${el.dataset.number} löschen?`, 'Die Bewerbung und alle Notizen dazu werden endgültig gelöscht.', 'Endgültig löschen'))) return;
+    await api.del('/api/admin/applications/' + el.dataset.id);
+    toast('Bewerbung gelöscht.');
+    await modalBack();
+    await refreshBehind();
+  },
+  'position-new': () => positionModal(null),
+  'position-edit': (el) => positionModal(st.positions.find((p) => p.id === Number(el.dataset.id))),
+  'position-delete': async (el) => {
+    const p = st.positions.find((x) => x.id === Number(el.dataset.id));
+    if (!p || !(await askDelete('Stelle löschen?', `„${p.title}“ wird von der Karriereseite entfernt. Bestehende Bewerbungen bleiben erhalten.`))) return;
+    await api.del('/api/admin/positions/' + p.id);
+    toast('Stelle gelöscht.');
+    await refreshBehind();
+  },
+
+  // Protokoll
+  'audit-more': async () => {
+    await loadAudit(true);
+    $('#auditList').innerHTML = auditTable();
+  },
+});

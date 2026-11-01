@@ -1913,3 +1913,135 @@ document.addEventListener('change', (e) => {
   const from = e.target.closest && e.target.closest('input[data-event-from]');
   if (from) guard(() => eventKindCalc(from));
 });
+
+/* ================================================================
+   Aktionen: Kalender & Kanzlei-Post (Klicks auf data-action)
+   ================================================================ */
+Object.assign(actions, {
+  // Kalender
+  'new-event': async (el) => {
+    st.returnCase = el.dataset.returnCase ? Number(el.dataset.returnCase) : null;
+    const caseId = el.dataset.caseId ? Number(el.dataset.caseId) : null;
+    await load.cases();
+    if (isStaff()) {
+      await load.lawyers();
+      openModal(eventForm(null, { caseId, day: el.dataset.day || null }));
+    } else {
+      openModal(eventRequestForm(caseId));
+    }
+  },
+  'open-event': (el) => openEvent(Number(el.dataset.id), st.modalCaseId),
+  'invite-respond': async (el) => {
+    const id = Number(el.dataset.id);
+    await api.patch(`/api/calendar/${id}/invite`, { status: el.dataset.status });
+    toast(el.dataset.status === 'zugesagt' ? 'Zugesagt – danke!' : 'Abgesagt – die Einladenden sehen es.');
+    await load.events();
+    // Ist der Termin gerade geöffnet, zeigt er die neue Antwort
+    if ($(`#modalBody form[data-form="event"][data-id="${id}"]`) && st.eventCache.get(id)) replaceModal(eventForm(st.eventCache.get(id)));
+    renderView();
+  },
+  'event-status': async (el) => {
+    await api.patch('/api/calendar/' + el.dataset.id, { status: el.dataset.status });
+    toast({ bestaetigt: 'Termin bestätigt.', abgesagt: 'Termin abgesagt.', erledigt: 'Frist als erledigt markiert.' }[el.dataset.status] || 'Gespeichert.');
+    await returnOrClose();
+  },
+  // Terminvorschlag: Mandant tippt eine Zeit an
+  'event-choose': async (el) => {
+    await api.post(`/api/calendar/${el.dataset.id}/choose`, { startsAt: el.dataset.at });
+    toast('Termin bestätigt – danke!');
+    await returnOrClose();
+  },
+  'event-delete': async (el) => {
+    const id = Number(el.dataset.id);
+    const ev = st.eventCache.get(id);
+    undoDelete({
+      url: '/api/calendar/' + id,
+      hide: `[data-action="open-event"][data-id="${id}"]:not(.kpi)`,
+      label: ev && ev.type === 'frist' ? 'Frist' : 'Termin',
+      after: async () => {
+        st.eventCache.delete(id);
+        if (st.modalCaseId) await reloadCase(st.modalCaseId);
+        else await refreshBehind();
+      },
+    });
+    await returnOrClose();
+  },
+  'cal-nav': (el) => {
+    const m = st.cal.month;
+    st.cal.month = new Date(m.getFullYear(), m.getMonth() + Number(el.dataset.dir), 1);
+    renderView();
+    calSlide(Number(el.dataset.dir));
+  },
+  'cal-today': () => {
+    st.cal.month = monthStart(new Date());
+    st.cal.selected = dayKey(new Date());
+    renderView();
+  },
+  'cal-select': (el) => {
+    st.cal.selected = el.dataset.day;
+    const d = new Date(`${el.dataset.day}T12:00:00`);
+    if (d.getMonth() !== st.cal.month.getMonth()) st.cal.month = monthStart(d);
+    renderView();
+    if (window.matchMedia('(max-width: 1279px)').matches) $('#dayAgenda')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  },
+  'cal-type': (el) => {
+    st.cal.types[el.dataset.type] = !st.cal.types[el.dataset.type];
+    renderView();
+  },
+
+  // Kanzlei-Post
+  compose: async (el) => {
+    st.returnCase = el.dataset.returnCase ? Number(el.dataset.returnCase) : null;
+    await composeModal({
+      recipientId: el.dataset.recipient ? Number(el.dataset.recipient) : null,
+      caseId: el.dataset.caseId ? Number(el.dataset.caseId) : null,
+    });
+  },
+  'mail-box': async (el) => {
+    st.mailBox = el.dataset.value;
+    st.mailSel = null;
+    await load.messages();
+    renderView();
+  },
+  'mail-open': async (el) => {
+    const m = st.messages.find((x) => x.id === Number(el.dataset.id));
+    if (!m) return;
+    st.mailSel = m.id;
+    if (st.mailBox === 'inbox' && !m.isRead) {
+      m.isRead = true;
+      st.unread = Math.max(0, st.unread - 1);
+      api.patch('/api/messages/' + m.id, { isRead: true }).catch(() => {});
+    }
+    renderView();
+    if (window.matchMedia('(max-width: 1023px)').matches) window.scrollTo({ top: 0, behavior: 'smooth' });
+  },
+  'mail-back': () => {
+    st.mailSel = null;
+    renderView();
+  },
+  'mail-reply': async (el) => {
+    const m = st.messages.find((x) => x.id === Number(el.dataset.id));
+    if (!m) return;
+    st.returnCase = null;
+    await composeModal({ recipientId: m.senderId, caseId: m.caseId, subject: m.subject.startsWith('Re:') ? m.subject : `Re: ${m.subject}`.trim(), reply: true });
+  },
+  'mail-unread': async (el) => {
+    const m = st.messages.find((x) => x.id === Number(el.dataset.id));
+    await api.patch('/api/messages/' + el.dataset.id, { isRead: false });
+    if (m) m.isRead = false;
+    st.unread += 1;
+    st.mailSel = null;
+    renderView();
+  },
+  'mail-delete': async (el) => {
+    if (!(await askDelete('Nachricht löschen?', 'Die Nachricht verschwindet aus Ihrem Postfach.'))) return;
+    await api.del('/api/messages/' + el.dataset.id);
+    st.mailSel = null;
+    toast('Nachricht gelöscht.');
+    await refreshBehind();
+  },
+  'mail-read-all': async () => {
+    await api.post('/api/messages/read-all');
+    await refreshBehind();
+  },
+});
