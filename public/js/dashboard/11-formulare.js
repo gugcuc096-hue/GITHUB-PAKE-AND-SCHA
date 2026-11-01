@@ -194,6 +194,7 @@ const forms = {
       if (f.elements.lawyerId) body.lawyerId = val(fd, 'lawyerId') ? Number(val(fd, 'lawyerId')) : null;
       if (f.querySelector('[data-team]')) body.coLawyerIds = fd.getAll('coLawyerIds').map(Number);
       if (val(fd, 'priority')) body.priority = Number(val(fd, 'priority'));
+      if (f.elements.boardOnly && f.elements.boardOnly.checked) body.boardOnly = true;
     }
     const res = await api.post('/api/cases', body);
     toast(`Akte ${res.case.caseNumber} angelegt.`);

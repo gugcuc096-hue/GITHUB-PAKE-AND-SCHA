@@ -128,6 +128,7 @@ router.post(
 
     const c = getCase(id);
     discord.notify('case.created', {
+      caseId: c ? c.id : null,
       title: `${d.urgency === 'notfall' ? '🚨 NOTFALL – ' : ''}Neue Mandatsanfrage ${c.case_number}`,
       description: truncate(d.description, 500),
       color: d.urgency === 'notfall' ? discord.RED : discord.GOLD,

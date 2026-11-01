@@ -229,6 +229,16 @@ async function postWebhook(url, payload) {
   }
 }
 
+/** Akte nur für das Board of Partners? (dann keine Meldungen in gemeinsame Kanäle) */
+function secretCase(id) {
+  try {
+    const row = require('../db/db').db.prepare('SELECT board_only FROM cases WHERE id = ?').get(Number(id));
+    return !!(row && row.board_only);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Sendet ein Kanzlei-Update an Discord, falls ein Webhook konfiguriert und das
  * Ereignis aktiviert ist. Blockiert nie die eigentliche Anfrage; Fehler landen im Log.
@@ -236,7 +246,10 @@ async function postWebhook(url, payload) {
 function notify(event, message) {
   const url = webhookFor(event);
   if (!url || !enabledEvents().includes(event)) return;
-  const payload = buildPayload({ link: publicUrl(), ...message, roleIds: rolesFor(event) });
+  // Geheimes Mandat (nur Board of Partners): nichts in die gemeinsamen Kanzlei-Kanäle
+  const { caseId, ...rest } = message || {};
+  if (caseId && secretCase(caseId)) return;
+  const payload = buildPayload({ link: publicUrl(), ...rest, roleIds: rolesFor(event) });
   postWebhook(url, payload).catch((err) => console.warn(`Discord-Webhook (${event}) fehlgeschlagen: ${err.message}`));
 }
 

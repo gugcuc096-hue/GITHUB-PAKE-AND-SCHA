@@ -241,6 +241,7 @@ function notifySigned(c, k, who, user, pingIds) {
   const lawyers = needsOf(k).lawyer ? allLawyers(k) : [];
   const viaTicket = tickets.active() && !!c.discord_channel_id && !k.internal;
   discord.notify('contract.signed', {
+    caseId: c.id,
     title: `${c.case_number}: ${k.template_name} ${full ? 'vollständig unterschrieben' : `vom ${who} unterschrieben`}`,
     description: truncate(c.title, 300),
     color: full ? 0x10b981 : discord.GOLD,

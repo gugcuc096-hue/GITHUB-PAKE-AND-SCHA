@@ -47,9 +47,16 @@ function starBtn(c) {
   return `<button type="button" class="star-btn${on ? ' on' : ''}" data-action="case-star" data-id="${c.id}" aria-pressed="${on}" title="${on ? 'Lösen – nicht mehr oben' : 'Anpinnen – steht dann oben'}" aria-label="${on ? 'Akte lösen' : 'Akte anpinnen'}">${icon('tack', 'ico-sm')}</button>`;
 }
 
+/** Schloss für geheime Mandate: nur Board of Partners und zugewiesene Anwälte sehen die Akte. */
+function secretBadge(small) {
+  return small
+    ? `<span class="secret-mark" title="Geheimes Mandat – nur Board of Partners" aria-label="Geheimes Mandat">${icon('lock', 'ico-sm')}</span>`
+    : `<span class="secret-badge" title="Nur das Board of Partners und die zugewiesenen Anwälte sehen diese Akte">${icon('lock', 'ico-sm')}<span>Nur Board</span></span>`;
+}
+
 function caseListRow(c, extra = '', cls = '') {
   return `<div class="list-row${c.starred ? ' is-pinned' : ''}${cls ? ` ${cls}` : ''}" data-action="open-case" data-id="${c.id}" role="button" tabindex="0">
-      <div class="main"><div class="title">${c.starred ? starBtn(c) : ''}${esc(c.title)}</div>
+      <div class="main"><div class="title">${c.starred ? starBtn(c) : ''}${c.boardOnly ? secretBadge(true) : ''}${esc(c.title)}</div>
         <div class="meta"><span class="font-mono text-gold">${esc(c.caseNumber)}</span> · ${esc(c.clientName)}${caseLevelText(c)}</div></div>
       <div class="flex items-center gap-2 shrink-0">${extra || stageBadge(c)}</div></div>`;
 }
@@ -490,7 +497,7 @@ function caseTable() {
         rows,
         (c) => `<tr class="row${c.idleDays ? ' row-idle' : ''}${staff && c.starred ? ' is-pinned' : ''}${selecting && st.caseSel.has(c.id) ? ' is-picked' : ''}" data-action="${selecting ? 'case-pick' : 'open-case'}" data-id="${c.id}"${selecting ? ` aria-selected="${st.caseSel.has(c.id)}"` : ''}>
           ${selecting ? `<td class="td-check"><span class="pick-box" aria-hidden="true">${icon('check', 'ico-sm')}</span></td>` : ''}<td class="td-main"><div class="case-meta"><span class="font-mono text-gold text-xs">${esc(c.caseNumber)}</span><span class="case-dot" aria-hidden="true">·</span><span>${esc(AREAS[c.area] || c.area)}</span>${staff ? '' : caseLevelBadge(c)}</div>
-            <div class="font-medium case-title-line" title="${esc(c.title)}">${staff ? starBtn(c) : ''}<span class="case-title-text">${esc(c.title)}</span>${c.chatUnread ? ` <span class="chat-new" title="Neue Nachrichten">${icon('chat', 'ico-sm')}${c.chatUnread}</span>` : ''}</div></td>
+            <div class="font-medium case-title-line" title="${esc(c.title)}">${staff ? starBtn(c) : ''}${c.boardOnly ? secretBadge(true) : ''}<span class="case-title-text">${esc(c.title)}</span>${c.chatUnread ? ` <span class="chat-new" title="Neue Nachrichten">${icon('chat', 'ico-sm')}${c.chatUnread}</span>` : ''}</div></td>
           ${staff ? `<td data-label="Mandant">${esc(c.clientName)}${c.membership ? `<div class="mt-1">${memberBadge(c.membership)}</div>` : ''}</td>` : ''}
           <td data-label="Zuständig">${whoHtml(c)}</td>
           ${staff ? `<td data-label="Priorität">${priorityBadge(c, true)}</td>` : ''}
@@ -1318,6 +1325,17 @@ Object.assign(actions, {
     const id = Number(el.dataset.id);
     await api.patch('/api/cases/' + id, { lawyerId: null });
     toast(next ? `Akte abgegeben – federführend ist jetzt ${next.name}.` : 'Akte abgegeben.');
+    await reloadCase(id);
+  },
+  'case-secret': async (el) => {
+    const id = Number(el.dataset.id);
+    const on = el.dataset.on === '1';
+    const text = on
+      ? 'Die Akte verschwindet für alle Mitarbeiter außer dem Board of Partners und den zugewiesenen Anwälten – aus Listen, Suche, Kalender, Aufgaben und Rechnungen. Discord-Meldungen zu dieser Akte entfallen.'
+      : 'Die Akte ist danach wieder für die ganze Kanzlei sichtbar.';
+    if (!(await ask(text, { title: on ? 'Geheimes Mandat?' : 'Für die Kanzlei freigeben?', confirmText: on ? 'Nur Board' : 'Freigeben' }))) return;
+    await casePatch(id, { boardOnly: on });
+    toast(on ? 'Geheimes Mandat – nur noch das Board und die zugewiesenen Anwälte sehen die Akte.' : 'Akte für die Kanzlei freigegeben.');
     await reloadCase(id);
   },
   'leave-case': async (el) => {

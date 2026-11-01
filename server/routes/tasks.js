@@ -6,7 +6,7 @@ const { db, tx } = require('../db/db');
 const Q = require('../db/queries');
 const { requireAuth, requireStaff } = require('../core/auth');
 const { wrap, parseBody, idParam, dateOnly, truncate, CHECKLISTS } = require('../core/helpers');
-const { TASK_SELECT, taskRow, getCase, addSystemNote } = require('../db/models');
+const { TASK_SELECT, taskRow, getCase, addSystemNote, hiddenCaseIds } = require('../db/models');
 const discord = require('../integrations/discord');
 
 const router = express.Router();
@@ -29,6 +29,7 @@ function touchCase(caseId) {
 function notifyAssigned(task, assignee, by) {
   if (!assignee || assignee.id === by.id) return;
   discord.notify('task.assigned', {
+    caseId: task.case_id || task.caseId || null,
     title: `Neue Aufgabe für ${assignee.display_name}`,
     description: truncate(task.title, 300),
     fields: [
@@ -56,7 +57,8 @@ router.get('/', (req, res) => {
     params.push(caseId);
   }
   const order = done ? 't.done_at DESC, t.id DESC LIMIT 200' : 't.due_date IS NULL, t.due_date ASC, t.id ASC LIMIT 500';
-  const rows = db.prepare(`${TASK_SELECT} WHERE ${where.join(' AND ')} ORDER BY ${order}`).all(...params);
+  const hidden = hiddenCaseIds(req.user); // geheime Mandate (nur Board)
+  const rows = db.prepare(`${TASK_SELECT} WHERE ${where.join(' AND ')} ORDER BY ${order}`).all(...params).filter((t) => !hidden.has(t.case_id));
   res.json({ tasks: rows.map(taskRow) });
 });
 
