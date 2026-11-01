@@ -57,14 +57,14 @@ describe('Reiterleisten, Akte und Handy (Browser)', { skip: chromium ? false : '
     await page.waitForFunction(() => st.user && st.user.id, null, { timeout: 15000 });
   };
 
-  it('PC: Reiter der Einstellungen brechen um statt abgeschnitten zu werden; Auswahllisten haben einen Pfeil', async () => {
+  it('PC: Reiter (Board-Eingang) brechen um statt abgeschnitten zu werden; Auswahllisten haben einen Pfeil', async () => {
     const ctx = await browser.newContext({ viewport: { width: 1366, height: 860 }, locale: 'de-DE' });
     const page = await ctx.newPage();
     const problems = [];
     page.on('pageerror', (e) => problems.push(e.message));
     try {
       await login(page);
-      await page.evaluate(() => (location.hash = '#settings'));
+      await page.evaluate(() => (location.hash = '#concerns-board'));
       await page.waitForSelector('#content .settings-tabs.tabrow');
       const row = await page.$eval('#content .settings-tabs', (r) => ({ sw: r.scrollWidth, cw: r.clientWidth, wrap: getComputedStyle(r).flexWrap, n: r.children.length }));
       assert.ok(row.n >= 5, 'mehrere Reiter');
@@ -86,25 +86,26 @@ describe('Reiterleisten, Akte und Handy (Browser)', { skip: chromium ? false : '
     }
   });
 
-  it('Handy: zu breite Reiterleiste wird zur Auswahlliste, die den Reiter wechselt; Akte springt per Liste', async () => {
+  it('Handy: zu breite Reiterleiste wird zur Auswahlliste, die den Reiter wechselt; Akte-Reiter per Liste', async () => {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'de-DE' });
     const page = await ctx.newPage();
     const problems = [];
     page.on('pageerror', (e) => problems.push(e.message));
     try {
       await login(page);
-      await page.evaluate(() => (location.hash = '#settings'));
+      await page.evaluate(() => (location.hash = '#concerns-board'));
       await page.waitForSelector('.tabrow-pick select');
       assert.equal(await page.$eval('#content .settings-tabs', (r) => getComputedStyle(r).display), 'none', 'Leiste versteckt');
-      await page.selectOption('.tabrow-pick select', { label: 'Listen' });
-      await page.waitForFunction(() => st.settingsTab === 'listen');
-      assert.equal(await page.$eval('.tabrow-pick select', (s) => s.options[s.selectedIndex].text), 'Listen', 'Liste zeigt den gewählten Reiter');
-      assert.equal(await page.$$eval('.tabrow-pick', (l) => l.length), 1, 'genau eine Liste');
+      const idx = await page.$eval('.tabrow-pick select', (s) => [...s.options].findIndex((o) => /^Bewerbungen/.test(o.text)));
+      await page.selectOption('.tabrow-pick select', String(idx));
+      await page.waitForFunction(() => st.view === 'applications');
+      await page.waitForFunction(() => /^Bewerbungen/.test(document.querySelector('.tabrow-pick select')?.selectedOptions[0]?.text || ''));
+      assert.equal(await page.$$eval('.tabrow-pick + .hub-tabs', (l) => l.length), 1, 'genau eine Liste für die Reiter');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0, 'nichts ragt seitlich heraus');
-      // Akte: Sprungleiste als „Springen zu …“
+      // Akte: Reiter als Auswahlliste, der gewählte Reiter steht drin
       await page.evaluate((id) => openCase(id), kase.id);
       await page.waitForSelector('#modal.open .case-jump .tabrow-pick select');
-      assert.equal(await page.$eval('#modal .case-jump .tabrow-pick select', (s) => s.options[0].text), 'Springen zu …');
+      assert.match(await page.$eval('#modal .case-jump .tabrow-pick select', (s) => s.options[s.selectedIndex].text), /^Überblick/);
       // Dienststatus: Uhr mit Statuspunkt und verständlicher Beschriftung
       const duty = await page.$eval('#dutyBtn', (b) => ({ label: b.getAttribute('aria-label'), ico: getComputedStyle(b.querySelector('.duty-ico')).display }));
       assert.equal(duty.label, 'Dienststatus: Außer Dienst');

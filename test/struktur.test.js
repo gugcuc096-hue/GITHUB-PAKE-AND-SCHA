@@ -45,6 +45,7 @@ describe('Aufgeräumte Bedienung (Browser)', { skip: chromium ? false : 'Playwri
     const page = await ctx.newPage();
     try {
       await login(page);
+      await page.waitForSelector('#nav .nav-foot');
       const nav = await page.evaluate(() => ({
         heads: [...document.querySelectorAll('#nav .nav-section')].map((h) => h.textContent.trim().toUpperCase()),
         hrefs: [...document.querySelectorAll('#nav a.nav-item')].map((a) => a.getAttribute('href')),

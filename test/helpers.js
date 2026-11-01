@@ -172,6 +172,7 @@ function docxText(buf) {
 async function pickTab(page, selector) {
   const el = page.locator(selector).first();
   await el.waitFor({ state: 'attached' });
+  await caseTabFor(page, selector); // Abschnitt einer Akte: erst dessen Reiter öffnen
   // die Reiterleiste wird nach dem Zeichnen (nächstes Bild) gemessen – erst danach steht fest, ob sie eine Liste ist
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   if (await el.isVisible()) return el.click();
