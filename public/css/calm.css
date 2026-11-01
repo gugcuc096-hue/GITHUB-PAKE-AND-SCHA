@@ -77,3 +77,11 @@ html.ps-leaving body { transform: none !important; transition-duration: 90ms !im
 .ps-season, .ps-season *, .live-dot, .calc-promo-badge { animation: none !important; }
 .sb-aurora i, .site-banner.is-promo::after, .sb-ticket { animation: none !important; }
 .promo-dock { transition: opacity 0.2s ease !important; }
+/* Reiter, Überschriften, Zähler: nur Überblenden (13-reiter.js gleitet bei „Bewegung reduzieren“ ohnehin nicht) */
+@keyframes title-rise { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tab-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ink-ico { from { opacity: 1; } to { opacity: 1; } }
+@keyframes count-roll { from { opacity: 0; } to { opacity: 1; } }
+@keyframes count-roll-down { from { opacity: 0; } to { opacity: 1; } }
+details::details-content { transition: none !important; }
+

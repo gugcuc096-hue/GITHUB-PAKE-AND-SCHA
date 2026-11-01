@@ -1031,6 +1031,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         assert.match(await page.textContent('#modalBody [data-action="case-tab"][data-tab="dokumente"]'), /Dokumente\s*1/);
         await pickTab(page, '#modalBody [data-action="case-tab"][data-tab="dokumente"]');
         await page.waitForSelector('#secInvoices');
+        await page.waitForFunction(() => !document.querySelector('#modalBody .case-root').getAnimations().length); // Höhe hat fertig geglitten
         await page.$eval('#modalBody', (b) => (b.scrollTop = b.scrollHeight));
         await page.waitForTimeout(300);
         const pos = await page.evaluate(() => {
@@ -1914,7 +1915,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         document.body.appendChild(box);
         window.PS.countUp(box);
         const first = box.textContent;
-        await new Promise((r) => setTimeout(r, 1100));
+        // Zählen dauert ~1 s; auf ausgelasteten Rechnern etwas länger – höchstens 3 s warten
+        for (let i = 0; i < 30 && box.textContent !== '1.234 $'; i++) await new Promise((r) => setTimeout(r, 100));
         box.remove();
         return [first, box.textContent];
       });
@@ -2138,8 +2140,18 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       // Die Karte hebt sich beim Darüberfahren an (0,35 s) – erst danach messen, wo sie steht
       const start = await card.boundingBox();
       await A.page.mouse.move(start.x + 30, start.y + 30);
-      await A.page.waitForTimeout(600);
-      const box = await card.boundingBox();
+      // warten, bis die Karte ruhig steht (Anheben, Seite lädt nach) – auf ausgelasteten Rechnern dauert das länger
+      const steady = async () => {
+        let prev = null;
+        for (let i = 0; i < 40; i++) {
+          const b = await card.boundingBox();
+          if (prev && Math.abs(b.x - prev.x) < 0.5 && Math.abs(b.y - prev.y) < 0.5) return b;
+          prev = b;
+          await A.page.waitForTimeout(100);
+        }
+        return prev;
+      };
+      const box = await steady();
       await A.page.mouse.move(box.x + 60, box.y + 80);
       await A.page.waitForFunction(() => document.querySelector('#teamGrid .team-card.ps-spot-on'));
       await A.page.waitForTimeout(300); // Neigung zur Maus abwarten
@@ -3555,6 +3567,9 @@ describe('Browser: Nachladen in der Akte, Listen virtuell zeichnen, weniger Live
         assert.match(await page.textContent('.log-more'), /ältere Einträge laden/);
 
         // Ältere Nachrichten: 15 kommen dazu, der Knopf verschwindet, die Leseposition bleibt
+        // (erst wenn die Seite hinter der Akte fertig geladen ist – sonst zeichnet sie die Akte noch einmal neu)
+        await page.waitForLoadState('networkidle');
+        await page.waitForFunction(() => !document.getAnimations().some((a) => a.playState === 'running' && a.effect && a.effect.target && a.effect.target.closest && a.effect.target.closest('#modal, #content') && isFinite(a.effect.getComputedTiming().endTime)));
         await page.evaluate(() => {
           document.querySelector('#secChat').scrollIntoView({ block: 'center' });
           document.querySelector('#chatList').scrollTo({ top: 0, behavior: 'instant' }); // oben im Chat – dort sitzt „Ältere laden“

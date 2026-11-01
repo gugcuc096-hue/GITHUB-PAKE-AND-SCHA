@@ -1550,8 +1550,11 @@ function markChangedBadges(root) {
  * Aktenliste und Rechnungen sortieren sich weich um: Nach dem Neuzeichnen gleitet jede Zeile von ihrer alten an die
  * neue Stelle (FLIP), neue Zeilen blenden ein. Nur wenn höchstens 60 Zeilen sichtbar sind und ohne „Bewegung reduzieren“.
  */
-// Aktenliste (auch im Auswahlmodus), Rechnungen, Mandanten, Lager-Gegenstände und Aufgaben
-const FLIP_SEL = '#caseList tr[data-id], #content tr[data-inv], #clientList tr[data-key], #storageGrid .lager-item[data-item], #content .task-row[data-id], #modalBody .task-row[data-id]';
+// Aktenliste (auch im Auswahlmodus), Rechnungen, Mandanten, Lager-Gegenstände, Aufgaben, Kanzlei-Post, Anliegen,
+// Bewerbungen und Termine der Tagesliste
+const FLIP_SEL =
+  '#caseList tr[data-id], #content tr[data-inv], #clientList tr[data-key], #storageGrid .lager-item[data-item], #content .task-row[data-id], #modalBody .task-row[data-id], ' +
+  '#content .mail-item[data-id], #content .list-row[data-action="concern-open"][data-id], #content tr[data-action="app-open"][data-id], #content .ev-row[data-id]';
 /** Liste neu zeichnen und dabei weich umsortieren (Suche beim Tippen). */
 function flipFill(el, html) {
   if (!el) return;

@@ -84,9 +84,15 @@ function cfgBannerMount() {
 
 /* ---------------------------------------------------------------- Stil & Saison */
 let stylePreviewing = false;
+let stylePreviewFont = null;
 function stylePreview(s) {
   stylePreviewing = true;
-  PS.theme && PS.theme.apply(s, { force: true });
+  const apply = () => PS.theme && PS.theme.apply(s, { force: true });
+  // Andere Schrift gewählt: die ganze Oberfläche blendet weich über (View Transition), statt hart umzuspringen
+  const fontChanged = stylePreviewFont !== null && stylePreviewFont !== s.font;
+  stylePreviewFont = s.font;
+  if (fontChanged && typeof document.startViewTransition === 'function' && !window.PS.motion.calm()) document.startViewTransition(apply);
+  else apply();
 }
 function stylePreviewEnd() {
   if (!stylePreviewing) return;

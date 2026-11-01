@@ -40,7 +40,7 @@ function hubTabs(view) {
     .map(([k, l]) => {
       const n = navCount(k);
       const on = hubTabActive(k);
-      return `<a href="#${k}" class="chip ${on ? 'active' : ''}" role="tab" aria-selected="${on}">${icon(VIEWS[k].icon, 'ico-sm')}<span>${esc(l)}</span>${n ? `<span class="nav-count">${n > 99 ? '99+' : n}</span>` : ''}</a>`;
+      return `<a href="#${k}" class="chip ${on ? 'active' : ''}" role="tab" aria-selected="${on}">${icon(VIEWS[k].icon, 'ico-sm')}<span class="tab-label" data-label="${esc(l)}">${esc(l)}</span>${n ? `<span class="nav-count">${n > 99 ? '99+' : n}</span>` : ''}</a>`;
     })
     .join('')}</div>`;
 }
@@ -935,6 +935,13 @@ async function goNow(view) {
   const order = Object.keys(VIEWS);
   const dir = order.indexOf(view) >= order.indexOf(st.view) ? 'fwd' : 'back';
   $('#content').dataset.dir = dir;
+  // Wechsel innerhalb eines Bereichs (z. B. Überblick → Protokoll): Leiste und Überschrift bleiben stehen, nur der Inhalt
+  // wechselt; die Höhe gleitet zur neuen Seite
+  const hubFrom = hubOf(st.view);
+  const hubTo = hubOf(view);
+  const sameHub = !!(hubFrom && hubTo && hubFrom.key === hubTo.key && st.view !== view);
+  $('#content').dataset.hubSwitch = sameHub ? '1' : '';
+  const h0 = sameHub ? $('#content').offsetHeight : 0;
   st.view = view;
   closeModal();
   closeSidebar();
@@ -953,6 +960,7 @@ async function goNow(view) {
       renderView();
       playIn(content, 'view-in');
       growBars(content);
+      if (sameHub) heightGlide(content, h0);
     } catch {
       shown = null; // alter Stand passt nicht mehr – normal laden
     }
@@ -979,7 +987,14 @@ async function goNow(view) {
     }
   }
   // Platzhalter erst, wenn das Laden dauert – schnelle Seiten erscheinen ohne kurzes Aufblitzen
-  const slow = setTimeout(() => token === st.navToken && (content.innerHTML = loadingHtml(view)), 120);
+  let skeleton = '';
+  const slow = setTimeout(() => {
+    if (token !== st.navToken) return;
+    const bar = sameHub ? $('#content > .hub-tabs') : null; // Leiste des Bereichs bleibt beim Laden stehen
+    skeleton = loadingHtml(view);
+    content.innerHTML = skeleton;
+    if (bar) (content.firstElementChild ? content.firstElementChild.after(bar) : content.prepend(bar));
+  }, 120);
   try {
     // beim Drüberfahren schon vorgeladen? Dann nur noch auf dieses Laden warten (meist ist es fertig)
     const pre = viewPrefetch.get(view);
@@ -998,6 +1013,8 @@ async function goNow(view) {
   renderView();
   playIn(content, 'view-in');
   growBars(content);
+  if (skeleton) skeletonFade(content, skeleton); // Platzhalter blendet aus, während der Inhalt einblendet
+  if (sameHub) heightGlide(content, h0);
 }
 const INSTANT_SKIP = new Set(['invoice-new', 'settings', 'profile']);
 
@@ -1032,6 +1049,48 @@ document.addEventListener('pointerdown', (e) => {
   const view = navTarget(e);
   if (view) prefetchView(view);
 });
+/**
+ * Bereichs-Reiter beim Neuzeichnen behalten: Hat die neue Seite dieselbe Leiste (gleicher Bereich, gleiche Reiter),
+ * bleibt die bisherige stehen und übernimmt nur Auswahl und Zahlen – sie flackert nicht, und Strich, Farbe und
+ * Schriftstärke gleiten zum neuen Reiter.
+ */
+function hubBarKeep(oldBar, fresh) {
+  if (!oldBar || !fresh || oldBar === fresh || oldBar.getAttribute('aria-label') !== fresh.getAttribute('aria-label')) return;
+  const a = [...oldBar.children].filter((c) => c.matches('a'));
+  const b = [...fresh.children].filter((c) => c.matches('a'));
+  if (a.length !== b.length || a.some((el, i) => el.getAttribute('href') !== b[i].getAttribute('href'))) return;
+  a.forEach((el, i) => {
+    if (el.innerHTML !== b[i].innerHTML) el.innerHTML = b[i].innerHTML; // Zahl geändert
+    el.className = b[i].className;
+    el.setAttribute('aria-selected', b[i].getAttribute('aria-selected') || 'false');
+  });
+  oldBar.querySelectorAll(':scope > .tab-ink').forEach((x) => x.remove());
+  oldBar.classList.remove('ink-gliding');
+  fresh.replaceWith(oldBar);
+  tabInk(oldBar);
+}
+/** Höhe gleitet vom alten zum neuen Stand (Reiterwechsel) statt zu springen. */
+function heightGlide(el, h0) {
+  if (!el || !h0 || window.PS.motion.calm() || typeof Element.prototype.animate !== 'function') return;
+  const h1 = el.offsetHeight;
+  if (Math.abs(h1 - h0) < 12) return;
+  el.style.overflow = 'clip';
+  const a = el.animate([{ height: `${h0}px` }, { height: `${h1}px` }], { duration: Math.min(420, 220 + Math.abs(h1 - h0) / 8), easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+  const done = () => (el.style.overflow = '');
+  a.finished.then(done, done);
+}
+/** Ladeplatzhalter weich ausblenden, während der echte Inhalt erscheint (statt hartem Austausch). */
+function skeletonFade(content, html) {
+  if (window.PS.motion.calm()) return;
+  const ov = document.createElement('div');
+  ov.className = 'skel-fade';
+  ov.setAttribute('aria-hidden', 'true');
+  ov.inert = true;
+  ov.innerHTML = html;
+  content.append(ov);
+  const bye = () => ov.remove();
+  setTimeout(bye, 400);
+}
 /** Sanft einblenden (Seitenwechsel, neues Fenster) – nicht bei jedem Neuzeichnen, sonst flackert es. */
 function playIn(el, cls) {
   if (!el) return;
@@ -1054,6 +1113,7 @@ function renderView({ force = false } = {}) {
   const before = flipSnapshot(); // Positionen der Zeilen vor dem Neuzeichnen (weiches Umsortieren)
   document.body.toggleAttribute('data-readbar', st.view === 'wiki'); // Lesefortschritt in langen Wiki-Artikeln
   window.PS.readBarOff();
+  const oldBar = $('#content > .hub-tabs'); // Reiter des Bereichs: bleiben stehen, damit der Goldstrich gleiten kann
   $('#content').innerHTML = views[st.view].render();
   heroLand(); // aus einer Kachel bzw. einem Menüpunkt: die neue Überschrift fliegt von dort an ihren Platz
   flipPlay(before);
@@ -1061,6 +1121,7 @@ function renderView({ force = false } = {}) {
   // Seite eines Bündels: Reiter unter der Überschrift
   const tabs = hubTabs(st.view);
   if (tabs) ($('#content > .page-head') || $('#content').firstElementChild)?.insertAdjacentHTML($('#content > .page-head') ? 'afterend' : 'beforebegin', tabs);
+  hubBarKeep(oldBar, $('#content > .hub-tabs'));
   renderNav();
   tickCountdowns();
   hidePendingDeletes();
