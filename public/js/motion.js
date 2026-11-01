@@ -352,7 +352,9 @@
   document.addEventListener(
     'click',
     (e) => {
-      if (e.target.closest && e.target.closest('[role="tab"], [data-action$="-tab"]')) tabAt = Date.now();
+      const t = e.target.closest && e.target.closest('[role="tab"], [data-action$="-tab"]');
+      // Bereichs- und Akte-Reiter haben ihren eigenen Übergang (Leiste bleibt stehen, Strich gleitet – 13-reiter.js)
+      if (t) tabAt = t.closest('.hub-tabs, .case-jump-list') ? 0 : Date.now();
     },
     true
   );

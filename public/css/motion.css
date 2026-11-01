@@ -326,3 +326,69 @@ body:has(#sidebar) .promo-dock.is-on { translate: 0 0; }
 /* Tarifrechner: laufende Rabattaktion (home.js) */
 .calc-promo-row { --o1: var(--accent-rgb); color: color-mix(in srgb, rgb(var(--o1)) 70%, #fff); border-top: 1px dashed rgba(var(--o1), 0.4); }
 .calc-promo-badge { --o1: var(--accent-rgb); display: inline-flex; align-items: center; gap: 0.25rem; margin-left: 0.6rem; padding: 0.12rem 0.55rem; border-radius: 999px; font-size: 0.72rem; font-weight: 800; vertical-align: middle; color: #02050e; background: linear-gradient(180deg, #fff, rgb(var(--o1))); animation: sb-pulse 2.6s ease-in-out infinite; }
+
+/* ================================================================ 11. Reiterleisten: gleitender Goldstrich, ruhige Leiste, Schrift und Symbol
+   13-reiter.js setzt beim Wechsel einen Strich (Unterstrich-Leisten) bzw. eine Pille (Chip-Leisten), der vom alten zum
+   neuen Reiter gleitet; währenddessen trägt der neue Reiter seine eigene Markierung noch nicht. */
+#content { position: relative; }
+.ink-host { position: relative; }
+.tab-ink { position: absolute; z-index: 0; pointer-events: none; box-sizing: border-box; }
+.tab-ink.is-line { border-radius: 2px; background: linear-gradient(90deg, var(--gold-500, #d4af37), var(--gold-light, #f3e5ab), var(--gold-500, #d4af37)); box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.45); }
+.tab-ink.is-pill { border: 1px solid transparent; }
+.ink-gliding > :is(button, a) { position: relative; z-index: 1; }
+.ink-gliding:is(.hub-tabs, .case-jump-list) > .active { border-bottom-color: transparent !important; }
+.ink-gliding:not(.hub-tabs):not(.case-jump-list) > .active { background-color: transparent !important; border-color: transparent !important; box-shadow: none !important; }
+/* Reiter: Farbe, Schriftstärke und Symbol gleiten; die Breite bleibt (unsichtbare fette Kopie reserviert den Platz) */
+.chip-row.hub-tabs .chip, .case-jump .jump { transition: color var(--m-panel) var(--m-ease), border-color var(--m-panel) var(--m-ease); }
+.tab-label[data-label] { display: inline-grid; font-weight: 450; transition: font-weight var(--m-panel) var(--m-ease); }
+.tab-label[data-label]::after { content: attr(data-label); font-weight: 620; height: 0; overflow: hidden; visibility: hidden; pointer-events: none; user-select: none; }
+:is(.hub-tabs .chip, .case-jump .jump).active .tab-label { font-weight: 620; }
+.chip-row.hub-tabs .chip .ico { transition: color var(--m-panel) var(--m-ease), transform var(--m-panel) var(--m-ease); }
+.chip-row.hub-tabs .chip.active .ico { color: var(--gold-500, #d4af37); }
+.ink-arrive .ico { animation: ink-ico var(--m-page) var(--m-spring); }
+.ink-arrive .tab-label { animation: ink-label var(--m-page) var(--m-ease); }
+@keyframes ink-ico { 40% { transform: translateY(-3px) scale(1.12); } }
+@keyframes ink-label { from { color: var(--text-muted); } }
+/* Vorschau beim Überfahren: ein zarter Strich zeigt, wohin es geht */
+.chip-row.hub-tabs .chip:not(.active):hover, .case-jump .jump:not(.active):hover { border-bottom-color: rgba(var(--accent-rgb), 0.3); }
+/* Wechsel innerhalb eines Bereichs: Leiste bleibt stehen, die Überschrift tauscht nur den Text */
+#content.view-in[data-hub-switch="1"] > .hub-tabs { animation: none; }
+#content.view-in[data-hub-switch="1"] > .page-head { animation: title-swap var(--m-panel) var(--m-ease) both; }
+@keyframes title-swap { from { opacity: 0.35; } to { opacity: 1; } }
+
+/* ================================================================ 12. Menü → Seite: Überschrift steigt leicht auf; Akte: Reiter gestaffelt */
+#content.view-in:not([data-hub-switch="1"]) > .page-head .page-title { animation: title-rise var(--m-page) var(--m-ease) both; }
+@keyframes title-rise { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
+#modalBody.modal-stagger .case-tabs .jump { animation: tab-in var(--m-page) var(--m-ease) both; animation-delay: 0.12s; }
+#modalBody.modal-stagger .case-tabs .jump:nth-child(2) { animation-delay: 0.17s; }
+#modalBody.modal-stagger .case-tabs .jump:nth-child(3) { animation-delay: 0.22s; }
+#modalBody.modal-stagger .case-tabs .jump:nth-child(4) { animation-delay: 0.27s; }
+@keyframes tab-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+
+/* ================================================================ 13. Aufklappen mit echter Höhe (moderne Browser), Zähler rollen, Platzhalter blendet aus */
+@supports selector(::details-content) {
+  details { interpolate-size: allow-keywords; }
+  details::details-content { height: 0; overflow: clip; transition: height var(--m-panel) var(--m-ease), content-visibility var(--m-panel) allow-discrete; }
+  details[open]::details-content { height: auto; }
+}
+.count-roll { display: inline-block; animation: count-roll var(--m-panel) var(--m-ease); }
+.count-roll[data-roll="down"] { animation-name: count-roll-down; }
+@keyframes count-roll { from { opacity: 0; transform: translateY(60%); } to { opacity: 1; transform: none; } }
+@keyframes count-roll-down { from { opacity: 0; transform: translateY(-60%); } to { opacity: 1; transform: none; } }
+#content > .skel-fade { position: absolute; inset: 0 0 auto 0; z-index: 2; pointer-events: none; animation: skel-out 0.32s ease forwards !important; }
+@keyframes skel-out { to { opacity: 0; } }
+
+/* ================================================================ 14. Schrift: Label beim Antippen, gleich breite Ziffern, ruhige Titel */
+.label { transition: color var(--m-micro) ease, transform var(--m-panel) var(--m-ease), letter-spacing var(--m-panel) var(--m-ease), font-weight var(--m-panel) var(--m-ease); }
+:is(div, label, p):has(> .field:focus) > .label, :is(div, label, p):has(> .field:focus) > .label-row .label { font-weight: 620; }
+.nav-count, .chip-count, .jump-n, .badge, .money, .kpi-value, .tbl td, .num-input input, .countdown { font-variant-numeric: lining-nums tabular-nums; }
+.page-title, .section-title, .modal-title, .case-title { font-kerning: normal; font-optical-sizing: auto; text-rendering: optimizeLegibility; }
+.page-title { letter-spacing: -0.006em; }
+/* Schriftwechsel unter Stil (Vorschau, 07-stil.js): die Oberfläche blendet weich über */
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: var(--m-page); animation-timing-function: var(--m-ease); }
+
+/* ================================================================ 15. Handy: kürzere Wege */
+@media (max-width: 639px) {
+  #content.view-in:not([data-hub-switch="1"]) > .page-head .page-title { animation-duration: var(--m-panel); }
+  #modalBody.modal-stagger .case-tabs .jump { animation-delay: 0.08s !important; animation-duration: var(--m-panel); }
+}

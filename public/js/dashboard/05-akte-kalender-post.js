@@ -1148,7 +1148,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
   const jumpBar = `<nav class="case-jump case-tabs" aria-label="Bereiche der Akte"><div class="case-jump-list" role="tablist" aria-label="Bereiche der Akte">${tabsShown
     .map(([k, label, keys]) => {
       const n = k === 'ueberblick' ? 0 : tabCount(keys);
-      return `<button type="button" class="jump ${k === caseTab ? 'active' : ''}" role="tab" aria-selected="${k === caseTab}" data-action="case-tab" data-tab="${k}">${esc(label)}${n ? `<span class="jump-n">${n}</span>` : ''}</button>`;
+      return `<button type="button" class="jump ${k === caseTab ? 'active' : ''}" role="tab" aria-selected="${k === caseTab}" data-action="case-tab" data-tab="${k}"><span class="tab-label" data-label="${esc(label)}">${esc(label)}</span>${n ? `<span class="jump-n">${n}</span>` : ''}</button>`;
     })
     .join('')}</div>${staff ? `<button type="button" class="btn-ghost btn-sm jump-edit" data-action="sec-edit" title="Abschnitte umsortieren, ausblenden oder einklappen">${icon('grip', 'ico-sm')}<span>Ansicht anpassen</span></button>` : ''}</nav>`;
 

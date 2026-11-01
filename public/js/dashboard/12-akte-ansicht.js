@@ -43,6 +43,7 @@ function caseTabSet(tab) {
   if (!root || !CASE_TABS.some((t) => t[0] === tab)) return;
   st.caseTab = tab;
   if (root.dataset.caseTab === tab) return;
+  const h0 = root.offsetHeight;
   root.dataset.caseTab = tab;
   root.querySelectorAll('.case-jump [data-action="case-tab"]').forEach((b) => {
     const on = b.dataset.tab === tab;
@@ -51,6 +52,14 @@ function caseTabSet(tab) {
   });
   const pick = root.querySelector('.case-jump .tabrow-pick select');
   if (pick) pick.value = String(CASE_TABS.findIndex((t) => t[0] === tab));
+  // Bewegung: Goldstrich gleitet, der neue Reiter blendet weich ein, die Höhe des Fensters folgt
+  tabInk(root.querySelector('.case-jump-list'));
+  if (!window.PS.motion.calm() && typeof Element.prototype.animate === 'function') {
+    root.querySelectorAll(':scope [data-pane]').forEach((pane) => {
+      if (pane.getClientRects().length) pane.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 260, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+    });
+    heightGlide(root, h0);
+  }
 }
 /** Abschnitt sichtbar machen (passenden Reiter öffnen) – für Sprünge aus Kacheln, Hinweisen und Links. */
 function caseReveal(id) {
