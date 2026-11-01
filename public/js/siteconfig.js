@@ -276,7 +276,7 @@
     const root = document.documentElement;
     themed.forEach((k) => root.style.removeProperty(k));
     themed = [];
-    if (!style) return;
+    if (!style) return syncLogos();
     const s = { ...THEME_DEFAULTS, ...style };
     const plain = s.accent.toLowerCase() === THEME_DEFAULTS.accent && +s.glass === 50 && +s.radius === 50 && s.font === 'klassisch';
     // Der Server setzt den Stil schon beim Ausliefern ein (<style id="psTheme">); hier zieht die Seite nach, wenn er sich
@@ -290,13 +290,23 @@
     }
     if (s.font !== 'klassisch') root.dataset.font = s.font;
     else delete root.dataset.font;
+    syncLogos();
+  }
+  /** Logo in der gerade gültigen Farbe (eigene Adresse je Farbe – kein altes Logo aus dem Zwischenspeicher). */
+  function syncLogos() {
+    const hex = getComputedStyle(document.documentElement).getPropertyValue('--gold-500').trim().replace('#', '').toLowerCase();
+    if (!/^[0-9a-f]{6}$/.test(hex)) return;
+    document.querySelectorAll('img[src*="/img/logo."]').forEach((img) => {
+      const next = img.getAttribute('src').replace(/\/img\/logo\.(svg|png)(\?c=[0-9a-f]{6})?/i, `/img/logo.$1?c=${hex}`);
+      if (next !== img.getAttribute('src')) img.setAttribute('src', next);
+    });
   }
   /** Saison aus der Konfiguration (falls die Seite aus dem Zwischenspeicher kam und noch die alte zeigt). */
   function applySeason(season) {
     if (season === undefined || !PS.season) return;
     if ((document.documentElement.dataset.season || '') !== (season || '')) PS.season.set(season || '');
   }
-  PS.theme = { vars: themeVars, apply: applyTheme, season: applySeason };
+  PS.theme = { vars: themeVars, apply: applyTheme, season: applySeason, logos: syncLogos };
 
   /* ---------------------------------------------------------------- Startseite */
   const FEATURE_SECTION = { vip: 'vip', stimmen: 'reviews', karriere: 'karriere' };

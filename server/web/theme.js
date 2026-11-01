@@ -70,6 +70,7 @@ function seasonFor(page, style = siteConfig.get('style')) {
 /** In eine ausgelieferte HTML-Seite einsetzen. */
 function inject(html, page) {
   if (BARE.has(page)) return html;
+  html = require('./brand').logoUrls(html); // Logo-Adresse mit Farbe (kein altes Logo aus dem Zwischenspeicher)
   let style;
   try {
     style = siteConfig.get('style');

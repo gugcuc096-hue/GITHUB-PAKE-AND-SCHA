@@ -248,7 +248,7 @@
     root.className = 'paper';
     root.innerHTML = `
       <div class="head">
-        <div class="brand"><img class="mark" src="/img/logo.svg" width="32" height="60" alt="Pake &amp; Scha" decoding="async"><div><div class="firm">Pake &amp; Scha</div><div class="tag">Legal Consulting &amp; Advocacy</div></div></div>
+        <div class="brand"><img class="mark" src="/img/logo.svg?c=${(getComputedStyle(document.documentElement).getPropertyValue('--gold-500').trim().replace('#', '') || 'd4af37').toLowerCase()}" width="32" height="60" alt="Pake &amp; Scha" decoding="async"><div><div class="firm">Pake &amp; Scha</div><div class="tag">Legal Consulting &amp; Advocacy</div></div></div>
         <div class="addr">${esc(firm.address)}${firm.contact ? '\n' + esc(firm.contact) : ''}</div>
       </div>
       <div class="title">
