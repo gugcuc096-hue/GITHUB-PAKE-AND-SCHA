@@ -12,27 +12,6 @@ const { isBoard } = require('../core/helpers');
 const { getCase, addSystemNote, logActivity } = require('../db/models');
 const tickets = require('../integrations/tickets');
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS discount_requests (
-    id                INTEGER PRIMARY KEY AUTOINCREMENT,
-    status            TEXT NOT NULL DEFAULT 'offen' CHECK (status IN ('offen','genehmigt','abgelehnt','verwendet')),
-    requested_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    requested_by_name TEXT NOT NULL DEFAULT '',
-    discount_pct      REAL NOT NULL,
-    subtotal          INTEGER NOT NULL DEFAULT 0,
-    case_id           INTEGER REFERENCES cases(id) ON DELETE SET NULL,
-    client_name       TEXT NOT NULL DEFAULT '',
-    reason            TEXT NOT NULL DEFAULT '',
-    decided_by        INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    decided_by_name   TEXT NOT NULL DEFAULT '',
-    decided_at        TEXT,
-    decided_via       TEXT NOT NULL DEFAULT '',
-    decision_note     TEXT NOT NULL DEFAULT '',
-    invoice_id        INTEGER,
-    created_at        TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-`);
-
 const fail = (message, status = 400) => Object.assign(new Error(message), { status });
 const usd = (n) => `${Math.round(n).toLocaleString('de-DE')} $`;
 const pct = (n) => `${Number(n).toLocaleString('de-DE', { maximumFractionDigits: 1 })} %`;

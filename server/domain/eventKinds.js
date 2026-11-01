@@ -9,28 +9,6 @@ const { z } = require('zod');
 const { db } = require('../db/db');
 const { EVENT_TYPES } = require('../core/helpers');
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS event_kinds (
-    key             TEXT PRIMARY KEY,
-    name            TEXT NOT NULL,
-    base            TEXT NOT NULL DEFAULT 'frist',
-    default_minutes INTEGER NOT NULL DEFAULT 0,
-    default_location TEXT NOT NULL DEFAULT '',
-    client_visible  INTEGER NOT NULL DEFAULT -1,   -- -1 = wie die Grundart
-    rule_amount     INTEGER NOT NULL DEFAULT 0,    -- 0 = keine Rechenregel
-    rule_unit       TEXT NOT NULL DEFAULT 'tage',  -- tage | werktage | wochen | monate
-    rule_from       TEXT NOT NULL DEFAULT '',      -- „Zustellung“, „Verkündung“ …
-    weekend_shift   INTEGER NOT NULL DEFAULT 1,    -- Fristende am Wochenende → nächster Werktag (§ 193 BGB)
-    sort_order      INTEGER NOT NULL DEFAULT 0,
-    active          INTEGER NOT NULL DEFAULT 1
-  );
-`);
-try {
-  db.exec('ALTER TABLE appointments ADD COLUMN kind TEXT');
-} catch {
-  /* Spalte ist schon da */
-}
-
 const BASES = Object.keys(EVENT_TYPES);
 const UNITS = { tage: 'Kalendertage', werktage: 'Werktage (Mo–Fr)', wochen: 'Wochen', monate: 'Monate' };
 

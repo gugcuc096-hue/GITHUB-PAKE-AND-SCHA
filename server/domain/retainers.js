@@ -12,34 +12,6 @@ const billing = require('./billing');
 const discord = require('../integrations/discord');
 const tickets = require('../integrations/tickets');
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS retainers (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    title           TEXT NOT NULL,
-    client_user_id  INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    client_name     TEXT NOT NULL,
-    client_contact  TEXT NOT NULL DEFAULT '',
-    case_id         INTEGER REFERENCES cases(id) ON DELETE SET NULL,
-    amount          INTEGER NOT NULL,
-    interval_months INTEGER NOT NULL DEFAULT 1,
-    start_date      TEXT NOT NULL,
-    end_date        TEXT,
-    runs            INTEGER NOT NULL DEFAULT 0,
-    type_key        TEXT NOT NULL DEFAULT 'rechnung',
-    note            TEXT NOT NULL DEFAULT '',
-    status          TEXT NOT NULL DEFAULT 'aktiv' CHECK (status IN ('aktiv','pausiert','beendet')),
-    created_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    created_by_name TEXT NOT NULL DEFAULT '',
-    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
-    last_invoice_id INTEGER
-  );
-`);
-try {
-  db.exec('ALTER TABLE invoices ADD COLUMN retainer_id INTEGER');
-} catch {
-  /* Spalte ist schon da */
-}
-
 const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 const fail = (message, status = 400) => Object.assign(new Error(message), { status });
 

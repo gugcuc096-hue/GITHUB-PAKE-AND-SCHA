@@ -523,15 +523,18 @@ Der Server-Code liegt nach Bereichen in `server/`:
 | Ordner | Inhalt |
 |---|---|
 | `server/routes/` | API-Routen (je Bereich eine Datei) |
-| `server/db/` | Datenbank: Schema, Abfragen, Sicherung, Wartung, Papierkorb |
+| `server/db/` | Datenbank: Verbindung, nummerierte Migrationen (`migrations/`), Abfragen, Sicherung, Wartung, Papierkorb |
 | `server/core/` | Grundlagen: Anmeldung, Rechte, Helfer, Uploads, Live-Verbindung, Start-Routinen |
 | `server/domain/` | Fachlogik: Akten, Rechnungen, Verträge, Fristen, Rechtsgebiete, Strafkatalog … |
 | `server/integrations/` | Discord (Bot, Tickets, Webhooks), FiveNet, Google (Drive, Docs, Sheets), Sicherung außer Haus |
 | `server/web/` | Website: Seiten, Design, SEO, Anwalts-Profile, Word-Dateien, schnelles Laden |
 
+**Neue Tabelle oder Spalte:** neue Datei `server/db/migrations/NNN-name.js` mit der nächsten Nummer anlegen, die `up({ db, addColumn, … })` exportiert – nie eine bereits ausgelieferte Migration ändern. Beim Start laufen alle noch nicht erledigten Migrationen in Nummernfolge; ältere Datenbanken und eingespielte Sicherungen ohne `schema_migrations` werden dabei automatisch auf den aktuellen Stand gebracht (die Migrationen 001–015 sind dafür so geschrieben, dass sie auf bestehenden Tabellen nichts doppelt anlegen).
+
 ```
 server.js        App-Setup, Routen, Start
-server/db/db.js  SQLite-Schema, Migrationen, Helfer, Wiederherstellen aus restore.db
+server/db/db.js  Datenbank öffnen, Helfer (Einstellungen, Nummern, Transaktion), Wiederherstellen aus restore.db
+server/db/migrate.js + server/db/migrations/  Tabellen als nummerierte Migrationen (001-grundtabellen … 015-bereichstabellen), jede läuft genau einmal (Tabelle schema_migrations)
 server/db/backup.js Tägliche Datensicherung (backups/), Aufbewahrung, Download für das Board
 server/integrations/driveBackup.js Sicherung außer Haus: jede neue Datenbank-Sicherung + wöchentlich die Bilder in den privaten Drive-Ordner, Aufräumen, Warnung
 server/integrations/mediaBackup.js Bilder als .tar.gz sichern, Sicherungen hochladen und einspielen (restore.db, Bilder-Archiv)

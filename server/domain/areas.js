@@ -9,23 +9,6 @@
 const { z } = require('zod');
 const { db } = require('../db/db');
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS areas (
-    key          TEXT PRIMARY KEY,
-    name         TEXT NOT NULL,
-    short        TEXT NOT NULL DEFAULT '',
-    color        TEXT NOT NULL DEFAULT 'gold',
-    icon         TEXT NOT NULL DEFAULT 'scale',
-    intake_title TEXT NOT NULL DEFAULT '',
-    sort_order   INTEGER NOT NULL DEFAULT 0,
-    active       INTEGER NOT NULL DEFAULT 1,
-    steps        TEXT NOT NULL DEFAULT '[]',
-    checklist    TEXT NOT NULL DEFAULT '[]',
-    outcomes     TEXT NOT NULL DEFAULT '[]',
-    fields       TEXT NOT NULL DEFAULT '[]'
-  );
-`);
-
 const DEFAULT_STEPS = ['Eingang', 'Akteneinsicht', 'Strategie', 'Verhandlung'];
 const COLORS = ['gold', 'sky', 'emerald', 'amber', 'red', 'violet', 'slate'];
 const ICONS = ['scale', 'shield', 'book', 'doc', 'folder', 'box', 'briefcase', 'users', 'star', 'crown', 'home', 'seal', 'ballot', 'tag'];

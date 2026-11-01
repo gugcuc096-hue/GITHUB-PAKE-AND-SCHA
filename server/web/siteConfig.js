@@ -9,17 +9,6 @@ const { z } = require('zod');
 const { db } = require('../db/db');
 const configLog = require('../core/configLog');
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS site_config (
-    key          TEXT PRIMARY KEY,
-    published    TEXT,
-    draft        TEXT,
-    updated_by   INTEGER,
-    updated_at   TEXT,
-    published_at TEXT
-  );
-`);
-
 const SECTIONS = {
   ablauf: 'Ablauf',
   rechner: 'Tarifrechner',

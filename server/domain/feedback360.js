@@ -11,35 +11,6 @@ const { db } = require('../db/db');
 const { isBoard } = require('../core/helpers');
 const { logActivity } = require('../db/models');
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS feedback_rounds (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    title      TEXT NOT NULL,
-    status     TEXT NOT NULL DEFAULT 'offen' CHECK (status IN ('offen','geschlossen','veroeffentlicht')),
-    due_date   TEXT,
-    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    closed_at  TEXT
-  );
-  CREATE TABLE IF NOT EXISTS feedback_participants (
-    round_id INTEGER NOT NULL REFERENCES feedback_rounds(id) ON DELETE CASCADE,
-    user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    PRIMARY KEY (round_id, user_id)
-  );
-  CREATE TABLE IF NOT EXISTS feedback_entries (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    round_id      INTEGER NOT NULL REFERENCES feedback_rounds(id) ON DELETE CASCADE,
-    about_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    from_user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    r_team        INTEGER, r_reliable INTEGER, r_know INTEGER, r_comm INTEGER,
-    strengths     TEXT NOT NULL DEFAULT '',
-    improve       TEXT NOT NULL DEFAULT '',
-    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE (round_id, about_user_id, from_user_id)
-  );
-`);
-
 const MIN_RESPONSES = 3; // darunter werden Ergebnisse einer Person nicht gezeigt
 const DIMENSIONS = { r_team: 'Zusammenarbeit', r_reliable: 'Zuverlässigkeit', r_know: 'Fachwissen', r_comm: 'Kommunikation' };
 const fail = (message, status = 400) => Object.assign(new Error(message), { status });

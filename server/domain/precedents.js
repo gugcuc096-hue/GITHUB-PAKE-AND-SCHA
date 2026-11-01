@@ -10,29 +10,6 @@ const { db } = require('../db/db');
 const { OUTCOMES } = require('../core/helpers');
 const areas = require('./areas');
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS precedents (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    case_id       INTEGER UNIQUE REFERENCES cases(id) ON DELETE SET NULL,
-    title         TEXT NOT NULL,
-    area          TEXT NOT NULL DEFAULT '',
-    summary       TEXT NOT NULL DEFAULT '',
-    arguments     TEXT NOT NULL DEFAULT '',
-    result        TEXT NOT NULL DEFAULT '',
-    lessons       TEXT NOT NULL DEFAULT '',
-    outcome       TEXT NOT NULL DEFAULT '',
-    sentence_he   INTEGER,
-    sentence_fine INTEGER,
-    paragraphs    TEXT NOT NULL DEFAULT '',
-    tags          TEXT NOT NULL DEFAULT '',
-    created_by    TEXT NOT NULL DEFAULT '',
-    created_by_id INTEGER,
-    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-  CREATE INDEX IF NOT EXISTS idx_precedents_area ON precedents(area);
-`);
-
 const fold = (s) =>
   String(s || '')
     .toLowerCase()

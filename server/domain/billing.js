@@ -8,39 +8,7 @@
  */
 const { z } = require('zod');
 const { db } = require('../db/db');
-require('./areas'); // legt die Tabelle areas an (hier kommen Spalten dazu)
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS fee_categories (
-    key        TEXT PRIMARY KEY,
-    name       TEXT NOT NULL,
-    sort_order INTEGER NOT NULL DEFAULT 0,
-    active     INTEGER NOT NULL DEFAULT 1
-  );
-  CREATE TABLE IF NOT EXISTS invoice_types (
-    key            TEXT PRIMARY KEY,
-    name           TEXT NOT NULL,
-    base           TEXT NOT NULL DEFAULT 'rechnung',   -- rechnung | honorarvereinbarung
-    due_days       INTEGER NOT NULL DEFAULT 7,         -- Zahlungsziel in Tagen (0 = kein Datum)
-    advance_pct    INTEGER NOT NULL DEFAULT 0,         -- Vorschuss in % vor Beginn der Tätigkeit
-    expense_label  TEXT NOT NULL DEFAULT '',           -- Auslagenpauschale: Bezeichnung der Position
-    expense_amount INTEGER NOT NULL DEFAULT 0,         -- … und Betrag (0 = keine)
-    note           TEXT NOT NULL DEFAULT '',           -- Standardtext (Anmerkungen / Vereinbarungstext)
-    sort_order     INTEGER NOT NULL DEFAULT 0,
-    active         INTEGER NOT NULL DEFAULT 1
-  );
-`);
-for (const [table, ddl] of [
-  ['invoices', 'type_key TEXT'],
-  ['areas', "default_fees TEXT NOT NULL DEFAULT '[]'"],
-  ['areas', "default_type TEXT NOT NULL DEFAULT ''"],
-]) {
-  try {
-    db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
-  } catch {
-    /* Spalte ist schon da */
-  }
-}
+require('./areas'); // Rechtsgebiete (Standardgebühren je Gebiet)
 
 const BASES = { rechnung: 'Rechnung', honorarvereinbarung: 'Honorarvereinbarung' };
 const SEED_CATEGORIES = [
