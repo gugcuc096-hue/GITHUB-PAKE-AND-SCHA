@@ -42,6 +42,13 @@ router.get('/', (req, res) => {
   res.json({ config: out, sections: siteConfig.SECTIONS, terms: siteConfig.TERMS, messages: messages.catalog() });
 });
 
+/** Discord-Meldungen gestalten: Ereignisse und die Felder, die sie bisher mitgeschickt haben. */
+router.get('/discord-fields', (req, res) => {
+  if (!mayEdit(req.user, 'discordLook')) return res.status(403).json({ error: 'Dafür fehlt Ihnen das Recht.' });
+  const discord = require('../integrations/discord');
+  res.json({ events: discord.EVENTS, fields: discord.fieldsSeen() });
+});
+
 /** Aktenzeichen-Muster ausprobieren: nächstes Zeichen ohne es zu vergeben (?pattern=…&digits=4). */
 router.get('/numbering/preview', (req, res) => {
   if (!mayEdit(req.user, 'numbering')) return res.status(403).json({ error: 'Dafür fehlt Ihnen das Recht.' });

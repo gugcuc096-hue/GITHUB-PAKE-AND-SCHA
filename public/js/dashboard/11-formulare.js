@@ -179,6 +179,23 @@ const forms = {
     await modalBack();
     await refreshBehind();
   },
+  // Angaben zum Mandat (Zusatzfelder des Rechtsgebiets) in der Akte bearbeiten
+  'case-answers': async (f) => {
+    const id = Number(f.dataset.id);
+    const answers = {};
+    f.querySelectorAll('[data-answer]').forEach((el) => (answers[el.dataset.answer] = el.type === 'checkbox' ? el.checked : el.value.trim()));
+    await api.patch('/api/cases/' + id, { answers });
+    toast('Angaben gespeichert.');
+    st.returnCase = id;
+    await returnOrClose(); // zurück in die Akte (mit den neuen Angaben)
+  },
+  'notify-prefs': async (f) => {
+    const fd = new FormData(f);
+    const body = { dm: val(fd, 'dm') || 'an', quiet: fd.has('quiet'), quietFrom: val(fd, 'quietFrom') || '22:00', quietTo: val(fd, 'quietTo') || '08:00' };
+    if (f.elements.toasts) Object.assign(body, { toasts: fd.has('toasts'), sound: fd.has('sound') });
+    st.notify = (await api.put('/api/notify-prefs', body)).prefs;
+    toast('Benachrichtigungen gespeichert.');
+  },
   'new-case': async (f) => {
     const fd = new FormData(f);
     const body = { title: val(fd, 'title'), area: val(fd, 'area'), urgency: val(fd, 'urgency') || 'normal', description: val(fd, 'description') };

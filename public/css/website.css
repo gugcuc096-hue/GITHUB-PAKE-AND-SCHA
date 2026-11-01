@@ -18,7 +18,7 @@
 
     --text-main: #f8fafc;
     --text-muted: #cbd5e1;
-    --text-dim: #7d8aa8;
+    --text-dim: #95a1bd;
     --glass-border: rgba(255, 255, 255, 0.12);
 }
 
@@ -278,3 +278,6 @@ body.page-in { animation: page-in 0.35s ease-out; }
     :where(footer a, [data-auth-link], .team-name) { position: relative; }
     :where(footer a, [data-auth-link], .team-name)::after { content: ''; position: absolute; inset: -12px 0; }
 }
+
+/* Tarifrechner: Kostenschätzung nur so hoch wie ihr Inhalt und läuft am PC beim Scrollen mit (keine großen Lücken) */
+@media (min-width: 1024px) { .calc-summary { align-self: start; position: sticky; top: 6.5rem; } }

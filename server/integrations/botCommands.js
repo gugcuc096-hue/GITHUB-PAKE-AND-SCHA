@@ -116,7 +116,7 @@ async function sendNewPassword(body, u, discordId) {
         }),
       ],
       ...(login ? { components: linkRow('Zum Login', login) } : {}),
-    });
+    }, { important: true }); // Zugangsdaten: kommen immer an
   } catch (err) {
     // Passwort zurücksetzen, falls es inzwischen niemand anderes geändert hat
     db.prepare('UPDATE users SET password_hash = ?, must_change_password = ? WHERE id = ? AND password_hash = ?').run(before.password_hash, before.must_change_password, u.id, newHash);

@@ -270,6 +270,7 @@
       ${opts.log ? logSection(data.notes || [], internal, opts.logSystem) : ''}
       ${opts.attachments ? attachmentsSection(data.attachments || [], internal, opts.images) : ''}
       <div class="foot"><span>Pake &amp; Scha Legal Consulting · Aktenauszug ${esc(c.caseNumber)}</span><span>Stand ${esc(stand)}</span></div>`;
+    if (window.PS.docLook) window.PS.docLook.apply(root, firm.doc, 'extract');
     // Seitenzahlen im Druck (Browser mit @page-Randfeldern, z. B. Chrome/Edge)
     let pageStyle = document.getElementById('pageStyle');
     if (!pageStyle) {

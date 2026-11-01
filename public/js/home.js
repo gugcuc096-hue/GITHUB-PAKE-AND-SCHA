@@ -17,7 +17,6 @@ const PAGE_ACTIONS = {
     'concern-close': () => window.closeConcernModal(),
     faq: (el) => toggleFaq(el),
     category: (el) => setCategory(el.dataset.cat),
-    'copy-email': () => copyEmail(),
     top: () => window.scrollTo({ top: 0, behavior: 'smooth' }),
 };
 document.querySelectorAll('[data-act]').forEach((el) => {
@@ -132,6 +131,13 @@ document.querySelectorAll('#mobileMenu a[href^="#"]').forEach(link => {
             done = true;
             target.scrollIntoView({ behavior: 'smooth', block: 'start' });
             history.pushState(null, '', hash);
+            // Lädt oberhalb noch etwas nach (Team, Stimmen …), verschiebt sich das Ziel – nach dem Scrollen nachjustieren
+            const pad = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 96;
+            const settle = () => {
+                if (Math.abs(target.getBoundingClientRect().top - pad) > 12) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            };
+            if ('onscrollend' in window) window.addEventListener('scrollend', settle, { once: true });
+            setTimeout(settle, 1400);
         };
         menu.addEventListener('transitionend', jump, { once: true });
         setTimeout(jump, 450); // falls kein Übergang läuft (z. B. reduzierte Bewegung)
@@ -233,6 +239,20 @@ document.querySelectorAll('.price-item').forEach((item, i) => item.dataset.origi
 enhancePriceCategories();
 
 /* ---------- Interactive Calculator ---------- */
+const pctDe = (n) => String(n).replace('.', ',');
+/** Beschriftung des Prioritätszuschlags und des Bündelrabatts nach den Einstellungen. */
+function syncPriorityLabel(calc, priorityPct) {
+    const opt = document.getElementById('priorityAddon')?.closest('.calc-opt');
+    if (opt) {
+        const name = opt.querySelector('.calc-opt-name');
+        const sub = opt.querySelector('.calc-opt-sub');
+        if (name) name.textContent = `${calc.priorityLabel || 'Priorisierte Bearbeitung'} (+${pctDe(priorityPct)} %)`;
+        if (sub && calc.prioritySub !== undefined) { sub.textContent = calc.prioritySub; sub.hidden = !calc.prioritySub; }
+        opt.hidden = !priorityPct;
+    }
+    const label = document.getElementById('discountLabel');
+    if (label && calc.bundlePct !== undefined) label.textContent = `Mandatsbündel-Rabatt (${pctDe(calc.bundlePct)} %)`;
+}
 function calculateTotal() {
     const checkboxes = document.querySelectorAll('.calc-check:checked:not(#priorityAddon)');
     const priorityChecked = document.getElementById('priorityAddon').checked;
@@ -249,13 +269,19 @@ function calculateTotal() {
             subtotal += price;
             const li = document.createElement('li');
             li.className = 'flex justify-between items-center text-white border-b border-slate-800 pb-1';
-            li.innerHTML = `<span>${name}</span><span class="font-mono text-[var(--gold-500)]">${price.toLocaleString('de-DE')} $</span>`;
+            li.innerHTML = `<span>${name}</span><span class="num text-[var(--gold-500)]">${price.toLocaleString('de-DE')} $</span>`;
             listElement.appendChild(li);
         });
     }
 
-    const bundleEligible = checkboxes.length >= 3;
-    const discount = bundleEligible ? Math.round(subtotal * 0.10) : 0;
+    // Bündelrabatt und Prioritätszuschlag aus den Einstellungen (Tarifrechner), sonst wie bisher 3 Leistungen / 10 % / 15 %
+    const calc = (window.PS && window.PS.calc) || {};
+    const bundleMin = calc.bundleMin || 3;
+    const bundlePct = calc.bundlePct ?? 10;
+    const priorityPct = calc.priorityPct ?? 15;
+    syncPriorityLabel(calc, priorityPct);
+    const bundleEligible = bundlePct > 0 && checkboxes.length >= bundleMin;
+    const discount = bundleEligible ? Math.round((subtotal * bundlePct) / 100) : 0;
     document.getElementById('discountRow').classList.toggle('hidden', !bundleEligible);
     document.getElementById('discountAmount').textContent = '− ' + discount.toLocaleString('de-DE') + ' $';
 
@@ -273,7 +299,7 @@ function calculateTotal() {
     let total = subtotal - discount - promoAmount;
     const noteEl = document.getElementById('totalNote');
     if (priorityChecked && total > 0) {
-        const surcharge = Math.round(total * 0.15);
+        const surcharge = Math.round((total * priorityPct) / 100);
         total += surcharge;
         noteEl.textContent = 'inkl. Zuschlag priorisierte Bearbeitung (+' + surcharge.toLocaleString('de-DE') + ' $)';
     } else if (promoAmount) {
@@ -324,23 +350,6 @@ function toggleFaq(item) {
 
 /* ---------- Mandantenstimmen: Karussell und echte Bewertungen siehe js/site.js ---------- */
 
-/* ---------- Copy Email ---------- */
-function copyEmail() {
-    const btn = document.getElementById('emailCopyBtn');
-    const email = btn.dataset.email || 'kontakt@pake-scha.ls';
-    const done = () => {
-        btn.textContent = 'E-Mail kopiert ✓';
-        btn.classList.add('copied');
-        showToast('Kopiert', 'Die E-Mail-Adresse wurde in die Zwischenablage übernommen.');
-        setTimeout(() => { btn.textContent = `${email} kopieren`; btn.classList.remove('copied'); }, 2500);
-    };
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(email).then(done).catch(() => { window.location.href = 'mailto:' + email; });
-    } else {
-        window.location.href = 'mailto:' + email;
-    }
-}
-
 /* ---------- Team & Honorarordnung lädt /js/site.js live aus der Datenbank ---------- */
 document.getElementById('footerYear').textContent = new Date().getFullYear();
 
@@ -356,25 +365,7 @@ function updateClock() {
 updateClock();
 setInterval(updateClock, 1000);
 
-/* ---------- Scrollspy Navigation ---------- */
-// Abschnitte kommen aus den Menüpunkten selbst (data-section) – unabhängig von der Reihenfolge auf der Seite.
-// Markiert wird der Menüpunkt des Abschnitts, in dem man gerade liest; ganz unten der letzte (Kontakt).
-const navLinks = document.querySelectorAll('.nav-link[data-section]');
-const spySections = [...navLinks].map(link => document.getElementById(link.dataset.section)).filter(Boolean);
-function updateScrollspy() {
-    const y = window.scrollY + 140;
-    const tops = spySections.map(el => ({ id: el.id, top: el.getBoundingClientRect().top + window.scrollY }));
-    let current = null;
-    let best = -Infinity;
-    tops.forEach(s => {
-        if (s.top <= y && s.top > best) { best = s.top; current = s.id; }
-    });
-    const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
-    if (atBottom && tops.length) current = tops.reduce((a, b) => (b.top > a.top ? b : a)).id;
-    navLinks.forEach(link => {
-        link.classList.toggle('nav-active', link.dataset.section === current);
-    });
-}
+/* ---------- Scrollspy Navigation: goldener Strich unter dem Menüpunkt siehe js/motion.js (nav[data-ink]) ---------- */
 
 /* ---------- Reveal on Scroll ---------- */
 const revealObserver = new IntersectionObserver((entries) => {
@@ -389,7 +380,6 @@ document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
 
 /* ---------- Back to top + Scrollspy on scroll ---------- */
 window.addEventListener('scroll', () => {
-    updateScrollspy();
     document.getElementById('backToTop').classList.toggle('show', window.scrollY > 600);
     syncMobileCta();
 });
@@ -398,7 +388,3 @@ function syncMobileCta() {
     const menuOpen = document.getElementById('mobileMenu').classList.contains('open');
     document.getElementById('mobileCta').classList.toggle('show', window.scrollY > 600 && !menuOpen);
 }
-// Team, Honorarordnung & Co. werden nachgeladen und verschieben die Abschnitte
-window.addEventListener('load', updateScrollspy);
-window.addEventListener('resize', updateScrollspy);
-updateScrollspy();

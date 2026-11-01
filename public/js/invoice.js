@@ -58,6 +58,7 @@
                 ? `<div class="sign"><div>Ort, Datum · Unterschrift Mandant</div><div>Ort, Datum · Pake &amp; Scha Legal Consulting</div></div>`
                 : `<div class="issuer">Mit freundlichen Grüßen<div class="name">${esc(inv.issuerName || 'Pake & Scha')}</div>${inv.issuerRank ? esc(inv.issuerRank) + ' · ' : ''}Pake &amp; Scha Legal Consulting</div>`}
             <div class="foot"><span>Pake &amp; Scha Legal Consulting · ${esc(firm.seat || 'Würfelpark, Los Santos')}</span><span>${esc(inv.number)}</span></div>`;
+        if (window.PS.docLook) window.PS.docLook.apply(root, firm.doc, 'invoice', { signer: inv.issuerName || '' });
         if (new URLSearchParams(location.search).get('print') === '1') setTimeout(() => window.print(), 400);
     }
 
@@ -89,6 +90,19 @@
         }).catch(() => {});
     }
 
+    // Vorschau in den Einstellungen (Dokumente): Beispielrechnung mit dem Entwurf (?beispiel=1&vorschau=1)
+    const qs = new URLSearchParams(location.search);
+    if (qs.get('beispiel') === '1') {
+        // In der Vorschau der Einstellungen (iframe): ohne Werkzeugleiste
+        if (window.self !== window.top) document.querySelector('.toolbar')?.setAttribute('hidden', '');
+        api.get('/api/invoices/firm' + (qs.get('vorschau') === '1' ? '?draft=1' : ''))
+            .then(({ firm }) => {
+                const today = new Date().toISOString();
+                render({ kind: 'rechnung', number: 'RE-2026-0042', createdAt: today, caseNumber: 'PS-2026-0012', dueDate: today.slice(0, 10), clientName: 'Tina Termin', clientContact: '555-0123', issuerName: 'Dr. Alois Pake', issuerRank: 'Founding Partner', subject: 'Strafrechtliche Vertretung', items: [{ description: 'Strafrechtliche Vertretung', quantity: 1, unitPrice: 60000 }, { description: 'Persönliche Rechtsberatung', quantity: 2, unitPrice: 25000 }], subtotal: 110000, total: 110000, status: 'offen' }, firm);
+            })
+            .catch((err) => (root.textContent = err.message));
+        return;
+    }
     if (!Number.isInteger(id) || id <= 0) {
         root.innerHTML = 'Kein Dokument angegeben. <a href="/dashboard#invoices">Zum Dashboard</a>';
         return;

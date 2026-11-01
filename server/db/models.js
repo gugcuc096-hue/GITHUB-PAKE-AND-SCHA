@@ -195,7 +195,8 @@ function caseRow(c, u) {
     stepLabel: (require('../domain/areas').stepsOf(c.area)[c.step]) || STEPS[0],
     steps: require('../domain/areas').stepsOf(c.area),
     areaLabel: require('../domain/areas').name(c.area),
-    intakeAnswers: parseJson(c.intake_answers) || {},
+    // Zusatzangaben; interne Felder (nur Kanzlei) sieht der Mandant nicht
+    intakeAnswers: staff ? parseJson(c.intake_answers) || {} : Object.fromEntries(Object.entries(parseJson(c.intake_answers) || {}).filter(([, a]) => !a || !a.internal)),
     closed: c.status === 'geschlossen',
     publicNote: c.public_note,
     source: c.source,

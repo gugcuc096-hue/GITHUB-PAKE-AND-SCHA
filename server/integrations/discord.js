@@ -185,7 +185,58 @@ function discordTime(value, style = 'f') {
   return Number.isFinite(ts) ? `<t:${ts}:${style}> (<t:${ts}:R>)` : '—';
 }
 
-function buildPayload({ title, description, fields = [], color = GOLD, mentionIds = [], roleIds = [], link }) {
+/*
+ * Aussehen je Ereignis (Einstellungen → Discord-Meldungen): Farbe, Titel mit {titel}, ausgeblendete Felder, Fußzeile.
+ * Feldnamen, die ein Ereignis schon einmal mitgeschickt hat, werden gemerkt – die Einstellungen bieten sie zum Ausblenden an.
+ */
+const seenFields = new Map(); // Ereignis → Set der Feldnamen
+function loadSeen() {
+  if (seenFields.size) return;
+  try {
+    const raw = JSON.parse(getSetting('discord_fields_seen', '{}')) || {};
+    for (const [k, v] of Object.entries(raw)) seenFields.set(k, new Set(Array.isArray(v) ? v : []));
+  } catch {
+    /* leer */
+  }
+}
+function rememberFields(event, fields) {
+  loadSeen();
+  const set = seenFields.get(event) || new Set();
+  const before = set.size;
+  for (const f of fields || []) if (f && f.name && set.size < 40) set.add(String(f.name).slice(0, 80));
+  seenFields.set(event, set);
+  if (set.size !== before) {
+    try {
+      require('../db/db').setSetting('discord_fields_seen', JSON.stringify(Object.fromEntries([...seenFields].map(([k, v]) => [k, [...v]]))));
+    } catch {
+      /* nur Komfort */
+    }
+  }
+}
+function fieldsSeen() {
+  loadSeen();
+  return Object.fromEntries([...seenFields].map(([k, v]) => [k, [...v]]));
+}
+function applyLook(event, message) {
+  let look = null;
+  try {
+    look = require('../web/siteConfig').get('discordLook');
+  } catch {
+    return message;
+  }
+  const ev = (look && look.events && look.events[event]) || {};
+  const out = { ...message };
+  if (ev.title) out.title = ev.title.replace(/\{titel\}/gi, message.title || '').trim() || message.title;
+  if (ev.color) out.color = parseInt(ev.color.slice(1), 16);
+  if (ev.hide && ev.hide.length && Array.isArray(message.fields)) {
+    const hide = new Set(ev.hide.map((x) => x.toLowerCase()));
+    out.fields = message.fields.filter((f) => !f || !hide.has(String(f.name || '').toLowerCase()));
+  }
+  if (look && look.footer) out.footer = look.footer;
+  return out;
+}
+
+function buildPayload({ title, description, fields = [], color = GOLD, mentionIds = [], roleIds = [], link, footer }) {
   const mentions = [...new Set(mentionIds.filter((id) => /^\d{5,25}$/.test(String(id))))].map(String);
   const roles = [...new Set(roleIds.filter((id) => /^\d{15,25}$/.test(String(id))))].map(String);
   const content = [...roles.map((id) => `<@&${id}>`), ...mentions.map((id) => `<@${id}>`)].join(' ');
@@ -200,6 +251,7 @@ function buildPayload({ title, description, fields = [], color = GOLD, mentionId
         description: description ? truncate(description, 4000) : undefined,
         color,
         url: link,
+        footer: footer ? { text: truncate(footer, 200) } : undefined,
         fields: fields
           .filter((f) => f && f.name)
           .slice(0, 25)
@@ -249,7 +301,8 @@ function notify(event, message) {
   // Geheimes Mandat (nur Board of Partners): nichts in die gemeinsamen Kanzlei-Kanäle
   const { caseId, ...rest } = message || {};
   if (caseId && secretCase(caseId)) return;
-  const payload = buildPayload({ link: publicUrl(), ...rest, roleIds: rolesFor(event) });
+  rememberFields(event, rest.fields);
+  const payload = buildPayload({ link: publicUrl(), ...applyLook(event, rest), roleIds: rolesFor(event) });
   postWebhook(url, payload).catch((err) => console.warn(`Discord-Webhook (${event}) fehlgeschlagen: ${err.message}`));
 }
 
@@ -398,6 +451,9 @@ async function fetchDiscordUser(cfg, code) {
 
 module.exports = {
   GOLD,
+  applyLook,
+  fieldsSeen,
+  buildPayload,
   brandColors,
   RED,
   EVENTS,

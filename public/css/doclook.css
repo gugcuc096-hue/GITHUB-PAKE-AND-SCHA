@@ -1,0 +1,13 @@
+/* Aussehen der Dokumente (js/doclook.js): Logo-Position, Fußzeile, Unterschrift, Wasserzeichen */
+.paper, .sheet { position: relative; }
+.doc-logo-mitte .head { flex-direction: column; align-items: center; text-align: center; gap: 0.6rem; }
+.doc-logo-mitte .head .addr { text-align: center; }
+.doc-logo-rechts .head { flex-direction: row-reverse; }
+.doc-logo-rechts .head .addr { text-align: left; }
+.doc-footline { margin-top: 1.6rem; padding-top: 0.6rem; border-top: 1px solid rgba(0, 0, 0, 0.12); font-size: 0.72rem; line-height: 1.5; color: #55607a; text-align: center; white-space: pre-line; }
+.doc-watermark { position: absolute; inset: 0; z-index: 0; display: grid; place-items: center; pointer-events: none; overflow: hidden; font: 700 clamp(3rem, 14vw, 7.5rem) / 1 Inter, sans-serif; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(150, 120, 40, 0.09); transform: rotate(-28deg); white-space: nowrap; }
+:is(.paper, .sheet) > :not(.doc-watermark) { position: relative; z-index: 1; }
+.doc-sign { margin: 0.5rem 0 0.1rem; color: #1d2340; }
+.doc-sign-schrift { font: 400 2rem / 1.1 'Allura', 'Dancing Script', cursive; }
+.doc-sign-klar { font: italic 600 1.05rem / 1.3 'Cormorant Garamond', Georgia, serif; }
+@media print { .doc-watermark { color: rgba(150, 120, 40, 0.12); } }

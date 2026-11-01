@@ -148,6 +148,38 @@
       /* egal */
     }
   };
+  /* Symbole im Siegel, wenn kein eigenes gewählt ist (je Aufmachung) */
+  const svg = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">${d}</svg>`;
+  const BANNER_GLYPH = {
+    edel: svg('<path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"/>'),
+    dezent: svg('<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/>'),
+    hinweis: svg('<path d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/>'),
+    dringend: svg('<path d="M12 8v5m0 3h.01"/><circle cx="12" cy="12" r="9"/>'),
+    feierlich: svg('<path d="M5 3v4M3 5h4M6 17v4M4 19h4M13 3l2.3 6.9L21 12l-5.7 2.1L13 21l-2.3-6.9L5 12l5.7-2.1z"/>'),
+  };
+  /** Mehrere Meldungen: alle 7 Sekunden die nächste (weiches Überblenden), Punkte zum Weiterschalten, Pause unter der Maus. */
+  function rotate(el, n) {
+    let i = 0;
+    let paused = false;
+    const show = (k) => {
+      i = (k + n) % n;
+      el.querySelectorAll('.sb-slide').forEach((s) => {
+        const on = Number(s.dataset.i) === i;
+        s.classList.toggle('is-on', on);
+        s.setAttribute('aria-hidden', String(!on));
+      });
+      el.querySelectorAll('.sb-dot').forEach((d) => d.classList.toggle('is-on', Number(d.dataset.i) === i));
+    };
+    el.addEventListener('mouseenter', () => (paused = true));
+    el.addEventListener('mouseleave', () => (paused = false));
+    el.addEventListener('focusin', () => (paused = true));
+    el.addEventListener('focusout', () => (paused = false));
+    el.querySelectorAll('.sb-dot').forEach((d) => d.addEventListener('click', () => show(Number(d.dataset.i))));
+    const timer = setInterval(() => {
+      if (!el.isConnected) return clearInterval(timer);
+      if (!paused && !document.hidden) show(i + 1);
+    }, 7000);
+  }
   function banner(b, host, { before = true, className = '', id = 'siteBanner', dock = false } = {}) {
     document.getElementById(id)?.remove();
     document.getElementById(`${id}Dock`)?.remove();
@@ -161,7 +193,8 @@
     if (hidden) return;
     const el = document.createElement('div');
     el.id = id;
-    el.className = `site-banner tone-${b.tone}${b.promo ? ` is-promo occ-${b.occasion}` : ''}${b.endsAt ? ' has-count' : ''} ${className}`.trim();
+    const slides = b.promo ? [] : (b.slides && b.slides.length ? b.slides : [{ title: b.title || '', text: b.text, icon: b.icon || '', link: b.link, linkLabel: b.linkLabel }]).filter((x) => x && x.text);
+    el.className = `site-banner tone-${b.tone}${b.promo ? ` is-promo occ-${b.occasion}` : ` sb-${b.style || 'edel'}`}${slides.length > 1 ? ' has-slides' : ''}${b.endsAt ? ' has-count' : ''} ${className}`.trim();
     el.setAttribute('role', 'status');
     const ext = b.link && /^https?:/i.test(b.link);
     const link = b.link ? `<a class="site-banner-link sb-cta" href="${esc(b.link)}"${ext ? ' target="_blank" rel="noopener"' : ''}>${esc(b.linkLabel || 'Mehr erfahren')}<span aria-hidden="true">→</span></a>` : '';
@@ -174,7 +207,19 @@
         <span class="sb-copy"><strong class="sb-title">${esc(b.title || 'Aktion')}</strong><span class="site-banner-text">${esc(b.sub || b.text)}</span></span></span>
         <span class="sb-tail">${count}${link}</span>${x}`;
     } else {
-      el.innerHTML = `<span class="sb-shine" aria-hidden="true"></span>${b.icon ? `<span class="sb-icon" aria-hidden="true">${esc(b.icon)}</span>` : ''}<span class="site-banner-text">${esc(b.text)}</span>${count}${link}${x}`;
+      // Siegel-Leiste: Symbol im Kreis, Titel (Überschriften-Schrift) + Zeile, Knopf rechts; mehrere Meldungen wechseln sich ab
+      const seal = (ic) => `<span class="sb-seal" aria-hidden="true">${ic ? `<span class="sb-icon">${esc(ic)}</span>` : BANNER_GLYPH[b.style] || BANNER_GLYPH.edel}</span>`;
+      const cta = (sl) => {
+        if (!sl.link) return '';
+        const ex = /^https?:/i.test(sl.link);
+        return `<a class="site-banner-link sb-cta" href="${esc(sl.link)}"${ex ? ' target="_blank" rel="noopener"' : ''}>${esc(sl.linkLabel || 'Mehr erfahren')}<span aria-hidden="true">→</span></a>`;
+      };
+      const slide = (sl, i) =>
+        `<div class="sb-slide${i === 0 ? ' is-on' : ''}"${i ? ' aria-hidden="true"' : ''} data-i="${i}">${seal(sl.icon)}<span class="sb-copy">${sl.title ? `<strong class="sb-title">${esc(sl.title)}</strong>` : ''}<span class="site-banner-text">${esc(sl.text)}</span></span>${cta(sl)}</div>`;
+      const dots = slides.length > 1 ? `<span class="sb-dots" role="tablist" aria-label="Meldungen">${slides.map((_, i) => `<button type="button" class="sb-dot${i === 0 ? ' is-on' : ''}" data-i="${i}" aria-label="Meldung ${i + 1}"></button>`).join('')}</span>` : '';
+      el.innerHTML = `<span class="sb-shine" aria-hidden="true"></span>${b.style === 'feierlich' ? '<span class="sb-aurora" aria-hidden="true"><i></i><i></i></span><span class="sb-sparks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>' : ''}
+        <div class="sb-inner"><div class="sb-stage">${slides.map(slide).join('')}</div><span class="sb-tail">${dots}${count}</span></div>${x}`;
+      if (slides.length > 1) rotate(el, slides.length);
     }
     let pill = null;
     el.querySelector('.site-banner-x')?.addEventListener('click', () => {
@@ -344,12 +389,7 @@
         )
         .join('');
     }
-    // Kontakt: E-Mail-Adresse und weitere Links (Discord, Instagram …)
-    const btn = document.getElementById('emailCopyBtn');
-    if (btn && h.contactEmail) {
-      btn.dataset.email = h.contactEmail;
-      btn.textContent = `${h.contactEmail} kopieren`;
-    }
+    // Kontakt: weitere Links (Discord, Instagram …)
     const kontakt = document.querySelector('#kontakt .glass-card');
     document.getElementById('siteLinks')?.remove();
     if (kontakt && h.links && h.links.length) {
@@ -370,6 +410,7 @@
     applyTheme(cfg.style, { force: !!preview });
     applySeason(cfg.season);
     PS.promo = cfg.promo || null;
+    if (cfg.calculator) PS.calc = cfg.calculator; // Tarifrechner: Bündelrabatt, Prioritätszuschlag
     window.dispatchEvent(new CustomEvent('ps:promo'));
     if (page === 'site') {
       banners(cfg, document.querySelector('.topstrip') || document.body.firstElementChild);

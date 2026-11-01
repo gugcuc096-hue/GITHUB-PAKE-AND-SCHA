@@ -22,7 +22,7 @@ function retainerCard(r) {
       <header class="ret-head"><div class="ret-title"><strong>${esc(r.title)}</strong><span class="ret-client">${esc(r.clientName)}${r.caseNumber ? ` · <span class="font-mono text-gold">${esc(r.caseNumber)}</span>` : ''}</span></div>
         <div class="ret-badges">${statusBadge(RETAINER_STATUS, r.status)}${due ? badge('Fällig', 'amber') : ''}</div></header>
       <div class="ret-facts">
-        <div><div class="k">Pauschale</div><div class="v"><span class="font-mono text-gold">${money(r.amount)}</span> <span class="text-dim">${esc(RETAINER_INTERVAL[r.intervalMonths] || `alle ${r.intervalMonths} Monate`)}</span></div></div>
+        <div><div class="k">Pauschale</div><div class="v"><span class="num text-gold">${money(r.amount)}</span> <span class="text-dim">${esc(RETAINER_INTERVAL[r.intervalMonths] || `alle ${r.intervalMonths} Monate`)}</span></div></div>
         <div><div class="k">Nächste Rechnung</div><div class="v">${esc(retainerDue(r))}</div></div>
         <div><div class="k">Laufzeit</div><div class="v">ab ${esc(fmtDateOnly(r.startDate))}${r.endDate ? ` bis ${esc(fmtDateOnly(r.endDate))}` : ' · unbefristet'}</div></div>
         <div><div class="k">Rechnungsart</div><div class="v">${esc(r.typeLabel)} · ${r.runs} erstellt</div></div>
@@ -62,7 +62,7 @@ async function retainerForm(r) {
       <div><label class="label" for="rtClient">Empfänger / Mandant</label><input id="rtClient" name="clientName" class="field" required minlength="2" maxlength="120" value="${esc(v.clientName)}"></div>
       <div><label class="label" for="rtContact">Kontakt (optional)</label><input id="rtContact" name="clientContact" class="field" maxlength="120" value="${esc(v.clientContact)}"></div>
       <div class="span-2"><label class="label" for="rtCase">Akte (optional)</label><select id="rtCase" name="caseId" class="field"><option value="">Ohne Aktenbezug</option>${st.cases.map((c) => opt(c.id, `${c.caseNumber} – ${c.title}`, c.id === v.caseId)).join('')}</select><p class="form-hint">Mit Akte: Meldung im Ticket, Verlaufseintrag und Zuordnung zum Mandantenkonto.</p></div>
-      <div><label class="label" for="rtAmount">Pauschale in $ je Zeitraum</label><input id="rtAmount" name="amount" type="number" min="1" step="1" required class="field" value="${esc(v.amount)}"></div>
+      <div><label class="label" for="rtAmount">Pauschale in $ je Zeitraum</label><input id="rtAmount" name="amount" data-money type="number" min="1" step="1" required class="field" value="${esc(v.amount)}"></div>
       <div><label class="label" for="rtInterval">Takt</label><select id="rtInterval" name="intervalMonths" class="field" ${r && r.runs ? 'disabled' : ''}>${Object.entries(RETAINER_INTERVAL).map(([k, l]) => opt(k, l, Number(k) === v.intervalMonths)).join('')}</select></div>
       <div><label class="label" for="rtStart">Erste Rechnung am</label><input id="rtStart" name="startDate" type="date" required class="field" value="${esc(v.startDate)}" ${r && r.runs ? 'disabled' : ''}></div>
       <div><label class="label" for="rtEnd">Letzte Rechnung bis (optional)</label><input id="rtEnd" name="endDate" type="date" class="field" value="${esc(v.endDate || '')}"></div>

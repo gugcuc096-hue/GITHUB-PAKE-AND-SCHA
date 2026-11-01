@@ -106,7 +106,7 @@ router.post(
     if (!d) return;
     const account = req.user && req.user.role === 'mandant' ? req.user : null;
     // Kurzer Titel mit Namen; der Text des Mandanten steht im Sachverhalt
-    const checked = areas.checkAnswers(d.area, d.answers);
+    const checked = areas.checkAnswers(d.area, d.answers, { staff: false });
     if (checked.error) return res.status(400).json({ error: checked.error });
     const title = intakeTitle(d.area, account ? account.display_name : d.name);
     const pin = randomPin();
@@ -145,6 +145,7 @@ router.post(
     });
 
     tickets.caseCreated(id);
+    require('../domain/automations').fire('case.created', { caseId: id }, 'created'); // Einstellungen → Automatik
     res.status(201).json({
       caseId: account ? id : undefined,
       caseNumber: c.case_number,

@@ -180,7 +180,7 @@ function feeModal(f, category) {
       <form data-form="fee" data-id="${f ? f.id : ''}" class="form-grid cols-2">
         <div class="span-2"><label class="label">Bezeichnung</label><input name="name" class="field" required minlength="2" maxlength="120" value="${esc(v.name || '')}" autofocus></div>
         <div><label class="label">Kategorie</label><select name="category" class="field">${cats.map((c) => opt(c.key, c.name, v.category === c.key)).join('')}</select></div>
-        <div><label class="label">Preis ($)</label><input name="price" type="number" inputmode="numeric" min="0" step="1" required class="field" value="${esc(v.price)}"></div>
+        <div><label class="label">Preis ($)</label><input name="price" data-money type="number" inputmode="numeric" min="0" step="1" required class="field" value="${esc(v.price)}"></div>
         <div class="span-2"><label class="label">Beschreibung</label><textarea name="description" rows="3" maxlength="400" class="field">${esc(v.description || '')}</textarea></div>
         <div><label class="label">Reihenfolge</label><input name="sortOrder" type="number" min="0" step="1" class="field" value="${esc(v.sortOrder ?? '')}" placeholder="automatisch"></div>
         <div class="flex flex-col justify-end gap-2 pb-1">
@@ -212,7 +212,7 @@ views.fees = {
               ? rows
                   .map(
                     (f) => `<div class="list-row wrap"><div class="main"><div class="title">${esc(f.name)} ${!f.active ? badge('Ausgeblendet', 'slate') : ''} ${f.inCalculator ? badge('Tarifrechner', 'sky') : ''}</div><div class="meta">${esc(f.description)}</div></div>
-                      <div class="flex items-center gap-2 shrink-0"><span class="font-mono text-gold nowrap">${money(f.price)}</span>
+                      <div class="flex items-center gap-2 shrink-0"><span class="num text-gold nowrap">${money(f.price)}</span>
                       <button class="icon-btn sm" data-action="fee-edit" data-id="${f.id}" aria-label="Bearbeiten">${icon('edit', 'ico-sm')}</button>
                       <button class="icon-btn sm" data-action="fee-delete" data-id="${f.id}" aria-label="Löschen">${icon('trash', 'ico-sm')}</button></div></div>`
                   )
@@ -516,16 +516,23 @@ const SETTINGS_SECTIONS = [
   ['general', 'Kanzleidaten & Rechnungen', 'Kanzlei', 'receipt', ['settings.edit'], 'Kanzleisitz Anschrift Briefkopf Zahlungshinweis Kontakt Zahlungserinnerung Wochenbericht Aufräumen Einarbeitung Checkliste liegengeblieben'],
   ['numbering', 'Aktenzeichen', 'Kanzlei', 'folder', 'cfg', 'Muster Nummern Kürzel Bereich'],
   ['listen', 'Listen', 'Kanzlei', 'tag', ['settings.edit'], 'Rechtsgebiete Terminarten Fristenarten Rechnungsarten Gebühren Mandatsformular'],
+  ['documents', 'Dokumente', 'Kanzlei', 'doc', 'cfg', 'Rechnung Aktenauszug Vertrag Logo Fußzeile Unterschrift Wasserzeichen PDF'],
+  ['statuses', 'Status', 'Kanzlei', 'tag', 'cfg', 'Status Offen In Bearbeitung Abgeschlossen Farben Namen Verfahrensschritte'],
+  ['automation', 'Automatik', 'Kanzlei', 'star', ['settings.edit'], 'Automatik Regeln Wenn Dann Aufgabe Priorität liegengeblieben Rechnung bezahlt'],
+  ['nav', 'Navigation', 'Dashboard', 'list', 'cfg', 'Menü Reihenfolge ausblenden umbenennen Links Rang'],
+  ['start', 'Dashboard-Start', 'Dashboard', 'home', 'cfg', 'Übersicht Kacheln Kästen Startseite Rang Reihenfolge'],
   ['site', 'Website & Ränge', 'Website', 'globe', ['site.edit'], 'Ränge Anwalt des Monats Website-Texte Team'],
   ['home', 'Startseite', 'Website', 'home', 'cfg', 'Startseite Abschnitte Reihenfolge'],
   ['labels', 'Beschriftungen', 'Website', 'edit', 'cfg', 'Beschriftungen Namen Begriffe'],
   ['banner', 'Banner', 'Website', 'bell', 'cfg', 'Banner Hinweis Streifen Countdown'],
   ['style', 'Stil & Saison', 'Website', 'star', 'cfg', 'Stil Farbe Akzent Schrift Glas Rundung Bewegung Saison Halloween Weihnachten Deko'],
   ['promos', 'Rabattaktionen', 'Geld', 'tag', 'cfg', 'Rabatt Aktion Black Friday Ostern Prozent'],
+  ['calculator', 'Tarifrechner', 'Geld', 'chart', 'cfg', 'Tarifrechner Bündelrabatt Prioritätszuschlag Rechner Website'],
   ['@fees', 'Honorarordnung', 'Geld', 'scale', 'view', 'Preise Gebühren Leistungen'],
   ['@vip', 'VIP & Lifetime', 'Geld', 'crown', 'view', 'VIP Lifetime Mitgliedschaft'],
   ['bot', 'Discord', 'Kommunikation', 'discord', ['discord.edit'], 'Discord Webhook Bot Tickets Rollen Login Kanäle Nachrichten'],
   ['messages', 'Mitteilungen', 'Kommunikation', 'mail', 'cfg', 'Mitteilungen Texte Erinnerung Ansprache'],
+  ['discordLook', 'Discord-Meldungen', 'Kommunikation', 'discord', 'cfg', 'Discord Meldungen Farbe Titel Felder Fußzeile Aussehen'],
   ['integrations', 'Integrationen', 'Kommunikation', 'link', ['system.edit'], 'FiveNet Google Docs Drive Sheets'],
   ['access', 'Rechte & Schalter', 'Rechte & System', 'key', CONFIG_PERMS, 'Rechte Funktionen Schalter Web-Admin Protokoll'],
   ['system', 'Sicherung & Notfall', 'Rechte & System', 'shield', ['system.edit'], 'Datensicherung Backup Wiederherstellen Notfall Wartung'],
@@ -583,9 +590,10 @@ function settingsBody(key, s) {
     if (!st.cfg) return '<div class="panel panel-pad"><p class="text-sm text-muted">Wird geladen …</p></div>';
     st.cfgTab = key;
     if (key !== 'style' && typeof stylePreviewEnd === 'function') stylePreviewEnd();
-    return { banner: cfgBanner, home: cfgHome, labels: cfgLabels, messages: cfgMessages, style: cfgStyle, promos: cfgPromos, numbering: cfgNumbering }[key]();
+    return ({ banner: cfgBanner, home: cfgHome, labels: cfgLabels, messages: cfgMessages, style: cfgStyle, promos: cfgPromos, numbering: cfgNumbering, ...CFG_PANELS }[key] || (() => ''))();
   }
   if (key === 'access') return accessPanels();
+  if (key === 'automation') return automationPanel();
   if (key === 'listen') return listsPanels();
   if (key === 'bot') return botSettings();
   if (key === 'integrations') return `${fivenetSettingsPanel(s)}${googleDocsPanel(st.google)}`;

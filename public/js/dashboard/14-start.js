@@ -1044,8 +1044,45 @@ document.addEventListener('visibilitychange', () => {
 });
 setInterval(liveSync, 3000); // Mandant öffnet bzw. schließt eine Akte → Verbindung folgt
 
+/*
+ * Hinweis bei Neuem (Profil → Benachrichtigungen): neue Nachricht in einer Akte, die gerade nicht offen ist →
+ * kleine Meldung mit „Öffnen“, auf Wunsch mit leisem Ton. Mehrere kurz hintereinander zählen als eine.
+ */
+let noticeAt = 0;
+function liveNotice(ev) {
+  const p = st.notify || {};
+  if (p.toasts === false || st.modalCaseId === ev.id || document.hidden) return;
+  if (Date.now() - noticeAt < 4000) return;
+  noticeAt = Date.now();
+  const c = (st.cases || []).find((x) => x.id === ev.id);
+  window.PS.toast(`Neue Nachricht${c ? ` in ${c.caseNumber}` : ''}${typeof ev.by === 'string' ? ` von ${ev.by}` : ''}.`, 'ok', { action: { label: 'Öffnen', onClick: () => openCase(ev.id) } });
+  if (p.sound) liveChime();
+}
+function liveChime() {
+  try {
+    const A = window.AudioContext || window.webkitAudioContext;
+    if (!A) return;
+    const ctx = liveChime.ctx || (liveChime.ctx = new A());
+    const t = ctx.currentTime;
+    [880, 1318.5].forEach((f, i) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t + i * 0.12);
+      g.gain.exponentialRampToValueAtTime(0.08, t + i * 0.12 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.12 + 0.35);
+      o.connect(g).connect(ctx.destination);
+      o.start(t + i * 0.12);
+      o.stop(t + i * 0.12 + 0.4);
+    });
+  } catch {
+    /* ohne Ton */
+  }
+}
 function liveConnect() {
   if (!window.EventSource || live.es || !st.user) return;
+  if (!st.notify) api.get('/api/notify-prefs').then((r) => (st.notify = r.prefs)).catch(() => (st.notify = {}));
   const es = new EventSource('/api/events?tab=' + encodeURIComponent(window.PS.tab));
   live.es = es;
   es.onopen = () => {
@@ -1080,6 +1117,7 @@ function liveConnect() {
       if (ev.v && APP_VERSION && ev.v !== APP_VERSION) sysBar('update');
       return;
     }
+    if (ev.k === 'case' && ev.chat && ev.by && ev.by !== st.user.displayName) liveNotice(ev);
     if (ev.k === 'case') liveLater(`case${ev.id}${ev.chat ? 'c' : ''}`, () => liveCase(ev));
     else if (ev.k === 'area') liveLater(`area:${ev.a}`, () => liveArea(ev.a));
     else if (ev.k === 'presence') hereShow(ev.id, ev.users);
@@ -1400,6 +1438,7 @@ document.addEventListener('ps:form-ok', () => buzz());
     st.features = me.features || null;
     setAreas(me.areas);
     st.siteConfig = me.siteConfig || null;
+    applyStatuses(st.siteConfig && st.siteConfig.statuses);
     st.twoFactor = me.twoFactor;
     setRanks(me.ranks);
   } catch {
@@ -1421,6 +1460,7 @@ document.addEventListener('ps:form-ok', () => buzz());
   }
   // Angefangene Texte je Konto im Browser behalten (Rechnungs-Entwurf eigens, siehe 06-rechnungen)
   window.PS.drafts.watch({ scope: `u${st.user.id}`, onRestore: () => toast('Angefangene Eingaben wiederhergestellt.') });
+  tourMaybe(); // Einführungstour beim ersten Login (13-tour.js)
 
   const params = new URLSearchParams(location.search);
   const discordState = params.get('discord');

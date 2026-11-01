@@ -395,7 +395,12 @@ const statusBadge = (map, key) => badge(...(map[key] || [key, 'slate']));
  * Stand einer Akte, wie ihn Liste, Suche und Aktenkopf zeigen – genauer als „In Bearbeitung“: offene Anfrage, der
  * Schritt des Verfahrens (Eingang … Verhandlung) oder abgeschlossen. [Bezeichnung, Farbe]
  */
-const caseStage = (c) => (c.status === 'geschlossen' ? ['Abgeschlossen', 'slate'] : c.status === 'offen' ? ['Offen', 'amber'] : [STEPS[c.step] || STEPS[0], 'sky']);
+const caseStage = (c) => (c.status === 'geschlossen' ? CASE_STATUS.geschlossen : c.status === 'offen' ? CASE_STATUS.offen : [c.stepLabel || stepsOf(c.area)[c.step] || STEPS[0], CASE_STATUS.in_bearbeitung[1]]);
+/** Einstellungen → Status: eigene Namen und Farben der drei Status (gelten im ganzen Dashboard). */
+function applyStatuses(cfg) {
+  const def = { offen: ['Offen', 'amber'], in_bearbeitung: ['In Bearbeitung', 'sky'], geschlossen: ['Abgeschlossen', 'slate'] };
+  for (const k of Object.keys(def)) CASE_STATUS[k] = cfg && cfg[k] ? [cfg[k].label || def[k][0], cfg[k].color || def[k][1]] : def[k];
+}
 const stageBadge = (c) => badge(...caseStage(c));
 /**
  * Leerer Abschnitt der Akte als eine Zeile: „Titel · noch keine … · Knöpfe“ statt Überschrift plus Erklärtext.

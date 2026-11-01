@@ -11,6 +11,13 @@ const CFG_TABS = [
   ['labels', 'Beschriftungen', 'site.edit'],
   ['messages', 'Mitteilungen', 'settings.edit'],
 ];
+const CFG_BANNER_STYLES = {
+  edel: ['Edel', 'Glas mit Lichtkante und Siegel'],
+  dezent: ['Dezent', 'schmale Zeile, ruhig'],
+  hinweis: ['Hinweis', 'Streifen links wie eine Notiz'],
+  dringend: ['Dringend', 'rot mit pulsierendem Ring'],
+  feierlich: ['Feierlich', 'Polarlicht und Funken'],
+};
 const CFG_TONES = { gold: 'Gold', sky: 'Blau', amber: 'Orange', red: 'Rot', green: 'Grün' };
 const CFG_AUDIENCE = { public: 'Besucher der Website', mandant: 'Mandanten', staff: 'Kanzlei' };
 const CFG_SAMPLE = {
@@ -66,7 +73,11 @@ function cfgBanner() {
       <p class="text-sm text-muted mb-4">Ein Hinweisstreifen ganz oben – auf der Website und im Dashboard (z. B. „Am Sonntag nur Notdienst“). Mit Zeitraum und Zielgruppe; Besucher können ihn wegklicken.</p>
       <form data-form="cfg-banner" class="form-grid cols-2">
         <label class="check span-2"><input type="checkbox" name="enabled" ${b.enabled ? 'checked' : ''}> Banner anzeigen</label>
+        <div class="span-2"><label class="label" for="cfgBTitle">Titel (optional, fett vorne)</label><input id="cfgBTitle" name="title" class="field" maxlength="80" value="${esc(b.title || '')}" placeholder="z. B. Notdienst am Wochenende"></div>
         <div class="span-2"><label class="label" for="cfgBText">Text</label><input id="cfgBText" name="text" class="field" maxlength="240" value="${esc(b.text)}" placeholder="z. B. Wegen Wartungsarbeiten sind wir am Sonntag nur im Notdienst erreichbar."></div>
+        <div class="span-2"><div class="label">Aufmachung</div><div class="banner-styles" role="radiogroup" aria-label="Aufmachung">${Object.entries(CFG_BANNER_STYLES)
+          .map(([k, [l, d]]) => `<label class="banner-style-opt"><input type="radio" name="style" value="${k}" ${(b.style || 'edel') === k ? 'checked' : ''}><span class="bso-swatch bso-${k}" aria-hidden="true"><i></i></span><span class="bso-name">${esc(l)}</span><span class="bso-desc">${esc(d)}</span></label>`)
+          .join('')}</div></div>
         <div><label class="label" for="cfgBTone">Farbe</label><select id="cfgBTone" name="tone" class="field">${Object.entries(CFG_TONES).map(([k, l]) => opt(k, l, b.tone === k)).join('')}</select></div>
         <div><label class="label" for="cfgBLinkLabel">Beschriftung des Links (optional)</label><input id="cfgBLinkLabel" name="linkLabel" class="field" maxlength="40" value="${esc(b.linkLabel)}" placeholder="Mehr erfahren"></div>
         <div class="span-2"><label class="label" for="cfgBLink">Link (optional)</label><input id="cfgBLink" name="link" class="field" maxlength="300" value="${esc(b.link)}" placeholder="https://… oder /karriere"></div>
@@ -74,6 +85,9 @@ function cfgBanner() {
         <div><label class="label" for="cfgBTo">Anzeigen bis (einschließlich)</label><input id="cfgBTo" type="date" name="to" class="field" value="${esc(b.to)}"></div>
         <div class="span-2"><div class="label">Wer sieht es?</div><div class="flex flex-wrap gap-4">${Object.entries(CFG_AUDIENCE).map(([k, l]) => `<label class="check"><input type="checkbox" name="audience" value="${k}" ${b.audience.includes(k) ? 'checked' : ''}> ${esc(l)}</label>`).join('')}</div></div>
         <label class="check span-2"><input type="checkbox" name="dismissible" ${b.dismissible ? 'checked' : ''}> Besucher dürfen den Banner wegklicken (kommt erst bei geändertem Text wieder)</label>
+        <div class="span-2"><div class="label">Weitere Meldungen im Wechsel (bis zu zwei, alle 7 Sekunden)</div>
+          <div id="cfgSlides">${(b.slides || []).map(cfgSlideRow).join('')}</div>
+          <button type="button" class="btn-outline btn-sm mt-2" data-action="banner-slide-add" ${(b.slides || []).length >= 2 ? 'hidden' : ''}>${icon('plus', 'ico-sm')}<span>Meldung hinzufügen</span></button></div>
         <div class="span-2 cfg-live"><div class="label">So sieht es aus</div><div id="cfgBannerPreview">${cfgBannerPreview(b)}</div></div>
         <div class="span-2">${cfgBar('banner', `<a class="btn-ghost btn-md" href="/?vorschau=1" target="_blank" rel="noopener">${icon('globe', 'ico-sm')}<span>Vorschau mit Entwurf</span></a>`)}</div>
       </form>
@@ -83,9 +97,19 @@ function cfgBannerPreview(b) {
   if (!b.text) return '<p class="form-hint">Noch kein Text.</p>';
   return `<div class="site-banner tone-${esc(b.tone)}" style="animation:none"><span class="site-banner-text">${esc(b.text)}</span>${b.link ? `<span class="site-banner-link">${esc(b.linkLabel || 'Mehr erfahren')} →</span>` : ''}</div>`;
 }
+const cfgSlideRow = (x = { title: '', text: '', icon: '', link: '', linkLabel: '' }) => `<div class="cfg-row slide-row">
+    <input class="field" data-slide="icon" maxlength="8" value="${esc(x.icon || '')}" placeholder="📢" aria-label="Symbol">
+    <input class="field" data-slide="title" maxlength="80" value="${esc(x.title || '')}" placeholder="Titel (optional)" aria-label="Titel">
+    <input class="field" data-slide="text" maxlength="240" value="${esc(x.text || '')}" placeholder="Text" aria-label="Text">
+    <input class="field" data-slide="linkLabel" maxlength="40" value="${esc(x.linkLabel || '')}" placeholder="Knopf (optional)" aria-label="Beschriftung des Knopfs">
+    <input class="field" data-slide="link" maxlength="300" value="${esc(x.link || '')}" placeholder="Link (optional)" aria-label="Link">
+    <button type="button" class="icon-btn sm" data-action="banner-slide-del" aria-label="Meldung entfernen">${icon('trash', 'ico-sm')}</button></div>`;
 function cfgCollectBanner(f) {
   const fd = new FormData(f);
-  return { enabled: fd.has('enabled'), text: val(fd, 'text'), tone: val(fd, 'tone') || 'gold', link: val(fd, 'link'), linkLabel: val(fd, 'linkLabel'), from: val(fd, 'from'), to: val(fd, 'to'), audience: fd.getAll('audience'), dismissible: fd.has('dismissible') };
+  const slides = [...f.querySelectorAll('.slide-row')]
+    .map((r) => Object.fromEntries(['title', 'text', 'icon', 'link', 'linkLabel'].map((k) => [k, r.querySelector(`[data-slide="${k}"]`).value.trim()])))
+    .filter((x) => x.text);
+  return { enabled: fd.has('enabled'), title: val(fd, 'title'), text: val(fd, 'text'), tone: val(fd, 'tone') || 'gold', style: val(fd, 'style') || 'edel', slides, link: val(fd, 'link'), linkLabel: val(fd, 'linkLabel'), from: val(fd, 'from'), to: val(fd, 'to'), audience: fd.getAll('audience'), dismissible: fd.has('dismissible') };
 }
 
 /* ---------------------------------------------------------------- Startseite */
@@ -108,7 +132,6 @@ function cfgHome() {
           <div id="cfgFaq" class="${h.faq ? '' : 'hidden'}">${faq.map(cfgFaqRow).join('')}<button type="button" class="btn-outline btn-sm mt-2" data-action="home-faq-add">${icon('plus', 'ico-sm')}<span>Frage hinzufügen</span></button></div></div>
         <div><div class="label">Links im Kontaktbereich (Discord, Instagram …)</div>
           <div id="cfgLinks">${h.links.map(cfgLinkRow).join('')}</div><button type="button" class="btn-outline btn-sm mt-2" data-action="home-link-add">${icon('plus', 'ico-sm')}<span>Link hinzufügen</span></button></div>
-        <div><label class="label" for="cfgContactMail">E-Mail-Adresse im Kontaktbereich (Knopf „kopieren“)</label><input id="cfgContactMail" name="contactEmail" class="field" maxlength="120" value="${esc(h.contactEmail)}" placeholder="kontakt@pake-scha.ls"></div>
         <div><div class="label">Kennzahlen über den Mandantenstimmen</div>
           <label class="check"><input type="checkbox" name="kpi-closed" ${h.kpis.closed ? 'checked' : ''}> Abgeschlossene Verfahren</label>
           <label class="check"><input type="checkbox" name="kpi-success" ${h.kpis.success ? 'checked' : ''}> Erfolgsquote</label>
@@ -132,7 +155,7 @@ function cfgCollectHome(f) {
     hidden: secs.filter((s) => !s.querySelector('[name="show"]').checked).map((s) => s.dataset.id),
     faq: faq && faq.length ? faq : null,
     links: [...f.querySelectorAll('.link-row')].map((r) => ({ label: r.querySelector('[data-link="label"]').value.trim(), url: r.querySelector('[data-link="url"]').value.trim() })).filter((x) => x.label || x.url),
-    contactEmail: f.querySelector('[name="contactEmail"]').value.trim(),
+    contactEmail: cfgWork('home').contactEmail || '',
     kpis: { closed: f.querySelector('[name="kpi-closed"]').checked, success: f.querySelector('[name="kpi-success"]').checked, rating: f.querySelector('[name="kpi-rating"]').checked },
   };
 }
@@ -210,6 +233,8 @@ function cfgCollectMessages(f) {
   return { tone: val(fd, 'tone') === 'du' ? 'du' : 'sie', docsAfterDays: Number(val(fd, 'docsAfterDays') || 3), texts };
 }
 
+/** Weitere Bereiche (07-mehr-konfig.js): Schlüssel → Inhalt der Seite. */
+const CFG_PANELS = {};
 const CFG_COLLECT = { banner: cfgCollectBanner, home: cfgCollectHome, labels: cfgCollectLabels, messages: cfgCollectMessages };
 
 async function cfgSave(key, form) {
@@ -302,6 +327,18 @@ Object.assign(actions, {
   'home-faq-add': (el) => el.insertAdjacentHTML('beforebegin', cfgFaqRow()),
   'home-link-add': (el) => $('#cfgLinks').insertAdjacentHTML('beforeend', cfgLinkRow()),
   'home-row-del': (el) => el.closest('.cfg-row').remove(),
+  'banner-slide-add': (el) => {
+    $('#cfgSlides').insertAdjacentHTML('beforeend', cfgSlideRow());
+    el.hidden = $$('#cfgSlides .slide-row').length >= 2;
+    $('#cfgSlides .slide-row:last-child [data-slide="text"]').focus();
+  },
+  'banner-slide-del': (el) => {
+    const f = el.closest('form');
+    el.closest('.cfg-row').remove();
+    const add = f.querySelector('[data-action="banner-slide-add"]');
+    if (add) add.hidden = false;
+    if (typeof cfgBannerMount === 'function') cfgBannerMount();
+  },
   'msg-insert': (el) => {
     const ta = $(`#cfgM-${el.dataset.key}`);
     const s = ta.selectionStart ?? ta.value.length;
@@ -404,6 +441,7 @@ Object.assign(forms, {
 async function refreshSiteConfig() {
   const me = await api.get('/api/auth/me');
   st.siteConfig = me.siteConfig;
+  applyStatuses(st.siteConfig && st.siteConfig.statuses);
   if (window.PS.siteConfig && st.siteConfig) {
     PS.siteConfig.setLabels(st.siteConfig.labels);
     PS.siteConfig.banners(st.siteConfig, $('#content'), { className: 'dash-banner' });

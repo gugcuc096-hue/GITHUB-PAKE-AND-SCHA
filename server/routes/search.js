@@ -106,6 +106,9 @@ router.get('/', (req, res) => {
   const caseWhere = [L('c.case_number'), L('c.title'), L('c.client_name'), L('cu.display_name'), L('c.opponent'), L('c.court_ref')];
   const caseArgs = Array(caseWhere.length).fill(like);
   if (staff) {
+    // Zusatzangaben (eigene Felder, z. B. Kennzeichen oder Haftnummer)
+    caseWhere.push(L('c.intake_answers'));
+    caseArgs.push(like);
     // auch per FiveNet-/Google-Link oder Dokument-ID (wie die Aktensuche)
     caseWhere.push("c.id IN (SELECT case_id FROM case_external_docs WHERE external_id = ? OR canonical_url = ? OR original_url = ?)");
     caseArgs.push(q, q, q);

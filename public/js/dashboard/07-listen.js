@@ -55,11 +55,13 @@ const areaFieldRow = (f = { key: '', label: '', type: 'text', required: false, h
     <input class="field" data-f="label" maxlength="80" value="${esc(f.label)}" placeholder="Frage / Bezeichnung (z. B. Tatort)" aria-label="Bezeichnung">
     <select class="field" data-f="type" aria-label="Art des Feldes">${Object.entries(st.lists.fieldTypes).map(([k, l]) => opt(k, l, f.type === k)).join('')}</select>
     <label class="check"><input type="checkbox" data-f="required" ${f.required ? 'checked' : ''}> Pflicht</label>
+    <label class="check" title="Erscheint nicht im Mandatsformular und nicht beim Mandanten – nur die Kanzlei füllt es in der Akte aus"><input type="checkbox" data-f="internal" ${f.internal ? 'checked' : ''}> nur Kanzlei</label>
     <input class="field" data-f="hint" maxlength="200" value="${esc(f.hint)}" placeholder="Hinweis unter dem Feld (optional)" aria-label="Hinweis">
     <input class="field" data-f="options" maxlength="600" value="${esc((f.options || []).join(', '))}" placeholder="Auswahl: Möglichkeiten, durch Komma getrennt" aria-label="Möglichkeiten der Auswahl">
     <button type="button" class="icon-btn sm" data-action="area-field-del" aria-label="Feld entfernen">${icon('trash', 'ico-sm')}</button>
   </div>`;
 
+const areaStepInput = (s, i) => `<input class="field" data-step="${i}" maxlength="30" value="${esc(s)}" aria-label="Schritt ${i + 1}" placeholder="Schritt ${i + 1}">`;
 function areaFormHtml(a) {
   const L = st.lists;
   const steps = a && a.customSteps ? a.steps : L.defaultSteps;
@@ -74,8 +76,9 @@ function areaFormHtml(a) {
       <label class="check span-2"><input type="checkbox" name="active" ${!a || a.active ? 'checked' : ''}> Eingeschaltet (in Formularen und auf der Website wählbar)</label>
       <div class="span-2"><div class="label">Verfahrensschritte</div>
         <label class="check"><input type="checkbox" name="stdSteps" ${a && a.customSteps ? '' : 'checked'} data-action="area-steps-toggle"> Standard verwenden (${esc(L.defaultSteps.join(' → '))})</label>
-        <div class="area-steps ${a && a.customSteps ? '' : 'hidden'}" id="arSteps">${steps.map((s, i) => `<input class="field" data-step="${i}" maxlength="30" value="${esc(s)}" aria-label="Schritt ${i + 1}" placeholder="Schritt ${i + 1}">`).join('')}</div>
-        <p class="form-hint">Vier Schritte; danach folgt immer „Abgeschlossen“.</p></div>
+        <div class="area-steps ${a && a.customSteps ? '' : 'hidden'}" id="arSteps">${steps.map(areaStepInput).join('')}
+          <span class="area-step-btns"><button type="button" class="icon-btn sm" data-action="area-step-add" aria-label="Schritt hinzufügen" title="Schritt hinzufügen">${icon('plus', 'ico-sm')}</button><button type="button" class="icon-btn sm" data-action="area-step-del" aria-label="Letzten Schritt entfernen" title="Letzten Schritt entfernen">${icon('trash', 'ico-sm')}</button></span></div>
+        <p class="form-hint">Zwei bis acht Schritte; danach folgt immer „Abgeschlossen“.</p></div>
       <div class="span-2"><label class="label" for="arCheck">Checkliste (ein Punkt je Zeile)</label><textarea id="arCheck" name="checklist" class="field" rows="6" maxlength="3000" placeholder="Mandantengespräch führen">${esc(a ? a.checklist.join('\n') : '')}</textarea><p class="form-hint">Wird in der Akte unter „Aufgaben → Checkliste“ als Aufgaben übernommen.</p></div>
       <div class="span-2"><div class="label">Ergebnisse beim Abschluss</div><p class="form-hint mt-0">Nichts angehakt = alle Ergebnisse stehen zur Wahl.</p>
         <div class="area-outcomes">${L.outcomes.map((o) => `<label class="check"><input type="checkbox" name="outcome" value="${esc(o.key)}" ${a && a.outcomes.includes(o.key) ? 'checked' : ''}> ${esc(o.label)}</label>`).join('')}</div></div>
@@ -117,6 +120,7 @@ function collectArea(f) {
       label,
       type: row.querySelector('[data-f="type"]').value,
       required: row.querySelector('[data-f="required"]').checked,
+      internal: !!row.querySelector('[data-f="internal"]')?.checked,
       hint: row.querySelector('[data-f="hint"]').value.trim(),
       options: row.querySelector('[data-f="options"]').value.split(',').map((x) => x.trim()).filter(Boolean),
     });
@@ -146,6 +150,17 @@ Object.assign(actions, {
   },
   'area-edit': (el) => openModal(areaFormHtml(st.lists.areas.find((a) => a.key === el.dataset.key)), { wide: true }),
   'area-steps-toggle': (el) => $('#arSteps').classList.toggle('hidden', el.checked),
+  'area-step-add': () => {
+    const n = $$('#arSteps [data-step]').length;
+    if (n >= 8) return toast('Höchstens acht Schritte.', 'error');
+    $('#arSteps .area-step-btns').insertAdjacentHTML('beforebegin', areaStepInput('', n));
+    $(`#arSteps [data-step="${n}"]`).focus();
+  },
+  'area-step-del': () => {
+    const list = $$('#arSteps [data-step]');
+    if (list.length <= 2) return toast('Mindestens zwei Schritte.', 'error');
+    list[list.length - 1].remove();
+  },
   'area-field-add': (el) => $('#arFields').insertAdjacentHTML('beforeend', areaFieldRow()),
   'area-field-del': (el) => el.closest('.area-field').remove(),
   'area-toggle': async (el) => {

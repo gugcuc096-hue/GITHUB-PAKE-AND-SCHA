@@ -43,6 +43,35 @@ function twoFactorPanel(tf) {
 }
 
 /** Offline-Modus (nur dieses Gerät): freiwillig, Daten bleiben im Browser dieses Geräts und werden beim Abmelden gelöscht. */
+/** Benachrichtigungen: Discord-Direktnachrichten (an / still / aus), Ruhezeiten, Hinweise und Ton im Dashboard. */
+function notifyPanel() {
+  const p = st.notify;
+  if (!p) return '';
+  const u = st.user;
+  const seg = (name, map, cur) =>
+    `<div class="seg" role="radiogroup">${Object.entries(map)
+      .map(([k, l]) => `<label class="seg-opt"><input type="radio" name="${name}" value="${k}" ${cur === k ? 'checked' : ''}><span>${esc(l)}</span></label>`)
+      .join('')}</div>`;
+  return `<section class="panel panel-pad" id="notifyPanel">
+      <div class="panel-head"><h2 class="panel-title">Benachrichtigungen</h2></div>
+      <form data-form="notify-prefs" class="form-grid">
+        <div><div class="label">Discord-Direktnachrichten${u.discord ? '' : ' <span class="text-dim font-normal">(erst nach „Mit Discord verbinden“)</span>'}</div>
+          ${seg('dm', { an: 'An', still: 'Still (ohne Ton)', aus: 'Aus' }, p.dm)}
+          <p class="form-hint">„Still“: Nachrichten kommen an, aber ohne Ton und ohne Push aufs Handy. Login-Codes und neue Zugangsdaten kommen immer.</p></div>
+        <div><label class="check"><input type="checkbox" name="quiet" ${p.quiet ? 'checked' : ''}> Ruhezeiten – in dieser Zeit kommt alles still an</label>
+          <div class="flex flex-wrap items-center gap-2 mt-2"><input type="time" name="quietFrom" class="field w-auto" value="${esc(p.quietFrom)}" aria-label="Ruhezeit ab"><span class="text-dim">bis</span><input type="time" name="quietTo" class="field w-auto" value="${esc(p.quietTo)}" aria-label="Ruhezeit bis"></div></div>
+        ${
+          isStaff()
+            ? `<div><div class="label">Im Dashboard</div>
+          <label class="check"><input type="checkbox" name="toasts" ${p.toasts ? 'checked' : ''}> Hinweis bei neuen Nachrichten in Akten, die gerade nicht offen sind</label>
+          <label class="check"><input type="checkbox" name="sound" ${p.sound ? 'checked' : ''}> Mit leisem Ton</label></div>`
+            : ''
+        }
+        <div class="form-actions"><button type="submit" class="btn-gold btn-md">${icon('check', 'ico-sm')}<span>Speichern</span></button></div>
+      </form>
+    </section>`;
+}
+
 function offlinePanel() {
   const o = window.PS.offline;
   if (!o) return '';
@@ -69,6 +98,7 @@ views.profile = {
       load.fivenet(),
     ]);
     st.otherSessions = sessions.others;
+    st.notify = await api.get('/api/notify-prefs').then((r) => r.prefs, () => st.notify || null);
     st.offlineStats = window.PS.offline ? await window.PS.offline.stats() : null;
     st.twoFactor = me.twoFactor;
     st.myCoops = coops ? coops.matches : [];
@@ -89,7 +119,8 @@ views.profile = {
         : `<p class="text-sm text-muted">Das Board of Partners hat die Discord-Anmeldung noch nicht eingerichtet.${isAdmin() ? ' <a href="/dashboard?tab=bot&amp;modul=login#settings" class="text-gold underline">Einstellungen → Discord → Discord-Login</a> zeigt, was fehlt.' : ''}</p>`;
     return `
         ${u.mustChangePassword ? `<div class="banner banner-amber">${icon('alert')}<div><strong>Bitte jetzt ein eigenes Passwort festlegen.</strong> Ihr aktuelles Passwort wurde automatisch erzeugt oder vom Board of Partners zurückgesetzt.</div></div>` : ''}
-        <div class="page-head"><div><h1 class="page-title">Mein Profil</h1><p class="page-sub">Kontaktdaten, Passwort, Discord${isStaff() ? ' und FiveNet' : ''}.</p></div></div>
+        <div class="page-head"><div><h1 class="page-title">Mein Profil</h1><p class="page-sub">Kontaktdaten, Passwort, Discord${isStaff() ? ' und FiveNet' : ''}.</p></div>
+          <div class="page-actions"><button type="button" class="btn-outline btn-md" data-action="tour-start">${icon('star', 'ico-sm')}<span>Einführung ansehen</span></button></div></div>
         <div class="grid-2">
           <section class="panel panel-pad">
             <div class="flex items-center gap-5 mb-5">
@@ -126,6 +157,7 @@ views.profile = {
           ${motionPanel()}
           ${offlinePanel()}
           ${twoFactorPanel(st.twoFactor)}
+          ${notifyPanel()}
           <section class="panel panel-pad">
             <div class="panel-head"><h2 class="panel-title flex items-center gap-2">${DISCORD_ICON} Discord</h2>${u.discord ? badge('Verbunden', 'emerald') : ''}</div>
             ${discord}
@@ -317,7 +349,7 @@ function tierForm(t = null) {
       <form data-form="tier" ${t ? `data-id="${t.id}"` : ''} class="form-grid cols-2">
         <div><label class="label">Name</label><input name="name" class="field" required minlength="2" maxlength="60" value="${esc(t ? t.name : '')}" placeholder="z. B. VIP Gold" autofocus></div>
         <div><label class="label">Art</label><select name="kind" class="field" id="tierKind">${opt('vip', 'VIP (auf Zeit)', kind === 'vip')}${opt('perma', 'Lifetime (unbefristet)', kind === 'perma')}</select></div>
-        <div><label class="label">Preis ($)</label><input name="price" type="number" inputmode="numeric" min="0" step="1000" class="field" required value="${esc(t ? t.price : 250000)}"></div>
+        <div><label class="label">Preis ($)</label><input name="price" data-money type="number" inputmode="numeric" min="0" step="1000" class="field" required value="${esc(t ? t.price : 250000)}"></div>
         <div><label class="label">Rabatt auf alle Leistungen (%)</label><input name="discountPct" type="number" inputmode="decimal" min="0" max="100" step="0.5" class="field" required value="${esc(t ? t.discountPct : 15)}"></div>
         <div id="tierDuration" ${kind === 'perma' ? 'class="hidden"' : ''}><label class="label">Laufzeit (Tage)</label><input name="durationDays" type="number" inputmode="numeric" min="1" max="3650" class="field" value="${esc(t && t.durationDays ? t.durationDays : 30)}"></div>
         <div class="flex items-end"><label class="check"><input type="checkbox" name="active" ${!t || t.active ? 'checked' : ''}> Aktiv (kann vergeben werden)</label></div>
@@ -373,7 +405,7 @@ function offerCardHtml(t, busy) {
   return `<div class="panel panel-pad flex flex-col" style="border-top:2px solid ${life ? 'var(--gold-500)' : 'rgba(56,189,248,.6)'}">
       <div class="flex items-center justify-between mb-3">${memberBadge({ kind: t.kind, name: life ? 'Lifetime' : 'VIP' })}<span class="text-xs text-dim font-mono">${life ? 'unbefristet' : `${t.durationDays} Tage`}</span></div>
       <h3 class="font-serif text-2xl font-semibold">${esc(t.name)}</h3>
-      <div class="font-mono text-2xl text-gold font-semibold mt-1">${money(t.price)}</div>
+      <div class="num text-2xl text-gold font-semibold mt-1">${money(t.price)}</div>
       <div class="text-xs text-dim mb-3">${life ? 'einmalig · gilt unbefristet' : `für ${t.durationDays} Tage · verlängerbar`}</div>
       <div class="text-sm font-semibold mb-2" style="color:var(--gold-light)">${fmtPct(t.discountPct)} % Rabatt auf alle Leistungen</div>
       ${t.benefits ? `<p class="text-sm text-muted whitespace-pre-line mb-4" style="flex:1">${esc(t.benefits)}</p>` : '<div style="flex:1"></div>'}

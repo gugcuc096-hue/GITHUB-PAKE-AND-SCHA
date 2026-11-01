@@ -31,6 +31,8 @@ const PLACEHOLDERS = {
   gegenpartei: 'Gegenpartei der Akte',
   anklagepunkte: 'Anklagepunkte aus dem Strafmaß-Rechner (je Zeile einer)',
   kanzlei: 'Pake & Scha Legal Consulting',
+  frist: 'Nächste Frist der Akte (Datum und Bezeichnung)',
+  termin: 'Nächster Termin der Akte (Datum, Uhrzeit und Bezeichnung)',
   datum: 'Heutiges Datum',
   uhrzeit: 'Aktuelle Uhrzeit',
   ort: 'Los Santos, San Andreas',

@@ -160,7 +160,37 @@ function describeError(status, body) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** opts.reason: Begründung im Discord-Audit-Log (z. B. bei Rollenänderungen durch den Bot). */
+/*
+ * Direktnachrichten beachten die Wahl der Person (Profil → Benachrichtigungen): „aus“ → nicht senden, „still“ bzw.
+ * Ruhezeit → ohne Ton/Push (Flag SUPPRESS_NOTIFICATIONS). Dazu merkt sich der Versand, welcher DM-Kanal zu wem gehört.
+ * opts.important (Login-Codes, Zugangsdaten) geht immer normal raus.
+ */
+const dmChannels = new Map(); // Kanal-ID → Discord-ID des Empfängers
+const SUPPRESS_NOTIFICATIONS = 1 << 12;
+function dmGate(method, path, body, opts) {
+  if (method !== 'POST' || opts.important) return { body };
+  const m = /^\/channels\/(\d+)\/messages$/.exec(path);
+  const to = m && dmChannels.get(m[1]);
+  if (!to) return { body };
+  const mode = require('../domain/notifyPrefs').dmMode(to);
+  if (mode === 'nicht') return { skip: true };
+  if (mode === 'still' && body && typeof body === 'object') return { body: { ...body, flags: (Number(body.flags) || 0) | SUPPRESS_NOTIFICATIONS } };
+  return { body };
+}
 async function rest(method, path, body, opts = {}) {
+  if (!opts.attempt) {
+    const gate = dmGate(method, path, body, opts);
+    if (gate.skip) return { id: null, skipped: true };
+    body = gate.body;
+  }
+  const result = await restRaw(method, path, body, opts);
+  if (method === 'POST' && path === '/users/@me/channels' && result && result.id && body && body.recipient_id) {
+    if (dmChannels.size > 2000) dmChannels.clear();
+    dmChannels.set(String(result.id), String(body.recipient_id));
+  }
+  return result;
+}
+async function restRaw(method, path, body, opts = {}) {
   const attempt = opts.attempt || 0;
   const headers = {
     Authorization: `Bot ${token()}`,
@@ -177,7 +207,7 @@ async function rest(method, path, body, opts = {}) {
   if (res.status === 429 && attempt < 3 && !opts.noRetry) {
     const info = await res.json().catch(() => ({}));
     await sleep(Math.min(15, Number(info.retry_after) || 1) * 1000 + 250);
-    return rest(method, path, body, { ...opts, attempt: attempt + 1 });
+    return restRaw(method, path, body, { ...opts, attempt: attempt + 1 });
   }
   if (res.status === 204) return null;
   const text = await res.text().catch(() => '');
