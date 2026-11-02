@@ -1129,6 +1129,7 @@ router.get(
     if (!a || (a.internal && !isStaff(req.user))) return res.status(404).json({ error: 'Anhang nicht gefunden.' });
     res.set('Cache-Control', 'private, max-age=86400');
     res.type(a.mime);
+    await require('../dauer/files').ensureLocal(evidencePath(a.file)); // Dauerbetrieb: nach einem Neustart aus dem Drive
     res.sendFile(evidencePath(a.file), (err) => {
       if (err && !res.headersSent) res.status(404).json({ error: 'Datei nicht gefunden.' });
     });
@@ -1191,6 +1192,7 @@ router.get(
     if (!a || (a.internal && !isStaff(req.user))) return res.status(404).json({ error: 'Anhang nicht gefunden.' });
     res.set('Cache-Control', 'private, max-age=604800');
     if (!a.thumb) res.type(a.mime); // Vorschaubild: Typ aus der Dateiendung (.webp/.jpg/.png)
+    await require('../dauer/files').ensureLocal(evidencePath(a.thumb || a.file)); // Dauerbetrieb: nach einem Neustart aus dem Drive
     res.sendFile(evidencePath(a.thumb || a.file), (err) => {
       if (err && !res.headersSent) res.status(404).json({ error: 'Datei nicht gefunden.' });
     });

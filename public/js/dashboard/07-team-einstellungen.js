@@ -468,6 +468,7 @@ views.settings = {
     if (st.settingsTab === 'bot' && bot && !st.botDiscord) await loadBotDiscord();
     if (st.settingsTab === 'bot' && bot) await loadBotMessages().catch(() => {});
     if (st.settingsTab === 'health' && can('system.edit')) st.system = await api.get('/api/system').catch(() => null);
+    if (st.settingsTab === 'dauer' && can('system.edit')) await loadDauer();
   },
   render() {
     const s = st.settings;
@@ -536,6 +537,7 @@ const SETTINGS_SECTIONS = [
   ['integrations', 'Integrationen', 'Kommunikation', 'link', ['system.edit'], 'FiveNet Google Docs Drive Sheets'],
   ['access', 'Rechte & Schalter', 'Rechte & System', 'key', CONFIG_PERMS, 'Rechte Funktionen Schalter Web-Admin Protokoll'],
   ['system', 'Sicherung & Notfall', 'Rechte & System', 'shield', ['system.edit'], 'Datensicherung Backup Wiederherstellen Notfall Wartung'],
+  ['dauer', 'Dauerbetrieb', 'Rechte & System', 'clock', ['system.edit'], 'Dauerbetrieb Render Free wach einschlafen Wecker Ping cron Google Drive Live-Sicherung Neustart Schlüssel'],
   ['health', 'Systemzustand', 'Rechte & System', 'chart', ['system.edit'], 'Systemzustand Speicher Datenbank Selbsttest Anfragen Leistung'],
 ].map(([key, label, group, ic, perm, words]) => ({ key, label, group, icon: ic, perm, words }));
 /** Alte Reiter-Namen (Links, Lesezeichen) → neuer Bereich. */
@@ -599,6 +601,7 @@ function settingsBody(key, s) {
   if (key === 'integrations') return `${fivenetSettingsPanel(s)}${googleDocsPanel(st.google)}`;
   if (key === 'system') return `${backupPanel()}<div class="mt-4 lg:mt-5">${emergencyPanel()}</div>`;
   if (key === 'health') return st.system ? systemPanel(true) : '<div class="panel panel-pad"><p class="text-sm text-muted">Wird geladen …</p></div>';
+  if (key === 'dauer') return dauerPanel();
   if (key === 'site') return `${websitePanel(s)}<div class="mt-4 lg:mt-5">${lotmPanel(s)}</div><div class="mt-4 lg:mt-5">${siteTextsPanel()}</div><div class="mt-4 lg:mt-5">${ranksPanel()}</div>`;
   return settingsGeneral(s);
 }

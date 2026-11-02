@@ -57,6 +57,7 @@ router.get(
       gdocs.retryPending();
       gdocs.ensureAll(); // Docs für alle vorhandenen Rechnungen, Verträge und Schriftsätze nachholen
       require('../integrations/driveBackup').afterConnect(); // gleich eine Kopie der Datensicherung in den privaten Ordner
+      require('../dauer/live').kick(); // Dauerbetrieb: Live-Sicherung beginnt jetzt
       back('verbunden');
     } catch (err) {
       console.warn('Google-Anmeldung fehlgeschlagen:', err.message);

@@ -111,6 +111,7 @@ async function build(kind, refId, { options, viewer } = {}) {
       for (const a of data.attachments || []) {
         const r = db.prepare('SELECT file FROM case_attachments WHERE id = ?').get(a.id);
         try {
+          if (r) await require('../dauer/files').ensureLocal(evidencePath(r.file)); // Dauerbetrieb: nach einem Neustart aus dem Drive
           const buf = r && fs.readFileSync(evidencePath(r.file));
           const type = buf && detectImage(buf);
           if (type && (type.ext === 'jpg' || type.ext === 'png')) files[a.id] = { data: buf, type: type.ext };

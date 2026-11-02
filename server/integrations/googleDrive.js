@@ -18,11 +18,14 @@ const fs = require('fs');
 const { getSetting, setSetting } = require('../db/db');
 const { envValue } = require('./discord');
 
+// GOOGLE_API_BASE / GOOGLE_OAUTH_BASE nur für Tests (nachgebautes Google), sonst die echten Adressen
+const API_BASE = (process.env.GOOGLE_API_BASE || 'https://www.googleapis.com').replace(/\/+$/, '');
+const OAUTH_BASE = (process.env.GOOGLE_OAUTH_BASE || 'https://oauth2.googleapis.com').replace(/\/+$/, '');
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
-const TOKEN_URL = 'https://oauth2.googleapis.com/token';
-const REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
-const DRIVE = 'https://www.googleapis.com/drive/v3';
-const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
+const TOKEN_URL = `${OAUTH_BASE}/token`;
+const REVOKE_URL = `${OAUTH_BASE}/revoke`;
+const DRIVE = `${API_BASE}/drive/v3`;
+const UPLOAD = `${API_BASE}/upload/drive/v3`;
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const SCOPES = ['openid', 'email', DRIVE_SCOPE];
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -199,7 +202,7 @@ async function upload(method, url, metadata, docx) {
     headers: { 'X-Upload-Content-Type': DOCX_MIME, 'X-Upload-Content-Length': String(docx.length) },
   });
   const session = res.headers.get('location');
-  if (!session || !/^https:\/\/www\.googleapis\.com\//.test(session)) throw fail('Google Drive: Upload-Sitzung konnte nicht gestartet werden.');
+  if (!session || !session.startsWith(`${API_BASE}/`)) throw fail('Google Drive: Upload-Sitzung konnte nicht gestartet werden.');
   return call('PUT', session, { body: docx, headers: { 'Content-Type': DOCX_MIME } });
 }
 
@@ -305,7 +308,7 @@ async function uploadFile(kind, name, file, mime, retried = false) {
     throw err;
   }
   const session = res.headers.get('location');
-  if (!session || !/^https:\/\/www\.googleapis\.com\//.test(session)) throw fail('Google Drive: Upload-Sitzung konnte nicht gestartet werden.');
+  if (!session || !session.startsWith(`${API_BASE}/`)) throw fail('Google Drive: Upload-Sitzung konnte nicht gestartet werden.');
   const fh = await fs.promises.open(file, 'r');
   try {
     let pos = 0;
@@ -380,4 +383,4 @@ function status(req) {
   };
 }
 
-module.exports = { configured, connected, authorizeUrl, connect, disconnect, createDoc, updateDoc, trashDoc, uploadFile, listFiles, deleteFile, folderUrl, status, DRIVE_SCOPE };
+module.exports = { currentRefreshToken: () => (configured() ? refreshToken() : null), configured, connected, authorizeUrl, connect, disconnect, createDoc, updateDoc, trashDoc, uploadFile, listFiles, deleteFile, folderUrl, status, DRIVE_SCOPE };

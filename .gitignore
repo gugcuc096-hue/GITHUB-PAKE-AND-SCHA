@@ -9,3 +9,4 @@ data/backups/
 data/restore.db*
 data/*.before-restore-*
 .packed/
+data/.dauer/

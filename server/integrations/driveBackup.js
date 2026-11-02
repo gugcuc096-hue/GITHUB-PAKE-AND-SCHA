@@ -78,14 +78,17 @@ async function runNow({ fresh = false } = {}) {
   running = true;
   let uploaded = 0;
   try {
+    const dauer = require('../dauer/config').enabled();
+    const allowed = require('../dauer/guard').historyAllowed(); // Speicherwächter: bei knappem Drive pausieren
     const newest = backup.list()[0];
-    if (newest && newest.name !== s.dbName) {
+    if (allowed && newest && newest.name !== s.dbName) {
       const up = await drive.uploadFile('backup', newest.name, path.join(backup.DIR, newest.name), DB_MIME);
       Object.assign(s, { dbName: newest.name, dbAt: new Date().toISOString(), dbSize: up.size });
       saveState(s);
       uploaded += 1;
     }
-    if (!s.mediaAt || Date.now() - Date.parse(s.mediaAt) >= MEDIA_EVERY_DAYS * 864e5) {
+    // Im Dauerbetrieb liegt jedes Bild ohnehin einzeln im Drive – kein zusätzliches Archiv
+    if (!dauer && allowed && (!s.mediaAt || Date.now() - Date.parse(s.mediaAt) >= MEDIA_EVERY_DAYS * 864e5)) {
       const stats = media.stats();
       if (stats.files) {
         const name = `pake-scha-bilder-${new Date().toISOString().slice(0, 10)}.tar.gz`;

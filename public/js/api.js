@@ -58,10 +58,19 @@
     }
     let res;
     // Lesen darf es nach kurzer Pause noch einmal versuchen – z. B. während eines Updates, wenn der Server für einen
-    // Moment neu startet (Render: ca. eine Minute). Ändern (POST & Co.) nie automatisch wiederholen.
+    // Moment neu startet (Render: ca. eine Minute). Ändern (POST & Co.) nur, wenn der Server ausdrücklich sagt, dass er
+    // die Anfrage NICHT verarbeitet hat (X-PS-Retry, Dauerbetrieb: Übergabe an die neue Instanz) – dann bis zu
+    // 2 Minuten, bis die neue Instanz sie annimmt. So geht auch während eines Deploys keine Eingabe verloren.
+    const started = Date.now();
+    let waitToast = null;
     for (let attempt = 0; ; attempt++) {
       try {
         res = await fetch(url, opts);
+        if (res.status === 503 && res.headers.get('X-PS-Retry') === '1' && Date.now() - started < 120000) {
+          if (!waitToast && method !== 'GET' && attempt >= 1 && window.PS && PS.toast) waitToast = PS.toast('Der Server wird gerade aktualisiert – Ihre Änderung wird gleich gespeichert …', 'ok', { duration: 8000 });
+          await new Promise((r) => setTimeout(r, Math.min(4000, 1000 + attempt * 500)));
+          continue;
+        }
         if (method !== 'GET' || attempt >= 3 || ![502, 503, 504].includes(res.status)) break;
       } catch {
         if (method !== 'GET' || attempt >= 3) {

@@ -16,6 +16,8 @@ Ausgelagert aus der [README](../README.md): Discord (Bot, Rang-Sync, Willkommen)
 | Speicher fast voll | weniger als 300 MB frei auf der Disk | wieder über 400 MB frei |
 | Server abgestürzt | beim Neustart nach einem Absturz (mit Fehlermeldung, falls bekannt); Deploys und Neustarts über Render lösen nichts aus | – |
 
+**Dauerbetrieb (Render Free):** Eigenes Ereignis „Dauerbetrieb“ – es **pingt nur die Web-Admins und den Inhaber** (einzeln mit Namen, nie eine Rolle; dafür muss ihr Discord mit dem Konto verknüpft sein). Gemeldet wird: Sicherung im Google Drive klappt seit 3 Minuten nicht bzw. Google-Zugang abgelaufen, Google Drive wird knapp, externer Wecker seit 20 Minuten still, anderer Stand im Drive gefunden (Start ohne Schlüssel), Server war eingeschlafen oder ist unerwartet neu gestartet (mit dem wiederhergestellten Stand), ein Update wurde nicht übernommen. Im Dauerbetrieb ersetzt diese Meldung die Warnung „Server abgestürzt“. Siehe [README → Dauerbetrieb](../README.md#render-free-dauerbetrieb-nie-einschlafen-nichts-geht-verloren).
+
 Jede Störung wird **einmal** gemeldet (auch über Neustarts hinweg), nicht wiederholt. Solange eine Störung besteht, zeigt die Übersicht des Dashboards dem Board zusätzlich einen roten Hinweis. Fehlertexte werden ohne Links und lange Zeichenketten gesendet, damit nie ein Zugangsschlüssel in Discord landet.
 
 **Discord-Login / Konto verknüpfen:**

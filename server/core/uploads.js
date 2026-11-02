@@ -36,6 +36,7 @@ function saveImageBuffer(buf, kind) {
   }
   const file = `${crypto.randomBytes(12).toString('hex')}.${info.ext}`;
   fs.writeFileSync(path.join(DIRS[kind], file), buf);
+  require('../dauer/files').touched(path.join(DIRS[kind], file)); // Dauerbetrieb: sofort ins Google Drive
   return { file, mime: info.mime, size: buf.length };
 }
 
@@ -48,6 +49,7 @@ function saveImage(req, kind) {
 function removeFile(kind, file) {
   if (!file || file !== path.basename(file)) return;
   fs.rm(path.join(DIRS[kind], file), { force: true }, () => {});
+  require('../dauer/files').removed(path.join(DIRS[kind], file)); // Dauerbetrieb: im Drive noch 30 Tage aufheben
 }
 
 function evidencePath(file) {
