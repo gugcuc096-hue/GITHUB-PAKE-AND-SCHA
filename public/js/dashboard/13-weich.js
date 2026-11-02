@@ -19,7 +19,8 @@ const WCH_OK =
 
 /** Kann jetzt überblendet werden? (nicht bei „Bewegung reduzieren“, nicht im Hintergrund-Tab, nicht mitten im Ziehen) */
 function wchCan() {
-  return WCH_OK && !wchInUpdate && !window.PS.motion.calm() && !document.hidden && !document.body.classList.contains('cal-dragging') && !st.heroRect;
+  // Schnelle Grafikstufe: Überblendungen (Bildschirmfotos der Seite) sind ohne Grafikkarte teuer – dann ohne
+  return WCH_OK && document.documentElement.dataset.gfx !== 'lite' && !wchInUpdate && !window.PS.motion.calm() && !document.hidden && !document.body.classList.contains('cal-dragging') && !st.heroRect;
 }
 
 /**
