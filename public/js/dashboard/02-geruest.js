@@ -980,7 +980,8 @@ async function goNow(view) {
   // Das Menü reagiert sofort auf den Klick. Mit Überblendung (13-weich.js) bleibt die alte Seite stehen, bis die neue fertig ist:
   // der Scrollstand wechselt erst dann
   renderNav();
-  const smooth = wchCan();
+  // Die erste Seite nach dem Öffnen wird nicht überblendet (es gibt nichts Altes) – so ist sie sofort bedienbar
+  const smooth = !!st.firstPainted && wchCan();
   if (!smooth) window.scrollTo(0, 0);
   const token = ++st.navToken;
   const paint = async (extra) => {
@@ -1169,6 +1170,7 @@ function renderView({ force = false } = {}) {
   hidePendingDeletes();
   window.PS.countUp($('#content')); // Kennzahlen zählen hoch (erstes Erscheinen bzw. bei Änderung)
   window.PS.roll($('#content')); // Zählwerk (Lager): Ziffern rollen zum neuen Stand
+  st.firstPainted = true;
 }
 function navigate(view) {
   // Aus einem offenen Fenster heraus: dessen Verlaufseintrag durch die neue Seite ersetzen (Zurück führt nicht ins Leere)
