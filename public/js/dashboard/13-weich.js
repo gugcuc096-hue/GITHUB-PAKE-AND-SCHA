@@ -68,6 +68,7 @@ function wchSwap(fn) {
   wchCur = t;
   const done = () => {
     delete root.dataset.wch;
+    delete root.dataset.wchDir;
     if (wchCur === t) wchCur = null;
   };
   t.ready.catch(() => {}); // von einer neueren Überblendung abgelöst: kein Fehler, das Neue läuft einfach weiter

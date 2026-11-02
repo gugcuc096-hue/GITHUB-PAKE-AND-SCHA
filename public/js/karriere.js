@@ -128,7 +128,7 @@
     // Offene Stellen – drei nebeneinander, wenn es aufgeht (sonst zwei bzw. eine mittig), damit keine Lücke bleibt
     window.PS.boot('positions', '/api/public/positions').then(({ positions }) => {
         const root = document.getElementById('positions');
-        select.innerHTML = positions.map((p) => `<option value="${p.id}">${esc(p.title)}</option>`).join('') + '<option value="">Initiativbewerbung</option>';
+        select.innerHTML = positions.map((p) => `<option value="${p.id}">${esc(p.title)}</option>`).join('');
         const wanted = Number(new URLSearchParams(location.search).get('stelle'));
         if (wanted && positions.some((p) => p.id === wanted)) select.value = String(wanted);
         if (positions.length) {
@@ -140,7 +140,10 @@
         root.className = `grid grid-cols-1 gap-4 md:gap-6 ${n === 1 ? 'max-w-xl mx-auto' : n % 3 === 0 ? 'md:grid-cols-2 lg:grid-cols-3' : 'md:grid-cols-2'}`;
         if (!n) {
             root.className = 'grid grid-cols-1 max-w-2xl mx-auto';
-            root.innerHTML = `<div class="glass-card p-8 text-center"><p class="text-muted mb-4">Aktuell sind keine Stellen ausgeschrieben – wir freuen uns trotzdem über Ihre Initiativbewerbung.</p><button class="btn-gold btn-md" data-apply="">Initiativ bewerben</button></div>`;
+            // Ohne ausgeschriebene Stelle gibt es nichts zu bewerben: Formular und Verweise darauf entfallen
+            root.innerHTML = '<div class="glass-card p-8 text-center"><p class="text-muted">Aktuell sind keine Stellen ausgeschrieben – schauen Sie bald wieder vorbei.</p></div>';
+            document.getElementById('bewerben').hidden = true;
+            document.querySelectorAll('a[href="#bewerben"]').forEach((a) => (a.hidden = true));
             return;
         }
         root.innerHTML = positions.map((p) => `
