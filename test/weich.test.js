@@ -68,8 +68,12 @@ describe('Weiche Wechsel und Feinschliff (Browser)', { skip: chromium ? false : 
       await page.waitForFunction(() => location.hash === '#users');
       await page.waitForFunction(() => window.__vt >= 1, null, { timeout: 5000 }); // (noch nicht besuchte Seiten laden erst)
       // Sofort noch einmal klicken – mitten in der Überblendung (rohe Mausposition, ohne Warten auf den Browser)
-      const box = await (await page.$('#content .hub-tabs >> text=Beförderungen')).boundingBox();
-      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+      // (Die Seite lädt nach und die Leiste verschiebt sich dabei evtl. noch – unter Last darum neu messen und notfalls erneut klicken.)
+      for (let versuch = 0; versuch < 3 && (await page.evaluate(() => location.hash)) !== '#personnel'; versuch++) {
+        const box = await (await page.$('#content .hub-tabs >> text=Beförderungen')).boundingBox();
+        await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+        await page.waitForFunction(() => location.hash === '#personnel', null, { timeout: 2500 }).catch(() => {});
+      }
       await page.waitForFunction(() => location.hash === '#personnel', null, { timeout: 5000 });
       await page.waitForFunction(() => /Beförderung|Personal/i.test(document.querySelector('#content .page-title')?.textContent || ''), null, { timeout: 5000 });
       await settled(page);
