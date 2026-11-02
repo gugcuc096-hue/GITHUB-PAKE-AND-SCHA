@@ -154,6 +154,7 @@ const TERM = [
 const LAYOUT = {
   zivilrecht: {
     retitle: { tathergang: 'Streitgegenstand / Sachverhalt' },
+    hide: ['charges'],
     quiet: ['karte'], // nur sichtbar, wenn es schon Orte gibt (sonst „⋯ Mehr → Karte“)
     sections: [
       { key: 'claims', title: 'Ansprüche', meta: [VALUE], item: 'claim', sumLabel: 'Summe der Ansprüche', hint: 'Je Anspruch: Grundlage, wer von wem was fordert, Stand und Verjährung.' },
@@ -163,7 +164,7 @@ const LAYOUT = {
   },
   verfassungsrecht: {
     retitle: { evidence: 'Beweismittel & Anhänge' },
-    hide: ['tathergang', 'witnesses', 'karte'],
+    hide: ['tathergang', 'charges', 'witnesses', 'karte'],
     sections: [
       { key: 'subject', title: 'Angegriffener Akt & Verfahren', meta: SUBJECT_VERF },
       { key: 'admiss', title: 'Zulässigkeit', checks: ADMISS.slice(0, 4), meta: [ADMISS[4]], hint: 'Vier Prüfpunkte, bevor ein Schriftsatz Sinn ergibt.' },
@@ -173,7 +174,7 @@ const LAYOUT = {
   },
   vertragsrecht: {
     retitle: { evidence: 'Anlagen' },
-    hide: ['tathergang', 'witnesses', 'karte'],
+    hide: ['tathergang', 'charges', 'witnesses', 'karte'],
     sections: [
       { key: 'subject', title: 'Vertragsgegenstand & Ziel', meta: SUBJECT_VERTR, modeSwitch: true },
       { key: 'parties', title: 'Vertragsparteien', item: 'party', hint: 'Mit Vertretungsbefugnis – wer darf für wen unterschreiben?' },
@@ -269,17 +270,142 @@ function saveItem(caseId, id, data) {
 }
 const removeItem = (caseId, id) => db.prepare('DELETE FROM case_items WHERE id = ? AND case_id = ?').run(id, caseId).changes > 0;
 
+/* ---------------------------------------------------------------- Eigene Bezeichnungen */
+/*
+ * Jede Vorlage lässt sich umbenennen: Reiter der Akte, Abschnitte, Bezeichnung eines Eintrags („Anspruch“) und die Felder darin.
+ * Gespeichert wird nur, was vom Standard abweicht, als { 'sec.claims': 'Forderungen', … } je Rechtsgebiet (areas.labels):
+ *   tab.<reiter>  ·  sec.<abschnitt>  ·  kind.<eintrag>  ·  field.<eintrag>.<feld>  ·  meta.<feld>
+ */
+const TABS = [['ueberblick', 'Überblick'], ['kommunikation', 'Kommunikation'], ['fall', 'Fall'], ['dokumente', 'Dokumente']];
+// Abschnitte, die es in jeder Akte gibt (je nach Rechtsgebiet ausgeblendet, siehe LAYOUT.hide)
+const STANDARD = [['tathergang', 'Tathergang'], ['charges', 'Anklagepunkte'], ['witnesses', 'Zeugen'], ['karte', 'Tatort-Karte'], ['evidence', 'Beweismittel & Anhänge']];
+const FIELDKEY = /^(tab|sec|kind|field|meta)\.[a-z0-9_.]+$/;
+
+const areaLabels = (area) => {
+  try {
+    return require('./areas').get(area)?.labels || {};
+  } catch {
+    return {};
+  }
+};
+const layoutOf = (area) => LAYOUT[area] || { sections: [], retitle: {}, hide: [], quiet: [] };
+const stdTitle = (area, key) => layoutOf(area).retitle?.[key] || STANDARD.find((x) => x[0] === key)[1];
+
+/** Alles, was sich in der Vorlage eines Rechtsgebiets umbenennen lässt: Gruppen mit { id, def } (def = Standardbezeichnung). */
+function catalog(area) {
+  const lay = layoutOf(area);
+  const groups = [];
+  groups.push({ title: 'Reiter der Akte', items: TABS.map(([k, l]) => ({ id: `tab.${k}`, def: l })) });
+  const sec = STANDARD.filter(([k]) => !(lay.hide || []).includes(k)).map(([k]) => ({ id: `sec.${k}`, def: stdTitle(area, k) }));
+  for (const s of lay.sections) sec.push({ id: `sec.${s.key}`, def: s.title });
+  groups.push({ title: 'Abschnitte im Reiter „Fall“', items: sec });
+  const kinds = [...new Set(lay.sections.map((s) => s.item).filter(Boolean))];
+  if (kinds.length) groups.push({ title: 'Bezeichnung eines Eintrags (Schaltfläche „+ …“)', items: kinds.map((k) => ({ id: `kind.${k}`, def: KINDS[k].label })) });
+  const seen = new Set();
+  for (const s of lay.sections) {
+    const fields = uniqueBy([...(s.checks || []), ...(s.meta || [])]).filter((x) => !seen.has(x.key));
+    if (fields.length) {
+      fields.forEach((x) => seen.add(x.key));
+      groups.push({ title: `Angaben: ${s.title}`, items: fields.map((x) => ({ id: `meta.${x.key}`, def: x.label })) });
+    }
+  }
+  for (const k of kinds) groups.push({ title: `Felder: ${KINDS[k].label}`, items: KINDS[k].fields.map((x) => ({ id: `field.${k}.${x.key}`, def: x.label })) });
+  return groups;
+}
+const catalogIds = (area) => new Set(catalog(area).flatMap((g) => g.items.map((i) => i.id)));
+
+/** Eingaben prüfen und bereinigen: nur bekannte Schlüssel, getrimmt, leer = Standard. */
+function checkLabels(area, given) {
+  if (!given || typeof given !== 'object' || Array.isArray(given)) throw Object.assign(new Error('Ungültige Bezeichnungen.'), { status: 400 });
+  const known = catalogIds(area);
+  const out = {};
+  for (const [id, raw] of Object.entries(given)) {
+    if (!FIELDKEY.test(id) || !known.has(id)) throw Object.assign(new Error(`Diese Bezeichnung gibt es in der Vorlage nicht: ${id}`), { status: 400 });
+    const v = String(raw ?? '').trim().replace(/\s+/g, ' ');
+    if (v.length > 80) throw Object.assign(new Error('Bezeichnungen sind höchstens 80 Zeichen lang.'), { status: 400 });
+    if (v) out[id] = v;
+  }
+  return out;
+}
+
+/** Eigene Bezeichnungen in den Aufbau einsetzen (verändert nichts an den Daten, nur an der Anzeige). */
+function applyLabels(F, labels) {
+  const L = labels || {};
+  const pick = (id, def) => L[id] || def;
+  F.sections = F.sections.map((s) => ({
+    ...s,
+    title: pick(`sec.${s.key}`, s.title),
+    meta: s.meta.map((x) => ({ ...x, label: pick(`meta.${x.key}`, x.label) })),
+    checks: s.checks.map((x) => ({ ...x, label: pick(`meta.${x.key}`, x.label) })),
+  }));
+  for (const k of Object.keys(F.kinds)) {
+    F.kinds[k] = { ...F.kinds[k], label: pick(`kind.${k}`, F.kinds[k].label), fields: F.kinds[k].fields.map((x) => ({ ...x, label: pick(`field.${k}.${x.key}`, x.label) })) };
+  }
+  F.retitle = { ...F.retitle };
+  for (const [k] of STANDARD) F.retitle[k] = pick(`sec.${k}`, F.retitle[k] || STANDARD.find((x) => x[0] === k)[1]);
+  for (const [k, l] of TABS) F.retitle[`tab.${k}`] = pick(`tab.${k}`, l);
+  return F;
+}
+
+/* ---------------------------------------------------------------- Beispieldaten für die Vorschau */
+const iso = (days) => new Date(Date.now() + days * 864e5).toISOString().slice(0, 10);
+const withIds = (kind, rows) => rows.map((r, i) => ({ id: -(i + 1), kind, no: i + 1, ...withDefaults(KINDS[kind].fields, r), createdBy: 'Beispiel', createdAt: '', updatedAt: '' }));
+function sample(area, mode = 'gestaltung') {
+  if (area === 'zivilrecht')
+    return {
+      meta: { streitwert: 18500 },
+      items: {
+        claim: withIds('claim', [
+          { basis: '§ 280 BGB – Schadensersatz wegen Vertragsverletzung', claimant: 'Max Mustermann', opponent: 'Bob Beispiel', amount: 12500, status: 'bestritten', deadline: iso(90), note: 'Rechnung und Mahnung liegen vor.' },
+          { basis: '§ 288 BGB – Verzugszinsen', claimant: 'Max Mustermann', opponent: 'Bob Beispiel', amount: 1200, status: 'geltend', deadline: iso(120) },
+        ]),
+        motion: withIds('motion', [
+          { side: 'klage', text: 'Der Beklagte wird verurteilt, an den Kläger 13.700 $ nebst Zinsen zu zahlen.' },
+          { side: 'abweisung', text: 'Die Widerklage wird abgewiesen.' },
+        ]),
+        corr: withIds('corr', [{ type: 'mahnung', direction: 'aus', date: iso(-14), deadline: iso(7), state: 'offen', note: 'Zahlungsfrist 14 Tage gesetzt.' }]),
+      },
+    };
+  if (area === 'verfassungsrecht')
+    return {
+      meta: { actType: 'urteil', procedure: 'verfassungsbeschwerde', actTitle: 'Urteil des Obergerichts vom 12.03.', actAuthority: 'Obergericht San Andreas', actDate: iso(-30), actSummary: 'Das Gericht hat die Versammlung untersagt; gerügt wird die Verletzung der Versammlungsfreiheit.', c_befugnis: 'ja', c_rechtsweg: 'ja', c_frist: 'offen', c_subsid: 'offen' },
+      items: {
+        norm: withIds('norm', [{ norm: 'Art. 8 – Versammlungsfreiheit', intervention: 'Untersagung der Versammlung', purpose: 'ja', suitable: 'ja', necessary: 'nein', proportional: 'offen', reasoning: 'Ein milderes Mittel (Auflagen) hätte genügt.', assessment: 'aussichtsreich' }]),
+        participant: withIds('participant', [{ name: 'Innenministerium', role: 'aeusserung', deadline: iso(30), note: 'Stellungnahme angefordert.' }, { name: 'Kanzlei Pake & Scha', role: 'vertreter' }]),
+      },
+    };
+  if (area === 'vertragsrecht')
+    return {
+      meta: { mode, subjectText: 'Mietvertrag über ein Lagerhaus am Hafen', goal: 'Günstige Miete bei langer Laufzeit', breach: 'Miete seit zwei Monaten nicht gezahlt', start: iso(0), end: iso(365), notice: '3 Monate zum Quartalsende', options: 'Einmal um zwei Jahre verlängerbar', streitwert: 8400 },
+      items: {
+        party: withIds('party', [{ name: 'Hafen Immobilien GmbH', role: 'gegenseite', rep: 'Geschäftsführer, einzelvertretungsberechtigt', proof: 'ja' }, { name: 'Max Mustermann', role: 'mandant' }]),
+        clause: withIds('clause', [
+          { topic: 'preis', title: 'Miete 2.800 $ im Monat', status: 'vereinbart', risk: 'gruen' },
+          { topic: 'haftung', title: 'Haftung auf Vorsatz und grobe Fahrlässigkeit begrenzt', status: 'strittig', risk: 'rot', text: 'Gegenseite will unbegrenzte Haftung.' },
+          { topic: 'kuendigung', title: 'Kündigung nur zum Quartalsende', status: 'verhandelt', risk: 'gelb' },
+        ]),
+        version: withIds('version', [{ date: iso(-20), note: 'Erster Entwurf' }, { date: iso(-6), note: 'Haftung und Kündigung angepasst' }]),
+        claim: withIds('claim', [{ basis: '§ 535 BGB – Mietzahlung', claimant: 'Hafen Immobilien GmbH', opponent: 'Max Mustermann', amount: 5600, status: 'geltend' }]),
+      },
+    };
+  return { meta: {}, items: {} };
+}
+
 /* ---------------------------------------------------------------- Angaben für das Dashboard */
 const publicSpec = (s) => ({ key: s.key, label: s.label, type: s.type, options: s.options || null, def: s.def, required: !!s.required, hint: s.hint || '', placeholder: s.placeholder || '', wide: !!s.wide, rows: s.rows || 0, when: s.when || null, light: !!s.light, today: !!s.today });
 
-/** Aufbau der Akte für ein Rechtsgebiet; null = Rechtsgebiet ohne eigene Bausteine (Strafrecht, Sonstiges, eigene). */
-function payload(c) {
-  const layout = LAYOUT[c.area];
-  if (!layout) return null;
-  const m = meta(c.id, c.area);
-  const usedKinds = new Set(layout.sections.map((s) => s.item).filter(Boolean));
-  const all = items(c.id);
-  return {
+/**
+ * Aufbau der Akte für ein Rechtsgebiet, mit den eigenen Bezeichnungen. Rechtsgebiete ohne eigene Bausteine (Strafrecht, Sonstiges,
+ * eigene) bekommen nur die Bezeichnungen. opts.sample: Beispieldaten statt der Akte (Vorschau), opts.labels: noch nicht
+ * gespeicherte Bezeichnungen, opts.mode: Modus der Vorschau (Vertragsrecht).
+ */
+function payload(c, opts = {}) {
+  const layout = layoutOf(c.area);
+  const smp = opts.sample ? sample(c.area, opts.mode) : null;
+  const m = smp ? withDefaults(uniqueBy(allMetaFields(c.area)), smp.meta) : meta(c.id, c.area);
+  const usedKinds = new Set(layout.sections.map((x) => x.item).filter(Boolean));
+  const all = smp ? smp.items : items(c.id);
+  const F = {
     area: c.area,
     meta: m,
     items: Object.fromEntries([...usedKinds].map((k) => [k, all[k] || []])),
@@ -291,6 +417,7 @@ function payload(c) {
     hide: layout.hide || [],
     quiet: layout.quiet || [],
   };
+  return applyLabels(F, opts.labels || areaLabels(c.area));
 }
 
-module.exports = { KINDS, LAYOUT, SECTION_KEYS, allMetaFields, uniqueBy, schemaFor, meta, saveMeta, items, one, addItem, saveItem, removeItem, payload, withDefaults };
+module.exports = { KINDS, LAYOUT, SECTION_KEYS, TABS, STANDARD, allMetaFields, uniqueBy, schemaFor, meta, saveMeta, items, one, addItem, saveItem, removeItem, payload, withDefaults, catalog, checkLabels, applyLabels, areaLabels, sample };

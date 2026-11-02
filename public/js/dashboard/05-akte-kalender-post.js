@@ -1130,17 +1130,17 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
   };
   const openTasks = tasks.filter((t) => !t.done).length;
   const jumps = [
-    ['secTathergang', 'Tathergang', storySteps(c.incident).length, parts.tathergang],
-    ['secCharges', 'Anklage', charges ? charges.charges.length : 0, parts.charges],
+    ['secTathergang', fallTitle('tathergang', 'Tathergang'), storySteps(c.incident).length, parts.tathergang],
+    ['secCharges', fallTitle('charges', 'Anklage'), charges ? charges.charges.length : 0, parts.charges],
     ...(fall && fall.area === c.area ? fall.sections.map((x) => [fallAnchor(x.key), x.title, fallCount(fall, x), parts[x.key]]) : []),
     ['secChat', 'Nachrichten', chat ? chat.messages.length : 0, parts.chat],
     ['secEvents', 'Termine', appointments.length, true],
-    ['secWitnesses', 'Zeugen', parties.filter((p) => p.role === 'zeuge').length, parts.witnesses],
-    ['secKarte', 'Karte', places.length, parts.karte],
+    ['secWitnesses', fallTitle('witnesses', 'Zeugen'), parties.filter((p) => p.role === 'zeuge').length, parts.witnesses],
+    ['secKarte', fallTitle('karte', 'Karte'), places.length, parts.karte],
     ['secContracts', 'Verträge', contractList.length, parts.contracts],
     ['secBriefs', 'Schriftsätze', briefList.length, parts.briefs],
     ['secExternal', 'Dokumente', externalDocs.length, parts.external],
-    ['secEvidence', 'Beweise', attachments.length + linkedEvidence.reduce((n, k) => n + k.attachments.length, 0), parts.evidence],
+    ['secEvidence', fallTitle('evidence', 'Beweise'), attachments.length + linkedEvidence.reduce((n, k) => n + k.attachments.length, 0), parts.evidence],
     ['secRequests', 'Unterlagen', requests.filter((r) => !r.done).length, parts.requests],
     ['secTasks', 'Aufgaben', openTasks, parts.tasks],
     ['secInvoices', 'Rechnungen', invoices.length, parts.invoices],
@@ -1156,7 +1156,8 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
   const caseTab = tabsShown.some(([k]) => k === st.caseTab) ? st.caseTab : 'ueberblick';
   const tabCount = (keys) => jumps.filter(([id]) => keys.includes(caseSecKey(id)) && !caseSecIsHidden(c, id)).reduce((n, j) => n + (j[2] || 0), 0);
   const jumpBar = `<nav class="case-jump case-tabs" aria-label="Bereiche der Akte"><div class="case-jump-list" role="tablist" aria-label="Bereiche der Akte">${tabsShown
-    .map(([k, label, keys]) => {
+    .map(([k, label0, keys]) => {
+      const label = fallTitle(`tab.${k}`, label0); // eigene Bezeichnung der Vorlage
       const n = k === 'ueberblick' ? 0 : tabCount(keys);
       return `<button type="button" class="jump ${k === caseTab ? 'active' : ''}" role="tab" aria-selected="${k === caseTab}" data-action="case-tab" data-tab="${k}"><span class="tab-label" data-label="${esc(label)}">${esc(label)}</span>${n ? `<span class="jump-n">${n}</span>` : ''}</button>`;
     })

@@ -7,6 +7,9 @@
  *  PUT    /api/areas/order         Reihenfolge { keys: [...] }
  *  PUT    /api/areas/:key          ändern (Name, Farbe, Symbol, Kurztitel, Schritte, Checkliste, Ergebnisse, Zusatzfelder, ein/aus)
  *  DELETE /api/areas/:key          nur wenn nichts mehr daran hängt – sonst ausblenden
+ *  GET    /api/areas/:key/template  Akten-Vorlage: alles, was sich umbenennen lässt (Katalog) und die eigenen Bezeichnungen
+ *  PUT    /api/areas/:key/labels    eigene Bezeichnungen speichern { labels: { 'sec.claims': 'Forderungen', … } } (leer = Standard)
+ *  POST   /api/areas/:key/preview   Vorschau mit Beispieldaten { labels?, mode? } – schreibt nichts, benachrichtigt niemanden
  */
 const express = require('express');
 const { requireAuth, requireStaff } = require('../core/auth');
@@ -70,6 +73,47 @@ router.put(
     configLog.add(req.user, { area: 'areas', key: a.key, label: `Rechtsgebiet geändert: ${a.name}${what ? ` (${what})` : ''}`, perm: 'settings.edit' });
     logActivity(req.user, 'Rechtsgebiet geändert', 'settings', null, `${a.name}${what ? ` – ${what}` : ''}`);
     res.json({ area: withUsage(a) });
+  })
+);
+
+/* Akten-Vorlage je Rechtsgebiet: umbenennen und ansehen, ohne eine Akte anzulegen (nichts wird gespeichert oder gemeldet) */
+const fall = require('../domain/fall');
+const areaOf = (req, res) => {
+  const a = areas.get(req.params.key);
+  if (!a) res.status(404).json({ error: 'Rechtsgebiet nicht gefunden.' });
+  return a;
+};
+router.get(
+  '/:key/template',
+  wrap(async (req, res) => {
+    const a = areaOf(req, res);
+    if (!a) return;
+    res.json({ area: { key: a.key, name: a.name }, labels: a.labels, catalog: fall.catalog(a.key), hasBlocks: !!fall.LAYOUT[a.key], modes: a.key === 'vertragsrecht' ? [['gestaltung', 'Vertragsgestaltung'], ['streit', 'Vertragsstreit']] : [] });
+  })
+);
+router.put(
+  '/:key/labels',
+  requirePerm('settings.edit'),
+  guard((req, res) => {
+    const a = areaOf(req, res);
+    if (!a) return;
+    const labels = fall.checkLabels(a.key, req.body && req.body.labels);
+    areas.setLabels(a.key, labels);
+    const n = Object.keys(labels).length;
+    configLog.add(req.user, { area: 'areas', key: a.key, label: `Akten-Vorlage „${a.name}“: ${n ? `${n} eigene Bezeichnung${n === 1 ? '' : 'en'}` : 'zurück auf die Standardbezeichnungen'}`, perm: 'settings.edit' });
+    logActivity(req.user, 'Akten-Vorlage geändert', 'settings', null, a.name);
+    res.json({ labels });
+  })
+);
+router.post(
+  '/:key/preview',
+  guard((req, res) => {
+    const a = areaOf(req, res);
+    if (!a) return;
+    const body = req.body || {};
+    const labels = body.labels === undefined ? a.labels : fall.checkLabels(a.key, body.labels);
+    const mode = body.mode === 'streit' ? 'streit' : 'gestaltung';
+    res.json({ area: { key: a.key, name: a.name }, fall: fall.payload({ id: 0, area: a.key }, { sample: true, labels, mode }) });
   })
 );
 
