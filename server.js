@@ -126,6 +126,7 @@ app.use('/api/requests', require('./server/routes/docRequests').mineRouter);
 app.use('/api/cases/:id/parties', require('./server/routes/parties').router); // Beteiligte der Akte
 app.use('/api/places', require('./server/routes/places').postalsRouter); // Postleitzahlen der Karte (nur Kanzlei)
 app.use('/api/cases/:id/places', require('./server/routes/places').router); // Orte der Akte (Tatort-Karte)
+app.use('/api/cases/:id/fall', require('./server/routes/fall').router); // Fall-Bausteine je Rechtsgebiet (Zivil, Verfassung, Vertrag)
 app.use('/api/cases/:id/charges', require('./server/routes/penal').caseRouter); // Anklagepunkte & Strafmaß-Rechner
 app.use('/api/cases/:id/fivenet', externalRoutes.caseRouter); // ältere Adresse, bleibt gültig
 app.use('/api/cases', require('./server/routes/cases'));

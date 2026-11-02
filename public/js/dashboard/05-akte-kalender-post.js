@@ -878,8 +878,9 @@ function routingHtml(routing) {
     .join('')}</div>`;
 }
 
-function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, transcripts = [], clientSuggestions, review, chat, charges, deals = [], links = [], linkedEvidence = [], routing = [], parties = [], places = [], overlaps = {}, requests = [], similar = [], precedentId = null, logMore = 0 }) {
+function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, transcripts = [], clientSuggestions, review, chat, charges, deals = [], links = [], linkedEvidence = [], routing = [], parties = [], places = [], fall = null, overlaps = {}, requests = [], similar = [], precedentId = null, logMore = 0 }) {
   const staff = isStaff();
+  st.caseFall = fall; // Bausteine des Rechtsgebiets (12-fall.js): bestimmen Abschnitte, Titel und was wegfällt
   const admin = isAdmin();
   const me = st.user.id;
   // Bearbeitungsstand: die vier Schritte des Verfahrens und als fünfter Kreis „Abgeschlossen“. Zuständige Anwälte klicken
@@ -1023,6 +1024,8 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     // Seltene bzw. folgenreiche Aktionen stehen im Menü „⋯ Mehr“ statt zwischen den täglichen Knöpfen
     const more = [
       // Strafsachen haben den Abschnitt „Anklagepunkte“ immer – sonst kommt er von hier
+      // Karte ist im Rechtsgebiet nur optional: erst „Ort erfassen“ legt sie an
+      fall && (fall.quiet || []).includes('karte') && !places.length && c.canEdit ? `<button type="button" class="more-item" data-action="place-add" data-case-id="${c.id}">${icon('pin', 'ico-sm')}<span>Karte (Ort erfassen)</span></button>` : '',
       c.area !== 'strafrecht' && c.canEdit && charges && !charges.charges.length ? `<button type="button" class="more-item" data-action="charge-pick" data-id="${c.id}">${icon('scale', 'ico-sm')}<span>Anklagepunkte</span></button>` : '',
       c.area !== 'strafrecht' && !(charges && charges.charges.length) ? `<button type="button" class="more-item" data-action="hearing-start" data-id="${c.id}">${icon('scale', 'ico-sm')}<span>Verhandlungsmodus</span></button>` : '',
       isBoard() ? `<button type="button" class="more-item" data-action="case-secret" data-id="${c.id}" data-on="${c.boardOnly ? '0' : '1'}">${icon(c.boardOnly ? 'unlock' : 'lock', 'ico-sm')}<span>${c.boardOnly ? 'Für die Kanzlei freigeben' : 'Nur für das Board (geheim)'}</span></button>` : '',
@@ -1107,11 +1110,13 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
   const contractList = contracts.filter((k) => k.kind !== 'schriftsatz');
   const briefList = contracts.filter((k) => k.kind === 'schriftsatz');
   const parts = {
-    tathergang: tathergangSection(c),
-    charges: staff ? chargesSection(c, charges, deals) : dealClientCard(c, deals),
+    // Je Rechtsgebiet entfällt, was dort nicht passt (und nichts enthält); Bausteine des Rechtsgebiets kommen dazu (12-fall.js)
+    ...fallParts(c, fall),
+    tathergang: fallQuiet('tathergang', !!c.incident) ? '' : tathergangSection(c),
+    charges: staff ? (fallQuiet('charges', !!(charges && charges.charges.length)) ? '' : chargesSection(c, charges, deals)) : dealClientCard(c, deals),
     chat: chatSection(c, chat, ticket),
-    witnesses: witnessesSection(c, parties),
-    karte: karteSection(c, places),
+    witnesses: fallQuiet('witnesses', parties.some((p) => p.role === 'zeuge')) ? '' : witnessesSection(c, parties),
+    karte: fallQuiet('karte', places.length > 0) ? '' : karteSection(c, places),
     contracts: contractsSection(c, contractList),
     briefs: briefsSection(c, briefList),
     external: externalSection(c, externalDocs, attachments),
@@ -1127,6 +1132,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
   const jumps = [
     ['secTathergang', 'Tathergang', storySteps(c.incident).length, parts.tathergang],
     ['secCharges', 'Anklage', charges ? charges.charges.length : 0, parts.charges],
+    ...(fall && fall.area === c.area ? fall.sections.map((x) => [fallAnchor(x.key), x.title, fallCount(fall, x), parts[x.key]]) : []),
     ['secChat', 'Nachrichten', chat ? chat.messages.length : 0, parts.chat],
     ['secEvents', 'Termine', appointments.length, true],
     ['secWitnesses', 'Zeugen', parties.filter((p) => p.role === 'zeuge').length, parts.witnesses],
@@ -1172,7 +1178,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
         : ''}
       </div>`;
   // Abschnitte der Akte: Reihenfolge, Ausblenden und Einklappen je Person (12-akte-ansicht.js); Mandanten sehen die feste Reihenfolge
-  const secMap = { tathergang: parts.tathergang, charges: parts.charges, chat: parts.chat, events: eventsSection, witnesses: parts.witnesses, karte: parts.karte, contracts: parts.contracts, briefs: parts.briefs, external: parts.external, evidence: parts.evidence, requests: parts.requests, tasks: parts.tasks, invoices: parts.invoices, work: parts.work, notes: notesHtml };
+  const secMap = { subject: parts.subject, admiss: parts.admiss, claims: parts.claims, motions: parts.motions, norms: parts.norms, participants: parts.participants, parties: parts.parties, clauses: parts.clauses, term: parts.term, versions: parts.versions, vclaims: parts.vclaims, corr: parts.corr, tathergang: parts.tathergang, charges: parts.charges, chat: parts.chat, events: eventsSection, witnesses: parts.witnesses, karte: parts.karte, contracts: parts.contracts, briefs: parts.briefs, external: parts.external, evidence: parts.evidence, requests: parts.requests, tasks: parts.tasks, invoices: parts.invoices, work: parts.work, notes: notesHtml };
   const secMeta = Object.fromEntries(jumps.map(([id, label, n]) => [caseSecKey(id), { label, n }]));
   return `<div class="case-root" data-case-tab="${caseTab}">
       <div class="case-head case-cover mb-5" data-case-head="${c.id}">

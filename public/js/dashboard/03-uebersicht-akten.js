@@ -870,6 +870,7 @@ function rememberCase(data) {
   st.caseDocs = data.externalDocs || [];
   st.caseParties = data.parties || []; // Zeugen und andere Beteiligte (nur Kanzlei)
   st.casePlaces = data.places || []; // Orte der Tatort-Karte (nur Kanzlei)
+  st.caseFall = data.fall || null; // Fall-Bausteine des Rechtsgebiets (Zivil, Verfassung, Vertrag; nur Kanzlei)
   st.caseContracts = data.contracts || [];
   st.caseTasks = data.tasks || [];
   st.caseInfo = data.case;
@@ -1008,19 +1009,19 @@ function attachmentsSection(c, attachments, linkedEvidence = []) {
   const staff = isStaff();
   const canUpload = staff || !c.closed;
   if (!attachments.length && linkedEvidence.length)
-    return `<div class="section" id="secEvidence"><h3 class="section-title">Beweismittel & Anhänge <span class="text-xs text-dim font-normal sec-meta">nur aus verknüpften Akten</span></h3>
+    return `<div class="section" id="secEvidence"><h3 class="section-title">${esc(fallTitle('evidence', 'Beweismittel & Anhänge'))} <span class="text-xs text-dim font-normal sec-meta">nur aus verknüpften Akten</span></h3>
       ${canUpload ? `<label class="btn-outline btn-sm file-btn mb-3">${icon('camera', 'ico-sm')}<span>Bilder hinzufügen</span><input type="file" accept="image/*" multiple data-upload="evidence" data-case-id="${c.id}" aria-label="Bilder hinzufügen"></label>` : ''}
       ${linkedEvidenceHtml(linkedEvidence)}</div>`;
   if (!attachments.length)
     return emptySection(
       'secEvidence',
-      'Beweismittel & Anhänge',
+      fallTitle('evidence', 'Beweismittel & Anhänge'),
       'noch keine',
       canUpload ? `<label class="btn-outline btn-sm file-btn">${icon('camera', 'ico-sm')}<span>Bilder hinzufügen</span><input type="file" accept="image/*" multiple data-upload="evidence" data-case-id="${c.id}" aria-label="Bilder hinzufügen"></label>` : '',
       `${staff ? 'Fotos, Screenshots und Belege (bis 40 Bilder). Neue Bilder sind zunächst nur für die Kanzlei sichtbar.' : 'Fotos, Screenshots und Belege zu Ihrem Fall (bis 40 Bilder).'} Screenshots auch einfach mit Strg+V einfügen oder ins Fenster ziehen.`
     );
   return `<div class="section" id="secEvidence">
-      <h3 class="section-title">Beweismittel & Anhänge <span class="text-xs text-dim font-normal sec-meta">${attachments.length} / 40</span></h3>
+      <h3 class="section-title">${esc(fallTitle('evidence', 'Beweismittel & Anhänge'))} <span class="text-xs text-dim font-normal sec-meta">${attachments.length} / 40</span></h3>
       ${evidenceToolbar(attachments)}
       ${canUpload ? `<div class="flex flex-wrap items-center gap-3 mb-3">
           <input id="attCaption" class="field" style="max-width:340px" maxlength="200" placeholder="Beschreibung für neue Bilder (optional)" aria-label="Beschreibung für neue Bilder">
