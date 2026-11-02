@@ -104,6 +104,7 @@ Object.assign(actions, {
     history.replaceState(history.state, '', `${location.pathname}?tab=${st.settingsTab}#settings`);
     if (st.settingsTab === 'bot' && st.bot && !st.botDiscord) await loadBotDiscord();
     if (st.settingsTab === 'health') st.system = await api.get('/api/system');
+    if (st.settingsTab === 'dauer') await loadDauer();
     await settingsSwitch(() => renderView()); // Leiste bleibt stehen, der Inhalt daneben blendet über
   },
   'bot-module': async (el) => {

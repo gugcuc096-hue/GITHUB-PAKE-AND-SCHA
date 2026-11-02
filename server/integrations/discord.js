@@ -44,6 +44,7 @@ const EVENTS = {
   'membership.changed': 'VIP / Lifetime vergeben, verlängert, beendet oder abgelaufen',
   'name.requested': 'Namensänderung beantragt bzw. vom Board entschieden',
   'system.alert': 'Systemwarnung: Kanzlei-Bot offline, Datensicherung fehlgeschlagen, Speicher fast voll, Absturz',
+  'system.dauer': 'Dauerbetrieb (Render Free): Sicherung im Google Drive, Wecker, Neustarts, Drive-Speicher – pingt nur die Web-Admins',
   'review.created': 'Neue Mandantenstimme (Bewertung) zur Freigabe',
   'invoice.payment': 'Mandant meldet eine Rechnung als bezahlt',
   'case.idle': 'Liegengebliebene Akte – nur wenn die Discord-DM an den zuständigen Anwalt nicht möglich ist',
@@ -54,7 +55,7 @@ const EVENTS = {
 
 // Ereignisse, die nach dem Speichern der Auswahl dazugekommen sind, sind eingeschaltet (bis jemand sie abwählt).
 // discord_events_known = Ereignisse, die es beim letzten Speichern gab; ältere Speicherstände kennen alle außer diesen:
-const ADDED_LATER = ['system.alert', 'review.created', 'invoice.payment', 'case.idle', 'case.victory', 'resolution.created', 'lawyer.month'];
+const ADDED_LATER = ['system.alert', 'system.dauer', 'review.created', 'invoice.payment', 'case.idle', 'case.victory', 'resolution.created', 'lawyer.month'];
 
 function isValidWebhookUrl(url) {
   return WEBHOOK_RE.test(String(url || '').trim());
@@ -302,7 +303,8 @@ function notify(event, message) {
   const { caseId, ...rest } = message || {};
   if (caseId && secretCase(caseId)) return;
   rememberFields(event, rest.fields);
-  const payload = buildPayload({ link: publicUrl(), ...applyLook(event, rest), roleIds: rolesFor(event) });
+  // Dauerbetrieb: nur die genannten Web-Admins pingen, nie eine Rolle
+  const payload = buildPayload({ link: publicUrl(), ...applyLook(event, rest), roleIds: event === 'system.dauer' ? [] : rolesFor(event) });
   postWebhook(url, payload).catch((err) => console.warn(`Discord-Webhook (${event}) fehlgeschlagen: ${err.message}`));
 }
 

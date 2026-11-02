@@ -1068,6 +1068,7 @@ async function discordData(fresh = false) {
 
 module.exports = {
   start,
+  stop,
   presenceText,
   refresh,
   listMembers,

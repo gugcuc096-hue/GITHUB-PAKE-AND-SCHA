@@ -437,6 +437,7 @@ router.get(
     const inv = loadInvoice(idParam(req));
     if (!inv || !visibleTo(inv, req.user) || !inv.payment_proof) return res.status(404).json({ error: 'Kein Nachweis vorhanden.' });
     res.set('Cache-Control', 'private, no-store');
+    await require('../dauer/files').ensureLocal(evidencePath(inv.payment_proof)); // Dauerbetrieb: nach einem Neustart aus dem Drive
     res.sendFile(evidencePath(inv.payment_proof), (err) => {
       if (err && !res.headersSent) res.status(404).json({ error: 'Datei nicht gefunden.' });
     });

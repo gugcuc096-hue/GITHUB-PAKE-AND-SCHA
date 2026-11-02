@@ -39,19 +39,22 @@ function clean(text) {
     .slice(0, 300);
 }
 
-/** Störung melden – nur beim ersten Auftreten. */
-function raise(key, { title, description, fields = [] }) {
+/**
+ * Störung melden – nur beim ersten Auftreten. via.event: anderes Discord-Ereignis (Dauerbetrieb: „system.dauer“),
+ * via.mentionIds: genau diese Personen pingen (statt der eingestellten Rolle).
+ */
+function raise(key, { title, description, fields = [] }, via = {}) {
   const s = readState();
   if (s[key]) return false;
   s[key] = { since: new Date().toISOString(), title, description: description || '' };
   saveState(s);
   console.warn(`Systemwarnung: ${title}${description ? ` – ${description}` : ''}`);
-  discord.notify('system.alert', { title: `⚠️ ${title}`, description, fields, color: discord.RED });
+  discord.notify(via.event || 'system.alert', { title: `⚠️ ${title}`, description, fields, color: discord.RED, ...(via.mentionIds ? { mentionIds: via.mentionIds } : {}) });
   return true;
 }
 
 /** Störung behoben → Entwarnung (nur wenn vorher gewarnt wurde). quiet: ohne Nachricht (z. B. Bot ausgeschaltet). */
-function resolve(key, { title, description } = {}, quiet = false) {
+function resolve(key, { title, description } = {}, quiet = false, via = {}) {
   const s = readState();
   if (!s[key]) return false;
   const since = s[key].since;
@@ -59,7 +62,7 @@ function resolve(key, { title, description } = {}, quiet = false) {
   saveState(s);
   if (!quiet) {
     console.log(`Systemwarnung behoben: ${title}`);
-    discord.notify('system.alert', { title: `✅ ${title}`, description, fields: [{ name: 'Gestört seit', value: fmtTime(since) }], color: GREEN });
+    discord.notify(via.event || 'system.alert', { title: `✅ ${title}`, description, fields: [{ name: 'Gestört seit', value: fmtTime(since) }], color: GREEN });
   }
   return true;
 }
@@ -141,7 +144,8 @@ function markRunning() {
   } catch {
     prev = null;
   }
-  if (prev && prev.startedAt) {
+  // Im Dauerbetrieb meldet die Wiederherstellung selbst (an die Web-Admins), was passiert ist
+  if (prev && prev.startedAt && !require('../dauer/config').enabled()) {
     discord.notify('system.alert', {
       title: '⚠️ Server ist abgestürzt und wurde neu gestartet',
       description: `Die Website war kurz nicht erreichbar und läuft wieder.${prev.crash ? ` Fehler: ${clean(prev.crash)}` : ''}`,
@@ -158,7 +162,11 @@ function markRunning() {
     } catch {
       /* Datenbank schon zu */
     }
-    process.exit(signal === 'SIGINT' ? 130 : 0);
+    const code = signal === 'SIGINT' ? 130 : 0;
+    // Dauerbetrieb (Render Free): letzte Änderungen ins Google Drive, dann beenden (Render wartet bis zu 30 s)
+    const dauer = require('../dauer/live');
+    if (dauer.isRunning()) dauer.shutdown().finally(() => process.exit(code));
+    else process.exit(code);
   };
   process.once('SIGTERM', () => stopCleanly('SIGTERM'));
   process.once('SIGINT', () => stopCleanly('SIGINT'));
@@ -178,6 +186,7 @@ function markRunning() {
 function start() {
   markRunning();
   const tick = () => {
+    if (require('../dauer/state').frozen) return; // nach der Übergabe an eine neue Instanz: nichts mehr schreiben
     try {
       checkBot();
       checkDisk();

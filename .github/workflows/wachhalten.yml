@@ -1,0 +1,42 @@
+# Dauerbetrieb (Render Free): Reserve-Wecker – ruft alle 5 Minuten /api/ping der Website auf, damit Render den Dienst
+# nicht schlafen legt (Render Free schläft nach 15 Minuten ohne Aufruf ein). Hauptwecker sind der Selbst-Ping des
+# Servers und cron-job.org (siehe README → Dauerbetrieb); GitHub startet geplante Läufe manchmal verspätet.
+#
+# Einrichtung: Repository → Settings → Secrets and variables → Actions → Variables → „RENDER_URL“ =
+# https://<dein-dienst>.onrender.com (ohne / am Ende). Ohne die Variable tut der Lauf nichts.
+# Öffentliche Repositories zahlen keine Actions-Minuten.
+name: Wachhalten
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wachhalten
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    name: Render wecken
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: /api/ping aufrufen
+        env:
+          RENDER_URL: ${{ vars.RENDER_URL }}
+        run: |
+          if [ -z "$RENDER_URL" ]; then
+            echo "::notice::Variable RENDER_URL ist nicht gesetzt – nichts zu tun (siehe Kommentar oben)."
+            exit 0
+          fi
+          for i in 1 2 3; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 "${RENDER_URL%/}/api/ping?src=github" || echo 000)
+            echo "Versuch $i: HTTP $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 15
+          done
+          echo "::warning::Website antwortet nicht (HTTP $code)."

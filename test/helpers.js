@@ -68,9 +68,18 @@ async function startServer(opts = {}) {
   return {
     base,
     dir,
+    port,
+    child,
     log: () => log,
+    /** Hart beenden (z. B. SIGKILL = Absturz) – ohne den Ordner zu löschen. */
+    async kill(signal = 'SIGKILL') {
+      if (child.exitCode === null && child.signalCode === null) {
+        child.kill(signal);
+        await new Promise((r) => child.once('exit', r));
+      }
+    },
     async stop() {
-      if (child.exitCode === null) {
+      if (child.exitCode === null && child.signalCode === null) {
         child.kill();
         await new Promise((r) => child.once('exit', r));
       }
