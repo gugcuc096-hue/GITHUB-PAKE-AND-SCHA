@@ -66,7 +66,7 @@ describe('Weiche Wechsel und Feinschliff (Browser)', { skip: chromium ? false : 
       });
       await page.click('#content .hub-tabs >> text=Benutzer');
       await page.waitForFunction(() => location.hash === '#users');
-      assert.ok((await page.evaluate(() => window.__vt)) >= 1, 'der Wechsel läuft in einer Überblendung');
+      await page.waitForFunction(() => window.__vt >= 1, null, { timeout: 5000 }); // (noch nicht besuchte Seiten laden erst)
       // Sofort noch einmal klicken – mitten in der Überblendung (rohe Mausposition, ohne Warten auf den Browser)
       const box = await (await page.$('#content .hub-tabs >> text=Beförderungen')).boundingBox();
       await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
@@ -212,8 +212,8 @@ describe('Weiche Wechsel und Feinschliff (Browser)', { skip: chromium ? false : 
       assert.match(css.caret, /rgb\(212, 175, 55\)|rgb\(\d+, \d+, \d+\)/);
       await page.click('#content [data-action="open-case"]');
       await page.waitForSelector('#modal.open');
-      const names = await page.evaluate(() => document.querySelector('#modal').getAnimations().map((a) => a.animationName));
-      assert.ok(names.includes('modal-blur-in'), `Unschärfe wächst (Animationen: ${names})`);
+      const names = await page.evaluate(() => getComputedStyle(document.querySelector('#modal')).animationName);
+      assert.match(names, /modal-blur-in/, `Unschärfe wächst (Animationen: ${names})`);
       await page.waitForTimeout(800);
       assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('#content')).scale), '0.992', 'Seite dahinter tritt minimal zurück');
       await page.evaluate(() => closeModal());

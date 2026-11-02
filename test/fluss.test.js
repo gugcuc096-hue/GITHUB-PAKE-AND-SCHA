@@ -50,6 +50,7 @@ describe('Ziehen im Kalender und Abhaken (Browser)', { skip: chromium ? false : 
       el.dispatchEvent(ev);
     }, [selector, type, x, y, pointerType]);
   const center = async (page, selector) => {
+    await page.waitForFunction(() => !document.documentElement.dataset.wch); // Seitenwechsel blenden kurz über (13-weich.js)
     const b = await page.locator(selector).first().boundingBox();
     return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
   };

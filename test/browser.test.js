@@ -13,6 +13,9 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { startServer, client, TEAM, PASSWORD, pickTab, caseShow } = require('./helpers');
 
+/** Seitenwechsel und Reiter blenden kurz ineinander über (13-weich.js); Messungen und rohe Gesten danach warten, bis das vorbei ist. */
+const wchSettled = (page) => page.waitForFunction(() => !document.documentElement.dataset.wch);
+
 let chromium = null;
 try {
   ({ chromium } = require('playwright'));
@@ -72,8 +75,6 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
     return { ctx, page, problems, settle };
   }
   const overflow = (page) => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-  // Seitenwechsel blenden kurz ineinander über (13-weich.js); rohe Mausgesten direkt danach warten, bis das vorbei ist
-  const wchSettled = (page) => page.waitForFunction(() => !document.documentElement.dataset.wch);
   async function login(page, email, base = server.base) {
     await page.goto(base + '/login');
     await page.fill('#email', email);
@@ -1045,6 +1046,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         });
         assert.equal(pos.sticky, 'sticky', 'Reiterleiste klebt');
         assert.ok(pos.barTop <= 2 || pos.scrolled < pos.barTop, `Leiste klebt oben (${pos.barTop}, gescrollt ${pos.scrolled})`);
+        await wchSettled(page);
         const closeFree = await page.$eval('.modal-close', (x) => {
           const r = x.getBoundingClientRect();
           return r.bottom < 0 || x.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
