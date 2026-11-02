@@ -119,7 +119,7 @@ describe('Aufgeräumte Bedienung (Browser)', { skip: chromium ? false : 'Playwri
       assert.equal(await page.isVisible('.set-nav'), false);
       assert.deepEqual(await page.$$eval('#setPick optgroup', (l) => l.map((g) => g.label)), ['Kanzlei', 'Dashboard', 'Website', 'Geld', 'Kommunikation', 'Rechte & System']);
       await page.selectOption('#setPick', 'style');
-      await page.waitForFunction(() => st.settingsTab === 'style');
+      await page.waitForFunction(() => st.settingsTab === 'style' && document.querySelector('.set-main')?.dataset.setSection === 'style' && !document.documentElement.dataset.wch); // der Bereich blendet über (13-weich.js)
       await page.fill('#setSearch', 'rabatt');
       assert.equal(await page.isVisible('.set-nav-item[data-key="promos"]'), true, 'Treffer sichtbar');
       await page.click('.set-nav-item[data-key="promos"]');
