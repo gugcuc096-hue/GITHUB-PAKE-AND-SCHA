@@ -143,11 +143,6 @@ function collectArea(f) {
 
 Object.assign(actions, {
   'area-new': () => openModal(areaFormHtml(null), { wide: true }),
-  // Aus „Neue Akte“ heraus: neues Rechtsgebiet anlegen und gleich im Formular wählen
-  'area-quick-new': async () => {
-    if (!st.lists) await loadLists();
-    openModal(areaFormHtml(null), { wide: true, child: true });
-  },
   'area-edit': (el) => openModal(areaFormHtml(st.lists.areas.find((a) => a.key === el.dataset.key)), { wide: true }),
   'area-steps-toggle': (el) => $('#arSteps').classList.toggle('hidden', el.checked),
   'area-step-add': () => {

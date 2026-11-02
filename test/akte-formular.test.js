@@ -50,6 +50,8 @@ describe('Neue Akte: Konto-Vorschläge, Rechtsgebiet anlegen, Beteiligte, Aufkla
       await page.click('button[type=submit]');
       await page.waitForURL(/dashboard/);
 
+      // ein Rechtsgebiet, das es im Formular zu wählen gibt
+      assert.equal((await admin.post('/api/areas', { name: `Verkehrsrecht ${name}` })).status, 201);
       // Neue Akte: kein E-Mail-Feld mehr, stattdessen Vorschläge beim Namen
       await page.goto(`${srv.base}/dashboard?new=case`);
       await page.waitForSelector('form[data-form="new-case"] #ncName');
@@ -69,14 +71,11 @@ describe('Neue Akte: Konto-Vorschläge, Rechtsgebiet anlegen, Beteiligte, Aufkla
       await page.waitForSelector('#ncSuggest:not([hidden]) .client-suggest-item');
       await page.click('#ncSuggest .client-suggest-item');
 
-      // Rechtsgebiet direkt anlegen und gleich wählen
+      // Rechtsgebiet wählen (ein „+ neu“ im Formular gibt es nicht mehr – neue Rechtsgebiete legt man unter Einstellungen → Listen an)
+      assert.equal(await page.locator('[data-action="area-quick-new"]').count(), 0);
       await page.fill('#ncTitle', `Verkehrsunfall ${name}`);
-      await page.click('[data-action="area-quick-new"]');
-      await page.waitForSelector('form[data-form="area-save"]');
-      await page.fill('#arName', `Verkehrsrecht ${name}`);
-      await Promise.all([page.waitForResponse((r) => r.url().endsWith('/api/areas') && r.request().method() === 'POST' && r.ok()), page.click('form[data-form="area-save"] button[type=submit]')]);
-      await page.waitForFunction((t) => document.querySelector('select[data-area-select]')?.selectedOptions[0]?.textContent === t, `Verkehrsrecht ${name}`);
-      assert.equal(await page.inputValue('#ncTitle'), `Verkehrsunfall ${name}`, 'bereits Getipptes bleibt stehen');
+      await page.selectOption('select[data-area-select]', { label: `Verkehrsrecht ${name}` });
+      assert.equal(await page.inputValue('#ncTitle'), `Verkehrsunfall ${name}`);
       assert.equal(await page.inputValue('#ncName'), 'Tina Termin');
       await page.fill('textarea[name="description"]', 'Auffahrunfall am Legion Square.');
       await page.click('form[data-form="new-case"] button[type=submit]');

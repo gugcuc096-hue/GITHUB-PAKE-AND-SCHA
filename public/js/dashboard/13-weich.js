@@ -42,7 +42,8 @@ function wchSwap(fn) {
     return Promise.resolve(false);
   }
   const root = document.documentElement;
-  root.dataset.wch = '1'; // schaltet die Namen der Teile (motion.css) nur für die Dauer des Wechsels ein
+  // schaltet die Namen der Teile (motion.css) nur für die Dauer des Wechsels ein; bei offenem Fenster nur die des Fensters
+  root.dataset.wch = document.body.classList.contains('modal-open') ? 'modal' : '1';
   let err = null; // Fehler beim Zeichnen gehören dem Aufrufer (er fällt dann z. B. auf normales Laden zurück)
   let t;
   try {
