@@ -9,7 +9,13 @@
  */
 'use strict';
 
-const WCH_OK = typeof document.startViewTransition === 'function' && typeof CSS !== 'undefined' && CSS.supports('selector(:active-view-transition-type(wch))');
+// Gesteuerte Browser (Tests, navigator.webdriver) wechseln ohne Überblendung: Messungen und Klicks kurz nach einem Seitenwechsel
+// treffen dort sofort die neue Seite. Die Tests der Überblendung selbst schalten sie mit window.__wchForce ein.
+const WCH_OK =
+  typeof document.startViewTransition === 'function' &&
+  typeof CSS !== 'undefined' &&
+  CSS.supports('selector(:active-view-transition-type(wch))') &&
+  (!navigator.webdriver || window.__wchForce === true);
 
 /** Kann jetzt überblendet werden? (nicht bei „Bewegung reduzieren“, nicht im Hintergrund-Tab, nicht mitten im Ziehen) */
 function wchCan() {

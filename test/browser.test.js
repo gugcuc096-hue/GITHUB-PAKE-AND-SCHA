@@ -54,8 +54,9 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
     if (server) await server.stop();
   });
 
-  async function open(device) {
+  async function open(device, { wch = false } = {}) {
     const ctx = await browser.newContext({ ...device, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+    if (wch) await ctx.addInitScript(() => (window.__wchForce = true)); // Überblendung auch im gesteuerten Browser (13-weich.js)
     const page = await ctx.newPage();
     const problems = [];
     page.on('pageerror', (e) => problems.push(`JavaScript-Fehler: ${e.message}`));
@@ -2256,7 +2257,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
 
   it('Übergänge: Seitenblöcke gestaffelt, Fenster blendet weich aus, Menügruppe klappt weich auf, bei „Bewegung reduzieren“ nur Überblenden', async () => {
     const tsrv = await startServer();
-    const { ctx, page, problems } = await open(DESKTOP);
+    const { ctx, page, problems } = await open(DESKTOP, { wch: true });
     try {
       await login(page, TEAM.admin, tsrv.base);
       // Seitenwechsel: alt und neu blenden ineinander über (View Transition), statt das Alte hart zu entfernen

@@ -33,6 +33,7 @@ describe('Weiche Wechsel und Feinschliff (Browser)', { skip: chromium ? false : 
 
   const open = async (viewport = { width: 1280, height: 720 }) => {
     const ctx = await browser.newContext({ viewport, locale: 'de-DE' });
+    await ctx.addInitScript(() => (window.__wchForce = true)); // Überblendung auch im gesteuerten Browser (13-weich.js)
     const page = await ctx.newPage();
     const problems = [];
     page.on('pageerror', (e) => problems.push(e.message));
