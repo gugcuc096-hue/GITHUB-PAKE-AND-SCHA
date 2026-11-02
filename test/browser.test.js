@@ -2510,6 +2510,7 @@ describe('Browser: Strafmaß, Verhandlung, Wiki, Beschlüsse, Rechnungszeile, Ge
       let loads = 0;
       page.on('request', (r) => /\/api\/wiki$/.test(r.url()) && loads++);
       await wchSettled(page);
+      await page.evaluate(() => window.scrollTo(0, 0)); // Ziehen zum Aktualisieren gilt nur ganz oben (der Klick auf die Karte hat evtl. gescrollt)
       await swipe(page, '#content', 400);
       await page.waitForFunction(() => !document.querySelector('.ptr.spin'));
       await page.waitForTimeout(300);
