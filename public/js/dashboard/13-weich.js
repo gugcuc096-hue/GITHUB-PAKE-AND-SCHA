@@ -163,3 +163,23 @@ const WCH_TAB_ACTION = /^(?!settings-|cfg-)[a-z0-9-]+-(tab|view|mode)$/;
 function wchActionOk(name, fn) {
   return WCH_TAB_ACTION.test(name) && !(fn.constructor && fn.constructor.name === 'AsyncFunction') && wchCan();
 }
+
+// Rechtsklick direkt nach einem Wechsel: ebenso an das Element unter dem Zeiger weitergeben
+document.addEventListener(
+  'contextmenu',
+  (e) => {
+    if (!wchCur || e.target !== document.documentElement) return;
+    const x = e.clientX;
+    const y = e.clientY;
+    try {
+      wchCur.skipTransition();
+    } catch {
+      /* schon zu Ende */
+    }
+    const el = document.elementFromPoint(x, y);
+    if (!el || el === document.documentElement) return;
+    e.preventDefault();
+    el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 2 }));
+  },
+  true
+);

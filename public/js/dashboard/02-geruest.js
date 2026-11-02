@@ -987,6 +987,7 @@ async function goNow(view) {
   const paint = async (extra) => {
     const draw = () => {
       if (token !== st.navToken) return;
+      if (smooth) content.classList.remove('view-in'); // die Überblendung ersetzt die gestaffelte Einblendung (sonst liefe beides)
       renderView();
       window.scrollTo(0, restore); // nach dem Zeichnen: die Seite hat jetzt ihre Höhe
       if (!smooth) playIn(content, 'view-in');
