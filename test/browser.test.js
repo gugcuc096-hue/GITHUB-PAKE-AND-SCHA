@@ -578,6 +578,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         assert.ok(chatTop < (await page.evaluate(() => innerHeight)) - 250, `Nachrichten sind im Blick (${Math.round(chatTop)}px)`);
         await page.click('.modal-close');
         await settle();
+        // die Seite dahinter zeichnet sich nach dem Schließen neu (Punkt „Neue Nachricht“ ist erledigt) – unter Last dauert das
+        await page.waitForFunction(() => document.querySelectorAll('#content section.todo .todo-title').length === 1, null, { timeout: 8000 }).catch(() => {});
         assert.deepEqual(await titles(), [`${k.templateName} unterschreiben`]);
         assert.deepEqual(problems, []);
         await ctx.close();
@@ -2511,10 +2513,16 @@ describe('Browser: Strafmaß, Verhandlung, Wiki, Beschlüsse, Rechnungszeile, Ge
       page.on('request', (r) => /\/api\/wiki$/.test(r.url()) && loads++);
       await wchSettled(page);
       await page.evaluate(() => window.scrollTo(0, 0)); // Ziehen zum Aktualisieren gilt nur ganz oben (der Klick auf die Karte hat evtl. gescrollt)
-      await swipe(page, '#content', 400);
-      await page.waitForFunction(() => !document.querySelector('.ptr.spin'));
-      await page.waitForTimeout(300);
-      assert.ok(loads >= 1, 'Seite neu geladen');
+      for (let i = 0; i < 3 && !loads; i++) {
+        await page.waitForTimeout(500); // Schließen per Zurück stellt den Scrollstand noch einmal her – erst danach ganz nach oben
+        await wchSettled(page);
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await swipe(page, '#content', 400);
+        await page.waitForTimeout(400);
+        await page.waitForFunction(() => !document.querySelector('.ptr.spin'), null, { timeout: 8000 });
+      }
+      const dbg = await page.evaluate(() => ({ y: scrollY, wch: document.documentElement.dataset.wch || '', body: document.body.className, modal: document.querySelector('#modal').className }));
+      assert.ok(loads >= 1, `Seite neu geladen (${JSON.stringify(dbg)})`);
       await page.goto(srv.base + '/dashboard#resolutions');
       await page.waitForSelector('#content .page-title');
       assert.ok((await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 1);

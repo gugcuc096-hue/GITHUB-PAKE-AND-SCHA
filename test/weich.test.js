@@ -214,11 +214,11 @@ describe('Weiche Wechsel und Feinschliff (Browser)', { skip: chromium ? false : 
       await page.waitForSelector('#modal.open');
       const names = await page.evaluate(() => getComputedStyle(document.querySelector('#modal')).animationName);
       assert.match(names, /modal-blur-in/, `Unschärfe wächst (Animationen: ${names})`);
-      await page.waitForTimeout(800);
+      await page.waitForFunction(() => getComputedStyle(document.querySelector('#content')).scale === '0.992', null, { timeout: 8000 }).catch(() => {});
       assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('#content')).scale), '0.992', 'Seite dahinter tritt minimal zurück');
       await page.evaluate(() => closeModal());
       await page.waitForFunction(() => !document.querySelector('#modal').classList.contains('open'));
-      await page.waitForTimeout(800);
+      await page.waitForFunction(() => getComputedStyle(document.querySelector('#content')).scale === 'none', null, { timeout: 8000 }).catch(() => {}); // läuft unter Last langsamer aus
       assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('#content')).scale), 'none', 'danach wieder normal');
       assert.deepEqual(problems, []);
     } finally {
