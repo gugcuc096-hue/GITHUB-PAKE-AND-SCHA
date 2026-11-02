@@ -37,6 +37,7 @@ describe('Design-Paket', () => {
     for (const f of pages) {
       const html = fs.readFileSync(path.join(root, f), 'utf8');
       if (/href="\/css\/fonts\.css"/.test(html)) assert.match(html, /href="\/css\/scrollbar\.css"/, `${f} lädt scrollbar.css`);
+      if (/href="\/css\/fonts\.css"/.test(html)) assert.match(html, /href="\/css\/feinschliff\.css"/, `${f} lädt feinschliff.css`);
     }
     // <datalist> zeichnet der Browser selbst (weiße Standardleiste, nicht gestaltbar) → eigene Vorschlagsliste (comboField)
     const walk = (d) => fs.readdirSync(path.join(root, d), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]));

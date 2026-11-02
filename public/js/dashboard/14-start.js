@@ -46,7 +46,9 @@ document.addEventListener('click', (e) => {
   // Doppelklick: dieselbe Aktion läuft noch (z. B. Senden, Erinnern, Übernehmen) – nicht ein zweites Mal auslösen
   if (el.dataset.busy) return;
   el.dataset.busy = '1';
-  guard(() => fn(el, e)).finally(() => delete el.dataset.busy);
+  // Reiter-Wechsel: alt und neu blenden ineinander über (13-weich.js)
+  const run = wchActionOk(el.dataset.action, fn) ? () => wchSwap(() => fn(el, e)) : () => fn(el, e);
+  guard(run).finally(() => delete el.dataset.busy);
 });
 
 document.addEventListener('keydown', (e) => {
@@ -770,6 +772,7 @@ window.addEventListener('hashchange', () =>
       }
       discardDrafts($('#content'));
     }
+    st.restoreScroll = true; // Zurück/Vor: die Seite steht wieder dort, wo man sie verlassen hat
     await go(view);
   })
 );

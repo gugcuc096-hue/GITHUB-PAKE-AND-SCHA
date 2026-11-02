@@ -291,8 +291,7 @@ Object.assign(actions, {
   'cfg-tab': (el) => {
     st.cfgTab = st.settingsTab = el.dataset.tab;
     if (st.view === 'settings') history.replaceState(history.state, '', `${location.pathname}?tab=${st.settingsTab}#settings`);
-    renderView();
-    if ($('.set-main')) playIn($('.set-main'), 'swap-in');
+    return settingsSwitch(() => renderView());
   },
   'cfg-publish': async (el) => {
     const key = el.dataset.key;

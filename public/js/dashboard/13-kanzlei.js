@@ -417,7 +417,7 @@ Object.assign(actions, {
     if (st.wikiTab === 'bausteine') await loadSnippets(true);
     if (st.wikiTab === 'fall') await loadPrecedents();
     if (st.wikiTab === 'vorlagen') st.contractTemplates = await api.get('/api/contract-templates?all=1');
-    renderView();
+    await wchSwap(() => renderView()); // erst laden, dann in einem Zug überblenden
   },
   'wiki-cat': (el) => {
     st.wikiCat = el.dataset.value;

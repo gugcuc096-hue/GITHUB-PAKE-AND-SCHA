@@ -968,14 +968,36 @@ async function goNow(view) {
   const sameHub = !!(hubFrom && hubTo && hubFrom.key === hubTo.key && st.view !== view);
   $('#content').dataset.hubSwitch = sameHub ? '1' : '';
   const h0 = sameHub ? $('#content').offsetHeight : 0;
+  // Scrollstand der verlassenen Seite merken; bei Zurück/Vor steht die Seite dort wieder, wo man sie verlassen hat
+  (st.scrollMemo || (st.scrollMemo = {}))[st.view] = window.scrollY;
+  const restore = st.restoreScroll ? st.scrollMemo[view] || 0 : 0;
+  st.restoreScroll = false;
   st.view = view;
   closeModal();
   closeSidebar();
   closeDutyPop();
-  renderNav();
   const content = $('#content');
-  window.scrollTo(0, 0);
+  // Das Menü reagiert sofort auf den Klick. Mit Überblendung (13-weich.js) bleibt die alte Seite stehen, bis die neue fertig ist:
+  // der Scrollstand wechselt erst dann
+  renderNav();
+  // Die erste Seite nach dem Öffnen wird nicht überblendet (es gibt nichts Altes) – so ist sie sofort bedienbar
+  const smooth = !!st.firstPainted && wchCan();
+  if (!smooth) window.scrollTo(0, 0);
   const token = ++st.navToken;
+  const paint = async (extra) => {
+    const draw = () => {
+      if (token !== st.navToken) return;
+      if (smooth) content.classList.remove('view-in'); // die Überblendung ersetzt die gestaffelte Einblendung (sonst liefe beides)
+      renderView();
+      window.scrollTo(0, restore); // nach dem Zeichnen: die Seite hat jetzt ihre Höhe
+      if (!smooth) playIn(content, 'view-in');
+      growBars(content);
+      if (!smooth && sameHub) heightGlide(content, h0);
+      if (extra) extra();
+    };
+    if (smooth) await wchSwap(draw);
+    else draw();
+  };
   const seen = st.seenViews || (st.seenViews = new Set());
   // Schon einmal geladen: sofort mit dem letzten Stand zeigen und im Hintergrund auffrischen (kein Warten beim Menüwechsel).
   // Formularseiten nicht – dort sollen keine Eingaben unter den Fingern neu gezeichnet werden.
@@ -983,10 +1005,7 @@ async function goNow(view) {
     let shown = null;
     try {
       shown = views[view].render();
-      renderView();
-      playIn(content, 'view-in');
-      growBars(content);
-      if (sameHub) heightGlide(content, h0);
+      await paint();
     } catch {
       shown = null; // alter Stand passt nicht mehr – normal laden
     }
@@ -1016,6 +1035,7 @@ async function goNow(view) {
   let skeleton = '';
   const slow = setTimeout(() => {
     if (token !== st.navToken) return;
+    if (smooth) window.scrollTo(0, 0);
     const bar = sameHub ? $('#content > .hub-tabs') : null; // Leiste des Bereichs bleibt beim Laden stehen
     skeleton = loadingHtml(view);
     content.innerHTML = skeleton;
@@ -1036,11 +1056,9 @@ async function goNow(view) {
   clearTimeout(slow);
   if (token !== st.navToken) return;
   seen.add(view);
-  renderView();
-  playIn(content, 'view-in');
-  growBars(content);
-  if (skeleton) skeletonFade(content, skeleton); // Platzhalter blendet aus, während der Inhalt einblendet
-  if (sameHub) heightGlide(content, h0);
+  await paint(() => {
+    if (skeleton && !smooth) skeletonFade(content, skeleton); // Platzhalter blendet aus, während der Inhalt einblendet
+  });
 }
 const INSTANT_SKIP = new Set(['invoice-new', 'settings', 'profile']);
 
@@ -1153,6 +1171,7 @@ function renderView({ force = false } = {}) {
   hidePendingDeletes();
   window.PS.countUp($('#content')); // Kennzahlen zählen hoch (erstes Erscheinen bzw. bei Änderung)
   window.PS.roll($('#content')); // Zählwerk (Lager): Ziffern rollen zum neuen Stand
+  st.firstPainted = true;
 }
 function navigate(view) {
   // Aus einem offenen Fenster heraus: dessen Verlaufseintrag durch die neue Seite ersetzen (Zurück führt nicht ins Leere)
@@ -1174,6 +1193,7 @@ async function returnToView(view) {
       const t = nav.traverseTo(prev.key);
       t.committed.catch(() => {});
       await t.finished;
+      st.restoreScroll = true;
       return go(view);
     } catch {
       st.hashSkip = null; // Zurück abgebrochen: Eintrag des Formulars einfach ersetzen

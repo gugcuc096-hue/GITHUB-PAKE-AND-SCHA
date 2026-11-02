@@ -13,6 +13,9 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { startServer, client, TEAM, PASSWORD, pickTab, caseShow } = require('./helpers');
 
+/** Seitenwechsel und Reiter blenden kurz ineinander über (13-weich.js); Messungen und rohe Gesten danach warten, bis das vorbei ist. */
+const wchSettled = (page) => page.waitForFunction(() => !document.documentElement.dataset.wch);
+
 let chromium = null;
 try {
   ({ chromium } = require('playwright'));
@@ -575,6 +578,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         assert.ok(chatTop < (await page.evaluate(() => innerHeight)) - 250, `Nachrichten sind im Blick (${Math.round(chatTop)}px)`);
         await page.click('.modal-close');
         await settle();
+        // die Seite dahinter zeichnet sich nach dem Schließen neu (Punkt „Neue Nachricht“ ist erledigt) – unter Last dauert das
+        await page.waitForFunction(() => document.querySelectorAll('#content section.todo .todo-title').length === 1, null, { timeout: 8000 }).catch(() => {});
         assert.deepEqual(await titles(), [`${k.templateName} unterschreiben`]);
         assert.deepEqual(problems, []);
         await ctx.close();
@@ -1043,6 +1048,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         });
         assert.equal(pos.sticky, 'sticky', 'Reiterleiste klebt');
         assert.ok(pos.barTop <= 2 || pos.scrolled < pos.barTop, `Leiste klebt oben (${pos.barTop}, gescrollt ${pos.scrolled})`);
+        await wchSettled(page);
         const closeFree = await page.$eval('.modal-close', (x) => {
           const r = x.getBoundingClientRect();
           return r.bottom < 0 || x.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
@@ -2242,7 +2248,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       assert.equal(res.status(), 404);
       assert.equal(await page.textContent('h1'), 'Seite nicht gefunden');
       assert.equal(await page.getAttribute('.nf-actions a.btn-gold', 'href'), '/');
-      assert.equal(await overflow(page), 0);
+      assert.ok((await overflow(page)) <= 0, 'kein Überstand (der Platz der Leiste bleibt reserviert)');
       assert.deepEqual(problems, []);
       await ctx.close();
     }
@@ -2253,18 +2259,17 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
     const { ctx, page, problems } = await open(DESKTOP);
     try {
       await login(page, TEAM.admin, tsrv.base);
-      // Seitenwechsel: die Blöcke der Seite kommen nacheinander (höchstens 0,2 s versetzt)
+      // Seitenwechsel: alt und neu blenden ineinander über (View Transition), statt das Alte hart zu entfernen
+      await page.evaluate(() => {
+        window.__vt = 0;
+        const o = document.startViewTransition.bind(document);
+        document.startViewTransition = (...a) => (window.__vt++, o(...a));
+      });
       await page.evaluate(() => (location.hash = '#calendar'));
-      await page.waitForSelector('#content.view-in .page-title');
-      // Auf langsamen Rechnern kann die Seite noch nachgezeichnet werden (Ladeplatzhalter → Inhalt): warten, bis alle Blöcke einblenden
-      await page.waitForFunction(() => {
-        const els = [...document.querySelectorAll('#content.view-in > *')];
-        return els.length >= 2 && els.every((e) => /^(view-in|ps-page-(fwd|back))$/.test(getComputedStyle(e).animationName));
-      }, null, { timeout: 5000 });
-      const anim = await page.$$eval('#content.view-in > *', (els) => els.map((e) => [getComputedStyle(e).animationName, parseFloat(getComputedStyle(e).animationDelay)]));
-      assert.ok(anim.length >= 2, 'mehrere Blöcke');
-      assert.ok(anim.every(([n]) => /^(view-in|ps-page-(fwd|back))$/.test(n)));
-      assert.ok(anim[1][1] > anim[0][1] && Math.max(...anim.map(([, d]) => d)) <= 0.2, `gestaffelt: ${JSON.stringify(anim)}`);
+      await page.waitForSelector('#content .page-title');
+      await page.waitForFunction(() => window.__vt >= 1);
+      await wchSettled(page);
+      assert.equal(await page.evaluate(() => document.querySelector('#content').classList.contains('view-in')), false, 'ohne Überblendung gäbe es die gestaffelte Einblendung');
       // Fenster schließen: echtes Fenster sofort zu, eine stumme Kopie ohne ids blendet aus und ist danach weg
       await page.evaluate(() => openModal(eventForm(null)));
       await page.waitForSelector('#modal.open #evStart');
@@ -2506,10 +2511,18 @@ describe('Browser: Strafmaß, Verhandlung, Wiki, Beschlüsse, Rechnungszeile, Ge
       await page.waitForFunction(() => !document.querySelector('#modal').classList.contains('open'));
       let loads = 0;
       page.on('request', (r) => /\/api\/wiki$/.test(r.url()) && loads++);
-      await swipe(page, '#content', 400);
-      await page.waitForFunction(() => !document.querySelector('.ptr.spin'));
-      await page.waitForTimeout(300);
-      assert.ok(loads >= 1, 'Seite neu geladen');
+      await wchSettled(page);
+      await page.evaluate(() => window.scrollTo(0, 0)); // Ziehen zum Aktualisieren gilt nur ganz oben (der Klick auf die Karte hat evtl. gescrollt)
+      for (let i = 0; i < 3 && !loads; i++) {
+        await page.waitForTimeout(500); // Schließen per Zurück stellt den Scrollstand noch einmal her – erst danach ganz nach oben
+        await wchSettled(page);
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await swipe(page, '#content', 400);
+        await page.waitForTimeout(400);
+        await page.waitForFunction(() => !document.querySelector('.ptr.spin'), null, { timeout: 8000 });
+      }
+      const dbg = await page.evaluate(() => ({ y: scrollY, wch: document.documentElement.dataset.wch || '', body: document.body.className, modal: document.querySelector('#modal').className }));
+      assert.ok(loads >= 1, `Seite neu geladen (${JSON.stringify(dbg)})`);
       await page.goto(srv.base + '/dashboard#resolutions');
       await page.waitForSelector('#content .page-title');
       assert.ok((await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 1);
@@ -2636,6 +2649,7 @@ describe('Browser: Board-Menü gebündelt, Hover-Karte, Kalender ziehen, Vorlage
       await page.click('#nav a[href="#calendar"]');
       const chip = page.locator(`#content .cal-ev[data-ev="${ev.id}"]`);
       await chip.waitFor();
+      await wchSettled(page);
       const evDay = now.day + ahead;
       const targetDay = evDay + (evDay > 20 ? -1 : 1);
       const key = `${now.year}-${String(now.month).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;

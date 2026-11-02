@@ -55,7 +55,8 @@ function caseTabSet(tab) {
   if (pick) pick.value = String(CASE_TABS.findIndex((t) => t[0] === tab));
   // Bewegung: Goldstrich gleitet, der neue Reiter blendet weich ein, die Höhe des Fensters folgt
   tabInk(root.querySelector('.case-jump-list'));
-  if (!window.PS.motion.calm() && typeof Element.prototype.animate === 'function') {
+  // Läuft der Wechsel in einer Überblendung (13-weich.js), blenden alt und neu ineinander über – die Einblendungen hier entfallen
+  if (!wchInside() && !window.PS.motion.calm() && typeof Element.prototype.animate === 'function') {
     root.querySelectorAll(':scope [data-pane]').forEach((pane) => {
       if (pane.getClientRects().length) pane.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 260, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
     });
