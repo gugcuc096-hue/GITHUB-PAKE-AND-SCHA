@@ -83,7 +83,7 @@ Object.assign(actions, {
     st.invTab = ['dauer', 'freigaben'].includes(el.dataset.tab) ? el.dataset.tab : 'rechnungen';
     if (st.invTab === 'dauer') await loadRetainers();
     if (st.invTab === 'freigaben') await loadApprovals();
-    renderView();
+    await wchSwap(() => renderView()); // erst laden, dann in einem Zug überblenden
   },
   'ret-new': async () => openModal(await retainerForm(null), { wide: true }),
   'ret-edit': async (el) => openModal(await retainerForm(retainerById(el.dataset.id)), { wide: true }),

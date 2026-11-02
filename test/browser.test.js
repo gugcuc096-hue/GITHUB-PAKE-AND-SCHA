@@ -72,6 +72,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
     return { ctx, page, problems, settle };
   }
   const overflow = (page) => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  // Seitenwechsel blenden kurz ineinander über (13-weich.js); rohe Mausgesten direkt danach warten, bis das vorbei ist
+  const wchSettled = (page) => page.waitForFunction(() => !document.documentElement.dataset.wch);
   async function login(page, email, base = server.base) {
     await page.goto(base + '/login');
     await page.fill('#email', email);
@@ -2242,7 +2244,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       assert.equal(res.status(), 404);
       assert.equal(await page.textContent('h1'), 'Seite nicht gefunden');
       assert.equal(await page.getAttribute('.nf-actions a.btn-gold', 'href'), '/');
-      assert.equal(await overflow(page), 0);
+      assert.ok((await overflow(page)) <= 0, 'kein Überstand (der Platz der Leiste bleibt reserviert)');
       assert.deepEqual(problems, []);
       await ctx.close();
     }
@@ -2253,18 +2255,17 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
     const { ctx, page, problems } = await open(DESKTOP);
     try {
       await login(page, TEAM.admin, tsrv.base);
-      // Seitenwechsel: die Blöcke der Seite kommen nacheinander (höchstens 0,2 s versetzt)
+      // Seitenwechsel: alt und neu blenden ineinander über (View Transition), statt das Alte hart zu entfernen
+      await page.evaluate(() => {
+        window.__vt = 0;
+        const o = document.startViewTransition.bind(document);
+        document.startViewTransition = (...a) => (window.__vt++, o(...a));
+      });
       await page.evaluate(() => (location.hash = '#calendar'));
-      await page.waitForSelector('#content.view-in .page-title');
-      // Auf langsamen Rechnern kann die Seite noch nachgezeichnet werden (Ladeplatzhalter → Inhalt): warten, bis alle Blöcke einblenden
-      await page.waitForFunction(() => {
-        const els = [...document.querySelectorAll('#content.view-in > *')];
-        return els.length >= 2 && els.every((e) => /^(view-in|ps-page-(fwd|back))$/.test(getComputedStyle(e).animationName));
-      }, null, { timeout: 5000 });
-      const anim = await page.$$eval('#content.view-in > *', (els) => els.map((e) => [getComputedStyle(e).animationName, parseFloat(getComputedStyle(e).animationDelay)]));
-      assert.ok(anim.length >= 2, 'mehrere Blöcke');
-      assert.ok(anim.every(([n]) => /^(view-in|ps-page-(fwd|back))$/.test(n)));
-      assert.ok(anim[1][1] > anim[0][1] && Math.max(...anim.map(([, d]) => d)) <= 0.2, `gestaffelt: ${JSON.stringify(anim)}`);
+      await page.waitForSelector('#content .page-title');
+      await page.waitForFunction(() => window.__vt >= 1);
+      await wchSettled(page);
+      assert.equal(await page.evaluate(() => document.querySelector('#content').classList.contains('view-in')), false, 'ohne Überblendung gäbe es die gestaffelte Einblendung');
       // Fenster schließen: echtes Fenster sofort zu, eine stumme Kopie ohne ids blendet aus und ist danach weg
       await page.evaluate(() => openModal(eventForm(null)));
       await page.waitForSelector('#modal.open #evStart');
@@ -2506,6 +2507,7 @@ describe('Browser: Strafmaß, Verhandlung, Wiki, Beschlüsse, Rechnungszeile, Ge
       await page.waitForFunction(() => !document.querySelector('#modal').classList.contains('open'));
       let loads = 0;
       page.on('request', (r) => /\/api\/wiki$/.test(r.url()) && loads++);
+      await wchSettled(page);
       await swipe(page, '#content', 400);
       await page.waitForFunction(() => !document.querySelector('.ptr.spin'));
       await page.waitForTimeout(300);
@@ -2636,6 +2638,7 @@ describe('Browser: Board-Menü gebündelt, Hover-Karte, Kalender ziehen, Vorlage
       await page.click('#nav a[href="#calendar"]');
       const chip = page.locator(`#content .cal-ev[data-ev="${ev.id}"]`);
       await chip.waitFor();
+      await wchSettled(page);
       const evDay = now.day + ahead;
       const targetDay = evDay + (evDay > 20 ? -1 : 1);
       const key = `${now.year}-${String(now.month).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;

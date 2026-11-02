@@ -977,17 +977,15 @@ async function goNow(view) {
   closeSidebar();
   closeDutyPop();
   const content = $('#content');
-  // Mit Überblendung (13-weich.js) bleibt die alte Seite stehen, bis die neue fertig ist: Menü und Scrollstand wechseln erst dann
+  // Das Menü reagiert sofort auf den Klick. Mit Überblendung (13-weich.js) bleibt die alte Seite stehen, bis die neue fertig ist:
+  // der Scrollstand wechselt erst dann
+  renderNav();
   const smooth = wchCan();
-  if (!smooth) {
-    renderNav();
-    window.scrollTo(0, 0);
-  }
+  if (!smooth) window.scrollTo(0, 0);
   const token = ++st.navToken;
   const paint = async (extra) => {
     const draw = () => {
       if (token !== st.navToken) return;
-      if (smooth) renderNav();
       renderView();
       window.scrollTo(0, restore); // nach dem Zeichnen: die Seite hat jetzt ihre Höhe
       if (!smooth) playIn(content, 'view-in');
@@ -1035,10 +1033,7 @@ async function goNow(view) {
   let skeleton = '';
   const slow = setTimeout(() => {
     if (token !== st.navToken) return;
-    if (smooth) {
-      renderNav();
-      window.scrollTo(0, 0);
-    }
+    if (smooth) window.scrollTo(0, 0);
     const bar = sameHub ? $('#content > .hub-tabs') : null; // Leiste des Bereichs bleibt beim Laden stehen
     skeleton = loadingHtml(view);
     content.innerHTML = skeleton;
@@ -1053,7 +1048,6 @@ async function goNow(view) {
     if (token !== st.navToken) return;
     clearTimeout(slow);
     handleError(e);
-    if (smooth) renderNav();
     content.innerHTML = errorHtml(e.message);
     return;
   }

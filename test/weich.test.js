@@ -71,9 +71,9 @@ describe('Weiche Wechsel und Feinschliff (Browser)', { skip: chromium ? false : 
       const box = await (await page.$('#content .hub-tabs >> text=Beförderungen')).boundingBox();
       await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
       await page.waitForFunction(() => location.hash === '#personnel', null, { timeout: 5000 });
+      await page.waitForFunction(() => /Beförderung|Personal/i.test(document.querySelector('#content .page-title')?.textContent || ''), null, { timeout: 5000 });
       await settled(page);
       assert.equal(await page.evaluate(() => window.__bar === document.querySelector('#content .hub-tabs')), true, 'dieselbe Leiste');
-      assert.match(await page.textContent('#content .page-title'), /Beförderung|Personal/i);
       assert.deepEqual(problems, []);
     } finally {
       await ctx.close();
@@ -150,12 +150,13 @@ describe('Weiche Wechsel und Feinschliff (Browser)', { skip: chromium ? false : 
       await page.evaluate(() => (location.hash = '#cases'));
       await page.waitForSelector('#content [data-action="open-case"]');
       await page.waitForTimeout(900);
-      await page.evaluate(() => window.scrollTo(0, 700));
-      await page.waitForTimeout(200);
+      const row = page.locator('#content [data-action="open-case"]').nth(20);
+      await row.scrollIntoViewIfNeeded();
+      await page.waitForTimeout(300);
       const y0 = await page.evaluate(() => scrollY);
       assert.ok(y0 > 300, `Liste ist lang genug (${y0})`);
       // Fenster auf und zu: nichts rutscht
-      await page.click('#content [data-action="open-case"] >> nth=12');
+      await row.click();
       await page.waitForSelector('#modal.open');
       await page.waitForTimeout(500);
       assert.equal(await page.evaluate(() => scrollY), y0, 'Scrollstand bei offenem Fenster');
