@@ -1478,8 +1478,7 @@ Object.assign(actions, {
     const body = $('#modalBody');
     const bar = $('#modalBody .case-jump');
     if (body && bar && bar.getBoundingClientRect().top <= body.getBoundingClientRect().top + 2) bar.scrollIntoView({ block: 'start' });
-    const root = $('#modalBody .case-root');
-    if (root) playIn(root, 'swap-in');
+    // (Kein Einblenden der ganzen Akte hier: der Kopf der Akte bleibt stehen, nur der Inhalt wechselt – siehe caseTabSet und motion.css)
   },
   'scroll-to': (el) => {
     const target = caseReveal(el.dataset.target) || $('#' + el.dataset.target);
