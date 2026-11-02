@@ -12,6 +12,36 @@
         }
     }
 
+    /* Zahlenfeld (Alter): eigene goldene Auf-/Ab-Tasten statt der Systempfeile; lösen dieselben Ereignisse aus wie Tippen */
+    document.querySelectorAll('input[type="number"].field').forEach((input) => {
+        const host = input.parentElement;
+        if (!host || host.querySelector('.num-spin')) return;
+        if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+        const spin = document.createElement('span');
+        spin.className = 'num-spin';
+        const mk = (dir, d) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.tabIndex = -1;
+            b.setAttribute('aria-label', dir > 0 ? 'Einmal mehr' : 'Einmal weniger');
+            b.innerHTML = `<svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+            b.addEventListener('click', () => {
+                if (input.disabled) return;
+                const step = Number(input.step) > 0 ? Number(input.step) : 1;
+                const min = input.min !== '' ? Number(input.min) : -Infinity;
+                const max = input.max !== '' ? Number(input.max) : Infinity;
+                const base = input.value === '' ? (dir > 0 ? min - step : max + step) : Number(input.value);
+                const start = Number.isFinite(base) ? base : 0;
+                input.value = String(Math.min(max, Math.max(min, start + dir * step)));
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+            return b;
+        };
+        spin.append(mk(1, 'M2 6.5 5 3.5 8 6.5'), mk(-1, 'M2 3.5 5 6.5 8 3.5'));
+        host.append(spin);
+    });
+
     /* Handy-Menü: erst zuklappen, dann zum Abschnitt springen (sonst landet man um die Menühöhe zu tief) */
     const menu = document.getElementById('karMenu');
     const menuBtn = document.getElementById('karMenuBtn');
