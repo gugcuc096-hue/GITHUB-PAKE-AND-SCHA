@@ -1195,6 +1195,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       ${idleStrip}
       ${pinnedStrip}
       ${claim}
+      <div class="case-panes">
       <div class="case-overview" data-pane="ueberblick">
       ${track}
       ${
@@ -1218,6 +1219,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       ${staff ? precedentStrip(c, similar, precedentId) : ''}
       </div>
       ${caseSecHtml(c, secMap, secMeta, staff)}
+      </div>
     </div>`;
 }
 

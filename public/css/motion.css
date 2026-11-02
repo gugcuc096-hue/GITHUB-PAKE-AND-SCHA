@@ -464,8 +464,16 @@ body:has(#sidebar) .promo-dock.is-on { translate: 0 0; }
 html[data-wch="1"] #content { view-transition-name: wch-content; }
 html[data-wch="1"] #content > .hub-tabs { view-transition-name: wch-tabs; }
 html[data-wch="1"] .set-side { view-transition-name: wch-side; }
-html[data-wch] #modalBody .case-root { view-transition-name: wch-case; }
+/* Beim Reiterwechsel in der Akte überblendet nur der Inhalt unter der Reiterleiste; Kopf der Akte und Leiste stehen still */
+html[data-wch] #modalBody .case-root .case-panes { view-transition-name: wch-case; }
 html[data-wch] #modalBody .case-root .case-jump { view-transition-name: wch-casejump; }
+html[data-wch="modal"] #modalCard { view-transition-name: wch-card; }
+/* Der Rest (abgedunkelte Seite) bleibt unverändert stehen – keine Überblendung des Hintergrunds, nichts flackert */
+html[data-wch="modal"]::view-transition-old(root) { display: none; }
+html[data-wch="modal"]::view-transition-new(root) { animation: none; }
+::view-transition-group(wch-card) { animation-duration: 0.26s; animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1); }
+::view-transition-old(wch-card) { display: none; }
+::view-transition-new(wch-card) { animation: none; height: 100%; object-fit: none; object-position: left top; }
 html:active-view-transition-type(wch)::view-transition-old(root), html:active-view-transition-type(wch)::view-transition-new(root) { animation-duration: 0.2s; }
 ::view-transition-group(wch-content), ::view-transition-group(wch-case) { animation-duration: 0.26s; animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1); }
 ::view-transition-old(wch-content), ::view-transition-old(wch-case) { animation: wch-out 0.14s ease-out both; }

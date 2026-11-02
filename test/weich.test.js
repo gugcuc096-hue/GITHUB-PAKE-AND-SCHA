@@ -133,6 +133,7 @@ describe('Weiche Wechsel und Feinschliff (Browser)', { skip: chromium ? false : 
       await page.waitForTimeout(900);
       await page.evaluate(() => {
         window.__jump = document.querySelector('#modalBody .case-jump');
+        window.__head = document.querySelector('#modalBody .case-head');
         window.__vt = 0;
         window.__names = [];
         const o = document.startViewTransition.bind(document);
@@ -146,6 +147,10 @@ describe('Weiche Wechsel und Feinschliff (Browser)', { skip: chromium ? false : 
             opts.update = async () => {
               const r = await u();
               (window.__dirs = window.__dirs || []).push(document.documentElement.dataset.wchDir || '');
+              // Der Kopf der Akte darf beim Reiterwechsel nicht neu einblenden: keine Animation auf der ganzen Akte, keine auf dem Kopf
+              (window.__headAnims = window.__headAnims || []).push(
+                document.getAnimations().filter((a) => a.effect && a.effect.target && a.effect.target.classList && (a.effect.target.classList.contains('case-root') || a.effect.target.classList.contains('case-head'))).map((a) => a.animationName).join(',')
+              );
               return r;
             };
           }
@@ -164,6 +169,8 @@ describe('Weiche Wechsel und Feinschliff (Browser)', { skip: chromium ? false : 
       await page.waitForFunction(() => document.querySelector('#modalBody .case-root')?.dataset.caseTab === 'ueberblick');
       await settled(page);
       assert.deepEqual(await page.evaluate(() => window.__dirs), ['fwd', 'back'], 'Richtung der Reiterüberblendung');
+      assert.deepEqual(await page.evaluate(() => window.__headAnims), ['', ''], 'der Kopf der Akte blendet beim Reiterwechsel nicht neu ein');
+      assert.equal(await page.evaluate(() => window.__head === document.querySelector('#modalBody .case-head')), true, 'derselbe Kopf');
       assert.deepEqual(problems, []);
     } finally {
       await ctx.close();
