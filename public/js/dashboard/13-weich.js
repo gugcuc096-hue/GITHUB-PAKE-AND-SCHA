@@ -103,9 +103,10 @@ function settingsSideKeep(old, fresh) {
  * draw() setzt den neuen Zustand und zeichnet mit renderView().
  */
 function settingsSwitch(draw) {
-  const old = document.querySelector('.set-side');
-  const keepScroll = old ? old.querySelector('.set-nav')?.scrollTop || 0 : 0;
   return wchSwap(() => {
+    // Die Leiste erst jetzt greifen (nicht schon beim Klick): wurde die Seite zwischendurch neu gezeichnet, ist die alte Leiste sonst veraltet
+    const old = document.querySelector('.set-side');
+    const keepScroll = old ? old.querySelector('.set-nav')?.scrollTop || 0 : 0;
     draw();
     const fresh = document.querySelector('.set-side');
     if (settingsSideKeep(old, fresh)) {

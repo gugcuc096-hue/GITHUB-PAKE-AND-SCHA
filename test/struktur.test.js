@@ -84,10 +84,12 @@ describe('Aufgeräumte Bedienung (Browser)', { skip: chromium ? false : 'Playwri
       await page.fill('#setSearch', 'webhook');
       assert.deepEqual(await page.$$eval('.set-nav-item:not([hidden])', (l) => l.map((x) => x.dataset.key)), ['bot']);
       await page.press('#setSearch', 'Enter');
-      await page.waitForFunction(() => st.settingsTab === 'bot' && /tab=bot/.test(location.search));
+      // erst wenn der Bereich fertig angezeigt ist (er lädt Daten nach und blendet über – 13-weich.js)
+      await page.waitForFunction(() => st.settingsTab === 'bot' && /tab=bot/.test(location.search) && document.querySelector('.set-main')?.dataset.setSection === 'bot' && !document.documentElement.dataset.wch);
       // Die Leiste bleibt beim Wechseln stehen – auch der Suchtext; zum nächsten Bereich erst die Suche leeren
       assert.equal(await page.inputValue('#setSearch'), 'webhook');
       await page.fill('#setSearch', '');
+      await page.waitForFunction(() => !document.querySelector('.set-nav-item[hidden]'));
       // Systemzustand in den Einstellungen
       await page.click('.set-nav-item[data-key="health"]');
       await page.waitForSelector('.set-main [data-action="sys-check"]');
