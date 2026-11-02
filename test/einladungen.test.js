@@ -133,6 +133,8 @@ describe('Einladungen im Dashboard (Browser)', { skip: chromium ? false : 'Playw
         await page.waitForURL(/dashboard/);
         await page.waitForFunction(() => typeof newEventModal === 'function' || typeof eventForm === 'function');
         await page.goto(`${srv.base}/dashboard#calendar`);
+        // erst wenn der Kalender da ist (und die Überblendung durch): sonst öffnet der Klick das Formular auf der alten Seite, und der Seitenwechsel schließt es wieder
+        await page.waitForFunction(() => st.view === 'calendar' && !document.documentElement.dataset.wch && /Kalender/.test(document.querySelector('#content .page-title')?.textContent || ''));
         await page.waitForSelector('[data-action="new-event"]');
         await page.click('[data-action="new-event"]');
         await page.waitForSelector('form[data-form="event"] .invite-chips');

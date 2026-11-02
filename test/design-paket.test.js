@@ -162,6 +162,7 @@ describe('Design-Paket', () => {
 
       // Rechtsklick auf eine Aktenzeile: Menü mit Anpinnen, Kopieren …
       await page.evaluate(() => (location.hash = '#cases'));
+      await page.waitForFunction(() => st.view === 'cases' && !document.documentElement.dataset.wch); // die Seite blendet über – erst danach die Zeile suchen
       const row = page.locator(`[data-action="open-case"][data-id="${kase.id}"]`).first();
       await row.waitFor();
       await row.click({ button: 'right' });
