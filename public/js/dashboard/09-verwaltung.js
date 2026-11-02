@@ -680,7 +680,7 @@ function positionsPanel() {
               <div class="flex gap-1 shrink-0"><button class="icon-btn sm" data-action="position-edit" data-id="${p.id}" aria-label="Bearbeiten">${icon('edit', 'ico-sm')}</button><button class="icon-btn sm" data-action="position-delete" data-id="${p.id}" aria-label="Löschen">${icon('trash', 'ico-sm')}</button></div></div>`
           )
           .join('')
-      : empty('Keine Stellen ausgeschrieben – Initiativbewerbungen sind trotzdem möglich.', 'briefcase', nextStep('Stelle ausschreiben', 'position-new'))}
+      : empty('Keine Stellen ausgeschrieben – auf der Karriereseite kann man sich erst bewerben, wenn eine Stelle offen ist.', 'briefcase', nextStep('Stelle ausschreiben', 'position-new'))}
     </div>`;
 }
 

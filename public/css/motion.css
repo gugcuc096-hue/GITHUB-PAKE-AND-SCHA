@@ -470,6 +470,17 @@ html:active-view-transition-type(wch)::view-transition-old(root), html:active-vi
 ::view-transition-group(wch-content), ::view-transition-group(wch-case) { animation-duration: 0.26s; animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1); }
 ::view-transition-old(wch-content), ::view-transition-old(wch-case) { animation: wch-out 0.14s ease-out both; }
 ::view-transition-new(wch-content), ::view-transition-new(wch-case) { animation: wch-in 0.26s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+/* Beim Wechsel wächst oder schrumpft die Höhe: nichts ragt über den Rand der Gruppe hinaus */
+::view-transition-group(wch-content), ::view-transition-group(wch-case) { overflow: clip; }
+/* Reiter der Akte: das Alte gleitet in die Richtung hinaus, aus der man kommt, das Neue von der anderen Seite herein (data-wch-dir setzt caseTabSet) */
+html[data-wch-dir="fwd"]::view-transition-old(wch-case) { animation: wch-out-fwd 0.16s ease-in both; }
+html[data-wch-dir="fwd"]::view-transition-new(wch-case) { animation: wch-in-fwd 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.05s both; }
+html[data-wch-dir="back"]::view-transition-old(wch-case) { animation: wch-out-back 0.16s ease-in both; }
+html[data-wch-dir="back"]::view-transition-new(wch-case) { animation: wch-in-back 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.05s both; }
+@keyframes wch-out-fwd { to { opacity: 0; transform: translateX(-22px); } }
+@keyframes wch-in-fwd { from { opacity: 0; transform: translateX(22px); } }
+@keyframes wch-out-back { to { opacity: 0; transform: translateX(22px); } }
+@keyframes wch-in-back { from { opacity: 0; transform: translateX(-22px); } }
 ::view-transition-group(wch-tabs), ::view-transition-group(wch-side), ::view-transition-group(wch-casejump) { animation-duration: 0.22s; animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1); }
 @keyframes wch-out { to { opacity: 0; } }
 @keyframes wch-in { from { opacity: 0; transform: translateY(6px); } }

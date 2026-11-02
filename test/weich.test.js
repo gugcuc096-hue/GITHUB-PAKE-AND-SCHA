@@ -140,6 +140,15 @@ describe('Weiche Wechsel und Feinschliff (Browser)', { skip: chromium ? false : 
           // Beim Reiterwechsel in der Akte darf die Seite dahinter keinen eigenen Namen tragen – sonst löst sie sich aus dem Bild und legt sich über das Fenster
           window.__names.push([document.documentElement.dataset.wch, getComputedStyle(document.querySelector('#content')).viewTransitionName]);
           window.__vt++;
+          const opts = a[0];
+          if (opts && typeof opts === 'object' && opts.update) {
+            const u = opts.update;
+            opts.update = async () => {
+              const r = await u();
+              (window.__dirs = window.__dirs || []).push(document.documentElement.dataset.wchDir || '');
+              return r;
+            };
+          }
           return o(...a);
         };
       });
@@ -150,6 +159,11 @@ describe('Weiche Wechsel und Feinschliff (Browser)', { skip: chromium ? false : 
       assert.deepEqual(await page.evaluate(() => window.__names), [['modal', 'none']], 'nur das Fenster ist benannt, die Seite dahinter bleibt im Bild');
       assert.equal(await page.evaluate(() => window.__jump === document.querySelector('#modalBody .case-jump')), true);
       assert.equal(await page.locator('#modalBody .case-jump .active').count(), 1);
+      // Richtung: weiter nach rechts (Überblick → Fall) gleitet nach links hinaus, zurück umgekehrt
+      await page.click('#modalBody .case-jump [data-action="case-tab"][data-tab="ueberblick"]');
+      await page.waitForFunction(() => document.querySelector('#modalBody .case-root')?.dataset.caseTab === 'ueberblick');
+      await settled(page);
+      assert.deepEqual(await page.evaluate(() => window.__dirs), ['fwd', 'back'], 'Richtung der Reiterüberblendung');
       assert.deepEqual(problems, []);
     } finally {
       await ctx.close();

@@ -54,8 +54,11 @@ const casePaneOf = (key) => (CASE_TABS.find((t) => t[2].includes(key)) || CASE_T
 function caseTabSet(tab) {
   const root = $('#modalBody .case-root');
   if (!root || !CASE_TABS.some((t) => t[0] === tab)) return;
+  const from = CASE_TABS.findIndex((t) => t[0] === (root.dataset.caseTab || st.caseTab));
   st.caseTab = tab;
   if (root.dataset.caseTab === tab) return;
+  // Richtung für die Überblendung (motion.css): nach rechts weiter = das Alte geht nach links hinaus, das Neue kommt von rechts
+  if (wchInside()) document.documentElement.dataset.wchDir = CASE_TABS.findIndex((t) => t[0] === tab) > from ? 'fwd' : 'back';
   const h0 = root.offsetHeight;
   root.dataset.caseTab = tab;
   root.querySelectorAll('.case-jump [data-action="case-tab"]').forEach((b) => {
