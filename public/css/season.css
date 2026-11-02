@@ -58,6 +58,8 @@ html.has-season .field { background-color: rgba(6, 10, 24, 0.88); }
 
 /* Lichterkette in der Kopfzeile: bleibt innerhalb der Leiste */
 .ps-lights { position: absolute; left: 0; right: 0; bottom: 0; height: 12px; overflow: hidden; z-index: 1; }
+/* Die Kette bekommt eigenen Platz unter Logo und Namen – nichts liegt mehr aufeinander */
+.glass-nav:has(> .ps-lights) { padding-bottom: 14px; }
 .ps-lights .wire { position: absolute; left: 0; right: 0; bottom: 8px; height: 1px; background: rgba(148, 163, 184, 0.35); }
 .ps-lights .bulb { position: absolute; bottom: 2px; width: 5px; height: 7px; margin-left: -2.5px; border-radius: 45% 45% 50% 50%; background: var(--c); box-shadow: 0 0 5px 1px var(--c); animation: ps-twinkle 2.4s ease-in-out var(--d) infinite; }
 @keyframes ps-twinkle { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
