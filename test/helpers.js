@@ -204,17 +204,22 @@ async function caseSec(page, secId) {
 
 /** Akte: den Reiter öffnen, in dem das Element steht (falls es in einem Reiter steht) – vor Klick, Eingabe oder Prüfung. */
 async function caseShow(page, selector) {
-  // Suchen und Lesen in einem Zug: wird die Akte zwischendurch neu gezeichnet (z. B. nach dem Speichern), gibt es kein „Element weg“
-  const info = await (
-    await page.waitForFunction((sel) => {
-      const el = document.querySelector(sel);
-      if (!el) return false;
-      const pane = el.closest('.case-root [data-pane]');
-      const root = el.closest('.case-root');
-      return { tab: pane && root && root.dataset.caseTab !== pane.dataset.pane ? pane.dataset.pane : null };
-    }, selector)
-  ).jsonValue();
-  const tab = info.tab;
+  // Wird die Akte zwischendurch neu gezeichnet (z. B. nach dem Speichern), ist das Element kurz weg: dann noch einmal suchen
+  let tab = null;
+  for (let versuch = 0; ; versuch++) {
+    await page.waitForSelector(selector, { state: 'attached' });
+    try {
+      tab = await page.$eval(selector, (el) => {
+        const pane = el.closest('.case-root [data-pane]');
+        const root = el.closest('.case-root');
+        return pane && root && root.dataset.caseTab !== pane.dataset.pane ? pane.dataset.pane : null;
+      });
+      break;
+    } catch (e) {
+      if (versuch >= 5 || !/Failed to find element/.test(String(e.message))) throw e;
+      await page.waitForTimeout(150);
+    }
+  }
   if (!tab) return;
   await pickTab(page, `#modalBody [data-action="case-tab"][data-tab="${tab}"]`);
   await page.waitForFunction((t) => document.querySelector('#modalBody .case-root')?.dataset.caseTab === t, tab);

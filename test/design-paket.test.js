@@ -165,11 +165,18 @@ describe('Design-Paket', () => {
       await page.waitForFunction(() => st.view === 'cases' && !document.documentElement.dataset.wch); // die Seite blendet über – erst danach die Zeile suchen
       const row = page.locator(`[data-action="open-case"][data-id="${kase.id}"]`).first();
       await row.waitFor();
-      await row.click({ button: 'right' });
-      await page.waitForSelector('.ctx-menu.is-open');
-      const labels = await page.$$eval('.ctx-menu .ctx-item', (l) => l.map((x) => x.textContent.trim()));
-      assert.ok(labels.includes('Akte öffnen') && labels.some((t) => /Anpinnen/.test(t)) && labels.includes('Aktenzeichen kopieren'), labels.join(' | '));
-      await page.click('.ctx-menu [data-action="case-star"]');
+      // Das Menü schließt bei jedem Scrollen – unter Last verschiebt sich die Liste noch einmal (Schrift/Bilder laden nach): dann erneut öffnen
+      let labels = [];
+      for (let versuch = 0; ; versuch++) {
+        await row.click({ button: 'right' });
+        await page.waitForSelector('.ctx-menu.is-open');
+        labels = await page.$$eval('.ctx-menu .ctx-item', (l) => l.map((x) => x.textContent.trim()));
+        assert.ok(labels.includes('Akte öffnen') && labels.some((t) => /Anpinnen/.test(t)) && labels.includes('Aktenzeichen kopieren'), labels.join(' | '));
+        const ok = await page.click('.ctx-menu [data-action="case-star"]', { timeout: 4000 }).then(() => true, () => false);
+        if (ok) break;
+        if (versuch >= 4) throw new Error('Das Rechtsklick-Menü blieb nicht offen');
+        await page.waitForFunction(() => !document.querySelector('.ctx-menu'));
+      }
       await page.waitForFunction(() => !document.querySelector('.ctx-menu'));
       await page.waitForFunction((id) => document.querySelector(`[data-action="case-star"][data-id="${id}"]`)?.getAttribute('aria-pressed') === 'true', kase.id);
       // Esc schließt das Menü
