@@ -559,6 +559,7 @@ function caseDetail(c, u, { lean = false, all = false } = {}) {
       : undefined,
     parties: staff ? require('../domain/parties').listForCase(c.id) : undefined,
     places: staff ? require('../domain/places').listForCase(c.id) : undefined, // Tatort-Karte (nur Kanzlei)
+    fall: staff ? require('../domain/fall').payload(c) : undefined, // Bausteine je Rechtsgebiet (Zivil, Verfassung, Vertrag)
     // Kanzlei: ähnliche Präzedenzfälle (gleiche Paragraphen/Rechtsgebiet) und der Eintrag zu dieser Akte
     similar: staff ? require('../domain/precedents').similarFor(c) : undefined,
     precedentId: staff ? ((Q.precedents.idByCaseId.get(c.id) || {}).id ?? null) : undefined,

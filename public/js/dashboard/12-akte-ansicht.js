@@ -9,12 +9,24 @@
 
 // [Schlüssel, Anker in der Akte, Bezeichnung]
 const CASE_SEC = [
+  ['subject', 'secSubject', 'Angegriffener Akt / Vertragsgegenstand'],
   ['tathergang', 'secTathergang', 'Tathergang'],
   ['charges', 'secCharges', 'Anklage'],
+  ['admiss', 'secAdmiss', 'Zulässigkeit'],
+  ['claims', 'secClaims', 'Ansprüche'],
+  ['motions', 'secMotions', 'Anträge'],
+  ['norms', 'secNorms', 'Grundrechte / Normen'],
+  ['participants', 'secParticipants', 'Beteiligte'],
+  ['parties', 'secParties', 'Vertragsparteien'],
+  ['clauses', 'secClauses', 'Klauseln'],
+  ['term', 'secTerm', 'Laufzeit & Fristen'],
+  ['versions', 'secVersions', 'Entwurfsversionen'],
+  ['vclaims', 'secVclaims', 'Ansprüche (Streit)'],
   ['chat', 'secChat', 'Nachrichten'],
   ['events', 'secEvents', 'Termine & Fristen'],
   ['witnesses', 'secWitnesses', 'Zeugen'],
   ['karte', 'secKarte', 'Tatort-Karte'],
+  ['corr', 'secCorr', 'Korrespondenz'],
   ['contracts', 'secContracts', 'Verträge'],
   ['briefs', 'secBriefs', 'Schriftsätze'],
   ['external', 'secExternal', 'Dokumente'],
@@ -34,7 +46,7 @@ const SEC_KEYS = CASE_SEC.map((s) => s[0]);
 const CASE_TABS = [
   ['ueberblick', 'Überblick', ['tasks', 'work', 'notes']],
   ['kommunikation', 'Kommunikation', ['chat', 'events', 'requests']],
-  ['fall', 'Fall', ['tathergang', 'charges', 'witnesses', 'evidence', 'karte']],
+  ['fall', 'Fall', ['subject', 'tathergang', 'charges', 'admiss', 'claims', 'motions', 'norms', 'participants', 'parties', 'clauses', 'term', 'versions', 'vclaims', 'witnesses', 'evidence', 'karte', 'corr']],
   ['dokumente', 'Dokumente', ['contracts', 'briefs', 'external', 'invoices']],
 ];
 const casePaneOf = (key) => (CASE_TABS.find((t) => t[2].includes(key)) || CASE_TABS[0])[0];
@@ -88,7 +100,9 @@ async function caseSecLoad() {
 function caseSecLayout(area) {
   const mine = kSecPrefs && kSecPrefs.mine;
   const view = mine || (kSecPrefs && kSecPrefs.defaults && kSecPrefs.defaults[area]) || null;
-  const order = (view ? view.order : []).filter((k) => SEC_KEYS.includes(k));
+  // Ohne eigene oder vorgegebene Ansicht gilt die Grundreihenfolge des Rechtsgebiets (12-fall.js), sonst die allgemeine
+  const base = view ? view.order : (typeof FALL_ORDER !== 'undefined' && FALL_ORDER[area]) || [];
+  const order = base.filter((k) => SEC_KEYS.includes(k));
   // Abschnitte, die es bei der gespeicherten Ansicht noch nicht gab (z. B. Tathergang): an ihrem Standardplatz einfügen
   SEC_KEYS.forEach((k, i) => {
     if (order.includes(k)) return;
@@ -322,15 +336,15 @@ function tathergangSection(c) {
   const v = c.incident || '';
   if (!v && !c.canEdit) return '';
   const tip = 'Was ist passiert – Schritt für Schritt. Eine Zeile je Schritt, gern mit Uhrzeit („14:20 – Festnahme vor dem Juwelier“); Absätze für längere Schilderungen.';
-  if (!v) return emptySection('secTathergang', 'Tathergang', 'noch nicht beschrieben', `<button type="button" class="btn-outline btn-sm" data-action="story-edit" data-case-id="${c.id}">${icon('edit', 'ico-sm')}<span>Tathergang beschreiben</span></button>`, tip);
+  if (!v) return emptySection('secTathergang', fallTitle('tathergang', 'Tathergang'), 'noch nicht beschrieben', `<button type="button" class="btn-outline btn-sm" data-action="story-edit" data-case-id="${c.id}">${icon('edit', 'ico-sm')}<span>${fallTitle('tathergang', 'Tathergang') === 'Tathergang' ? 'Tathergang beschreiben' : 'Sachverhalt beschreiben'}</span></button>`, tip);
   return storySection(c, v);
 }
 function storySection(c, v) {
   const n = storySteps(v).length;
-  return `<div class="section" id="secTathergang"><div class="section-head"><h3 class="section-title">Tathergang <span class="text-xs text-dim font-normal sec-meta">${n ? `${n} Schritt${n === 1 ? '' : 'e'}` : ''}</span></h3>
+  return `<div class="section" id="secTathergang"><div class="section-head"><h3 class="section-title">${esc(fallTitle('tathergang', 'Tathergang'))} <span class="text-xs text-dim font-normal sec-meta">${n ? `${n} Schritt${n === 1 ? '' : 'e'}` : ''}</span></h3>
       ${c.canEdit ? `<button type="button" class="btn-ghost btn-sm story-edit-btn" data-action="story-open">${icon('edit', 'ico-sm')}<span>Bearbeiten</span></button>` : ''}</div>
       ${c.canEdit ? `<p class="story-hint">Eine Zeile je Schritt, gern mit Uhrzeit („14:20 – Festnahme vor dem Juwelier“); Absätze für längere Schilderungen. Strg+Enter speichert.</p>` : ''}
-      <div class="ie-block story-box">${ie(c, 'incident', v, { type: 'textarea', placeholder: 'Tathergang beschreiben …', cls: 'ie-story' })}</div></div>`;
+      <div class="ie-block story-box">${ie(c, 'incident', v, { type: 'textarea', placeholder: `${fallTitle('tathergang', 'Tathergang') === 'Tathergang' ? 'Tathergang' : 'Sachverhalt'} beschreiben …`, cls: 'ie-story' })}</div></div>`;
 }
 Object.assign(actions, {
   'story-open': () => {

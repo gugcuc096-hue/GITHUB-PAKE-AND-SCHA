@@ -9,7 +9,13 @@
  */
 'use strict';
 
-const WCH_OK = typeof document.startViewTransition === 'function' && typeof CSS !== 'undefined' && CSS.supports('selector(:active-view-transition-type(wch))');
+// Gesteuerte Browser (Tests, navigator.webdriver) wechseln ohne Überblendung: Messungen und Klicks kurz nach einem Seitenwechsel
+// treffen dort sofort die neue Seite. Die Tests der Überblendung selbst schalten sie mit window.__wchForce ein.
+const WCH_OK =
+  typeof document.startViewTransition === 'function' &&
+  typeof CSS !== 'undefined' &&
+  CSS.supports('selector(:active-view-transition-type(wch))') &&
+  (!navigator.webdriver || window.__wchForce === true);
 
 /** Kann jetzt überblendet werden? (nicht bei „Bewegung reduzieren“, nicht im Hintergrund-Tab, nicht mitten im Ziehen) */
 function wchCan() {
@@ -103,9 +109,10 @@ function settingsSideKeep(old, fresh) {
  * draw() setzt den neuen Zustand und zeichnet mit renderView().
  */
 function settingsSwitch(draw) {
-  const old = document.querySelector('.set-side');
-  const keepScroll = old ? old.querySelector('.set-nav')?.scrollTop || 0 : 0;
   return wchSwap(() => {
+    // Die Leiste erst jetzt greifen (nicht schon beim Klick): wurde die Seite zwischendurch neu gezeichnet, ist die alte Leiste sonst veraltet
+    const old = document.querySelector('.set-side');
+    const keepScroll = old ? old.querySelector('.set-nav')?.scrollTop || 0 : 0;
     draw();
     const fresh = document.querySelector('.set-side');
     if (settingsSideKeep(old, fresh)) {

@@ -1,0 +1,77 @@
+/* Fall-Bausteine der Akte je Rechtsgebiet (Zivil, Verfassung, Vertrag) – siehe js/dashboard/12-fall.js */
+.badge-violet { color: #ddd6fe; background: rgba(139, 92, 246, 0.17); }
+.section-tools { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+
+/* Modus Gestaltung / Streit */
+.fall-mode { display: inline-flex; padding: 0.2rem; gap: 0.2rem; margin-bottom: 0.9rem; border: 1px solid var(--line); border-radius: 999px; background: rgba(4, 8, 20, 0.55); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4); }
+.fall-mode-btn { padding: 0.38rem 0.95rem; border: 0; border-radius: 999px; background: transparent; color: var(--text-muted); font: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: background 0.2s, color 0.2s, box-shadow 0.2s; }
+.fall-mode-btn:hover:not(.on):not(:disabled) { color: #fff; background: rgba(255, 255, 255, 0.06); }
+.fall-mode-btn.on { color: #06101f; background: linear-gradient(180deg, color-mix(in srgb, var(--gold-500), #fff 15%), color-mix(in srgb, var(--gold-500), #000 15%)); box-shadow: inset 0 1px 0 rgba(255, 246, 200, 0.6), 0 4px 12px -5px rgba(var(--accent-rgb), 0.7); }
+.fall-mode-btn.on.c-red { background: linear-gradient(180deg, #fca5a5, #ef4444); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 4px 12px -5px rgba(239, 68, 68, 0.7); }
+.fall-mode-btn.on.c-emerald { background: linear-gradient(180deg, #6ee7b7, #10b981); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 4px 12px -5px rgba(16, 185, 129, 0.7); }
+
+/* Einzelangaben */
+.fall-dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.7rem 1.4rem; margin: 0 0 0.9rem; }
+.fall-dl > div.wide { grid-column: 1 / -1; }
+.fall-dl dt, .fall-card .k { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim); }
+.fall-dl dd { margin: 0.15rem 0 0; font-size: 0.9rem; color: var(--text); }
+.fall-dl dd p, .fall-card .fall-text p { margin: 0.15rem 0 0; white-space: pre-wrap; font-size: 0.875rem; color: var(--text-muted); }
+
+/* Zulässigkeit als Checkliste */
+.fall-checks { list-style: none; margin: 0 0 0.9rem; padding: 0; display: grid; gap: 0.5rem; }
+.fall-check { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem 1rem; flex-wrap: wrap; padding: 0.65rem 0.85rem; border: 1px solid var(--line); border-left: 3px solid rgba(148, 163, 184, 0.4); border-radius: 12px; background: rgba(255, 255, 255, 0.02); transition: border-color 0.25s, background 0.25s; }
+.fall-check.st-ja { border-left-color: var(--emerald); background: rgba(16, 185, 129, 0.05); }
+.fall-check.st-nein { border-left-color: var(--red); background: rgba(239, 68, 68, 0.06); }
+.fall-check-text { display: flex; flex-direction: column; min-width: 0; flex: 1 1 14rem; }
+.fall-check-text strong { font-size: 0.9rem; }
+.fall-check-text span { font-size: 0.75rem; color: var(--text-dim); }
+.fall-seg { display: inline-flex; padding: 0.18rem; gap: 0.15rem; border: 1px solid var(--line); border-radius: 999px; background: rgba(4, 8, 20, 0.55); }
+.fall-seg-btn, .fall-seg-opt span { padding: 0.28rem 0.7rem; border: 0; border-radius: 999px; background: transparent; color: var(--text-muted); font: inherit; font-size: 0.75rem; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background 0.2s, color 0.2s; }
+.fall-seg-btn:hover:not(.on), .fall-seg-opt:hover span { color: #fff; background: rgba(255, 255, 255, 0.06); }
+.fall-seg-btn.on.st-offen, .fall-seg-opt.st-offen input:checked + span { color: #e2e8f0; background: rgba(148, 163, 184, 0.28); }
+.fall-seg-btn.on.st-ja, .fall-seg-opt.st-ja input:checked + span { color: #06231a; background: linear-gradient(180deg, #6ee7b7, #10b981); }
+.fall-seg-btn.on.st-nein, .fall-seg-opt.st-nein input:checked + span { color: #2a0a0a; background: linear-gradient(180deg, #fca5a5, #ef4444); }
+.fall-seg-opt { display: inline-flex; position: relative; }
+.fall-seg-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.fall-seg-form { align-self: start; }
+.fall-seg-opt input:focus-visible + span, .fall-seg-btn:focus-visible, .fall-mode-btn:focus-visible { outline: 2px solid var(--gold-500); outline-offset: 2px; }
+
+/* Streitwert und Summe */
+.fall-sum { display: flex; align-items: baseline; gap: 0.6rem 1rem; flex-wrap: wrap; margin: 0 0 0.8rem; padding: 0.55rem 0.85rem; border-radius: 12px; border: 1px solid rgba(var(--accent-rgb), 0.28); background: linear-gradient(90deg, rgba(var(--accent-rgb), 0.1), rgba(var(--accent-rgb), 0.02) 70%); }
+.fall-sum span { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); }
+.fall-sum strong { font-size: 1.1rem; color: var(--gold-light, #f3e5ab); }
+.fall-sum em { font-style: normal; font-size: 0.8rem; color: var(--text-muted); }
+
+/* Karten */
+.fall-list { display: grid; gap: 0.7rem; }
+.fall-card { display: flex; flex-direction: column; gap: 0.55rem; padding: 0.85rem 1rem; border: 1px solid var(--line); border-radius: 14px; background: rgba(255, 255, 255, 0.02); transition: border-color 0.2s, background 0.2s; }
+.fall-card:hover { border-color: rgba(var(--accent-rgb), 0.3); background: rgba(255, 255, 255, 0.035); }
+.fall-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem 1rem; flex-wrap: wrap; }
+.fall-title { display: flex; align-items: baseline; gap: 0.55rem; min-width: 0; flex: 1 1 14rem; }
+.fall-title strong { font-size: 0.95rem; overflow-wrap: anywhere; }
+.fall-no { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.75rem; font-weight: 700; color: var(--gold-500); padding: 0.1rem 0.45rem; border-radius: 6px; background: rgba(var(--accent-rgb), 0.14); }
+.fall-date { font-size: 0.75rem; color: var(--text-dim); }
+.fall-chips { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; justify-content: flex-end; }
+.fall-amount { font-weight: 700; color: var(--gold-light, #f3e5ab); margin-right: 0.2rem; }
+.fall-flow { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-muted); flex-wrap: wrap; }
+.fall-flow .ico-sm { color: var(--gold-500); flex: none; }
+.fall-line { display: flex; gap: 0.6rem; font-size: 0.85rem; flex-wrap: wrap; align-items: baseline; }
+.fall-line .k { min-width: 9rem; }
+.fall-due { display: inline-flex; align-items: center; gap: 0.25rem; margin-left: 0.3rem; font-size: 0.75rem; font-weight: 600; }
+.fall-actions { display: flex; align-items: center; gap: 0.3rem; margin-top: 0.1rem; }
+.fall-actions .push { margin-left: auto; }
+
+/* Rechtfertigungsprüfung */
+.fall-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.4rem; }
+.fall-step { display: flex; flex-direction: column; gap: 0.1rem; padding: 0.4rem 0.6rem; border-radius: 10px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.02); }
+.fall-step b { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-dim); }
+.fall-step i { font-style: normal; font-size: 0.82rem; font-weight: 600; }
+.fall-step.st-ja { border-color: rgba(16, 185, 129, 0.4); } .fall-step.st-ja i { color: #6ee7b7; }
+.fall-step.st-nein { border-color: rgba(239, 68, 68, 0.4); } .fall-step.st-nein i { color: #fca5a5; }
+.fall-step.st-offen i { color: var(--text-dim); }
+@media (max-width: 560px) { .fall-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } .fall-line .k { min-width: 0; width: 100%; } }
+
+/* Risikoampel */
+.fall-light { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.16rem 0.5rem 0.16rem 0.4rem; border-radius: 6px; font-size: 0.72rem; font-weight: 600; background: rgba(148, 163, 184, 0.12); color: #cbd5e1; }
+.fall-light i { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; }
+.fall-light.l-gruen { color: #6ee7b7; } .fall-light.l-gelb { color: #fcd34d; } .fall-light.l-rot { color: #fca5a5; }
