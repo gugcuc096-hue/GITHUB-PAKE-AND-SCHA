@@ -140,7 +140,7 @@ function inkGlide(row, active, from, to) {
   void active.offsetWidth;
   active.classList.add('ink-arrive');
   const narrow = window.matchMedia('(max-width: 639px)').matches;
-  const anim = ink.animate([box(from), box(to)], { duration: narrow ? 300 : 420, easing: 'cubic-bezier(0.34, 1.25, 0.5, 1)', fill: 'both' });
+  const anim = ink.animate([box(from), box(to)], { duration: narrow ? 260 : 340, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'both' });
   const done = () => {
     ink.remove();
     if (!row.querySelector(':scope > .tab-ink')) row.classList.remove('ink-gliding');

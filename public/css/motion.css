@@ -526,6 +526,10 @@ nav[data-ink] .nav-link.nav-active { color: var(--gold-light, #f3e5ab) !importan
   box-shadow: 0 0 0 2px rgba(5, 9, 20, 0.95), 0 0 0 4px rgba(var(--accent-rgb, 212, 175, 55), 0.9), 0 0 18px 2px rgba(var(--accent-rgb, 212, 175, 55), 0.35) !important;
   transition: box-shadow 0.18s ease;
 }
+/* Reiterleisten (Akte, Bereiche): kein Kasten um den Reiter – der Fokus zeigt sich als hellere Schrift und zarter Strich, damit nichts am alten Reiter „hängen“ bleibt */
+.case-jump .jump:focus-visible, .chip-row.hub-tabs .chip:focus-visible { box-shadow: none !important; color: #fff; }
+.case-jump .jump:not(.active):focus-visible, .chip-row.hub-tabs .chip:not(.active):focus-visible { border-bottom-color: rgba(var(--accent-rgb), 0.45); }
+.case-jump .jump.active:focus-visible, .chip-row.hub-tabs .chip.active:focus-visible { color: var(--gold-light); }
 :where(input, select, textarea):focus-visible {
   outline: none !important;
   border-color: rgba(var(--accent-rgb, 212, 175, 55), 0.85) !important;
