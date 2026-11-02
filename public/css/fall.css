@@ -75,3 +75,16 @@
 .fall-light { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.16rem 0.5rem 0.16rem 0.4rem; border-radius: 6px; font-size: 0.72rem; font-weight: 600; background: rgba(148, 163, 184, 0.12); color: #cbd5e1; }
 .fall-light i { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; }
 .fall-light.l-gruen { color: #6ee7b7; } .fall-light.l-gelb { color: #fcd34d; } .fall-light.l-rot { color: #fca5a5; }
+
+/* Akten-Vorlage umbenennen und ansehen (Einstellungen → Listen → Rechtsgebiete → Vorlage) */
+.tpl-form { display: grid; gap: 1.1rem; }
+.tpl-group { margin: 0; padding: 0.85rem 1rem 1rem; border: 1px solid var(--line); border-radius: 14px; background: rgba(255, 255, 255, 0.02); display: grid; gap: 0.5rem; }
+.tpl-group legend { padding: 0 0.5rem; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold-light, #f3e5ab); }
+.tpl-row { display: grid; grid-template-columns: minmax(8rem, 14rem) 1fr; align-items: center; gap: 0.4rem 1rem; }
+.tpl-def { font-size: 0.82rem; color: var(--text-muted); overflow-wrap: anywhere; }
+.tpl-actions { position: sticky; bottom: -1px; padding: 0.8rem 0 0.2rem; background: linear-gradient(180deg, transparent, rgba(10, 16, 34, 0.96) 35%); flex-wrap: wrap; }
+@media (max-width: 560px) { .tpl-row { grid-template-columns: 1fr; } }
+.tpl-preview-note { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.9rem; padding: 0.5rem 0.8rem; border-radius: 10px; font-size: 0.78rem; color: #fcd34d; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); }
+.tpl-preview { pointer-events: none; user-select: none; }
+.tpl-preview .jump { cursor: default; }
+.tpl-preview .fall-mode { display: none; } /* der Schalter der Vorschau steht oben */

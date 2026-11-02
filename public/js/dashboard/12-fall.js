@@ -249,3 +249,107 @@ Object.assign(forms, {
     await reloadCase(caseId);
   },
 });
+
+/* ================================================================
+   Akten-Vorlage je Rechtsgebiet ansehen und umbenennen (Einstellungen → Listen → Rechtsgebiete → „Vorlage“)
+   Die Vorschau zeigt den Reiter „Fall“ mit Beispieldaten – es wird keine Akte angelegt, nichts gespeichert und niemand benachrichtigt.
+   ================================================================ */
+const TPL_ORDER = { strafrecht: ['tathergang', 'charges', 'witnesses', 'karte', 'evidence'], ...FALL_ORDER };
+const TPL_SAMPLE_TEXT = {
+  tathergang: '14:20 – Festnahme vor dem Juwelier am Legion Square. 14:35 – Überstellung in die Zelle.',
+  charges: 'Beispiel: Diebstahl, Sachbeschädigung – der Strafmaß-Rechner zeigt, was droht.',
+  witnesses: 'Beispiel: Zeuge mit Kontakt, Ladung, Aussage und Vorhalten.',
+  karte: 'Beispiel: Tatort, Festnahme und Fundort als Nadeln auf der Karte.',
+  evidence: 'Beispiel: B1 Bodycam-Aufnahme, B2 Foto vom Tatort.',
+};
+
+function templateModalHtml(d) {
+  const groups = d.catalog
+    .map(
+      (g) => `<fieldset class="tpl-group"><legend>${esc(g.title)}</legend>${g.items
+        .map((i) => `<label class="tpl-row"><span class="tpl-def">${esc(i.def)}</span><input class="field" data-tpl="${esc(i.id)}" maxlength="80" value="${esc(d.labels[i.id] || '')}" placeholder="${esc(i.def)}" aria-label="${esc(`Bezeichnung für „${i.def}“`)}" autocomplete="off"></label>`)
+        .join('')}</fieldset>`
+    )
+    .join('');
+  return `<h2 class="modal-title">Akten-Vorlage: ${esc(d.area.name)}</h2>
+    <p class="text-sm text-muted mb-4">Benenne Reiter, Abschnitte, Einträge und Felder der Akte um. Leer lassen bedeutet: Standardbezeichnung. „Vorschau“ zeigt die Vorlage mit Beispieldaten – dafür wird keine Akte angelegt, nichts gespeichert und niemand benachrichtigt.</p>
+    <form data-form="area-template-save" data-key="${esc(d.area.key)}" data-modes="${d.modes.length ? '1' : ''}" class="tpl-form">
+      ${groups}
+      <div class="form-actions tpl-actions">
+        <button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button>
+        <button type="button" class="btn-outline btn-md" data-action="tpl-preview" data-key="${esc(d.area.key)}">${icon('eye', 'ico-sm')}<span>Vorschau</span></button>
+        <button type="button" class="btn-ghost btn-md" data-action="tpl-reset">Alle auf Standard</button>
+        <button type="button" class="btn-ghost btn-md" data-action="close-modal">Abbrechen</button>
+      </div>
+    </form>`;
+}
+/** Bezeichnungen aus dem Formular lesen (nur ausgefüllte). */
+const tplCollect = (form) => Object.fromEntries([...form.querySelectorAll('[data-tpl]')].map((i) => [i.dataset.tpl, i.value.trim()]).filter(([, v]) => v));
+
+/** Vorschau: Tab-Leiste und Reiter „Fall“ mit Beispieldaten, nicht bedienbar. */
+function templatePreviewHtml(P) {
+  const key = P.area.key;
+  const prev = st.caseFall;
+  st.caseFall = P.fall; // damit fallTitle() die eigenen Bezeichnungen kennt
+  try {
+    const c = { id: 0, canEdit: false, area: key };
+    const parts = fallParts(c, P.fall);
+    const order = (TPL_ORDER[key] || ['tathergang', 'witnesses', 'evidence']).filter((k) => parts[k] || !(P.fall.hide || []).includes(k));
+    const body = order
+      .map((k) => {
+        if (parts[k]) return parts[k];
+        if (!TPL_SAMPLE_TEXT[k]) return '';
+        return `<div class="section"><div class="section-head"><h3 class="section-title">${esc(fallTitle(k, k))} <span class="text-xs text-dim font-normal sec-meta">Beispiel</span></h3></div><p class="text-sm text-muted">${esc(TPL_SAMPLE_TEXT[k])}</p></div>`;
+      })
+      .join('');
+    const tabs = [['ueberblick', 'Überblick'], ['kommunikation', 'Kommunikation'], ['fall', 'Fall'], ['dokumente', 'Dokumente']]
+      .map(([k, l]) => `<span class="jump${k === 'fall' ? ' active' : ''}"><span class="tab-label" data-label="${esc(fallTitle(`tab.${k}`, l))}">${esc(fallTitle(`tab.${k}`, l))}</span></span>`)
+      .join('');
+    const modes = key === 'vertragsrecht'
+      ? `<div class="fall-mode" role="group" aria-label="Modus der Vorschau">${[['gestaltung', 'Vertragsgestaltung'], ['streit', 'Vertragsstreit']]
+          .map(([m, l]) => `<button type="button" class="fall-mode-btn${(P.fall.meta.mode || 'gestaltung') === m ? ' on' : ''}" data-action="tpl-preview-mode" data-mode="${m}">${esc(l)}</button>`)
+          .join('')}</div>`
+      : '';
+    return `<div class="tpl-preview-note">${icon('eye', 'ico-sm')}<span>Vorschau mit Beispieldaten – nichts wird angelegt, gespeichert oder gemeldet.</span></div>
+      <h2 class="modal-title">${esc(P.area.name)} – Reiter „${esc(fallTitle('tab.fall', 'Fall'))}“</h2>
+      ${modes}
+      <div class="tpl-preview case-root" data-case-tab="fall"><nav class="case-jump case-tabs" aria-hidden="true"><div class="case-jump-list">${tabs}</div></nav><div class="tpl-preview-body" id="tplPreviewBody">${body}</div></div>`;
+  } finally {
+    st.caseFall = prev;
+  }
+}
+
+Object.assign(actions, {
+  'area-template': async (el) => {
+    const d = await api.get(`/api/areas/${encodeURIComponent(el.dataset.key)}/template`);
+    openModal(templateModalHtml(d), { wide: true });
+  },
+  'tpl-reset': (el) => el.closest('form').querySelectorAll('[data-tpl]').forEach((i) => (i.value = '')),
+  'tpl-preview': async (el) => {
+    const labels = tplCollect(el.closest('form'));
+    const key = el.dataset.key;
+    const P = await api.post(`/api/areas/${encodeURIComponent(key)}/preview`, { labels });
+    st.tplPreview = { key, labels };
+    openModal(templatePreviewHtml(P), { wide: true, child: true });
+  },
+  // Vertragsrecht: Vorschau im anderen Modus (Gestaltung / Streit)
+  'tpl-preview-mode': async (el) => {
+    if (!st.tplPreview) return;
+    const P = await api.post(`/api/areas/${encodeURIComponent(st.tplPreview.key)}/preview`, { labels: st.tplPreview.labels, mode: el.dataset.mode });
+    const holder = document.createElement('div');
+    holder.innerHTML = templatePreviewHtml(P);
+    const fresh = holder.querySelector('.tpl-preview');
+    const old = document.querySelector('#modalBody .tpl-preview');
+    if (fresh && old) old.replaceWith(fresh);
+    document.querySelectorAll('#modalBody .fall-mode-btn').forEach((b) => b.classList.toggle('on', b.dataset.mode === el.dataset.mode));
+  },
+});
+
+Object.assign(forms, {
+  'area-template-save': async (f) => {
+    const key = f.dataset.key;
+    await api.put(`/api/areas/${encodeURIComponent(key)}/labels`, { labels: tplCollect(f) });
+    toast('Akten-Vorlage gespeichert. Offene Akten zeigen die neuen Namen nach dem Neuladen.');
+    closeModal();
+  },
+});

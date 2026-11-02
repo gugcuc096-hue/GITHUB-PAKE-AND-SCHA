@@ -40,8 +40,8 @@ describe('Fall-Bausteine je Rechtsgebiet (API)', () => {
 
   const fall = async (c) => (await admin.get(`/api/cases/${c.id}`)).json.fall;
 
-  it('die Akte liefert den Aufbau des Rechtsgebiets – Strafrecht hat keinen', async () => {
-    assert.equal((await fall(straf)) ?? null, null);
+  it('die Akte liefert den Aufbau des Rechtsgebiets – Strafrecht hat keine eigenen Bausteine', async () => {
+    assert.deepEqual((await fall(straf)).sections, [], 'Strafrecht hat keine eigenen Bausteine, nur Bezeichnungen');
     assert.deepEqual((await fall(zivil)).sections.map((s) => s.key), ['claims', 'motions', 'corr']);
     assert.deepEqual((await fall(verf)).sections.map((s) => s.key), ['subject', 'admiss', 'norms', 'participants']);
     assert.deepEqual((await fall(vertrag)).sections.map((s) => s.key), ['subject', 'parties', 'clauses', 'term', 'versions']);
@@ -128,6 +128,48 @@ describe('Fall-Bausteine je Rechtsgebiet (API)', () => {
     assert.ok([403, 404].includes(other.status), `fremder Anwalt: ${other.status}`);
     const view = { order: ['subject', 'claims', 'corr', 'norms', 'clauses', 'versions', 'vclaims'], hidden: [], collapsed: [] };
     assert.equal((await anwalt.put('/api/prefs/case-sections', view)).status, 200);
+  });
+
+  it('Akten-Vorlage: Bezeichnungen umbenennen (geprüft, je Rechtsgebiet), Vorschau mit Beispieldaten ohne Akte und ohne Spuren', async () => {
+    const tpl = (await admin.get('/api/areas/zivilrecht/template')).json;
+    const ids = tpl.catalog.flatMap((g) => g.items.map((i) => i.id));
+    assert.ok(ids.includes('tab.fall') && ids.includes('sec.claims') && ids.includes('kind.claim') && ids.includes('field.claim.basis') && ids.includes('meta.streitwert'), ids.join(','));
+    assert.ok(!ids.includes('sec.norms'), 'Normen gibt es im Zivilrecht nicht');
+    assert.equal((await admin.get('/api/areas/gibtsnicht/template')).status, 404);
+    // ungültig: unbekannter Schlüssel, zu lang, kein Objekt
+    assert.equal((await admin.put('/api/areas/zivilrecht/labels', { labels: { 'sec.norms': 'x' } })).status, 400);
+    assert.equal((await admin.put('/api/areas/zivilrecht/labels', { labels: { 'sec.claims': 'x'.repeat(81) } })).status, 400);
+    assert.equal((await admin.put('/api/areas/zivilrecht/labels', { labels: ['x'] })).status, 400);
+    // nur mit dem Recht „Kanzlei-Einstellungen“
+    assert.notEqual((await anwalt.put('/api/areas/zivilrecht/labels', { labels: { 'sec.claims': 'Hack' } })).status, 200, 'Senior Associate ohne Einstellungsrecht');
+    // Vorschau vor dem Speichern: mit den noch ungespeicherten Namen, schreibt nichts
+    const before = (await admin.get('/api/cases')).json.cases.length;
+    const prev = (await admin.post('/api/areas/zivilrecht/preview', { labels: { 'sec.claims': 'Forderungen', 'kind.claim': 'Forderung', 'tab.fall': 'Streit', 'field.claim.basis': 'Rechtsgrundlage' } })).json;
+    assert.equal(prev.fall.sections.find((x) => x.key === 'claims').title, 'Forderungen');
+    assert.equal(prev.fall.kinds.claim.label, 'Forderung');
+    assert.equal(prev.fall.kinds.claim.fields.find((x) => x.key === 'basis').label, 'Rechtsgrundlage');
+    assert.equal(prev.fall.retitle['tab.fall'], 'Streit');
+    assert.ok(prev.fall.items.claim.length >= 1 && prev.fall.items.claim[0].basis, 'Beispieldaten');
+    assert.equal((await admin.get('/api/cases')).json.cases.length, before, 'keine Akte angelegt');
+    assert.equal((await fall(zivil)).sections[0].title, 'Ansprüche', 'noch nichts gespeichert');
+    const streit = (await admin.post('/api/areas/vertragsrecht/preview', { mode: 'streit' })).json.fall;
+    assert.ok(streit.sections.some((x) => x.key === 'vclaims'), 'Vorschau im Streitmodus');
+    // speichern: gilt für die Akten dieses Rechtsgebiets, nicht für andere; leer = Standard
+    assert.equal((await admin.put('/api/areas/zivilrecht/labels', { labels: { 'sec.claims': 'Forderungen', 'sec.tathergang': 'Hergang', 'tab.fall': 'Streit', 'kind.claim': '  Forderung  ', 'sec.motions': '' } })).status, 200);
+    const f = await fall(zivil);
+    assert.equal(f.sections[0].title, 'Forderungen');
+    assert.equal(f.kinds.claim.label, 'Forderung');
+    assert.equal(f.retitle.tathergang, 'Hergang');
+    assert.equal(f.retitle['tab.fall'], 'Streit');
+    assert.equal(f.sections.find((x) => x.key === 'motions').title, 'Anträge', 'leer = Standard');
+    assert.equal((await fall(verf)).retitle['tab.fall'], 'Fall', 'andere Rechtsgebiete bleiben');
+    // auch Strafrecht lässt sich umbenennen
+    assert.equal((await admin.put('/api/areas/strafrecht/labels', { labels: { 'sec.witnesses': 'Zeugen & Auskunftspersonen' } })).status, 200);
+    assert.equal((await fall(straf)).retitle.witnesses, 'Zeugen & Auskunftspersonen');
+    // zurücksetzen
+    assert.equal((await admin.put('/api/areas/zivilrecht/labels', { labels: {} })).status, 200);
+    assert.equal((await fall(zivil)).sections[0].title, 'Ansprüche');
+    await admin.put('/api/areas/strafrecht/labels', { labels: {} });
   });
 });
 
@@ -279,6 +321,47 @@ describe('Fall-Bausteine je Rechtsgebiet (Browser)', { skip: chromium ? false : 
       await page.click('#modalBody form[data-form="fall-save"] button[type=submit]');
       await page.waitForSelector('#secVersions .fall-no');
       assert.equal((await page.textContent('#secVersions .fall-no')).trim(), 'v1');
+      assert.deepEqual(problems, []);
+    } finally {
+      await ctx.close();
+    }
+  });
+
+  it('Vorlage umbenennen und ansehen: Vorschau ohne Akte, danach tragen die Akten die neuen Namen', async () => {
+    const { ctx, page, problems } = await open();
+    try {
+      await page.goto(`${srv.base}/dashboard?tab=listen#settings`);
+      await page.waitForSelector('[data-action="area-template"][data-key="zivilrecht"]');
+      const casesBefore = await page.evaluate(async () => (await (await fetch('/api/cases')).json()).cases.length);
+      await page.click('[data-action="area-template"][data-key="zivilrecht"]');
+      await page.waitForSelector('form[data-form="area-template-save"] input[data-tpl="sec.claims"]');
+      await page.fill('input[data-tpl="sec.claims"]', 'Forderungen');
+      await page.fill('input[data-tpl="tab.fall"]', 'Streit');
+      await page.fill('input[data-tpl="kind.claim"]', 'Forderung');
+      // Vorschau: Beispieldaten, nicht bedienbar, mit den noch ungespeicherten Namen
+      await page.click('[data-action="tpl-preview"]');
+      await page.waitForSelector('.tpl-preview #secClaims');
+      assert.match(await page.textContent('.tpl-preview-note'), /nichts wird angelegt/);
+      assert.match(await page.textContent('.tpl-preview #secClaims .section-title'), /Forderungen/);
+      assert.ok((await page.locator('.tpl-preview .fall-card').count()) >= 2, 'Beispieldaten');
+      assert.match(await page.textContent('.tpl-preview .case-jump'), /Streit/);
+      assert.equal(await page.locator('.tpl-preview [data-action="fall-add"], .tpl-preview [data-action="fall-edit"]').count(), 0, 'nicht bedienbar');
+      assert.equal(await page.evaluate(async () => (await (await fetch('/api/cases')).json()).cases.length), casesBefore, 'keine Akte angelegt');
+      // Vorschau schließen (zurück zum Formular) und speichern
+      await page.evaluate(() => modalBack());
+      await page.waitForSelector('form[data-form="area-template-save"] input[data-tpl="sec.claims"]');
+      assert.equal(await page.inputValue('input[data-tpl="sec.claims"]'), 'Forderungen', 'Eingaben bleiben stehen');
+      await page.click('form[data-form="area-template-save"] button[type=submit]');
+      await page.waitForFunction(() => !document.querySelector('form[data-form="area-template-save"]'));
+      // Die Akte trägt die neuen Namen
+      await page.evaluate((id) => openCase(id), zivil.id);
+      await page.waitForSelector('#modalBody .case-root');
+      assert.match(await page.textContent('#modalBody .case-jump-list'), /Streit/);
+      assert.equal(await page.locator('#modalBody .case-jump-list >> text=Fall').count(), 0, 'der Reiter heißt jetzt „Streit“');
+      await page.click('#modalBody [data-action="case-tab"][data-tab="fall"]');
+      await page.waitForSelector('#secClaims');
+      assert.match(await page.textContent('#secClaims .section-title'), /Forderungen/);
+      assert.match(await page.textContent('#secClaims [data-action="fall-add"]'), /Forderung/);
       assert.deepEqual(problems, []);
     } finally {
       await ctx.close();

@@ -44,6 +44,7 @@ function areaCard(a, i, n) {
       <div class="area-btns">
         <button type="button" class="icon-btn sm" data-action="area-move" data-key="${esc(a.key)}" data-dir="-1" aria-label="Nach oben" ${i === 0 ? 'disabled' : ''}>${icon('chevronUp', 'ico-sm')}</button>
         <button type="button" class="icon-btn sm" data-action="area-move" data-key="${esc(a.key)}" data-dir="1" aria-label="Nach unten" ${i === n - 1 ? 'disabled' : ''}>${icon('chevronDown', 'ico-sm')}</button>
+        <button type="button" class="btn-outline btn-sm" data-action="area-template" data-key="${esc(a.key)}" title="Akten-Vorlage ansehen und umbenennen">${icon('doc', 'ico-sm')}<span>Vorlage</span></button>
         <button type="button" class="btn-outline btn-sm" data-action="area-edit" data-key="${esc(a.key)}">${icon('edit', 'ico-sm')}<span>Bearbeiten</span></button>
         <button type="button" class="btn-ghost btn-sm" data-action="area-toggle" data-key="${esc(a.key)}">${a.active ? 'Ausblenden' : 'Einblenden'}</button>
         ${u.cases || u.packages ? '<span class="icon-btn-ph" aria-hidden="true"></span>' : `<button type="button" class="icon-btn sm fn-danger" data-action="area-delete" data-key="${esc(a.key)}" data-name="${esc(a.name)}" aria-label="Löschen">${icon('trash', 'ico-sm')}</button>`}

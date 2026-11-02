@@ -37,7 +37,7 @@ function chargesSection(c, data, deals = []) {
     if (c.area !== 'strafrecht' && !deals.length) return '';
     // Ein Angebot der Staatsanwaltschaft bleibt auch ohne Anklagepunkte sichtbar
     const deal = deals.length ? `<div class="section deal-only">${dealBlock(c, deals, { mitigations: [] }, { he: null })}</div>` : '';
-    return emptySection('secCharges', 'Anklagepunkte', 'noch keine', `${addBtn}${hearingBtn}`, 'Tatbestände aus dem Strafgesetzbuch – der Strafmaß-Rechner zeigt sofort, was droht.') + deal;
+    return emptySection('secCharges', fallTitle('charges', 'Anklagepunkte'), 'noch keine', `${addBtn}${hearingBtn}`, 'Tatbestände aus dem Strafgesetzbuch – der Strafmaß-Rechner zeigt sofort, was droht.') + deal;
   }
   const haft = s.fineOnly ? 'keine' : s.minHe > 0 ? (s.minHe === s.maxHe ? `${s.maxHe} HE` : `${s.minHe}–${s.maxHe} HE`) : `bis ${s.maxHe} HE`;
   const haftSub = s.fineOnly ? 'nur Geldstrafe' : s.open || s.capped ? `Gesamtstrafe höchstens ${s.cap} HE (§ 3 Abs. 2)` : s.severe ? 'besonders schwerer Fall – Rahmen bis 180 HE' : 'Gesamtstrafe nach § 3';
@@ -71,7 +71,7 @@ function chargesSection(c, data, deals = []) {
     : `<div class="chg-big">${estimate.he != null ? `${estimate.he} HE` : '—'}</div><div class="chg-sub">${estimate.fine != null ? usd(estimate.fine) : ''}</div>`;
   const mitig = s.mitigations.length ? `<p class="chg-mitig">${icon('info', 'ico-sm')}<span>Milderung möglich: ${s.mitigations.map(esc).join(' · ')}</span></p>` : '';
   return `<div class="section" id="secCharges">
-      <div class="section-head"><h3 class="section-title">Anklagepunkte <span class="text-xs text-dim font-normal sec-meta">Strafmaß-Rechner</span></h3>
+      <div class="section-head"><h3 class="section-title">${esc(fallTitle('charges', 'Anklagepunkte'))} <span class="text-xs text-dim font-normal sec-meta">Strafmaß-Rechner</span></h3>
         <div class="section-actions">${addBtn}${hearingBtn}</div></div>
       <div class="chg-sum">
         <div><div class="chg-k">Freiheitsstrafe</div><div class="chg-big" data-count="chg:${c.id}:he">${esc(haft)}</div><div class="chg-sub">${esc(haftSub)}</div></div>

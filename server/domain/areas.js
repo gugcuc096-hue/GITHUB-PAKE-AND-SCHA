@@ -47,6 +47,14 @@ const json = (text, fallback) => {
     return fallback;
   }
 };
+const jsonObj = (text) => {
+  try {
+    const v = JSON.parse(text);
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  } catch {
+    return {};
+  }
+};
 const row = (r) => ({
   key: r.key,
   name: r.name,
@@ -63,6 +71,7 @@ const row = (r) => ({
   fields: json(r.fields, []),
   defaultFees: json(r.default_fees, []).filter((n) => Number.isInteger(n)),
   defaultType: r.default_type || '',
+  labels: jsonObj(r.labels), // eigene Bezeichnungen der Akten-Vorlage (domain/fall.js): { 'sec.claims': 'Forderungen', … }
 });
 
 let cache = null;
@@ -160,6 +169,13 @@ function update(key, data) {
   bump();
   return get(key);
 }
+/** Eigene Bezeichnungen der Akten-Vorlage speichern (geprüft wird in domain/fall.js). */
+function setLabels(key, labels) {
+  if (!exists(key)) throw Object.assign(new Error('Rechtsgebiet nicht gefunden.'), { status: 404 });
+  db.prepare('UPDATE areas SET labels = ? WHERE key = ?').run(JSON.stringify(labels), key);
+  bump();
+  return get(key);
+}
 function reorder(keys) {
   const st = db.prepare('UPDATE areas SET sort_order = ? WHERE key = ?');
   keys.forEach((k, i) => st.run(i + 1, k));
@@ -211,4 +227,4 @@ const publicList = (staff = false) =>
 /** Für Dashboard und Startseite beim Start: eingeschaltete mit Feldern, dazu alle Namen/Schritte (auch ausgeblendete) zum Anzeigen alter Akten. */
 const clientPayload = (staff = false) => ({ list: publicList(staff), names: names(), steps: Object.fromEntries(all().map((a) => [a.key, a.steps])), outcomes: Object.fromEntries(all().filter((a) => a.outcomes.length).map((a) => [a.key, a.outcomes])), colors: Object.fromEntries(all().map((a) => [a.key, a.color])) });
 
-module.exports = { clientPayload, activeKeySchema, DEFAULT_STEPS, COLORS, ICONS, FIELD_TYPES, list, get, exists, name, names, intakeTitleOf, checklistOf, stepsOf, keySchema, create, update, reorder, remove, usage, checkAnswers, publicList, bump };
+module.exports = { clientPayload, activeKeySchema, DEFAULT_STEPS, COLORS, ICONS, FIELD_TYPES, list, get, exists, name, names, intakeTitleOf, checklistOf, stepsOf, keySchema, create, update, setLabels, reorder, remove, usage, checkAnswers, publicList, bump };
