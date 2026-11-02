@@ -459,9 +459,11 @@ body:has(#sidebar) .promo-dock.is-on { translate: 0 0; }
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: var(--m-page); animation-timing-function: var(--m-ease); }
 
 /* Weiche Wechsel (13-weich.js): Seiten und Bereiche blenden ineinander über; was stehen bleibt, bekommt einen eigenen Namen */
-html[data-wch] #content { view-transition-name: wch-content; }
-html[data-wch] #content > .hub-tabs { view-transition-name: wch-tabs; }
-html[data-wch] .set-side { view-transition-name: wch-side; }
+/* Die Seite selbst (data-wch="1") hat eigene Namen; bei offenem Fenster (data-wch="modal") bekommt nur das Fenster welche –
+   sonst löst sich die Seite dahinter aus dem Bild und legt sich über das Fenster */
+html[data-wch="1"] #content { view-transition-name: wch-content; }
+html[data-wch="1"] #content > .hub-tabs { view-transition-name: wch-tabs; }
+html[data-wch="1"] .set-side { view-transition-name: wch-side; }
 html[data-wch] #modalBody .case-root { view-transition-name: wch-case; }
 html[data-wch] #modalBody .case-root .case-jump { view-transition-name: wch-casejump; }
 html:active-view-transition-type(wch)::view-transition-old(root), html:active-view-transition-type(wch)::view-transition-new(root) { animation-duration: 0.2s; }

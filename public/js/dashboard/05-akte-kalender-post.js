@@ -1348,7 +1348,7 @@ async function newCaseModal() {
             <div class="client-picked" id="ncPicked" hidden></div></div>
           <div><label class="label" for="ncPhone">Telefon (im Spiel)</label><input id="ncPhone" name="clientPhone" class="field" maxlength="40" placeholder="555-0123"></div>` : ''}
         <div class="span-2"><label class="label" for="ncTitle">Titel</label><input id="ncTitle" name="title" class="field" required minlength="3" maxlength="120" placeholder="z. B. Festnahme am Legion Square" ${staff ? '' : 'autofocus'}></div>
-        <div><label class="label">Rechtsgebiet${staff && can('settings.edit') ? ' <button type="button" class="ie-link" data-action="area-quick-new">+ neu</button>' : ''}</label><select name="area" class="field" data-area-select>${areaOptions().map(([k, l]) => opt(k, l)).join('')}</select></div>
+        <div><label class="label">Rechtsgebiet</label><select name="area" class="field" data-area-select>${areaOptions().map(([k, l]) => opt(k, l)).join('')}</select></div>
         ${staff
           ? `<div><label class="label">Priorität</label><select name="priority" class="field">${Object.entries(PRIORITY).map(([k, [l]]) => opt(k, l, k === '2')).join('')}</select></div>`
           : `<div><label class="label">Dringlichkeit</label><select name="urgency" class="field">${Object.entries(URGENCY).map(([k, [l]]) => opt(k, l)).join('')}</select></div>`}

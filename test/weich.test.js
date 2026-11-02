@@ -134,13 +134,20 @@ describe('Weiche Wechsel und Feinschliff (Browser)', { skip: chromium ? false : 
       await page.evaluate(() => {
         window.__jump = document.querySelector('#modalBody .case-jump');
         window.__vt = 0;
+        window.__names = [];
         const o = document.startViewTransition.bind(document);
-        document.startViewTransition = (...a) => (window.__vt++, o(...a));
+        document.startViewTransition = (...a) => {
+          // Beim Reiterwechsel in der Akte darf die Seite dahinter keinen eigenen Namen tragen – sonst löst sie sich aus dem Bild und legt sich über das Fenster
+          window.__names.push([document.documentElement.dataset.wch, getComputedStyle(document.querySelector('#content')).viewTransitionName]);
+          window.__vt++;
+          return o(...a);
+        };
       });
       await page.click('#modalBody .case-jump [data-action="case-tab"][data-tab="fall"]');
       await page.waitForFunction(() => document.querySelector('#modalBody .case-root')?.dataset.caseTab === 'fall');
       await settled(page);
       assert.ok((await page.evaluate(() => window.__vt)) >= 1, 'Reiterwechsel in der Akte läuft in einer Überblendung');
+      assert.deepEqual(await page.evaluate(() => window.__names), [['modal', 'none']], 'nur das Fenster ist benannt, die Seite dahinter bleibt im Bild');
       assert.equal(await page.evaluate(() => window.__jump === document.querySelector('#modalBody .case-jump')), true);
       assert.equal(await page.locator('#modalBody .case-jump .active').count(), 1);
       assert.deepEqual(problems, []);
