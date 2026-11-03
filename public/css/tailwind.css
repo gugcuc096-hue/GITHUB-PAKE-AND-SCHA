@@ -667,8 +667,6 @@ video {
   height: 1.5rem;
 }.h-7 {
   height: 1.75rem;
-}.h-9 {
-  height: 2.25rem;
 }.h-\[50px\] {
   height: 50px;
 }.h-\[68px\] {
@@ -1570,10 +1568,6 @@ video {
 
   .lg\:mt-5 {
     margin-top: 1.25rem;
-  }
-
-  .lg\:inline {
-    display: inline;
   }
 
   .lg\:hidden {

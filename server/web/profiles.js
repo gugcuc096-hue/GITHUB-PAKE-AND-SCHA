@@ -93,6 +93,10 @@ function render(member, facts, { origin, url }) {
   const portrait = member.photoUrl
     ? `<img class="pf-photo" src="${esc(member.photoUrl)}" alt="${esc(member.name)}" width="144" height="144" decoding="async">`
     : `<span class="pf-photo kz-mono" aria-hidden="true">${esc(String(member.initials || '').replace(/[^\p{L}\p{N}]/gu, '').slice(0, 2).toUpperCase() || '–')}</span>`;
+  // Telefon im Spiel (Team-Verwaltung): zum Kopieren – im Rollenspiel wählt man die Nummer im Spiel
+  const phone = member.phone
+    ? `<p class="pf-phone"><button type="button" class="pf-phone-btn" data-copy="${esc(member.phone)}" title="Nummer kopieren">${require('./icons').svg('phone')}<span class="pf-phone-k">Telefon</span><span class="pf-phone-n">${esc(member.phone)}</span>${require('./icons').svg('copy', 'kz-ico pf-phone-c')}</button></p>`
+    : '';
   const duty = member.duty ? `<p class="pf-duty"><span class="duty-dot s-${esc(member.duty)}"></span>${esc(DUTY_STATUS[member.duty] || '')}</p>` : '';
 
   // Schwerpunkte: vom Board eingetragen, sonst die häufigsten Rechtsgebiete seiner Akten
@@ -135,6 +139,7 @@ function render(member, facts, { origin, url }) {
                         <h1 class="kz-h1 pf-name">${esc(member.name)}</h1>
                         <p class="pf-rank">${esc(member.roleTitle)}</p>
                         ${duty}
+                        ${phone}
                         ${member.description ? `<p class="kz-lead pf-desc">${esc(member.description)}</p>` : ''}
                         <div class="pf-actions kz-actions">${cta}<a href="/anwaelte" class="btn-outline kz-btn">Alle Anwälte</a></div>
                     </div>

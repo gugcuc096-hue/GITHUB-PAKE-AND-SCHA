@@ -100,6 +100,27 @@ describe('Startseite anpassen und gemeinsames Design', () => {
     assert.equal(pub.focusAuto, true);
   });
 
+  it('Telefonnummer eines Anwalts: in der Team-Verwaltung gepflegt, auf der Profilseite zum Kopieren', async () => {
+    const team = (await admin.c.get('/api/admin/team')).json.team;
+    const m = team.find((t) => t.visible) || team[0];
+    const bad = await admin.c.patch(`/api/admin/team/${m.id}`, { phone: 'ruf mich an' });
+    assert.equal(bad.status, 400, 'nur Telefonnummern');
+    const ok = await admin.c.patch(`/api/admin/team/${m.id}`, { phone: '555-0142' });
+    assert.equal(ok.status, 200, ok.text);
+    const pub = (await fetch(`${server.base}/api/team`).then((r) => r.json())).team.find((t) => t.id === m.id);
+    assert.equal(pub.phone, '555-0142');
+    const profile = await page(`/team/${pub.slug}`);
+    assert.match(profile, /class="pf-phone-btn" data-copy="555-0142"/);
+    assert.equal((await admin.c.patch(`/api/admin/team/${m.id}`, { phone: '' })).status, 200);
+    assert.doesNotMatch(await page(`/team/${pub.slug}`), /pf-phone-btn/, 'ohne Nummer keine Zeile');
+  });
+
+  it('keine Zeile mehr über der Kopfzeile; Banner stehen über der Kopfzeile (nur Website)', async () => {
+    const home = await page('/');
+    assert.doesNotMatch(home, /class="topstrip/);
+    assert.doesNotMatch(await (await fetch(`${server.base}/js/dashboard.bundle.js`)).text(), /className: 'dash-banner'/, 'Dashboard zeigt keine Banner');
+  });
+
   it('Browser: Startseite auf der Seite anpassen und goldener Strich gleitet beim Seitenwechsel', { skip: chromium ? false : 'Playwright nicht installiert' }, async () => {
     const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'de-DE' });

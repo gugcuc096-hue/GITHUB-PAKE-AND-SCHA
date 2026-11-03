@@ -208,7 +208,7 @@ describe('Texte & Banner im Browser', { skip: chromium ? false : 'Playwright nic
       await page.waitForSelector('#nav .nav-item');
       if (device.isMobile) await page.click('#bottomNav [data-action="open-sidebar"]').catch(() => {});
       await page.waitForFunction(() => /Klienten/.test(document.querySelector('#nav')?.textContent || '') && !/Mandanten/.test(document.querySelector('#nav')?.textContent || ''), null, { timeout: 8000 });
-      assert.ok(await page.locator('.dash-banner').count(), 'Banner im Dashboard');
+      assert.equal(await page.locator('.dash-banner, #siteBanner').count(), 0, 'Banner nur auf der Website, nicht im Dashboard');
       // Als Rang ansehen: Mandant → kein Einstellungs-Punkt
       await page.evaluate(() => (location.href = '/dashboard?tab=access#settings'));
       await page.waitForSelector('[data-action="view-as"][data-as="mandant"]', { timeout: 15000 });

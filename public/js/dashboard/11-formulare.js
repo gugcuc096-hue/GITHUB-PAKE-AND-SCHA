@@ -607,6 +607,7 @@ const forms = {
       description: val(fd, 'description'),
       focus: val(fd, 'focus'),
       highlights: val(fd, 'highlights'),
+      phone: val(fd, 'phone'),
       initials: val(fd, 'initials'),
       visible: fd.get('visible') === 'on',
     };

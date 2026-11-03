@@ -532,6 +532,7 @@ function teamRow(t, withAdminFields = false) {
     // Profilseite: vom Board gepflegt (leer = Schwerpunkte automatisch aus den Akten)
     focus: String(t.focus || '').split('\n').filter(Boolean),
     highlights: String(t.highlights || '').split('\n').filter(Boolean),
+    phone: t.phone || '', // Telefon im Spiel (Profilseite), in der Team-Verwaltung gepflegt
   };
   if (withAdminFields) {
     row.hasOwnPhoto = !!t.photo;

@@ -107,9 +107,6 @@
 }
 
 /* ------------------------------------------------------------------ Kopfleiste oben (Notdienst, Kanzleisitz, Portal) */
-.site-home .topstrip { background: rgba(2, 5, 14, 0.95); border-bottom: 1px solid var(--kz-rule); font-size: var(--fs-xs); color: var(--kz-muted); }
-.kz-strip-duty { display: inline-flex; align-items: center; gap: 0.55rem; min-width: 0; color: var(--kz-text); text-decoration: none; }
-.kz-strip-duty:hover #dutyLabel { color: var(--gold-light); }
 .kz-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--emerald); }
 .kz-dot.is-off { background: var(--amber); }
 .site-home .status-dot { width: 7px; height: 7px; box-shadow: none; }
@@ -402,10 +399,9 @@ body.menu-open { overflow: hidden; }
 
 /* Seitenwechsel zwischen den Unterseiten (View Transitions, Kopf- und Fußzeile bleiben stehen) */
 .site-home .kz-header { view-transition-name: kz-header; }
-.site-home .topstrip { view-transition-name: kz-strip; }
-html:has(body.site-home)::view-transition-old(kz-header), html:has(body.site-home)::view-transition-old(kz-strip) { display: none; }
-html:has(body.site-home)::view-transition-new(kz-header), html:has(body.site-home)::view-transition-new(kz-strip) { animation: none; }
-html:has(body.site-home)::view-transition-group(kz-header), html:has(body.site-home)::view-transition-group(kz-strip) { animation: none; z-index: 2; }
+html:has(body.site-home)::view-transition-old(kz-header) { display: none; }
+html:has(body.site-home)::view-transition-new(kz-header) { animation: none; }
+html:has(body.site-home)::view-transition-group(kz-header) { animation: none; z-index: 2; }
 html:has(body.site-home)::view-transition-old(root) { animation: kz-vt-out 0.2s ease both; }
 html:has(body.site-home)::view-transition-new(root) { animation: kz-vt-in 0.42s var(--ease-out) both; }
 @keyframes kz-vt-out { to { opacity: 0; } }
@@ -451,6 +447,14 @@ html:active-view-transition .kz-hero-in > * { animation: none; }
 .pf-rank { margin: 0; font: 600 0.78rem/1.3 var(--kz-sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--kz-muted); }
 .pf-duty { display: inline-flex; align-items: center; gap: 0.45rem; margin: 0.8rem 0 0; font-size: 0.85rem; color: var(--kz-muted); }
 .pf-desc { margin-top: 1.25rem; }
+/* Telefon im Spiel: Pille zum Kopieren */
+.pf-phone { margin: 0.9rem 0 0; }
+.pf-phone-btn { display: inline-flex; align-items: center; gap: 0.55rem; min-height: 40px; padding: 0 0.95rem 0 0.8rem; border-radius: var(--r-pill); border: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.03); color: var(--kz-ink); font: 500 0.95rem/1 var(--kz-sans); cursor: pointer; transition: border-color var(--dur-1) ease, background-color var(--dur-1) ease; }
+.pf-phone-btn .kz-ico { width: 17px; height: 17px; color: var(--gold-500); }
+.pf-phone-k { font: 600 0.66rem/1 var(--kz-sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--kz-muted); }
+.pf-phone-n { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+.pf-phone-btn .pf-phone-c { width: 15px; height: 15px; color: var(--kz-muted); }
+.pf-phone-btn:hover { border-color: rgba(var(--accent-rgb), 0.5); background: var(--gold-soft); }
 .pf-actions { margin-top: var(--sp-3); }
 .pf-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.75rem; margin-bottom: var(--sp-4); }
 .pf-stats .kpi { padding: 1.1rem 1.25rem; border-radius: var(--radius); }
@@ -473,5 +477,32 @@ html:active-view-transition .kz-hero-in > * { animation: none; }
 .duty-dot.s-gericht { background: var(--gold-500); }
 .duty-dot.s-pause { background: var(--amber); }
 @media (max-width: 479px) { .pf-actions > .kz-btn { flex: 1 1 100%; } }
+
+/* ------------------------------------------------------------------ Banner ganz oben (Einstellungen → Texte & Banner)
+   Schlank und ruhig wie die Kopfzeile: eine Zeile, Titel in der Überschriften-Schrift, Text, Link in Gold – kein
+   Siegel-Kreis, kein Glanz, Breite wie der Inhalt der Seite. Aktionsbanner (Rabatt) behalten ihre eigene Aufmachung. */
+.site-home .site-banner:not(.is-promo) { background: linear-gradient(90deg, rgba(var(--sb), 0.05), rgba(var(--sb), 0.12) 50%, rgba(var(--sb), 0.05)), #050a16; box-shadow: none; border: 0; }
+.site-home .site-banner:not(.is-promo)::before { display: none; }
+.site-home .site-banner:not(.is-promo)::after { opacity: 0.6; }
+.site-home .site-banner:not(.is-promo) .sb-shine, .site-home .site-banner:not(.is-promo) .sb-seal { display: none; }
+.site-home .site-banner:not(.is-promo) .sb-inner { max-width: 72rem; min-height: 2.75rem; padding: 0.45rem 3rem 0.45rem 1.5rem; gap: 0.5rem 1.25rem; justify-content: center; }
+.site-home .site-banner:not(.is-promo) .sb-stage { flex: 0 1 auto; }
+.site-home .site-banner:not(.is-promo) .sb-slide { justify-content: center; gap: 0.5rem 1rem; flex-wrap: wrap; }
+.site-home .site-banner:not(.is-promo) .sb-copy { flex: 0 1 auto; flex-direction: row; flex-wrap: wrap; align-items: baseline; justify-content: center; text-align: center; gap: 0.1rem 0.6rem; }
+.site-home .site-banner:not(.is-promo) .sb-title { font: 600 1.05rem/1.2 var(--kz-serif); color: var(--sb-ink); text-shadow: none; letter-spacing: 0.01em; }
+.site-home .site-banner:not(.is-promo) .sb-title::after { content: '·'; margin-left: 0.6rem; color: var(--kz-muted); }
+.site-home .site-banner:not(.is-promo) .site-banner-text { font: 400 0.86rem/1.4 var(--kz-sans); color: var(--kz-text); }
+.site-home .site-banner:not(.is-promo) .sb-cta { padding: 0; background: none; border: 0; box-shadow: none; color: var(--gold-500); font: 600 0.84rem/1.2 var(--kz-sans); }
+.site-home .site-banner:not(.is-promo) .sb-cta:hover { background: none; color: var(--gold-light); transform: none; }
+.site-home .site-banner:not(.is-promo) .site-banner-x { width: 1.7rem; height: 1.7rem; background: transparent; color: var(--kz-muted); }
+.site-home .site-banner:not(.is-promo) .site-banner-x:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+@media (max-width: 767px) {
+    .site-home .site-banner:not(.is-promo) .sb-inner { padding: 0.55rem 2.6rem 0.55rem 1rem; min-height: 0; }
+    .site-home .site-banner:not(.is-promo) .sb-tail { justify-content: center; }
+    .site-home .site-banner:not(.is-promo) .sb-inner { flex-direction: column; }
+    .site-home .site-banner:not(.is-promo) .sb-title::after { display: none; }
+    .site-home .site-banner:not(.is-promo) .sb-copy { flex-direction: column; align-items: center; }
+    .site-home .site-banner:not(.is-promo) .site-banner-text { font-size: 0.8rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+}
 
 /* Ausgewogen/Schnell (ohne Grafikkarte): deckende Flächen, stehender Hintergrund, kein Glanz – siehe gfx.css */

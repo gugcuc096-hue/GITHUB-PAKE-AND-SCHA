@@ -701,6 +701,13 @@
       if (teaser && lastNews.length) teaser.innerHTML = lastNews.slice(0, Math.max(1, Number(teaser.dataset.count) || 3)).map(newsCard).join('');
     },
   };
+  // Profilseite: Telefonnummer des Anwalts mit einem Klick kopieren
+  document.addEventListener('click', async (e) => {
+    const b = e.target.closest && e.target.closest('[data-copy]');
+    if (!b) return;
+    const ok = await window.PS.copy(b.dataset.copy);
+    window.PS.toast(ok ? `Nummer ${b.dataset.copy} kopiert.` : 'Kopieren hat nicht geklappt.', ok ? 'ok' : 'error');
+  });
   // Eckdaten der Startseite: Zahlen zählen hoch, sobald sie ins Bild kommen
   if (document.getElementById('fakten')) window.PS.countUp(document.getElementById('fakten'), { whenVisible: true });
 
