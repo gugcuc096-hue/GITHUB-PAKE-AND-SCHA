@@ -450,7 +450,7 @@ Alte Links auf Abschnitte der früheren Startseite (`/#honorar`, `/#team` …) f
 - **Anwälten**: Kanzleileitung, eigene Auswahl (wer und in welcher Reihenfolge), wer im Dienst ist zuerst, oder alle – und wie viele Karten,
 - **Rechtsgebieten**: welche und in welcher Reihenfolge,
 - **Aktuelles**: wie viele Meldungen,
-- **Startbereich**: zweiter Knopf (Notdienst, Anwälte, Verfahrensstand, Honorare, Kontakt oder keiner) und der Hinweis „Bereits Mandant?“.
+- **Startbereich**: zweiter Knopf (Notdienst, Anwälte, Honorare, Kontakt oder keiner) und der Hinweis „Bereits Mandant?“.
 
 Jede Änderung zeigt sich sofort; „Veröffentlichen“ speichert sie in der Konfiguration „Startseite“ (mit Änderungsprotokoll). Der Server wendet sie beim Ausliefern an – ohne Flackern. Texte und Überschriften ändert man wie bisher durch Anklicken.
 
@@ -473,7 +473,22 @@ Gemessen in Chromium ohne Grafikkarte (wie „Hardwarebeschleunigung aus“), 14
 
 - **Ursache:** der Weichzeichner hinter Flächen (`backdrop-filter`) – auf jeder Website-Karte, jedem Umriss-Knopf, Seitenleiste, Fenster und Fenster-Hintergrund, obwohl die meisten Flächen deckend sind (man sah ihn gar nicht) – und darunter laufende Dauer-Animationen (Uhr, Leuchten mit `blur(150px)`), die ihn jedes Bild neu rechnen ließen.
 - **Für alle Geräte** (`public/css/gfx.css`, als letztes Stylesheet): kein unsichtbarer Weichzeichner mehr, Fenster-Hintergründe etwas dunkler statt weichgezeichnet, Leuchten per Maske statt Riesen-Filter, keine `transition: all`, Scroll-Handler passiv und einmal pro Bild, Uhr pausiert im Hintergrund-Tab.
-- **Grafikstufe je Gerät** (`public/js/gfx.js`, erstes Skript im `<head>`): „Automatisch“ erkennt Software-Rendering (SwiftShader, llvmpipe, „Microsoft Basic Render“), schwache Geräte, „Transparenz reduzieren“ und den Datensparmodus → **„Schnell“**: gar kein Weichzeichner, deckende Kopfzeile und Menüs, keine Deko-Dauer-Animationen, Saison-Szene als stehendes Bild, keine Seiten-Überblendungen und kein clip-path-Aufziehen von Fenstern. Optisch fast gleich. Dazu misst ein **Wächter** in den ersten Minuten die Bildrate (im Leerlauf und beim Scrollen): unter ~40 Bildern pro Sekunde schaltet er sofort um und merkt sich das eine Woche. Von Hand: *Mein Profil → Animationen → Grafik* (Automatisch / Schnell / Schön).
+- **Grafikstufe je Gerät** (`public/js/gfx.js`, erstes Skript im `<head>`), drei Stufen:
+  - **„Schön“** (mit Grafikkarte): Glas in Kopfzeile, Menüs und Fenstern, bewegte Leuchten, Glanz alle paar Sekunden.
+  - **„Ausgewogen“** (automatisch ohne Grafikkarte, also bei Software-Rendering wie SwiftShader, llvmpipe oder „Microsoft Basic Render“): sieht fast gleich aus. Statt Weichzeichner gibt es deckende Verläufe, die Leuchtkreise stehen als weiche Verläufe in einer einzigen Hintergrundebene, Flächen sind deckend, es laufen keine Dauer-Animationen und die Schatten sind feiner (bei hoher Pixeldichte noch feiner). Beim Darüberfahren gleiten nur Verschieben und Einblenden; Farben wechseln sofort. Bei Seitenwechseln blendet nur der Inhalt über, lange Listen werden außerhalb des Bildes nicht gezeichnet.
+  - **„Schnell“** (schwache Geräte, „Transparenz reduzieren“, Datensparmodus): zusätzlich keine Seitenüberblendungen und kein Glanz.
+  - **Wächter:** Er bestimmt zuerst die Bildwiederholrate des Monitors (60, 120, 144 Hz …) und misst dann die Bildrate im Leerlauf und beim Scrollen. Verfehlt die Seite den Takt des Monitors zweimal deutlich, geht es eine Stufe herunter (Schön → Ausgewogen → Schnell), und das Gerät merkt es sich eine Woche.
+  - **Von Hand:** *Mein Profil → Animationen → Grafik* (Automatisch / Schön / Ausgewogen / Schnell); dort steht auch, mit wie viel Hz der Monitor läuft.
+- **Bewegung ohne Neumalen:**
+  - Der Glanz über „Recht bekommen.“ ist eine eigene Ebene, die nur verschoben wird.
+  - Der größere Schatten beim Darüberfahren liegt fertig in einer eigenen Ebene und wird nur eingeblendet.
+  - Kacheln im Dashboard heben sich, ohne dass ihr Schatten neu gemalt wird.
+- **Weniger Arbeit pro Bild:**
+  - Live-Änderungen werden gebündelt: höchstens einmal je Bild, im Hintergrund-Tab gar nicht, beim Zurückkehren einmal.
+  - Nach dem Öffnen einer Akte wird die Tatort-Karte erst nach dem ersten Bild gezeichnet.
+  - Animationen werden nur dann mit einem sofortigen Layout neu gestartet, wenn sie schon liefen.
+  - Auch die Benutzer- und Bewerbungslisten zeichnen nur die sichtbaren Zeilen.
+- **Erst bei Bedarf laden:** Die Tatort-Karte steckt im Kanzlei-Bündel (Mandanten laden sie nie). Die 3D-Ansicht (WebGL, Geländemodell) kommt als eigenes Bündel `/js/dashboard.karte3d.js` erst beim ersten Klick auf „3D“.
 
 ## Schneller laden
 

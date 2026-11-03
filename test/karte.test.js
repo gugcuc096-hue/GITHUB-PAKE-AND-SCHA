@@ -215,7 +215,7 @@ describe('Tatort-Karte (Browser)', { skip: chromium ? false : 'Playwright nicht 
         // Kartenbild ist geladen und liegt unter den Postals
         await page.waitForFunction(() => karteBase() && karteBase().img.naturalWidth >= 2000, null, { timeout: 15000 });
         // 3D: Gelände, Klick trifft einen Postal, zurück zu 2D (nur wenn der Browser WebGL kann)
-        const has3d = await page.evaluate(() => karteSet3d(kViews.get('kmapForm'), true));
+        const has3d = await page.evaluate(async () => (await karteLoad3d()) && karteSet3d(kViews.get('kmapForm'), true));
         if (has3d) {
           await page.evaluate(() => {
             const v = kViews.get('kmapForm');

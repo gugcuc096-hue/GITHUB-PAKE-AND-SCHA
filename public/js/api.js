@@ -946,9 +946,11 @@
   });
 
   /*
-   * Seitenübergang Teamkarte → Profilseite (index.html, views/anwalt.html): nur dorthin. Jeder andere Wechsel überspringt
-   * ihn – sonst bricht der Browser ihn auf einer Seite ohne Übergang (Dashboard, Login …) ab und meldet einen Fehler.
+   * Seitenübergang zwischen den Unterseiten der Website (und zur Profilseite /team/…): nur dorthin. Wechsel zu Seiten
+   * ohne Übergang (Dashboard, Anmeldung, Karriere, Druckansichten …) überspringen ihn – sonst bricht der Browser ihn dort
+   * ab und meldet einen Fehler. „Schnell“ überspringt ihn ebenfalls (gfx.js).
    */
+  const NO_VT = /^\/(dashboard|login|registrieren|karriere|bewerbung|vertrag|rechnung|aktenauszug|offline|aufwachen|api|uploads)(\/|$)/;
   window.addEventListener('pageswap', (e) => {
     const vt = e.viewTransition;
     if (!vt) return;
@@ -959,7 +961,7 @@
     } catch {
       to = null;
     }
-    if (!to || to.origin !== location.origin || !to.pathname.startsWith('/team/') || motion.calm()) vt.skipTransition();
+    if (!to || to.origin !== location.origin || NO_VT.test(to.pathname) || !document.body.classList.contains('site-home') || motion.calm()) vt.skipTransition();
   });
 
   /**

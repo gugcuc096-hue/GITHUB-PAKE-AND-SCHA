@@ -9,8 +9,8 @@
  * fertig komprimiert – Brotli für alle Browser, die es können, sonst gzip. Komprimiert wird einmal je Fassung, nicht
  * bei jedem Abruf.
  *
- * Dashboard in zwei Bündeln (gleiche Reihenfolge, alle im strikten Modus – zusammengefügt verhalten sie sich wie
- * einzeln geladen): /js/dashboard.bundle.js für alle, /js/dashboard.staff.js mit den Verwaltungsteilen (Team,
+ * Dashboard in Bündeln (gleiche Reihenfolge, alle im strikten Modus – zusammengefügt verhalten sie sich wie
+ * einzeln geladen): /js/dashboard.bundle.js für alle, /js/dashboard.staff.js mit den Verwaltungsteilen (Tatort-Karte, Team,
  * Einstellungen, Discord, Statistik, Wiki, Lager …) lädt das Dashboard nur für die Kanzlei nach.
  */
 const fs = require('fs');
@@ -23,7 +23,10 @@ const PUBLIC = path.join(__dirname, '..', '..', 'public');
 const DASH_DIR = path.join(PUBLIC, 'js', 'dashboard');
 const YEAR = 'public, max-age=31536000, immutable';
 /** Nur für die Kanzlei (Mandanten laden sie nie): Teile, deren Ansichten Kanzlei/Board vorbehalten sind. */
-const STAFF_PARTS = new Set(['12-aktuelles.js', '07-konfiguration.js', '07-listen.js', '07-mehr-konfig.js', '07-rechte-schalter.js', '07-stil.js', '07-team-einstellungen.js', '08-discord.js', '09-system.js', '09-verwaltung.js', '13-kanzlei.js']);
+const STAFF_PARTS = new Set(['12-karte.js', '12-aktuelles.js', '07-konfiguration.js', '07-listen.js', '07-mehr-konfig.js', '07-rechte-schalter.js', '07-stil.js', '07-team-einstellungen.js', '08-discord.js', '09-system.js', '09-verwaltung.js', '13-kanzlei.js']);
+/** Erst bei Bedarf geladen (eigenes Bündel): die 3D-Ansicht der Tatort-Karte (WebGL, Geländemodell). */
+const LAZY_PARTS = { karte3d: ['12-karte3d.js'] };
+const LAZY_FILES = new Set(Object.values(LAZY_PARTS).flat());
 const PROD = () => process.env.NODE_ENV === 'production';
 
 let esbuild = null;
@@ -56,8 +59,9 @@ function build() {
   const join = (list) => list.map((f) => `/* ---- ${f} ---- */\n${fs.readFileSync(path.join(DASH_DIR, f), 'utf8')}`).join('\n;\n');
   return {
     version,
-    bundle: join(parts.filter((f) => !STAFF_PARTS.has(f))),
-    staff: join(parts.filter((f) => STAFF_PARTS.has(f))),
+    bundle: join(parts.filter((f) => !STAFF_PARTS.has(f) && !LAZY_FILES.has(f))),
+    staff: join(parts.filter((f) => STAFF_PARTS.has(f) && !LAZY_FILES.has(f))),
+    lazy: Object.fromEntries(Object.entries(LAZY_PARTS).map(([k, list]) => [k, join(list)])),
     pages: new Map(),
     packed: new Map(),
     at,
@@ -176,7 +180,7 @@ function rewrite(html) {
   return html
     .replace(
       /(?:[ \t]*<script src="\/js\/dashboard\/\d\d-[\w-]+\.js"><\/script>\s*)+/,
-      `    <script src="/js/dashboard.bundle.js" data-staff="/js/dashboard.staff.js?v=${version}"></script>\n`
+      `    <script src="/js/dashboard.bundle.js" data-staff="/js/dashboard.staff.js?v=${version}" data-lazy="/js/dashboard.{teil}.js?v=${version}"></script>\n`
     )
     .replace(/\b(src|href)="(\/(?:js|css)\/[^"?#]+\.(?:js|css))"/g, `$1="$2?v=${version}"`);
 }
@@ -206,6 +210,12 @@ function pages(req, res, next) {
 /** /js/dashboard.bundle.js (alle) und /js/dashboard.staff.js (nur Kanzlei – enthält keine Daten, nur Programmcode). */
 const bundle = (req, res) => send(req, res, pack('bundle', state().bundle, 'js'));
 const staffBundle = (req, res) => send(req, res, pack('staff', state().staff, 'js'));
+/** /js/dashboard.karte3d.js – Teile, die erst bei Bedarf nachgeladen werden (LAZY_PARTS). */
+const lazyBundle = (req, res, next) => {
+  const name = req.params.part;
+  if (!Object.hasOwn(LAZY_PARTS, name)) return next();
+  send(req, res, pack(`lazy-${name}`, state().lazy[name], 'js'));
+};
 
 /** Übrige Skripte und Stylesheets aus public/js und public/css: verkleinert und komprimiert. */
 function staticAsset(req, res, next) {
@@ -223,6 +233,7 @@ async function packAll() {
   const items = [
     ['bundle', st.bundle, 'js'],
     ['staff', st.staff, 'js'],
+    ...Object.entries(st.lazy).map(([k, text]) => [`lazy-${k}`, text, 'js']),
   ];
   for (const f of [...listFiles(path.join(PUBLIC, 'js')), ...listFiles(path.join(PUBLIC, 'css'))]) {
     const rel = '/' + path.relative(PUBLIC, f).split(path.sep).join('/');
@@ -246,4 +257,4 @@ function setHeaders(res) {
   if (res.req && res.req.query && res.req.query.v === state().version) res.set('Cache-Control', YEAR);
 }
 
-module.exports = { rewrite, page, pages, bundle, staffBundle, staticAsset, warm, packAll, setHeaders, reset, version: () => state().version, STAFF_PARTS };
+module.exports = { LAZY_PARTS, lazyBundle, rewrite, page, pages, bundle, staffBundle, staticAsset, warm, packAll, setHeaders, reset, version: () => state().version, STAFF_PARTS };

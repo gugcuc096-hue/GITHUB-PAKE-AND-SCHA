@@ -95,11 +95,14 @@
     border-radius: var(--radius);
     box-shadow: var(--sh-2), inset 0 1px 0 var(--lit-edge);
 }
-/* Anklickbare Karten heben sich beim Darüberfahren, ein goldener Strich wächst unten (wie die Kacheln im Dashboard) */
-.kz-tile > a, .kz-person, .kz-news-card { position: relative; transition: transform var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out), border-color var(--dur-2) ease; }
+/* Anklickbare Karten heben sich beim Darüberfahren, ein goldener Strich wächst unten (wie die Kacheln im Dashboard).
+   Der größere Schatten liegt fertig in einer eigenen Ebene (::before) und wird nur eingeblendet – kein Neumalen je Bild. */
+.kz-tile > a, .kz-person, .kz-news-card { position: relative; transition: transform var(--dur-2) var(--ease-out), border-color var(--dur-1) ease; }
+.kz-tile > a::before, .kz-person::before, .kz-news-card::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; box-shadow: var(--sh-3); opacity: 0; transition: opacity var(--dur-2) var(--ease-out); pointer-events: none; }
 .kz-tile > a::after, .kz-person::after, .kz-news-card::after { content: ''; position: absolute; left: 1.5rem; right: 1.5rem; bottom: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--gold-500), transparent); transform: scaleX(0); transition: transform var(--dur-3) var(--ease-out); pointer-events: none; }
 @media (hover: hover) and (pointer: fine) {
-    .kz-tile > a:hover, .kz-person:hover, .kz-news-card:hover { transform: translateY(-3px); border-color: rgba(var(--accent-rgb), 0.28); box-shadow: var(--sh-3), inset 0 1px 0 rgba(var(--accent-light-rgb), 0.16); }
+    .kz-tile > a:hover, .kz-person:hover, .kz-news-card:hover { transform: translateY(-3px); border-color: rgba(var(--accent-rgb), 0.28); }
+    .kz-tile > a:hover::before, .kz-person:hover::before, .kz-news-card:hover::before { opacity: 1; }
     .kz-tile > a:hover::after, .kz-person:hover::after, .kz-news-card:hover::after { transform: scaleX(1); }
 }
 
@@ -184,9 +187,12 @@ body.menu-open { overflow: hidden; }
 .kz-hero .kz-h1 { margin: var(--sp-3) 0; font-size: clamp(2.9rem, 7.4vw, 5.6rem); }
 .kz-hero .kz-lead { margin: 0 auto var(--sp-4); }
 @media (max-width: 767px) { .kz-hero { padding: var(--sp-5) 0 var(--sp-4); } }
-/* „Recht bekommen.“ mit langsam wanderndem Goldschimmer */
-.kz-shine { background: linear-gradient(100deg, var(--gold-600) 0%, var(--gold-500) 22%, var(--gold-light) 42%, #fff7d6 50%, var(--gold-light) 58%, var(--gold-500) 78%, var(--gold-600) 100%); background-size: 250% 100%; background-position: 100% 0; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: var(--gold-500); animation: kz-shine 7s ease-in-out infinite; padding: 0 0.06em; }
-@keyframes kz-shine { 0%, 15% { background-position: 100% 0; } 60%, 100% { background-position: 0% 0; } }
+/* „Recht bekommen.“: stehender Goldverlauf; der Glanz ist eine eigene Ebene, die darübergleitet (js/motion.js → shine) –
+   sie wird nur verschoben, nie neu gemalt. Läuft beim Laden, beim Darüberfahren und (Schön) alle paar Sekunden. */
+.kz-shine { position: relative; display: inline-block; white-space: nowrap; background: linear-gradient(100deg, var(--gold-600) 0%, var(--gold-500) 30%, var(--gold-light) 55%, var(--gold-500) 80%, var(--gold-600) 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: var(--gold-500); padding: 0 0.06em; }
+.kz-shine-band { position: absolute; top: 0; bottom: 0; left: 0; width: 38%; overflow: hidden; pointer-events: none; transform: translateX(-110%); will-change: transform;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 40%, #000 60%, transparent); mask-image: linear-gradient(90deg, transparent, #000 40%, #000 60%, transparent); }
+.kz-shine-band > span { position: absolute; top: 0; left: 0; padding: inherit; white-space: nowrap; color: #fff8dc; -webkit-text-fill-color: #fff8dc; will-change: transform; }
 .kz-hero-note { margin-top: var(--sp-3); font-size: 0.92rem; color: var(--kz-muted); }
 .kz-hero-note a { color: var(--kz-ink); text-decoration: underline; text-decoration-color: rgba(var(--accent-rgb), 0.4); text-underline-offset: 4px; }
 .kz-hero-note a:hover { color: var(--gold-light); }
@@ -404,6 +410,13 @@ html:has(body.site-home)::view-transition-old(root) { animation: kz-vt-out 0.2s 
 html:has(body.site-home)::view-transition-new(root) { animation: kz-vt-in 0.42s var(--ease-out) both; }
 @keyframes kz-vt-out { to { opacity: 0; } }
 @keyframes kz-vt-in { from { opacity: 0; transform: translateY(10px); } }
+/* Ausgewogen (ohne Grafikkarte): nur der Inhalt blendet über, kürzer – der Rest der Seite wechselt sofort */
+html[data-gfx='mid'] body.site-home main { view-transition-name: kz-main; }
+html[data-gfx='mid']:has(body.site-home)::view-transition-old(root) { animation: none; display: none; }
+html[data-gfx='mid']:has(body.site-home)::view-transition-new(root) { animation: none; }
+html[data-gfx='mid']:has(body.site-home)::view-transition-group(kz-main) { animation-duration: 0.22s; }
+html[data-gfx='mid']:has(body.site-home)::view-transition-old(kz-main) { animation: kz-vt-out 0.12s ease both; }
+html[data-gfx='mid']:has(body.site-home)::view-transition-new(kz-main) { animation: kz-vt-in 0.24s var(--ease-out) both; }
 /* Auf der neuen Seite nicht noch einmal alles einzeln einblenden lassen */
 html:active-view-transition .kz-hero-in > * { animation: none; }
 
@@ -461,9 +474,4 @@ html:active-view-transition .kz-hero-in > * { animation: none; }
 .duty-dot.s-pause { background: var(--amber); }
 @media (max-width: 479px) { .pf-actions > .kz-btn { flex: 1 1 100%; } }
 
-/* ------------------------------------------------------------------ Schnelle Stufe (gfx lite): deckend statt Glas, kein Schimmer */
-html[data-gfx='lite'] .site-home .glass-nav { background: #050a18; }
-html[data-gfx='lite'] .site-home #mobileMenu { background: #050a18; }
-html[data-gfx='lite'] .kz-nav-menu { background: #0b1226; }
-html[data-gfx='lite'] .kz-shine { animation: none; background-position: 50% 0; }
-html[data-gfx='lite'] .site-home .btn-gold::before { display: none; }
+/* Ausgewogen/Schnell (ohne Grafikkarte): deckende Flächen, stehender Hintergrund, kein Glanz – siehe gfx.css */

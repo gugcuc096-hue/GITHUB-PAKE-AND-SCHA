@@ -33,7 +33,7 @@ const SECTION_IDS = Object.keys(SECTIONS);
 const START_SECTIONS = { fakten: 'Eckdaten', gebiete: 'Rechtsgebiete', ansprechpartner: 'Anwälte', neuigkeiten: 'Aktuelles', ablauf: 'Ablauf eines Mandats', band: 'Abschluss mit „Mandat anfragen“' };
 const START_IDS = Object.keys(START_SECTIONS);
 const LAWYER_MODES = { leitung: 'Kanzleileitung (Board of Partners)', auswahl: 'Eigene Auswahl', dienst: 'Wer gerade im Dienst ist zuerst', alle: 'Alle Anwälte' };
-const HERO_SECOND = { notdienst: 'Notdienst bei Festnahme', anwaelte: 'Unsere Anwälte', verfahrensstand: 'Verfahrensstand abfragen', honorare: 'Honorare & Tarifrechner', kontakt: 'Kontakt', keiner: 'Kein zweiter Knopf' };
+const HERO_SECOND = { notdienst: 'Notdienst bei Festnahme', anwaelte: 'Unsere Anwälte', honorare: 'Honorare & Tarifrechner', kontakt: 'Kontakt', keiner: 'Kein zweiter Knopf' };
 const START_DEFAULTS = { order: START_IDS, hidden: ['ablauf'], lawyerMode: 'leitung', lawyers: [], lawyerCount: 3, areas: [], newsCount: 3, heroSecond: 'notdienst', heroNote: true };
 const startSchema = z
   .object({
@@ -44,7 +44,8 @@ const startSchema = z
     lawyerCount: z.number().int().min(1).max(9).default(3),
     areas: z.array(z.string().regex(/^[a-z0-9-]{2,40}$/)).max(20).default([]),
     newsCount: z.number().int().min(1).max(6).default(3),
-    heroSecond: z.enum(Object.keys(HERO_SECOND)).default('notdienst'),
+    // „Verfahrensstand abfragen“ gibt es als Knopf nicht mehr – gespeicherte Wahl fällt auf den Notdienst zurück
+    heroSecond: z.preprocess((v) => (v === 'verfahrensstand' ? 'notdienst' : v), z.enum(Object.keys(HERO_SECOND))).default('notdienst'),
     heroNote: z.boolean().default(true),
   })
   .default(START_DEFAULTS);

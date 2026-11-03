@@ -1206,6 +1206,24 @@ async function placeFormInit(p) {
   show(input.value.trim());
 }
 
+/** 3D-Ansicht (12-karte3d.js, WebGL und Geländemodell) erst beim ersten Klick auf „3D“ laden – eigenes Bündel. */
+let k3Loading = null;
+function karteLoad3d() {
+  if (typeof karteSet3d === 'function') return Promise.resolve(true);
+  const tpl = document.querySelector('script[data-lazy]')?.dataset.lazy;
+  if (!tpl) return Promise.resolve(false);
+  k3Loading =
+    k3Loading ||
+    new Promise((resolve) => {
+      const s = document.createElement('script');
+      s.src = tpl.replace('{teil}', 'karte3d');
+      s.onload = () => resolve(typeof karteSet3d === 'function');
+      s.onerror = () => ((k3Loading = null), resolve(false));
+      document.head.appendChild(s);
+    });
+  return k3Loading;
+}
+
 Object.assign(actions, {
   'place-add': async (el) => {
     openModal(placeForm(Number(el.dataset.caseId), null), { wide: true, child: true });
@@ -1272,6 +1290,11 @@ Object.assign(actions, {
     const v = kViews.get(el.dataset.id);
     if (!v) return;
     el.classList.add('is-busy');
+    const ok = await karteLoad3d();
+    if (!ok) {
+      el.classList.remove('is-busy');
+      return toast('Die 3D-Ansicht konnte nicht geladen werden – bitte neu laden.', 'error');
+    }
     const on = await karteSet3d(v, !v.m3);
     el.classList.remove('is-busy');
     el.classList.toggle('is-on', on);

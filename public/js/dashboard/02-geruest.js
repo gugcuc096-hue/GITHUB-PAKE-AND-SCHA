@@ -1139,10 +1139,18 @@ function skeletonFade(content, html) {
 /** Sanft einblenden (Seitenwechsel, neues Fenster) – nicht bei jedem Neuzeichnen, sonst flackert es. */
 function playIn(el, cls) {
   if (!el) return;
-  el.classList.remove(cls);
-  void el.offsetWidth; // Animation neu starten
+  // Neu starten braucht ein sofortiges Layout (teuer, besonders ohne Grafikkarte) – nur, wenn die Klasse schon dran ist
+  if (el.classList.contains(cls)) {
+    el.classList.remove(cls);
+    void el.offsetWidth;
+  }
   el.classList.add(cls);
 }
+/**
+ * Arbeit, die nicht zum ersten Bild gehört (Karte zeichnen, Fortschrittsbalken, Vorschaubilder …), erst nach dem
+ * Zeichnen erledigen – das Fenster bzw. die Seite steht dann schon, keine lange Aufgabe blockiert den ersten Eindruck.
+ */
+const afterPaint = (fn) => requestAnimationFrame(() => setTimeout(fn, 0));
 /*
  * Solange ein Fenster (z. B. eine Akte) offen ist, bleibt die Seite dahinter ruhig: Sie wird nicht bei jeder Änderung im
  * Fenster neu gezeichnet (das sah man durch den abgedunkelten Hintergrund als Neuladen). Stattdessen wird das Neuzeichnen

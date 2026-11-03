@@ -658,16 +658,16 @@ function appTable() {
   if (!rows.length) return empty(st.applications.length ? 'Keine Bewerbungen für diese Auswahl.' : 'Noch keine Bewerbungen eingegangen.', 'userAdd');
   return `<div class="tbl-wrap"><table class="tbl tbl-cards">
       <thead><tr><th>Bewerbung</th><th>Stelle</th><th>Eingang</th><th>Bewertung</th><th>Status</th></tr></thead>
-      <tbody>${rows
-      .map(
+      <tbody>${lazyRows(
+        rows,
         (a) => `<tr class="row" data-action="app-open" data-id="${a.id}">
           <td class="td-main"><div class="font-mono text-gold text-xs">${esc(a.number)}</div><div class="font-medium">${esc(a.name)}${a.age ? ` <span class="text-dim text-xs">(${esc(a.age)})</span>` : ''}${a.unreadMessages ? ` <span class="chat-new" title="Neue Nachrichten des Bewerbers">${icon('chat', 'ico-sm')}${a.unreadMessages}</span>` : ''}</div><div class="text-xs text-dim">Discord: ${esc(a.discord || '—')}</div></td>
           <td data-label="Stelle">${esc(a.positionTitle)}</td>
           <td data-label="Eingang" class="text-xs text-dim nowrap">${esc(fmtDate(a.createdAt))}</td>
           <td data-label="Bewertung">${stars(a.rating)}</td>
-          <td data-label="Status">${statusBadge(APP_STATUS, a.status)}</td></tr>`
-      )
-      .join('')}</tbody></table></div>`;
+          <td data-label="Status">${statusBadge(APP_STATUS, a.status)}</td></tr>`,
+        5
+      )}</tbody></table></div>`;
 }
 
 function positionsPanel() {

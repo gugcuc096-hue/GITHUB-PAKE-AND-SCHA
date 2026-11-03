@@ -2,14 +2,19 @@
  * Leistungsschicht – wird auf jeder Seite als LETZTES Stylesheet geladen (nach motion.css/season.css).
  * Gemessen (Chromium, ohne Grafikkarte): Der Weichzeichner hinter Flächen (backdrop-filter) und Dauer-Animationen darunter
  * kosteten fast alles – die Startseite lief im Leerlauf mit 13 statt 60 Bildern pro Sekunde, beim Scrollen mit 22.
+ * Ohne Grafikkarte kostet jedes Bild so viel, wie Fläche neu gemalt und übereinandergemischt werden muss.
  *
  * Für ALLE Geräte:
  *  - Kein Weichzeichner, wo man ihn gar nicht sieht (deckende Flächen: Karten, Knöpfe, Fenster, Seitenleiste) und
  *    nicht auf bildschirmfüllenden Ebenen (Fenster-Hintergrund) – stattdessen etwas dunkler.
  *  - Leuchtende Hintergrund-Kreise ohne Riesen-Weichzeichner (blur(150px)) – derselbe weiche Verlauf per Maske, eigene Ebene.
  *  - Keine „transition: all“ (sonst wandern auch Schatten und Farben bei jeder Kleinigkeit mit).
- * Nur html[data-gfx="lite"] (gfx.js: ohne Grafikkarte, schwaches Gerät oder Ruckeln gemessen):
- *  - gar kein Weichzeichner, deckende Kopfzeile/Menüs, keine Dauer-Animationen der Deko, keine Weichzeichner-Filter.
+ * html[data-gfx="mid"] „Ausgewogen“ (gfx.js: automatisch ohne Grafikkarte) und html[data-gfx="lite"] „Schnell“:
+ *  - kein Weichzeichner, Kopfzeile/Menüs als deckender Verlauf, deckende Flächen (weniger Ebenen zu mischen)
+ *  - keine Dauer-Animationen; die Leuchtkreise stehen als weiche Verläufe in einer einzigen Hintergrundebene
+ *  - beim Darüberfahren gleiten nur Verschieben und Einblenden – Farben und Ränder wechseln sofort
+ *  - kleinere Schatten, bei hoher Pixeldichte noch feiner (der Aufwand wächst mit dem Quadrat der Skalierung)
+ * Nur „Schnell“: zusätzlich keine Seitenüberblendungen (gfx.js), kein Glanz, keine Weichzeichner-Filter in Übergängen.
  */
 
 /* ================================================================ Alle Geräte */
@@ -72,36 +77,78 @@
  * Sprünge zu #karriere, #kontakt … landeten dann an der falschen Stelle.
  */
 
-/* ================================================================ Schnelle Stufe (lite) */
-html[data-gfx='lite'] *,
-html[data-gfx='lite'] *::before,
-html[data-gfx='lite'] *::after {
+/* ================================================================ Ausgewogen + Schnell (ohne Grafikkarte) */
+html:is([data-gfx='mid'], [data-gfx='lite']) *,
+html:is([data-gfx='mid'], [data-gfx='lite']) *::before,
+html:is([data-gfx='mid'], [data-gfx='lite']) *::after {
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
 }
 
-/* Glasflächen deckend (gleicher Farbton) */
-html[data-gfx='lite'] .glass-nav { background: linear-gradient(180deg, #080e20, #04080f); }
-html[data-gfx='lite'] .topbar { background: rgba(5, 9, 21, 0.985); }
-html[data-gfx='lite'] .site-banner { background-color: #0a1122; }
-html[data-gfx='lite'] :is(.ps-toast, .pop, .more-pop, .dp, .bulk-bar, .sys-bar, .kmap-card, .ctx-menu, .promo-dock) { background: var(--glass-tint), #0b1226; }
-html[data-gfx='lite'] .case-jump { background: var(--glass-tint), #080e20; }
-html[data-gfx='lite'] .modal { background: rgba(1, 3, 10, 0.9); }
-/* Seite hinter einem Fenster nicht verkleinern (die ganze Seite neu zu skalieren kostet ohne Grafikkarte) */
-html[data-gfx='lite'] body.modal-open #content { scale: 1; }
+/* Glasflächen: deckender Verlauf im gleichen Farbton (statt Weichzeichner, der jedes Scroll-Bild neu gerechnet wird) */
+html:is([data-gfx='mid'], [data-gfx='lite']) .glass-nav { background: linear-gradient(180deg, #0a1126, #050a17); }
+html:is([data-gfx='mid'], [data-gfx='lite']) .topbar { background: linear-gradient(180deg, rgba(8, 13, 30, 0.995), rgba(5, 9, 21, 0.99)); }
+html:is([data-gfx='mid'], [data-gfx='lite']) .site-banner { background-color: #0a1122; }
+html:is([data-gfx='mid'], [data-gfx='lite']) :is(.ps-toast, .pop, .more-pop, .dp, .bulk-bar, .sys-bar, .kmap-card, .ctx-menu, .promo-dock) { background: var(--glass-tint), #0b1226; }
+html:is([data-gfx='mid'], [data-gfx='lite']) .case-jump { background: var(--glass-tint), #080e20; }
+html:is([data-gfx='mid'], [data-gfx='lite']) .modal { background: rgba(1, 3, 10, 0.9); }
+html:is([data-gfx='mid'], [data-gfx='lite']) .site-home #mobileMenu { background: linear-gradient(180deg, #070c1c, #04070f); }
+html:is([data-gfx='mid'], [data-gfx='lite']) .kz-nav-menu { background: #0b1226; }
+
+/* Flächen deckend: gleicher Farbton, aber nichts mehr durchzumischen */
+html:is([data-gfx='mid'], [data-gfx='lite']) {
+  --panel-alpha: 1;
+  --navy-800: #0a1228;
+  /* Kleinere Schatten (weniger weich gezeichnete Fläche je Karte) */
+  --sh-2: 0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 18px -10px rgba(0, 0, 0, 0.6);
+  --sh-3: 0 2px 4px rgba(0, 0, 0, 0.35), 0 12px 24px -12px rgba(0, 0, 0, 0.65);
+  --sh-4: 0 4px 8px rgba(0, 0, 0, 0.4), 0 20px 40px -16px rgba(0, 0, 0, 0.7);
+}
+html:is([data-gfx='mid'], [data-gfx='lite']) .site-home { --kz-panel-bg: linear-gradient(180deg, #0e172f, #0a1228 120px); }
+
+/* Leuchtkreise: stehen still, als weiche Verläufe in einer einzigen Hintergrundebene statt zwei bildschirmgroßer Ebenen */
+html:is([data-gfx='mid'], [data-gfx='lite']) .glow-orb { display: none; }
+html:is([data-gfx='mid'], [data-gfx='lite']) .ambient-bg {
+  background:
+    radial-gradient(42vw 42vw at 8% 4%, rgba(var(--accent-rgb), 0.075), transparent 70%),
+    radial-gradient(48vw 48vw at 96% 98%, rgba(30, 58, 138, 0.2), transparent 70%),
+    radial-gradient(ellipse 80% 60% at 50% -12%, #0d1a3a 0%, var(--navy-950) 78%);
+  background-size: 100% 100%;
+}
 
 /* Deko ohne Dauer-Animation (Funktion bleibt: Ladebalken, Tippanzeige, Live-Punkte, Drehen beim Aktualisieren) */
-html[data-gfx='lite'] :is(.glow-orb, .sb-shine, .sb-icon, .sb-aurora i, .sb-sparks i, .sb-seal::after, .calc-promo-badge, .ps-lights .bulb, .ps-fog i, .ps-aurora i, .ps-rays),
-html[data-gfx='lite'] .site-banner.is-promo::after,
-html[data-gfx='lite'] .sb-seal::after {
+html:is([data-gfx='mid'], [data-gfx='lite']) :is(.glow-orb, .sb-shine, .sb-icon, .sb-aurora i, .sb-sparks i, .sb-seal::after, .calc-promo-badge, .ps-lights .bulb, .ps-fog i, .ps-aurora i, .ps-rays, .lotm-badge, .gold-shine),
+html:is([data-gfx='mid'], [data-gfx='lite']) .site-banner.is-promo::after,
+html:is([data-gfx='mid'], [data-gfx='lite']) .sb-seal::after {
   animation: none !important;
 }
-html[data-gfx='lite'] .glow-orb { will-change: auto; }
-html[data-gfx='lite'] .sb-aurora { filter: none; opacity: 0.55; }
-html[data-gfx='lite'] .sb-sparks { display: none; }
+html:is([data-gfx='mid'], [data-gfx='lite']) .sb-aurora { filter: none; opacity: 0.55; }
+html:is([data-gfx='mid'], [data-gfx='lite']) .sb-sparks { display: none; }
 
+/* Beim Darüberfahren gleiten nur Verschieben und Einblenden (das erledigt der Compositor) – Farben, Ränder und Schatten
+   wechseln sofort, statt Bild für Bild neu gemalt zu werden */
+html:is([data-gfx='mid'], [data-gfx='lite']) :is(.btn-gold, .btn-outline, .btn-ghost, .btn-danger, .icon-btn, .chip, .nav-item, .list-row, .panel, .kpi, .glass-card, .tab-btn, .badge, .kz-tile > a, .kz-person, .kz-news-card, .kz-link, .kz-others a, .kz-nav > a, .kz-nav-drop > a, .kz-nav-menu a, .kz-footer a, .kz-tile-ico, .site-avatar, .topbar-search, .bn-item) {
+  transition-property: transform, opacity !important;
+}
+
+/* Lange Listen: Zeilen außerhalb des Bildes werden nicht gezeichnet (Platz bleibt reserviert) */
+html:is([data-gfx='mid'], [data-gfx='lite']) :is(.list-row, .task-item, .event-row, .place-row, .kz-news > li) { content-visibility: auto; contain-intrinsic-size: auto 64px; }
+
+/* Hohe Pixeldichte (Laptops mit 150 %/200 %): noch feinere Schatten, kein Raster im Hintergrund */
+@media (min-resolution: 1.5dppx) {
+  html:is([data-gfx='mid'], [data-gfx='lite']) {
+    --sh-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --sh-2: 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 12px -8px rgba(0, 0, 0, 0.6);
+    --sh-3: 0 2px 4px rgba(0, 0, 0, 0.35), 0 10px 18px -10px rgba(0, 0, 0, 0.65);
+    --sh-4: 0 4px 8px rgba(0, 0, 0, 0.4), 0 16px 30px -14px rgba(0, 0, 0, 0.7);
+  }
+  html:is([data-gfx='mid'], [data-gfx='lite']) .ambient-bg { background: radial-gradient(ellipse 80% 60% at 50% -12%, #0d1a3a 0%, var(--navy-950) 78%); }
+}
+
+/* ================================================================ Nur „Schnell“ (lite) */
+/* Seite hinter einem Fenster nicht verkleinern (die ganze Seite neu zu skalieren kostet ohne Grafikkarte) */
+html[data-gfx='lite'] body.modal-open #content { scale: 1; }
 /* Keine Weichzeichner-Filter in Übergängen (Banner-Meldungen, Ziffern) */
 html[data-gfx='lite'] .sb-slide:not(.is-on) { filter: none; }
-
-/* Leuchtende Schatten beim Überfahren: ohne Übergang (Schatten neu zu zeichnen ist ohne Grafikkarte teuer) */
-html[data-gfx='lite'] :is(.glass-card, .btn-outline, .btn-gold, .panel, .kpi, .list-row, .nav-item) { transition-property: transform, background-color, border-color, color, opacity; }
+/* Kein Glanz über Knöpfen und Überschrift */
+html[data-gfx='lite'] .site-home .btn-gold::before, html[data-gfx='lite'] .kz-shine-band { display: none; }

@@ -1,12 +1,13 @@
 'use strict';
 /*
  * Grafikstufe (public/js/gfx.js + public/css/gfx.css):
- *  - Automatisch: ohne Grafikkarte (der Testbrowser zeichnet mit SwiftShader) → „lite“: nirgends ein Weichzeichner
- *    hinter Flächen, Hintergrund-Leuchten ohne Animation, Saison-Szene nur als stehendes Bild
- *  - Wächter: ruckelt es (künstlich langsame Bilder), schaltet „auto“ von „full“ auf „lite“ und merkt es sich
+ *  - Automatisch: ohne Grafikkarte (der Testbrowser zeichnet mit SwiftShader) → „mid“ (Ausgewogen): nirgends ein
+ *    Weichzeichner hinter Flächen, Leuchten stehen in einer Hintergrundebene, Flächen deckend, kein Dauer-Glanz
+ *  - Wächter: misst den Bildtakt des Monitors; ruckelt es (künstlich langsame Bilder), geht „auto“ eine Stufe herunter
+ *    (full → mid → lite) und merkt es sich
  *  - Auch in „full“: kein (unsichtbarer) Weichzeichner auf deckenden Karten, Knöpfen und Fenster-Hintergründen,
  *    Leuchten ohne blur(150px)
- *  - Mein Profil → Animationen → Grafik: Schnell / Schön / Automatisch gilt sofort und bleibt auf dem Gerät
+ *  - Mein Profil → Animationen → Grafik: Schön / Ausgewogen / Schnell / Automatisch gilt sofort und bleibt auf dem Gerät
  */
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
@@ -41,22 +42,25 @@ describe('Grafikstufe (Browser)', { skip: !chromium && 'Playwright nicht install
         .map((el) => `${el.tagName.toLowerCase()}.${String(el.className).split(' ').join('.')}`)
     );
 
-  it('ohne Grafikkarte automatisch „lite“: kein Weichzeichner, ruhige Leuchten', async () => {
+  it('ohne Grafikkarte automatisch „Ausgewogen“: kein Weichzeichner, stehende Leuchten, deckende Flächen', async () => {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     await ctx.addInitScript(() => (window.__gfxAuto = true));
     const page = await ctx.newPage();
     await page.goto(server.base + '/');
-    assert.equal(await page.evaluate(() => document.documentElement.dataset.gfx), 'lite');
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.gfx), 'mid');
     assert.match(await page.evaluate(() => window.PSGfx.reason), /Software|WebGL/i);
     assert.deepEqual(await blurred(page), [], 'nirgends backdrop-filter');
-    const orb = await page.$eval('.glow-orb', (el) => ({ filter: getComputedStyle(el).filter, anim: getComputedStyle(el).animationName }));
-    assert.deepEqual(orb, { filter: 'none', anim: 'none' });
+    const orb = await page.$eval('.glow-orb', (el) => ({ display: getComputedStyle(el).display, anim: getComputedStyle(el).animationName }));
+    assert.deepEqual(orb, { display: 'none', anim: 'none' }, 'Leuchtkreise stehen als Verlauf im Hintergrund');
+    assert.match(await page.$eval('.ambient-bg', (el) => getComputedStyle(el).backgroundImage), /radial-gradient/);
+    assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--panel-alpha').trim()), '1', 'Flächen deckend');
+    assert.deepEqual(await page.evaluate(() => document.getAnimations().filter((a) => a.playState === 'running' && (a.effect.getTiming().iterations === Infinity)).length), 0, 'keine Dauer-Animationen');
     // Ergebnis gemerkt (beim nächsten Seitenaufruf kein WebGL-Test mehr)
-    assert.equal(JSON.parse(await page.evaluate(() => localStorage.getItem('ps.gfx.auto'))).mode, 'lite');
+    assert.equal(JSON.parse(await page.evaluate(() => localStorage.getItem('ps.gfx.auto'))).mode, 'mid');
     await ctx.close();
   });
 
-  it('Wächter: ruckelt es, schaltet „auto“ von „full“ auf „lite“ und merkt es sich', async () => {
+  it('Wächter: misst den Bildtakt des Monitors und geht bei Ruckeln stufenweise herunter (full → mid → lite)', async () => {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     await ctx.addInitScript(() => {
       window.__gfxAuto = true;
@@ -74,12 +78,21 @@ describe('Grafikstufe (Browser)', { skip: !chromium && 'Playwright nicht install
         });
     });
     const page = await ctx.newPage();
-    await page.goto(server.base + '/');
+    await page.goto(server.base + '/anwaelte');
     assert.equal(await page.evaluate(() => document.documentElement.dataset.gfx), 'full');
-    await page.waitForFunction(() => document.documentElement.dataset.gfx === 'lite', null, { timeout: 15000 });
-    const learned = JSON.parse(await page.evaluate(() => localStorage.getItem('ps.gfx.auto')));
+    await page.waitForFunction(() => document.documentElement.dataset.gfx === 'mid', null, { timeout: 15000 });
+    let learned = JSON.parse(await page.evaluate(() => localStorage.getItem('ps.gfx.auto')));
+    assert.equal(learned.mode, 'mid');
+    assert.match(learned.why, /Bildrate gemessen \(\d+ von \d+ Bildern\/s\)/);
+    assert.ok((await page.evaluate(() => window.PSGfx.hz)) >= 30, 'Bildtakt des Monitors bestimmt');
+    // reicht auch „Ausgewogen“ nicht: beim Scrollen weiter messen → „Schnell“
+    for (let i = 0; i < 30 && (await page.evaluate(() => document.documentElement.dataset.gfx)) !== 'lite'; i++) {
+      await page.mouse.wheel(0, i % 2 ? -300 : 300);
+      await page.waitForTimeout(500);
+    }
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.gfx), 'lite');
+    learned = JSON.parse(await page.evaluate(() => localStorage.getItem('ps.gfx.auto')));
     assert.equal(learned.mode, 'lite');
-    assert.match(learned.why, /Bildrate/);
     await ctx.close();
   });
 
@@ -97,7 +110,7 @@ describe('Grafikstufe (Browser)', { skip: !chromium && 'Playwright nicht install
     await ctx.close();
   });
 
-  it('Mein Profil → Grafik: Schnell / Schön / Automatisch gilt sofort und bleibt', async () => {
+  it('Mein Profil → Grafik: Schnell / Ausgewogen / Schön / Automatisch gilt sofort und bleibt', async () => {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const page = await ctx.newPage();
     await page.goto(server.base + '/login');
@@ -114,6 +127,10 @@ describe('Grafikstufe (Browser)', { skip: !chromium && 'Playwright nicht install
     await page.reload();
     await page.waitForSelector('[data-action="gfx-set"][data-value="lite"].active');
     assert.equal(await page.evaluate(() => document.documentElement.dataset.gfx), 'lite', 'bleibt nach dem Neuladen');
+    await page.click('[data-action="gfx-set"][data-value="mid"]');
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.gfx), 'mid');
+    assert.deepEqual(await blurred(page), [], 'Ausgewogen: kein Weichzeichner');
+    await page.waitForSelector('[data-action="gfx-set"][data-value="mid"].active');
     await page.click('[data-action="gfx-set"][data-value="full"]');
     assert.equal(await page.evaluate(() => document.documentElement.dataset.gfx), 'full');
     assert.notEqual(await page.$eval('.topbar', (el) => getComputedStyle(el).backdropFilter), 'none', 'Schön: Glas in der Kopfzeile');

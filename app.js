@@ -247,6 +247,7 @@ app.get('/team/:slug', require('./server/web/profiles').handler);
 const assets = require('./server/web/assets');
 app.get('/js/dashboard.bundle.js', assets.bundle);
 app.get('/js/dashboard.staff.js', assets.staffBundle);
+app.get('/js/dashboard.:part(karte3d).js', assets.lazyBundle);
 // Logo in der Kanzleifarbe (Einstellungen → Stil & Saison; brand.js)
 app.get('/img/logo.svg', require('./server/web/brand').logoHandler('svg'));
 app.get('/img/logo.png', require('./server/web/brand').logoHandler('png'));

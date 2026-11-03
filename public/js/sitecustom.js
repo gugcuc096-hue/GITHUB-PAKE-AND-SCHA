@@ -16,7 +16,7 @@
 
   const SECTIONS = { fakten: 'Eckdaten', gebiete: 'Rechtsgebiete', ansprechpartner: 'Anwälte', neuigkeiten: 'Aktuelles', ablauf: 'Ablauf eines Mandats', band: 'Abschluss „Mandat anfragen“' };
   const MODES = { leitung: 'Kanzleileitung (Board of Partners)', auswahl: 'Eigene Auswahl', dienst: 'Wer im Dienst ist zuerst', alle: 'Alle Anwälte' };
-  const HERO = { notdienst: ['/notdienst', 'Notdienst bei Festnahme'], anwaelte: ['/anwaelte', 'Unsere Anwälte'], verfahrensstand: ['/verfahrensstand', 'Verfahrensstand abfragen'], honorare: ['/honorare', 'Honorare & Tarifrechner'], kontakt: ['/kontakt', 'Kontakt'], keiner: ['', 'Kein zweiter Knopf'] };
+  const HERO = { notdienst: ['/notdienst', 'Notdienst bei Festnahme'], anwaelte: ['/anwaelte', 'Unsere Anwälte'], honorare: ['/honorare', 'Honorare & Tarifrechner'], kontakt: ['/kontakt', 'Kontakt'], keiner: ['', 'Kein zweiter Knopf'] };
   const ICON = {
     up: '<path d="M5 15l7-7 7 7"/>',
     down: '<path d="M19 9l-7 7-7-7"/>',
