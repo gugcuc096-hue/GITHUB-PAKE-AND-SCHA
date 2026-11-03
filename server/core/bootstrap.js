@@ -452,6 +452,7 @@ function runBootstrap() {
   ensureMembershipTiers();
   renameLifetime();
   ensureDefaultFees();
+  require('../domain/honorar').seedDefaults(); // Honorarrechner: Rechtsgebiete, Preismodelle, Pakete (einmal)
   ensureDefaultPositions();
   fixCourtWording();
   fixMentoringWording();

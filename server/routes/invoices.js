@@ -125,13 +125,23 @@ router.post(
   '/',
   requireStaff,
   wrap(async (req, res) => {
-    const u = req.user;
     const d = parseBody(createSchema, req, res);
     if (!d) return;
+    const r = await createInvoice(req.user, d);
+    res.status(r.status).json(r.body);
+  })
+);
+
+const reply = (status, body) => ({ status, body });
+/**
+ * Rechnung bzw. Honorarvereinbarung anlegen (Formular des Dashboards und Erfolgshonorar beim Abschluss einer Akte,
+ * server/routes/honorar.js). d: geprüfte Angaben nach createSchema. → { status, body }
+ */
+async function createInvoice(u, d) {
 
     // Rechnungsart: Grundart, Zahlungsziel und Standardtext kommen aus der Art, wenn das Formular sie offenlässt
     const type = d.typeKey ? billing.type(d.typeKey) : null;
-    if (d.typeKey && (!type || !type.active)) return res.status(400).json({ error: 'Diese Rechnungsart gibt es nicht (mehr).' });
+    if (d.typeKey && (!type || !type.active)) return reply(400, { error: 'Diese Rechnungsart gibt es nicht (mehr).' });
     if (type) {
       d.kind = type.base;
       if (d.dueDate === undefined && type.dueDays > 0) d.dueDate = new Date(Date.parse(`${berlinToday()}T12:00:00Z`) + type.dueDays * 864e5).toISOString().slice(0, 10);
@@ -141,10 +151,10 @@ router.post(
     let c = null;
     if (d.caseId) {
       c = getCase(d.caseId);
-      if (!c) return res.status(404).json({ error: 'Akte nicht gefunden.' });
+      if (!c) return reply(404, { error: 'Akte nicht gefunden.' });
     }
     const clientName = d.clientName || (c ? c.client_account_name || c.client_name : '');
-    if (!clientName || clientName.length < 2) return res.status(400).json({ error: 'Bitte den Rechnungsempfänger angeben.' });
+    if (!clientName || clientName.length < 2) return reply(400, { error: 'Bitte den Rechnungsempfänger angeben.' });
     const clientContact = d.clientContact || (c ? c.client_phone || c.client_account_phone || c.client_email || '' : '');
 
     // Hoher Rabatt: ohne Freigabe geht erst eine Anfrage ans Board; mit genehmigter Freigabe läuft die Rechnung durch
@@ -153,10 +163,10 @@ router.post(
       if (!d.approvalId) {
         const subtotal = d.items.reduce((sum, it) => sum + it.quantity * it.unitPrice, 0);
         const asked = approvals.request(u, { discountPct: d.discountPct, subtotal, caseId: c ? c.id : null, clientName, reason: d.discountReason });
-        return res.status(202).json({ needsApproval: true, approval: asked.request, thresholdPct: approvals.threshold() });
+        return reply(202, { needsApproval: true, approval: asked.request, thresholdPct: approvals.threshold() });
       }
       const chk = approvals.check(u, d.approvalId, d.discountPct);
-      if (!chk.ok) return res.status(chk.status).json({ error: chk.error });
+      if (!chk.ok) return reply(chk.status, { error: chk.error });
       approval = chk.request;
     }
 
@@ -165,7 +175,7 @@ router.post(
     let via = '';
     if (d.cooperationId) {
       k = Q.cooperations.getById.get(d.cooperationId);
-      if (!k || !coop.isValid(k)) return res.status(400).json({ error: 'Die gewählte Kooperation gibt es nicht oder sie ist nicht (mehr) aktiv.' });
+      if (!k || !coop.isValid(k)) return reply(400, { error: 'Die gewählte Kooperation gibt es nicht oder sie ist nicht (mehr) aktiv.' });
       via = 'manuell';
       if (c) {
         const found = await coop.detectForCase(c).catch(() => null);
@@ -177,7 +187,7 @@ router.post(
     let ms = null;
     if (d.membershipId) {
       ms = db.prepare("SELECT * FROM memberships WHERE id = ? AND status = 'aktiv' AND (expires_at IS NULL OR expires_at > ?)").get(d.membershipId, new Date().toISOString());
-      if (!ms) return res.status(400).json({ error: 'Die gewählte VIP-/Lifetime-Mitgliedschaft ist nicht (mehr) aktiv.' });
+      if (!ms) return reply(400, { error: 'Die gewählte VIP-/Lifetime-Mitgliedschaft ist nicht (mehr) aktiv.' });
     }
     // VIP/Lifetime und Kooperation werden nicht addiert – es gilt der höhere Rabatt
     if (ms && k) {
@@ -282,9 +292,8 @@ router.post(
     const inv = db.prepare(`${INVOICE_SELECT} WHERE i.id = ?`).get(Number(info.lastInsertRowid));
     require('../integrations/googleDocs').ensure('invoice', inv.id); // Google Doc gleich mit anlegen (wenn verbunden)
     require('../integrations/googleDocs').touchExtract(inv.case_id); // Rechnungen stehen im Aktenauszug
-    res.status(201).json({ invoice: invoiceRow(inv) });
-  })
-);
+    return reply(201, { invoice: invoiceRow(inv) });
+}
 
 router.patch(
   '/:id',
@@ -505,3 +514,5 @@ router.delete(
 module.exports = router;
 module.exports.firmInfo = firmInfo;
 module.exports.visibleTo = visibleTo;
+module.exports.createInvoice = createInvoice;
+module.exports.createSchema = createSchema;

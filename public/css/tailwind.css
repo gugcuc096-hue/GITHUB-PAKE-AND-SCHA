@@ -657,8 +657,6 @@ video {
   height: 3.5rem;
 }.h-2 {
   height: 0.5rem;
-}.h-3 {
-  height: 0.75rem;
 }.h-4 {
   height: 1rem;
 }.h-5 {
@@ -677,6 +675,8 @@ video {
   max-height: 92dvh;
 }.max-h-\[92vh\] {
   max-height: 92vh;
+}.min-h-3 {
+  min-height: 0.75rem;
 }.min-h-screen {
   min-height: 100vh;
 }.w-1\.5 {
@@ -900,9 +900,6 @@ video {
 }.border-slate-700 {
   --tw-border-opacity: 1;
   border-color: rgb(51 65 85 / var(--tw-border-opacity, 1));
-}.border-slate-800 {
-  --tw-border-opacity: 1;
-  border-color: rgb(30 41 59 / var(--tw-border-opacity, 1));
 }.border-t-\[var\(--gold-500\)\] {
   border-top-color: var(--gold-500);
 }.border-t-amber-500\/60 {

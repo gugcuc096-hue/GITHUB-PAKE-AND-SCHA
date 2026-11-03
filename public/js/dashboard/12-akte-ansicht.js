@@ -33,6 +33,7 @@ const CASE_SEC = [
   ['evidence', 'secEvidence', 'Beweise'],
   ['requests', 'secRequests', 'Unterlagen'],
   ['tasks', 'secTasks', 'Aufgaben'],
+  ['fee', 'secFee', 'Honorarvereinbarung'],
   ['invoices', 'secInvoices', 'Rechnungen'],
   ['work', 'secWork', 'Zeiten'],
   ['notes', 'secNotes', 'Verlauf & Notizen'],
@@ -47,7 +48,7 @@ const CASE_TABS = [
   ['ueberblick', 'Überblick', ['tasks', 'work', 'notes']],
   ['kommunikation', 'Kommunikation', ['chat', 'events', 'requests']],
   ['fall', 'Fall', ['subject', 'tathergang', 'charges', 'admiss', 'claims', 'motions', 'norms', 'participants', 'parties', 'clauses', 'term', 'versions', 'vclaims', 'witnesses', 'evidence', 'karte', 'corr']],
-  ['dokumente', 'Dokumente', ['contracts', 'briefs', 'external', 'invoices']],
+  ['dokumente', 'Dokumente', ['contracts', 'briefs', 'external', 'fee', 'invoices']],
 ];
 const casePaneOf = (key) => (CASE_TABS.find((t) => t[2].includes(key)) || CASE_TABS[0])[0];
 /** Reiter der offenen Akte wechseln (ohne neu zu zeichnen). */

@@ -131,6 +131,7 @@ app.use('/api/cases/:id', (req, res, next) => {
 });
 app.use('/api/cases/:id/external', externalRoutes.caseRouter);
 app.use('/api/cases/:id/contracts', contractRoutes.caseRouter);
+app.use('/api/cases/:id/honorar', require('./server/routes/honorar').caseRouter); // Honorarvereinbarung (Angebot HON-…, Erfolgshonorar)
 app.use('/api/task-packages', require('./server/routes/taskPackages').router); // Aufgaben-Pakete je Anlass
 app.use('/api/cases/:id/requests', require('./server/routes/docRequests').caseRouter); // fehlende Unterlagen der Akte
 app.use('/api/requests', require('./server/routes/docRequests').mineRouter);

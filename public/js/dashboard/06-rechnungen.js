@@ -304,7 +304,7 @@ async function loadContractBilling(d, auto = false) {
   }
   if (st.draft !== d || d.caseId !== caseId) return false;
   d.billing = { caseId, ...r };
-  if (auto && r.contract && !d.items.length && !r.invoices.length) {
+  if (auto && (r.contract || (r.feeAgreement && r.feeAgreement.used)) && !d.items.length && !r.invoices.length) {
     applyContractItems(d);
     return true;
   }
@@ -313,7 +313,16 @@ async function loadContractBilling(d, auto = false) {
 /** Leistungen des Vertrags als Positionen (zum regulären Preis; passende Leistungen der Honorarordnung sind angehakt). */
 function applyContractItems(d) {
   const b = d.billing;
-  if (!b || !b.contract || !b.items.length) return;
+  if (!b || !b.items.length) return;
+  // Ohne Vertrag: Positionen aus der Honorarvereinbarung (Angebot des Honorarrechners), Bündelrabatt als Rabatt
+  if (!b.contract && b.feeAgreement && b.feeAgreement.used) {
+    d.items = b.items.map((it) => ({ ...it }));
+    if (b.feeAgreement.bundlePct && !d.discountPct) d.discountPct = b.feeAgreement.bundlePct;
+    if (!d.notes) d.notes = `Abrechnung gemäß Honorarvereinbarung ${b.feeAgreement.offerCode} (Angebot aus dem Tarifrechner).`;
+    d.fromContract = b.feeAgreement.offerCode;
+    return;
+  }
+  if (!b.contract) return;
   const feeByName = new Map(st.fees.map((f) => [f.name.trim().toLowerCase(), f]));
   d.items = b.items.map((it) => {
     const fee = feeByName.get(it.description.trim().toLowerCase());
@@ -324,6 +333,18 @@ function applyContractItems(d) {
 }
 function contractStripHtml(d) {
   const b = d.billing;
+  if (b && !b.contract && b.feeAgreement && b.feeAgreement.used) {
+    const fa = b.feeAgreement;
+    const applied = d.fromContract === fa.offerCode;
+    return `<div class="ticket-strips">${ticketStrip({
+      title: applied ? 'Aus der Honorarvereinbarung übernommen' : 'Honorarvereinbarung vorhanden',
+      ico: icon('scale'),
+      tone: 'gold',
+      badges: `<span class="ts-label">Angebot <span class="font-mono">${esc(fa.offerCode)}</span> · laut Angebot ${esc(fa.totalHigh > fa.total ? `${money(fa.total)} – ${money(fa.totalHigh)}` : money(fa.total))}</span>`,
+      actions: applied ? '' : `<button type="button" class="btn-outline btn-sm" data-action="inv-from-contract">${icon('plus', 'ico-sm')}<span>Positionen übernehmen</span></button>`,
+      hint: 'Spannen stehen mit dem unteren Betrag drin – nach Aufwand anpassen. Das Erfolgshonorar wird beim Abschluss der Akte abgerechnet.',
+    })}</div>`;
+  }
   if (!b || !b.contract) return '';
   const k = b.contract;
   const applied = d.fromContract === k.id;
