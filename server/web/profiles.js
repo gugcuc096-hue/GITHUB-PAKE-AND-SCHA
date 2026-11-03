@@ -131,7 +131,7 @@ function render(member, facts, { origin, url }) {
                 <div class="pf-head">
                     <div class="pf-portrait">${portrait}</div>
                     <div class="min-w-0">
-                        <span class="kz-rubric">${lead ? 'Board of Partners' : 'Associate Attorneys'}</span>${member.lawyerOfMonth ? ` <span class="kz-lotm is-inline lotm-badge" title="Für herausragende Arbeit im ${esc(member.lawyerOfMonth)}">Anwalt des Monats</span>` : ''}
+                        <span class="kz-rubric">${lead ? 'Board of Partners' : 'Associate Attorneys'}</span>${member.lawyerOfMonth ? ` <span class="lotm-badge" title="Für herausragende Arbeit im ${esc(member.lawyerOfMonth)}">Anwalt des Monats</span>` : ''}
                         <h1 class="kz-h1 pf-name">${esc(member.name)}</h1>
                         <p class="pf-rank">${esc(member.roleTitle)}</p>
                         ${duty}
