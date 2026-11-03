@@ -117,12 +117,12 @@
    es ändern sich nur transform und opacity. Karten mit eigenem ::before (glass-card, Kennzahl-Kachel) bekommen nur den Strich. */
 .kz-fact, .kz-band, .kz-quote, .kz-principles > div, .kz-flow > li, .kz-contact > div, .kz-news > li:not(.kz-empty), .pf-review, .pf-stats .kpi, .hr-pack, .price-item { position: relative; }
 .kz-fact, .kz-band, .kz-quote, .kz-principles > div, .kz-flow > li, .kz-contact > div, .kz-news > li:not(.kz-empty), .pf-review, .hr-pack, .price-item { transition: transform var(--dur-2) var(--ease-out), border-color var(--dur-1) ease; }
-.kz-fact::before, .kz-band::before, .kz-quote::before, .kz-principles > div::before, .kz-flow > li::before, .kz-contact > div::before, .kz-news > li:not(.kz-empty)::before, .pf-review::before, .hr-pack::before, .price-item::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; box-shadow: var(--sh-3); opacity: 0; transition: opacity var(--dur-2) var(--ease-out); pointer-events: none; }
+.kz-fact::before, .kz-band::before, .kz-quote::before, .kz-principles > div::before, .kz-contact > div::before, .kz-news > li:not(.kz-empty)::before, .pf-review::before, .hr-pack::before, .price-item::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; box-shadow: var(--sh-3); opacity: 0; transition: opacity var(--dur-2) var(--ease-out); pointer-events: none; }
 .kz-fact::after, .kz-band::after, .kz-quote::after, .kz-principles > div::after, .kz-flow > li::after, .kz-contact > div::after, .kz-news > li:not(.kz-empty)::after, .pf-review::after, .pf-stats .kpi::after, .hr-pack::after, .price-item::after, .site-home main .glass-card::after { content: ''; position: absolute; left: 1.5rem; right: 1.5rem; bottom: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--gold-500), transparent); transform: scaleX(0); transition: transform var(--dur-3) var(--ease-out); pointer-events: none; }
 .pf-stats .kpi::after { bottom: 0; left: 1.25rem; right: 1.25rem; }
 @media (hover: hover) and (pointer: fine) {
     .kz-fact:hover, .kz-band:hover, .kz-quote:hover, .kz-principles > div:hover, .kz-flow > li:hover, .kz-contact > div:hover, .kz-news > li:not(.kz-empty):hover, .pf-review:hover, .hr-pack:hover, .price-item:hover { transform: translateY(-3px); border-color: rgba(var(--accent-rgb), 0.28); }
-    .kz-fact:hover::before, .kz-band:hover::before, .kz-quote:hover::before, .kz-principles > div:hover::before, .kz-flow > li:hover::before, .kz-contact > div:hover::before, .kz-news > li:not(.kz-empty):hover::before, .pf-review:hover::before, .hr-pack:hover::before, .price-item:hover::before { opacity: 1; }
+    .kz-fact:hover::before, .kz-band:hover::before, .kz-quote:hover::before, .kz-principles > div:hover::before, .kz-contact > div:hover::before, .kz-news > li:not(.kz-empty):hover::before, .pf-review:hover::before, .hr-pack:hover::before, .price-item:hover::before { opacity: 1; }
     .kz-fact:hover::after, .kz-band:hover::after, .kz-quote:hover::after, .kz-principles > div:hover::after, .kz-flow > li:hover::after, .kz-contact > div:hover::after, .kz-news > li:not(.kz-empty):hover::after, .pf-review:hover::after, .pf-stats .kpi:hover::after, .hr-pack:hover::after, .price-item:hover::after, .site-home main .glass-card:hover::after { transform: scaleX(1); }
     .pf-stats .kpi { transition: transform var(--dur-2) var(--ease-out), border-color var(--dur-1) ease; }
     .pf-stats .kpi:hover { transform: translateY(-3px); border-color: rgba(var(--accent-rgb), 0.28); }
@@ -639,11 +639,6 @@ html:active-view-transition .kz-hero-in > * { animation: none; }
 .hr-way li.is-sum { color: var(--kz-text); padding-top: 0.35rem; border-top: 1px dashed rgba(255, 255, 255, 0.08); }
 .hr-way li.is-sum + li.is-sum { border-top: 0; padding-top: 0; }
 .hr-way-note { margin: 0.6rem 0 0; font-size: 0.72rem; color: var(--kz-muted); }
-.hr-code { margin-top: 0.75rem; padding: 0.85rem; border-radius: 12px; border: 1px dashed rgba(var(--accent-rgb), 0.45); text-align: center; font-size: 0.78rem; color: var(--kz-muted); }
-.hr-code-k { font: 600 0.62rem/1.2 var(--kz-sans); letter-spacing: 0.16em; text-transform: uppercase; }
-.hr-code-v { display: inline-block; margin: 0.35rem 0; padding: 0.3rem 0.8rem; border: 0; border-radius: 8px; background: var(--gold-soft); color: var(--gold-light); font: 700 1.3rem/1.2 var(--kz-sans); letter-spacing: 0.08em; cursor: pointer; }
-.hr-code p { margin: 0.25rem 0; }
-.hr-code-link { border: 0; background: none; color: var(--gold-500); font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 
 /* Assistent */
 .hr-wizard { display: grid; gap: var(--sp-3); }

@@ -267,8 +267,6 @@
     $('#hrSteps').innerHTML = q.positions.length
       ? [...q.positions.map((p) => `<li><b>${esc(p.name)}</b>${p.steps.map((s) => `<span>${esc(s)}</span>`).join('')}</li>`), ...q.steps.map((s) => `<li class="is-sum">${esc(s)}</li>`)].join('')
       : '';
-    const save = $('#hrSave');
-    if (save) save.disabled = !q.positions.length;
     if (PS.countUp) {
       PS.countUp($('#totalAmount').parentElement, { ms: 700 });
       PS.countUp(dRow, { ms: 500 });
@@ -285,8 +283,6 @@
   /* ---------------------------------------------------------------- Angebot speichern (Code + Link) */
   function hideCode() {
     st.offer = null;
-    const box = $('#hrCode');
-    if (box) box.hidden = true;
   }
   async function ensureOffer() {
     const sel = selection();
@@ -297,25 +293,6 @@
     st.offer = { code: r.code, url: r.url, sig };
     return st.offer;
   }
-  async function saveOffer() {
-    const btn = $('#hrSave');
-    btn.disabled = true;
-    try {
-      const o = await ensureOffer();
-      if (!o) return;
-      const link = `${location.origin}${o.url}`;
-      const box = $('#hrCode');
-      box.hidden = false;
-      box.innerHTML = `<div class="hr-code-k">Ihr Angebot</div><button type="button" class="hr-code-v" data-copy="${esc(o.code)}" title="Code kopieren">${esc(o.code)}</button>
-        <p>Nennen Sie den Code bei Ihrer Anfrage – Ihr Anwalt öffnet das Angebot damit in Ihrer Akte.</p>
-        <button type="button" class="hr-code-link" data-copy="${esc(link)}">Link kopieren</button>`;
-    } catch (err) {
-      if (PS.toast) PS.toast(err.message || 'Das Angebot konnte nicht gespeichert werden.', 'error');
-    } finally {
-      btn.disabled = !(st.quote && st.quote.positions.length);
-    }
-  }
-
   /** Text für das Mandatsformular (home.js → openTicketModal('calc')). */
   function ticketText() {
     const q = st.quote || calculateTotal();
@@ -440,11 +417,10 @@
 
   /* ---------------------------------------------------------------- Ereignisse */
   root.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-hr-area], [data-hr-tab], [data-hr-pack], [data-hr-qty], [data-hr-w], #hrSave');
+    const t = e.target.closest('[data-hr-area], [data-hr-tab], [data-hr-pack], [data-hr-qty], [data-hr-w]');
     if (!t) return;
     if (t.dataset.hrArea !== undefined) return setArea(t.dataset.hrArea);
     if (t.dataset.hrTab) return setTab(t.dataset.hrTab);
-    if (t.id === 'hrSave') return void saveOffer();
     if (t.dataset.hrPack) {
       const id = Number(t.dataset.hrPack);
       st.packageId = st.packageId === id ? null : id;
@@ -565,10 +541,6 @@
         await wait();
         applySelection(o.selection || {});
         calculateTotal();
-        st.offer = { code: o.code, url: `/honorare?angebot=${o.code}`, sig: JSON.stringify(selection()) };
-        const box = $('#hrCode');
-        box.hidden = false;
-        box.innerHTML = `<div class="hr-code-k">Gespeichertes Angebot</div><span class="hr-code-v">${esc(o.code)}</span><p>Preise nach heutigem Stand – bei Ihrer Anfrage übernimmt die Kanzlei das Angebot in Ihre Akte.</p>`;
         root.scrollIntoView({ block: 'start' });
       })
       .catch(() => PS.toast && PS.toast('Dieses Angebot gibt es nicht (mehr).', 'error'));
