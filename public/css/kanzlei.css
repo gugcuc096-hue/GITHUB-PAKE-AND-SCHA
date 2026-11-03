@@ -112,6 +112,22 @@
     .kz-tile > a:hover::after, .kz-person:hover::after, .kz-news-card:hover::after { transform: scaleX(1); }
 }
 
+/* Alle Karten der Website: beim Darüberfahren hebt sich die Karte und der goldene Strich wächst unten – nicht nur bei
+   anklickbaren (Anwälte, Rechtsgebiete, Meldungen). Gleiche Technik: Schatten und Strich liegen fertig in eigenen Ebenen,
+   es ändern sich nur transform und opacity. Karten mit eigenem ::before (glass-card, Kennzahl-Kachel) bekommen nur den Strich. */
+.kz-fact, .kz-band, .kz-quote, .kz-principles > div, .kz-flow > li, .kz-contact > div, .kz-news > li:not(.kz-empty), .pf-review, .pf-stats .kpi, .hr-pack, .price-item { position: relative; }
+.kz-fact, .kz-band, .kz-quote, .kz-principles > div, .kz-flow > li, .kz-contact > div, .kz-news > li:not(.kz-empty), .pf-review, .hr-pack, .price-item { transition: transform var(--dur-2) var(--ease-out), border-color var(--dur-1) ease; }
+.kz-fact::before, .kz-band::before, .kz-quote::before, .kz-principles > div::before, .kz-flow > li::before, .kz-contact > div::before, .kz-news > li:not(.kz-empty)::before, .pf-review::before, .hr-pack::before, .price-item::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; box-shadow: var(--sh-3); opacity: 0; transition: opacity var(--dur-2) var(--ease-out); pointer-events: none; }
+.kz-fact::after, .kz-band::after, .kz-quote::after, .kz-principles > div::after, .kz-flow > li::after, .kz-contact > div::after, .kz-news > li:not(.kz-empty)::after, .pf-review::after, .pf-stats .kpi::after, .hr-pack::after, .price-item::after, .site-home main .glass-card::after { content: ''; position: absolute; left: 1.5rem; right: 1.5rem; bottom: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--gold-500), transparent); transform: scaleX(0); transition: transform var(--dur-3) var(--ease-out); pointer-events: none; }
+.pf-stats .kpi::after { bottom: 0; left: 1.25rem; right: 1.25rem; }
+@media (hover: hover) and (pointer: fine) {
+    .kz-fact:hover, .kz-band:hover, .kz-quote:hover, .kz-principles > div:hover, .kz-flow > li:hover, .kz-contact > div:hover, .kz-news > li:not(.kz-empty):hover, .pf-review:hover, .hr-pack:hover, .price-item:hover { transform: translateY(-3px); border-color: rgba(var(--accent-rgb), 0.28); }
+    .kz-fact:hover::before, .kz-band:hover::before, .kz-quote:hover::before, .kz-principles > div:hover::before, .kz-flow > li:hover::before, .kz-contact > div:hover::before, .kz-news > li:not(.kz-empty):hover::before, .pf-review:hover::before, .hr-pack:hover::before, .price-item:hover::before { opacity: 1; }
+    .kz-fact:hover::after, .kz-band:hover::after, .kz-quote:hover::after, .kz-principles > div:hover::after, .kz-flow > li:hover::after, .kz-contact > div:hover::after, .kz-news > li:not(.kz-empty):hover::after, .pf-review:hover::after, .pf-stats .kpi:hover::after, .hr-pack:hover::after, .price-item:hover::after, .site-home main .glass-card:hover::after { transform: scaleX(1); }
+    .pf-stats .kpi { transition: transform var(--dur-2) var(--ease-out), border-color var(--dur-1) ease; }
+    .pf-stats .kpi:hover { transform: translateY(-3px); border-color: rgba(var(--accent-rgb), 0.28); }
+}
+
 /* ------------------------------------------------------------------ Kopfleiste oben (Notdienst, Kanzleisitz, Portal) */
 .kz-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--emerald); }
 .kz-dot.is-off { background: var(--amber); }
@@ -208,6 +224,7 @@ body.menu-open { overflow: hidden; }
 .kz-fact dt .kz-ico { width: 16px; height: 16px; color: var(--gold-500); }
 .kz-fact dd { margin: 0; font: 600 1.35rem/1.25 var(--kz-serif); color: var(--kz-ink); }
 .kz-fact dd a { color: inherit; text-decoration: none; }
+.kz-fact dd [data-count] { font-family: var(--kz-sans); font-weight: 700; font-size: 1.2rem; letter-spacing: -0.01em; color: var(--gold-500); font-variant-numeric: lining-nums tabular-nums; }
 .kz-fact dd a:hover { color: var(--gold-light); }
 .kz-fact dd small { display: block; margin-top: 0.3rem; font: 400 0.8rem/1.4 var(--kz-sans); color: var(--kz-muted); }
 
@@ -474,7 +491,7 @@ html:active-view-transition .kz-hero-in > * { animation: none; }
 .pf-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: var(--sp-2); margin-bottom: var(--sp-4); max-width: 52rem; }
 /* Kennzahlen (die Website lädt app.css nicht): Symbol im Goldring, kleine Beschriftung, große Zahl, Balken bzw. Sterne */
 .pf-stats .kpi { position: relative; overflow: hidden; display: grid; align-content: start; padding: 1.25rem 1.35rem 1.2rem; border-radius: var(--radius); background: var(--kz-panel-bg); border: 1px solid rgba(255, 255, 255, 0.09); box-shadow: var(--sh-2), inset 0 1px 0 var(--lit-edge); }
-.pf-stats .kpi::after { content: ''; position: absolute; inset: 0 0 auto; height: 2px; background: linear-gradient(90deg, transparent, rgba(var(--accent-rgb), 0.55), transparent); opacity: 0.7; }
+.pf-stats .kpi::before { content: ''; position: absolute; inset: 0 0 auto; height: 2px; background: linear-gradient(90deg, transparent, rgba(var(--accent-rgb), 0.55), transparent); opacity: 0.7; }
 .pf-stats .kpi-ico { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; margin-bottom: 0.9rem; border-radius: 50%; background: var(--gold-soft); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.35); color: var(--gold-500); }
 .pf-stats .kpi-ico .kz-ico { width: 17px; height: 17px; }
 .pf-stats .kpi-label { font: 600 0.68rem/1.2 var(--kz-sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--kz-muted); }
