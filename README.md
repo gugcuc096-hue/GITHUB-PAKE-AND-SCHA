@@ -426,6 +426,21 @@ Codes und Geräte-Merkmale liegen nur als SHA-256-Hash in der Datenbank und fehl
 
 Seiten haben keine Endung mehr: `/login`, `/registrieren`, `/dashboard`, `/karriere`, `/bewerbung`, `/vertrag?id=12`, `/rechnung?id=5`, `/aktenauszug` (und `/offline`). Alle Links auf der Website, im Dashboard, in Discord-Nachrichten, im Kanzlei-Bot und in der installierten App verwenden die neuen Adressen. **Alte Links funktionieren weiter**: `/login.html`, `/register.html`, `/invoice.html?id=5` … leiten dauerhaft (301) auf die neue Adresse um – mit Abfrage und Sprungmarke, also landet `/dashboard.html?case=4#cases` auf `/dashboard?case=4#cases`. Die installierte App behält ihre Kennung (`id` im Manifest), damit sie nicht als neue App gilt.
 
+## Flüssig mit und ohne Grafikkarte
+
+Gemessen in Chromium ohne Grafikkarte (wie „Hardwarebeschleunigung aus“), 1440×900:
+
+| | vorher | nachher |
+|---|---|---|
+| Startseite im Leerlauf | 13–15 Bilder/s | **60 Bilder/s** |
+| Startseite scrollen | 22 Bilder/s, 93 Ruckler | **59 Bilder/s, 0 Ruckler** |
+| Dashboard im Leerlauf | 42 Bilder/s | **60 Bilder/s** |
+| Akte öffnen/schließen | 16 Bilder/s, Bilder bis 233 ms | **60+ Bilder/s, kaum noch Ruckler** |
+
+- **Ursache:** der Weichzeichner hinter Flächen (`backdrop-filter`) – auf jeder Website-Karte, jedem Umriss-Knopf, Seitenleiste, Fenster und Fenster-Hintergrund, obwohl die meisten Flächen deckend sind (man sah ihn gar nicht) – und darunter laufende Dauer-Animationen (Uhr, Leuchten mit `blur(150px)`), die ihn jedes Bild neu rechnen ließen.
+- **Für alle Geräte** (`public/css/gfx.css`, als letztes Stylesheet): kein unsichtbarer Weichzeichner mehr, Fenster-Hintergründe etwas dunkler statt weichgezeichnet, Leuchten per Maske statt Riesen-Filter, keine `transition: all`, Scroll-Handler passiv und einmal pro Bild, Uhr pausiert im Hintergrund-Tab.
+- **Grafikstufe je Gerät** (`public/js/gfx.js`, erstes Skript im `<head>`): „Automatisch“ erkennt Software-Rendering (SwiftShader, llvmpipe, „Microsoft Basic Render“), schwache Geräte, „Transparenz reduzieren“ und den Datensparmodus → **„Schnell“**: gar kein Weichzeichner, deckende Kopfzeile und Menüs, keine Deko-Dauer-Animationen, Saison-Szene als stehendes Bild, keine Seiten-Überblendungen und kein clip-path-Aufziehen von Fenstern. Optisch fast gleich. Dazu misst ein **Wächter** in den ersten Minuten die Bildrate (im Leerlauf und beim Scrollen): unter ~40 Bildern pro Sekunde schaltet er sofort um und merkt sich das eine Woche. Von Hand: *Mein Profil → Animationen → Grafik* (Automatisch / Schnell / Schön).
+
 ## Schneller laden
 
 - **Kleiner:** JavaScript und CSS werden beim Start verkleinert (esbuild) und vorab komprimiert – Brotli, sonst gzip. Das Dashboard ist in ein Kernpaket und ein **Kanzlei-Paket** geteilt (Einstellungen, Discord, Verwaltung, Kanzlei-Werkzeuge); Mandanten laden das zweite nie.

@@ -16,8 +16,21 @@ function motionPanel() {
         window.PS.motion.systemCalm() ? ' Ihr System ist auf <strong>„Bewegung reduzieren“</strong> gestellt (Windows: Einstellungen → Barrierefreiheit → Visuelle Effekte → Animationseffekte) – bei „Wie System“ sind die Animationen deshalb gedämpft.' : ''
       }</p>
       <div class="chip-row mt-3">${opt('auto', 'Wie System')}${opt('on', 'Immer an')}${opt('off', 'Aus')}</div>
+      ${gfxChoice()}
       ${window.PS.season ? `<label class="check mt-4"><input type="checkbox" data-season-toggle ${window.PS.season.isOff() ? '' : 'checked'}> Saison-Deko auf diesem Gerät zeigen <span class="text-dim">(Schnee, Halloween, Feuerwerk …)</span></label>` : ''}
     </section>`;
+}
+
+/** Grafik je Gerät (gfx.js): automatisch, schnell (ohne Glas und Dauer-Animationen) oder schön (Glas). */
+function gfxChoice() {
+  const g = window.PSGfx;
+  if (!g) return '';
+  const opt = (v, label) => `<button type="button" class="chip ${g.pref === v ? 'active' : ''}" data-action="gfx-set" data-value="${v}" aria-pressed="${g.pref === v}">${label}</button>`;
+  const now = g.mode === 'lite' ? 'schnell' : 'schön';
+  return `<h3 class="section-title mt-5 text-base">Grafik</h3>
+      <p class="text-sm text-muted">„Automatisch“ erkennt, ob dieser Browser mit Grafikkarte zeichnet, und misst die Bildrate – ruckelt es, schaltet die Website von selbst auf „Schnell“: gleiche Optik ohne Glas-Weichzeichner und Dauer-Animationen, viel weniger Last. „Schön“ zeigt Glas in Kopfzeile, Menüs und Fenstern (braucht eine Grafikkarte).</p>
+      <div class="chip-row mt-3">${opt('auto', 'Automatisch')}${opt('lite', 'Schnell')}${opt('full', 'Schön')}</div>
+      <p class="form-hint mt-2">Gerade: <strong>${now}</strong>${g.pref === 'auto' && g.reason ? ` (${esc(g.reason)})` : ''}.</p>`;
 }
 
 /**
@@ -1078,6 +1091,12 @@ Object.assign(actions, {
     window.PS.season && window.PS.season.refresh();
     renderView();
     toast({ on: 'Animationen sind auf diesem Gerät jetzt immer an.', off: 'Animationen sind auf diesem Gerät aus.' }[el.dataset.value] || 'Animationen folgen jetzt der Einstellung des Systems.');
+  },
+  // Mein Profil → Animationen → Grafik (je Gerät)
+  'gfx-set': (el) => {
+    window.PSGfx.set(el.dataset.value);
+    renderView();
+    toast({ lite: 'Grafik: Schnell – ohne Glas und Dauer-Animationen.', full: 'Grafik: Schön – mit Glas-Effekten.' }[el.dataset.value] || `Grafik: Automatisch (gerade ${window.PSGfx.mode === 'lite' ? 'schnell' : 'schön'}).`);
   },
   // Zwei-Faktor-Anmeldung (Profil)
   'tf-on': async () => {

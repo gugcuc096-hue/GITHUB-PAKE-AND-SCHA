@@ -1,0 +1,107 @@
+/*
+ * Leistungsschicht – wird auf jeder Seite als LETZTES Stylesheet geladen (nach motion.css/season.css).
+ * Gemessen (Chromium, ohne Grafikkarte): Der Weichzeichner hinter Flächen (backdrop-filter) und Dauer-Animationen darunter
+ * kosteten fast alles – die Startseite lief im Leerlauf mit 13 statt 60 Bildern pro Sekunde, beim Scrollen mit 22.
+ *
+ * Für ALLE Geräte:
+ *  - Kein Weichzeichner, wo man ihn gar nicht sieht (deckende Flächen: Karten, Knöpfe, Fenster, Seitenleiste) und
+ *    nicht auf bildschirmfüllenden Ebenen (Fenster-Hintergrund) – stattdessen etwas dunkler.
+ *  - Leuchtende Hintergrund-Kreise ohne Riesen-Weichzeichner (blur(150px)) – derselbe weiche Verlauf per Maske, eigene Ebene.
+ *  - Keine „transition: all“ (sonst wandern auch Schatten und Farben bei jeder Kleinigkeit mit).
+ * Nur html[data-gfx="lite"] (gfx.js: ohne Grafikkarte, schwaches Gerät oder Ruckeln gemessen):
+ *  - gar kein Weichzeichner, deckende Kopfzeile/Menüs, keine Dauer-Animationen der Deko, keine Weichzeichner-Filter.
+ */
+
+/* ================================================================ Alle Geräte */
+
+/* Hintergrund-Leuchten: gleiche Farbe, weicher Rand per Maske statt blur(150px) (das wurde jedes Bild neu gerechnet) */
+.glow-orb {
+  filter: none !important;
+  -webkit-mask-image: radial-gradient(closest-side, #000 12%, rgba(0, 0, 0, 0.78) 32%, rgba(0, 0, 0, 0.45) 52%, rgba(0, 0, 0, 0.18) 72%, rgba(0, 0, 0, 0.05) 88%, transparent 100%);
+  mask-image: radial-gradient(closest-side, #000 12%, rgba(0, 0, 0, 0.78) 32%, rgba(0, 0, 0, 0.45) 52%, rgba(0, 0, 0, 0.18) 72%, rgba(0, 0, 0, 0.05) 88%, transparent 100%);
+  will-change: transform, opacity;
+  contain: strict;
+}
+.ambient-bg { contain: strict; }
+
+/* Deckende Flächen: Weichzeichner unsichtbar, aber teuer → weg */
+.glass-card,
+.btn-outline,
+.toast,
+.sidebar,
+.bottom-nav,
+.modal-card,
+.sys-bar,
+.drop-hint,
+.doc-peek,
+.kmap-cap,
+.kmap-seg,
+.kmap-modes > .kmap-mode,
+.kmap-tools .icon-btn,
+.fn-table thead th,
+.pk-chapter,
+.case-sections.is-editing .sec-editbar {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+.fn-table thead th, .pk-chapter { background: rgba(16, 22, 40, 0.97); }
+.kmap-seg, .kmap-modes > .kmap-mode, .kmap-tools .icon-btn { background: rgba(6, 15, 30, 0.94); }
+.kmap-cap, .drop-hint { background: rgba(4, 10, 24, 0.94); }
+@media (min-width: 768px) {
+  .modal-card { background: var(--glass-tint), rgba(8, 14, 32, 0.985); }
+}
+
+/* Bildschirmfüllende Hintergründe von Fenstern: dunkler statt weichgezeichnet (auch die Einblend-Animation des Weichzeichners) */
+.modal,
+.ps-dialog-root,
+[class*='backdrop-blur'] {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+.modal { background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(6, 11, 26, 0.86), rgba(0, 0, 0, 0.9)); }
+.ps-dialog-root { background: rgba(2, 5, 14, 0.84); }
+[class*='backdrop-blur'].bg-black\/80 { background-color: rgba(0, 0, 0, 0.88); }
+@keyframes modal-blur-in { from { opacity: 1; } }
+
+/* Website-Karten: nur das animieren, was sich wirklich ändert */
+.glass-card { transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.35s ease, box-shadow 0.35s ease; }
+.btn-outline { transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease; }
+
+/*
+ * Kein content-visibility auf den Abschnitten der Startseite: deren Höhe wäre bis zum Zeichnen nur geschätzt –
+ * Sprünge zu #karriere, #kontakt … landeten dann an der falschen Stelle.
+ */
+
+/* ================================================================ Schnelle Stufe (lite) */
+html[data-gfx='lite'] *,
+html[data-gfx='lite'] *::before,
+html[data-gfx='lite'] *::after {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+/* Glasflächen deckend (gleicher Farbton) */
+html[data-gfx='lite'] .glass-nav { background: linear-gradient(180deg, #080e20, #04080f); }
+html[data-gfx='lite'] .topbar { background: rgba(5, 9, 21, 0.985); }
+html[data-gfx='lite'] .site-banner { background-color: #0a1122; }
+html[data-gfx='lite'] :is(.ps-toast, .pop, .more-pop, .dp, .bulk-bar, .sys-bar, .kmap-card, .ctx-menu, .promo-dock) { background: var(--glass-tint), #0b1226; }
+html[data-gfx='lite'] .case-jump { background: var(--glass-tint), #080e20; }
+html[data-gfx='lite'] .modal { background: rgba(1, 3, 10, 0.9); }
+/* Seite hinter einem Fenster nicht verkleinern (die ganze Seite neu zu skalieren kostet ohne Grafikkarte) */
+html[data-gfx='lite'] body.modal-open #content { scale: 1; }
+
+/* Deko ohne Dauer-Animation (Funktion bleibt: Ladebalken, Tippanzeige, Live-Punkte, Drehen beim Aktualisieren) */
+html[data-gfx='lite'] :is(.glow-orb, .sb-shine, .sb-icon, .sb-aurora i, .sb-sparks i, .sb-seal::after, .calc-promo-badge, .ps-lights .bulb, .ps-fog i, .ps-aurora i, .ps-rays),
+html[data-gfx='lite'] .site-banner.is-promo::after,
+html[data-gfx='lite'] .sb-seal::after {
+  animation: none !important;
+}
+html[data-gfx='lite'] .glow-orb { will-change: auto; }
+html[data-gfx='lite'] .sb-aurora { filter: none; opacity: 0.55; }
+html[data-gfx='lite'] .sb-sparks { display: none; }
+
+/* Keine Weichzeichner-Filter in Übergängen (Banner-Meldungen, Ziffern) */
+html[data-gfx='lite'] .sb-slide:not(.is-on) { filter: none; }
+
+/* Leuchtende Schatten beim Überfahren: ohne Übergang (Schatten neu zu zeichnen ist ohne Grafikkarte teuer) */
+html[data-gfx='lite'] :is(.glass-card, .btn-outline, .btn-gold, .panel, .kpi, .list-row, .nav-item) { transition-property: transform, background-color, border-color, color, opacity; }

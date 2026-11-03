@@ -355,6 +355,7 @@ document.getElementById('footerYear').textContent = new Date().getFullYear();
 
 /* ---------- Live Clock ---------- */
 function updateClock() {
+    if (document.hidden) return; // im Hintergrund-Tab nichts zeichnen
     const now = new Date();
     const time = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const clockEl = document.getElementById('liveClock');
@@ -379,10 +380,17 @@ const revealObserver = new IntersectionObserver((entries) => {
 document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
 
 /* ---------- Back to top + Scrollspy on scroll ---------- */
+// Passiv und höchstens einmal pro Bild (der Browser muss beim Scrollen nicht auf das Skript warten)
+let scrollQueued = false;
 window.addEventListener('scroll', () => {
-    document.getElementById('backToTop').classList.toggle('show', window.scrollY > 600);
-    syncMobileCta();
-});
+    if (scrollQueued) return;
+    scrollQueued = true;
+    requestAnimationFrame(() => {
+        scrollQueued = false;
+        document.getElementById('backToTop').classList.toggle('show', window.scrollY > 600);
+        syncMobileCta();
+    });
+}, { passive: true });
 // Fester Knopf „Mandat anfragen“ am Handy: nach dem Startbereich, nicht bei offenem Menü
 function syncMobileCta() {
     const menuOpen = document.getElementById('mobileMenu').classList.contains('open');

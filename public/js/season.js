@@ -21,7 +21,8 @@
   const OFF_KEY = 'ps.season.off';
   const TAU = Math.PI * 2;
   const dash = () => !!document.getElementById('sidebar');
-  const calm = () => (window.PS && window.PS.motion ? window.PS.motion.calm() : window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  // Schnelle Grafikstufe (gfx.js: ohne Grafikkarte, schwaches Gerät, Ruckeln gemessen) → nur das stehende Bild
+  const calm = () => root.dataset.gfx === 'lite' || (window.PS && window.PS.motion ? window.PS.motion.calm() : window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const isOff = () => {
     try {
       return localStorage.getItem(OFF_KEY) === '1';
@@ -1740,6 +1741,8 @@
     refresh: () => set(root.dataset.season || current),
   };
 
+  // Grafikstufe wechselt (Wächter oder von Hand): Szene passend neu aufbauen
+  document.addEventListener('ps:gfx', () => current && set(root.dataset.season || current));
   const start = () => set(root.dataset.season || '');
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else start();

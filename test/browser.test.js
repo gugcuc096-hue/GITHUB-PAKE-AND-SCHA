@@ -2174,8 +2174,9 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       await card.locator('.team-name').click();
       await A.page.waitForURL(/\/team\/[a-z0-9-]+$/);
       assert.equal((await A.page.textContent('h1.pf-name')).trim(), name);
-      await A.page.click('.pf-actions a.btn-gold');
-      await A.page.waitForFunction(() => !document.getElementById('ticketModal').classList.contains('pointer-events-none'));
+      // erst auf die Startseite warten – sonst prüft der Test noch die Profilseite (dort gibt es kein Mandatsfenster)
+      await Promise.all([A.page.waitForURL((u) => u.pathname === '/'), A.page.click('.pf-actions a.btn-gold')]);
+      await A.page.waitForFunction(() => document.getElementById('ticketModal') && !document.getElementById('ticketModal').classList.contains('pointer-events-none'));
       assert.equal(await A.page.textContent('#tkLawyerName'), name);
       assert.equal(new URL(A.page.url()).search, '', 'Adresse wieder sauber');
       // Profil am Handy: nichts ragt über den Rand, Knopf über die ganze Breite
@@ -3919,9 +3920,19 @@ describe('Browser: Startseite ↔ Dashboard – Anmelden im Dialog, Umschalter, 
         const loginBtn = device === PHONE ? '#menuToggle' : 'header [data-auth-link]';
         if (device === PHONE) {
           await page.click('#menuToggle');
+          // erst tippen, wenn das Menü fertig aufgeklappt ist (es klappt mit Animation auf)
+          await page.waitForFunction(() => {
+            const m = document.getElementById('mobileMenu');
+            const a = m && m.querySelector('[data-auth-link]');
+            return m.classList.contains('open') && a && a.getBoundingClientRect().bottom <= window.innerHeight && getComputedStyle(m).visibility === 'visible';
+          });
+          await page.waitForTimeout(450);
           await page.click('#mobileMenu [data-auth-link]');
         } else await page.click(loginBtn);
-        await page.waitForSelector('#loginDialog:not(.pointer-events-none)');
+        await page.waitForSelector('#loginDialog:not(.pointer-events-none)', { timeout: 10000 }).catch(async (e) => {
+          const state = await page.evaluate(() => JSON.stringify({ url: location.href, menu: document.getElementById('mobileMenu')?.className, dialog: document.getElementById('loginDialog')?.className, top: document.elementFromPoint(innerWidth / 2, innerHeight / 2)?.outerHTML.slice(0, 120) }));
+          throw new Error(`${e.message} – Zustand: ${state} – Fehler: ${problems.join(' | ')}`);
+        });
         assert.equal(new URL(page.url()).pathname, '/', 'der Dialog öffnet sich auf der Startseite');
         await page.fill('#ldEmail', 'tina.termin');
         await page.fill('#ldPassword', 'falsch');
