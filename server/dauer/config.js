@@ -37,7 +37,7 @@ function mode() {
   if (['1', 'an', 'on', 'true', 'ja'].includes(v)) return { on: true, why: 'eingeschaltet (DAUERBETRIEB=1)' };
   if (['0', 'aus', 'off', 'false', 'nein'].includes(v)) return { on: false, why: 'ausgeschaltet (DAUERBETRIEB=0)' };
   if (env('RENDER') && !ownDisk(path.dirname(DB_PATH))) return { on: true, why: 'automatisch: Render ohne eigene Disk (Free-Plan)' };
-  return { on: false, why: env('RENDER') ? 'aus: Render mit eigener Disk' : 'aus: nicht auf Render' };
+  return env('RENDER') ? { on: false, disk: true, why: 'aus: Render mit eigener Disk' } : { on: false, why: 'aus: nicht auf Render' };
 }
 let cached = null;
 const enabled = () => (cached ||= mode()).on;
