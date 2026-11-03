@@ -456,8 +456,12 @@ html:active-view-transition .kz-hero-in > * { animation: none; }
 .pf-phone-btn .pf-phone-c { width: 15px; height: 15px; color: var(--kz-muted); }
 .pf-phone-btn:hover { border-color: rgba(var(--accent-rgb), 0.5); background: var(--gold-soft); }
 .pf-actions { margin-top: var(--sp-3); }
-.pf-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.75rem; margin-bottom: var(--sp-4); }
-.pf-stats .kpi { padding: 1.1rem 1.25rem; border-radius: var(--radius); }
+.pf-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 15rem)); gap: 0.75rem; margin-bottom: var(--sp-4); }
+.pf-stats .kpi { padding: 1.1rem 1.25rem; border-radius: var(--radius); border: 1px solid rgba(255, 255, 255, 0.09); box-shadow: var(--sh-2), inset 0 1px 0 var(--lit-edge); }
+/* Kennzahlen wie im Dashboard (die Website lädt app.css nicht): kleine Beschriftung, große goldene Zahl */
+.pf-stats .kpi-label { font: 600 0.68rem/1.2 var(--kz-sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--kz-muted); }
+.pf-stats .kpi-value { margin-top: 0.35rem; font: 600 2.2rem/1.1 var(--kz-sans); letter-spacing: -0.01em; color: var(--gold-500); font-variant-numeric: lining-nums tabular-nums; }
+.pf-stats .kpi-sub { margin-top: 0.2rem; font-size: 0.8rem; color: var(--kz-muted); }
 .pf-section { margin-top: var(--sp-4); max-width: 46rem; }
 .pf-section:first-child { margin-top: 0; }
 .pf-h { margin: 0 0 1rem; font: 600 var(--fs-xs)/1.2 var(--kz-sans); letter-spacing: 0.18em; text-transform: uppercase; color: var(--kz-muted); }
@@ -467,7 +471,7 @@ html:active-view-transition .kz-hero-in > * { animation: none; }
 .pf-highlights li { position: relative; padding-left: 1.6rem; color: var(--kz-text); }
 .pf-highlights li::before { content: ''; position: absolute; left: 0.1rem; top: 0.6rem; width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--gold-soft); box-shadow: inset 0 0 0 1.5px var(--gold-500); }
 .pf-wins li { display: flex; gap: 0.8rem; align-items: baseline; color: var(--kz-text); }
-.pf-wins b { font: 600 1.35rem/1 var(--kz-serif); color: var(--gold-500); min-width: 2.4rem; }
+.pf-wins b { font: 600 1.15rem/1 var(--kz-sans); font-variant-numeric: lining-nums tabular-nums; color: var(--gold-500); min-width: 2.4rem; } /* Ziffern in Inter: „1×“ sah in der Schmuckschrift wie „I×“ aus */
 .pf-reviews { display: grid; gap: var(--sp-2); }
 .pf-review { margin: 0; padding: 1.4rem 1.5rem; background: var(--kz-panel-bg); border: 1px solid rgba(255, 255, 255, 0.09); border-radius: var(--radius); box-shadow: var(--sh-2), inset 0 1px 0 var(--lit-edge); }
 .pf-stars { color: var(--gold-500); letter-spacing: 0.15em; font-size: 0.85rem; }
