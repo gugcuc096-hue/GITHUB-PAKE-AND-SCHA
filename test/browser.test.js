@@ -3920,9 +3920,19 @@ describe('Browser: Startseite ↔ Dashboard – Anmelden im Dialog, Umschalter, 
         const loginBtn = device === PHONE ? '#menuToggle' : 'header [data-auth-link]';
         if (device === PHONE) {
           await page.click('#menuToggle');
+          // erst tippen, wenn das Menü fertig aufgeklappt ist (es klappt mit Animation auf)
+          await page.waitForFunction(() => {
+            const m = document.getElementById('mobileMenu');
+            const a = m && m.querySelector('[data-auth-link]');
+            return m.classList.contains('open') && a && a.getBoundingClientRect().bottom <= window.innerHeight && getComputedStyle(m).visibility === 'visible';
+          });
+          await page.waitForTimeout(450);
           await page.click('#mobileMenu [data-auth-link]');
         } else await page.click(loginBtn);
-        await page.waitForSelector('#loginDialog:not(.pointer-events-none)');
+        await page.waitForSelector('#loginDialog:not(.pointer-events-none)', { timeout: 10000 }).catch(async (e) => {
+          const state = await page.evaluate(() => JSON.stringify({ url: location.href, menu: document.getElementById('mobileMenu')?.className, dialog: document.getElementById('loginDialog')?.className, top: document.elementFromPoint(innerWidth / 2, innerHeight / 2)?.outerHTML.slice(0, 120) }));
+          throw new Error(`${e.message} – Zustand: ${state} – Fehler: ${problems.join(' | ')}`);
+        });
         assert.equal(new URL(page.url()).pathname, '/', 'der Dialog öffnet sich auf der Startseite');
         await page.fill('#ldEmail', 'tina.termin');
         await page.fill('#ldPassword', 'falsch');
