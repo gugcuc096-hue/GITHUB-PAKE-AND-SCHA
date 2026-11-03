@@ -105,6 +105,13 @@ function dauerLiveHtml(d) {
     </div>`;
 }
 
+/** Dauerbetrieb aus: mit eigener Render-Disk ist er nicht nötig – klar sagen statt gelber Warnungen. */
+function dauerOffNote(d) {
+  if (d.mode && d.mode.disk)
+    return `<div class="banner banner-emerald is-stack mt-4">${icon('check')}<div><strong>Nicht nötig – deine Daten liegen auf einer eigenen Render-Disk.</strong> Sie bleiben bei Neustarts und Updates erhalten. Die Live-Sicherung ins Google Drive braucht es nur auf Render Free (ohne Disk). Zusätzlich legt der Server jede Nacht eine Sicherung im Google Drive ab (Einstellungen → Sicherung &amp; Notfall). Der Eintrag <code>DAUERBETRIEB_SCHLUESSEL</code> in Render schadet nicht und kann bleiben.</div></div>`;
+  return `<div class="banner banner-slate is-stack mt-4">${icon('info')}<div><strong>Dauerbetrieb ist aus</strong> (${esc(d.mode ? d.mode.why : '')}). Er ist für Render Free gedacht und schaltet sich dort von selbst ein; erzwingen mit <code>DAUERBETRIEB=1</code>.</div></div>`;
+}
+
 function dauerPanel() {
   const d = st.dauer;
   if (!d) return '<div class="panel panel-pad"><p class="text-sm text-muted">Wird geladen …</p></div>';
@@ -132,9 +139,11 @@ function dauerPanel() {
       <p class="text-sm text-muted">Für Render Free: Der Server <strong>schläft nie ein</strong> (Selbst-Ping alle 4 Minuten, externer Wecker jede Minute, GitHub alle 5 Minuten), und <strong>jede Änderung</strong> – jede Akte, Nachricht, Einstellung, jedes Bild – liegt <strong>sofort nach der Aktion verschlüsselt im Google Drive</strong> (spätestens nach zwei Sekunden). Startet Render den Server neu oder kommt ein Update, holt er sich vorher alles zurück; bei einem Update übergibt die alte Instanz ihren letzten Stand direkt an die neue. Das Drive läuft nie voll: Es gibt eine feste Obergrenze, alte Kopien werden endgültig gelöscht.</p>
       ${d.enabled ? dauerLiveHtml(d) : ''}
       ${restoreNote}
+      ${d.enabled ? '' : dauerOffNote(d)}
+      ${d.enabled ? '' : '<details class="edit-box mt-4"><summary>Einrichtung trotzdem ansehen</summary>'}
       <h3 class="section-title mt-6">Einrichtung</h3>
       <ol class="dauer-checks">${checks
-        .map((c) => `<li class="dauer-check ${c.ok ? 'is-ok' : 'is-open'}"><span class="dauer-check-mark" aria-hidden="true">${icon(c.ok ? 'check' : 'alert', 'ico-sm')}</span><div class="dauer-check-body"><div class="dauer-check-title">${c.title}<span class="sr-only">${c.ok ? ' – erledigt' : ' – offen'}</span></div><div class="dauer-check-text">${c.text}</div></div>${c.action ? `<div class="dauer-check-action">${c.action}</div>` : ''}</li>`)
+        .map((c) => `<li class="dauer-check ${c.ok ? 'is-ok' : d.enabled ? 'is-open' : 'is-idle'}"><span class="dauer-check-mark" aria-hidden="true">${icon(c.ok ? 'check' : d.enabled ? 'alert' : 'minus', 'ico-sm')}</span><div class="dauer-check-body"><div class="dauer-check-title">${c.title}<span class="sr-only">${c.ok ? ' – erledigt' : ' – offen'}</span></div><div class="dauer-check-text">${c.text}</div></div>${c.action && (d.enabled || !/dauer-probe/.test(c.action)) ? `<div class="dauer-check-action">${c.action}</div>` : ''}</li>`)
         .join('')}</ol>
       <h3 class="section-title mt-6">Externer Wecker (cron-job.org)</h3>
       <ol class="text-sm text-muted dauer-steps">
@@ -150,7 +159,8 @@ function dauerPanel() {
         <button type="button" class="btn-ghost btn-md" data-action="dauer-check">${icon('refresh', 'ico-sm')}<span>Jetzt messen</span></button>
       </form>
       <p class="form-hint mt-2">Mindestens 500 MB bzw. 5 % des Drives bleiben immer frei. Wird es eng, löscht der Server zuerst ältere Tages-/Wochensicherungen, dann gelöschte Bilder, dann den vorigen Gesamtstand – nie den aktuellen Stand und nie vorhandene Bilder. ${lv.rootUrl ? `Ordner: <a class="link-btn" href="${esc(lv.rootUrl)}" target="_blank" rel="noopener">„Pake &amp; Scha – Dauerbetrieb“</a> (nicht freigegeben, nichts darin von Hand löschen).` : ''}</p>
-      <div class="form-actions mt-4">
+      ${d.enabled ? '' : '</details>'}
+      <div class="form-actions mt-4"${d.enabled ? '' : ' hidden'}>
         <button type="button" class="btn-outline btn-md" data-action="dauer-base" ${lv.running ? '' : 'disabled'}>${icon('shield', 'ico-sm')}<span>Jetzt komplett sichern</span></button>
         <button type="button" class="btn-ghost btn-md" data-action="dauer-refresh">${icon('refresh', 'ico-sm')}<span>Aktualisieren</span></button>
       </div>
