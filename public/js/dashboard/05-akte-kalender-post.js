@@ -518,6 +518,7 @@ function animateTrack(track) {
  */
 async function closeCase(id) {
   const data = await api.get('/api/cases/' + id);
+  st.feeClose = data.feeAgreement || null; // 12-honorar.js: Vorschau des Erfolgshonorars
   openModal(closeCaseHtml(data), { key: `close:${id}` });
 }
 function closeOpenItems({ invoices = [], contracts = [], tasks = [], appointments = [] }) {
@@ -571,6 +572,7 @@ function closeCaseHtml(data) {
         <div><label class="label" for="ccOutcome">Ergebnis</label>
           <select id="ccOutcome" name="outcome" class="field" required>${outcomeOptions(c.outcome || '', c.area)}</select>
           <p class="form-hint">Nur für die Kanzlei – daraus entsteht die Erfolgsquote auf der Startseite. Beratung ohne Verfahren und vorzeitig beendete Mandate zählen dort nicht mit.</p></div>
+        ${typeof feeCloseField === 'function' ? feeCloseField(data.feeAgreement) : ''}
         ${
           sent && sent.estimateHe != null
             ? `<div><div class="label">Tatsächliches Strafmaß <span class="text-dim font-normal normal-case tracking-normal">– optional, für den Vergleich mit eurer Einschätzung (${esc(String(sent.estimateHe))} HE${sent.estimateFine ? ` · ${esc(money(sent.estimateFine))}` : ''})</span></div>
@@ -878,7 +880,7 @@ function routingHtml(routing) {
     .join('')}</div>`;
 }
 
-function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, transcripts = [], clientSuggestions, review, chat, charges, deals = [], links = [], linkedEvidence = [], routing = [], parties = [], places = [], fall = null, overlaps = {}, requests = [], similar = [], precedentId = null, logMore = 0 }) {
+function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, transcripts = [], clientSuggestions, review, chat, charges, deals = [], links = [], linkedEvidence = [], routing = [], parties = [], places = [], fall = null, overlaps = {}, requests = [], similar = [], precedentId = null, logMore = 0, feeAgreement = null }) {
   const staff = isStaff();
   st.caseFall = fall; // Bausteine des Rechtsgebiets (12-fall.js): bestimmen Abschnitte, Titel und was wegfällt
   const admin = isAdmin();
@@ -1123,6 +1125,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     evidence: attachmentsSection(c, attachments, linkedEvidence),
     requests: requestsSection(c, requests),
     tasks: staff ? caseTasksSection(c, tasks) : '',
+    fee: typeof feeAgreementSection === 'function' ? feeAgreementSection(c, feeAgreement, staff) : '', // 12-honorar.js
     invoices: invoiceList
       ? `<div class="section" id="secInvoices"><h3 class="section-title">Rechnungen & Honorare</h3>${invoiceSums(c, invoices)}${invoiceList}</div>`
       : '',
@@ -1143,6 +1146,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     ['secEvidence', fallTitle('evidence', 'Beweise'), attachments.length + linkedEvidence.reduce((n, k) => n + k.attachments.length, 0), parts.evidence],
     ['secRequests', 'Unterlagen', requests.filter((r) => !r.done).length, parts.requests],
     ['secTasks', 'Aufgaben', openTasks, parts.tasks],
+    ['secFee', 'Honorar', feeAgreement ? 1 : 0, parts.fee],
     ['secInvoices', 'Rechnungen', invoices.length, parts.invoices],
     ['secWork', 'Zeiten', 0, parts.work],
     ['secNotes', 'Verlauf', 0, true],
@@ -1179,7 +1183,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
         : ''}
       </div>`;
   // Abschnitte der Akte: Reihenfolge, Ausblenden und Einklappen je Person (12-akte-ansicht.js); Mandanten sehen die feste Reihenfolge
-  const secMap = { subject: parts.subject, admiss: parts.admiss, claims: parts.claims, motions: parts.motions, norms: parts.norms, participants: parts.participants, parties: parts.parties, clauses: parts.clauses, term: parts.term, versions: parts.versions, vclaims: parts.vclaims, corr: parts.corr, tathergang: parts.tathergang, charges: parts.charges, chat: parts.chat, events: eventsSection, witnesses: parts.witnesses, karte: parts.karte, contracts: parts.contracts, briefs: parts.briefs, external: parts.external, evidence: parts.evidence, requests: parts.requests, tasks: parts.tasks, invoices: parts.invoices, work: parts.work, notes: notesHtml };
+  const secMap = { subject: parts.subject, admiss: parts.admiss, claims: parts.claims, motions: parts.motions, norms: parts.norms, participants: parts.participants, parties: parts.parties, clauses: parts.clauses, term: parts.term, versions: parts.versions, vclaims: parts.vclaims, corr: parts.corr, tathergang: parts.tathergang, charges: parts.charges, chat: parts.chat, events: eventsSection, witnesses: parts.witnesses, karte: parts.karte, contracts: parts.contracts, briefs: parts.briefs, external: parts.external, evidence: parts.evidence, requests: parts.requests, tasks: parts.tasks, fee: parts.fee, invoices: parts.invoices, work: parts.work, notes: notesHtml };
   const secMeta = Object.fromEntries(jumps.map(([id, label, n]) => [caseSecKey(id), { label, n }]));
   return `<div class="case-root" data-case-tab="${caseTab}">
       <div class="case-head case-cover mb-5" data-case-head="${c.id}">

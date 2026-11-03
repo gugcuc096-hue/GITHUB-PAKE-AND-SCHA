@@ -495,6 +495,8 @@ caseRouter.get('/billing', (req, res) => {
     })
     .filter((x) => x.items.length);
   const pick = candidates.find((x) => fullySigned(x.k)) || candidates[0] || null;
+  const fee = require('../domain/honorar').agreementFor(c.id);
+  const feeItems = require('../domain/honorar').invoiceItems(fee);
   const invoices = db
     .prepare("SELECT id, number, kind, total, status FROM invoices WHERE case_id = ? AND status != 'storniert' ORDER BY id")
     .all(c.id);
@@ -511,7 +513,9 @@ caseRouter.get('/billing', (req, res) => {
           extraFee: String(pick.data.zusatzgebuehr || '').trim(), // Zusatzgebühr (Text) – nur als Hinweis
         }
       : null,
-    items: pick ? pick.items : [],
+    items: pick ? pick.items : fee ? feeItems : [],
+    // Ohne Vertrag mit Leistungen: Positionen aus der Honorarvereinbarung (Angebot des Honorarrechners)
+    ...(fee ? { feeAgreement: { offerCode: fee.offerCode, bundlePct: fee.quote.bundle ? fee.quote.bundle.pct : 0, used: !pick && feeItems.length > 0, total: fee.quote.totalLow, totalHigh: fee.quote.totalHigh } } : {}),
     invoices: invoices.map((i) => ({ id: i.id, number: i.number, kind: i.kind, total: i.total, status: i.status })),
   });
 });

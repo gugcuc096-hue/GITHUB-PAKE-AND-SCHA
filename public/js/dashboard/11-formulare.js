@@ -262,6 +262,14 @@ const forms = {
     const actual = { actualHe: num('actualHe'), actualFine: num('actualFine') };
     await api.patch('/api/cases/' + id, { status: 'geschlossen', outcome, ...(actual.actualHe !== undefined ? { actualHe: actual.actualHe } : {}), ...(actual.actualFine !== undefined ? { actualFine: actual.actualFine } : {}) });
     if (OUTCOMES[outcome][1] === true && window.PS.confetti) window.PS.confetti(window.innerWidth / 2, Math.round(window.innerHeight * 0.35)); // Erfolg: goldenes Konfetti
+    // Erfolgshonorar (Honorarvereinbarung aus dem Tarifrechner): bei Erfolg mit erstrittenem Betrag gleich die Rechnung
+    const won = f.elements.wonAmount ? Math.round(Number(f.elements.wonAmount.value) || 0) : 0;
+    if (won > 0 && OUTCOMES[outcome][1] === true) {
+      await returnOrClose();
+      await feeSettle(id, won);
+      f.dataset.noInvoice = '';
+      return;
+    }
     await returnOrClose();
     // Ohne Rechnung abgeschlossen: noch einmal anbieten (sechs Sekunden), statt die Akte stillschweigend zu verlassen
     toast(`Verfahren abgeschlossen – ${OUTCOMES[outcome][0]}`, 'ok', f.dataset.noInvoice ? { duration: 8000, action: { label: 'Rechnung erstellen', onClick: () => guard(() => actions['new-invoice']({ dataset: { caseId: String(id) } })) } } : {});
@@ -649,17 +657,8 @@ const forms = {
     await refreshBehind();
   },
   fee: async (f) => {
-    const fd = new FormData(f);
     const id = f.dataset.id ? Number(f.dataset.id) : null;
-    const body = {
-      name: val(fd, 'name'),
-      category: val(fd, 'category'),
-      price: Math.max(0, Math.round(Number(fd.get('price')) || 0)),
-      description: val(fd, 'description'),
-      inCalculator: fd.get('inCalculator') === 'on',
-      active: fd.get('active') === 'on',
-    };
-    if (val(fd, 'sortOrder') !== '') body.sortOrder = Math.max(0, Math.round(Number(fd.get('sortOrder')) || 0));
+    const body = feeFormBody(f); // 07-team-einstellungen.js: Preismodell, Rechtsgebiete, Zuschläge …
     if (id) await api.patch('/api/admin/fees/' + id, body);
     else await api.post('/api/admin/fees', body);
     toast('Honorarordnung aktualisiert – live auf der Website.');

@@ -26,9 +26,6 @@ document.querySelectorAll('[data-act]').forEach((el) => {
     el.addEventListener('click', (e) => el.dataset.act.split(' ').forEach((name) => PAGE_ACTIONS[name](el, e)));
 });
 // Tarifrechner (auch die von site.js nachgeladenen Leistungen), Suche und Sortierung der Honorarordnung, Mandatsformular
-document.addEventListener('change', (e) => {
-    if (e.target.classList && e.target.classList.contains('calc-check')) calculateTotal();
-});
 document.getElementById('priceSearch')?.addEventListener('input', () => {
     priceManual.clear(); // neue Suche: aufklappen, was passt
     filterPrices();
@@ -43,13 +40,18 @@ function openTicketModal(source, lawyer = null) {
     document.getElementById('ticketFormWrap').classList.remove('hidden');
     document.getElementById('ticketSuccess').classList.add('hidden');
     setWishLawyer(lawyer); // „Direkt anfragen“ auf einer Teamkarte – alle anderen Knöpfe senden an die ganze Kanzlei
-    // Auswahl aus dem Tarifrechner in den Sachverhalt übernehmen
-    if (source === 'calc') {
-        const picked = Array.from(document.querySelectorAll('.calc-check:checked:not(#priorityAddon)')).map((cb) => cb.getAttribute('data-name'));
+    // Auswahl aus dem Tarifrechner in den Sachverhalt übernehmen; beim Absenden geht das Angebot (HON-…) mit (site.js)
+    document.getElementById('ticketForm').dataset.draftSource = source === 'calc' ? 'calc' : ''; // „draft…“: zählt nicht zum Schlüssel des Entwurfs
+    if (source === 'calc' && window.PSHonorarSite) {
+        const text = window.PSHonorarSite.ticketText();
         const desc = document.getElementById('tkDesc');
-        if (picked.length && desc && !desc.value.trim()) {
-            const prio = document.getElementById('priorityAddon').checked ? ' (priorisierte Bearbeitung)' : '';
-            desc.value = `Gewünschte Leistungen${prio}: ${picked.join(', ')}.\nGeschätztes Honorar laut Tarifrechner: ${document.getElementById('totalAmount').textContent}\n\nSachverhalt: `;
+        if (text && desc && !desc.value.trim()) desc.value = text;
+        // Rechtsgebiet des Rechners ins Formular
+        const area = window.PSHonorarSite.area();
+        const sel = document.getElementById('tkArea');
+        if (area && sel && [...sel.options].some((o) => o.value === area) && sel.value !== area) {
+            sel.value = area;
+            sel.dispatchEvent(new Event('change'));
         }
     }
     modal.classList.remove('opacity-0', 'pointer-events-none');
@@ -254,103 +256,7 @@ function sortPrices() {
 document.querySelectorAll('.price-item').forEach((item, i) => item.dataset.originalIndex = i);
 enhancePriceCategories();
 
-/* ---------- Interactive Calculator ---------- */
-const pctDe = (n) => String(n).replace('.', ',');
-/** Beschriftung des Prioritätszuschlags und des Bündelrabatts nach den Einstellungen. */
-function syncPriorityLabel(calc, priorityPct) {
-    const opt = document.getElementById('priorityAddon')?.closest('.calc-opt');
-    if (opt) {
-        const name = opt.querySelector('.calc-opt-name');
-        const sub = opt.querySelector('.calc-opt-sub');
-        if (name) name.textContent = `${calc.priorityLabel || 'Priorisierte Bearbeitung'} (+${pctDe(priorityPct)} %)`;
-        if (sub && calc.prioritySub !== undefined) { sub.textContent = calc.prioritySub; sub.hidden = !calc.prioritySub; }
-        opt.hidden = !priorityPct;
-    }
-    const label = document.getElementById('discountLabel');
-    if (label && calc.bundlePct !== undefined) label.textContent = `Mandatsbündel-Rabatt (${pctDe(calc.bundlePct)} %)`;
-}
-function calculateTotal() {
-    if (!document.getElementById('totalAmount')) return; // Tarifrechner nur auf /honorare
-    const checkboxes = document.querySelectorAll('.calc-check:checked:not(#priorityAddon)');
-    const priorityChecked = document.getElementById('priorityAddon').checked;
-    let subtotal = 0;
-    const listElement = document.getElementById('selectedList');
-    listElement.innerHTML = '';
-
-    if (checkboxes.length === 0) {
-        listElement.innerHTML = '<li class="italic text-gray-500">Keine Leistungen ausgewählt</li>';
-    } else {
-        checkboxes.forEach(cb => {
-            const price = parseInt(cb.value);
-            const name = cb.getAttribute('data-name');
-            subtotal += price;
-            const li = document.createElement('li');
-            li.className = 'flex justify-between items-center text-white border-b border-slate-800 pb-1';
-            li.innerHTML = `<span>${name}</span><span class="num text-[var(--gold-500)]">${price.toLocaleString('de-DE')} $</span>`;
-            listElement.appendChild(li);
-        });
-    }
-
-    // Bündelrabatt und Prioritätszuschlag aus den Einstellungen (Tarifrechner), sonst wie bisher 3 Leistungen / 10 % / 15 %
-    const calc = (window.PS && window.PS.calc) || {};
-    const bundleMin = calc.bundleMin || 3;
-    const bundlePct = calc.bundlePct ?? 10;
-    const priorityPct = calc.priorityPct ?? 15;
-    syncPriorityLabel(calc, priorityPct);
-    const bundleEligible = bundlePct > 0 && checkboxes.length >= bundleMin;
-    const discount = bundleEligible ? Math.round((subtotal * bundlePct) / 100) : 0;
-    document.getElementById('discountRow').classList.toggle('hidden', !bundleEligible);
-    document.getElementById('discountAmount').textContent = '− ' + discount.toLocaleString('de-DE') + ' $';
-
-    // Rabattaktion für alle (z. B. Halloween): kommt mit der Konfiguration (siteconfig.js → PS.promo), wie auf der Rechnung
-    const promo = window.PS && window.PS.promo;
-    const promoAmount = promo && subtotal ? Math.min(subtotal - discount, Math.round((subtotal * promo.pct) / 100)) : 0;
-    const promoRow = document.getElementById('promoRow');
-    if (promoRow) {
-        promoRow.classList.toggle('hidden', !promoAmount);
-        promoRow.className = promoRow.className.replace(/\s*occ-\w+/g, '') + (promo ? ` occ-${promo.occasion}` : '');
-        if (promo) document.getElementById('promoLabel').textContent = `${promo.icon} ${promo.name} (${String(promo.pct).replace('.', ',')} %)`;
-        document.getElementById('promoAmount').textContent = '− ' + promoAmount.toLocaleString('de-DE') + ' $';
-    }
-
-    let total = subtotal - discount - promoAmount;
-    const noteEl = document.getElementById('totalNote');
-    if (priorityChecked && total > 0) {
-        const surcharge = Math.round((total * priorityPct) / 100);
-        total += surcharge;
-        noteEl.textContent = 'inkl. Zuschlag priorisierte Bearbeitung (+' + surcharge.toLocaleString('de-DE') + ' $)';
-    } else if (promoAmount) {
-        noteEl.textContent = `${promo.name} automatisch angewendet`;
-    } else if (bundleEligible) {
-        noteEl.textContent = 'Mandatsbündel-Rabatt automatisch angewendet';
-    } else {
-        noteEl.textContent = '';
-    }
-
-    document.getElementById('totalAmount').textContent = total.toLocaleString('de-DE') + ' $';
-    // Rabatt und Summe laufen weich zum neuen Betrag (statt zu springen)
-    if (window.PS && window.PS.countUp) {
-        window.PS.countUp(document.getElementById('totalAmount').parentElement, { ms: 700 });
-        window.PS.countUp(document.getElementById('discountAmount').parentElement, { ms: 500 });
-        if (promoRow) window.PS.countUp(promoRow, { ms: 500 });
-    }
-}
-
-/* ---------- Rabattaktion: Plakette im Rechner, Summe neu rechnen ---------- */
-window.addEventListener('ps:promo', () => {
-    const promo = window.PS && window.PS.promo;
-    const head = document.getElementById('promoRow')?.closest('.glass-card')?.querySelector('h3');
-    document.getElementById('calcPromoBadge')?.remove();
-    if (promo && head) {
-        const b = document.createElement('span');
-        b.id = 'calcPromoBadge';
-        b.className = `calc-promo-badge occ-${promo.occasion}`;
-        b.textContent = `${promo.icon} −${String(promo.pct).replace('.', ',')} %`;
-        b.title = `${promo.name} – automatisch abgezogen`;
-        head.appendChild(b);
-    }
-    calculateTotal();
-});
+/* ---------- Tarifrechner: siehe js/honorar-site.js (Rechenkern js/honorar-calc.js) ---------- */
 
 /* ---------- FAQ Accordion ---------- */
 function toggleFaq(item) {

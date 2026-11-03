@@ -17,7 +17,7 @@ const { requireAuth, requireStaff } = require('../core/auth');
 const { wrap, parseBody, isBoard } = require('../core/helpers');
 const { logActivity } = require('../db/models');
 
-const SECTIONS = ['subject', 'tathergang', 'charges', 'admiss', 'claims', 'motions', 'norms', 'participants', 'parties', 'clauses', 'term', 'versions', 'vclaims', 'chat', 'events', 'witnesses', 'evidence', 'karte', 'corr', 'contracts', 'briefs', 'external', 'requests', 'tasks', 'invoices', 'work', 'notes'];
+const SECTIONS = ['subject', 'tathergang', 'charges', 'admiss', 'claims', 'motions', 'norms', 'participants', 'parties', 'clauses', 'term', 'versions', 'vclaims', 'chat', 'events', 'witnesses', 'evidence', 'karte', 'corr', 'contracts', 'briefs', 'external', 'requests', 'tasks', 'fee', 'invoices', 'work', 'notes'];
 const keyList = z.array(z.enum(SECTIONS)).max(SECTIONS.length);
 const viewSchema = z.object({ order: keyList, hidden: keyList.default([]), collapsed: keyList.default([]) });
 const KEY = 'caseSections';

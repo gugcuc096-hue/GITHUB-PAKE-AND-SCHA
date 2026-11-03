@@ -127,6 +127,7 @@ const requestSchema = z.object({
   urgency: z.enum(URGENCIES).default('normal'),
   description: z.string().trim().min(10).max(4000),
   teamMemberId: z.number().int().positive().optional(), // Wunschanwalt (Teamkarte „Direkt anfragen“)
+  offerCode: z.string().trim().max(20).optional(), // Angebot aus dem Honorarrechner (HON-4821) → Honorarvereinbarung in der Akte
   website: z.string().max(0).optional(), // Honeypot-Feld: bleibt bei Menschen leer
 });
 
@@ -190,6 +191,15 @@ router.post(
       mentionIds: lawyer && lawyer.discord_id ? [lawyer.discord_id] : [], // Wunschanwalt wird gepingt
     });
 
+    // Angebot aus dem Honorarrechner: wird zur Honorarvereinbarung der Akte (Rechnung übernimmt die Positionen)
+    if (d.offerCode) {
+      const honorar = require('../domain/honorar');
+      const offer = honorar.offerByCode(d.offerCode);
+      if (offer && !offer.caseId) {
+        honorar.attachOffer(id, offer.code, null);
+        addSystemNote(id, null, `Honorarangebot ${offer.code} aus dem Tarifrechner übernommen (${honorar.H.range(offer.totalLow, offer.totalHigh)}).`);
+      }
+    }
     tickets.caseCreated(id);
     require('../domain/automations').fire('case.created', { caseId: id }, 'created'); // Einstellungen → Automatik
     res.status(201).json({
@@ -205,5 +215,29 @@ router.post(
     });
   })
 );
+
+/*
+ * Honorarrechner: Angebot speichern (Code HON-4821 + Link) und wieder abrufen. Der Server rechnet selbst nach –
+ * Beträge aus dem Browser zählen nicht. Kein Personenbezug im Angebot, deshalb ohne Anmeldung abrufbar.
+ */
+const offerLimiter = limit(60 * 60 * 1000, 30, 'Sie haben in kurzer Zeit sehr viele Angebote erstellt. Bitte später erneut versuchen.', true);
+router.post(
+  '/offers',
+  offerLimiter,
+  wrap(async (req, res) => {
+    const honorar = require('../domain/honorar');
+    const d = parseBody(honorar.pickSchemaShape(z), req, res);
+    if (!d) return;
+    const r = honorar.createOffer(d);
+    if (r.error) return res.status(400).json({ error: r.error });
+    res.status(201).json({ code: r.code, url: `/honorare?angebot=${r.code}`, quote: r.quote, lawyer: r.lawyer });
+  })
+);
+router.get('/offers/:code', (req, res) => {
+  const o = require('../domain/honorar').offerByCode(req.params.code);
+  if (!o) return res.status(404).json({ error: 'Kein Angebot mit diesem Code gefunden.' });
+  res.set('Cache-Control', 'no-store');
+  res.json({ code: o.code, selection: o.selection, quote: o.quote, createdAt: o.createdAt });
+});
 
 module.exports = router;

@@ -555,7 +555,21 @@ function feeRow(f) {
     inCalculator: !!f.in_calculator,
     active: !!f.active,
     sortOrder: f.sort_order,
+    // Honorarrechner (Migration 024): Rechtsgebiete, Preismodell, Spanne, „Was ist enthalten?“, Zuschläge
+    areas: jsonOr(f.areas, []),
+    model: f.model || 'fest',
+    config: jsonOr(f.config, {}),
+    includes: String(f.includes || '').split('\n').map((x) => x.trim()).filter(Boolean),
+    surcharges: jsonOr(f.surcharges, []),
   };
+}
+function jsonOr(text, fallback) {
+  try {
+    const v = JSON.parse(text || '');
+    return v && typeof v === 'object' ? v : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function boardRow(n) {

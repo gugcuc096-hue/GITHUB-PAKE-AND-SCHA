@@ -538,6 +538,8 @@ function caseDetail(c, u, { lean = false, all = false } = {}) {
     ticket: tickets.ticketInfo(c, u),
     // Gesicherte Verläufe gelöschter Tickets (nur Kanzlei)
     transcripts: staff ? require('../integrations/transcripts').listForCase(c.id) : undefined,
+    // Honorarvereinbarung aus dem Honorarrechner (Angebot HON-…) – Kanzlei und Mandant
+    feeAgreement: require('../domain/honorar').agreementFor(c.id),
     // Angebote der Staatsanwaltschaft (Deal-Rechner) – Kanzlei und Mandant
     deals: require('../domain/deals').forCase(c.id),
     // Mandant: eigene Bewertung der (abgeschlossenen) Akte

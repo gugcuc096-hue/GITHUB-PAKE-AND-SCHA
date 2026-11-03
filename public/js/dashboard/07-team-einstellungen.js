@@ -170,60 +170,328 @@ async function updateUserField(t) {
   }
 }
 
-/* ---------------------------------------------------------------- Honorarordnung */
+/* ---------------------------------------------------------------- Honorarordnung (mit Honorarrechner) */
+/*
+ * Jede Leistung: Rechtsgebiete, Preismodell (Festpreis, je Einheit, Prozent/Staffel vom Streitwert, Erfolgshonorar,
+ * Grundgebühr + Erfolgsanteil), Spanne, „Was ist enthalten?“, Zuschläge – mit Live-Vorschau wie auf der Website.
+ * Dazu Pakete je Rechtsgebiet und der Satz je Rang. Gerechnet wird mit /js/honorar-calc.js (window.PSHonorar).
+ */
+const HM = () => window.PSHonorar;
+const HM_MODELS = { fest: 'Festpreis', einheit: 'Je Einheit', prozent: 'Prozent vom Streitwert', staffel: 'Staffel nach Streitwert', erfolg: 'Erfolgshonorar (nur bei Erfolg)', grund_erfolg: 'Grundgebühr + Erfolgsanteil' };
+const feeAreaList = () => (AREA_META.list || []).filter((a) => a.key !== 'sonstiges');
+const numOr = (v, d = '') => (v === undefined || v === null || v === '' ? d : v);
+
+/** Felder je Preismodell (werden beim Wechsel des Modells neu gezeichnet). */
+function feeModelFields(model, c = {}, price = 0) {
+  const n = (name, label, value, hint = '', attrs = '') => `<div><label class="label">${label}</label><input name="${name}" type="number" inputmode="decimal" min="0" step="any" class="field" value="${esc(numOr(value))}" ${attrs}>${hint ? `<p class="form-hint">${hint}</p>` : ''}</div>`;
+  const value = () => `
+      <div><label class="label">Bezeichnung des Werts</label><input name="valueLabel" class="field" maxlength="40" value="${esc(c.valueLabel || (model === 'erfolg' || model === 'grund_erfolg' ? 'Erwarteter Schaden' : 'Streitwert'))}"></div>
+      ${n('valueDefault', 'Startwert des Reglers ($)', numOr(c.valueDefault, 50000))}
+      ${n('valueMin', 'Regler von ($)', numOr(c.valueMin, 0))}
+      ${n('valueMax', 'Regler bis ($)', numOr(c.valueMax, 1000000))}
+      ${n('valueStep', 'Schrittweite ($)', numOr(c.valueStep, 5000))}`;
+  const success = () => `
+      ${n('pct', 'Anteil in %', numOr(c.pct, 20), 'z. B. 20 % vom erstrittenen Betrag', 'max="100"')}
+      ${n('minFee', 'Mindesthonorar ($)', numOr(c.minFee, 0), 'leer/0 = keins')}
+      ${n('cap', 'Deckel ($)', numOr(c.cap, 0), 'höchstens – leer/0 = ohne')}`;
+  if (model === 'einheit')
+    return `${n('price', 'Preis je Einheit ($)', price, '', 'required')}${n('priceMax', 'bis ($, Spanne)', c.priceMax, 'leer = fester Preis je Einheit')}
+      <div><label class="label">Einheit</label><input name="unit" class="field" maxlength="30" value="${esc(c.unit || 'Stunde')}"></div>${n('unitMax', 'höchstens wählbar', numOr(c.unitMax, 20))}`;
+  if (model === 'prozent') return `${n('pct', 'Prozent vom Wert', numOr(c.pct, 5), '', 'max="100"')}${n('minFee', 'Mindesthonorar ($)', numOr(c.minFee, 0))}${n('cap', 'Deckel ($)', numOr(c.cap, 0))}${value()}`;
+  if (model === 'staffel') {
+    const tiers = (c.tiers && c.tiers.length ? c.tiers : [{ upTo: 50000, price: 20000 }, { upTo: 200000, price: 40000 }, { upTo: 0, price: 80000 }]).concat(Array(6).fill({})).slice(0, 6);
+    return `<div class="span-2"><div class="label">Staffel <span class="text-dim font-normal normal-case tracking-normal">– Wert bis … kostet …; „bis“ leer/0 = alles darüber</span></div>
+        <div class="hm-tiers">${tiers.map((t, i) => `<div class="hm-tier"><span class="text-xs text-dim">bis</span><input name="tierUp${i}" type="number" min="0" step="any" class="field" value="${esc(numOr(t.upTo))}" placeholder="darüber"><span class="text-xs text-dim">$ →</span><input name="tierPrice${i}" type="number" min="0" step="any" class="field" value="${esc(numOr(t.price))}" placeholder="Preis"><span class="text-xs text-dim">$</span></div>`).join('')}</div></div>${value()}`;
+  }
+  if (model === 'erfolg') return `${success()}${value()}`;
+  if (model === 'grund_erfolg') return `${n('base', 'Grundgebühr ($)', numOr(c.base, 15000))}${n('baseMax', 'Grundgebühr bis ($, Spanne)', c.baseMax, 'leer = fest')}${success()}${value()}`;
+  return `${n('price', 'Preis ($)', price, '', 'required')}${n('priceMax', 'bis ($, Spanne)', c.priceMax, 'leer = Festpreis; sonst „von – bis“ je nach Aufwand')}`;
+}
+
+/** Leistung aus dem Formular (für Speichern und Vorschau). */
+function feeFormBody(f) {
+  const fd = new FormData(f);
+  const num = (k) => {
+    const v = fd.get(k);
+    return v === null || String(v).trim() === '' ? undefined : Math.max(0, Number(v));
+  };
+  const model = val(fd, 'model') || 'fest';
+  const config = {};
+  for (const k of ['priceMax', 'unitMax', 'pct', 'minFee', 'cap', 'base', 'baseMax', 'valueMin', 'valueMax', 'valueStep', 'valueDefault']) {
+    const v = num(k);
+    if (v !== undefined && Number.isFinite(v)) config[k] = k === 'unitMax' ? Math.max(1, Math.round(v)) : v;
+  }
+  if (val(fd, 'unit')) config.unit = val(fd, 'unit');
+  if (val(fd, 'valueLabel')) config.valueLabel = val(fd, 'valueLabel');
+  if (model === 'staffel') {
+    config.tiers = [];
+    for (let i = 0; i < 6; i++) {
+      const p = num(`tierPrice${i}`);
+      if (p === undefined) continue;
+      config.tiers.push({ upTo: num(`tierUp${i}`) || 0, price: p });
+    }
+  }
+  const surcharges = [];
+  for (let i = 0; i < 4; i++) {
+    const name = val(fd, `surName${i}`);
+    const v = num(`surVal${i}`);
+    if (name.length >= 2 && v) surcharges.push(val(fd, `surKind${i}`) === 'amount' ? { name, amount: v } : { name, pct: v });
+  }
+  const body = {
+    name: val(fd, 'name'),
+    category: val(fd, 'category'),
+    price: ['fest', 'einheit'].includes(model) ? Math.round(num('price') || 0) : 0,
+    description: val(fd, 'description'),
+    inCalculator: fd.get('inCalculator') === 'on',
+    active: fd.get('active') === 'on',
+    areas: fd.getAll('areas').map(String),
+    model,
+    config,
+    includes: val(fd, 'includes').split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 15),
+    surcharges,
+  };
+  if (val(fd, 'sortOrder') !== '') body.sortOrder = Math.max(0, Math.round(Number(fd.get('sortOrder')) || 0));
+  return body;
+}
+
+/** Live-Vorschau: so erscheint die Leistung im Tarifrechner (mit Regler bzw. Menge zum Ausprobieren). */
+function feePreviewHtml(fee, probe = {}) {
+  const H = HM();
+  if (!H) return '';
+  const c = H.configOf(fee);
+  const value = probe.value ?? c.valueDefault;
+  const qty = probe.qty || 2;
+  const p = H.position({ ...fee, id: 1, name: fee.name || 'Leistung' }, { value, qty, surcharges: probe.surcharges || [] }, 1);
+  const from = H.fromPrice(fee);
+  const probeCtl = H.needsValue(fee)
+    ? `<label class="hm-probe">${esc(c.valueLabel)} zum Ausprobieren: <b>${esc(H.money(value))}</b><input type="range" data-hm-probe="value" min="${c.valueMin}" max="${c.valueMax}" step="${c.valueStep}" value="${value}"></label>`
+    : fee.model === 'einheit'
+      ? `<p class="hm-probe">Beispiel mit ${qty} × ${esc(c.unit)}</p>`
+      : '';
+  const sur = (fee.surcharges || []).length ? `<div class="hm-pv-chips">${fee.surcharges.map((s) => `<label class="hm-pv-chip"><input type="checkbox" data-hm-probe-sur="${esc(s.name)}"${(probe.surcharges || []).includes(s.name) ? ' checked' : ''}> ${esc(s.name)} ${s.pct ? `+${H.pctText(s.pct)}` : `+${H.money(s.amount)}`}</label>`).join('')}</div>` : '';
+  return `<div class="hm-pv-card">
+      <div class="hm-pv-head"><span class="hm-pv-name">${esc(fee.name || 'Neue Leistung')}${fee.model === 'erfolg' ? ' <span class="hm-pv-badge">Nur bei Erfolg</span>' : ''}</span><span class="hm-pv-price">${esc(from.text)}</span></div>
+      ${fee.description ? `<p class="hm-pv-desc">${esc(fee.description)}</p>` : ''}
+      ${probeCtl}${sur}
+      <p class="hm-pv-line">${p.successOnly ? `Sie zahlen nur bei Erfolg: <b>${H.pctText(p.success.pct)} von ${H.money(p.success.value)} = ${H.money(p.success.amount)}</b>` : `<b>${esc(H.range(p.low, p.high))}</b>${p.success ? ` + bei Erfolg <b>${H.money(p.success.amount)}</b>` : ''}`}</p>
+      <ol class="hm-pv-way">${p.steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>
+      ${fee.includes && fee.includes.length ? `<div class="hm-pv-inc"><span>Was ist enthalten?</span><ul>${fee.includes.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
+    </div>`;
+}
+function feePreviewRefresh(f) {
+  const box = $('#feePreview');
+  if (!box) return;
+  const probe = { value: st.feeProbe && st.feeProbe.value, surcharges: (st.feeProbe && st.feeProbe.surcharges) || [] };
+  box.innerHTML = feePreviewHtml(feeFormBody(f), probe);
+}
+
 function feeModal(f, category) {
   const cats = (st.feeCats || []).filter((c) => c.active || (f && f.category === c.key));
-  const v = f || { category: category || (cats[0] && cats[0].key) || 'rechtsberatung', inCalculator: true, active: true, price: 0 };
-  openModal(`
+  const v = f || { category: category || (cats[0] && cats[0].key) || 'rechtsberatung', inCalculator: true, active: true, price: 0, model: 'fest', config: {}, areas: [], includes: [], surcharges: [] };
+  st.feeProbe = {};
+  const sur = (v.surcharges || []).concat(Array(4).fill(null)).slice(0, 4);
+  openModal(
+    `
       <h2 class="modal-title">${f ? 'Leistung bearbeiten' : 'Neue Leistung'}</h2>
       <p class="modal-sub">Erscheint sofort in der Honorarordnung, im Tarifrechner der Website und im Rechnungs-Generator.</p>
-      <form data-form="fee" data-id="${f ? f.id : ''}" class="form-grid cols-2">
+      <div class="hm-edit">
+      <form data-form="fee" data-id="${f ? f.id : ''}" class="form-grid cols-2 hm-form">
         <div class="span-2"><label class="label">Bezeichnung</label><input name="name" class="field" required minlength="2" maxlength="120" value="${esc(v.name || '')}" autofocus></div>
         <div><label class="label">Kategorie</label><select name="category" class="field">${cats.map((c) => opt(c.key, c.name, v.category === c.key)).join('')}</select></div>
-        <div><label class="label">Preis ($)</label><input name="price" data-money type="number" inputmode="numeric" min="0" step="1" required class="field" value="${esc(v.price)}"></div>
-        <div class="span-2"><label class="label">Beschreibung</label><textarea name="description" rows="3" maxlength="400" class="field">${esc(v.description || '')}</textarea></div>
+        <div><label class="label">Preismodell</label><select name="model" class="field" data-hm-model>${Object.entries(HM_MODELS).map(([k, l]) => opt(k, l, (v.model || 'fest') === k)).join('')}</select></div>
+        <div class="span-2"><div class="label">Rechtsgebiete <span class="text-dim font-normal normal-case tracking-normal">– keins gewählt = gilt für alle; im Rechner erscheint die Leistung beim gewählten Gebiet</span></div>
+          <div class="hm-areas">${feeAreaList().map((a) => `<label class="check"><input type="checkbox" name="areas" value="${esc(a.key)}" ${(v.areas || []).includes(a.key) ? 'checked' : ''}> ${esc(a.name)}</label>`).join('')}</div></div>
+        <div class="span-2 form-grid cols-2 hm-model" id="feeModelFields">${feeModelFields(v.model || 'fest', v.config || {}, v.price)}</div>
+        <div class="span-2"><label class="label">Beschreibung</label><textarea name="description" rows="2" maxlength="400" class="field">${esc(v.description || '')}</textarea></div>
+        <div class="span-2"><label class="label">Was ist enthalten? <span class="text-dim font-normal normal-case tracking-normal">– je Zeile ein Punkt</span></label><textarea name="includes" rows="3" maxlength="2400" class="field" placeholder="Akteneinsicht&#10;Begleitung zu Vernehmungen">${esc((v.includes || []).join('\n'))}</textarea></div>
+        <div class="span-2"><div class="label">Zuschläge <span class="text-dim font-normal normal-case tracking-normal">– der Mandant hakt sie im Rechner an (z. B. Eilzuschlag, Nacht/Wochenende, zweite Instanz)</span></div>
+          <div class="hm-surs">${sur
+            .map((s, i) => `<div class="hm-sur"><input name="surName${i}" class="field" maxlength="60" placeholder="Name, z. B. Eilzuschlag" value="${esc(s ? s.name : '')}"><select name="surKind${i}" class="field">${opt('pct', '%', !s || !s.amount)}${opt('amount', '$', !!(s && s.amount))}</select><input name="surVal${i}" type="number" min="0" step="any" class="field" placeholder="Wert" value="${esc(s ? s.pct || s.amount || '' : '')}"></div>`)
+            .join('')}</div></div>
         <div><label class="label">Reihenfolge</label><input name="sortOrder" type="number" min="0" step="1" class="field" value="${esc(v.sortOrder ?? '')}" placeholder="automatisch"></div>
         <div class="flex flex-col justify-end gap-2 pb-1">
           <label class="check"><input type="checkbox" name="inCalculator" ${v.inCalculator ? 'checked' : ''}> Im Tarifrechner anbieten</label>
           <label class="check"><input type="checkbox" name="active" ${v.active ? 'checked' : ''}> Auf der Website anzeigen</label>
         </div>
         <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button></div>
+      </form>
+      <aside class="hm-preview"><div class="label">Live-Vorschau – so sieht es im Tarifrechner aus</div><div id="feePreview"></div></aside>
+      </div>`,
+    { wide: true }
+  );
+  const form = $('#modalBody form[data-form="fee"]');
+  if (form) feePreviewRefresh(form);
+}
+// Vorschau live: jede Eingabe; Modellwechsel zeichnet die Felder neu
+document.addEventListener('input', (e) => {
+  const f = e.target.closest && e.target.closest('form[data-form="fee"]');
+  if (f) return feePreviewRefresh(f);
+  if (e.target.matches && e.target.matches('[data-hm-probe="value"]')) {
+    st.feeProbe = { ...(st.feeProbe || {}), value: Number(e.target.value) };
+    const form = $('#modalBody form[data-form="fee"]');
+    if (form) feePreviewRefresh(form);
+  }
+  const pk = e.target.closest && e.target.closest('form[data-form="fee-package"]');
+  if (pk) packagePreviewRefresh(pk);
+});
+document.addEventListener('change', (e) => {
+  if (e.target.matches && e.target.matches('[data-hm-model]')) {
+    const form = e.target.closest('form');
+    $('#feeModelFields', form).innerHTML = feeModelFields(e.target.value, {}, Number(form.elements.price && form.elements.price.value) || 0);
+    feePreviewRefresh(form);
+  } else if (e.target.matches && e.target.matches('[data-hm-probe-sur]')) {
+    const all = $$('[data-hm-probe-sur]:checked').map((x) => x.dataset.hmProbeSur);
+    st.feeProbe = { ...(st.feeProbe || {}), surcharges: all };
+    const form = $('#modalBody form[data-form="fee"]');
+    if (form) feePreviewRefresh(form);
+  } else {
+    const pk = e.target.closest && e.target.closest('form[data-form="fee-package"]');
+    if (pk) packagePreviewRefresh(pk);
+  }
+});
+
+/* Pakete */
+function packagePreviewHtml(p) {
+  const H = HM();
+  const list = (p.feeIds || []).map((id) => st.adminFees.find((f) => f.id === id)).filter(Boolean);
+  const sum = H ? list.reduce((s, f) => s + H.position(f, {}, 1).low, 0) : 0;
+  const saving = Math.max(0, sum - (p.price || 0));
+  return list.length
+    ? `<div class="hm-pack-pv"><span>Einzeln ${money(sum)}</span><span>Paket <b>${money(p.price || 0)}</b></span>${saving ? `<span class="hm-save">Sie sparen ${money(saving)}</span>` : '<span class="text-amber-300">Paket ist nicht günstiger als einzeln</span>'}</div>`
+    : '<p class="text-sm text-dim">Mindestens zwei Leistungen wählen.</p>';
+}
+function packageBody(f) {
+  const fd = new FormData(f);
+  return { area: val(fd, 'area'), name: val(fd, 'name'), description: val(fd, 'description'), feeIds: fd.getAll('feeIds').map(Number), price: Math.max(0, Math.round(Number(fd.get('price')) || 0)), active: fd.get('active') === 'on' };
+}
+function packagePreviewRefresh(f) {
+  const box = $('#packPreview', f);
+  if (box) box.innerHTML = packagePreviewHtml(packageBody(f));
+}
+function packageModal(p) {
+  const v = p || { area: '', name: '', description: '', feeIds: [], price: 0, active: true };
+  const fees = st.adminFees.filter((f) => f.active);
+  openModal(`
+      <h2 class="modal-title">${p ? 'Paket bearbeiten' : 'Neues Paket'}</h2>
+      <p class="modal-sub">Mehrere Leistungen zum Paketpreis – im Rechner mit „Sie sparen …“.</p>
+      <form data-form="fee-package" data-id="${p ? p.id : ''}" class="form-grid cols-2">
+        <div><label class="label">Name</label><input name="name" class="field" required minlength="2" maxlength="100" value="${esc(v.name)}" autofocus></div>
+        <div><label class="label">Rechtsgebiet</label><select name="area" class="field">${opt('', 'Alle Rechtsgebiete', !v.area)}${feeAreaList().map((a) => opt(a.key, a.name, v.area === a.key)).join('')}</select></div>
+        <div class="span-2"><label class="label">Beschreibung</label><input name="description" class="field" maxlength="300" value="${esc(v.description)}"></div>
+        <div class="span-2"><div class="label">Enthaltene Leistungen</div><div class="hm-pack-fees">${fees.map((f) => `<label class="check"><input type="checkbox" name="feeIds" value="${f.id}" ${v.feeIds.includes(f.id) ? 'checked' : ''}> ${esc(f.name)} <span class="text-dim text-xs">${esc(HM() ? HM().fromPrice(f).text : money(f.price))}</span></label>`).join('')}</div></div>
+        <div><label class="label">Paketpreis ($)</label><input name="price" data-money type="number" min="0" step="1" required class="field" value="${esc(v.price)}"></div>
+        <div class="flex items-end pb-1"><label class="check"><input type="checkbox" name="active" ${v.active ? 'checked' : ''}> Im Rechner anbieten</label></div>
+        <div class="span-2" id="packPreview">${packagePreviewHtml(v)}</div>
+        <div class="span-2 form-actions"><button type="submit" class="btn-gold btn-md">${icon('check')}<span>Speichern</span></button></div>
       </form>`);
 }
+
+/* Satz je Rang */
+function rankFactorsPanel() {
+  const ranks = st.feeRanks || [];
+  const f = st.rankFactors || {};
+  return `<section class="panel panel-pad mb-4">
+      <div class="panel-head"><h2 class="panel-title">${icon('crown')} Satz je Rang</h2><span class="text-xs text-dim">1 = Standardsatz</span></div>
+      <p class="text-sm text-muted mb-3">Wählt der Mandant im Rechner einen bestimmten Anwalt („Mandat direkt an …“), gilt dessen Satz – auf alle Beträge außer dem Erfolgsanteil.</p>
+      <form data-form="fee-ranks" class="hm-ranks">${ranks
+        .map((r) => `<label class="hm-rank"><span>${esc(r)}</span><span class="hm-rank-in">× <input name="rank:${esc(r)}" type="number" min="0.3" max="5" step="0.05" class="field" value="${esc(f[r] || 1)}"></span></label>`)
+        .join('')}
+        <div class="form-actions"><button type="submit" class="btn-outline btn-md">${icon('check', 'ico-sm')}<span>Sätze speichern</span></button></div></form>
+    </section>`;
+}
+function packagesPanel() {
+  const H = HM();
+  const areaName = (k) => (feeAreaList().find((a) => a.key === k) || {}).name || 'Alle Rechtsgebiete';
+  return `<section class="panel panel-pad mb-4">
+      <div class="panel-head"><h2 class="panel-title">${icon('box')} Pakete</h2><button class="btn-ghost btn-sm" data-action="fee-pack-new">${icon('plus', 'ico-sm')}<span>Paket</span></button></div>
+      ${(st.feePackages || []).length
+        ? st.feePackages
+            .map((p) => {
+              const list = p.feeIds.map((id) => st.adminFees.find((f) => f.id === id)).filter(Boolean);
+              const sum = H ? list.reduce((s, f) => s + H.position(f, {}, 1).low, 0) : 0;
+              return `<div class="list-row wrap"><div class="main"><div class="title">${esc(p.name)} ${badge(areaName(p.area), 'slate')} ${p.active ? '' : badge('Aus', 'slate')}</div><div class="meta">${list.map((f) => esc(f.name)).join(' · ')}</div></div>
+                <div class="flex items-center gap-2 shrink-0">${sum > p.price ? `<span class="text-xs text-emerald-300 nowrap">spart ${money(sum - p.price)}</span>` : ''}<span class="num text-gold nowrap">${money(p.price)}</span>
+                <button class="icon-btn sm" data-action="fee-pack-edit" data-id="${p.id}" aria-label="Bearbeiten">${icon('edit', 'ico-sm')}</button>
+                <button class="icon-btn sm" data-action="fee-pack-delete" data-id="${p.id}" aria-label="Löschen">${icon('trash', 'ico-sm')}</button></div></div>`;
+            })
+            .join('')
+        : '<p class="text-sm text-dim py-2">Noch keine Pakete – z. B. „Strafverteidigung komplett“ aus U-Haft, Vertretung und Hauptverhandlung.</p>'}
+    </section>`;
+}
+
 views.fees = {
   async load() {
     const r = await api.get('/api/admin/fees');
     st.adminFees = r.fees;
     st.feeCats = r.categories;
+    st.feePackages = r.packages || [];
+    st.rankFactors = r.rankFactors || {};
+    st.feeRanks = r.ranks || [];
   },
   render() {
+    const H = HM();
+    const areaName = (k) => (feeAreaList().find((a) => a.key === k) || {}).name || k;
     return `
         <div class="page-head">
-          <div><h1 class="page-title">Honorarordnung</h1><p class="page-sub">Preise und Leistungen pflegen – die Website und der Tarifrechner übernehmen Änderungen sofort.</p></div>
-          <div class="page-actions"><a href="/#honorar" target="_blank" rel="noopener" class="btn-outline btn-md">${icon('globe', 'ico-sm')}<span>Website ansehen</span></a><button class="btn-gold btn-md" data-action="fee-new">${icon('plus')}<span>Leistung hinzufügen</span></button></div>
+          <div><h1 class="page-title">Honorarordnung</h1><p class="page-sub">Leistungen je Rechtsgebiet mit eigenem Preismodell, Pakete und Satz je Rang – Website und Tarifrechner übernehmen Änderungen sofort.</p></div>
+          <div class="page-actions"><a href="/honorare#rechner" target="_blank" rel="noopener" class="btn-outline btn-md">${icon('globe', 'ico-sm')}<span>Rechner ansehen</span></a><button class="btn-gold btn-md" data-action="fee-new">${icon('plus')}<span>Leistung hinzufügen</span></button></div>
         </div>
+        <div class="grid-2 mb-0">${packagesPanel()}${rankFactorsPanel()}</div>
         ${st.feeCats
-        .map((c) => {
-          const cat = c.key;
-          const rows = st.adminFees.filter((f) => f.category === cat);
-          return `<section class="panel panel-pad mb-4${c.active ? '' : ' is-off'}">
+          .map((c) => {
+            const cat = c.key;
+            const rows = st.adminFees.filter((f) => f.category === cat);
+            return `<section class="panel panel-pad mb-4${c.active ? '' : ' is-off'}">
               <div class="panel-head"><h2 class="panel-title">${esc(c.name)} ${c.active ? '' : badge('Ausgeblendet', 'slate')}</h2><button class="btn-ghost btn-sm" data-action="fee-new" data-category="${cat}">${icon('plus', 'ico-sm')}<span>Leistung</span></button></div>
               ${rows.length
-              ? rows
-                  .map(
-                    (f) => `<div class="list-row wrap"><div class="main"><div class="title">${esc(f.name)} ${!f.active ? badge('Ausgeblendet', 'slate') : ''} ${f.inCalculator ? badge('Tarifrechner', 'sky') : ''}</div><div class="meta">${esc(f.description)}</div></div>
-                      <div class="flex items-center gap-2 shrink-0"><span class="num text-gold nowrap">${money(f.price)}</span>
+                ? rows
+                    .map(
+                      (f) => `<div class="list-row wrap"><div class="main"><div class="title">${esc(f.name)} ${!f.active ? badge('Ausgeblendet', 'slate') : ''} ${f.inCalculator ? badge('Tarifrechner', 'sky') : ''} ${f.model && f.model !== 'fest' ? badge(HM_MODELS[f.model] || f.model, f.model === 'erfolg' || f.model === 'grund_erfolg' ? 'emerald' : 'gold') : ''}</div>
+                        <div class="meta">${(f.areas || []).length ? `${f.areas.map(areaName).map(esc).join(', ')} · ` : ''}${esc(f.description)}${(f.surcharges || []).length ? ` · Zuschläge: ${f.surcharges.map((s) => esc(s.name)).join(', ')}` : ''}</div></div>
+                      <div class="flex items-center gap-2 shrink-0"><span class="num text-gold nowrap">${esc(H ? H.fromPrice(f).text : money(f.price))}</span>
                       <button class="icon-btn sm" data-action="fee-edit" data-id="${f.id}" aria-label="Bearbeiten">${icon('edit', 'ico-sm')}</button>
                       <button class="icon-btn sm" data-action="fee-delete" data-id="${f.id}" aria-label="Löschen">${icon('trash', 'ico-sm')}</button></div></div>`
-                  )
-                  .join('')
-              : '<p class="text-sm text-dim py-2">Keine Leistungen in dieser Kategorie.</p>'}
+                    )
+                    .join('')
+                : '<p class="text-sm text-dim py-2">Keine Leistungen in dieser Kategorie.</p>'}
             </section>`;
-        })
-        .join('')}
-        <p class="text-xs text-dim">Kategorien (und die Reiter der Website) legen Sie unter Einstellungen → Listen an, benennen sie um oder blenden sie aus.</p>`;
+          })
+          .join('')}
+        <p class="text-xs text-dim">Kategorien (und die Reiter der Website) legen Sie unter Einstellungen → Listen an, benennen sie um oder blenden sie aus. Rabatt und Prioritätszuschlag des Rechners: Einstellungen → Tarifrechner.</p>`;
   },
 };
+Object.assign(actions, {
+  'fee-pack-new': () => packageModal(null),
+  'fee-pack-edit': (el) => packageModal(st.feePackages.find((p) => p.id === Number(el.dataset.id))),
+  'fee-pack-delete': async (el) => {
+    const p = st.feePackages.find((x) => x.id === Number(el.dataset.id));
+    if (!p || !(await ask(`Paket „${p.name}“ löschen? Die Leistungen bleiben.`, { title: 'Paket löschen?', confirmText: 'Löschen', danger: true }))) return;
+    await api.del('/api/admin/fees/packages/' + p.id);
+    toast('Paket gelöscht.');
+    await refreshBehind();
+  },
+});
+Object.assign(forms, {
+  'fee-package': async (f) => {
+    const body = packageBody(f);
+    if (body.feeIds.length < 2) throw new Error('Bitte mindestens zwei Leistungen wählen.');
+    if (f.dataset.id) await api.patch('/api/admin/fees/packages/' + f.dataset.id, body);
+    else await api.post('/api/admin/fees/packages', body);
+    toast('Paket gespeichert – live im Tarifrechner.');
+    await modalBack();
+    await refreshBehind();
+  },
+  'fee-ranks': async (f) => {
+    const factors = {};
+    $$('input[name^="rank:"]', f).forEach((i) => {
+      const v = Number(i.value);
+      if (v > 0) factors[i.name.slice(5)] = Math.round(v * 100) / 100;
+    });
+    const r = await api.put('/api/admin/fees/rank-factors', { factors });
+    st.rankFactors = r.rankFactors;
+    toast('Sätze je Rang gespeichert.');
+  },
+});
 
 /* ---------------------------------------------------------------- Einstellungen */
 /* ---------------------------------------------------------------- FiveNet: Verbindungsstatus & Schnittstellenprüfung */

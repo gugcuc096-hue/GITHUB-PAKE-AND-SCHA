@@ -189,6 +189,8 @@ function shape(html, view) {
     const a = view.area;
     const steps = a.steps.map((st) => `<li>${esc(st)}</li>`).join('');
     html = html.replace(/\{\{gebiet:name\}\}/g, esc(a.name)).replace('<!--gebiet:steps-->', steps).replace(/data-gebiet-key/g, `data-area-key="${esc(a.key)}"`);
+    // „Honorar berechnen“: Tarifrechner gleich für dieses Rechtsgebiet
+    html = html.replace(/<a href="\/honorare" class="btn-outline kz-btn"[^>]*>Honorare<\/a>/g, `<a href="/honorare?gebiet=${esc(a.key)}#rechner" class="btn-outline kz-btn">Honorar berechnen</a>`);
     // Großes, zurückhaltendes Symbol des Rechtsgebiets hinter der Überschrift
     html = html.replace(/(<section class="kz-pagehead[^"]*" data-page="gebiet:[^"]+">)/g, `$1<span class="kz-pagehead-ico" aria-hidden="true">${icons.areaIcon(a.key)}</span>`);
   }
@@ -245,7 +247,7 @@ const BOOT_VIEW = {
   start: { team: '/api/team', news: '/api/public/news', stats: '/api/public/stats' },
   kanzlei: { stats: '/api/public/stats', reviews: '/api/public/reviews', positions: '/api/public/positions' },
   anwaelte: { team: '/api/team' },
-  honorare: { fees: '/api/fees', memberships: '/api/public/memberships' },
+  honorare: { fees: '/api/fees', memberships: '/api/public/memberships', team: '/api/team' },
   aktuelles: { news: '/api/public/news' },
   gebiet: { team: '/api/team' },
 };

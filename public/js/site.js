@@ -112,6 +112,8 @@
   }
   function applyAreas(list) {
     areaList = list || [];
+    window.PS.areaList = areaList; // Honorarrechner (honorar-site.js): „Worum geht es?“
+    if (window.PSHonorarSite) window.PSHonorarSite.setAreas(areaList);
     const sel = document.getElementById('tkArea');
     if (!sel || !areaList.length) return;
     const keep = sel.value;
@@ -143,6 +145,11 @@
     };
     const wish = Number(form.elements.teamMemberId && form.elements.teamMemberId.value);
     if (wish) data.teamMemberId = wish; // Wunschanwalt von der Teamkarte
+    // Aus dem Tarifrechner: Angebot (HON-…) speichern und mitschicken → Honorarvereinbarung in der Akte
+    if (form.dataset.draftSource === 'calc' && window.PSHonorarSite) {
+      const offer = await window.PSHonorarSite.ensureOffer().catch(() => null);
+      if (offer) data.offerCode = offer.code;
+    }
     clearFieldErrors(form);
     if (data.name.length < 2) return fieldError(form.elements.name, 'Bitte Ihren vollständigen Namen angeben.');
     if (data.description.length < 10) return fieldError(form.elements.description, `Bitte beschreiben Sie Ihr Anliegen kurz (mind. 10 Zeichen, aktuell ${data.description.length}).`);
@@ -293,7 +300,7 @@
   }
 
   /* ---------------------------------------------------------------- Honorarordnung & Tarifrechner */
-  function renderFees(fees, categories) {
+  function renderFees(fees, categories, extra = { fees }) {
     if (!fees.length) return; // statischer Inhalt der Seite bleibt als Rückfall bestehen
     // Kategorien aus der Honorarordnung (Einstellungen → Listen): Überschriften und Reiter; ohne Angabe die eingebauten
     const cats = categories && categories.length ? categories.map((c) => [c.key, c.name]) : FEE_CATEGORIES;
@@ -330,7 +337,7 @@
                 (f) => `
               <div class="price-item ledger-item p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2" data-name="${esc(`${f.name} ${f.description}`.toLowerCase())}" data-category="${key}" data-price="${Number(f.price)}">
                 <div><div class="font-medium text-white text-base">${esc(f.name)}</div><div class="text-xs text-[var(--text-muted)]">${esc(f.description)}</div></div>
-                <div class="num text-[var(--gold-500)] font-semibold text-lg whitespace-nowrap">${money(f.price)}</div>
+                <div class="num text-[var(--gold-500)] font-semibold text-lg whitespace-nowrap">${esc(window.PSHonorar ? window.PSHonorar.fromPrice(f).text : money(f.price))}</div>
               </div>`
               )
               .join('')}</div>
@@ -343,23 +350,9 @@
       if (typeof window.enhancePriceCategories === 'function') window.enhancePriceCategories(); // Kategorien auf-/zuklappbar
     }
 
-    const calc = document.getElementById('calcOptions');
-    const calcFees = fees.filter((f) => f.inCalculator);
-    if (calc && calcFees.length) {
-      calc.innerHTML = calcFees
-        .map(
-          (f) => `
-        <label class="calc-opt">
-          <span class="calc-opt-main min-w-0">
-            <input type="checkbox" class="calc-check" value="${Number(f.price)}" data-name="${esc(f.name)}">
-            <span class="calc-opt-name">${esc(f.name)}</span>
-          </span>
-          <span class="calc-opt-price">${money(f.price)}</span>
-        </label>`
-        )
-        .join('');
-      if (typeof window.calculateTotal === 'function') window.calculateTotal();
-    }
+    // Tarifrechner: honorar-site.js (lädt nach dieser Datei – deshalb auch hier ablegen)
+    window.PS.feesData = extra;
+    if (window.PSHonorarSite) window.PSHonorarSite.setData(extra);
   }
 
   /* ---------------------------------------------------------------- VIP & Lifetime (Angebot aus dem Dashboard) */
@@ -637,7 +630,7 @@
     });
 
   if (has('priceListContainer', 'calcOptions')) window.PS.boot('fees', '/api/fees')
-    .then((r) => renderFees(r.fees || [], r.categories))
+    .then((r) => renderFees(r.fees || [], r.categories, r))
     .catch(() => {});
 
   if (has('vipTiers')) window.PS.boot('memberships', '/api/public/memberships')
