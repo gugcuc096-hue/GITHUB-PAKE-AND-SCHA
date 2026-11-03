@@ -9,6 +9,15 @@
   const { api, esc, money, copy, fieldError, fieldErrors, clearFieldErrors } = window.PS;
   let me = null;
 
+  // Leerer Zustand: Symbol im goldenen Kreis und ein freundlicher Satz statt einer kahlen Zeile
+  const EMPTY_ICO = {
+    users: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z',
+    bell: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9',
+    refresh: 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15',
+  };
+  const empty = (ico, text, tag = 'p') =>
+    `<${tag} class="kz-empty is-rich"><span class="kz-empty-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${EMPTY_ICO[ico]}"/></svg></span><span class="kz-empty-text">${text}</span></${tag}>`;
+
   // Dienststatus: [Beschriftung, Punktfarbe, Textfarbe]
   const DUTY = {
     dienst: ['Im Dienst', 'bg-emerald-400', 'text-emerald-300'],
@@ -220,7 +229,7 @@
   function renderTeam(team) {
     const grid = document.getElementById('teamGrid');
     if (grid) {
-      if (!team.length) grid.innerHTML = '<p class="kz-empty">Aktuell sind keine Anwälte hinterlegt.</p>';
+      if (!team.length) grid.innerHTML = empty('users', 'Gerade stellt sich hier noch niemand vor – schreiben Sie uns trotzdem, wir melden uns.');
       else {
         const groups = [
           ['Board of Partners', 'Leitende Gesellschafter', team.filter((m) => m.tier === 'leitung')],
@@ -238,7 +247,7 @@
       lead.dataset.n = String(list.length);
       if (list.length) lead.innerHTML = list.map(personCard).join('');
       else {
-        lead.innerHTML = '<p class="kz-empty">Keine Anwälte ausgewählt.</p>';
+        lead.innerHTML = empty('users', 'Hier erscheinen bald die Gesichter der Kanzlei.');
         lead.closest('section').classList.add('hidden');
       }
     }
@@ -623,7 +632,7 @@
     })
     .catch(() => {
       const grid = document.getElementById('teamGrid');
-      if (grid) grid.innerHTML = '<p class="kz-empty">Die Anwälte konnten nicht geladen werden.</p>';
+      if (grid) grid.innerHTML = empty('refresh', 'Die Anwälte konnten gerade nicht geladen werden – bitte laden Sie die Seite neu.');
       document.getElementById('leadGrid')?.closest('section').classList.add('hidden');
     });
 
@@ -676,6 +685,13 @@
   /* ---------------------------------------------------------------- Mandantenstimmen */
   // Nur echte, vom Board freigegebene Bewertungen – ab drei Stück erscheint der Abschnitt, vorher bleibt er weg.
   const track = document.getElementById('testimonialTrack');
+  const initialsOf = (name) =>
+    String(name || '')
+      .split(/\s+/)
+      .map((w) => w.replace(/[^\p{L}\p{N}]/gu, '')[0] || '')
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || '★';
   if (track) {
     window.PS.boot('reviews', '/api/public/reviews')
       .then(({ reviews }) => {
@@ -684,7 +700,7 @@
           .slice(0, 6)
           .map(
             (r) => `<figure class="kz-quote"><div class="kz-stars" aria-label="${r.rating} von 5 Sternen">${'★'.repeat(r.rating)}<span style="opacity:.25">${'★'.repeat(5 - r.rating)}</span></div>
-              <blockquote>„${esc(r.body)}“</blockquote><figcaption>${esc(r.name)}${r.area ? ` · ${esc(r.area)}` : ''}</figcaption></figure>`
+              <blockquote>„${esc(r.body)}“</blockquote><figcaption><span class="kz-avatar" aria-hidden="true">${esc(initialsOf(r.name))}</span><span>${esc(r.name)}${r.area ? `<small>${esc(r.area)}</small>` : ''}</span></figcaption></figure>`
           )
           .join('');
         document.getElementById('stimmen')?.classList.remove('hidden');
@@ -701,6 +717,30 @@
       if (teaser && lastNews.length) teaser.innerHTML = lastNews.slice(0, Math.max(1, Number(teaser.dataset.count) || 3)).map(newsCard).join('');
     },
   };
+  // Abschnitte abwechselnd auf einem leicht helleren Band (statt Trennlinien): jeder zweite sichtbare Abschnitt.
+  // Neu gezählt, wenn ein Abschnitt erscheint (Stimmen, Meldungen) oder auf der Seite umsortiert wird.
+  const main = document.querySelector('body.site-home main');
+  if (main) {
+    const bands = () => {
+      let i = 0;
+      for (const sec of main.querySelectorAll(':scope > section.kz-section')) {
+        const shown = !sec.classList.contains('hidden') && !sec.hidden && !sec.classList.contains('is-flush');
+        const want = shown && i++ % 2 === 1;
+        if (sec.classList.contains('is-band') !== want) sec.classList.toggle('is-band', want);
+      }
+    };
+    bands();
+    let queued = false;
+    const later = () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => ((queued = false), bands()));
+    };
+    const watch = new MutationObserver(later);
+    watch.observe(main, { childList: true });
+    for (const sec of main.querySelectorAll(':scope > section')) watch.observe(sec, { attributes: true, attributeFilter: ['class', 'hidden'] });
+  }
+
   // Profilseite: Telefonnummer des Anwalts mit einem Klick kopieren
   document.addEventListener('click', async (e) => {
     const b = e.target.closest && e.target.closest('[data-copy]');
@@ -729,7 +769,7 @@
     window.PS.boot('news', '/api/public/news')
       .then(({ news }) => {
         const list = document.getElementById('newsList');
-        if (list) list.innerHTML = news.length ? news.map(newsItem).join('') : '<li class="kz-empty">Derzeit keine Meldungen.</li>';
+        if (list) list.innerHTML = news.length ? news.map(newsItem).join('') : empty('bell', 'Gerade gibt es nichts Neues – sobald sich etwas tut, lesen Sie es hier.', 'li');
         lastNews = news;
         const teaser = document.getElementById('newsTeaser');
         if (teaser && news.length) {
@@ -739,7 +779,7 @@
       })
       .catch(() => {
         const list = document.getElementById('newsList');
-        if (list) list.innerHTML = '<li class="kz-empty">Meldungen konnten nicht geladen werden.</li>';
+        if (list) list.innerHTML = empty('refresh', 'Die Meldungen konnten gerade nicht geladen werden – bitte versuchen Sie es gleich noch einmal.', 'li');
       });
 
   /* ---------------------------------------------------------------- Verfahrensstand (Aktenzeichen + Pin) */

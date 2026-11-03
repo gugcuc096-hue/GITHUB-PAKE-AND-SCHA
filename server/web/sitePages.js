@@ -189,6 +189,8 @@ function shape(html, view) {
     const a = view.area;
     const steps = a.steps.map((st) => `<li>${esc(st)}</li>`).join('');
     html = html.replace(/\{\{gebiet:name\}\}/g, esc(a.name)).replace('<!--gebiet:steps-->', steps).replace(/data-gebiet-key/g, `data-area-key="${esc(a.key)}"`);
+    // Großes, zurückhaltendes Symbol des Rechtsgebiets hinter der Überschrift
+    html = html.replace(/(<section class="kz-pagehead[^"]*" data-page="gebiet:[^"]+">)/g, `$1<span class="kz-pagehead-ico" aria-hidden="true">${icons.areaIcon(a.key)}</span>`);
   }
   html = html.replace(/(id="factAreas">)\d+/, `$1${areas.length}`); // Eckdaten: Zahl der Rechtsgebiete
   if (view.key === 'start') {

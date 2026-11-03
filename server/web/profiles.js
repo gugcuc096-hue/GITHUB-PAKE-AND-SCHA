@@ -21,6 +21,7 @@ const AREA_LABEL = new Proxy({}, { get: (_, k) => (typeof k === 'string' && k !=
 
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const num = (n, d = 0) => n.toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d });
+const initials = (name) => String(name || '').split(/\s+/).filter(Boolean).map((w) => w.replace(/[^\p{L}\p{N}]/gu, '')[0] || '').join('').slice(0, 2).toUpperCase() || '★';
 
 /** Adresse aus dem Namen: „Dr. Jürgen Weiß“ → „dr-juergen-weiss“. */
 function slugify(name) {
@@ -102,13 +103,24 @@ function render(member, facts, { origin, url }) {
   // Schwerpunkte: vom Board eingetragen, sonst die häufigsten Rechtsgebiete seiner Akten
   const focus = member.focus.length ? member.focus : facts.focus;
   const tiles = [];
-  if (facts.closed) tiles.push(['Abgeschlossene Mandate', num(facts.closed), '']);
-  if (facts.successRate !== null) tiles.push(['Erfolgsquote', `${facts.successRate} %`, 'der Verfahren mit Ergebnis']);
-  if (facts.rating) tiles.push(['Bewertung', `★ ${num(facts.rating.avg, 1)}`, `aus ${facts.rating.count} Mandantenstimmen`]);
+  if (facts.closed) tiles.push(['Abgeschlossene Mandate', num(facts.closed), 'seit Beginn bei der Kanzlei', 'check']);
+  if (facts.successRate !== null) tiles.push(['Erfolgsquote', `${facts.successRate} %`, 'der Verfahren mit Ergebnis', 'chart', facts.successRate]);
+  if (facts.rating) tiles.push(['Bewertung', `${num(facts.rating.avg, 1)}`, `aus ${facts.rating.count} Mandantenstimmen`, 'star', null, facts.rating.avg]);
   const section = (title, body) => `<section class="pf-section"><h2 class="pf-h">${title}</h2>${body}</section>`;
   const blocks = [
     tiles.length
-      ? `<div class="pf-stats">${tiles.map(([l, v, s]) => `<div class="panel kpi"><div class="kpi-label">${esc(l)}</div><div class="kpi-value">${esc(v)}</div><div class="kpi-sub">${esc(s)}</div></div>`).join('')}</div>`
+      ? `<div class="pf-stats">${tiles
+          .map(([l, v, s, ico, pct, stars]) => {
+            // Kleine Zugabe je Kachel: Balken für die Quote, Sterne für die Bewertung
+            const extra =
+              pct != null
+                ? `<span class="kpi-bar" aria-hidden="true"><i style="width:${Math.max(0, Math.min(100, pct))}%"></i></span>`
+                : stars != null
+                  ? `<span class="kpi-stars" aria-hidden="true">${[1, 2, 3, 4, 5].map((n) => `<i class="${stars >= n - 0.25 ? 'on' : ''}">★</i>`).join('')}</span>`
+                  : '';
+            return `<div class="kpi"><span class="kpi-ico" aria-hidden="true">${require('./icons').svg(ico)}</span><div class="kpi-label">${esc(l)}</div><div class="kpi-value">${esc(v)}</div>${extra}<div class="kpi-sub">${esc(s)}</div></div>`;
+          })
+          .join('')}</div>`
       : '',
     focus.length ? section('Schwerpunkte', `<div class="pf-chips">${focus.map((f) => `<span class="pf-chip">${esc(f)}</span>`).join('')}</div>`) : '',
     member.highlights.length || facts.wins.length
@@ -122,7 +134,7 @@ function render(member, facts, { origin, url }) {
       ? section(
           'Mandantenstimmen',
           `<div class="pf-reviews">${facts.reviews
-            .map((r) => `<figure class="pf-review"><div class="pf-stars" aria-label="${r.rating} von 5 Sternen">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</div><blockquote>„${esc(r.body)}“</blockquote><figcaption>– ${esc(r.name)}</figcaption></figure>`)
+            .map((r) => `<figure class="pf-review"><div class="pf-stars" aria-label="${r.rating} von 5 Sternen">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</div><blockquote>„${esc(r.body)}“</blockquote><figcaption><span class="kz-avatar" aria-hidden="true">${esc(initials(r.name))}</span><span>${esc(r.name)}</span></figcaption></figure>`)
             .join('')}</div>`
         )
       : '',
