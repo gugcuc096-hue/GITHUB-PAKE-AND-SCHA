@@ -12,6 +12,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { db } = require('../db/db');
 const ranks = require('../domain/ranks');
+const icons = require('./icons');
 const { collect, jsonForHtml } = require('../domain/collect');
 
 const PAGES = { index: 'index.html', karriere: 'karriere.html' };
@@ -79,6 +80,8 @@ function render(page, origin, view = null) {
     }
   }
   if (page === 'index') html = shape(html, view || { key: 'start' });
+  // Symbole aus dem Dashboard (<!--icon:name-->), damit Website und Dashboard dieselben zeigen
+  html = html.replace(/<!--icon:([a-zA-Z]+)-->/g, (_, n) => icons.svg(n));
   html = html.replace(/(content=")\/img\/og-image\.png"/g, `$1${origin}/img/og-image.png"`);
   return html.replace('</head>', `    ${require('./seo').headExtras(page, origin, view)}\n</head>`);
 }
@@ -124,6 +127,50 @@ function metaOf(view) {
   return VIEWS[view.key];
 }
 
+const HEAD_EXTRAS = '<style>@view-transition { navigation: auto; }</style>';
+
+/** Zweiter Knopf im Startbereich (Startseite anpassen → Startbereich). */
+const HERO_LINKS = { anwaelte: ['/anwaelte', 'Unsere Anwälte'], verfahrensstand: ['/verfahrensstand', 'Verfahrensstand abfragen'], honorare: ['/honorare', 'Honorare & Tarifrechner'], kontakt: ['/kontakt', 'Kontakt'] };
+const START_SECTION = /<section\b[^>]*\bdata-start="([a-z]+)"[^>]*>[\s\S]*?<\/section>\s*/g;
+/** Einstellungen der Startseite anwenden: Abschnitte (Reihenfolge, ausblenden), Rechtsgebiete, Anwälte, Meldungen, Startbereich. */
+function applyStart(html, cfg, edit = false) {
+  const { START_IDS } = require('./siteConfig');
+  const order = [...cfg.order.filter((id) => START_IDS.includes(id)), ...START_IDS.filter((id) => !cfg.order.includes(id))];
+  const hidden = new Set(cfg.hidden);
+  const found = new Map();
+  let first = -1;
+  html = html.replace(START_SECTION, (all, id, at) => {
+    if (first < 0) first = at;
+    // Bearbeitungsmodus (Startseite anpassen): ausgeblendete Abschnitte bleiben sichtbar markiert, damit man sie wieder einschalten kann
+    if (!hidden.has(id)) found.set(id, all);
+    else if (edit) found.set(id, all.replace('<section', '<section data-sc-hidden'));
+    return '\u0000';
+  });
+  if (first >= 0) {
+    const sorted = order.filter((id) => found.has(id)).map((id) => found.get(id)).join('');
+    let placed = false;
+    html = html.replace(/\u0000/g, () => (placed ? '' : ((placed = true), sorted)));
+  }
+  // Rechtsgebiete: nur die gewählten, in dieser Reihenfolge (leer = alle)
+  if (cfg.areas.length && !edit) {
+    html = html.replace(/(<section id="gebiete"[\s\S]*?<ol class="[^"]*">)([\s\S]*?)(<\/ol>)/, (all, a, list, b) => {
+      const items = new Map([...list.matchAll(/<li\b[^>]*\bdata-area="([a-z0-9-]+)"[^>]*>[\s\S]*?<\/li>/g)].map((m) => [m[1], m[0]]));
+      const picked = cfg.areas.filter((k) => items.has(k)).map((k) => items.get(k));
+      return a + (picked.length ? picked : [...items.values()]).join('') + b;
+    });
+  }
+  html = html.replace('id="leadGrid" class="kz-people" data-mode="leitung" data-count="3"', `id="leadGrid" class="kz-people" data-mode="${esc(cfg.lawyerMode)}" data-count="${Number(cfg.lawyerCount) || 3}" data-ids="${cfg.lawyers.map(Number).join(',')}"`);
+  html = html.replace('id="newsTeaser" class="kz-news-cards" data-count="3"', `id="newsTeaser" class="kz-news-cards" data-count="${Number(cfg.newsCount) || 3}"`);
+  if (cfg.heroSecond !== 'notdienst') {
+    const l = HERO_LINKS[cfg.heroSecond];
+    if (l) html = html.replace(/<!--hero:second-->[\s\S]*?<!--\/hero:second-->/, `<a href="${l[0]}" class="btn-outline kz-btn is-lg" data-hero-second="${esc(cfg.heroSecond)}">${esc(l[1])}</a>`);
+    else if (edit) html = html.replace('data-hero-second="notdienst"', 'data-hero-second="notdienst" hidden');
+    else html = html.replace(/<!--hero:second-->[\s\S]*?<!--\/hero:second-->/, '');
+  }
+  if (!cfg.heroNote) html = edit ? html.replace('<!--hero:note--><p class="kz-hero-note"', '<!--hero:note--><p class="kz-hero-note" hidden') : html.replace(/<!--hero:note-->[\s\S]*?<!--\/hero:note-->/, '');
+  return html;
+}
+
 const SECTION = /<section\b[^>]*\bdata-page="([^"]+)"[^>]*>[\s\S]*?<\/section>/g;
 function shape(html, view) {
   const want = view.key === 'gebiet' ? (AREA_PAGES.includes(view.area.key) ? `gebiet:${view.area.key}` : 'gebiet:*') : view.key;
@@ -135,13 +182,23 @@ function shape(html, view) {
   html = html.replace(/<!--areas:more-->/g, () =>
     areas
       .filter((a) => !AREA_PAGES.includes(a.key))
-      .map((a) => `<li class="kz-area" data-area="${esc(a.key)}"><a href="/rechtsgebiete/${esc(a.key)}"><span class="kz-area-name">${esc(a.name)}</span><span class="kz-area-text">${esc(a.intakeTitle || a.name)}</span><span class="kz-more">Zum Rechtsgebiet</span></a></li>`)
+      .map((a) => `<li class="kz-tile" data-area="${esc(a.key)}"><a href="/rechtsgebiete/${esc(a.key)}"><span class="kz-tile-ico">${icons.areaIcon(a.key)}</span><span class="kz-area-name">${esc(a.name)}</span><span class="kz-area-text">${esc(a.intakeTitle || a.name)}</span><span class="kz-more">Zum Rechtsgebiet</span></a></li>`)
       .join('')
   );
   if (view.key === 'gebiet') {
     const a = view.area;
     const steps = a.steps.map((st) => `<li>${esc(st)}</li>`).join('');
     html = html.replace(/\{\{gebiet:name\}\}/g, esc(a.name)).replace('<!--gebiet:steps-->', steps).replace(/data-gebiet-key/g, `data-area-key="${esc(a.key)}"`);
+  }
+  html = html.replace(/(id="factAreas">)\d+/, `$1${areas.length}`); // Eckdaten: Zahl der Rechtsgebiete
+  if (view.key === 'start') {
+    let start = null;
+    try {
+      start = require('./siteConfig').get('home').start;
+    } catch {
+      /* Standard */
+    }
+    html = applyStart(html, start || require('./siteConfig').START_DEFAULTS, !!view.edit);
   }
   // Übrige Rechtsgebiete unter einem Rechtsgebiet (ohne das aktuelle)
   if (view.key === 'gebiet') {
@@ -162,6 +219,10 @@ function shape(html, view) {
   const navKey = view.key === 'gebiet' ? 'rechtsgebiete' : view.key === 'profil' ? 'anwaelte' : view.key;
   html = html.replace(new RegExp(`data-nav="${navKey}"`, 'g'), `data-nav="${navKey}" aria-current="page"`);
   html = html.replace(/<body([^>]*)class="/, `<body$1data-view="${view.key}" class="`);
+  // Weiche Seitenwechsel zwischen den Unterseiten (Kopf und Fußzeile bleiben stehen, nur der Inhalt blendet über) –
+  // nur auf diesen Seiten: Anmeldung, Dashboard usw. machen nicht mit, dorthin geht es wie bisher.
+  // (Vorladen beim Darüberfahren: js/sitenav.js)
+  html = html.replace('</head>', `    ${HEAD_EXTRAS}\n</head>`);
   // Kanzleisitz gleich richtig (sonst kurz der Standardwert)
   try {
     const { firmSeat, firmPlace } = require('../db/models');
@@ -206,6 +267,7 @@ function handler(page) {
       if (page === 'index') {
         view = viewOf(req.path);
         if (!view) return next();
+        if (view.key === 'start' && 'bearbeiten' in req.query) view = { ...view, edit: true }; // Startseite anpassen (Board)
       }
       const html = await shell(req, view, undefined, page);
       res.set('Cache-Control', 'private, no-cache'); // enthält den Anmeldestatus der Person
@@ -235,4 +297,4 @@ function previewHandler(file) {
   };
 }
 
-module.exports = { shell, PAGES, VIEWS, AREA_PAGES, texts, render, handler, previewHandler, keyOf, viewOf, metaOf, publicAreas };
+module.exports = { HERO_LINKS, applyStart, shell, PAGES, VIEWS, AREA_PAGES, texts, render, handler, previewHandler, keyOf, viewOf, metaOf, publicAreas };

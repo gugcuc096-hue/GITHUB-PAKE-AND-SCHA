@@ -428,10 +428,10 @@ Statt einer langen Startseite hat die Website echte Unterseiten – jede mit eig
 
 | Adresse | Inhalt |
 |---|---|
-| `/` | Startseite: Kanzleisiegel, Rechtsgebiete, Kanzleileitung, die neuesten Meldungen, Ablauf eines Mandats |
+| `/` | Startseite: zentrierter Startbereich („Recht bekommen.“ mit Goldschimmer), Eckdaten, Rechtsgebiete als Kacheln, Anwälte, die neuesten Meldungen, Abschluss – **direkt auf der Seite anpassbar** (siehe unten) |
 | `/kanzlei` | Über die Kanzlei, vier Grundsätze, Ablauf, Ränge, Mandantenstimmen (nur echte, ab drei), Karriere |
 | `/rechtsgebiete` und `/rechtsgebiete/<gebiet>` | Strafrecht, Zivilrecht, Verfassungsrecht, Vertragsrecht – Leistungen, **Verfahrensschritte aus Einstellungen → Listen**, Anwälte mit diesem Schwerpunkt; vom Board angelegte Rechtsgebiete bekommen automatisch eine Seite, ausgeblendete verschwinden |
-| `/anwaelte` | Board of Partners und Associates mit Foto oder Monogramm-Siegel, „Direkt anfragen“; Profile unter `/team/<name>` im selben Design |
+| `/anwaelte` | Board of Partners und Associates als gleich hohe Karten: Foto oder Initialen auf Gold, Rang, Name, Schwerpunkte (ohne Eintrag automatisch aus den Akten), „Mandat anfragen“; die ganze Karte führt zum Profil `/team/<name>`; Anwalt des Monats mit goldenem Band |
 | `/honorare` | Tarifrechner, Honorarordnung, VIP & Lifetime |
 | `/notdienst` | Wer gerade im Dienst ist (live), was bei einer Festnahme zu tun ist, „Notfall-Mandat anfragen“ |
 | `/aktuelles` | Meldungen des Boards (Einstellungen → Aktuelles: schreiben, anheften, verbergen) und automatisch: neu im Team, Beförderungen, offene Stellen (je abschaltbar unter Einstellungen → Startseite) |
@@ -441,7 +441,20 @@ Statt einer langen Startseite hat die Website echte Unterseiten – jede mit eig
 
 Alte Links auf Abschnitte der früheren Startseite (`/#honorar`, `/#team` …) führen automatisch zur neuen Unterseite. Alle Texte bleiben im Bearbeitungsmodus (`?bearbeiten`) änderbar.
 
-**Gestaltung:** ruhig und typografisch wie eine Kanzlei – Überschriften in Cormorant Garamond, Text in Inter, Gold nur als Linie, Rubrik und Knopf; Listen und Haarlinien statt leuchtender Karten, keine Silbentrennung, nur weiches Einblenden. **Keine Programmierschrift** mehr – auch nicht im Dashboard, auf Rechnungen, Aktenauszügen und im Word-Export: Zahlen und Aktenzeichen stehen in Inter mit gleich breiten Ziffern. Technisch steht die ganze Website in `public/index.html` (jeder Abschnitt mit `data-page="…"`), der Server liefert je Adresse nur die passenden Abschnitte (`server/web/sitePages.js`); das Designsystem liegt in `public/css/kanzlei.css`.
+**Website und Dashboard aus einem Guss:** beide nutzen dieselben Werte aus `public/css/tokens.css` (Farben, drei Rundungen, Schatten, Abstände 8/16/24/40/64, sechs Schriftgrößen, eine Bewegungskurve mit drei Dauern) – Stil & Saison wirkt deshalb auf beide gleich. Dazu dieselben Bausteine: Flächen wie die Panels im Dashboard, Pillen-Knöpfe mit Goldverlauf, Initialen-Avatare, Badges, leere Zustände und **dieselben Symbole** (der Server liest sie aus dem Dashboard, `server/web/icons.js`). Regeln gegen Überladung: höchstens ein goldener Knopf je Abschnitt, Karte = Titel + ein Satz + eine Handlung, kein Leuchten im Ruhezustand, Gold nur für Handlung und „aktiv“. Glas (Weichzeichner) nur auf schwebenden Ebenen – Kopfzeile, Menüs, Fenster –, in der schnellen Grafikstufe deckend. Kein Siegel mehr; die Fußzeile zeigt Logo und den Notdienst live.
+
+**Bewegung:** weiche Seitenwechsel zwischen den Unterseiten (View Transitions – Kopfzeile bleibt stehen, nur der Inhalt blendet über; Anmeldung und Dashboard machen nicht mit), Unterseiten werden beim Darüberfahren schon geladen (`public/js/sitenav.js`), Karten erscheinen beim Scrollen nacheinander, Aufklappmenü öffnet weich mit versetzten Einträgen, das Handy-Menü gleitet von rechts herein, Karten heben sich beim Darüberfahren mit wachsendem Goldstrich, Glanz über dem goldenen Knopf, Zahlen zählen hoch. Unter dem Menü liegt ein **leuchtender goldener Strich** unter der aktuellen Seite, folgt der Maus und gleitet beim Seitenwechsel von der alten zur neuen Stelle. Bei „Bewegung reduzieren“ steht alles still (`calm.css`).
+
+**Startseite auf der Seite anpassen** (Board, `/?bearbeiten` → „Startseite anpassen“, auch verlinkt unter Einstellungen → Startseite): an jedem Abschnitt eine kleine Leiste (nach oben/unten, ausblenden, Einstellungen) und eine Seitenleiste mit
+- **Abschnitten** unter dem Startbereich: Eckdaten, Rechtsgebiete, Anwälte, Aktuelles, Ablauf eines Mandats, Abschluss – Reihenfolge und ein/aus,
+- **Anwälten**: Kanzleileitung, eigene Auswahl (wer und in welcher Reihenfolge), wer im Dienst ist zuerst, oder alle – und wie viele Karten,
+- **Rechtsgebieten**: welche und in welcher Reihenfolge,
+- **Aktuelles**: wie viele Meldungen,
+- **Startbereich**: zweiter Knopf (Notdienst, Anwälte, Verfahrensstand, Honorare, Kontakt oder keiner) und der Hinweis „Bereits Mandant?“.
+
+Jede Änderung zeigt sich sofort; „Veröffentlichen“ speichert sie in der Konfiguration „Startseite“ (mit Änderungsprotokoll). Der Server wendet sie beim Ausliefern an – ohne Flackern. Texte und Überschriften ändert man wie bisher durch Anklicken.
+
+Typografie: Überschriften in Cormorant Garamond, Text in Inter, keine Silbentrennung. **Keine Programmierschrift** mehr – auch nicht im Dashboard, auf Rechnungen, Aktenauszügen und im Word-Export: Zahlen und Aktenzeichen stehen in Inter mit gleich breiten Ziffern. Technisch steht die ganze Website in `public/index.html` (jeder Abschnitt mit `data-page="…"`, Startseiten-Abschnitte zusätzlich mit `data-start="…"`), der Server liefert je Adresse nur die passenden Abschnitte (`server/web/sitePages.js`); das Designsystem der Website liegt in `public/css/kanzlei.css`, die Anpassung in `public/js/sitecustom.js`.
 
 ## Saubere Adressen
 
@@ -645,6 +658,7 @@ server/domain/lawyerOfMonth.js Anwalt des Monats: Punkte aus dem Vormonat, Modus
 seeds/stgb.json  Strafgesetzbuch des Staates San Andreas: Gesetzestext je Paragraph und Strafkatalog (Stand 10/2026)
 server/web/profiles.js Anwalts-Profilseiten /team/<name> (in der Hülle der Website, Abschnitt data-page="profil", Link-Vorschau mit Foto, Zahlen ab Mindestanzahl)
 server/web/sitePages.js Website in Unterseiten (index.html → je Adresse die Abschnitte mit data-page, Titel, Link-Vorschau)
+server/web/icons.js     Symbole des Dashboards (01-basis.js → ICONS) für die Website
 server/domain/news.js   Aktuelles: Meldungen des Boards + automatische (neu im Team, Beförderung, offene Stelle)
 server/web/assets.js Schnell laden: Versionsnummern für Skripte/CSS (ein Jahr im Browser), Dashboard-Teile als ein Bündel
 server/db/trash.js Papierkorb für Akten: Momentaufnahme beim Löschen, Wiederherstellen, endgültig löschen nach 30 Tagen
@@ -685,5 +699,5 @@ public/js/       je Seite ein Skript (home.js, login.js, register.js, karriere.j
 public/js/dashboard/  das Dashboard in 15 Teilen (01-basis … 09-profil-board + 09-verwaltung … 12-recht, 13-bewegung, 13-kanzlei, 14-start), von dashboard.html in dieser Reihenfolge geladen
 ```
 
-**Stylesheets (`public/css/`), in dieser Reihenfolge geladen:** `fonts.css` (Schriften) · `app.css` (Bausteine des Dashboards: Gerüst, Listen, Akte, Kalender, Fenster …) · `website.css` bzw. `karriere.css` (nur Startseite bzw. Karriereseite) · `tailwind.css` (fest gebaut) · `select.css` (Auswahllisten) · `controls.css` (Häkchen, Optionsfelder, Datei-Knopf) · `depth.css` (Licht, Schatten, Glas) · `motion.css` (Zeiten und Kurven aller Bewegungen) · `season.css` (Saison-Deko, lädt `season.js` nur bei aktiver Saison) · `calm.css` zuletzt (nur bei „Bewegung reduzieren“). Farben, Abstände und Zeiten kommen aus Variablen (`--gold-500`, `--sh-1…4`, `--m-panel` …). Größere `<style>`-Blöcke in den Seiten sind nicht erlaubt (Test), nur die Druckansichten bringen ihr Layout selbst mit.
+**Stylesheets (`public/css/`), in dieser Reihenfolge geladen:** `fonts.css` (Schriften) · `tokens.css` (gemeinsame Werte von Website und Dashboard: Farben, Rundungen, Schatten, Abstände, Schriftgrößen, Bewegung) · `app.css` (Bausteine des Dashboards: Gerüst, Listen, Akte, Kalender, Fenster …) · `website.css` bzw. `karriere.css` (nur Startseite bzw. Karriereseite) · `tailwind.css` (fest gebaut) · `select.css` (Auswahllisten) · `controls.css` (Häkchen, Optionsfelder, Datei-Knopf) · `depth.css` (Licht, Schatten, Glas) · `motion.css` (Zeiten und Kurven aller Bewegungen) · `season.css` (Saison-Deko, lädt `season.js` nur bei aktiver Saison) · `kanzlei.css` (Website: Unterseiten, Kacheln, Anwalts-Karten, Kopf- und Fußzeile) · `calm.css` (nur bei „Bewegung reduzieren“) · `gfx.css` zuletzt (Grafikstufe). Farben, Abstände und Zeiten kommen aus Variablen (`--gold-500`, `--sh-1…4`, `--m-panel` …). Größere `<style>`-Blöcke in den Seiten sind nicht erlaubt (Test), nur die Druckansichten bringen ihr Layout selbst mit.
 

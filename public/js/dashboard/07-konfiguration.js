@@ -120,6 +120,7 @@ function cfgHome() {
   return `<section class="panel panel-pad">
       <div class="panel-head"><h2 class="panel-title">Website</h2></div>
       <p class="text-sm text-muted mb-4">Abschnitte der Website ein- und ausblenden (jeder steht auf seiner Unterseite), Fragen &amp; Antworten selbst pflegen, Links zu Discord &amp; Co. und welche Kennzahlen öffentlich stehen. Einzelne Texte ändern Sie direkt auf der Seite (Reiter „Website &amp; Ränge“).</p>
+      <p class="mb-4"><a class="btn-outline btn-md" href="/?bearbeiten" target="_blank" rel="noopener">${icon('globe', 'ico-sm')}<span>Startseite auf der Seite anpassen</span></a> <span class="text-xs text-dim">Welche Anwälte, Rechtsgebiete und Meldungen, Reihenfolge der Abschnitte, Startbereich.</span></p>
       <form data-form="cfg-home" class="form-grid">
         <div><div class="label">Abschnitte der Website (Häkchen entfernen = ausblenden)</div>
           <div class="home-secs" id="cfgSections">${order
@@ -162,6 +163,7 @@ function cfgCollectHome(f) {
     contactEmail: cfgWork('home').contactEmail || '',
     kpis: { closed: f.querySelector('[name="kpi-closed"]').checked, success: f.querySelector('[name="kpi-success"]').checked, rating: f.querySelector('[name="kpi-rating"]').checked },
     news: { hires: !!f.querySelector('[name="news-hires"]')?.checked, promotions: !!f.querySelector('[name="news-promotions"]')?.checked, positions: !!f.querySelector('[name="news-positions"]')?.checked },
+    start: cfgWork('home').start, // Startseite (Anwälte, Rechtsgebiete, Abschnitte …) stellt das Board direkt auf der Seite ein
   };
 }
 

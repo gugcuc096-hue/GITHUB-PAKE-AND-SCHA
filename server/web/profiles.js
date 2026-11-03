@@ -92,7 +92,7 @@ function render(member, facts, { origin, url }) {
   const photo = member.photoUrl ? `${origin}${member.photoUrl}` : `${origin}/img/og-image.png`;
   const portrait = member.photoUrl
     ? `<img class="pf-photo" src="${esc(member.photoUrl)}" alt="${esc(member.name)}" width="144" height="144" decoding="async">`
-    : `<span class="pf-photo kz-mono" aria-hidden="true">${esc(member.initials || '?')}</span>`;
+    : `<span class="pf-photo kz-mono" aria-hidden="true">${esc(String(member.initials || '').replace(/[^\p{L}\p{N}]/gu, '').slice(0, 2).toUpperCase() || '–')}</span>`;
   const duty = member.duty ? `<p class="pf-duty"><span class="duty-dot s-${esc(member.duty)}"></span>${esc(DUTY_STATUS[member.duty] || '')}</p>` : '';
 
   // Schwerpunkte: vom Board eingetragen, sonst die häufigsten Rechtsgebiete seiner Akten
@@ -131,7 +131,7 @@ function render(member, facts, { origin, url }) {
                 <div class="pf-head">
                     <div class="pf-portrait">${portrait}</div>
                     <div class="min-w-0">
-                        <span class="kz-rubric">${lead ? 'Board of Partners' : 'Associate Attorneys'}</span>${member.lawyerOfMonth ? ` <span class="lotm-badge" title="Für herausragende Arbeit im ${esc(member.lawyerOfMonth)}">Anwalt des Monats</span>` : ''}
+                        <span class="kz-rubric">${lead ? 'Board of Partners' : 'Associate Attorneys'}</span>${member.lawyerOfMonth ? ` <span class="kz-lotm is-inline lotm-badge" title="Für herausragende Arbeit im ${esc(member.lawyerOfMonth)}">Anwalt des Monats</span>` : ''}
                         <h1 class="kz-h1 pf-name">${esc(member.name)}</h1>
                         <p class="pf-rank">${esc(member.roleTitle)}</p>
                         ${duty}

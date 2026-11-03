@@ -24,6 +24,31 @@ const SECTIONS = {
 };
 const SECTION_IDS = Object.keys(SECTIONS);
 
+/*
+ * Startseite der Website, direkt auf der Seite einstellbar (Board, ?bearbeiten → „Startseite anpassen“):
+ * Reihenfolge und Sichtbarkeit der Abschnitte unter dem Startbereich, welche Anwälte (und wie viele), welche
+ * Rechtsgebiete, wie viele Meldungen und der zweite Knopf im Startbereich. Angewendet beim Ausliefern
+ * (server/web/sitePages.js → applyStart), also ohne Flackern.
+ */
+const START_SECTIONS = { fakten: 'Eckdaten', gebiete: 'Rechtsgebiete', ansprechpartner: 'Anwälte', neuigkeiten: 'Aktuelles', ablauf: 'Ablauf eines Mandats', band: 'Abschluss mit „Mandat anfragen“' };
+const START_IDS = Object.keys(START_SECTIONS);
+const LAWYER_MODES = { leitung: 'Kanzleileitung (Board of Partners)', auswahl: 'Eigene Auswahl', dienst: 'Wer gerade im Dienst ist zuerst', alle: 'Alle Anwälte' };
+const HERO_SECOND = { notdienst: 'Notdienst bei Festnahme', anwaelte: 'Unsere Anwälte', verfahrensstand: 'Verfahrensstand abfragen', honorare: 'Honorare & Tarifrechner', kontakt: 'Kontakt', keiner: 'Kein zweiter Knopf' };
+const START_DEFAULTS = { order: START_IDS, hidden: ['ablauf'], lawyerMode: 'leitung', lawyers: [], lawyerCount: 3, areas: [], newsCount: 3, heroSecond: 'notdienst', heroNote: true };
+const startSchema = z
+  .object({
+    order: z.array(z.enum(START_IDS)).max(START_IDS.length).default(START_DEFAULTS.order),
+    hidden: z.array(z.enum(START_IDS)).max(START_IDS.length).default(START_DEFAULTS.hidden),
+    lawyerMode: z.enum(Object.keys(LAWYER_MODES)).default('leitung'),
+    lawyers: z.array(z.number().int().positive()).max(12).default([]),
+    lawyerCount: z.number().int().min(1).max(9).default(3),
+    areas: z.array(z.string().regex(/^[a-z0-9-]{2,40}$/)).max(20).default([]),
+    newsCount: z.number().int().min(1).max(6).default(3),
+    heroSecond: z.enum(Object.keys(HERO_SECOND)).default('notdienst'),
+    heroNote: z.boolean().default(true),
+  })
+  .default(START_DEFAULTS);
+
 /** Begriffe, die sich im ganzen Dashboard und auf der Website umbenennen lassen. */
 const TERMS = {
   mandant: { label: 'Mandant', sg: 'Mandant', pl: 'Mandanten' },
@@ -134,8 +159,9 @@ const SPECS = {
       kpis: z.object({ closed: z.boolean(), success: z.boolean(), rating: z.boolean() }),
       // Aktuelles: automatische Meldungen aus Personalprotokoll und Stellen (domain/news.js)
       news: z.object({ hires: z.boolean(), promotions: z.boolean(), positions: z.boolean() }).default({ hires: true, promotions: true, positions: true }),
+      start: startSchema,
     }),
-    defaults: { order: SECTION_IDS, hidden: [], faq: null, links: [], contactEmail: '', kpis: { closed: true, success: true, rating: true }, news: { hires: true, promotions: true, positions: true } },
+    defaults: { order: SECTION_IDS, hidden: [], faq: null, links: [], contactEmail: '', kpis: { closed: true, success: true, rating: true }, news: { hires: true, promotions: true, positions: true }, start: START_DEFAULTS },
   },
   labels: {
     perm: 'site.edit',
@@ -372,4 +398,4 @@ function publicPayload(user, { draft = false } = {}) {
   };
 }
 
-module.exports = { BANNER_STYLES, PROFILES, START_BLOCKS, profileOf, PRESETS, FONTS, SPECS, KEYS, SECTIONS, SECTION_IDS, TERMS, MESSAGE_KEYS, get, getDraft, hasDraft, getForEdit, saveDraft, discardDraft, publish, setPublished, activeBanner, labelsPayload, publicPayload };
+module.exports = { START_SECTIONS, START_IDS, START_DEFAULTS, LAWYER_MODES, HERO_SECOND, BANNER_STYLES, PROFILES, START_BLOCKS, profileOf, PRESETS, FONTS, SPECS, KEYS, SECTIONS, SECTION_IDS, TERMS, MESSAGE_KEYS, get, getDraft, hasDraft, getForEdit, saveDraft, discardDraft, publish, setPublished, activeBanner, labelsPayload, publicPayload };

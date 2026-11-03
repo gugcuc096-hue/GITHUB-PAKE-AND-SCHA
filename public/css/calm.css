@@ -99,3 +99,13 @@ details::details-content { transition: none !important; }
 #content { transition: none; }
 body.modal-open #content { scale: 1; }
 @keyframes modal-blur-in { from { opacity: 1; } }
+
+/* Website (kanzlei.css): Schimmer steht, Karten und Menüs erscheinen ohne Gleiten */
+.kz-shine { animation: none !important; background-position: 50% 0 !important; }
+.kz-hero-in > *, .site-home .reveal.in-view :is(.kz-tiles, .kz-people, .kz-news-cards, .kz-facts, .kz-flow, .kz-principles, .kz-contact) > *, .site-home #mobileMenu.open .kz-mm-nav > * { animation: none !important; }
+.site-home .reveal { transform: none !important; }
+.site-home #mobileMenu { transform: none !important; opacity: 0; transition: opacity 0.15s ease, visibility 0s linear 0.15s !important; }
+.site-home #mobileMenu.open { opacity: 1; transition: opacity 0.15s ease, visibility 0s !important; }
+.kz-nav-menu, .kz-nav-menu a { transform: none !important; }
+.kz-tile > a:hover, .kz-person:hover, .kz-news-card:hover { transform: none !important; }
+.site-home .btn-gold::before { display: none; }
