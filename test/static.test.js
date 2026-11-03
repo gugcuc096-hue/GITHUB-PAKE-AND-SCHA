@@ -72,8 +72,10 @@ describe('Strenge Content-Security-Policy', () => {
     const files = [...css.matchAll(/url\((\/fonts\/[^)]+)\)/g)].map((m) => m[1]);
     assert.ok(files.length >= 10, 'fonts.css nennt die Schriftdateien');
     for (const f of files) assert.ok(fs.existsSync(path.join(PUBLIC, f)), `${f} fehlt`);
-    for (const family of ['Inter', 'Cormorant-Garamond', 'JetBrains-Mono', 'Tinos', 'Roboto-Serif', 'Allura', 'Dancing-Script'])
+    for (const family of ['Inter', 'Cormorant-Garamond', 'Tinos', 'Roboto-Serif', 'Allura', 'Dancing-Script'])
       assert.ok(fs.existsSync(path.join(PUBLIC, 'fonts', 'licenses', `${family}.txt`)), `Lizenz für ${family} fehlt`);
+    // Keine Programmierschrift mehr – Zahlen und Aktenzeichen stehen in Inter mit gleich breiten Ziffern
+    assert.doesNotMatch(css, /JetBrains/, 'fonts.css lädt keine Programmierschrift');
   });
 
   it('alle Browser-Skripte sind gültiges JavaScript', () => {

@@ -1,14 +1,13 @@
 'use strict';
 /*
  * Öffentliche Anwalts-Profilseiten: /team/<name> – Foto, Rang, Beschreibung, Schwerpunkte, Erfolge,
- * Mandantenstimmen und „Mandat anfragen“. Wird auf dem Server zusammengesetzt (views/anwalt.html), damit
+ * Mandantenstimmen und „Mandat anfragen“. Wird auf dem Server in die Hülle der Website gesetzt (index.html, Abschnitte
+ * data-page="profil" – gleiche Kopfzeile, Fußzeile und Fenster wie jede Unterseite), damit
  * Discord & Co. in der Link-Vorschau gleich Name, Rang und Foto zeigen.
  *
  * Zahlen nur, wo sie nichts über einzelne Mandate verraten: erst ab mehreren abgeschlossenen Akten bzw.
  * Bewertungen, und nur wenn das Board „Erfolge öffentlich zeigen“ eingeschaltet hat (wie auf der Startseite).
  */
-const fs = require('node:fs');
-const path = require('node:path');
 const { db, getSetting } = require('../db/db');
 const { teamRow, TEAM_SELECT } = require('../db/models');
 const { OUTCOMES, DUTY_STATUS } = require('../core/helpers');
@@ -87,18 +86,13 @@ function lawyerFacts(userId, showSuccess) {
   return facts;
 }
 
-let template = null;
-const readTemplate = () => {
-  if (!template || process.env.NODE_ENV !== 'production') template = fs.readFileSync(path.join(__dirname, '..', '..', 'views', 'anwalt.html'), 'utf8');
-  return template;
-};
 
 function render(member, facts, { origin, url }) {
   const lead = member.tier === 'leitung';
   const photo = member.photoUrl ? `${origin}${member.photoUrl}` : `${origin}/img/og-image.png`;
   const portrait = member.photoUrl
-    ? `<img class="pf-photo" src="${esc(member.photoUrl)}" alt="${esc(member.name)}" width="136" height="136" decoding="async">`
-    : `<div class="pf-photo pf-initials ${lead ? '' : 'slate'}" aria-hidden="true">${esc(member.initials || '?')}</div>`;
+    ? `<img class="pf-photo" src="${esc(member.photoUrl)}" alt="${esc(member.name)}" width="144" height="144" decoding="async">`
+    : `<span class="pf-photo kz-mono" aria-hidden="true">${esc(member.initials || '?')}</span>`;
   const duty = member.duty ? `<p class="pf-duty"><span class="duty-dot s-${esc(member.duty)}"></span>${esc(DUTY_STATUS[member.duty] || '')}</p>` : '';
 
   // Schwerpunkte: vom Board eingetragen, sonst die häufigsten Rechtsgebiete seiner Akten
@@ -131,28 +125,31 @@ function render(member, facts, { origin, url }) {
   ].join('');
 
   // Mit Konto geht die Anfrage direkt an ihn (Wunschanwalt), sonst an die ganze Kanzlei
-  const cta = `<a href="${member.bookable ? `/?anwalt=${member.id}` : '/?mandat=1'}" class="btn-gold btn-md">Mandat anfragen</a>`;
+  const cta = `<a href="${member.bookable ? `/?anwalt=${member.id}` : '/?mandat=1'}" class="btn-gold kz-btn">Mandat anfragen</a>`;
   const summary = member.description || `${member.roleTitle} bei Pake & Scha Legal Consulting. Mandat direkt anfragen.`;
-  const values = {
-    title: esc(`${member.name} – ${member.roleTitle} | Pake & Scha`),
-    ogTitle: esc(`${member.name} – ${member.roleTitle}`),
-    description: esc(summary.length > 200 ? `${summary.slice(0, 197)}…` : summary),
-    url: esc(url),
-    image: esc(photo),
-    imageAlt: esc(member.photoUrl ? `Foto von ${member.name}` : 'Pake & Scha Legal Consulting'),
+  const head = `<nav class="kz-crumbs" aria-label="Pfad"><a href="/">Startseite</a><span aria-hidden="true">/</span><a href="/anwaelte">Anwälte</a><span aria-hidden="true">/</span>${esc(member.name)}</nav>
+                <div class="pf-head">
+                    <div class="pf-portrait">${portrait}</div>
+                    <div class="min-w-0">
+                        <span class="kz-rubric">${lead ? 'Board of Partners' : 'Associate Attorneys'}</span>${member.lawyerOfMonth ? ` <span class="lotm-badge" title="Für herausragende Arbeit im ${esc(member.lawyerOfMonth)}">Anwalt des Monats</span>` : ''}
+                        <h1 class="kz-h1 pf-name">${esc(member.name)}</h1>
+                        <p class="pf-rank">${esc(member.roleTitle)}</p>
+                        ${duty}
+                        ${member.description ? `<p class="kz-lead pf-desc">${esc(member.description)}</p>` : ''}
+                        <div class="pf-actions kz-actions">${cta}<a href="/anwaelte" class="btn-outline kz-btn">Alle Anwälte</a></div>
+                    </div>
+                </div>`;
+  const meta = {
+    path: url.replace(/^https?:\/\/[^/]+/, ''),
+    title: `${member.name} – ${member.roleTitle} | Pake & Scha`,
+    full: true,
+    ogTitle: `${member.name} – ${member.roleTitle}`,
+    desc: summary.length > 200 ? `${summary.slice(0, 197)}…` : summary,
+    image: photo,
     card: member.photoUrl ? 'summary' : 'summary_large_image',
-    portrait,
-    tier: `<span class="pf-tier ${lead ? '' : 'slate'}">${lead ? 'Board of Partners' : 'Associate Attorneys'}</span>${
-      member.lawyerOfMonth ? `<span class="lotm-badge" title="Für herausragende Arbeit im ${esc(member.lawyerOfMonth)}">Anwalt des Monats</span>` : ''
-    }`,
-    name: esc(member.name),
-    rank: esc(member.roleTitle),
-    duty,
-    desc: member.description ? `<p class="pf-desc">${esc(member.description)}</p>` : '',
-    blocks,
-    cta,
+    themeColor: '#d4af37',
   };
-  return readTemplate().replace(/\{\{(\w+)\}\}/g, (all, k) => (k in values ? values[k] : all));
+  return { head, body: blocks, meta };
 }
 
 /** GET /team/:slug – unbekannte oder ausgeblendete Profile landen auf der 404-Seite. */
@@ -173,8 +170,22 @@ function handler(req, res, next) {
     const showSuccess = getSetting('show_success_public', '1') === '1';
     const facts = row.user_id ? lawyerFacts(row.user_id, showSuccess) : { focus: [], closed: null, successRate: null, wins: [], rating: null, reviews: [] };
     const origin = `${req.protocol}://${req.get('host')}`;
-    res.set('Cache-Control', 'no-cache');
-    res.type('html').send(require('./assets').rewrite(render(member, facts, { origin, url: `${origin}/team/${slugs.get(id)}` })));
+    const p = render(member, facts, { origin, url: `${origin}/team/${slugs.get(id)}` });
+    // In der Hülle der Website (Kopfzeile, Fußzeile, Mandatsfenster) – wie jede andere Unterseite
+    require('./sitePages')
+      .shell(req, { key: 'profil', meta: p.meta }, (html) =>
+        html
+          // Von der Karte eines Anwalts: Foto und Name gleiten an ihren Platz (Gegenstück in site.js) – im <head>, damit es vor dem Wechsel gilt
+          .replace('</head>', '<style>@view-transition { navigation: auto; } .pf-photo { view-transition-name: pf-photo; } .pf-name { view-transition-name: pf-name; }</style>\n</head>')
+          .replace('<!--profil:head-->', () => p.head)
+          .replace(p.body ? '<!--profil:body-->' : /<section[^>]*data-page="profil"[^>]*>\s*<div class="kz-wrap">\s*<!--profil:body-->[\s\S]*?<\/section>/, () => p.body)
+      )
+      .then((html) => {
+        res.set('Cache-Control', 'no-cache');
+        res.type('html').send(html);
+      })
+      .catch(next);
+    return;
   } catch (err) {
     next(err);
   }

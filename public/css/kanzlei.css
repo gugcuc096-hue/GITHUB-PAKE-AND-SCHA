@@ -1,0 +1,377 @@
+/*
+ * Website der Kanzlei (alle Unterseiten aus index.html): ruhig, typografisch, wie eine Kanzlei.
+ *  - Überschriften Cormorant Garamond, Text Inter; Zahlen in Inter mit gleich breiten Ziffern – keine Programmierschrift
+ *  - Gold nur als Linie, Rubrik und Knopf; keine Leuchteffekte, kein Glas auf Inhalten
+ *  - Linien statt Karten: Listen, Spalten und Haarlinien tragen die Seite
+ *  - Bewegung: nur weiches Einblenden (kein Hereinfliegen)
+ * Wird nach tailwind/depth/motion und vor gfx.css geladen; gilt nur auf body.site-home.
+ */
+.site-home {
+    --kz-bg: #070b16;
+    --kz-bg-2: #0a1020;
+    --kz-panel: #0c1324;
+    --kz-ink: #efe9dc;
+    --kz-text: #cfd3dc;
+    --kz-muted: #9ea6b8;
+    --kz-rule: rgba(255, 255, 255, 0.09);
+    --kz-gold-rule: rgba(var(--accent-rgb), 0.28);
+    --kz-serif: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+    --kz-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    background: var(--kz-bg);
+    color: var(--kz-text);
+    font-family: var(--kz-sans);
+    font-size: 1rem;
+    line-height: 1.65;
+    font-variant-numeric: lining-nums tabular-nums;
+}
+.site-home ::selection { background: rgba(var(--accent-rgb), 0.35); color: #fff; }
+/* Ruhiger Hintergrund: nur ein Hauch Licht oben, kein Raster, keine wandernden Kreise */
+.site-home .ambient-bg { background: radial-gradient(1200px 520px at 50% -180px, rgba(36, 54, 98, 0.55), transparent 70%), var(--kz-bg); }
+.site-home .glow-orb { display: none; }
+.site-home h1, .site-home h2, .site-home h3, .site-home h4 { hyphens: manual; -webkit-hyphens: manual; text-wrap: balance; }
+.site-home p { hyphens: manual; -webkit-hyphens: manual; text-wrap: pretty; }
+/* Keine Programmierschrift auf der Website: Zahlen und Kennungen in Inter mit gleich breiten Ziffern */
+.site-home .font-mono, .site-home .num { font-family: var(--kz-sans) !important; font-variant-numeric: lining-nums tabular-nums; letter-spacing: 0; }
+
+/* ------------------------------------------------------------------ Grundbausteine */
+.kz-wrap { width: 100%; max-width: 72rem; margin: 0 auto; padding: 0 1.5rem; }
+.kz-wrap-narrow { max-width: 52rem; }
+@media (max-width: 639px) { .kz-wrap { padding: 0 1.15rem; } }
+
+.kz-rubric {
+    display: inline-flex; align-items: center; gap: 0.75rem;
+    font: 600 0.7rem/1.2 var(--kz-sans); letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold-500);
+}
+.kz-rubric::before { content: ''; width: 1.75rem; height: 1px; background: currentColor; opacity: 0.7; }
+.kz-rubric.is-plain::before { display: none; }
+
+.kz-h1 { font: 500 clamp(2.5rem, 5.6vw, 4.4rem)/1.04 var(--kz-serif); color: var(--kz-ink); letter-spacing: -0.01em; margin: 0; }
+.kz-h1 em { font-style: italic; color: var(--gold-500); font-weight: 500; }
+.kz-h2 { font: 500 clamp(1.95rem, 3.4vw, 2.75rem)/1.12 var(--kz-serif); color: var(--kz-ink); margin: 0; }
+.kz-h3 { font: 600 1.45rem/1.25 var(--kz-serif); color: var(--kz-ink); margin: 0; }
+.kz-lead { font-size: 1.1rem; line-height: 1.7; color: var(--kz-text); max-width: 40rem; }
+.kz-text { color: var(--kz-text); max-width: 42rem; }
+.kz-small { font-size: 0.85rem; color: var(--kz-muted); }
+.kz-muted { color: var(--kz-muted); }
+.kz-ink { color: var(--kz-ink); }
+
+.kz-section { position: relative; z-index: 1; padding: 5.5rem 0; border-top: 1px solid var(--kz-rule); }
+.kz-section.is-first { border-top: 0; }
+.kz-section.is-tight { padding: 3.5rem 0; }
+@media (max-width: 767px) { .kz-section { padding: 3.75rem 0; } }
+.kz-head { display: grid; gap: 1rem; margin-bottom: 2.75rem; max-width: 44rem; }
+.kz-head-row { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1.5rem; margin-bottom: 2.75rem; }
+.kz-head-row .kz-head { margin-bottom: 0; }
+
+/* Links mit Pfeil */
+.kz-link { display: inline-flex; align-items: center; gap: 0.5rem; color: var(--gold-500); font-weight: 500; font-size: 0.92rem; text-decoration: none; border-bottom: 1px solid transparent; transition: color 0.2s ease, border-color 0.2s ease; }
+.kz-link::after { content: '→'; transition: transform 0.2s ease; }
+.kz-link:hover { color: var(--gold-light); border-bottom-color: var(--kz-gold-rule); }
+.kz-link:hover::after { transform: translateX(3px); }
+
+/* Knöpfe der Website: eckiger, ohne Leuchten */
+.site-home .btn-gold { border-radius: 3px; box-shadow: none; background: var(--gold-500); color: #0a0d16; letter-spacing: 0.12em; }
+.site-home .btn-gold:hover { transform: none; box-shadow: none; filter: none; background: var(--gold-light); }
+.site-home .btn-outline { border-radius: 3px; background: transparent; border-color: rgba(var(--accent-rgb), 0.55); color: var(--kz-ink); letter-spacing: 0.12em; }
+.site-home .btn-outline:hover { transform: none; background: rgba(var(--accent-rgb), 0.08); color: var(--gold-light); }
+:where(.kz-btn) { display: inline-flex; }
+.kz-btn { align-items: center; justify-content: center; gap: 0.55rem; min-height: 3rem; padding: 0 1.6rem; font: 600 0.74rem/1 var(--kz-sans); text-transform: uppercase; letter-spacing: 0.14em; text-decoration: none; cursor: pointer; }
+.kz-actions { display: flex; flex-wrap: wrap; gap: 0.85rem; align-items: center; }
+@media (max-width: 479px) { .kz-actions > .kz-btn { flex: 1 1 100%; } }
+
+/* ------------------------------------------------------------------ Kopfleiste oben (Notdienst, Kanzleisitz, Portal) */
+.site-home .topstrip { background: #04070f; border-bottom: 1px solid var(--kz-rule); font-size: 0.74rem; color: var(--kz-muted); }
+.kz-strip-duty { display: inline-flex; align-items: center; gap: 0.55rem; min-width: 0; color: var(--kz-text); text-decoration: none; }
+.kz-strip-duty:hover #dutyLabel { color: var(--gold-light); }
+.kz-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: #34d399; }
+.kz-dot.is-off { background: #f2c14e; }
+.site-home .status-dot { width: 7px; height: 7px; box-shadow: none; }
+.site-home .status-active { background: #34d399; box-shadow: none; }
+
+/* ------------------------------------------------------------------ Kopfzeile */
+.site-home .glass-nav { background: rgba(7, 11, 22, 0.92); border-bottom: 1px solid var(--kz-rule); }
+.kz-brand { flex: none; display: flex; align-items: center; gap: 0.9rem; text-decoration: none; min-width: 0; }
+.kz-brand img { height: 46px; width: auto; flex: none; }
+.kz-brand-name { font: 600 1.32rem/1.05 var(--kz-serif); color: var(--kz-ink); letter-spacing: 0.04em; white-space: nowrap; }
+.kz-brand-sub { display: block; margin-top: 0.3rem; font: 600 0.56rem/1 var(--kz-sans); letter-spacing: 0.26em; text-transform: uppercase; color: var(--gold-500); white-space: nowrap; }
+.kz-nav { align-items: center; gap: 1.45rem; }
+.kz-nav > a, .kz-nav-drop > a { position: relative; display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.4rem 0; font: 500 0.78rem/1 var(--kz-sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--kz-text); text-decoration: none; background: none; border: 0; cursor: pointer; white-space: nowrap; }
+.kz-nav > a::after, .kz-nav-drop > a::after { content: ''; position: absolute; left: 0; right: 0; bottom: -0.35rem; height: 1px; background: var(--gold-500); transform: scaleX(0); transform-origin: left; transition: transform 0.25s ease; }
+.kz-nav > a:hover, .kz-nav-drop > a:hover, .kz-nav-drop:focus-within > button { color: var(--kz-ink); }
+.kz-nav > a[aria-current='page'], .kz-nav-drop > a[aria-current='page'] { color: var(--gold-light); }
+.kz-nav > a[aria-current='page']::after, .kz-nav-drop > a[aria-current='page']::after { transform: scaleX(1); }
+.kz-nav-drop { position: relative; }
+.kz-nav-drop > a svg { width: 0.7rem; height: 0.7rem; opacity: 0.7; transition: transform 0.2s ease; }
+.kz-nav-drop:hover > button svg, .kz-nav-drop:focus-within > button svg { transform: rotate(180deg); }
+.kz-nav-menu { position: absolute; top: calc(100% + 0.9rem); left: -1.25rem; min-width: 17rem; padding: 0.6rem 0; background: #0b1121; border: 1px solid var(--kz-rule); border-top: 2px solid var(--gold-500); box-shadow: 0 22px 50px rgba(0, 0, 0, 0.55); opacity: 0; visibility: hidden; transform: translateY(-4px); transition: opacity 0.18s ease, transform 0.18s ease, visibility 0s linear 0.18s; z-index: 50; }
+.kz-nav-menu::before { content: ''; position: absolute; left: 0; right: 0; top: -1rem; height: 1rem; }
+.kz-nav-drop:hover .kz-nav-menu, .kz-nav-drop:focus-within .kz-nav-menu { opacity: 1; visibility: visible; transform: none; transition: opacity 0.18s ease, transform 0.18s ease, visibility 0s; }
+.kz-nav-menu a { display: block; padding: 0.6rem 1.25rem; color: var(--kz-text); text-decoration: none; font-size: 0.92rem; }
+.kz-nav-menu a:hover { color: var(--gold-light); background: rgba(255, 255, 255, 0.03); }
+.kz-nav-menu a.is-all { margin-top: 0.4rem; padding-top: 0.75rem; border-top: 1px solid var(--kz-rule); font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold-500); }
+.kz-nav-menu .kz-num { display: inline-block; width: 1.8rem; font-family: var(--kz-serif); color: var(--gold-500); }
+.kz-duty-link { align-items: center; gap: 0.5rem; font: 500 0.78rem/1 var(--kz-sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--kz-text); text-decoration: none; white-space: nowrap; }
+.kz-duty-link:hover { color: var(--gold-light); }
+
+/* Menü am Handy: ganze Fläche, große Schrift */
+.site-home #mobileMenu { position: fixed; inset: 0; top: 0; z-index: 45; max-height: none; overflow-y: auto; background: #070b16; border: 0; visibility: hidden; opacity: 0; transition: opacity 0.22s ease, visibility 0s linear 0.22s; }
+.site-home #mobileMenu.open { visibility: visible; opacity: 1; transition: opacity 0.22s ease, visibility 0s; }
+.kz-mm-head { display: flex; align-items: center; justify-content: space-between; height: 72px; padding: 0 1.15rem; border-bottom: 1px solid var(--kz-rule); }
+.kz-mm-close { width: 2.6rem; height: 2.6rem; display: grid; place-items: center; border: 1px solid var(--kz-rule); color: var(--kz-ink); background: none; cursor: pointer; }
+.kz-mm-nav { display: grid; padding: 1rem 1.15rem 2rem; }
+.kz-mm-nav > a { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding: 0.95rem 0; border-bottom: 1px solid var(--kz-rule); font: 500 1.6rem/1.1 var(--kz-serif); color: var(--kz-ink); text-decoration: none; }
+.kz-mm-nav > a[aria-current='page'] { color: var(--gold-light); }
+.kz-mm-nav > a small { font: 500 0.68rem/1 var(--kz-sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--kz-muted); }
+.kz-mm-sub { display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem; padding: 0.7rem 0 0.9rem; border-bottom: 1px solid var(--kz-rule); }
+.kz-mm-sub a { font-size: 0.92rem; color: var(--kz-text); text-decoration: none; }
+.kz-mm-actions { display: grid; gap: 0.7rem; padding-top: 1.4rem; }
+.kz-mm-actions .kz-btn { width: 100%; }
+body.menu-open { overflow: hidden; }
+
+/* ------------------------------------------------------------------ Startbereich */
+.kz-hero { position: relative; z-index: 1; padding: 5.5rem 0 4.5rem; }
+.kz-hero-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3.5rem; align-items: center; }
+@media (min-width: 1024px) { .kz-hero-grid { grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.65fr); } }
+.kz-hero .kz-h1 { margin: 1.4rem 0 1.6rem; }
+.kz-hero .kz-lead { margin-bottom: 2.25rem; }
+.kz-hero-aside { justify-self: center; display: grid; justify-items: center; gap: 1.25rem; text-align: center; }
+.kz-seal { width: min(19rem, 70vw); height: auto; color: var(--gold-500); }
+.kz-seal text { font: 600 9.6px var(--kz-sans); letter-spacing: 3.2px; fill: currentColor; text-transform: uppercase; }
+.kz-seal-caption { font: italic 500 1.05rem/1.4 var(--kz-serif); color: var(--kz-muted); max-width: 18rem; }
+@media (max-width: 1023px) { .kz-hero-aside { display: none; } .kz-hero { padding: 3.75rem 0 3.25rem; } }
+.kz-hero-note { margin-top: 1.6rem; font-size: 0.9rem; color: var(--kz-muted); }
+.kz-hero-note a { color: var(--kz-ink); text-decoration: underline; text-decoration-color: var(--kz-gold-rule); text-underline-offset: 4px; }
+.kz-hero-note a:hover { color: var(--gold-light); }
+
+/* Fakten unter dem Startbereich: nur echte Angaben */
+.kz-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--kz-gold-rule); border-bottom: 1px solid var(--kz-rule); }
+@media (min-width: 900px) { .kz-facts { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.kz-fact { padding: 1.5rem 1.25rem 1.6rem; border-left: 1px solid var(--kz-rule); min-width: 0; }
+.kz-fact:first-child { border-left: 0; padding-left: 0; }
+@media (max-width: 899px) { .kz-fact:nth-child(3) { border-left: 0; padding-left: 0; } .kz-fact:nth-child(n + 3) { border-top: 1px solid var(--kz-rule); } }
+.kz-fact dt { font: 600 0.66rem/1.2 var(--kz-sans); letter-spacing: 0.2em; text-transform: uppercase; color: var(--kz-muted); margin-bottom: 0.55rem; }
+.kz-fact dd { margin: 0; font: 500 1.3rem/1.25 var(--kz-serif); color: var(--kz-ink); }
+.kz-fact dd a { color: inherit; text-decoration: none; }
+.kz-fact dd a:hover { color: var(--gold-light); }
+.kz-fact dd small { display: block; margin-top: 0.3rem; font: 400 0.8rem/1.4 var(--kz-sans); color: var(--kz-muted); }
+
+/* ------------------------------------------------------------------ Seitenkopf der Unterseiten */
+.kz-pagehead { position: relative; z-index: 1; padding: 4.25rem 0 3.25rem; border-bottom: 1px solid var(--kz-rule); }
+.kz-pagehead .kz-h1 { margin: 1rem 0 1.25rem; font-size: clamp(2.3rem, 4.6vw, 3.6rem); }
+.kz-crumbs { display: flex; flex-wrap: wrap; gap: 0.5rem; font-size: 0.78rem; color: var(--kz-muted); margin-bottom: 1.75rem; }
+.kz-crumbs a { color: var(--kz-muted); text-decoration: none; }
+.kz-crumbs a:hover { color: var(--gold-light); }
+.kz-crumbs span[aria-hidden] { opacity: 0.5; }
+@media (max-width: 767px) { .kz-pagehead { padding: 2.75rem 0 2.25rem; } }
+
+/* ------------------------------------------------------------------ Rechtsgebiete */
+.kz-areas { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); border-top: 1px solid var(--kz-gold-rule); counter-reset: area; }
+@media (min-width: 768px) { .kz-areas { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.kz-area { counter-increment: area; border-bottom: 1px solid var(--kz-rule); }
+@media (min-width: 768px) { .kz-area:nth-child(odd) { border-right: 1px solid var(--kz-rule); } }
+.kz-area > a { position: relative; display: grid; grid-template-columns: 3.25rem minmax(0, 1fr); column-gap: 0.75rem; row-gap: 0.5rem; padding: 2rem 2rem 2rem 0; text-decoration: none; color: inherit; transition: background-color 0.25s ease; }
+@media (min-width: 768px) { .kz-area:nth-child(even) > a { padding-left: 2rem; } }
+.kz-area > a::before { content: counter(area, upper-roman) '.'; grid-row: span 3; font: 500 1.6rem/1.15 var(--kz-serif); color: var(--gold-500); }
+.kz-area > a:hover { background: rgba(255, 255, 255, 0.015); }
+.kz-area-name { font: 500 1.75rem/1.15 var(--kz-serif); color: var(--kz-ink); }
+.kz-area-text { color: var(--kz-text); font-size: 0.97rem; max-width: 30rem; }
+.kz-more { margin-top: 0.4rem; font-size: 0.82rem; font-weight: 500; color: var(--gold-500); letter-spacing: 0.04em; }
+.kz-more::after { content: ' →'; transition: margin 0.2s ease; }
+.kz-area > a:hover .kz-more { color: var(--gold-light); }
+
+/* Rechtsgebiet: Leistungen und Ablauf */
+.kz-split { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3rem; }
+@media (min-width: 900px) { .kz-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4.5rem; } }
+.kz-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--kz-rule); }
+.kz-list > li { position: relative; padding: 1rem 0 1rem 1.75rem; border-bottom: 1px solid var(--kz-rule); color: var(--kz-text); }
+.kz-list > li::before { content: ''; position: absolute; left: 0.2rem; top: 1.62rem; width: 0.6rem; height: 1px; background: var(--gold-500); }
+.kz-list > li strong { display: block; color: var(--kz-ink); font-weight: 600; margin-bottom: 0.15rem; }
+.kz-steps { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+.kz-steps > li { counter-increment: step; position: relative; padding: 0 0 1.6rem 3.4rem; color: var(--kz-text); }
+.kz-steps > li::before { content: counter(step, upper-roman); position: absolute; left: 0; top: -0.1rem; width: 2.3rem; height: 2.3rem; display: grid; place-items: center; border: 1px solid var(--kz-gold-rule); border-radius: 50%; font: 500 0.95rem/1 var(--kz-serif); color: var(--gold-500); }
+.kz-steps > li::after { content: ''; position: absolute; left: 1.15rem; top: 2.4rem; bottom: 0.25rem; width: 1px; background: var(--kz-rule); }
+.kz-steps > li:last-child { padding-bottom: 0; }
+.kz-steps > li:last-child::after { display: none; }
+.kz-steps > li strong { display: block; color: var(--kz-ink); font-weight: 600; }
+/* Ablauf waagrecht (Kanzlei, Startseite) */
+.kz-flow { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; counter-reset: flow; border-top: 1px solid var(--kz-gold-rule); }
+@media (min-width: 900px) { .kz-flow { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.kz-flow > li { counter-increment: flow; padding: 1.75rem 1.5rem 1.75rem 0; border-bottom: 1px solid var(--kz-rule); }
+@media (min-width: 900px) { .kz-flow > li { border-bottom: 0; border-right: 1px solid var(--kz-rule); padding-left: 1.5rem; } .kz-flow > li:first-child { padding-left: 0; } .kz-flow > li:last-child { border-right: 0; } }
+.kz-flow > li::before { content: counter(flow, upper-roman) '.'; display: block; font: 500 1.4rem/1 var(--kz-serif); color: var(--gold-500); margin-bottom: 0.9rem; }
+.kz-flow h3 { font: 600 1.25rem/1.25 var(--kz-serif); color: var(--kz-ink); margin: 0 0 0.45rem; }
+.kz-flow p { font-size: 0.92rem; color: var(--kz-text); margin: 0; }
+
+/* Andere Rechtsgebiete (unter einem Rechtsgebiet) */
+.kz-others { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.kz-others a { padding: 0.5rem 0.95rem; border: 1px solid var(--kz-rule); color: var(--kz-text); text-decoration: none; font-size: 0.88rem; transition: border-color 0.2s ease, color 0.2s ease; }
+.kz-others a:hover { border-color: var(--kz-gold-rule); color: var(--gold-light); }
+
+/* Abschluss-Band mit Knopf */
+.kz-band { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.75rem; align-items: center; padding: 2.5rem 2.25rem; background: var(--kz-panel); border: 1px solid var(--kz-rule); border-left: 3px solid var(--gold-500); }
+@media (min-width: 900px) { .kz-band { grid-template-columns: minmax(0, 1fr) auto; } }
+.kz-band .kz-h3 { font-size: 1.7rem; }
+
+/* ------------------------------------------------------------------ Personen (Anwälte) */
+.kz-people { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; border-top: 1px solid var(--kz-gold-rule); }
+@media (min-width: 640px) { .kz-people { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .kz-people { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.kz-person { position: relative; display: flex; flex-direction: column; padding: 2rem 1.75rem 2rem 0; border-bottom: 1px solid var(--kz-rule); }
+@media (min-width: 640px) { .kz-person { padding-left: 1.75rem; border-left: 1px solid var(--kz-rule); } }
+@media (min-width: 640px) and (max-width: 1023px) { .kz-person:nth-child(2n + 1) { border-left: 0; padding-left: 0; } }
+@media (min-width: 1024px) { .kz-person:nth-child(3n + 1) { border-left: 0; padding-left: 0; } }
+.kz-portrait { position: relative; display: block; width: 5.75rem; height: 5.75rem; margin-bottom: 1.25rem; text-decoration: none; }
+.kz-portrait img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; filter: saturate(0.92); box-shadow: 0 0 0 1px var(--kz-gold-rule), 0 0 0 5px var(--kz-bg), 0 0 0 6px var(--kz-rule); }
+/* Monogramm-Siegel statt Initialen-Kreis, wenn kein Foto da ist */
+.kz-mono { width: 100%; height: 100%; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--kz-gold-rule); box-shadow: inset 0 0 0 4px var(--kz-bg), inset 0 0 0 5px rgba(var(--accent-rgb), 0.16); background: radial-gradient(circle at 50% 35%, rgba(var(--accent-rgb), 0.08), transparent 70%); font: 500 1.9rem/1 var(--kz-serif); letter-spacing: 0.02em; color: var(--gold-light); }
+.kz-portrait .kz-duty { position: absolute; right: 0.15rem; bottom: 0.25rem; width: 0.85rem; height: 0.85rem; border-radius: 50%; border: 2px solid var(--kz-bg); }
+.kz-person-rank { font: 600 0.66rem/1.3 var(--kz-sans); letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold-500); margin-bottom: 0.4rem; }
+.kz-person-name { font: 500 1.6rem/1.15 var(--kz-serif); color: var(--kz-ink); margin: 0 0 0.6rem; }
+.kz-person-name a { color: inherit; text-decoration: none; }
+.kz-person-name a:hover { color: var(--gold-light); }
+.kz-person-text { font-size: 0.93rem; color: var(--kz-text); margin: 0 0 1rem; }
+.kz-person-meta { font-size: 0.8rem; color: var(--kz-muted); margin-bottom: 1rem; }
+.kz-person-actions { margin-top: auto; display: flex; flex-wrap: wrap; gap: 1.1rem; align-items: center; }
+.kz-person-actions button { background: none; border: 0; padding: 0; cursor: pointer; }
+.kz-person .lotm-badge { position: static; display: inline-flex; width: max-content; margin-bottom: 0.75rem; }
+.kz-group-title { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin: 3rem 0 0; padding-bottom: 0.9rem; }
+.kz-group-title:first-child { margin-top: 0; }
+
+/* ------------------------------------------------------------------ Aktuelles */
+.kz-news { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--kz-gold-rule); }
+.kz-news > li { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.4rem 2rem; padding: 1.6rem 0; border-bottom: 1px solid var(--kz-rule); }
+@media (min-width: 768px) { .kz-news > li { grid-template-columns: 10rem minmax(0, 1fr); } }
+.kz-news time { font-size: 0.82rem; color: var(--kz-muted); padding-top: 0.3rem; }
+.kz-news .kz-news-kind { display: block; font: 600 0.64rem/1.2 var(--kz-sans); letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold-500); margin-top: 0.35rem; }
+.kz-news h3 { font: 500 1.45rem/1.25 var(--kz-serif); color: var(--kz-ink); margin: 0 0 0.35rem; }
+.kz-news p { margin: 0; color: var(--kz-text); white-space: pre-line; max-width: 46rem; }
+.kz-news .is-pinned h3::after { content: 'Angeheftet'; margin-left: 0.75rem; vertical-align: middle; font: 600 0.6rem/1 var(--kz-sans); letter-spacing: 0.16em; text-transform: uppercase; color: var(--kz-muted); border: 1px solid var(--kz-rule); padding: 0.25rem 0.45rem; }
+.kz-empty { padding: 2rem 0; color: var(--kz-muted); font-style: italic; }
+
+/* ------------------------------------------------------------------ Notdienst & Verfahrensstand */
+.kz-panel { background: var(--kz-panel); border: 1px solid var(--kz-rule); padding: 2rem; }
+.kz-panel.is-gold { border-top: 2px solid var(--gold-500); }
+.kz-duty-now { display: grid; gap: 1rem; align-content: start; align-self: start; }
+.kz-duty-state { display: flex; align-items: center; gap: 0.75rem; font: 500 1.6rem/1.2 var(--kz-serif); color: var(--kz-ink); }
+.kz-duty-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--kz-rule); }
+.kz-duty-list li { display: flex; justify-content: space-between; gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid var(--kz-rule); font-size: 0.95rem; }
+.kz-duty-list li span:last-child { color: var(--kz-muted); font-size: 0.85rem; }
+.kz-form { display: grid; gap: 1rem; }
+.kz-form label { display: grid; gap: 0.4rem; font-size: 0.8rem; font-weight: 500; letter-spacing: 0.04em; color: var(--kz-muted); }
+.kz-form input { height: 3rem; padding: 0 1rem; background: #060a14; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 2px; color: var(--kz-ink); font: 500 1rem var(--kz-sans); letter-spacing: 0.02em; }
+.kz-form input:focus { outline: none; border-color: var(--gold-500); }
+.kz-form-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+@media (min-width: 640px) { .kz-form-row { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); } }
+.kz-error { color: #fca5a5; font-size: 0.9rem; }
+.kz-progress { list-style: none; margin: 1.5rem 0 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0.35rem; }
+.kz-progress li { padding-top: 0.75rem; border-top: 3px solid rgba(255, 255, 255, 0.1); font-size: 0.78rem; color: var(--kz-muted); line-height: 1.35; }
+.kz-progress li.is-done { border-top-color: rgba(var(--accent-rgb), 0.55); color: var(--kz-text); }
+.kz-progress li.is-now { border-top-color: var(--gold-500); color: var(--kz-ink); font-weight: 600; }
+@media (max-width: 639px) { .kz-progress { grid-auto-flow: row; } .kz-progress li { padding: 0.5rem 0 0.5rem 0.9rem; border-top: 0; border-left: 3px solid rgba(255, 255, 255, 0.1); } .kz-progress li.is-done { border-left-color: rgba(var(--accent-rgb), 0.55); } .kz-progress li.is-now { border-left-color: var(--gold-500); } }
+.kz-dl { display: grid; grid-template-columns: minmax(0, 11rem) minmax(0, 1fr); gap: 0; margin: 1.5rem 0 0; border-top: 1px solid var(--kz-rule); }
+.kz-dl dt, .kz-dl dd { margin: 0; padding: 0.7rem 0; border-bottom: 1px solid var(--kz-rule); font-size: 0.93rem; }
+.kz-dl dt { color: var(--kz-muted); }
+.kz-dl dd { color: var(--kz-ink); }
+
+/* ------------------------------------------------------------------ Kanzlei: Grundsätze, Stimmen, Kanzleisitz */
+.kz-principles { display: grid; grid-template-columns: minmax(0, 1fr); border-top: 1px solid var(--kz-gold-rule); }
+@media (min-width: 768px) { .kz-principles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.kz-principles > div { padding: 1.75rem 2rem 1.75rem 0; border-bottom: 1px solid var(--kz-rule); }
+@media (min-width: 768px) { .kz-principles > div:nth-child(even) { padding-left: 2rem; border-left: 1px solid var(--kz-rule); } }
+.kz-principles h3 { font: 500 1.4rem/1.25 var(--kz-serif); color: var(--kz-ink); margin: 0 0 0.45rem; }
+.kz-principles p { margin: 0; font-size: 0.95rem; color: var(--kz-text); }
+.kz-quote { margin: 0; padding: 2.25rem 0; border-top: 1px solid var(--kz-rule); }
+.kz-quote blockquote { margin: 0 0 0.9rem; font: italic 500 1.5rem/1.45 var(--kz-serif); color: var(--kz-ink); max-width: 46rem; }
+.kz-quote figcaption { font-size: 0.85rem; color: var(--kz-muted); }
+.kz-quote .kz-stars { color: var(--gold-500); letter-spacing: 0.15em; font-size: 0.85rem; margin-bottom: 0.75rem; }
+.kz-contact { display: grid; grid-template-columns: minmax(0, 1fr); border-top: 1px solid var(--kz-gold-rule); }
+@media (min-width: 768px) { .kz-contact { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.kz-contact > div { display: flex; flex-direction: column; gap: 0.6rem; padding: 2rem 2rem 2rem 0; border-bottom: 1px solid var(--kz-rule); }
+@media (min-width: 768px) { .kz-contact > div + div { padding-left: 2rem; border-left: 1px solid var(--kz-rule); } }
+.kz-contact h3 { font: 500 1.45rem/1.2 var(--kz-serif); color: var(--kz-ink); margin: 0; }
+.kz-contact p { margin: 0; font-size: 0.95rem; }
+.kz-contact .kz-actions { margin-top: auto; padding-top: 0.75rem; }
+
+/* FAQ in Kanzlei-Optik */
+.site-home .kz-faq { border-top: 1px solid var(--kz-gold-rule); }
+.site-home .kz-faq .faq-item { border-bottom: 1px solid var(--kz-rule); }
+.site-home .kz-faq .faq-item button { padding: 1.35rem 0; }
+.site-home .kz-faq .faq-item button > span { font: 500 1.25rem/1.35 var(--kz-serif); color: var(--kz-ink); }
+.site-home .kz-faq .faq-answer p { color: var(--kz-text); font-size: 0.97rem; max-width: 46rem; }
+
+/* Impressum */
+.kz-legal h2 { font: 500 1.5rem/1.25 var(--kz-serif); color: var(--kz-ink); margin: 2.25rem 0 0.6rem; }
+.kz-legal h2:first-child { margin-top: 0; }
+.kz-legal p { margin: 0 0 0.9rem; max-width: 46rem; }
+
+/* ------------------------------------------------------------------ Bestehende Bausteine im neuen Gewand */
+/* Inhalte, die früher Glas-Karten waren (Tarifrechner, Honorarordnung, VIP, Ränge): flache Flächen mit Haarlinie */
+.site-home main .glass-card { background: var(--kz-panel); border: 1px solid var(--kz-rule); border-radius: 4px; box-shadow: none; }
+.site-home main .glass-card::before { display: none; }
+.site-home main .glass-card:hover { transform: none; box-shadow: none; border-color: var(--kz-rule); }
+.site-home .tab-btn { border-radius: 2px; font-size: 0.78rem; letter-spacing: 0.06em; }
+.site-home .tab-btn.active { box-shadow: none; background: rgba(var(--accent-rgb), 0.1); }
+.site-home .reveal { transform: none; transition: opacity 0.6s ease; }
+.site-home .reveal.in-view { transform: none; }
+/* Rang-Karten: Kennzeichnung ohne Programmierschrift */
+.site-home #raenge .glass-card { border-top-width: 2px; }
+
+/* ------------------------------------------------------------------ Fußzeile */
+.kz-footer { position: relative; z-index: 1; background: #04070f; border-top: 1px solid var(--kz-gold-rule); color: var(--kz-muted); font-size: 0.88rem; }
+.kz-footer-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2.5rem; padding: 4rem 0 3rem; }
+@media (min-width: 768px) { .kz-footer-grid { grid-template-columns: minmax(0, 1.3fr) repeat(3, minmax(0, 1fr)); } }
+.kz-footer h2 { font: 600 0.68rem/1.2 var(--kz-sans); letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold-500); margin: 0 0 1rem; }
+.kz-footer ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.55rem; }
+.kz-footer a { color: var(--kz-text); text-decoration: none; }
+.kz-footer a:hover { color: var(--gold-light); }
+.kz-footer-brand { display: grid; gap: 1rem; align-content: start; }
+.kz-footer-brand .kz-seal { width: 6.5rem; }
+.kz-footer-brand p { margin: 0; max-width: 20rem; }
+.kz-footer-motto { font: italic 500 1.15rem/1.3 var(--kz-serif); color: var(--kz-ink); }
+.kz-footer-bottom { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; justify-content: space-between; padding: 1.4rem 0 1.6rem; border-top: 1px solid var(--kz-rule); font-size: 0.78rem; }
+.kz-footer-bottom nav { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; }
+@media (max-width: 639px) { .kz-footer { padding-bottom: 4.5rem; } }
+
+/* Bearbeitungsmodus (Board): Platzhalter der Rechtsgebiet-Vorlage nicht bearbeitbar */
+.site-home [data-no-edit] { cursor: default; }
+/* Anwalts-Karten: Breite kommt aus dem Raster (nicht aus der alten .team-card-Regel) */
+.site-home .kz-person.team-card { width: auto; }
+/* Keine Silbentrennung auf der Website (Überschriften, Fließtext, Karten) */
+.site-home :is(p, li, dd, dt, span, a, h1, h2, h3, h4, blockquote, figcaption) { hyphens: manual; -webkit-hyphens: manual; }
+
+/* ------------------------------------------------------------------ Profilseite eines Anwalts (/team/<name>) */
+.pf-head { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2rem; align-items: start; }
+@media (min-width: 768px) { .pf-head { grid-template-columns: 11rem minmax(0, 1fr); gap: 3rem; } }
+.pf-portrait { width: 9rem; height: 9rem; }
+.pf-portrait img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; box-shadow: 0 0 0 1px var(--kz-gold-rule), 0 0 0 7px var(--kz-bg), 0 0 0 8px var(--kz-rule); }
+.pf-portrait .kz-mono { font-size: 2.8rem; }
+.pf-head .kz-h1 { margin: 0.9rem 0 0.4rem; }
+.pf-rank { margin: 0; font: 600 0.78rem/1.3 var(--kz-sans); letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold-500); }
+.pf-duty { display: inline-flex; align-items: center; gap: 0.45rem; margin: 0.8rem 0 0; font-size: 0.85rem; color: var(--kz-muted); }
+.pf-desc { margin-top: 1.4rem; }
+.pf-actions { margin-top: 2rem; }
+.pf-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); border-top: 1px solid var(--kz-gold-rule); margin-bottom: 2.5rem; }
+.pf-stats .kpi { padding: 1.4rem 1.5rem 1.4rem 0; border-bottom: 1px solid var(--kz-rule); }
+.pf-stats .kpi + .kpi { padding-left: 1.5rem; border-left: 1px solid var(--kz-rule); }
+.pf-stats .kpi-label { font: 600 0.66rem/1.2 var(--kz-sans); letter-spacing: 0.18em; text-transform: uppercase; color: var(--kz-muted); }
+.pf-stats .kpi-value { margin-top: 0.5rem; font: 500 2.1rem/1.1 var(--kz-serif); color: var(--kz-ink); }
+.pf-stats .kpi-sub { margin-top: 0.25rem; font-size: 0.8rem; color: var(--kz-muted); }
+.pf-section { margin-top: 2.5rem; max-width: 46rem; }
+.pf-section:first-child { margin-top: 0; }
+.pf-h { margin: 0 0 1rem; font: 600 0.7rem/1.2 var(--kz-sans); letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold-500); }
+.pf-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.pf-chip { padding: 0.45rem 0.95rem; border: 1px solid var(--kz-rule); color: var(--kz-ink); font-size: 0.9rem; }
+.pf-highlights, .pf-wins { list-style: none; margin: 0 0 1rem; padding: 0; border-top: 1px solid var(--kz-rule); }
+.pf-highlights li, .pf-wins li { padding: 0.8rem 0 0.8rem 1.6rem; border-bottom: 1px solid var(--kz-rule); position: relative; color: var(--kz-text); }
+.pf-highlights li::before { content: ''; position: absolute; left: 0.15rem; top: 1.45rem; width: 0.6rem; height: 1px; background: var(--gold-500); }
+.pf-wins li { display: flex; gap: 0.8rem; align-items: baseline; padding-left: 0; }
+.pf-wins b { font: 500 1.35rem/1 var(--kz-serif); color: var(--gold-500); min-width: 2.4rem; }
+.pf-reviews { display: grid; }
+.pf-review { margin: 0; padding: 1.5rem 0; border-top: 1px solid var(--kz-rule); }
+.pf-stars { color: var(--gold-500); letter-spacing: 0.15em; font-size: 0.85rem; }
+.pf-review blockquote { margin: 0.5rem 0; font: italic 500 1.3rem/1.5 var(--kz-serif); color: var(--kz-ink); }
+.pf-review figcaption { font-size: 0.82rem; color: var(--kz-muted); }
+.duty-dot { width: 8px; height: 8px; border-radius: 50%; background: #34d399; display: inline-block; }
+.duty-dot.s-gericht { background: var(--gold-500); }
+.duty-dot.s-pause { background: #f2c14e; }
+@media (max-width: 479px) { .pf-actions > .kz-btn { flex: 1 1 100%; } }

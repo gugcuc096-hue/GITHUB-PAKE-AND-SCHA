@@ -42,7 +42,7 @@ body {
 }
 
 .font-serif { font-family: 'Cormorant Garamond', serif; }
-.font-mono { font-family: 'JetBrains Mono', monospace; }
+.font-mono { font-family: var(--font-num); }
 h1, h2, h3 { text-wrap: balance; } /* kein einzelnes Wort allein in der letzten Zeile */
 /* Seite beim Laden weich einblenden (wie Karriere, Anmeldung und Dashboard) */
 body.page-in { animation: page-in 0.35s ease-out; }

@@ -196,7 +196,6 @@ describe('Texte & Banner im Browser', { skip: chromium ? false : 'Playwright nic
       await pickTab(page, '[data-action="cfg-tab"][data-tab="home"]');
       await page.waitForSelector('#cfgSections');
       await page.uncheck('.home-sec[data-id="karriere"] input[name="show"]');
-      await page.click('[data-action="home-move"][data-dir="1"] >> nth=0'); // erster Abschnitt eine Stelle nach unten
       await Promise.all([page.waitForResponse((r) => r.url().includes('/api/config/home/publish') && r.ok()), page.click('[data-action="cfg-publish"][data-key="home"]')]);
       // Beschriftungen: Mandant → Klient
       await pickTab(page, '[data-action="cfg-tab"][data-tab="labels"]');
@@ -221,7 +220,7 @@ describe('Texte & Banner im Browser', { skip: chromium ? false : 'Playwright nic
       await page.waitForFunction(() => !document.querySelector('#viewAsBand'));
       // Website: Banner oben, Karriere weg, Begriff ersetzt
       const site = await ctx.newPage();
-      await site.goto(`${srv.base}/`);
+      await site.goto(`${srv.base}/kanzlei`);
       await site.waitForSelector('#siteBanner', { timeout: 10000 });
       assert.match(await site.textContent('#siteBanner'), /Notdienst am Sonntag/);
       assert.equal(await site.isVisible('#karriere'), false, 'Abschnitt Karriere ausgeblendet');

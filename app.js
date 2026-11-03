@@ -235,11 +235,13 @@ app.get(/^\/([a-z0-9-]+)(\.html)?$/i, (req, res, next) => {
 });
 app.get('/fivenet-import.user.js', require('./server/routes/fivenet').userscript);
 app.use(require('./server/web/seo').router); // robots.txt, sitemap.xml, „nicht indexieren“ für Internes
-app.get('/', sitePages.handler('index'));
+// Website in Unterseiten (/kanzlei, /rechtsgebiete/strafrecht, /honorare …): eine Vorlage, je Adresse die passenden Abschnitte
+const websitePaths = ['/', ...Object.values(sitePages.VIEWS).map((v) => v.path).filter((p) => p !== '/'), '/rechtsgebiete/:key'];
+app.get(websitePaths, sitePages.handler('index'));
 app.get('/karriere', sitePages.handler('karriere'));
 for (const [route, file] of [['login', 'login.html'], ['registrieren', 'register.html'], ['bewerbung', 'bewerbung.html']]) app.get(`/${route}`, sitePages.previewHandler(file));
-// Öffentliche Anwalts-Profile (/team/<name>) mit Link-Vorschau; /team allein führt zum Team auf der Startseite
-app.get('/team', (req, res) => res.redirect(302, '/#team'));
+// Öffentliche Anwalts-Profile (/team/<name>) mit Link-Vorschau; /team allein führt zur Übersicht der Anwälte
+app.get('/team', (req, res) => res.redirect(302, '/anwaelte'));
 app.get('/team/:slug', require('./server/web/profiles').handler);
 // Übrige Seiten mit Versionsnummern für Skripte/CSS (dauerhaft im Browser), Dashboard-Teile als ein Bündel
 const assets = require('./server/web/assets');

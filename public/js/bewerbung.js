@@ -127,7 +127,7 @@
             <div class="text-center mb-8">
                 <p class="text-xs uppercase tracking-widest text-gold mb-2">Ihre Bewerbung</p>
                 <h1 class="font-serif text-4xl md:text-5xl font-semibold break-words">${esc(d.name)}</h1>
-                <p class="text-sm text-muted mt-2"><span class="font-mono text-gold">${esc(d.number)}</span> · ${esc(d.positionTitle)}</p>
+                <p class="text-sm text-muted mt-2"><span class="tabular-nums text-gold">${esc(d.number)}</span> · ${esc(d.positionTitle)}</p>
             </div>
             <div class="glass-card bw-card mb-5">
                 <div class="flex justify-center mb-5"><span class="badge badge-${STATUS_COLOR[d.status] || 'slate'} text-sm px-4 py-1" id="bwStatus">${esc(d.statusLabel)}</span></div>
@@ -237,7 +237,7 @@
                 <h1 class="font-serif text-4xl md:text-5xl font-semibold">Ihre Bewerbung</h1>
             </div>
             ${message ? `<div class="banner banner-amber mb-5"><div>${esc(message)}</div></div>` : ''}
-            ${list.length ? `<div class="glass-card bw-card mb-5"><h2 class="font-serif text-2xl font-semibold mb-3">Auf diesem Gerät</h2><div class="flex flex-col gap-2">${list.map((x) => `<a class="btn-outline btn-md justify-between" href="#${esc(x.token)}"><span class="font-mono">${esc(x.number || 'Bewerbung')}</span><span class="text-xs text-dim">${esc(x.position || '')}</span></a>`).join('')}</div></div>` : ''}
+            ${list.length ? `<div class="glass-card bw-card mb-5"><h2 class="font-serif text-2xl font-semibold mb-3">Auf diesem Gerät</h2><div class="flex flex-col gap-2">${list.map((x) => `<a class="btn-outline btn-md justify-between" href="#${esc(x.token)}"><span class="tabular-nums">${esc(x.number || 'Bewerbung')}</span><span class="text-xs text-dim">${esc(x.position || '')}</span></a>`).join('')}</div></div>` : ''}
             ${viaDiscord
                 ? `<div class="glass-card bw-card text-center">
                 <h2 class="font-serif text-2xl font-semibold mb-2">Mit Discord öffnen</h2>
@@ -249,8 +249,8 @@
                 <h2 class="font-serif text-2xl font-semibold mb-2">Mit Bewerbungsnummer öffnen</h2>
                 <p class="text-sm text-muted mb-4">Bewerbungsnummer und Zugangscode haben Sie nach dem Absenden erhalten.</p>
                 <form id="accessForm" data-nodraft class="flex flex-col sm:flex-row gap-3" novalidate>
-                    <input id="acNumber" class="field font-mono" placeholder="Bewerbungsnummer, z. B. BW-2026-0001" autocapitalize="characters" aria-label="Bewerbungsnummer">
-                    <input id="acCode" class="field font-mono sm:w-48" inputmode="numeric" maxlength="6" placeholder="Zugangscode" aria-label="Zugangscode">
+                    <input id="acNumber" class="field tabular-nums" placeholder="Bewerbungsnummer, z. B. BW-2026-0001" autocapitalize="characters" aria-label="Bewerbungsnummer">
+                    <input id="acCode" class="field tabular-nums sm:w-48" inputmode="numeric" maxlength="6" placeholder="Zugangscode" aria-label="Zugangscode">
                     <button type="submit" class="btn-gold btn-md shrink-0">Öffnen</button>
                 </form>
                 <p id="accessError" class="form-error mt-3" role="alert"></p>

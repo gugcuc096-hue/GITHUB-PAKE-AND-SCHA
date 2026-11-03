@@ -358,27 +358,19 @@
   function applyHome(h, features = {}) {
     const main = document.getElementById('start');
     if (!main || !h) return;
-    // Reihenfolge: die genannten Abschnitte tauschen nur untereinander die Plätze
-    const found = h.order.map((id) => document.getElementById(id)).filter((el) => el && el.parentElement === main);
-    const slots = [...found].sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
-    if (found.length === slots.length && found.some((el, i) => el !== slots[i])) {
-      const anchors = slots.map((el) => {
-        const m = document.createComment('slot');
-        el.before(m);
-        return m;
-      });
-      found.forEach((el, i) => anchors[i].after(el));
-      anchors.forEach((m) => m.remove());
-    }
+    // Reihenfolge: seit den Unterseiten ergibt sie sich aus der Seite selbst (index.html) – nur Ausblenden gilt noch
     const off = new Set(h.hidden);
     for (const [id, f] of Object.entries(FEATURE_SECTION)) if (features[f] === false) off.add(id);
+    const ALSO = { aktuelles: ['neuigkeiten'], team: ['ansprechpartner'] }; // Teaser auf der Startseite gehören dazu
     for (const id of off) {
-      const el = document.getElementById(id);
-      if (el) el.style.display = 'none';
-      document.querySelectorAll(`a[href="#${id}"]`).forEach((a) => (a.style.display = 'none'));
+      for (const x of [id, ...(ALSO[id] || [])]) {
+        const el = document.getElementById(x);
+        if (el) el.style.display = 'none';
+      }
+      document.querySelectorAll(`a[href="#${id}"], a[data-nav="${id}"]`).forEach((a) => (a.style.display = 'none'));
     }
     // Fragen & Antworten
-    const faq = document.querySelector('#faq .glass-card');
+    const faq = document.querySelector('#faq .kz-faq, #faq .glass-card');
     if (faq && h.faq && h.faq.length) {
       faq.innerHTML = h.faq
         .map(
@@ -390,7 +382,7 @@
         .join('');
     }
     // Kontakt: weitere Links (Discord, Instagram …)
-    const kontakt = document.querySelector('#kontakt .glass-card');
+    const kontakt = document.querySelector('#kontakt .kz-wrap, #kontakt .glass-card');
     document.getElementById('siteLinks')?.remove();
     if (kontakt && h.links && h.links.length) {
       const row = document.createElement('div');

@@ -174,7 +174,7 @@ describe('Rechnungs-Generator mit Rechnungsarten (Browser)', { skip: chromium ? 
     await a.post('/api/admin/fees', { category: 'verkehrsrecht', name: 'Unfallaufnahme', price: 12000 });
     const ctx = await browser.newContext({ viewport: { width: 1366, height: 900 }, locale: 'de-DE' });
     const page = await ctx.newPage();
-    await page.goto(`${srv.base}/`);
+    await page.goto(`${srv.base}/honorare`);
     await page.waitForSelector('.tab-btn[data-cat="verkehrsrecht"]', { state: 'attached', timeout: 15000 });
     assert.equal(await page.$eval('.tab-btn[data-cat="verkehrsrecht"]', (e) => e.textContent.trim()), 'Verkehrsrecht');
     assert.ok(await page.$('.price-category[data-category="verkehrsrecht"]'));

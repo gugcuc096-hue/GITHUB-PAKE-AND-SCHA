@@ -39,9 +39,10 @@
     <link rel="stylesheet" href="/css/depth.css">
     <link rel="stylesheet" href="/css/motion.css">
     <link rel="stylesheet" href="/css/calm.css" media="(prefers-reduced-motion: reduce)" data-calm>
+    <link rel="stylesheet" href="/css/kanzlei.css">
     <link rel="stylesheet" href="/css/gfx.css">
 </head>
-<body class="min-h-screen page-in">
+<body class="site-home min-h-screen page-in">
     <div class="ambient-bg"><div class="glow-orb orb-1"></div><div class="glow-orb orb-2"></div></div>
 
     <nav class="subpage-nav">
@@ -90,7 +91,7 @@
                 </div>
                 <div>
                     <label class="label" for="code">Anmeldecode</label>
-                    <input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" class="field font-mono text-center text-xl tracking-[0.35em]" placeholder="000000">
+                    <input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" class="field tabular-nums text-center text-xl tracking-[0.35em]" placeholder="000000">
                 </div>
                 <label class="check"><input type="checkbox" id="trustDevice"> Diesem Gerät 30 Tage vertrauen</label>
                 <p id="codeError" class="form-error" role="alert"></p>

@@ -138,8 +138,8 @@ describe('Einstellungen: Navigation, Dashboard-Start, Tarifrechner, Dokumente, D
       await doc.waitForSelector('#doc .doc-watermark');
       assert.match(await doc.textContent('#doc .doc-footline'), /Maze Bank/);
       assert.ok(await doc.$('#doc.doc-logo-mitte'));
-      // Tarifrechner: Name des Zuschlags auf der Website
-      await doc.goto(`${srv.base}/`);
+      // Tarifrechner: Name des Zuschlags auf der Website (Honorare)
+      await doc.goto(`${srv.base}/honorare`);
       await doc.waitForFunction(() => /Express \(\+25 %\)/.test(document.querySelector('#priorityAddon')?.closest('.calc-opt')?.textContent || ''));
       assert.deepEqual(problems, []);
     } finally {

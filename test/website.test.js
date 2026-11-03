@@ -44,10 +44,10 @@ describe('Website & Ränge selbst pflegen', () => {
     assert.equal(created.status, 201, created.text);
     const rank = created.json.ranks.find((x) => x.name === 'Managing Partner');
     assert.equal(rank.number, 4, 'Board-Ränge stehen vor den Associates');
-    const home = await client(server.base).get('/');
+    const home = await client(server.base).get('/kanzlei');
     assert.match(home.text, /<h4[^>]*>Managing Partner<\/h4>/);
     assert.match(home.text, /Führt das Tagesgeschäft der Kanzlei\./);
-    assert.match(home.text, /Rang 04/);
+    assert.match(home.text, /Rang 4</);
     // Auswahllisten im Dashboard bekommen die Ränge mit der Anmeldung
     assert.ok((await as.anwalt.get('/api/auth/me')).json.ranks['Board of Partners'].includes('Managing Partner'));
     // Der Anwalt bekommt den neuen Board-Rang → Board-Rechte
@@ -67,22 +67,22 @@ describe('Website & Ränge selbst pflegen', () => {
     assert.equal((await as.admin.patch(`/api/admin/users/${lex.id}`, { rank: 'Senior Associate' })).status, 200);
     assert.equal((await as.anwalt.get('/api/auth/me')).json.user.board, false);
     assert.equal((await as.admin.del(`/api/site/ranks/${rank.id}`)).status, 200);
-    assert.doesNotMatch((await client(server.base).get('/')).text, /Senior Partner/);
+    assert.doesNotMatch((await client(server.base).get('/kanzlei')).text, /Senior Partner/);
   });
 
   it('Website-Texte: Board ändert einen Text direkt auf der Seite, „Original“ stellt ihn wieder her', async () => {
-    const page = (await client(server.base).get('/')).text;
-    const key = page.match(/data-t="([0-9a-f]{12})">Hierarchie (?:&|&amp;) Kanzleiränge</)[1];
+    const page = (await client(server.base).get('/kanzlei')).text;
+    const key = page.match(/data-t="([0-9a-f]{12})">Vier Grundsätze</)[1];
     assert.equal((await as.anwalt.put('/api/site/texts', { page: 'index', key, text: 'Hallo' })).status, 403, 'nur Board of Partners');
     assert.equal((await as.admin.put('/api/site/texts', { page: 'index', key: 'ffffffffffff', text: 'x' })).status, 404, 'nur echte Texte der Seite');
     const saved = await as.admin.put('/api/site/texts', { page: 'index', key, text: 'Unsere <Ränge>' });
     assert.equal(saved.status, 200, saved.text);
-    const after = (await client(server.base).get('/')).text;
+    const after = (await client(server.base).get('/kanzlei')).text;
     assert.match(after, new RegExp(`data-t="${key}">Unsere &lt;Ränge&gt;<`), 'eingesetzt und maskiert');
     const list = (await as.admin.get('/api/site/texts')).json.texts;
-    assert.equal(list[0].original, 'Hierarchie & Kanzleiränge');
+    assert.equal(list[0].original, 'Vier Grundsätze');
     assert.equal((await as.admin.del(`/api/site/texts/index/${key}`)).status, 200);
-    assert.match((await client(server.base).get('/')).text, new RegExp(`data-t="${key}">Hierarchie (?:&|&amp;) Kanzleiränge<`));
+    assert.match((await client(server.base).get('/kanzlei')).text, new RegExp(`data-t="${key}">Vier Grundsätze<`));
     // Rang-Karten sind keine Website-Texte (die pflegt Einstellungen → Ränge)
     assert.doesNotMatch(after, /<h4[^>]*data-t=/);
   });
@@ -202,7 +202,7 @@ describe('Website & Ränge selbst pflegen', () => {
     r = await client(server.base).get('/team/gibt-es-nicht', { Accept: 'text/html' });
     assert.equal(r.status, 404);
     assert.match(r.text, /Seite nicht gefunden/);
-    assert.equal((await client(server.base).get('/team')).location, '/#team');
+    assert.equal((await client(server.base).get('/team')).location, '/anwaelte');
   });
 
   it('404: eigene Seite für Menschen, schlichte Antwort für Programme', async () => {

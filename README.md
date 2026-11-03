@@ -86,7 +86,7 @@ Premium-Webanwendung für die GTA-RP-Kanzlei **Pake & Scha Legal Consulting**: �
 | **Große Bildschirme** | Startseite und Karriereseite wachsen ab 1920 px Breite mit (Schrift und Abstände etwas größer, ab 2400 px noch einmal) – auf breiten Monitoren wirkt die Seite nicht mehr klein und verloren |
 | **Auswahllisten & Kalender** | Alle Auswahllisten (Sortierung, Status, Rang, Anwalt …) klappen im Stil der Kanzlei auf: dunkles Panel mit Goldrand, großzügige Zeilen, Gold-Häkchen bei der gewählten Option, Gruppen-Überschriften, sanftes Aufklappen (`public/css/select.css`, Chrome/Edge/Opera; andere Browser zeigen die normale Liste des Systems) · Vorschlagslisten (z. B. Dokumentart) im selben Stil · **eigener Kalender** für alle Datums- und Terminfelder (Termine, Fristen, Fälligkeiten, Rechnungen …): Monatsansicht Mo–So, heute und der gewählte Tag in Gold, Uhrzeit in 5-Minuten-Schritten mit „Übernehmen“, „Heute“/„Jetzt“ und „Leeren“ (bei Pflichtfeldern nicht), Esc schließt nur den Kalender · am Handy so breit wie das Feld, ohne das Datumsrad des Systems; am PC lässt sich das Datum weiterhin auch eintippen · Häkchen, Optionsfelder und „Datei auswählen“ in Gold |
 | **Barrierefreiheit** | Geprüft mit axe-core auf allen öffentlichen Seiten, allen Dashboard-Ansichten, allen Einstellungs-Reitern, 15 Formular-Fenstern und der Akte (Kanzlei und Mandant, PC und Handy): 0 Befunde · jedes Eingabefeld ist mit seiner Beschriftung verbunden (Screenreader lesen sie vor, Klick auf die Beschriftung setzt den Cursor ins Feld), jedes Fenster hat einen vorlesbaren Titel, Überschriften in richtiger Reihenfolge, Logo neben dem Namen wird nicht doppelt vorgelesen, Links im Text unterstrichen · Kontraste aller Textfarben mindestens 5 : 1 (Vorgabe 4,5 : 1) · beim Bedienen mit der Tastatur (Tab) ist überall sichtbar, was ausgewählt ist |
-| **Schriften vom eigenen Server** | Inter, Cormorant Garamond, JetBrains Mono und die Schriften der Druckansichten (Tinos, Roboto Serif, Allura, Dancing Script) liegen in `public/fonts/` (WOFF2, mit Lizenzen) – keine Anfragen mehr an Google beim Öffnen der Seite (Datenschutz), schneller und auch dann richtig, wenn Google nicht erreichbar ist · die Hauptschrift wird vorab geladen, Schriften werden 30 Tage im Browser zwischengespeichert |
+| **Schriften vom eigenen Server** | Inter und Cormorant Garamond (keine Programmierschrift – Zahlen in Inter mit gleich breiten Ziffern) und die Schriften der Druckansichten (Tinos, Roboto Serif, Allura, Dancing Script) liegen in `public/fonts/` (WOFF2, mit Lizenzen) – keine Anfragen mehr an Google beim Öffnen der Seite (Datenschutz), schneller und auch dann richtig, wenn Google nicht erreichbar ist · die Hauptschrift wird vorab geladen, Schriften werden 30 Tage im Browser zwischengespeichert |
 | **Team-Verwaltung** (Admin) | Mitglieder hinzufügen, umbenennen, Rang/Beschreibung ändern, sortieren, ausblenden, löschen – sofort live auf der Website · optional mit Login-Konto (Einmal-Passwort) |
 | **Benutzer** (Admin) | Rollen, Ränge, Sperren, Löschen, **Passwort-Reset per Klick** |
 | **Login-E-Mail @pake-scha.ls** | Alle Konten enden auf **@pake-scha.ls** – bei Registrierung, „Konto anlegen“, Team-Konto und Einstellung wird nur der Teil vor dem @ gewählt (Vorschlag aus dem Namen) · bestehende Konten wurden automatisch umgestellt (`john@mail.ls` → `john@pake-scha.ls`, bei Doppelungen `john2@…`), **Passwort unverändert** · Login mit neuer Adresse, nur dem Teil vor dem @ (`john`) **oder der alten Adresse** · einmaliger Hinweis im Dashboard mit der neuen Adresse · unter *Benutzer* steht „vorher: …“ (siehe [Login-E-Mail](#login-e-mail-pake-schals)) |
@@ -422,6 +422,27 @@ Für das **Board of Partners** ist die Zwei-Faktor-Anmeldung Pflicht, alle ander
 
 Codes und Geräte-Merkmale liegen nur als SHA-256-Hash in der Datenbank und fehlen in Datensicherungen; der Bot-Token bleibt in Render.
 
+## Die Website der Kanzlei
+
+Statt einer langen Startseite hat die Website echte Unterseiten – jede mit eigener Adresse, eigenem Titel und eigener Link-Vorschau:
+
+| Adresse | Inhalt |
+|---|---|
+| `/` | Startseite: Kanzleisiegel, Rechtsgebiete, Kanzleileitung, die neuesten Meldungen, Ablauf eines Mandats |
+| `/kanzlei` | Über die Kanzlei, vier Grundsätze, Ablauf, Ränge, Mandantenstimmen (nur echte, ab drei), Karriere |
+| `/rechtsgebiete` und `/rechtsgebiete/<gebiet>` | Strafrecht, Zivilrecht, Verfassungsrecht, Vertragsrecht – Leistungen, **Verfahrensschritte aus Einstellungen → Listen**, Anwälte mit diesem Schwerpunkt; vom Board angelegte Rechtsgebiete bekommen automatisch eine Seite, ausgeblendete verschwinden |
+| `/anwaelte` | Board of Partners und Associates mit Foto oder Monogramm-Siegel, „Direkt anfragen“; Profile unter `/team/<name>` im selben Design |
+| `/honorare` | Tarifrechner, Honorarordnung, VIP & Lifetime |
+| `/notdienst` | Wer gerade im Dienst ist (live), was bei einer Festnahme zu tun ist, „Notfall-Mandat anfragen“ |
+| `/aktuelles` | Meldungen des Boards (Einstellungen → Aktuelles: schreiben, anheften, verbergen) und automatisch: neu im Team, Beförderungen, offene Stellen (je abschaltbar unter Einstellungen → Startseite) |
+| `/verfahrensstand` | Stand eines Verfahrens mit Aktenzeichen + Pin aus der Bestätigung – nur Rechtsgebiet, Schritt, Status, zuständiger Anwalt und Hinweis der Kanzlei, nie Inhalte der Akte; Fehlversuche sind begrenzt |
+| `/kontakt` | Mandat, Notdienst, Kanzleisitz, Anliegen an das Board, Fragen & Antworten |
+| `/impressum` | Impressum (Kanzlei im Rollenspiel) |
+
+Alte Links auf Abschnitte der früheren Startseite (`/#honorar`, `/#team` …) führen automatisch zur neuen Unterseite. Alle Texte bleiben im Bearbeitungsmodus (`?bearbeiten`) änderbar.
+
+**Gestaltung:** ruhig und typografisch wie eine Kanzlei – Überschriften in Cormorant Garamond, Text in Inter, Gold nur als Linie, Rubrik und Knopf; Listen und Haarlinien statt leuchtender Karten, keine Silbentrennung, nur weiches Einblenden. **Keine Programmierschrift** mehr – auch nicht im Dashboard, auf Rechnungen, Aktenauszügen und im Word-Export: Zahlen und Aktenzeichen stehen in Inter mit gleich breiten Ziffern. Technisch steht die ganze Website in `public/index.html` (jeder Abschnitt mit `data-page="…"`), der Server liefert je Adresse nur die passenden Abschnitte (`server/web/sitePages.js`); das Designsystem liegt in `public/css/kanzlei.css`.
+
 ## Saubere Adressen
 
 Seiten haben keine Endung mehr: `/login`, `/registrieren`, `/dashboard`, `/karriere`, `/bewerbung`, `/vertrag?id=12`, `/rechnung?id=5`, `/aktenauszug` (und `/offline`). Alle Links auf der Website, im Dashboard, in Discord-Nachrichten, im Kanzlei-Bot und in der installierten App verwenden die neuen Adressen. **Alte Links funktionieren weiter**: `/login.html`, `/register.html`, `/invoice.html?id=5` … leiten dauerhaft (301) auf die neue Adresse um – mit Abfrage und Sprungmarke, also landet `/dashboard.html?case=4#cases` auf `/dashboard?case=4#cases`. Die installierte App behält ihre Kennung (`id` im Manifest), damit sie nicht als neue App gilt.
@@ -622,7 +643,9 @@ server/core/live.js Live-Aktualisierung (GET /api/events): meldet nur Akte/Berei
 server/domain/penal.js Strafgesetzbuch & Strafmaß-Rechner: StGB einspielen (seeds/stgb.json), Katalog, Anklagepunkte, Gesamtstrafe nach § 3 / § 13
 server/domain/lawyerOfMonth.js Anwalt des Monats: Punkte aus dem Vormonat, Modus automatisch/gewählt/aus, Discord-Beitrag zum Monatswechsel
 seeds/stgb.json  Strafgesetzbuch des Staates San Andreas: Gesetzestext je Paragraph und Strafkatalog (Stand 10/2026)
-server/web/profiles.js Anwalts-Profilseiten /team/<name> (Vorlage views/anwalt.html, Link-Vorschau mit Foto, Zahlen ab Mindestanzahl)
+server/web/profiles.js Anwalts-Profilseiten /team/<name> (in der Hülle der Website, Abschnitt data-page="profil", Link-Vorschau mit Foto, Zahlen ab Mindestanzahl)
+server/web/sitePages.js Website in Unterseiten (index.html → je Adresse die Abschnitte mit data-page, Titel, Link-Vorschau)
+server/domain/news.js   Aktuelles: Meldungen des Boards + automatische (neu im Team, Beförderung, offene Stelle)
 server/web/assets.js Schnell laden: Versionsnummern für Skripte/CSS (ein Jahr im Browser), Dashboard-Teile als ein Bündel
 server/db/trash.js Papierkorb für Akten: Momentaufnahme beim Löschen, Wiederherstellen, endgültig löschen nach 30 Tagen
 server/web/docxRender.js Word-Dateien im Layout der Druckansichten (Rechnung, Vertrag/Schriftsatz, Aktenauszug) – Grundlage der Google Docs

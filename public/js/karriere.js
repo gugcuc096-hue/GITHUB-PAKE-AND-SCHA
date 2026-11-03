@@ -80,7 +80,7 @@
                 const status = a.statusLabel ? `<span class="badge badge-${STATUS_COLOR[a.status] || 'slate'}">${esc(a.statusLabel)}</span>` : '';
                 const unread = a.unread ? `<span class="badge badge-gold">${a.unread === 1 ? '1 neue Nachricht' : `${a.unread} neue Nachrichten`}</span>` : '';
                 return `<a class="glass-card my-app" href="/bewerbung#${encodeURIComponent(a.token)}">
-                    <span class="min-w-0"><span class="block font-mono text-[var(--gold-light)]">${esc(a.number || 'Bewerbung')}</span><span class="block text-sm text-muted truncate">${esc(a.positionTitle || a.position || '')}</span></span>
+                    <span class="min-w-0"><span class="block tabular-nums text-[var(--gold-light)]">${esc(a.number || 'Bewerbung')}</span><span class="block text-sm text-muted truncate">${esc(a.positionTitle || a.position || '')}</span></span>
                     <span class="right flex items-center gap-2 shrink-0">${status}${unread}${status || unread ? '' : '<span class="text-sm text-muted">Stand ansehen</span>'}${ARROW}</span>
                 </a>`;
             })
@@ -207,7 +207,7 @@
             const text = `Bewerbungsnummer: ${res.number}\nZugangscode: ${res.code}\nBewerberseite: ${portal}`;
             // Mit Discord: Der Bot schickt den Link zur Bewerberseite per DM – kein Zugangscode nötig
             const access = res.discord
-                ? `<p class="text-xs text-dim mb-4">Bewerbungsnummer <span class="font-mono text-[var(--gold-light)]">${esc(res.number)}</span></p>
+                ? `<p class="text-xs text-dim mb-4">Bewerbungsnummer <span class="tabular-nums text-[var(--gold-light)]">${esc(res.number)}</span></p>
                 <div class="rounded-xl border border-[rgba(88,101,242,0.45)] bg-[rgba(88,101,242,0.1)] p-4 mb-6 max-w-md mx-auto text-left">
                     <div class="font-semibold mb-1">Jetzt Discord verbinden</div>
                     <p class="text-sm text-muted">Der Kanzlei-Bot schickt Ihnen den Link zu Ihrer Bewerberseite per Direktnachricht – damit öffnen Sie sie auf jedem Gerät. Antworten und neue Stände kommen ebenfalls dorthin. Auf diesem Gerät ist die Bewerbung schon gespeichert.</p>
@@ -217,8 +217,8 @@
                     <a href="${esc(res.portal)}" id="checkApply" class="btn-outline btn-md">Zur Bewerberseite</a>
                 </div>`
                 : `<div class="grid grid-cols-2 gap-3 mb-3 max-w-md mx-auto">
-                    <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3"><div class="text-[0.6rem] uppercase tracking-widest text-muted">Bewerbungsnummer</div><div class="font-mono text-lg text-[var(--gold-light)]">${esc(res.number)}</div></div>
-                    <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3"><div class="text-[0.6rem] uppercase tracking-widest text-muted">Zugangscode</div><div class="font-mono text-lg tracking-[0.2em] text-[var(--gold-light)]">${esc(res.code)}</div></div>
+                    <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3"><div class="text-[0.6rem] uppercase tracking-widest text-muted">Bewerbungsnummer</div><div class="tabular-nums text-lg text-[var(--gold-light)]">${esc(res.number)}</div></div>
+                    <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3"><div class="text-[0.6rem] uppercase tracking-widest text-muted">Zugangscode</div><div class="tabular-nums text-lg tracking-[0.2em] text-[var(--gold-light)]">${esc(res.code)}</div></div>
                 </div>
                 <p class="text-xs text-amber-300/90 mb-6">Die Bewerberseite ist auf diesem Gerät gespeichert. Bitte notieren Sie trotzdem beide Angaben – damit öffnen Sie sie auch auf jedem anderen Gerät.</p>
                 <div class="flex flex-col sm:flex-row justify-center gap-2">

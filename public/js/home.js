@@ -10,7 +10,10 @@
 // Vor allen anderen Listenern angemeldet – dieselbe Reihenfolge wie früher die Inline-Handler.
 const PAGE_ACTIONS = {
     menu: () => toggleMobileMenu(),
-    ticket: (el) => openTicketModal(el.dataset.source),
+    ticket: (el) => {
+        openTicketModal(el.dataset.source);
+        presetTicket(el.dataset.area, el.dataset.urgency); // „Mandat im Strafrecht anfragen“, „Notfall-Mandat“
+    },
     'ticket-close': () => closeTicketModal(),
     'ticket-lawyer-clear': () => setWishLawyer(null),
     concern: (el) => window.openConcernModal(el.dataset.mode || undefined),
@@ -26,11 +29,11 @@ document.querySelectorAll('[data-act]').forEach((el) => {
 document.addEventListener('change', (e) => {
     if (e.target.classList && e.target.classList.contains('calc-check')) calculateTotal();
 });
-document.getElementById('priceSearch').addEventListener('input', () => {
+document.getElementById('priceSearch')?.addEventListener('input', () => {
     priceManual.clear(); // neue Suche: aufklappen, was passt
     filterPrices();
 });
-document.getElementById('priceSort').addEventListener('change', () => sortPrices());
+document.getElementById('priceSort')?.addEventListener('change', () => sortPrices());
 document.getElementById('ticketForm').addEventListener('submit', (e) => window.handleFormSubmit(e));
 
 /* ---------- Modal Control ---------- */
@@ -63,6 +66,16 @@ function setWishLawyer(lawyer) {
     box.classList.toggle('flex', !!lawyer);
 }
 window.openTicketModal = openTicketModal;
+/** Rechtsgebiet bzw. Dringlichkeit im Mandatsformular vorbelegen (nur wenn der Knopf es mitbringt). */
+function presetTicket(area, urgency) {
+    const sel = document.getElementById('tkArea');
+    if (area && sel && [...sel.options].some((o) => o.value === area)) {
+        sel.value = area;
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    const radio = urgency && document.querySelector(`#ticketForm input[name="urgency"][value="${urgency}"]`);
+    if (radio) radio.checked = true;
+}
 window.setWishLawyer = setWishLawyer;
 function closeTicketModal() {
     const modal = document.getElementById('ticketModal');
@@ -110,6 +123,7 @@ function showToast(title, message) {
 function toggleMobileMenu() {
     const menu = document.getElementById('mobileMenu');
     const open = menu.classList.toggle('open');
+    document.body.classList.toggle('menu-open', open);
     document.getElementById('menuIconOpen').classList.toggle('hidden', open);
     document.getElementById('menuIconClose').classList.toggle('hidden', !open);
     document.getElementById('menuToggle').setAttribute('aria-expanded', open);
@@ -151,8 +165,8 @@ const priceManual = new Map(); // Kategorie → offen (von Hand umgeschaltet)
 function priceOpen(cat, index) {
     const key = cat.getAttribute('data-category');
     if (priceManual.has(key)) return priceManual.get(key);
-    const query = document.getElementById('priceSearch').value.trim();
-    const activeCat = document.querySelector('.tab-btn.active').getAttribute('data-cat');
+    const query = (document.getElementById('priceSearch') || { value: '' }).value.trim();
+    const activeCat = document.querySelector('.tab-btn.active')?.getAttribute('data-cat') || 'all';
     if (query) return [...cat.querySelectorAll('.price-item')].some((item) => item.style.display !== 'none');
     return activeCat !== 'all' || index === 0;
 }
@@ -202,8 +216,9 @@ function setCategory(cat) {
 
 /* ---------- Live Price Search ---------- */
 function filterPrices() {
+    if (!document.getElementById('priceSearch')) return; // nur auf /honorare
     const query = document.getElementById('priceSearch').value.toLowerCase();
-    const activeCat = document.querySelector('.tab-btn.active').getAttribute('data-cat');
+    const activeCat = document.querySelector('.tab-btn.active')?.getAttribute('data-cat') || 'all';
     let visibleCount = 0;
     document.querySelectorAll('.price-item').forEach(item => {
         const name = item.getAttribute('data-name').toLowerCase();
@@ -220,6 +235,7 @@ function filterPrices() {
 
 /* ---------- Price Sort ---------- */
 function sortPrices() {
+    if (!document.getElementById('priceSort')) return;
     const mode = document.getElementById('priceSort').value;
     document.querySelectorAll('.price-category').forEach(category => {
         const grid = category.querySelector('.grid');
@@ -254,6 +270,7 @@ function syncPriorityLabel(calc, priorityPct) {
     if (label && calc.bundlePct !== undefined) label.textContent = `Mandatsbündel-Rabatt (${pctDe(calc.bundlePct)} %)`;
 }
 function calculateTotal() {
+    if (!document.getElementById('totalAmount')) return; // Tarifrechner nur auf /honorare
     const checkboxes = document.querySelectorAll('.calc-check:checked:not(#priorityAddon)');
     const priorityChecked = document.getElementById('priorityAddon').checked;
     let subtotal = 0;
@@ -338,7 +355,7 @@ window.addEventListener('ps:promo', () => {
 /* ---------- FAQ Accordion ---------- */
 function toggleFaq(item) {
     const wasOpen = item.classList.contains('open');
-    item.closest('.glass-card').querySelectorAll('.faq-item').forEach(f => {
+    item.closest('.kz-faq, .glass-card').querySelectorAll('.faq-item').forEach(f => {
         f.classList.remove('open');
         f.querySelector('button').setAttribute('aria-expanded', 'false');
     });
@@ -352,19 +369,6 @@ function toggleFaq(item) {
 
 /* ---------- Team & Honorarordnung lädt /js/site.js live aus der Datenbank ---------- */
 document.getElementById('footerYear').textContent = new Date().getFullYear();
-
-/* ---------- Live Clock ---------- */
-function updateClock() {
-    if (document.hidden) return; // im Hintergrund-Tab nichts zeichnen
-    const now = new Date();
-    const time = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const clockEl = document.getElementById('liveClock');
-    const clockFooterEl = document.getElementById('liveClockFooter');
-    if (clockEl) clockEl.textContent = time;
-    if (clockFooterEl) clockFooterEl.textContent = time;
-}
-updateClock();
-setInterval(updateClock, 1000);
 
 /* ---------- Scrollspy Navigation: goldener Strich unter dem Menüpunkt siehe js/motion.js (nav[data-ink]) ---------- */
 

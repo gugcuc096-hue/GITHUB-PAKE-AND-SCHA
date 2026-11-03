@@ -39,6 +39,52 @@ router.get('/on-duty', (req, res) => {
   res.json({ visible: true, count: members.length, members });
 });
 
+/* Aktuelles: Meldungen des Boards und automatische Meldungen (neu im Team, Beförderung, offene Stelle) */
+router.get('/news', (req, res) => {
+  res.set('Cache-Control', 'no-cache');
+  res.json({ news: require('../domain/news').feed(30) });
+});
+
+/*
+ * Verfahrensstand ohne Konto: Aktenzeichen + Pin (steht in der Bestätigung der Mandatsanfrage). Gezeigt wird nur, was
+ * der Mandant ohnehin sehen darf – Rechtsgebiet, Schritt, Status, zuständiger Anwalt, Hinweis der Kanzlei. Kein Inhalt
+ * der Akte, keine Namen von Beteiligten. Fehlversuche zählen (Schutz gegen Durchprobieren der Pins).
+ */
+const statusLimiter = limit(15 * 60 * 1000, 10, 'Zu viele Versuche. Bitte warten Sie einige Minuten.');
+const statusSchema = z.object({ number: z.string().trim().min(3).max(40), pin: z.string().trim().regex(/^\d{4,8}$/, 'Der Pin besteht aus Ziffern.') });
+router.post(
+  '/case-status',
+  statusLimiter,
+  wrap(async (req, res) => {
+    const d = parseBody(statusSchema, req, res);
+    if (!d) return;
+    const c = db
+      .prepare(
+        `SELECT c.case_number, c.area, c.step, c.status, c.public_note, c.created_at, c.updated_at, c.closed_at, lu.display_name AS lawyer_name
+           FROM cases c LEFT JOIN users lu ON lu.id = c.lawyer_id
+          WHERE c.case_number = ? COLLATE NOCASE AND c.access_pin = ?`
+      )
+      .get(d.number, d.pin);
+    if (!c) return res.status(404).json({ error: 'Kein Verfahren mit diesem Aktenzeichen und Pin gefunden.' });
+    const { CASE_STATUS } = require('../core/helpers');
+    const steps = areas.stepsOf(c.area);
+    res.set('Cache-Control', 'no-store');
+    res.json({
+      caseNumber: c.case_number,
+      area: areas.name(c.area),
+      steps: [...steps, 'Abgeschlossen'],
+      step: c.status === 'geschlossen' ? steps.length : Math.min(Math.max(c.step || 0, 0), steps.length - 1),
+      status: c.status,
+      statusLabel: CASE_STATUS[c.status] || c.status,
+      lawyer: c.lawyer_name || null,
+      note: c.public_note || '',
+      openedAt: c.created_at,
+      updatedAt: c.updated_at,
+      closedAt: c.closed_at,
+    });
+  })
+);
+
 /*
  * Erfolge der Kanzlei für die Startseite (abschaltbar unter Einstellungen → Website). Gezählt werden abgeschlossene
  * Akten; die Erfolgsquote kommt aus dem Ergebnis, das beim Abschließen gewählt wird (Beratung ohne Verfahren und

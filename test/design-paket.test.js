@@ -33,7 +33,7 @@ describe('Design-Paket', () => {
     const fs = require('node:fs');
     const path = require('node:path');
     const root = path.join(__dirname, '..');
-    const pages = [...fs.readdirSync(path.join(root, 'public')).filter((f) => f.endsWith('.html')).map((f) => path.join('public', f)), path.join('views', 'anwalt.html')];
+    const pages = [...fs.readdirSync(path.join(root, 'public')).filter((f) => f.endsWith('.html')).map((f) => path.join('public', f))];
     for (const f of pages) {
       const html = fs.readFileSync(path.join(root, f), 'utf8');
       if (/href="\/css\/fonts\.css"/.test(html)) assert.match(html, /href="\/css\/scrollbar\.css"/, `${f} lädt scrollbar.css`);
@@ -82,20 +82,11 @@ describe('Design-Paket', () => {
       await page.waitForFunction(() => /Wir stellen ein/.test(document.querySelector('#siteBanner .sb-slide.is-on')?.textContent || ''));
       // kein „E-Mail kopieren“ mehr im Kontaktbereich
       assert.equal(await page.locator('#emailCopyBtn').count(), 0);
-      // Navi-Strich unter dem aktiven Abschnitt
-      await page.mouse.move(5, 880); // Maus weg von der Leiste (beim Darüberfahren folgt der Strich der Maus)
-      await page.evaluate(() => document.getElementById('team').scrollIntoView());
-      await page.waitForFunction(() => document.querySelector('nav[data-ink] .nav-link.nav-active')?.dataset.section === 'team');
-      // Strich liegt (nach dem Gleiten) genau unter dem aktiven Menüpunkt
-      await page.waitForFunction(
-        () => {
-          const i = document.querySelector('nav[data-ink] .nav-ink').getBoundingClientRect();
-          const l = document.querySelector('nav[data-ink] .nav-link.nav-active').getBoundingClientRect();
-          return Math.abs(i.left - l.left) < 2 && Math.abs(i.width - l.width) < 2 && getComputedStyle(document.querySelector('.nav-ink')).opacity === '1';
-        },
-        null,
-        { timeout: 8000 }
-      );
+      // Website in Unterseiten: die aktuelle Seite ist im Menü markiert (goldener Strich darunter)
+      await page.goto(`${srv.base}/anwaelte`);
+      assert.equal(await page.getAttribute('header nav a[data-nav="anwaelte"]', 'aria-current'), 'page');
+      assert.match(await page.$eval('header nav a[data-nav="anwaelte"]', (a) => getComputedStyle(a, '::after').transform), /matrix\(1, 0, 0, 1/);
+      assert.equal(await page.$eval('header nav a[data-nav="kontakt"]', (a) => getComputedStyle(a, '::after').transform), 'matrix(0, 0, 0, 1, 0, 0)');
       // Karriere: derselbe Strich
       await page.goto(`${srv.base}/karriere`);
       await page.evaluate(() => document.getElementById('ablauf').scrollIntoView());
