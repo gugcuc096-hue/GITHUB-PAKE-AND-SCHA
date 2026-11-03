@@ -413,8 +413,10 @@
   }
 
   /*
-   * Website-Navigation: ein goldener Strich gleitet unter den Menüpunkt des Abschnitts, in dem man gerade liest
-   * (Scrollspy), und folgt beim Darüberfahren der Maus. Gilt für jede <nav data-ink> mit .nav-link[data-section].
+   * Website-Navigation: ein leuchtender goldener Strich liegt unter dem Menüpunkt der aktuellen Seite
+   * (aria-current) bzw. des Abschnitts, in dem man gerade liest (Scrollspy, .nav-link[data-section]), und folgt beim
+   * Darüberfahren der Maus. Beim Wechsel auf eine andere Unterseite gleitet er von der alten Stelle zur neuen
+   * (Stelle in sessionStorage). Gilt für jede <nav data-ink> mit .nav-link.
    */
   function siteNavInk() {
     document.querySelectorAll('nav[data-ink]').forEach((nav) => {
@@ -425,11 +427,22 @@
       ink.setAttribute('aria-hidden', 'true');
       nav.appendChild(ink);
       let hover = null;
+      const KEY = 'ps.ink';
+      const isActive = (l) => l.classList.contains('nav-active') || (!l.dataset.section && l.getAttribute('aria-current') === 'page');
+      const remember = (v) => {
+        try {
+          if (v) sessionStorage.setItem(KEY, JSON.stringify(v));
+          else sessionStorage.removeItem(KEY);
+        } catch {
+          /* ohne Speicher erscheint der Strich einfach an seiner Stelle */
+        }
+      };
       const place = () => {
-        const active = links.find((l) => l.classList.contains('nav-active'));
+        const active = links.find(isActive);
         const target = hover || active;
         if (!target || !target.getClientRects().length) {
           ink.style.opacity = '0';
+          if (!hover) remember(null);
           return;
         }
         const nr = nav.getBoundingClientRect();
@@ -437,7 +450,21 @@
         ink.style.width = `${r.width}px`;
         ink.style.transform = `translateX(${r.left - nr.left}px)`;
         ink.style.opacity = hover && hover !== active ? '0.55' : '1';
+        if (target === active && nav.offsetWidth) remember({ x: r.left - nr.left, w: r.width, nw: nr.width });
       };
+      // Von der Stelle der vorigen Seite aus losgleiten (gleiche Breite der Leiste, sonst stimmt die Stelle nicht)
+      let from = null;
+      try {
+        from = JSON.parse(sessionStorage.getItem(KEY) || 'null');
+      } catch {
+        from = null;
+      }
+      if (from && Math.abs(from.nw - nav.getBoundingClientRect().width) < 2 && !calm()) {
+        ink.style.width = `${from.w}px`;
+        ink.style.transform = `translateX(${from.x}px)`;
+        ink.style.opacity = '1';
+        void ink.offsetWidth; // Startstelle festhalten, dann gleiten
+      }
       const spied = links.filter((l) => l.dataset.section && document.getElementById(l.dataset.section));
       const spy = () => {
         if (!spied.length) return;
@@ -484,9 +511,18 @@
       window.addEventListener('resize', onScroll);
       window.addEventListener('load', onScroll);
       document.fonts && document.fonts.ready && document.fonts.ready.then(onScroll);
-      spy();
-      place();
-      requestAnimationFrame(() => ink.classList.add('is-ready')); // erst danach gleiten (nicht von links hereinfliegen)
+      if (from && ink.style.opacity === '1') {
+        // erst gleiten, wenn die Seite steht (Schrift geladen) – sonst landet der Strich neben dem Menüpunkt
+        ink.classList.add('is-ready');
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          spy();
+          place();
+        }));
+      } else {
+        spy();
+        place();
+        requestAnimationFrame(() => ink.classList.add('is-ready')); // erst danach gleiten (nicht von links hereinfliegen)
+      }
     });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', siteNavInk);

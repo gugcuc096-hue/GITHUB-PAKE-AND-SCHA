@@ -2932,7 +2932,7 @@ describe('Browser: Bewegung, die zeigt, woher etwas kommt – Zahlen, die mitlau
     }
   });
 
-  it('Startseite: Seitenübergang nur von der Teamkarte zur Profilseite – sonst (Login, Discord-Anmeldung …) kein Übergang', async () => {
+  it('Website: weicher Seitenwechsel zwischen den Unterseiten und zur Profilseite – Anmeldung macht nicht mit, ohne Fehler', async () => {
     const srv = await startServer();
     const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
     try {
@@ -2951,7 +2951,7 @@ describe('Browser: Bewegung, die zeigt, woher etwas kommt – Zahlen, die mitlau
         );
       await page.goto(srv.base + '/anwaelte');
       await page.waitForSelector('#teamGrid .team-card .team-name');
-      assert.equal(await optedIn(), false, 'ohne Klick auf eine Teamkarte kein Übergang');
+      assert.equal(await optedIn(), true, 'Unterseiten nehmen am Übergang teil');
       await page.click('#teamGrid .team-card .team-name');
       await page.waitForURL(/\/team\//);
       await page.waitForSelector('.pf-photo');
@@ -2964,6 +2964,7 @@ describe('Browser: Bewegung, die zeigt, woher etwas kommt – Zahlen, die mitlau
       await page.click('#toLogin');
       await page.waitForURL(/login/);
       await page.waitForTimeout(300);
+      assert.equal(await optedIn(), false, 'Anmeldung ohne Übergang');
       assert.deepEqual(problems, []);
     } finally {
       await browser.close();

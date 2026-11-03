@@ -24,7 +24,10 @@ describe('Designsystem Tiefe, Glas, Licht', () => {
   }
 
   it('fünf feste Höhenstufen und Licht-Farben', () => {
-    for (const t of ['--sh-1', '--sh-2', '--sh-3', '--sh-4', '--lit-edge', '--lit-gold']) assert.match(css, new RegExp(`${t}:`), t);
+    // Höhenstufen stehen in den gemeinsamen Werten (tokens.css, Website und Dashboard), Licht-Farben in depth.css
+    const tokens = fs.readFileSync(path.join(PUBLIC, 'css', 'tokens.css'), 'utf8');
+    for (const t of ['--sh-1', '--sh-2', '--sh-3', '--sh-4']) assert.match(tokens, new RegExp(`${t}:`), t);
+    for (const t of ['--lit-edge', '--lit-gold']) assert.match(css, new RegExp(`${t}:`), t);
   });
 
   it('Glas nur auf Kopfzeile, Menü und Fenster-Hintergrund – nicht auf Karten und Kennzahlen', () => {

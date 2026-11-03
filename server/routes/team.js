@@ -26,6 +26,11 @@ publicRouter.get('/', (req, res) => {
       if (!showDuty) row.duty = null;
       row.slug = slugs.get(t.id);
       if (lotm && lotm.memberId === t.id) row.lawyerOfMonth = lotm.label;
+      // Keine Schwerpunkte eingetragen: aus den eigenen Akten (häufigste Rechtsgebiete, wie auf der Profilseite)
+      if (!row.focus.length && t.user_id) {
+        row.focus = require('../web/profiles').lawyerFacts(t.user_id, false).focus;
+        row.focusAuto = row.focus.length > 0;
+      }
       return row;
     }),
   });

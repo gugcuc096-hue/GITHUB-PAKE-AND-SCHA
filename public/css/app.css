@@ -1,32 +1,5 @@
-/* Design-Tokens der Kanzlei (Navy / Gold / Glas) – gemeinsam für Login, Registrierung und Dashboard */
-:root {
-  /* Schriften: Cormorant Garamond für Überschriften und Zahlen-Kacheln, Inter für alles andere – überall dieselben Ersatzschriften */
-  --font-display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
-  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --navy-950: #02050e;
-  --navy-900: #060b19;
-  --navy-850: #0a1228;
-  --navy-800: rgba(10, 18, 40, 0.85);
-  --gold-500: #d4af37;
-  --gold-600: #b8962e;
-  --gold-light: #f3e5ab;
-  --gold-hairline: rgba(var(--accent-rgb), 0.35);
-  --gold-soft: rgba(var(--accent-rgb), 0.1);
-  --text-main: #f8fafc;
-  --text-muted: #cbd5e1;
-  --text-dim: #9aa5c0;
-  --glass-border: rgba(255, 255, 255, 0.12);
-  --line: rgba(255, 255, 255, 0.07);
-  --emerald: #34d399;
-  --amber: #fbbf24;
-  --red: #f87171;
-  --sky: #7dd3fc;
-  --sidebar-w: 264px;
-  --topbar-h: 64px;
-  --bottomnav-h: 64px;
-  --radius: 18px;
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
-}
+/* Dashboard, Anmeldung, Registrierung, Karriere, Bewerbung */
+/* Werte (Farben, Rundung, Schatten, Abstände, Schrift, Bewegung): tokens.css – gemeinsam mit der Website */
 
 * { box-sizing: border-box; }
 html { scroll-padding-top: 96px; -webkit-text-size-adjust: 100%; }

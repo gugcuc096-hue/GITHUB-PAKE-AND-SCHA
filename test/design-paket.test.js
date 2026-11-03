@@ -85,8 +85,15 @@ describe('Design-Paket', () => {
       // Website in Unterseiten: die aktuelle Seite ist im Menü markiert (goldener Strich darunter)
       await page.goto(`${srv.base}/anwaelte`);
       assert.equal(await page.getAttribute('header nav a[data-nav="anwaelte"]', 'aria-current'), 'page');
-      assert.match(await page.$eval('header nav a[data-nav="anwaelte"]', (a) => getComputedStyle(a, '::after').transform), /matrix\(1, 0, 0, 1/);
-      assert.equal(await page.$eval('header nav a[data-nav="kontakt"]', (a) => getComputedStyle(a, '::after').transform), 'matrix(0, 0, 0, 1, 0, 0)');
+      // der leuchtende Strich (nav-ink) liegt unter „Anwälte“
+      await page.waitForFunction(() => {
+        const ink = document.querySelector('header nav[data-ink] .nav-ink');
+        const a = document.querySelector('header nav a[data-nav="anwaelte"]');
+        if (!ink || !a || getComputedStyle(ink).opacity !== '1') return false;
+        const r = ink.getBoundingClientRect();
+        const t = a.getBoundingClientRect();
+        return Math.abs(r.left - t.left) < 2 && Math.abs(r.width - t.width) < 2;
+      });
       // Karriere: derselbe Strich
       await page.goto(`${srv.base}/karriere`);
       await page.evaluate(() => document.getElementById('ablauf').scrollIntoView());

@@ -33,6 +33,7 @@
     <script src="/js/gfx.js"></script>
     <script src="/js/sitenav.js"></script>
     <link rel="stylesheet" href="/css/fonts.css">
+    <link rel="stylesheet" href="/css/tokens.css">
     <link rel="stylesheet" href="/css/scrollbar.css">
     <link rel="stylesheet" href="/css/feinschliff.css">
 
@@ -71,44 +72,46 @@
         </div>
     </div>
 
-    <!-- Kopfzeile -->
-    <header class="sticky top-0 z-40 glass-nav">
-        <div class="kz-wrap h-[76px] flex items-center justify-between gap-6">
+    <!-- Kopfzeile (wie die Kopfleiste des Dashboards: Navigation mit goldenem Strich, rechts Umschalter und Profil) -->
+    <header class="sticky top-0 z-40 glass-nav kz-header">
+        <div class="kz-wrap h-[72px] flex items-center justify-between gap-6">
             <a href="/" class="kz-brand" aria-label="Pake &amp; Scha – Startseite">
                 <img src="/img/logo.svg" width="25" height="46" alt="" decoding="async">
                 <span class="min-w-0"><span class="kz-brand-name">Pake &amp; Scha</span><span class="kz-brand-sub hidden sm:block">Legal Consulting</span></span>
             </a>
 
-            <nav class="kz-nav hidden xl:flex" aria-label="Hauptnavigation">
-                <a href="/kanzlei" data-nav="kanzlei">Kanzlei</a>
+            <nav class="kz-nav hidden xl:flex" data-ink aria-label="Hauptnavigation">
+                <a href="/kanzlei" class="nav-link" data-nav="kanzlei">Kanzlei</a>
                 <div class="kz-nav-drop">
-                    <a href="/rechtsgebiete" data-nav="rechtsgebiete" aria-haspopup="true">Rechtsgebiete <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5"/></svg></a>
+                    <a href="/rechtsgebiete" class="nav-link" data-nav="rechtsgebiete" aria-haspopup="true">Rechtsgebiete <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5"/></svg></a>
                     <div class="kz-nav-menu">
-                        <a href="/rechtsgebiete/strafrecht"><span class="kz-num">I.</span>Strafrecht</a>
-                        <a href="/rechtsgebiete/zivilrecht"><span class="kz-num">II.</span>Zivilrecht</a>
-                        <a href="/rechtsgebiete/verfassungsrecht"><span class="kz-num">III.</span>Verfassungsrecht</a>
-                        <a href="/rechtsgebiete/vertragsrecht"><span class="kz-num">IV.</span>Vertragsrecht</a>
+                        <a href="/rechtsgebiete/strafrecht"><!--icon:shield-->Strafrecht</a>
+                        <a href="/rechtsgebiete/zivilrecht"><!--icon:scale-->Zivilrecht</a>
+                        <a href="/rechtsgebiete/verfassungsrecht"><!--icon:book-->Verfassungsrecht</a>
+                        <a href="/rechtsgebiete/vertragsrecht"><!--icon:doc-->Vertragsrecht</a>
                         <a href="/rechtsgebiete" class="is-all">Alle Rechtsgebiete</a>
                     </div>
                 </div>
-                <a href="/anwaelte" data-nav="anwaelte">Anwälte</a>
-                <a href="/honorare" data-nav="honorare">Honorare</a>
-                <a href="/aktuelles" data-nav="aktuelles">Aktuelles</a>
-                <a href="/karriere" data-nav="karriere">Karriere</a>
-                <a href="/kontakt" data-nav="kontakt">Kontakt</a>
+                <a href="/anwaelte" class="nav-link" data-nav="anwaelte">Anwälte</a>
+                <a href="/honorare" class="nav-link" data-nav="honorare">Honorare</a>
+                <a href="/aktuelles" class="nav-link" data-nav="aktuelles">Aktuelles</a>
+                <a href="/karriere" class="nav-link" data-nav="karriere">Karriere</a>
+                <a href="/kontakt" class="nav-link" data-nav="kontakt">Kontakt</a>
             </nav>
 
             <div class="flex items-center gap-2 sm:gap-3 shrink-0">
-                <a href="/notdienst" class="kz-duty-link hidden 2xl:inline-flex" data-nav="notdienst"><span class="kz-dot" data-duty-dot></span>Notdienst</a>
-                <a href="/login" data-auth-link data-hdr-auth aria-label="Login / Mandantenportal" class="btn-outline kz-btn" style="min-height:2.6rem;padding:0 0.85rem">
-                    <svg class="w-4 h-4 text-[var(--gold-500)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                <div class="site-switch site-switch-top kz-in-only" role="group" aria-label="Bereich wechseln">
+                    <a href="/" class="is-active" aria-current="page">Website</a>
+                    <a href="/dashboard" data-nofade>Dashboard</a>
+                </div>
+                <a href="/login" data-auth-link data-hdr-auth aria-label="Login / Mandantenportal" class="btn-outline kz-btn kz-hdr-auth">
+                    <svg class="w-4 h-4 text-[var(--gold-500)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                     <span data-auth-label class="hidden md:inline">Login</span>
                 </a>
-                <a href="/dashboard" data-hdr-dash class="btn-gold kz-btn hdr-dash" style="min-height:2.6rem;padding:0 1.1rem"><span>Dashboard</span></a>
-                <button data-act="ticket" class="btn-gold kz-btn hidden sm:inline-flex" style="min-height:2.6rem;padding:0 1.15rem">Mandat anfragen</button>
-                <button id="menuToggle" data-act="menu" aria-label="Menü öffnen" aria-expanded="false" aria-controls="mobileMenu" class="xl:hidden w-10 h-10 border border-[var(--kz-rule)] flex items-center justify-center shrink-0 text-[var(--kz-ink)]">
-                    <svg id="menuIconOpen" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="1.6" d="M4 7h16M4 12h16M4 17h16"/></svg>
-                    <svg id="menuIconClose" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="1.6" d="M6 18L18 6M6 6l12 12"/></svg>
+                <button data-act="ticket" class="btn-gold kz-btn hidden sm:inline-flex">Mandat anfragen</button>
+                <button id="menuToggle" data-act="menu" aria-label="Menü öffnen" aria-expanded="false" aria-controls="mobileMenu" class="icon-btn xl:hidden">
+                    <svg id="menuIconOpen" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="1.8" d="M4 7h16M4 12h16M4 17h16"/></svg>
+                    <svg id="menuIconClose" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="1.8" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
         </div>
@@ -142,70 +145,51 @@
 
     <main id="start" class="flex-grow">
         <section class="kz-hero" data-page="start">
-            <div class="kz-wrap kz-hero-grid">
-                <div>
-                    <span class="kz-rubric">Rechtsanwaltskanzlei · Los Santos</span>
-                    <h1 class="kz-h1">Recht haben.<br><em>Recht bekommen.</em></h1>
-                    <p class="kz-lead">Wir vertreten Mandanten im Strafrecht, Zivilrecht, Verfassungsrecht und Vertragsrecht – bei der Polizei, vor Gericht und am Verhandlungstisch.</p>
-                    <div class="kz-actions">
-                        <button data-act="ticket" class="btn-gold kz-btn">Mandat anfragen</button>
-                        <a href="/notdienst" class="btn-outline kz-btn">Notdienst bei Festnahme</a>
-                    </div>
-                    <p class="kz-hero-note">Bereits Mandant? <a href="/verfahrensstand">Verfahrensstand abfragen</a> oder <a href="/login" data-auth-link><span data-auth-label data-auth-out="im Mandantenportal anmelden" data-auth-in="zum Dashboard">im Mandantenportal anmelden</span></a>.</p>
+            <div class="kz-wrap kz-hero-in">
+                <span class="kz-rubric is-plain">Rechtsanwaltskanzlei · Los Santos</span>
+                <h1 class="kz-h1">Recht haben.<br><em class="kz-shine">Recht bekommen.</em></h1>
+                <p class="kz-lead">Wir vertreten Mandanten im Strafrecht, Zivilrecht, Verfassungsrecht und Vertragsrecht – bei der Polizei, vor Gericht und am Verhandlungstisch.</p>
+                <div class="kz-actions is-center">
+                    <button data-act="ticket" class="btn-gold kz-btn is-lg">Mandat anfragen</button>
+                    <!--hero:second--><a href="/notdienst" class="btn-outline kz-btn is-lg" data-hero-second="notdienst">Notdienst bei Festnahme</a><!--/hero:second-->
                 </div>
-                <div class="kz-hero-aside" aria-hidden="true">
-                    <svg class="kz-seal" viewBox="0 0 200 200" role="img" aria-label="Siegel der Kanzlei Pake &amp; Scha">
-                <defs><path id="kzSealHero" d="M100,100 m-77,0 a77,77 0 1,1 154,0 a77,77 0 1,1 -154,0"/></defs>
-                <circle cx="100" cy="100" r="96" fill="none" stroke="currentColor" stroke-width="1.2"/>
-                <circle cx="100" cy="100" r="91" fill="none" stroke="currentColor" stroke-width="0.5" opacity="0.7"/>
-                <circle cx="100" cy="100" r="64" fill="none" stroke="currentColor" stroke-width="0.5" opacity="0.7"/>
-                <text><textPath href="#kzSealHero" textLength="472" lengthAdjust="spacing">Pake &amp; Scha · Legal Consulting · Los Santos ·</textPath></text>
-                <g transform="translate(81.5 66) scale(0.21)" fill="none" stroke="currentColor" stroke-width="13" stroke-linejoin="miter"><path d="M6.5 277.6V6.5H105.1A60.2 60.2 0 0 1 105.1 126.9H84.9A51.8 51.8 0 0 0 67.73 227.57L99.61 238.77"/><path d="M0 313.83H108.25A57.3 57.3 0 0 0 126.68 202.27L81.18 186.82"/></g>
-            </svg>
-                </div>
+                <!--hero:note--><p class="kz-hero-note">Bereits Mandant? <a href="/verfahrensstand">Verfahrensstand abfragen</a> oder <a href="/login" data-auth-link><span data-auth-label data-auth-out="im Mandantenportal anmelden" data-auth-in="zum Dashboard">im Mandantenportal anmelden</span></a>.</p><!--/hero:note-->
             </div>
-            <div class="kz-wrap mt-14">
+        </section>
+
+        <section id="fakten" class="kz-section is-flush reveal" data-page="start" data-start="fakten">
+            <div class="kz-wrap">
                 <dl class="kz-facts">
-                    <div class="kz-fact"><dt>Kanzleisitz</dt><dd data-firm-place>Würfelpark</dd></div>
-                    <div class="kz-fact"><dt>Notdienst</dt><dd><a href="/notdienst" id="factDuty">Anfrage per Mandat</a><small id="factDutySub">Anfrage geht an alle Anwälte</small></dd></div>
-                    <div class="kz-fact"><dt>Rechtsgebiete</dt><dd><a href="/rechtsgebiete">Straf-, Zivil-, Verfassungs- und Vertragsrecht</a></dd></div>
-                    <div class="kz-fact"><dt>Termine</dt><dd>Nach Vereinbarung<small>auch kurzfristig</small></dd></div>
+                    <div class="kz-fact"><dt><!--icon:home-->Kanzleisitz</dt><dd data-firm-place>Würfelpark</dd></div>
+                    <div class="kz-fact"><dt><!--icon:clock-->Notdienst</dt><dd><a href="/notdienst" id="factDuty">Anfrage per Mandat</a><small id="factDutySub">Anfrage geht an alle Anwälte</small></dd></div>
+                    <div class="kz-fact"><dt><!--icon:scale-->Rechtsgebiete</dt><dd><a href="/rechtsgebiete"><span data-count="fact:areas" id="factAreas">4</span> Rechtsgebiete</a><small>Straf-, Zivil-, Verfassungs- und Vertragsrecht</small></dd></div>
+                    <div class="kz-fact"><dt><!--icon:calendar-->Termine</dt><dd>Nach Vereinbarung<small>auch kurzfristig</small></dd></div>
                 </dl>
             </div>
         </section>
 
-        <section id="gebiete" class="kz-section reveal" data-page="start">
+        <section id="gebiete" class="kz-section reveal" data-page="start" data-start="gebiete">
             <div class="kz-wrap">
-                <div class="kz-head-row">
-                    <div class="kz-head"><span class="kz-rubric">Rechtsgebiete</span><h2 class="kz-h2">Wobei wir Sie vertreten</h2></div>
-                    <a href="/rechtsgebiete" class="kz-link">Alle Rechtsgebiete</a>
-                </div>
-                <ol class="kz-areas"><li class="kz-area" data-area="strafrecht"><a href="/rechtsgebiete/strafrecht"><span class="kz-area-name">Strafrecht</span><span class="kz-area-text">Verteidigung ab der Festnahme: Vertretung im Verhör, Akteneinsicht, Haftprüfung und Hauptverhandlung.</span><span class="kz-more">Zum Rechtsgebiet</span></a></li><li class="kz-area" data-area="zivilrecht"><a href="/rechtsgebiete/zivilrecht"><span class="kz-area-name">Zivilrecht</span><span class="kz-area-text">Forderungen, Schadensersatz und Streit zwischen Privatpersonen und Unternehmen – außergerichtlich und vor Gericht.</span><span class="kz-more">Zum Rechtsgebiet</span></a></li><li class="kz-area" data-area="verfassungsrecht"><a href="/rechtsgebiete/verfassungsrecht"><span class="kz-area-name">Verfassungsrecht</span><span class="kz-area-text">Verfassungsbeschwerden und Grundsatzverfahren, wenn staatliches Handeln Grundrechte verletzt.</span><span class="kz-more">Zum Rechtsgebiet</span></a></li><li class="kz-area" data-area="vertragsrecht"><a href="/rechtsgebiete/vertragsrecht"><span class="kz-area-name">Vertragsrecht</span><span class="kz-area-text">Entwurf, Prüfung und Verhandlung von Verträgen – vom Kaufvertrag bis zur Gesellschaftsvereinbarung.</span><span class="kz-more">Zum Rechtsgebiet</span></a></li><!--areas:more--></ol>
+                <div class="kz-head is-center"><span class="kz-rubric">Rechtsgebiete</span><h2 class="kz-h2">Wobei wir Sie vertreten</h2></div>
+                <ol class="kz-tiles kz-areas"><li class="kz-tile" data-area="strafrecht"><a href="/rechtsgebiete/strafrecht"><span class="kz-tile-ico"><!--icon:shield--></span><span class="kz-area-name">Strafrecht</span><span class="kz-area-text">Verteidigung ab der Festnahme: Verhör, Akteneinsicht, Haftprüfung und Hauptverhandlung.</span><span class="kz-more">Zum Rechtsgebiet</span></a></li><li class="kz-tile" data-area="zivilrecht"><a href="/rechtsgebiete/zivilrecht"><span class="kz-tile-ico"><!--icon:scale--></span><span class="kz-area-name">Zivilrecht</span><span class="kz-area-text">Forderungen, Schadensersatz und Streit zwischen Privatpersonen und Unternehmen.</span><span class="kz-more">Zum Rechtsgebiet</span></a></li><li class="kz-tile" data-area="verfassungsrecht"><a href="/rechtsgebiete/verfassungsrecht"><span class="kz-tile-ico"><!--icon:book--></span><span class="kz-area-name">Verfassungsrecht</span><span class="kz-area-text">Verfassungsbeschwerden und Grundsatzverfahren, wenn der Staat Grundrechte verletzt.</span><span class="kz-more">Zum Rechtsgebiet</span></a></li><li class="kz-tile" data-area="vertragsrecht"><a href="/rechtsgebiete/vertragsrecht"><span class="kz-tile-ico"><!--icon:doc--></span><span class="kz-area-name">Vertragsrecht</span><span class="kz-area-text">Entwurf, Prüfung und Verhandlung von Verträgen – vom Kauf bis zur Gesellschaft.</span><span class="kz-more">Zum Rechtsgebiet</span></a></li><!--areas:more--></ol>
             </div>
         </section>
 
-        <section id="ansprechpartner" class="kz-section reveal" data-page="start">
+        <section id="ansprechpartner" class="kz-section reveal" data-page="start" data-start="ansprechpartner">
             <div class="kz-wrap">
-                <div class="kz-head-row">
-                    <div class="kz-head"><span class="kz-rubric">Ansprechpartner</span><h2 class="kz-h2">Die Kanzleileitung</h2><p class="kz-text">Das Board of Partners leitet die Kanzlei und übernimmt Grundsatz- und Großmandate.</p></div>
-                    <a href="/anwaelte" class="kz-link">Alle Anwälte</a>
-                </div>
-                <div id="leadGrid" class="kz-people"><p class="kz-empty">Wird geladen …</p></div>
+                <div class="kz-head is-center"><span class="kz-rubric">Ansprechpartner</span><h2 class="kz-h2">Ihre Anwälte</h2></div>
+                <div id="leadGrid" class="kz-people" data-mode="leitung" data-count="3"><p class="kz-empty">Wird geladen …</p></div>
+                <div class="kz-center"><a href="/anwaelte" class="kz-link">Alle Anwälte</a></div>
             </div>
         </section>
 
-        <section id="neuigkeiten" class="kz-section reveal hidden" data-page="start">
+        <section id="neuigkeiten" class="kz-section reveal hidden" data-page="start" data-start="neuigkeiten">
             <div class="kz-wrap">
-                <div class="kz-head-row">
-                    <div class="kz-head"><span class="kz-rubric">Aktuelles</span><h2 class="kz-h2">Aus der Kanzlei</h2></div>
-                    <a href="/aktuelles" class="kz-link">Alle Meldungen</a>
-                </div>
-                <ul id="newsTeaser" class="kz-news"></ul>
+                <div class="kz-head is-center"><span class="kz-rubric">Aktuelles</span><h2 class="kz-h2">Aus der Kanzlei</h2></div>
+                <ul id="newsTeaser" class="kz-news-cards" data-count="3"></ul>
+                <div class="kz-center"><a href="/aktuelles" class="kz-link">Alle Meldungen</a></div>
             </div>
         </section>
-
-
-
 
         <section class="kz-pagehead" data-page="kanzlei">
             <div class="kz-wrap">
@@ -228,7 +212,7 @@
             </div>
         </section>
 
-        <section id="ablauf" class="kz-section reveal" data-page="start kanzlei">
+        <section id="ablauf" class="kz-section reveal" data-page="start kanzlei" data-start="ablauf">
             <div class="kz-wrap">
                 <div class="kz-head"><span class="kz-rubric">Ablauf eines Mandats</span><h2 class="kz-h2">In vier Schritten</h2></div>
                 <ol class="kz-flow">
@@ -405,7 +389,7 @@
 
         <section id="rechtsgebiete" class="kz-section is-first reveal" data-page="rechtsgebiete">
             <div class="kz-wrap">
-                <ol class="kz-areas"><li class="kz-area" data-area="strafrecht"><a href="/rechtsgebiete/strafrecht"><span class="kz-area-name">Strafrecht</span><span class="kz-area-text">Verteidigung ab der Festnahme: Vertretung im Verhör, Akteneinsicht, Haftprüfung und Hauptverhandlung.</span><span class="kz-more">Zum Rechtsgebiet</span></a></li><li class="kz-area" data-area="zivilrecht"><a href="/rechtsgebiete/zivilrecht"><span class="kz-area-name">Zivilrecht</span><span class="kz-area-text">Forderungen, Schadensersatz und Streit zwischen Privatpersonen und Unternehmen – außergerichtlich und vor Gericht.</span><span class="kz-more">Zum Rechtsgebiet</span></a></li><li class="kz-area" data-area="verfassungsrecht"><a href="/rechtsgebiete/verfassungsrecht"><span class="kz-area-name">Verfassungsrecht</span><span class="kz-area-text">Verfassungsbeschwerden und Grundsatzverfahren, wenn staatliches Handeln Grundrechte verletzt.</span><span class="kz-more">Zum Rechtsgebiet</span></a></li><li class="kz-area" data-area="vertragsrecht"><a href="/rechtsgebiete/vertragsrecht"><span class="kz-area-name">Vertragsrecht</span><span class="kz-area-text">Entwurf, Prüfung und Verhandlung von Verträgen – vom Kaufvertrag bis zur Gesellschaftsvereinbarung.</span><span class="kz-more">Zum Rechtsgebiet</span></a></li><!--areas:more--></ol>
+                <ol class="kz-tiles kz-areas is-wide"><li class="kz-tile" data-area="strafrecht"><a href="/rechtsgebiete/strafrecht"><span class="kz-tile-ico"><!--icon:shield--></span><span class="kz-area-name">Strafrecht</span><span class="kz-area-text">Verteidigung ab der Festnahme: Vertretung im Verhör, Akteneinsicht, Haftprüfung und Hauptverhandlung.</span><span class="kz-more">Zum Rechtsgebiet</span></a></li><li class="kz-tile" data-area="zivilrecht"><a href="/rechtsgebiete/zivilrecht"><span class="kz-tile-ico"><!--icon:scale--></span><span class="kz-area-name">Zivilrecht</span><span class="kz-area-text">Forderungen, Schadensersatz und Streit zwischen Privatpersonen und Unternehmen – außergerichtlich und vor Gericht.</span><span class="kz-more">Zum Rechtsgebiet</span></a></li><li class="kz-tile" data-area="verfassungsrecht"><a href="/rechtsgebiete/verfassungsrecht"><span class="kz-tile-ico"><!--icon:book--></span><span class="kz-area-name">Verfassungsrecht</span><span class="kz-area-text">Verfassungsbeschwerden und Grundsatzverfahren, wenn staatliches Handeln Grundrechte verletzt.</span><span class="kz-more">Zum Rechtsgebiet</span></a></li><li class="kz-tile" data-area="vertragsrecht"><a href="/rechtsgebiete/vertragsrecht"><span class="kz-tile-ico"><!--icon:doc--></span><span class="kz-area-name">Vertragsrecht</span><span class="kz-area-text">Entwurf, Prüfung und Verhandlung von Verträgen – vom Kaufvertrag bis zur Gesellschaftsvereinbarung.</span><span class="kz-more">Zum Rechtsgebiet</span></a></li><!--areas:more--></ol>
                 <p class="kz-small mt-6">Ihr Anliegen passt in keines davon? Fragen Sie trotzdem an – wir sagen Ihnen, ob wir helfen können.</p>
             </div>
         </section>
@@ -950,10 +934,10 @@
             <div class="kz-wrap"><!--profil:body--></div>
         </section>
 
-        <section class="kz-section is-tight reveal" data-page="start rechtsgebiete anwaelte aktuelles kanzlei honorare">
+        <section class="kz-section is-tight reveal" data-page="start rechtsgebiete anwaelte aktuelles kanzlei honorare" data-start="band">
             <div class="kz-wrap">
-                <div class="kz-band">
-                    <div><h2 class="kz-h3">Sie brauchen anwaltliche Hilfe?</h2><p class="kz-muted mt-2">Schildern Sie uns den Sachverhalt. Ein Anwalt meldet sich bei Ihnen.</p></div>
+                <div class="kz-band is-center">
+                    <div><h2 class="kz-h2">Sie brauchen anwaltliche Hilfe?</h2><p class="kz-muted mt-3">Schildern Sie uns den Sachverhalt. Ein Anwalt meldet sich bei Ihnen.</p></div>
                     <div class="kz-actions"><button data-act="ticket" class="btn-gold kz-btn">Mandat anfragen</button><a href="/kontakt" class="btn-outline kz-btn">Kontakt</a></div>
                 </div>
             </div>
@@ -966,16 +950,9 @@
         <div class="kz-wrap">
             <div class="kz-footer-grid">
                 <div class="kz-footer-brand">
-                    <svg class="kz-seal" viewBox="0 0 200 200" role="img" aria-label="Siegel der Kanzlei Pake &amp; Scha">
-                <defs><path id="kzSealFoot" d="M100,100 m-77,0 a77,77 0 1,1 154,0 a77,77 0 1,1 -154,0"/></defs>
-                <circle cx="100" cy="100" r="96" fill="none" stroke="currentColor" stroke-width="1.2"/>
-                <circle cx="100" cy="100" r="91" fill="none" stroke="currentColor" stroke-width="0.5" opacity="0.7"/>
-                <circle cx="100" cy="100" r="64" fill="none" stroke="currentColor" stroke-width="0.5" opacity="0.7"/>
-                <text><textPath href="#kzSealFoot" textLength="472" lengthAdjust="spacing">Pake &amp; Scha · Legal Consulting · Los Santos ·</textPath></text>
-                <g transform="translate(81.5 66) scale(0.21)" fill="none" stroke="currentColor" stroke-width="13" stroke-linejoin="miter"><path d="M6.5 277.6V6.5H105.1A60.2 60.2 0 0 1 105.1 126.9H84.9A51.8 51.8 0 0 0 67.73 227.57L99.61 238.77"/><path d="M0 313.83H108.25A57.3 57.3 0 0 0 126.68 202.27L81.18 186.82"/></g>
-            </svg>
-                    <p class="kz-footer-motto">Recht haben. Recht bekommen.</p>
-                    <p>Pake &amp; Scha Legal Consulting<br><span data-firm-seat>Würfelpark, Los Santos</span></p>
+                    <a href="/" class="kz-brand" aria-label="Pake &amp; Scha – Startseite"><img src="/img/logo.svg" width="22" height="40" alt="" decoding="async" loading="lazy" style="height:40px"><span><span class="kz-brand-name">Pake &amp; Scha</span><span class="kz-brand-sub">Legal Consulting</span></span></a>
+                                        <p><span data-firm-seat>Würfelpark, Los Santos</span></p>
+                    <a href="/notdienst" class="kz-footer-duty"><span class="kz-dot is-off" data-duty-dot></span><span><span class="kz-footer-duty-k">Notdienst</span><span id="footDuty">Anfrage per Mandat</span></span></a>
                 </div>
                 <div>
                     <h2>Kanzlei</h2>

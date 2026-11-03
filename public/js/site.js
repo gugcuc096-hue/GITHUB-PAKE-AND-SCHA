@@ -182,22 +182,41 @@
   })();
 
   /* ---------------------------------------------------------------- Anwälte (live aus dem Dashboard) */
-  // Karte einer Person: Foto oder Monogramm-Siegel, Rang, Name (→ Profil), Beschreibung, „Direkt anfragen“
-  const monogram = (m) => esc(String(m.initials || '').slice(0, 3) || '·');
+  // Karte einer Person (wie im Dashboard): Foto oder Monogramm auf Gold, Rang, Name, Schwerpunkte, ein Knopf.
+  // Die ganze Karte führt zum Profil; „Mandat anfragen“ schickt das Mandat direkt an diesen Anwalt.
+  const monogram = (m) => esc(String(m.initials || '').replace(/[^\p{L}\p{N}]/gu, '').slice(0, 2).toUpperCase() || '–');
+  const DUTY_BADGE = { dienst: 'badge-emerald', gericht: 'badge-gold', pause: 'badge-amber' };
+  const STAR = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.48 3.5a.56.56 0 011.04 0l2.12 5.11a.56.56 0 00.48.35l5.52.44c.5.04.7.66.32.99l-4.2 3.6a.56.56 0 00-.18.56l1.28 5.38a.56.56 0 01-.84.61l-4.73-2.89a.56.56 0 00-.58 0l-4.73 2.89a.56.56 0 01-.84-.61l1.28-5.38a.56.56 0 00-.18-.56l-4.2-3.6a.56.56 0 01.32-.99l5.52-.44a.56.56 0 00.48-.35z"/></svg>';
   function personCard(m) {
     const duty = m.duty ? DUTY[m.duty] : null;
-    const portrait = m.photoUrl ? `<img src="${esc(m.photoUrl)}" alt="${esc(m.name)}" loading="lazy" decoding="async" width="92" height="92">` : `<span class="kz-mono">${monogram(m)}</span>`;
-    const lotm = m.lawyerOfMonth ? `<div class="lotm-badge" title="Für herausragende Arbeit im ${esc(m.lawyerOfMonth)}">Anwalt des Monats</div>` : '';
+    const href = m.slug ? `/team/${esc(m.slug)}` : '/anwaelte';
+    const portrait = m.photoUrl ? `<img src="${esc(m.photoUrl)}" alt="" loading="lazy" decoding="async" width="112" height="112">` : `<span class="kz-mono">${monogram(m)}</span>`;
     const focus = (m.focus || []).slice(0, 3);
-    return `<article class="kz-person team-card${m.lawyerOfMonth ? ' is-lotm' : ''}">${lotm}
-        <a href="/team/${esc(m.slug)}" class="kz-portrait" tabindex="-1" aria-hidden="true">${portrait}${duty ? `<span class="kz-duty ${duty[1]}" title="${esc(duty[0])}"></span>` : ''}</a>
+    return `<article class="kz-person team-card${m.lawyerOfMonth ? ' is-lotm' : ''}">
+        ${m.lawyerOfMonth ? `<div class="kz-lotm" title="Für herausragende Arbeit im ${esc(m.lawyerOfMonth)}">${STAR}Anwalt des Monats</div>` : ''}
+        <span class="kz-portrait">${portrait}</span>
         <div class="kz-person-rank">${esc(m.roleTitle)}</div>
-        <h3 class="kz-person-name"><a href="/team/${esc(m.slug)}" class="team-name">${esc(m.name)}</a></h3>
-        ${m.description ? `<p class="kz-person-text">${esc(m.description)}</p>` : ''}
-        ${focus.length || duty ? `<p class="kz-person-meta">${[duty ? duty[0] : '', focus.length ? `Schwerpunkte: ${focus.map(esc).join(', ')}` : ''].filter(Boolean).join(' · ')}</p>` : ''}
-        <div class="kz-person-actions"><a href="/team/${esc(m.slug)}" class="kz-link">Profil</a>${m.bookable ? `<button type="button" class="kz-link" data-wish="${Number(m.id)}" data-name="${esc(m.name)}">Direkt anfragen</button>` : ''}</div>
+        <h3 class="kz-person-name"><a href="${href}" class="team-name">${esc(m.name)}</a></h3>
+        <p class="kz-person-focus"${m.focusAuto ? ' title="Aus den Akten dieses Anwalts"' : ''}>${focus.length ? focus.map(esc).join(' · ') : 'Alle Rechtsgebiete'}</p>
+        ${duty ? `<span class="badge ${DUTY_BADGE[m.duty] || 'badge-slate'} kz-person-duty">${esc(duty[0])}</span>` : ''}
+        <div class="kz-person-actions">${m.bookable ? `<button type="button" class="btn-outline kz-btn" data-wish="${Number(m.id)}" data-name="${esc(m.name)}">Mandat anfragen</button>` : '<span class="btn-outline kz-btn" aria-hidden="true">Profil ansehen</span>'}</div>
       </article>`;
   }
+  /** Startseite: welche Anwälte (Startseite anpassen → Anwälte; data-mode/-count/-ids kommen vom Server). */
+  function leadList(team, el) {
+    const mode = el.dataset.mode || 'leitung';
+    const count = Math.max(1, Number(el.dataset.count) || 3);
+    const ids = String(el.dataset.ids || '').split(',').map(Number).filter(Boolean);
+    let list;
+    if (mode === 'auswahl') list = ids.map((id) => team.find((m) => m.id === id)).filter(Boolean);
+    else if (mode === 'alle') list = team.slice();
+    else if (mode === 'dienst') list = [...team].sort((a, b) => (b.duty === 'dienst') - (a.duty === 'dienst') || !!b.duty - !!a.duty);
+    else list = team.filter((m) => m.tier === 'leitung');
+    if (!list.length && mode !== 'auswahl') list = team.slice();
+    return list.slice(0, count);
+  }
+  let lastTeam = [];
+  let lastNews = [];
   function renderTeam(team) {
     const grid = document.getElementById('teamGrid');
     if (grid) {
@@ -212,12 +231,16 @@
           .join('');
       }
     }
-    // Startseite: die Kanzleileitung (höchstens drei)
+    // Startseite: Ansprechpartner nach Einstellung (Standard: die Kanzleileitung, höchstens drei)
     const lead = document.getElementById('leadGrid');
     if (lead) {
-      const list = team.filter((m) => m.tier === 'leitung').slice(0, 3);
+      const list = leadList(team, lead);
+      lead.dataset.n = String(list.length);
       if (list.length) lead.innerHTML = list.map(personCard).join('');
-      else lead.closest('section').classList.add('hidden');
+      else {
+        lead.innerHTML = '<p class="kz-empty">Keine Anwälte ausgewählt.</p>';
+        lead.closest('section').classList.add('hidden');
+      }
     }
     // Rechtsgebiet: Anwälte, deren Schwerpunkte dieses Rechtsgebiet nennen
     const areaBox = document.getElementById('areaTeam');
@@ -249,7 +272,16 @@
     const btn = e.target.closest('[data-wish]');
     if (btn && typeof window.openTicketModal === 'function') window.openTicketModal('team', { id: Number(btn.dataset.wish), name: btn.dataset.name });
   };
-  for (const id of ['teamGrid', 'leadGrid', 'areaTeam']) document.getElementById(id)?.addEventListener('click', onTeamClick);
+  // Die ganze Karte ist der Link zum Profil (nur nicht der Knopf „Mandat anfragen“)
+  const onCardClick = (e) => {
+    if (e.defaultPrevented || e.target.closest('a, button, [data-wish]') || (window.getSelection && String(window.getSelection()))) return;
+    const link = e.target.closest('.kz-person')?.querySelector('a.team-name');
+    if (link) link.click();
+  };
+  for (const id of ['teamGrid', 'leadGrid', 'areaTeam']) {
+    document.getElementById(id)?.addEventListener('click', onTeamClick);
+    document.getElementById(id)?.addEventListener('click', onCardClick);
+  }
 
   /* ---------------------------------------------------------------- Honorarordnung & Tarifrechner */
   function renderFees(fees, categories) {
@@ -584,7 +616,8 @@
   const has = (...ids) => ids.some((id) => document.getElementById(id));
   if (has('teamGrid', 'leadGrid', 'areaTeam') || wishId) window.PS.boot('team', '/api/team')
     .then((r) => {
-      renderTeam(r.team || []);
+      lastTeam = r.team || [];
+      renderTeam(lastTeam);
       const m = wishId && (r.team || []).find((x) => x.id === wishId && x.bookable);
       if (wishId && typeof window.openTicketModal === 'function') window.openTicketModal('profile', m ? { id: m.id, name: m.name } : null);
     })
@@ -659,6 +692,18 @@
       .catch(() => {});
   }
 
+  // Für „Startseite anpassen“ (sitecustom.js): Anwälte und Meldungen mit neuer Einstellung sofort neu zeichnen
+  window.PS.site = {
+    team: () => lastTeam,
+    renderTeam: () => renderTeam(lastTeam),
+    renderNews: () => {
+      const teaser = document.getElementById('newsTeaser');
+      if (teaser && lastNews.length) teaser.innerHTML = lastNews.slice(0, Math.max(1, Number(teaser.dataset.count) || 3)).map(newsCard).join('');
+    },
+  };
+  // Eckdaten der Startseite: Zahlen zählen hoch, sobald sie ins Bild kommen
+  if (document.getElementById('fakten')) window.PS.countUp(document.getElementById('fakten'), { whenVisible: true });
+
   /* ---------------------------------------------------------------- Aktuelles */
   const NEWS_KIND = { meldung: 'Meldung', team: 'Neu im Team', befoerderung: 'Beförderung', stelle: 'Stellenangebot' };
   const newsDate = (v) => {
@@ -667,14 +712,21 @@
   };
   const newsItem = (n) => `<li${n.pinned ? ' class="is-pinned"' : ''}><div><time>${esc(newsDate(n.at))}</time><span class="kz-news-kind">${esc(NEWS_KIND[n.kind] || 'Meldung')}</span></div>
       <div><h3>${esc(n.title)}</h3>${n.body ? `<p>${esc(n.body)}</p>` : ''}${n.link ? `<a class="kz-link mt-3" href="${esc(n.link)}">Mehr erfahren</a>` : ''}</div></li>`;
+  // Startseite: die neuesten Meldungen als Karten (Art, Datum, Titel, ein Satz)
+  const newsCard = (n) => {
+    const title = n.link ? `<a href="${esc(n.link)}">${esc(n.title)}</a>` : esc(n.title);
+    return `<li class="kz-news-card${n.pinned ? ' is-pinned' : ''}"><div class="kz-news-meta"><span class="badge badge-gold">${esc(NEWS_KIND[n.kind] || 'Meldung')}</span><time>${esc(newsDate(n.at))}</time></div>
+      <h3>${title}</h3>${n.body ? `<p>${esc(n.body)}</p>` : ''}</li>`;
+  };
   if (has('newsList', 'newsTeaser'))
     window.PS.boot('news', '/api/public/news')
       .then(({ news }) => {
         const list = document.getElementById('newsList');
         if (list) list.innerHTML = news.length ? news.map(newsItem).join('') : '<li class="kz-empty">Derzeit keine Meldungen.</li>';
+        lastNews = news;
         const teaser = document.getElementById('newsTeaser');
         if (teaser && news.length) {
-          teaser.innerHTML = news.slice(0, 3).map(newsItem).join('');
+          teaser.innerHTML = news.slice(0, Math.max(1, Number(teaser.dataset.count) || 3)).map(newsCard).join('');
           document.getElementById('neuigkeiten')?.classList.remove('hidden');
         }
       })
@@ -738,6 +790,8 @@
     document.querySelectorAll('#dutyDot, [data-duty-dot]').forEach((dot) => dot.classList.toggle('is-off', !on));
     const fact = document.getElementById('factDuty');
     if (fact) fact.textContent = on ? `${d.count} ${d.count === 1 ? 'Anwalt' : 'Anwälte'} im Dienst` : 'Anfrage per Mandat';
+    const foot = document.getElementById('footDuty');
+    if (foot) foot.textContent = on ? `${d.count} ${d.count === 1 ? 'Anwalt' : 'Anwälte'} im Dienst` : 'Anfrage per Mandat';
     const factSub = document.getElementById('factDutySub');
     if (factSub) factSub.textContent = on ? 'jetzt erreichbar' : 'Anfrage geht an alle Anwälte';
     const now = document.getElementById('dutyNow');

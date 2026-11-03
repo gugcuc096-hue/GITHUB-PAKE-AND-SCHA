@@ -81,7 +81,7 @@
     document.addEventListener(
       'click',
       (e) => {
-        if (e.target.closest('#stBar')) return;
+        if (e.target.closest('#stBar, .sc-ui')) return; // Leiste unten, „Startseite anpassen“
         const el = e.target.closest('[data-t]');
         // Links und Knöpfe lösen im Bearbeitungsmodus nichts aus
         if (e.target.closest('a, button, [data-act]')) e.preventDefault();
@@ -122,9 +122,22 @@
     });
   }
 
+  // Startseite: zusätzlich „Startseite anpassen“ (Abschnitte, Anwälte, Rechtsgebiete, Meldungen, Startbereich)
+  const self = document.currentScript && document.currentScript.src;
+  function custom() {
+    if (document.body.dataset.view !== 'start') return;
+    const v = self ? new URL(self).searchParams.get('v') : null;
+    const s = document.createElement('script');
+    s.src = `/js/sitecustom.js${v ? `?v=${encodeURIComponent(v)}` : ''}`;
+    document.head.appendChild(s);
+  }
+
   call('GET', '/api/auth/session')
     .then((r) => {
-      if (r.user && (r.user.perms || []).includes('site.edit')) start();
+      if (r.user && (r.user.perms || []).includes('site.edit')) {
+        start();
+        custom();
+      }
     })
     .catch(() => {});
 })();

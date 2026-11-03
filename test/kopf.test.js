@@ -1,7 +1,7 @@
 'use strict';
 /*
- * Kopfzeile der Website: angemeldet führt ein Knopf mit Profilbild ins Dashboard – für die Kanzlei der goldene statt „Mandat“,
- * kein Umschalter in der Leiste oben, am Handy der Knopf mit Profilbild; der Menü-Indikator im Dashboard gleitet nicht mehr.
+ * Kopfzeile der Website wie die Kopfleiste des Dashboards: angemeldet ein runder Knopf mit Profilbild (ins Dashboard), am PC
+ * dazu der Umschalter Website/Dashboard, kein Umschalter in der Leiste oben; der Menü-Indikator im Dashboard gleitet nicht mehr.
  */
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
@@ -30,7 +30,7 @@ describe('Kopfzeile und Menü-Indikator (Browser)', { skip: chromium ? false : '
     ['PC', { width: 1366, height: 800 }, true],
     ['Handy', { width: 390, height: 844 }, false],
   ]) {
-    it(`${name}: angemeldet ${hidden ? 'nur der Umschalter oben, kein zweiter Dashboard-Knopf' : 'bleibt der Dashboard-Knopf in der Kopfzeile'}; Indikator ohne Gleiten`, async () => {
+    it(`${name}: angemeldet ${hidden ? 'Umschalter Website/Dashboard und Profilbild wie im Dashboard' : 'Profilbild in der Kopfzeile, kein Umschalter'}; Indikator ohne Gleiten`, async () => {
       const ctx = await browser.newContext({ viewport, locale: 'de-DE' });
       const page = await ctx.newPage();
       try {
@@ -49,16 +49,17 @@ describe('Kopfzeile und Menü-Indikator (Browser)', { skip: chromium ? false : '
         await page.goto(`${srv.base}/`);
         await page.waitForFunction(() => document.documentElement.classList.contains('ps-in'), null, { timeout: 15000 });
         await page.waitForFunction(() => document.documentElement.classList.contains('ps-team'));
-        const shown = await page.$eval('[data-hdr-auth]', (e) => getComputedStyle(e).display !== 'none');
-        assert.equal(shown, !hidden);
+        // wie die Kopfleiste des Dashboards: rund mit Profilbild (führt ins Dashboard), am PC dazu der Umschalter
+        assert.equal(await page.isVisible('header [data-hdr-auth]'), true);
+        assert.equal(await page.locator('header [data-hdr-auth] .hdr-av').count(), 1, 'Profilbild im Knopf');
+        assert.match(await page.getAttribute('header [data-hdr-auth]', 'href'), /\/dashboard$/);
         assert.equal(await page.$('.topstrip .site-switch'), null, 'kein Umschalter in der Leiste oben');
+        assert.equal(await page.locator('[data-hdr-dash]').count(), 0, 'kein zweiter Dashboard-Knopf');
+        assert.equal(await page.isVisible('header .site-switch'), hidden, 'Umschalter nur am PC');
         if (hidden) {
-          // Kanzlei am PC: der goldene Knopf heißt „Dashboard“ und trägt das Profilbild, „Mandat“ entfällt
-          assert.equal(await page.isVisible('[data-hdr-dash]'), true);
-          assert.match(await page.textContent('[data-hdr-dash]'), /Dashboard/);
-          assert.equal(await page.locator('[data-hdr-dash] .hdr-av').count(), 1);
-          assert.equal(await page.isVisible('header button[data-act="ticket"]'), false);
-        } else assert.equal(await page.locator('header [data-hdr-auth] .hdr-av').count(), 1, 'Handy: Profilbild im Knopf');
+          assert.equal(await page.isVisible('header .site-switch a[href="/dashboard"]'), true);
+          assert.equal(await page.isVisible('header button[data-act="ticket"]'), false, 'Kanzlei: kein „Mandat anfragen“');
+        }
       } finally {
         await ctx.close();
       }

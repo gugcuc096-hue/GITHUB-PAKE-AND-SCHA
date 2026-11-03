@@ -1,0 +1,70 @@
+/*
+ * Gemeinsame Gestaltungswerte für Website UND Dashboard (Anmeldung, Registrierung, Karriere, Bewerbung, 404).
+ * Wird überall als erstes Stylesheet nach fonts.css geladen – app.css, website.css, depth.css und kanzlei.css
+ * verwenden nur diese Werte. Stil & Saison (Einstellungen → Konfiguration) überschreibt Akzentfarbe, Glas und Rundung
+ * für beide gleich (server/web/theme.js).
+ *
+ *  Farben   Navy-Flächen, Gold nur für Handlung und „aktiv“, drei Textstufen
+ *  Rundung  3 Stufen: --r-sm (Felder, Badges) · --r-md (Kacheln, Menüs) · --radius (Panels, Karten) · Pillen 999px
+ *  Schatten --sh-1 … --sh-4 (Karte, Panel, angehoben, Fenster)
+ *  Abstand  8 · 16 · 24 · 40 · 64
+ *  Schrift  6 Größen; Überschriften Cormorant Garamond, sonst Inter
+ *  Bewegung eine Kurve, drei Dauern
+ */
+:root {
+  --font-display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --navy-950: #02050e;
+  --navy-900: #060b19;
+  --navy-850: #0a1228;
+  --navy-800: rgba(10, 18, 40, 0.85);
+  --gold-500: #d4af37;
+  --gold-600: #b8962e;
+  --gold-light: #f3e5ab;
+  --gold-hairline: rgba(var(--accent-rgb), 0.35);
+  --gold-soft: rgba(var(--accent-rgb), 0.1);
+  --gold-glow: rgba(var(--accent-rgb), 0.25);
+  --text-main: #f8fafc;
+  --text-muted: #cbd5e1;
+  --text-dim: #9aa5c0;
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --line: rgba(255, 255, 255, 0.07);
+  --emerald: #34d399;
+  --amber: #fbbf24;
+  --red: #f87171;
+  --sky: #7dd3fc;
+
+  --r-sm: 10px;
+  --r-md: 14px;
+  --radius: 18px;
+  --r-pill: 999px;
+
+  --sh-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 14px -8px rgba(0, 0, 0, 0.5);
+  --sh-2: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 24px -10px rgba(0, 0, 0, 0.55), 0 24px 48px -28px rgba(0, 0, 0, 0.5);
+  --sh-3: 0 2px 4px rgba(0, 0, 0, 0.35), 0 16px 32px -12px rgba(0, 0, 0, 0.6), 0 32px 64px -32px rgba(0, 0, 0, 0.55);
+  --sh-4: 0 4px 8px rgba(0, 0, 0, 0.4), 0 28px 56px -16px rgba(0, 0, 0, 0.7), 0 56px 96px -40px rgba(0, 0, 0, 0.6);
+
+  --sp-1: 8px;
+  --sp-2: 16px;
+  --sp-3: 24px;
+  --sp-4: 40px;
+  --sp-5: 64px;
+
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.875rem;
+  --fs-md: 1rem;
+  --fs-lg: 1.3rem;
+  --fs-xl: clamp(1.75rem, 3.2vw, 2.4rem);
+  --fs-2xl: clamp(2.5rem, 6vw, 4.6rem);
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-1: 0.15s;
+  --dur-2: 0.28s;
+  --dur-3: 0.5s;
+
+  --sidebar-w: 264px;
+  --topbar-h: 64px;
+  --bottomnav-h: 64px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}

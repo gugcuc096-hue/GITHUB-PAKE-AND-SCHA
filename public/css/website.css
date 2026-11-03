@@ -1,26 +1,7 @@
 /*
  * Startseite (index.html): Kopf, Abschnitte, Tarifrechner, Team, Kontakt – vorher als <style> in der Seite.
  */
-:root {
-    --navy-950: #02050e;
-    --navy-900: #060b19;
-    --navy-800: rgba(10, 18, 40, 0.85);
-    --navy-700: rgba(18, 30, 62, 0.90);
-    --navy-600: rgba(24, 38, 74, 0.6);
-
-    --gold-500: #d4af37;
-    --gold-600: #b8962e;
-    --gold-light: #f3e5ab;
-    --gold-glow: rgba(var(--accent-rgb), 0.25);
-    --gold-hairline: rgba(var(--accent-rgb), 0.35);
-
-    --emerald-500: #10b981;
-
-    --text-main: #f8fafc;
-    --text-muted: #cbd5e1;
-    --text-dim: #95a1bd;
-    --glass-border: rgba(255, 255, 255, 0.12);
-}
+/* Werte: tokens.css (gemeinsam mit dem Dashboard) */
 
 * { box-sizing: border-box; }
 
@@ -104,37 +85,44 @@ body.page-in { animation: page-in 0.35s ease-out; }
 }
 .glass-card:hover::before { opacity: 1; }
 
-/* Buttons & Badges */
-.btn-gold {
-    background: linear-gradient(135deg, var(--gold-500), var(--gold-600));
-    color: #02050e; font-weight: 600;
-    border-radius: 999px;
-    box-shadow: 0 4px 20px rgba(var(--accent-rgb), 0.3);
-    transition: all 0.25s ease;
-    display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+/* Knöpfe: genau dieselben wie im Dashboard (Kopie aus app.css – die Website lädt app.css nicht) */
+.btn-gold, .btn-outline, .btn-ghost, .btn-danger {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; cursor: pointer;
+  border-radius: 999px; font-weight: 600; white-space: nowrap; text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease, background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
-.btn-gold:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 32px rgba(var(--accent-rgb), 0.45);
-    filter: brightness(1.1);
-}
+.btn-gold { background: linear-gradient(135deg, var(--gold-500), var(--gold-600)); color: #02050e; box-shadow: 0 4px 20px rgba(var(--accent-rgb), 0.28); border: 0; }
+.btn-gold:hover { transform: translateY(-1px); box-shadow: 0 8px 28px rgba(var(--accent-rgb), 0.45); filter: brightness(1.08); }
+.btn-outline { background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(var(--accent-rgb), 0.4); color: var(--text-main); font-weight: 500; }
+.btn-outline:hover { border-color: var(--gold-500); color: var(--gold-light); background: rgba(var(--accent-rgb), 0.12); }
+.btn-ghost { background: transparent; border: 1px solid transparent; color: var(--text-muted); font-weight: 500; }
+.btn-ghost:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+.btn-danger { background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.35); color: #fca5a5; font-weight: 500; }
+.btn-danger:hover { background: rgba(239, 68, 68, 0.18); border-color: rgba(239, 68, 68, 0.6); color: #fecaca; }
+.btn-gold:disabled, .btn-outline:disabled, .btn-danger:disabled { opacity: 0.55; cursor: wait; transform: none; }
+.btn-sm { padding: 0.45rem 0.9rem; font-size: 0.8rem; min-height: 36px; }
+.btn-md { padding: 0.65rem 1.25rem; font-size: 0.875rem; min-height: 42px; }
+.btn-lg { padding: 0.85rem 1.6rem; font-size: 0.95rem; min-height: 48px; }
+.btn-block { width: 100%; }
 .btn-gold:focus-visible, .btn-outline:focus-visible, a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
     outline: 2px solid var(--gold-500); outline-offset: 3px;
 }
+.icon-btn {
+  display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex-shrink: 0;
+  border-radius: 999px; border: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.03); color: var(--text-muted);
+  cursor: pointer; transition: all 0.2s ease; position: relative;
+}
+.icon-btn:hover { border-color: var(--gold-hairline); color: var(--gold-light); background: var(--gold-soft); }
 
-.btn-outline {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(var(--accent-rgb), 0.4);
-    color: var(--text-main); border-radius: 999px;
-    backdrop-filter: blur(8px);
-    transition: all 0.25s ease;
-}
-.btn-outline:hover {
-    border-color: var(--gold-500);
-    color: var(--gold-light);
-    background: rgba(var(--accent-rgb), 0.12);
-    transform: translateY(-2px);
-}
+/* Badges: dieselben wie im Dashboard (Kopie aus app.css) */
+.badge, .countdown { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.16rem 0.5rem; border: 0; border-radius: 6px;
+  font-family: inherit; font-size: 0.72rem; font-weight: 600; line-height: 1.4; letter-spacing: 0.01em; white-space: nowrap; font-variant-numeric: lining-nums tabular-nums; }
+.badge-gold { color: var(--gold-light); background: rgba(var(--accent-rgb), 0.15); }
+.badge-emerald { color: #6ee7b7; background: rgba(16, 185, 129, 0.15); }
+.badge-amber { color: #fcd34d; background: rgba(245, 158, 11, 0.15); }
+.badge-slate { color: #cbd5e1; background: rgba(148, 163, 184, 0.14); }
+.badge-red { color: #fca5a5; background: rgba(239, 68, 68, 0.16); }
+.badge-sky { color: #bae6fd; background: rgba(56, 189, 248, 0.15); }
 
 /* Tabs & Filters */
 .tab-btn {
@@ -230,7 +218,7 @@ body.page-in { animation: page-in 0.35s ease-out; }
 
 /* Copy button */
 .copy-btn { transition: all 0.2s ease; }
-.copy-btn.copied { color: var(--emerald-500) !important; border-color: rgba(16,185,129,0.5) !important; }
+.copy-btn.copied { color: var(--emerald) !important; border-color: rgba(16,185,129,0.5) !important; }
 /* Anliegen ans Board: Reiter „Einreichen“ / „Meine Anliegen“ */
 .concern-tab { border-color: var(--glass-border); color: var(--text-muted); background: transparent; }
 .concern-tab:hover { color: #fff; }

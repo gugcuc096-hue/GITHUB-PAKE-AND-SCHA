@@ -92,7 +92,7 @@ function render(member, facts, { origin, url }) {
   const photo = member.photoUrl ? `${origin}${member.photoUrl}` : `${origin}/img/og-image.png`;
   const portrait = member.photoUrl
     ? `<img class="pf-photo" src="${esc(member.photoUrl)}" alt="${esc(member.name)}" width="144" height="144" decoding="async">`
-    : `<span class="pf-photo kz-mono" aria-hidden="true">${esc(member.initials || '?')}</span>`;
+    : `<span class="pf-photo kz-mono" aria-hidden="true">${esc(String(member.initials || '').replace(/[^\p{L}\p{N}]/gu, '').slice(0, 2).toUpperCase() || '–')}</span>`;
   const duty = member.duty ? `<p class="pf-duty"><span class="duty-dot s-${esc(member.duty)}"></span>${esc(DUTY_STATUS[member.duty] || '')}</p>` : '';
 
   // Schwerpunkte: vom Board eingetragen, sonst die häufigsten Rechtsgebiete seiner Akten
