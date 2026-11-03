@@ -469,6 +469,7 @@ views.settings = {
     if (st.settingsTab === 'bot' && bot) await loadBotMessages().catch(() => {});
     if (st.settingsTab === 'health' && can('system.edit')) st.system = await api.get('/api/system').catch(() => null);
     if (st.settingsTab === 'dauer' && can('system.edit')) await loadDauer();
+    if (st.settingsTab === 'aktuelles' && can('site.edit')) await loadNews();
   },
   render() {
     const s = st.settings;
@@ -524,6 +525,7 @@ const SETTINGS_SECTIONS = [
   ['start', 'Dashboard-Start', 'Dashboard', 'home', 'cfg', 'Übersicht Kacheln Kästen Startseite Rang Reihenfolge'],
   ['site', 'Website & Ränge', 'Website', 'globe', ['site.edit'], 'Ränge Anwalt des Monats Website-Texte Team'],
   ['home', 'Startseite', 'Website', 'home', 'cfg', 'Startseite Abschnitte Reihenfolge'],
+  ['aktuelles', 'Aktuelles', 'Website', 'bell', ['site.edit'], 'Aktuelles Meldungen News Neuigkeiten Website Beförderung Stellen'],
   ['labels', 'Beschriftungen', 'Website', 'edit', 'cfg', 'Beschriftungen Namen Begriffe'],
   ['banner', 'Banner', 'Website', 'bell', 'cfg', 'Banner Hinweis Streifen Countdown'],
   ['style', 'Stil & Saison', 'Website', 'star', 'cfg', 'Stil Farbe Akzent Schrift Glas Rundung Bewegung Saison Halloween Weihnachten Deko'],
@@ -602,6 +604,7 @@ function settingsBody(key, s) {
   if (key === 'system') return `${backupPanel()}<div class="mt-4 lg:mt-5">${emergencyPanel()}</div>`;
   if (key === 'health') return st.system ? systemPanel(true) : '<div class="panel panel-pad"><p class="text-sm text-muted">Wird geladen …</p></div>';
   if (key === 'dauer') return dauerPanel();
+  if (key === 'aktuelles') return newsPanel();
   if (key === 'site') return `${websitePanel(s)}<div class="mt-4 lg:mt-5">${lotmPanel(s)}</div><div class="mt-4 lg:mt-5">${siteTextsPanel()}</div><div class="mt-4 lg:mt-5">${ranksPanel()}</div>`;
   return settingsGeneral(s);
 }

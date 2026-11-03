@@ -297,7 +297,7 @@ describe('Stil, Saison und Aktionen im Browser', { skip: chromium ? false : 'Pla
       const problems = [];
       page.on('pageerror', (e) => problems.push(e.message));
       try {
-        await page.goto(`${srv.base}/`);
+        await page.goto(`${srv.base}/honorare`);
         await page.waitForSelector('#promoBanner .sb-count b');
         assert.match(await page.textContent('#promoBanner .sb-pct'), /−20\s%/);
         assert.ok(await page.$('#promoBanner.occ-halloween'), 'Farben des Anlasses');
@@ -387,7 +387,7 @@ describe('Stil, Saison und Aktionen im Browser', { skip: chromium ? false : 'Pla
       const site = await ctx.newPage();
       await site.goto(`${srv.base}/`);
       assert.equal(await site.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--gold-500').trim()), '#34d399');
-      assert.equal(await site.evaluate(() => getComputedStyle(document.querySelector('.btn-gold')).backgroundImage.includes('52, 211, 153') || getComputedStyle(document.querySelector('.btn-gold')).backgroundImage.includes('oklab')), true, 'Knöpfe in der neuen Farbe');
+      assert.equal(await site.evaluate(() => { const s = getComputedStyle(document.querySelector('.btn-gold')); return [s.backgroundImage, s.backgroundColor].some((v) => v.includes('52, 211, 153') || v.includes('oklab')); }), true, 'Knöpfe in der neuen Farbe');
       assert.deepEqual(problems, []);
     } finally {
       await owner.put('/api/config/style/draft', { preset: 'gold', accent: '#d4af37', glass: 50, radius: 50, font: 'klassisch', motion: 'normal', season: 'auto', seasonDash: true });

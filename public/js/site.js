@@ -50,7 +50,7 @@
         <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg></div>
       <h3 class="font-serif text-2xl font-semibold text-white text-center mb-2">Mandat eingegangen</h3>
       <p class="text-sm text-[var(--text-muted)] text-center mb-5">${res.lawyerName ? `${esc(res.lawyerName)} wurde benachrichtigt und meldet sich umgehend.` : 'Ein Anwalt der Kanzlei wurde benachrichtigt und meldet sich umgehend.'}${res.linkedToAccount ? ' Die Akte wurde Ihrem Konto hinzugefügt.' : ''}</p>
-      <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3 text-center mb-3"><div class="text-[0.6rem] uppercase tracking-widest text-[var(--text-muted)]">Ihr Aktenzeichen</div><div class="font-mono text-lg text-[var(--gold-light)]">${esc(res.caseNumber)}</div></div>
+      <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3 text-center mb-3"><div class="text-[0.6rem] uppercase tracking-widest text-[var(--text-muted)]">Ihr Aktenzeichen</div><div class="tabular-nums text-lg text-[var(--gold-light)]">${esc(res.caseNumber)}</div></div>
       <p class="text-xs text-[var(--text-muted)] text-center mb-5">Bitte geben Sie das Aktenzeichen bei Rückfragen an.${res.linkedToAccount ? '' : ' Mit einem Mandantenkonto sehen Sie den Stand Ihrer Akte jederzeit im Mandantenportal.'}</p>
       <div class="flex flex-col sm:flex-row gap-2">
         <button type="button" id="ticketCopy" class="btn-outline flex-1 py-3 text-xs uppercase tracking-wider">Aktenzeichen kopieren</button>
@@ -181,56 +181,75 @@
     setTimeout(() => showToast(title, text), 300);
   })();
 
-  /* ---------------------------------------------------------------- Team (live aus dem Dashboard) */
+  /* ---------------------------------------------------------------- Anwälte (live aus dem Dashboard) */
+  // Karte einer Person: Foto oder Monogramm-Siegel, Rang, Name (→ Profil), Beschreibung, „Direkt anfragen“
+  const monogram = (m) => esc(String(m.initials || '').slice(0, 3) || '·');
+  function personCard(m) {
+    const duty = m.duty ? DUTY[m.duty] : null;
+    const portrait = m.photoUrl ? `<img src="${esc(m.photoUrl)}" alt="${esc(m.name)}" loading="lazy" decoding="async" width="92" height="92">` : `<span class="kz-mono">${monogram(m)}</span>`;
+    const lotm = m.lawyerOfMonth ? `<div class="lotm-badge" title="Für herausragende Arbeit im ${esc(m.lawyerOfMonth)}">Anwalt des Monats</div>` : '';
+    const focus = (m.focus || []).slice(0, 3);
+    return `<article class="kz-person team-card${m.lawyerOfMonth ? ' is-lotm' : ''}">${lotm}
+        <a href="/team/${esc(m.slug)}" class="kz-portrait" tabindex="-1" aria-hidden="true">${portrait}${duty ? `<span class="kz-duty ${duty[1]}" title="${esc(duty[0])}"></span>` : ''}</a>
+        <div class="kz-person-rank">${esc(m.roleTitle)}</div>
+        <h3 class="kz-person-name"><a href="/team/${esc(m.slug)}" class="team-name">${esc(m.name)}</a></h3>
+        ${m.description ? `<p class="kz-person-text">${esc(m.description)}</p>` : ''}
+        ${focus.length || duty ? `<p class="kz-person-meta">${[duty ? duty[0] : '', focus.length ? `Schwerpunkte: ${focus.map(esc).join(', ')}` : ''].filter(Boolean).join(' · ')}</p>` : ''}
+        <div class="kz-person-actions"><a href="/team/${esc(m.slug)}" class="kz-link">Profil</a>${m.bookable ? `<button type="button" class="kz-link" data-wish="${Number(m.id)}" data-name="${esc(m.name)}">Direkt anfragen</button>` : ''}</div>
+      </article>`;
+  }
   function renderTeam(team) {
     const grid = document.getElementById('teamGrid');
-    if (!grid) return;
-    if (!team.length) {
-      grid.innerHTML = '<p class="w-full text-center text-sm text-[var(--text-muted)] py-8">Aktuell sind keine Teammitglieder hinterlegt.</p>';
-      return;
+    if (grid) {
+      if (!team.length) grid.innerHTML = '<p class="kz-empty">Aktuell sind keine Anwälte hinterlegt.</p>';
+      else {
+        const groups = [
+          ['Board of Partners', 'Leitende Gesellschafter', team.filter((m) => m.tier === 'leitung')],
+          ['Associate Attorneys', 'Angestellte Anwaltschaft', team.filter((m) => m.tier !== 'leitung')],
+        ].filter((g) => g[2].length);
+        grid.innerHTML = groups
+          .map(([t, sub, list]) => `<div class="kz-group-title"><h2 class="kz-h3">${t}</h2><span class="kz-rubric is-plain">${sub}</span></div><div class="kz-people">${list.map(personCard).join('')}</div>`)
+          .join('');
+      }
     }
-    grid.innerHTML = team
-      .map((m) => {
-        const lead = m.tier === 'leitung';
-        const duty = m.duty ? DUTY[m.duty] : null;
-        const portrait = m.photoUrl
-          ? `<img src="${esc(m.photoUrl)}" alt="${esc(m.name)}" loading="lazy" decoding="async" width="96" height="96" class="w-24 h-24 rounded-full object-cover ring-4 ring-[rgba(212,175,55,0.18)] ${lead ? 'shadow-[0_0_40px_rgba(212,175,55,0.35)]' : ''}">`
-          : `<div class="w-24 h-24 rounded-full ${lead ? 'bg-gradient-to-br from-[#d4af37] to-[#8f7322] text-[#02050e] shadow-[0_0_40px_rgba(212,175,55,0.35)]' : 'bg-gradient-to-br from-slate-600 to-slate-800 text-white'} flex items-center justify-center font-serif text-3xl font-bold ring-4 ring-[rgba(212,175,55,0.12)]">${esc(m.initials)}</div>`;
-        const lotm = m.lawyerOfMonth
-          ? `<div class="lotm-badge lotm-on-card" title="Für herausragende Arbeit im ${esc(m.lawyerOfMonth)}">Anwalt des Monats</div>`
-          : '';
-        return `
-        <article class="glass-card team-card p-7 text-center flex flex-col${m.lawyerOfMonth ? ' is-lotm' : ''}">${lotm}
-          <a href="/team/${esc(m.slug)}" class="relative block w-24 h-24 mx-auto mb-5" tabindex="-1" aria-hidden="true">${portrait}
-            ${duty ? `<span class="absolute bottom-1 right-1 w-5 h-5 rounded-full border-[3px] border-[#0a1228] ${duty[1]}" title="${esc(duty[0])}"></span>` : ''}</a>
-          ${duty ? `<div class="flex items-center justify-center gap-1.5 text-[0.7rem] ${duty[2]} mb-2"><span class="w-1.5 h-1.5 rounded-full ${duty[1]} animate-pulse"></span>${esc(duty[0])}</div>` : ''}
-          <span class="inline-block text-[0.6rem] uppercase tracking-[0.22em] px-3 py-1 rounded-full mb-3 ${lead ? 'text-[var(--gold-light)] border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.08)]' : 'text-slate-300 border border-slate-600 bg-slate-800/40'}">${lead ? 'Board of Partners' : 'Associate Attorneys'}</span>
-          <h3 class="font-serif text-2xl font-semibold text-white mb-1"><a href="/team/${esc(m.slug)}" class="team-name">${esc(m.name)}</a></h3>
-          <div class="text-xs uppercase tracking-widest ${lead ? 'text-[var(--gold-500)]' : 'text-slate-300'} mb-4">${esc(m.roleTitle)}</div>
-          <p class="text-sm text-[var(--text-muted)] leading-relaxed">${esc(m.description || '')}</p>
-          ${m.bookable ? `<div class="mt-auto pt-6"><button type="button" class="btn-outline w-full py-3 text-xs uppercase tracking-wider" data-wish="${Number(m.id)}" data-name="${esc(m.name)}">Direkt anfragen</button></div>` : ''}
-        </article>`;
-      })
-      .join('');
+    // Startseite: die Kanzleileitung (höchstens drei)
+    const lead = document.getElementById('leadGrid');
+    if (lead) {
+      const list = team.filter((m) => m.tier === 'leitung').slice(0, 3);
+      if (list.length) lead.innerHTML = list.map(personCard).join('');
+      else lead.closest('section').classList.add('hidden');
+    }
+    // Rechtsgebiet: Anwälte, deren Schwerpunkte dieses Rechtsgebiet nennen
+    const areaBox = document.getElementById('areaTeam');
+    const areaName = (document.querySelector('.kz-pagehead .kz-h1') || {}).textContent;
+    if (areaBox && areaName) {
+      const key = areaName.trim().toLowerCase();
+      const list = team.filter((m) => (m.focus || []).some((f) => f.toLowerCase().includes(key)));
+      if (list.length) {
+        areaBox.innerHTML = list.slice(0, 6).map(personCard).join('');
+        document.getElementById('gebietTeam')?.classList.remove('hidden');
+      }
+    }
   }
   // „Direkt anfragen“: Mandatsformular mit diesem Anwalt als Wunschanwalt (die Karten werden nachgeladen)
-  document.getElementById('teamGrid')?.addEventListener('click', (e) => {
+  const onTeamClick = (e) => {
     // Zur Profilseite: Foto und Name dieser Karte gleiten an ihren Platz auf der Profilseite (View Transitions,
     // Gegenstück in views/anwalt.html) – ohne Unterstützung im Browser ganz normal
     const link = e.target.closest('a[href^="/team/"]');
     if (link && window.PS && !window.PS.motion.calm()) {
       // nur dieser Seitenwechsel bekommt den Übergang – andere (Login, Discord-Anmeldung …) laufen ganz normal
       if (!document.getElementById('vtTeam')) document.head.insertAdjacentHTML('beforeend', '<style id="vtTeam">@view-transition { navigation: auto; }</style>');
-      document.querySelectorAll('#teamGrid [style*="view-transition-name"]').forEach((n) => (n.style.viewTransitionName = ''));
+      document.querySelectorAll('.kz-person [style*="view-transition-name"]').forEach((n) => (n.style.viewTransitionName = ''));
       const card = link.closest('.team-card');
-      const photo = card && card.querySelector('a[href^="/team/"] > img, a[href^="/team/"] > div');
+      const photo = card && card.querySelector('.kz-portrait > img, .kz-portrait > .kz-mono');
       const name = card && card.querySelector('.team-name');
       if (photo) photo.style.viewTransitionName = 'pf-photo';
       if (name) name.style.viewTransitionName = 'pf-name';
     }
     const btn = e.target.closest('[data-wish]');
     if (btn && typeof window.openTicketModal === 'function') window.openTicketModal('team', { id: Number(btn.dataset.wish), name: btn.dataset.name });
-  });
+  };
+  for (const id of ['teamGrid', 'leadGrid', 'areaTeam']) document.getElementById(id)?.addEventListener('click', onTeamClick);
 
   /* ---------------------------------------------------------------- Honorarordnung & Tarifrechner */
   function renderFees(fees, categories) {
@@ -320,8 +339,8 @@
         return `
         <article class="glass-card p-8 border-t-2 ${life ? 'border-t-[var(--gold-500)] shadow-[0_0_40px_rgba(212,175,55,0.12)]' : 'border-t-sky-400/60'} flex flex-col">
           <div class="flex items-center justify-between mb-4">
-            <span class="text-[0.65rem] font-mono px-3 py-1 rounded-full uppercase font-semibold ${life ? 'bg-[rgba(212,175,55,0.15)] text-[var(--gold-light)] border border-[var(--gold-hairline)]' : 'bg-sky-500/10 text-sky-300 border border-sky-500/20'}">${life ? '👑 Lifetime' : '⭐ VIP'}</span>
-            <span class="text-xs text-[var(--text-muted)] font-mono">${life ? 'unbefristet' : `${Number(t.durationDays)} Tage`}</span>
+            <span class="text-[0.65rem] tabular-nums px-3 py-1 rounded-full uppercase font-semibold ${life ? 'bg-[rgba(212,175,55,0.15)] text-[var(--gold-light)] border border-[var(--gold-hairline)]' : 'bg-sky-500/10 text-sky-300 border border-sky-500/20'}">${life ? '👑 Lifetime' : '⭐ VIP'}</span>
+            <span class="text-xs text-[var(--text-muted)] tabular-nums">${life ? 'unbefristet' : `${Number(t.durationDays)} Tage`}</span>
           </div>
           <h3 class="font-serif text-3xl font-semibold text-white mb-2">${esc(t.name)}</h3>
           <div class="num text-3xl text-[var(--gold-500)] font-semibold">${money(t.price)}</div>
@@ -422,6 +441,8 @@
   let loginDone = false; // im Dialog angemeldet
   function openLogin() {
     if (!dlg) return goTo('/login');
+    // aus dem Handy-Menü heraus: das Menü schließt sich, das Fenster liegt dann frei
+    if (document.getElementById('mobileMenu')?.classList.contains('open') && typeof window.toggleMobileMenu === 'function') window.toggleMobileMenu();
     dlg.classList.remove('opacity-0', 'pointer-events-none');
     document.body.style.overflow = 'hidden';
     api.get('/api/discord/status').then((s) => s.oauth && document.getElementById('ldDiscord').classList.remove('hidden')).catch(() => {});
@@ -559,7 +580,9 @@
   const wishId = Number(wish.get('anwalt')) || 0;
   if (wishId || wish.has('mandat')) history.replaceState(null, '', location.pathname + location.hash);
   if (!wishId && wish.has('mandat') && typeof window.openTicketModal === 'function') window.openTicketModal('profile');
-  window.PS.boot('team', '/api/team')
+  // Nur laden, was auf dieser Unterseite gebraucht wird
+  const has = (...ids) => ids.some((id) => document.getElementById(id));
+  if (has('teamGrid', 'leadGrid', 'areaTeam') || wishId) window.PS.boot('team', '/api/team')
     .then((r) => {
       renderTeam(r.team || []);
       const m = wishId && (r.team || []).find((x) => x.id === wishId && x.bookable);
@@ -567,14 +590,15 @@
     })
     .catch(() => {
       const grid = document.getElementById('teamGrid');
-      if (grid) grid.innerHTML = '<p class="w-full text-center text-sm text-[var(--text-muted)] py-8">Team konnte nicht geladen werden.</p>';
+      if (grid) grid.innerHTML = '<p class="kz-empty">Die Anwälte konnten nicht geladen werden.</p>';
+      document.getElementById('leadGrid')?.closest('section').classList.add('hidden');
     });
 
-  window.PS.boot('fees', '/api/fees')
+  if (has('priceListContainer', 'calcOptions')) window.PS.boot('fees', '/api/fees')
     .then((r) => renderFees(r.fees || [], r.categories))
     .catch(() => {});
 
-  window.PS.boot('memberships', '/api/public/memberships')
+  if (has('vipTiers')) window.PS.boot('memberships', '/api/public/memberships')
     .then((r) => renderVip(r.tiers || []))
     .catch(() => {
       const grid = document.getElementById('vipTiers');
@@ -603,7 +627,7 @@
     window.PS.countUp(box, { whenVisible: true }); // Zahlen zählen hoch, sobald sie ins Bild scrollen
   }
   window.addEventListener('ps:kpis', renderStats);
-  window.PS.boot('stats', '/api/public/stats')
+  if (has('firmStats')) window.PS.boot('stats', '/api/public/stats')
     .then((d) => {
       Object.assign(firmStats, {
         visible: !!d.visible,
@@ -617,68 +641,114 @@
     .catch(() => {});
 
   /* ---------------------------------------------------------------- Mandantenstimmen */
-  // Karussell; ab drei vom Board freigegebenen Bewertungen ersetzen echte Stimmen die bisherigen Texte.
+  // Nur echte, vom Board freigegebene Bewertungen – ab drei Stück erscheint der Abschnitt, vorher bleibt er weg.
   const track = document.getElementById('testimonialTrack');
-  const dotsRoot = document.getElementById('testimonialDots');
-  let tIndex = 0;
-  const tCount = () => (track ? track.children.length : 0);
-  function renderDots() {
-    if (!dotsRoot) return;
-    dotsRoot.innerHTML = '';
-    for (let i = 0; i < tCount(); i++) {
-      const dot = document.createElement('span');
-      dot.className = 'dot-btn' + (i === tIndex ? ' active' : '');
-      dot.addEventListener('click', () => {
-        tIndex = i;
-        updateTestimonial();
-      });
-      dotsRoot.appendChild(dot);
-    }
-  }
-  function updateTestimonial() {
-    track.style.transform = `translateX(-${tIndex * 100}%)`;
-    renderDots();
-  }
-  const reviewSlide = (r) => `<div class="w-full shrink-0 px-2">
-      <div class="glass-card p-8 md:p-10 text-center max-w-3xl mx-auto">
-        <div class="flex justify-center gap-1 mb-5 text-[var(--gold-500)]" aria-label="${r.rating} von 5 Sternen">${'★'.repeat(r.rating)}<span style="opacity:.25">${'★'.repeat(5 - r.rating)}</span></div>
-        <p class="font-serif text-xl sm:text-2xl italic text-white leading-relaxed mb-6">„${esc(r.body)}“</p>
-        <div class="text-sm text-[var(--gold-light)] font-medium">— ${esc(r.name)}${r.area ? `, ${esc(r.area)}` : ''}</div>
-      </div>
-    </div>`;
   if (track) {
-    renderDots();
-    setInterval(() => {
-      if (!tCount()) return;
-      tIndex = (tIndex + 1) % tCount();
-      updateTestimonial();
-    }, 6000);
     window.PS.boot('reviews', '/api/public/reviews')
       .then(({ reviews }) => {
-        if (!reviews || reviews.length < 3) return; // bis dahin bleiben die bisherigen Texte
-        track.innerHTML = reviews.slice(0, 8).map(reviewSlide).join('');
-        tIndex = 0;
-        updateTestimonial();
+        if (!reviews || reviews.length < 3) return;
+        track.innerHTML = reviews
+          .slice(0, 6)
+          .map(
+            (r) => `<figure class="kz-quote"><div class="kz-stars" aria-label="${r.rating} von 5 Sternen">${'★'.repeat(r.rating)}<span style="opacity:.25">${'★'.repeat(5 - r.rating)}</span></div>
+              <blockquote>„${esc(r.body)}“</blockquote><figcaption>${esc(r.name)}${r.area ? ` · ${esc(r.area)}` : ''}</figcaption></figure>`
+          )
+          .join('');
+        document.getElementById('stimmen')?.classList.remove('hidden');
       })
       .catch(() => {});
   }
 
+  /* ---------------------------------------------------------------- Aktuelles */
+  const NEWS_KIND = { meldung: 'Meldung', team: 'Neu im Team', befoerderung: 'Beförderung', stelle: 'Stellenangebot' };
+  const newsDate = (v) => {
+    const d = new Date(String(v).replace(' ', 'T') + (String(v).includes('Z') ? '' : 'Z'));
+    return isNaN(d) ? '' : d.toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' });
+  };
+  const newsItem = (n) => `<li${n.pinned ? ' class="is-pinned"' : ''}><div><time>${esc(newsDate(n.at))}</time><span class="kz-news-kind">${esc(NEWS_KIND[n.kind] || 'Meldung')}</span></div>
+      <div><h3>${esc(n.title)}</h3>${n.body ? `<p>${esc(n.body)}</p>` : ''}${n.link ? `<a class="kz-link mt-3" href="${esc(n.link)}">Mehr erfahren</a>` : ''}</div></li>`;
+  if (has('newsList', 'newsTeaser'))
+    window.PS.boot('news', '/api/public/news')
+      .then(({ news }) => {
+        const list = document.getElementById('newsList');
+        if (list) list.innerHTML = news.length ? news.map(newsItem).join('') : '<li class="kz-empty">Derzeit keine Meldungen.</li>';
+        const teaser = document.getElementById('newsTeaser');
+        if (teaser && news.length) {
+          teaser.innerHTML = news.slice(0, 3).map(newsItem).join('');
+          document.getElementById('neuigkeiten')?.classList.remove('hidden');
+        }
+      })
+      .catch(() => {
+        const list = document.getElementById('newsList');
+        if (list) list.innerHTML = '<li class="kz-empty">Meldungen konnten nicht geladen werden.</li>';
+      });
+
+  /* ---------------------------------------------------------------- Verfahrensstand (Aktenzeichen + Pin) */
+  const statusForm = document.getElementById('statusForm');
+  if (statusForm) {
+    const out = document.getElementById('stResult');
+    const err = document.getElementById('stError');
+    const fmt = (v) => (v ? newsDate(v) : '–');
+    statusForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const number = document.getElementById('stNumber').value.trim().toUpperCase();
+      const pin = document.getElementById('stPin').value.replace(/\D/g, '');
+      err.classList.add('hidden');
+      if (!number || pin.length < 4) {
+        err.textContent = 'Bitte Aktenzeichen und Pin eingeben.';
+        err.classList.remove('hidden');
+        return;
+      }
+      const btn = statusForm.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      try {
+        const c = await api.post('/api/public/case-status', { number, pin });
+        out.innerHTML = `<div class="kz-panel">
+            <span class="kz-rubric is-plain">${esc(c.area)}</span>
+            <h2 class="kz-h3 mt-2">Akte ${esc(c.caseNumber)}</h2>
+            <ol class="kz-progress">${c.steps.map((st, i) => `<li class="${i < c.step ? 'is-done' : i === c.step ? 'is-now' : ''}">${esc(st)}</li>`).join('')}</ol>
+            <dl class="kz-dl">
+              <dt>Status</dt><dd>${esc(c.statusLabel)}</dd>
+              <dt>Aktueller Schritt</dt><dd>${esc(c.steps[c.step] || '')}</dd>
+              <dt>Zuständig</dt><dd>${esc(c.lawyer || 'wird gerade zugeteilt')}</dd>
+              <dt>Eingegangen</dt><dd>${esc(fmt(c.openedAt))}</dd>
+              <dt>Zuletzt geändert</dt><dd>${esc(fmt(c.updatedAt))}</dd>
+            </dl>
+            ${c.note ? `<p class="mt-5"><span class="kz-rubric is-plain">Hinweis der Kanzlei</span><br><span class="kz-ink">${esc(c.note)}</span></p>` : ''}
+          </div>`;
+      } catch (ex) {
+        out.innerHTML = '';
+        err.textContent = (ex && ex.message) || 'Abfrage fehlgeschlagen.';
+        err.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+
   /* ---------------------------------------------------------------- Eilnotdienst live */
   function renderDuty(d) {
+    if (!d || !d.visible) return; // Anzeige abgeschaltet: die festen Texte bleiben
+    const on = d.count > 0;
     const label = document.getElementById('dutyLabel');
-    const dot = document.getElementById('dutyDot');
-    const wrap = document.getElementById('dutyStripText');
-    if (!label || !d || !d.visible) return; // Anzeige abgeschaltet: statischer Text bleibt
-    if (d.count > 0) {
-      label.textContent = `Eilnotdienst: ${d.count} ${d.count === 1 ? 'Anwalt' : 'Anwälte'} im Dienst`;
+    if (label) {
+      label.textContent = on ? `Notdienst: ${d.count} ${d.count === 1 ? 'Anwalt' : 'Anwälte'} im Dienst` : 'Notdienst: Anfrage per Mandat';
       label.title = d.members.map((m) => `${m.name} – ${m.statusLabel}`).join('\n');
-      wrap.className = 'flex items-center gap-2 text-emerald-400 min-w-0';
-      dot.className = 'status-dot status-active animate-pulse shrink-0';
-    } else {
-      label.textContent = 'Eilnotdienst: Anfrage per Mandat-Ticket';
-      label.title = '';
-      wrap.className = 'flex items-center gap-2 text-amber-300 min-w-0';
-      dot.className = 'status-dot shrink-0 bg-amber-400';
+    }
+    document.querySelectorAll('#dutyDot, [data-duty-dot]').forEach((dot) => dot.classList.toggle('is-off', !on));
+    const fact = document.getElementById('factDuty');
+    if (fact) fact.textContent = on ? `${d.count} ${d.count === 1 ? 'Anwalt' : 'Anwälte'} im Dienst` : 'Anfrage per Mandat';
+    const factSub = document.getElementById('factDutySub');
+    if (factSub) factSub.textContent = on ? 'jetzt erreichbar' : 'Anfrage geht an alle Anwälte';
+    const now = document.getElementById('dutyNow');
+    if (now) {
+      now.textContent = on ? `${d.count} ${d.count === 1 ? 'Anwalt' : 'Anwälte'} im Dienst` : 'Gerade niemand im Dienst';
+      document.getElementById('dutyNowText').textContent = on
+        ? 'Ihre Notfall-Anfrage geht sofort an die Anwälte im Dienst.'
+        : 'Ihre Anfrage geht trotzdem an alle Anwälte – wer zuerst im Dienst ist, übernimmt.';
+      const list = document.getElementById('dutyList');
+      list.innerHTML = d.members.map((m) => `<li><span class="kz-ink">${esc(m.name)}</span><span>${esc([m.rank, m.statusLabel].filter(Boolean).join(' · '))}</span></li>`).join('');
+      list.classList.toggle('hidden', !on);
     }
   }
   const loadDuty = () => api.get('/api/public/on-duty').then(renderDuty).catch(() => {});
@@ -711,7 +781,7 @@
         if (!el || !list.length) return;
         const a = list[0];
         const unread = a.unread ? ` · <span class="text-[var(--gold-light)]">${a.unread === 1 ? '1 neue Nachricht' : `${a.unread} neue Nachrichten`}</span>` : '';
-        el.innerHTML = `Ihre Bewerbung <span class="font-mono text-[var(--gold-light)]">${esc(a.number)}</span>: ${esc(a.statusLabel)}${unread}${list.length > 1 ? ` <span class="text-[var(--text-dim)]">(+${list.length - 1} weitere)</span>` : ''}`;
+        el.innerHTML = `Ihre Bewerbung <span class="text-[var(--gold-light)]">${esc(a.number)}</span>: ${esc(a.statusLabel)}${unread}${list.length > 1 ? ` <span class="text-[var(--text-dim)]">(+${list.length - 1} weitere)</span>` : ''}`;
         el.classList.remove('hidden');
       })
       .catch(() => {});
@@ -752,7 +822,7 @@
     box.classList.toggle('hidden', !list.length);
     box.innerHTML = list.length
       ? `<div class="text-[0.7rem] uppercase tracking-widest text-[var(--text-dim)] mb-2">Auf diesem Gerät</div><div class="flex flex-col gap-2">${list
-          .map((x) => `<button type="button" class="btn-outline w-full py-2.5 px-4 text-left flex items-center justify-between gap-3" data-saved-concern="${esc(x.reference)}"><span class="font-mono text-sm">${esc(x.reference)}</span><span class="text-xs text-[var(--text-dim)] truncate">${esc(x.subject || '')}</span></button>`)
+          .map((x) => `<button type="button" class="btn-outline w-full py-2.5 px-4 text-left flex items-center justify-between gap-3" data-saved-concern="${esc(x.reference)}"><span class="tabular-nums text-sm">${esc(x.reference)}</span><span class="text-xs text-[var(--text-dim)] truncate">${esc(x.subject || '')}</span></button>`)
           .join('')}</div>`
       : '';
   }
@@ -855,8 +925,8 @@
       <h3 class="font-serif text-2xl font-semibold text-white text-center mb-2">Anliegen übermittelt</h3>
       <p class="text-sm text-[var(--text-muted)] text-center mb-5">Das Board of Partners wurde benachrichtigt und meldet sich.${res.linkedToAccount ? ' Sie finden das Anliegen auch in Ihrem Dashboard.' : ''}</p>
       <div class="grid grid-cols-2 gap-3 mb-3">
-        <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3 text-center"><div class="text-[0.6rem] uppercase tracking-widest text-[var(--text-muted)]">Vorgangsnummer</div><div class="font-mono text-lg text-[var(--gold-light)]">${esc(res.reference)}</div></div>
-        <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3 text-center"><div class="text-[0.6rem] uppercase tracking-widest text-[var(--text-muted)]">Pin</div><div class="font-mono text-lg tracking-[0.2em] text-[var(--gold-light)]">${esc(res.pin)}</div></div>
+        <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3 text-center"><div class="text-[0.6rem] uppercase tracking-widest text-[var(--text-muted)]">Vorgangsnummer</div><div class="tabular-nums text-lg text-[var(--gold-light)]">${esc(res.reference)}</div></div>
+        <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3 text-center"><div class="text-[0.6rem] uppercase tracking-widest text-[var(--text-muted)]">Pin</div><div class="tabular-nums text-lg tracking-[0.2em] text-[var(--gold-light)]">${esc(res.pin)}</div></div>
       </div>
       <p class="text-xs text-amber-300/90 text-center mb-5">${res.linkedToAccount ? 'Bitte notieren Sie beide Angaben – damit lesen Sie jederzeit die Antwort des Boards.' : 'Auf diesem Gerät ist Ihr Anliegen gespeichert – unter „Meine Anliegen“ genügt ein Klick. Für andere Geräte bitte beide Angaben notieren.'}</p>
       <div class="flex flex-col sm:flex-row gap-2">
@@ -939,7 +1009,7 @@
     document.getElementById('concernResult').innerHTML = `
       <div class="rounded-xl border border-[var(--glass-border)] bg-slate-900/40 p-4 mb-4">
         <div class="flex items-start justify-between gap-3 mb-2">
-          <div class="min-w-0"><div class="font-mono text-xs text-[var(--gold-light)]">${esc(d.reference)}</div><div class="font-serif text-xl text-white break-words">${esc(d.subject)}</div></div>
+          <div class="min-w-0"><div class="tabular-nums text-xs text-[var(--gold-light)]">${esc(d.reference)}</div><div class="font-serif text-xl text-white break-words">${esc(d.subject)}</div></div>
           <span class="px-3 py-1 rounded-full text-xs font-semibold border whitespace-nowrap ${CONCERN_BADGE[d.status] || ''}">${esc(d.statusLabel)}</span>
         </div>
         <div class="text-[0.7rem] text-[var(--text-dim)] mb-3">${esc(d.categoryLabel)} · eingereicht ${esc(fmtWhen(d.createdAt))}${d.anonymous ? ' · anonym' : ''}</div>

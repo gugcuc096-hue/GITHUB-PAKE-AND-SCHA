@@ -82,7 +82,7 @@ router.delete(
 
 /* ---------------------------------------------------------------- Website-Texte */
 const boardOnly = requirePerm('site.edit'); // Website-Texte: Inhaber / Web-Admin
-const PAGE_LABEL = { index: 'Startseite', karriere: 'Karriere' };
+const PAGE_LABEL = { index: 'Website', karriere: 'Karriere' };
 
 router.get('/texts', boardOnly, (req, res) => {
   const rows = db
@@ -131,6 +131,43 @@ router.delete(
     Q.siteTexts.deleteByPageAndKey.run(page, key);
     logActivity(req.user, 'Website-Text zurückgesetzt', 'settings', null, `${PAGE_LABEL[page] || page}: „${truncate(row.original, 60)}“`);
     res.json({ text: row.original });
+  })
+);
+
+/* ---------------------------------------------------------------- Aktuelles (Meldungen auf der Website) */
+const news = require('../domain/news');
+router.get('/news', requirePerm('site.edit'), (req, res) => res.json({ news: news.manual({ all: true }), auto: news.automatic(), sources: news.sources() }));
+router.post(
+  '/news',
+  requirePerm('site.edit'),
+  wrap(async (req, res) => {
+    const d = parseBody(news.input, req, res);
+    if (!d) return;
+    const n = news.create(d, req.user);
+    logActivity(req.user, 'Meldung veröffentlicht', 'settings', n.id, truncate(n.title, 80));
+    res.status(201).json({ item: n, news: news.manual({ all: true }) });
+  })
+);
+router.put(
+  '/news/:id',
+  requirePerm('site.edit'),
+  wrap(async (req, res) => {
+    const d = parseBody(news.input, req, res);
+    if (!d) return;
+    const n = news.update(idParam(req), d);
+    if (!n) return res.status(404).json({ error: 'Meldung nicht gefunden.' });
+    logActivity(req.user, 'Meldung geändert', 'settings', n.id, truncate(n.title, 80));
+    res.json({ item: n, news: news.manual({ all: true }) });
+  })
+);
+router.delete(
+  '/news/:id',
+  requirePerm('site.edit'),
+  wrap(async (req, res) => {
+    const before = news.get(idParam(req));
+    if (!before || !news.remove(before.id)) return res.status(404).json({ error: 'Meldung nicht gefunden.' });
+    logActivity(req.user, 'Meldung gelöscht', 'settings', before.id, truncate(before.title, 80));
+    res.json({ news: news.manual({ all: true }) });
   })
 );
 

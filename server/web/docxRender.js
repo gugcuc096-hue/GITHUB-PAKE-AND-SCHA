@@ -22,7 +22,7 @@ const mm = (v) => Math.round(v * 56.6929); // Millimeter → twip
 const rem = (v) => v * 12; // 1rem = 16px = 12pt
 const eighths = (pt) => Math.max(2, Math.round(pt * 8)); // Linienstärke in 1/8 Punkt
 // CSS line-height bezieht sich auf die Schriftgröße, Word/Google auf die natürliche Zeilenhöhe der Schrift.
-const NATURAL_LINE = { Inter: 1.24, 'JetBrains Mono': 1.32, Tinos: 1.15, 'Roboto Serif': 1.18, 'Cormorant Garamond': 1.21 };
+const NATURAL_LINE = { Inter: 1.24, Tinos: 1.15, 'Roboto Serif': 1.18, 'Cormorant Garamond': 1.21 };
 const lineMul = (cssLineHeight, font) => Math.round((cssLineHeight / (NATURAL_LINE[font] || 1.15)) * 240);
 
 /* ---------------------------------------------------------------- Formatierung wie im Browser */
@@ -180,7 +180,7 @@ function metaCells(pairs, size, labelW, valueW) {
   const lines = (pick, o) => pairs.map((p) => para(pick(p), { font: o.font, size, color: o.color, align: o.align, after: rem(0.15) }));
   return [
     cell(lines((p) => p[0], { font: 'Inter', color: MUTED }), { width: labelW, valign: D.VerticalAlign.BOTTOM }),
-    cell(lines((p) => p[1], { font: 'JetBrains Mono', color: INK, align: D.AlignmentType.RIGHT }), { width: valueW, valign: D.VerticalAlign.BOTTOM }),
+    cell(lines((p) => p[1], { font: 'Inter', color: INK, align: D.AlignmentType.RIGHT }), { width: valueW, valign: D.VerticalAlign.BOTTOM }),
   ];
 }
 
@@ -293,7 +293,7 @@ async function invoiceDocx(inv, firm) {
       borders: { bottom: line(1.125, INK) },
     });
   const td = (t, num) =>
-    cell(para(t, { font: num ? 'JetBrains Mono' : 'Inter', size: rem(0.86), color: INK, align: num ? D.AlignmentType.RIGHT : undefined }), {
+    cell(para(t, { font: num ? 'Inter' : 'Inter', size: rem(0.86), color: INK, align: num ? D.AlignmentType.RIGHT : undefined }), {
       pt: rem(0.65),
       pb: rem(0.65),
       pl: rem(0.4),
@@ -314,7 +314,7 @@ async function invoiceDocx(inv, firm) {
   const totW = Math.min(W, tw(225));
   const totRow = (l, v, o = {}) => [
     cell(para(l, { font: 'Inter', size: o.size || rem(0.88), bold: o.bold, color: INK }), { width: totW - mm(32), pt: o.pt ?? rem(0.3), pb: rem(0.3), borders: o.borders }),
-    cell(para(v, { font: o.mono === false ? 'Inter' : 'JetBrains Mono', size: o.size || rem(0.88), bold: o.bold, color: o.color || INK, align: D.AlignmentType.RIGHT }), {
+    cell(para(v, { font: o.mono === false ? 'Inter' : 'Inter', size: o.size || rem(0.88), bold: o.bold, color: o.color || INK, align: D.AlignmentType.RIGHT }), {
       width: mm(32),
       pt: o.pt ?? rem(0.3),
       pb: rem(0.3),
@@ -813,7 +813,7 @@ async function extractDocx(data, firm, options = {}) {
     para([...runs(main, { font: 'Inter', size: rem(0.82), color: INK }), ...extra], { line: 1.45, font: 'Inter', mark: rem(0.82) }),
     ...(dim ? [para(dim, { font: 'Inter', size: rem(0.82), color: MUTED, line: 1.45 })] : []),
   ];
-  const mono = (t) => [para(t, { font: 'JetBrains Mono', size: rem(0.82), color: INK, line: 1.45 })];
+  const mono = (t) => [para(t, { font: 'Inter', size: rem(0.82), color: INK, line: 1.45 })];
 
   // Kopf
   body.push(firmHead(firm, W));
@@ -969,7 +969,7 @@ async function extractDocx(data, firm, options = {}) {
       body.push(
         grid(
           ['Nummer', 'Art', 'Datum', 'Betrag', 'Status'],
-          list.map((i) => [mono(i.number), withDim(INVOICE_KIND[i.kind] || i.kind, i.subject), dateDe(i.createdAt), [para(money(i.total), { font: 'JetBrains Mono', size: rem(0.82), color: INK, line: 1.45, align: D.AlignmentType.RIGHT })], withDim(INVOICE_STATUS[i.status] || i.status, i.overdueDays > 0 ? `${i.overdueDays} ${i.overdueDays === 1 ? 'Tag' : 'Tage'} überfällig` : null)]),
+          list.map((i) => [mono(i.number), withDim(INVOICE_KIND[i.kind] || i.kind, i.subject), dateDe(i.createdAt), [para(money(i.total), { font: 'Inter', size: rem(0.82), color: INK, line: 1.45, align: D.AlignmentType.RIGHT })], withDim(INVOICE_STATUS[i.status] || i.status, i.overdueDays > 0 ? `${i.overdueDays} ${i.overdueDays === 1 ? 'Tag' : 'Tage'} überfällig` : null)]),
           w,
           [3]
         )

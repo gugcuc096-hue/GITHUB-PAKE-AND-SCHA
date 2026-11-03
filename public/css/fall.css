@@ -49,7 +49,7 @@
 .fall-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem 1rem; flex-wrap: wrap; }
 .fall-title { display: flex; align-items: baseline; gap: 0.55rem; min-width: 0; flex: 1 1 14rem; }
 .fall-title strong { font-size: 0.95rem; overflow-wrap: anywhere; }
-.fall-no { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.75rem; font-weight: 700; color: var(--gold-500); padding: 0.1rem 0.45rem; border-radius: 6px; background: rgba(var(--accent-rgb), 0.14); }
+.fall-no { font-family: var(--font-num); font-size: 0.75rem; font-weight: 700; color: var(--gold-500); padding: 0.1rem 0.45rem; border-radius: 6px; background: rgba(var(--accent-rgb), 0.14); }
 .fall-date { font-size: 0.75rem; color: var(--text-dim); }
 .fall-chips { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; justify-content: flex-end; }
 .fall-amount { font-weight: 700; color: var(--gold-light, #f3e5ab); margin-right: 0.2rem; }

@@ -45,7 +45,7 @@ function seed() {
     /* ohne Startseite: nur Namen */
   }
   const cards = {};
-  const re = /<span[^>]*uppercase font-semibold">([^<]*)<\/span>[\s\S]*?<h4[^>]*>([^<]*)<\/h4>\s*<p[^>]*>([^<]*)<\/p>[\s\S]*?font-mono[^"]*">([^<]*)<\/div>/g;
+  const re = /<span[^>]*uppercase font-semibold">([^<]*)<\/span>[\s\S]*?<h4[^>]*>([^<]*)<\/h4>\s*<p[^>]*>([^<]*)<\/p>[\s\S]*?<div class="pt-4 border-t[^"]*">([^<]*)<\/div>/g;
   let m;
   while ((m = re.exec(html))) cards[clean(m[2])] = { badge: clean(m[1]), description: clean(m[3]), footer: clean(m[4]) };
   const ins = Q.ranks.insert;
@@ -163,13 +163,13 @@ function cardsHtml(level) {
                         <div class="glass-card p-6 border-t-2 ${top} flex flex-col justify-between">
                             <div>
                                 <div class="flex items-center justify-between mb-3">
-                                    ${r.badge ? `<span class="text-[0.65rem] font-mono px-3 py-1 rounded-full ${badge} uppercase font-semibold">${esc(r.badge)}</span>` : '<span></span>'}
-                                    <span class="text-xs text-[var(--text-muted)] font-mono">Rang ${String(offset + i + 1).padStart(2, '0')}</span>
+                                    ${r.badge ? `<span class="text-[0.62rem] tracking-[0.14em] px-3 py-1 rounded-sm ${badge} uppercase font-semibold">${esc(r.badge)}</span>` : '<span></span>'}
+                                    <span class="text-xs text-[var(--text-muted)] tabular-nums">Rang ${offset + i + 1}</span>
                                 </div>
                                 <h4 class="font-serif text-2xl font-semibold text-white mb-3">${esc(r.name)}</h4>
                                 ${r.description ? `<p class="text-xs text-[var(--text-muted)] leading-relaxed mb-4">${esc(r.description)}</p>` : ''}
                             </div>
-                            ${r.footer ? `<div class="pt-4 border-t border-[var(--glass-border)] text-[0.7rem] font-mono ${foot}">${esc(r.footer)}</div>` : ''}
+                            ${r.footer ? `<div class="pt-4 border-t border-[var(--glass-border)] text-[0.72rem] ${foot}">${esc(r.footer)}</div>` : ''}
                         </div>`;
     })
     .join('\n');

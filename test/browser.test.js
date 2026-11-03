@@ -85,9 +85,9 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
     await page.waitForSelector('#nav a.nav-item');
   }
 
-  it('Startseite am PC: Tarifrechner, Mandatsdialog, FAQ', async () => {
+  it('Website am PC: Tarifrechner (Honorare), Mandatsdialog, FAQ (Kontakt)', async () => {
     const { ctx, page, problems } = await open(DESKTOP);
-    await page.goto(server.base + '/');
+    await page.goto(server.base + '/honorare');
     const before = await page.textContent('#totalAmount');
     await page.locator('#calcOptions .calc-check').nth(0).check();
     await page.locator('#calcOptions .calc-check').nth(1).check();
@@ -98,11 +98,12 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
     // Klick daneben schließt das Fenster – die Eingaben bleiben erhalten; Esc schließt ebenso
     await page.mouse.click(5, 5);
     await page.waitForFunction(() => document.getElementById('ticketModal').classList.contains('opacity-0'));
-    await page.locator('[data-act="ticket"]').nth(1).click();
+    await page.locator('[data-act="ticket"]:visible').first().click();
     await page.waitForFunction(() => !document.getElementById('ticketModal').classList.contains('opacity-0'));
     assert.match(await page.inputValue('#tkDesc'), /Gewünschte Leistungen/, 'Eingaben bleiben erhalten');
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => document.getElementById('ticketModal').classList.contains('opacity-0'));
+    await page.goto(server.base + '/kontakt');
     await page.locator('[data-act="faq"]').first().click();
     assert.ok(await page.$('.faq-item.open'), 'FAQ klappt auf');
     assert.deepEqual(problems, []);
@@ -348,14 +349,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       } else {
         assert.equal(await portal.$$eval('#positions > article', (a) => new Set(a.map((x) => Math.round(x.getBoundingClientRect().top))).size), 1, 'drei Stellen in einer Reihe');
       }
-      // Startseite: „Karriere“ in der Leiste springt zum Karriere-Abschnitt; dort „Meine Bewerbung“ mit Stand
-      await portal.goto(server.base + '/');
-      if (device === PHONE) {
-        await portal.click('#menuToggle');
-        await portal.click('#mobileMenu a[href="#karriere"]');
-      } else {
-        await portal.click('header nav[aria-label="Hauptnavigation"] a[href="#karriere"]');
-      }
+      // Website → Kanzlei → Karriere-Kasten: „Meine Bewerbung“ mit Stand
+      await portal.goto(server.base + '/kanzlei#karriere');
       await portal.waitForFunction(() => Math.abs(document.getElementById('karriere').getBoundingClientRect().top - 96) < 40);
       assert.equal(await portal.getAttribute('#careerStatus', 'href'), app.portal);
       assert.equal((await portal.textContent('#careerStatus')).trim(), 'Meine Bewerbung');
@@ -711,7 +706,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         // Startseite (Besucher ohne Anmeldung): „Direkt anfragen“ auf der Teamkarte
         site = await open(device);
         const guest = site.page;
-        await guest.goto(server.base + '/');
+        await guest.goto(server.base + '/anwaelte');
         await guest.waitForSelector('#teamGrid [data-wish]');
         const name = await guest.getAttribute('#teamGrid [data-wish]', 'data-name');
         await guest.click('#teamGrid [data-wish]');
@@ -902,7 +897,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await ctx.clearCookies();
         discordId = `90000000000000018${suffix}`;
         await page.goto(dsrv.base + '/');
-        await page.locator('[data-act="ticket"]').nth(1).click();
+        await page.locator('[data-act="ticket"]:visible').first().click();
         await page.waitForFunction(() => !document.getElementById('ticketModal').classList.contains('opacity-0'));
         await page.fill('#tkName', `Lena Berg ${label}`);
         await page.selectOption('#tkArea', 'zivilrecht');
@@ -931,7 +926,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.mouse.click(5, 5);
         await page.waitForTimeout(300);
         assert.ok(await page.isVisible('#ticketAccount'), 'Bestätigung bleibt offen');
-        const caseNumber = (await page.textContent('#ticketSuccess .font-mono')).trim();
+        const caseNumber = (await page.textContent('#ticketSuccess .tabular-nums')).trim();
         if (device === PHONE) assert.ok((await overflow(page)) <= 1, 'Erfolgsanzeige passt aufs Handy');
         await page.click('#ticketAccount');
         await page.waitForURL(/dashboard/);
@@ -1163,7 +1158,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.waitForSelector('#modalBody .case-jump');
         for (const href of [`/vertrag?id=${k.id}`, `/rechnung?id=${inv.id}`, `/aktenauszug?id=${kase.id}`]) {
           const [tab] = await Promise.all([ctx.waitForEvent('page'), page.$eval(`#modalBody a[href="${href}"]`, (a) => a.click())]);
-          await tab.waitForFunction(() => document.getElementById('backLink').href.includes('?case='));
+          await tab.waitForFunction(() => document.getElementById('backLink')?.href.includes('?case=')); // der neue Tab ist anfangs noch leer (about:blank)
           assert.match(await tab.textContent('#backLink'), /Zur Akte/, `${href}: Knopf „Zur Akte“`);
           // Der Tab schließt sich mitten im Klick – Playwright meldet das als Fehler des Klicks, entscheidend ist „close“
           await Promise.all([tab.waitForEvent('close'), tab.click('#backLink').catch(() => {})]);
@@ -1174,7 +1169,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         // 3) Druckansicht direkt aufgerufen (z. B. „Lesen & unterschreiben“ aus Discord): „← Zur Akte“ öffnet die Akte, X führt zur Liste
         const direct = await ctx.newPage();
         await direct.goto(`${rsrv.base}/vertrag?id=${k.id}`);
-        await direct.waitForFunction(() => document.getElementById('backLink').href.includes('?case='));
+        await direct.waitForFunction(() => document.getElementById('backLink')?.href.includes('?case=')); // der neue Tab ist anfangs noch leer (about:blank)
         await direct.click('#backLink');
         await direct.waitForURL(/dashboard/);
         await direct.waitForSelector('#modalBody .case-jump');
@@ -1460,7 +1455,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
 
     it(`Startseite am ${label}: Honorarordnung nach Kategorien aufklappbar${device === PHONE ? ', fester Knopf „Mandat anfragen“' : ''}`, async () => {
       const { ctx, page, problems } = await open(device);
-      await page.goto(server.base + '/');
+      await page.goto(server.base + '/honorare');
       await page.waitForSelector('#priceListContainer .price-head');
       const state = () => page.$$eval('#priceListContainer .price-category', (els) => els.filter((e) => e.style.display !== 'none').map((e) => !e.classList.contains('collapsed')));
       const first = await state();
@@ -1752,18 +1747,18 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.waitForTimeout(300);
         assert.equal(await page.locator('#stBar').count(), 0);
         await login(page, TEAM.admin, wsrv.base);
-        await page.goto(wsrv.base + '/?bearbeiten#raenge');
+        await page.goto(wsrv.base + '/kanzlei?bearbeiten#raenge');
         await page.waitForSelector('#stBar');
         const h2 = page.locator('#raenge h2[data-t]');
         await h2.click();
         await page.keyboard.press('ControlOrMeta+A');
-        await page.keyboard.type('Unsere Ränge');
+        await page.keyboard.type('Aufbau unserer Kanzlei');
         await page.keyboard.press('Enter');
         await page.waitForFunction(() => document.querySelector('#stBar .st-msg').textContent === 'Gespeichert.');
         assert.ok((await overflow(page)) <= 1, 'Leiste passt in die Breite');
         await page.click('#stBar .st-done');
         await page.waitForURL((u) => !u.search.includes('bearbeiten'));
-        assert.equal((await page.textContent('#raenge h2')).trim(), 'Unsere Ränge');
+        assert.equal((await page.textContent('#raenge h2')).trim(), 'Aufbau unserer Kanzlei');
         assert.equal(await page.locator('#raenge h4', { hasText: 'Junior Associate' }).count(), 1, 'Rang-Karten aus der Datenbank');
         assert.deepEqual(problems, []);
       } finally {
@@ -2125,7 +2120,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
     }
   });
 
-  it('Gold-Spotlight und Goldschimmer, Anwalts-Profil mit „Mandat anfragen“, wer ist in der Akte und wer schreibt – PC und Handy', async () => {
+  it('Ruhige Website, Anwalts-Profil mit „Mandat anfragen“, Gold-Spotlight im Dashboard, wer ist in der Akte und wer schreibt – PC und Handy', async () => {
     const psrv = await startServer();
     const A = await open(DESKTOP); // Anwalt
     const B = await open(DESKTOP); // Partner (Board)
@@ -2137,42 +2132,22 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       assert.equal((await client(psrv.base).post('/api/auth/register', { displayName: 'Mia Mandant', email: 'mia.mandant', password: 'Mandanten-Passwort-1' })).status, 201);
       const kase = (await anwalt.post('/api/cases', { title: 'Präsenz-Akte', area: 'zivilrecht', clientEmail: 'mia.mandant' })).json.case;
 
-      // Startseite: Goldschimmer über „Recht bekommen.“, Licht folgt der Maus über die Teamkarte
+      // Website: ruhig wie eine Kanzlei – kein Streiflicht, keine Neigung auf den Karten der Anwälte
       await A.page.emulateMedia({ reducedMotion: 'no-preference' });
-      await A.page.goto(psrv.base + '/');
-      assert.equal(await A.page.$eval('.gold-shine', (el) => getComputedStyle(el).animationName), 'ps-shine');
+      await A.page.goto(psrv.base + '/anwaelte');
       const card = A.page.locator('#teamGrid .team-card').first();
       await card.locator('.team-name').waitFor();
       await card.scrollIntoViewIfNeeded();
-      // Die Karte hebt sich beim Darüberfahren an (0,35 s) – erst danach messen, wo sie steht
-      const start = await card.boundingBox();
-      await A.page.mouse.move(start.x + 30, start.y + 30);
-      // warten, bis die Karte ruhig steht (Anheben, Seite lädt nach) – auf ausgelasteten Rechnern dauert das länger
-      const steady = async () => {
-        let prev = null;
-        for (let i = 0; i < 40; i++) {
-          const b = await card.boundingBox();
-          if (prev && Math.abs(b.x - prev.x) < 0.5 && Math.abs(b.y - prev.y) < 0.5) return b;
-          prev = b;
-          await A.page.waitForTimeout(100);
-        }
-        return prev;
-      };
-      const box = await steady();
+      const box = await card.boundingBox();
+      await A.page.mouse.move(box.x + 40, box.y + 40);
       await A.page.mouse.move(box.x + 60, box.y + 80);
-      await A.page.waitForFunction(() => document.querySelector('#teamGrid .team-card.ps-spot-on'));
-      await A.page.waitForTimeout(300); // Neigung zur Maus abwarten
-      const spot = await card.evaluate((el) => [parseFloat(el.style.getPropertyValue('--mx')), parseFloat(el.style.getPropertyValue('--my'))]);
-      // Die Karte neigt sich zur Maus (3D) – das Licht sitzt trotzdem an der Maus (wenige Pixel Spiel durch die Neigung)
-      assert.ok(Math.abs(spot[0] - 60) <= 8 && Math.abs(spot[1] - 80) <= 8, `Licht an der Maus: ${spot}`);
-      assert.match(await card.evaluate((el) => el.style.transform), /perspective\(900px\).*rotateX\(.*rotateY\(/);
-      await A.page.mouse.move(2, 2);
-      await A.page.waitForFunction(() => !document.querySelector('.ps-spot-on'));
-      assert.equal(await card.evaluate((el) => el.style.transform), '', 'Karte richtet sich wieder auf');
+      await A.page.waitForTimeout(300);
+      assert.deepEqual(await card.evaluate((el) => [el.classList.contains('ps-spot-on'), el.style.transform]), [false, ''], 'keine Effekte auf der Website');
       // Name auf der Karte → Profilseite → „Mandat anfragen“ öffnet das Formular mit Wunschanwalt
       const name = (await card.locator('.team-name').textContent()).trim();
       await card.locator('.team-name').click();
       await A.page.waitForURL(/\/team\/[a-z0-9-]+$/);
+      const profileUrl = A.page.url();
       assert.equal((await A.page.textContent('h1.pf-name')).trim(), name);
       // erst auf die Startseite warten – sonst prüft der Test noch die Profilseite (dort gibt es kein Mandatsfenster)
       await Promise.all([A.page.waitForURL((u) => u.pathname === '/'), A.page.click('.pf-actions a.btn-gold')]);
@@ -2180,7 +2155,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       assert.equal(await A.page.textContent('#tkLawyerName'), name);
       assert.equal(new URL(A.page.url()).search, '', 'Adresse wieder sauber');
       // Profil am Handy: nichts ragt über den Rand, Knopf über die ganze Breite
-      await M.page.goto(psrv.base + new URL(await A.page.evaluate(() => document.querySelector('#teamGrid .team-name').href)).pathname);
+      await M.page.goto(psrv.base + new URL(profileUrl).pathname);
       assert.equal(await overflow(M.page), 0);
       const cta = await M.page.locator('.pf-actions a.btn-gold').boundingBox();
       assert.ok(cta.width > 300, `Knopf breit: ${cta.width}`);
@@ -2974,7 +2949,7 @@ describe('Browser: Bewegung, die zeigt, woher etwas kommt – Zahlen, die mitlau
             }
           })
         );
-      await page.goto(srv.base + '/');
+      await page.goto(srv.base + '/anwaelte');
       await page.waitForSelector('#teamGrid .team-card .team-name');
       assert.equal(await optedIn(), false, 'ohne Klick auf eine Teamkarte kein Übergang');
       await page.click('#teamGrid .team-card .team-name');
@@ -3280,7 +3255,7 @@ describe('Browser: Zahlenfelder mit eigenen Tasten, Kästchen im Kanzlei-Stil, E
 
       const home = await browser.newContext(DESKTOP);
       const hp = await home.newPage();
-      await hp.goto(srv.base + '/');
+      await hp.goto(srv.base + '/honorare');
       await hp.waitForSelector('#calcOptions .calc-opt');
       const box = await hp.$eval('#calcOptions .calc-check', (i) => getComputedStyle(i).backgroundColor);
       assert.notEqual(box, 'rgb(255, 255, 255)', 'Kästchen nicht weiß');
@@ -3924,7 +3899,7 @@ describe('Browser: Startseite ↔ Dashboard – Anmelden im Dialog, Umschalter, 
           await page.waitForFunction(() => {
             const m = document.getElementById('mobileMenu');
             const a = m && m.querySelector('[data-auth-link]');
-            return m.classList.contains('open') && a && a.getBoundingClientRect().bottom <= window.innerHeight && getComputedStyle(m).visibility === 'visible';
+            return m.classList.contains('open') && a && getComputedStyle(m).visibility === 'visible' && getComputedStyle(m).opacity === '1';
           });
           await page.waitForTimeout(450);
           await page.click('#mobileMenu [data-auth-link]');

@@ -118,14 +118,13 @@ function cfgHome() {
   const order = [...h.order, ...Object.keys(st.cfg.sections).filter((k) => !h.order.includes(k))];
   const faq = h.faq || [];
   return `<section class="panel panel-pad">
-      <div class="panel-head"><h2 class="panel-title">Startseite</h2></div>
-      <p class="text-sm text-muted mb-4">Abschnitte ein- und ausblenden und umsortieren, Fragen &amp; Antworten selbst pflegen, Links zu Discord &amp; Co. und welche Kennzahlen öffentlich stehen. Einzelne Texte ändern Sie direkt auf der Seite (Reiter „Website &amp; Ränge“).</p>
+      <div class="panel-head"><h2 class="panel-title">Website</h2></div>
+      <p class="text-sm text-muted mb-4">Abschnitte der Website ein- und ausblenden (jeder steht auf seiner Unterseite), Fragen &amp; Antworten selbst pflegen, Links zu Discord &amp; Co. und welche Kennzahlen öffentlich stehen. Einzelne Texte ändern Sie direkt auf der Seite (Reiter „Website &amp; Ränge“).</p>
       <form data-form="cfg-home" class="form-grid">
-        <div><div class="label">Abschnitte (Reihenfolge von oben nach unten)</div>
+        <div><div class="label">Abschnitte der Website (Häkchen entfernen = ausblenden)</div>
           <div class="home-secs" id="cfgSections">${order
             .map(
-              (id, i) => `<div class="home-sec" data-id="${id}"><label class="check"><input type="checkbox" name="show" ${h.hidden.includes(id) ? '' : 'checked'}> ${esc(st.cfg.sections[id])}</label>
-                <span class="home-sec-btns"><button type="button" class="icon-btn sm" data-action="home-move" data-dir="-1" aria-label="Nach oben">${icon('chevronUp', 'ico-sm')}</button><button type="button" class="icon-btn sm" data-action="home-move" data-dir="1" aria-label="Nach unten">${icon('chevronDown', 'ico-sm')}</button></span></div>`
+              (id, i) => `<div class="home-sec" data-id="${id}"><label class="check"><input type="checkbox" name="show" ${h.hidden.includes(id) ? '' : 'checked'}> ${esc(st.cfg.sections[id])}</label></div>`
             )
             .join('')}</div></div>
         <div><label class="check"><input type="checkbox" name="customFaq" ${h.faq ? 'checked' : ''} data-action="home-faq-toggle"> Eigene Fragen &amp; Antworten verwenden (statt der Standardfragen)</label>
@@ -137,6 +136,11 @@ function cfgHome() {
           <label class="check"><input type="checkbox" name="kpi-success" ${h.kpis.success ? 'checked' : ''}> Erfolgsquote</label>
           <label class="check"><input type="checkbox" name="kpi-rating" ${h.kpis.rating ? 'checked' : ''}> Durchschnittsbewertung</label>
           <p class="form-hint">Ob die Kennzahlen überhaupt erscheinen, steht unter „Website &amp; Ränge“ („Erfolge öffentlich anzeigen“); kleine Zahlen erscheinen nie.</p></div>
+        <div><div class="label">Aktuelles: automatische Meldungen</div>
+          <label class="check"><input type="checkbox" name="news-hires" ${(h.news || {}).hires !== false ? 'checked' : ''}> Neu im Team (aus dem Personalprotokoll)</label>
+          <label class="check"><input type="checkbox" name="news-promotions" ${(h.news || {}).promotions !== false ? 'checked' : ''}> Beförderungen (aus dem Personalprotokoll)</label>
+          <label class="check"><input type="checkbox" name="news-positions" ${(h.news || {}).positions !== false ? 'checked' : ''}> Offene Stellen (Karriere)</label>
+          <p class="form-hint">Eigene Meldungen schreiben Sie unter Einstellungen → Aktuelles. Rückstufungen und Kündigungen erscheinen nie.</p></div>
         ${cfgBar('home', `<a class="btn-ghost btn-md" href="/?vorschau=1" target="_blank" rel="noopener">${icon('globe', 'ico-sm')}<span>Vorschau mit Entwurf</span></a>`)}
       </form>
     </section>`;
@@ -157,6 +161,7 @@ function cfgCollectHome(f) {
     links: [...f.querySelectorAll('.link-row')].map((r) => ({ label: r.querySelector('[data-link="label"]').value.trim(), url: r.querySelector('[data-link="url"]').value.trim() })).filter((x) => x.label || x.url),
     contactEmail: cfgWork('home').contactEmail || '',
     kpis: { closed: f.querySelector('[name="kpi-closed"]').checked, success: f.querySelector('[name="kpi-success"]').checked, rating: f.querySelector('[name="kpi-rating"]').checked },
+    news: { hires: !!f.querySelector('[name="news-hires"]')?.checked, promotions: !!f.querySelector('[name="news-promotions"]')?.checked, positions: !!f.querySelector('[name="news-positions"]')?.checked },
   };
 }
 

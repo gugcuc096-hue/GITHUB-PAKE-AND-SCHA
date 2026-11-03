@@ -28,9 +28,11 @@ router.get('/robots.txt', (req, res) => {
   );
 });
 
-/** Öffentliche Seiten: Startseite, Karriere (wenn eingeschaltet), Profile der sichtbaren Anwälte. */
+/** Öffentliche Seiten: alle Unterseiten der Website, Rechtsgebiete, Karriere (wenn eingeschaltet), Profile der sichtbaren Anwälte. */
 function publicPaths() {
-  const paths = ['/'];
+  const sitePages = require('./sitePages');
+  const paths = Object.values(sitePages.VIEWS).map((v) => v.path);
+  for (const a of sitePages.publicAreas()) paths.push(`/rechtsgebiete/${a.key}`);
   if (features.on('karriere')) paths.push('/karriere');
   for (const slug of profiles.slugMap().values()) paths.push(`/team/${slug}`);
   return paths;
@@ -38,16 +40,17 @@ function publicPaths() {
 router.get('/sitemap.xml', (req, res) => {
   const origin = originOf(req);
   const body = publicPaths()
-    .map((p, i) => `  <url><loc>${xml(origin + (p === '/' ? '/' : p))}</loc><priority>${i === 0 ? '1.0' : p === '/karriere' ? '0.6' : '0.5'}</priority></url>`)
+    .map((p, i) => `  <url><loc>${xml(origin + p)}</loc><priority>${i === 0 ? '1.0' : /^\/(team|impressum)/.test(p) ? '0.5' : '0.7'}</priority></url>`)
     .join('\n');
   res.type('application/xml').set('Cache-Control', 'public, max-age=3600').send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`);
 });
 
 /** <head>-Ergänzungen für die öffentlichen Seiten: kanonische Adresse, og:url und – auf der Startseite – Schema.org „LegalService“. */
-function headExtras(page, origin) {
-  const url = origin + (page === 'karriere' ? '/karriere' : '/');
+function headExtras(page, origin, view = null) {
+  const path = page === 'karriere' ? '/karriere' : view ? require('./sitePages').metaOf(view).path : '/';
+  const url = origin + path;
   const out = [`<link rel="canonical" href="${xml(url)}">`, `<meta property="og:url" content="${xml(url)}">`];
-  if (page === 'index') {
+  if (page === 'index' && (!view || view.key === 'start')) {
     const contact = String(getSetting('firm_contact', '') || '');
     const email = (contact.match(/[^\s<>@]+@[^\s<>@]+\.[a-z]{2,}/i) || [])[0];
     const data = {
@@ -57,7 +60,7 @@ function headExtras(page, origin) {
       url,
       logo: `${origin}/img/logo.png`,
       image: `${origin}/img/og-image.png`,
-      description: 'Kanzlei für Zivil-, Straf- und Verfassungsrecht in Los Santos – Mandat online anfragen, Termine vereinbaren.',
+      description: 'Kanzlei für Straf-, Zivil-, Verfassungs- und Vertragsrecht in Los Santos – Mandat online anfragen, Termine vereinbaren.',
       areaServed: 'Los Santos',
       address: { '@type': 'PostalAddress', streetAddress: require('../db/models').firmSeat() },
       knowsAbout: areas.list({ activeOnly: true }).map((a) => a.name),

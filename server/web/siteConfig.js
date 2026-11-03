@@ -10,6 +10,7 @@ const { db } = require('../db/db');
 const configLog = require('../core/configLog');
 
 const SECTIONS = {
+  aktuelles: 'Aktuelles',
   ablauf: 'Ablauf',
   rechner: 'Tarifrechner',
   honorar: 'Honorarordnung',
@@ -131,8 +132,10 @@ const SPECS = {
       links: z.array(z.object({ label: z.string().trim().min(1).max(40), url: url.refine((v) => v !== '', 'Adresse fehlt.') })).max(8),
       contactEmail: z.string().trim().max(120).refine((v) => v === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), 'Keine gültige E-Mail-Adresse.'),
       kpis: z.object({ closed: z.boolean(), success: z.boolean(), rating: z.boolean() }),
+      // Aktuelles: automatische Meldungen aus Personalprotokoll und Stellen (domain/news.js)
+      news: z.object({ hires: z.boolean(), promotions: z.boolean(), positions: z.boolean() }).default({ hires: true, promotions: true, positions: true }),
     }),
-    defaults: { order: SECTION_IDS, hidden: [], faq: null, links: [], contactEmail: '', kpis: { closed: true, success: true, rating: true } },
+    defaults: { order: SECTION_IDS, hidden: [], faq: null, links: [], contactEmail: '', kpis: { closed: true, success: true, rating: true }, news: { hires: true, promotions: true, positions: true } },
   },
   labels: {
     perm: 'site.edit',

@@ -826,7 +826,7 @@
   let spotRaf = 0;
   function spotTarget(t) {
     const el = t && t.closest ? t.closest(SPOT_SEL) : null;
-    if (!el) return null;
+    if (!el || el.closest('body.site-home main')) return null; // Website der Kanzlei: ruhig, ohne Streiflicht
     if (!spotOk.has(el)) spotOk.set(el, !el.querySelector('input, textarea, select'));
     return spotOk.get(el) ? el : null;
   }
@@ -839,7 +839,7 @@
    * stark. Nicht bei gedämpften Animationen und nicht, solange in der Karte ein Feld bearbeitet wird. Die Karteikarte eines
    * Mandanten neigt sich bewusst nicht: man liest und schreibt darin, das Wackeln stört (nur das Streiflicht bleibt).
    */
-  const TILT_SEL = '.team-card, .pf-card, .kpi'; // Kacheln der Übersicht nur ganz leicht (siehe tilt)
+  const TILT_SEL = '.team-card:not(.kz-person), .pf-card, .kpi'; // Kacheln der Übersicht nur ganz leicht (siehe tilt)
   let tiltEl = null;
   function tiltOff() {
     if (tiltEl) {

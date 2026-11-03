@@ -49,7 +49,7 @@
         .title .sub { font-size: 0.9rem; color: var(--muted); margin-top: 0.2rem; }
         .meta { display: grid; grid-template-columns: auto auto; gap: 0.15rem 1rem; font-size: 0.82rem; }
         .meta span:nth-child(odd) { color: var(--muted); }
-        .meta span:nth-child(even) { font-family: 'JetBrains Mono', monospace; text-align: right; }
+        .meta span:nth-child(even) { font-family: var(--font-num); text-align: right; }
         .confidential { margin: -0.5rem 0 1.25rem; padding: 0.55rem 0.8rem; border: 1px solid #f1c27d; background: #fff8eb; color: #92400e; font-size: 0.78rem; border-radius: 4px; }
         section { margin-top: 1.6rem; break-inside: auto; }
         h2 { font: 600 1.3rem 'Cormorant Garamond', serif; margin: 0 0 0.6rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--line); break-after: avoid; }
@@ -62,8 +62,8 @@
         th { text-align: left; font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); border-bottom: 1.5px solid var(--ink); padding: 0.45rem 0.4rem; font-weight: 600; }
         td { padding: 0.5rem 0.4rem; border-bottom: 1px solid var(--line); vertical-align: top; line-height: 1.45; }
         tr { break-inside: avoid; }
-        .num { text-align: right; font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
-        .mono { font-family: 'JetBrains Mono', monospace; }
+        .num { text-align: right; font-family: var(--font-num); white-space: nowrap; }
+        .mono { font-family: var(--font-num); }
         .nowrap { white-space: nowrap; }
         .dim { color: var(--muted); }
         .pill { display: inline-block; font-size: 0.66rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.05rem 0.4rem; border-radius: 3px; border: 1px solid #d6cfb8; color: var(--muted); margin-left: 0.3rem; vertical-align: 1px; }

@@ -416,7 +416,7 @@ function karteGlow() {
 
 /** Postleitzahlen beschriften, ohne dass sich Nummern überlappen: von der Mitte nach außen, was frei ist, wird gesetzt. */
 function karteLabelFlow(x, items, cx, cy, onImage, max = 900) {
-  x.font = '700 11px ui-monospace, SFMono-Regular, Menlo, monospace';
+  x.font = '700 11px var(--font-num)';
   x.textBaseline = 'middle';
   x.textAlign = 'start';
   x.lineJoin = 'round';

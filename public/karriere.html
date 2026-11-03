@@ -40,9 +40,10 @@
     <link rel="stylesheet" href="/css/depth.css">
     <link rel="stylesheet" href="/css/motion.css">
     <link rel="stylesheet" href="/css/calm.css" media="(prefers-reduced-motion: reduce)" data-calm>
+    <link rel="stylesheet" href="/css/kanzlei.css">
     <link rel="stylesheet" href="/css/gfx.css">
 </head>
-<body class="site-page min-h-screen flex flex-col page-in">
+<body class="site-home site-page min-h-screen flex flex-col page-in">
     <div class="ambient-bg"><div class="glow-orb orb-1"></div><div class="glow-orb orb-2"></div></div>
 
     <!-- Kopfzeile wie auf der Startseite: Logo mit Schriftzug, Menü in kleinen Großbuchstaben, Login-Knopf -->
@@ -111,17 +112,17 @@
         <section class="max-w-6xl mx-auto px-5 sm:px-6 pb-16">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
                 <div class="glass-card p-6">
-                    <div class="text-gold font-mono text-2xl mb-2">01</div>
+                    <div class="text-gold tabular-nums text-2xl mb-2">01</div>
                     <h2 class="font-serif text-2xl font-semibold mb-2">Mentoring durch das Board of Partners</h2>
                     <p class="text-sm text-muted leading-relaxed">Sie arbeiten direkt mit dem Board of Partners und dem Senior-Team – mit klaren Aufstiegsstufen vom Junior Associate bis zum Partner.</p>
                 </div>
                 <div class="glass-card p-6">
-                    <div class="text-gold font-mono text-2xl mb-2">02</div>
+                    <div class="text-gold tabular-nums text-2xl mb-2">02</div>
                     <h2 class="font-serif text-2xl font-semibold mb-2">Echte Mandate ab Tag eins</h2>
                     <p class="text-sm text-muted leading-relaxed">Strafrecht, Zivilrecht, Verfassungsrecht und Verträge: Sie begleiten Verhöre, Haftprüfungen und Hauptverhandlungen vor allen Gerichten.</p>
                 </div>
                 <div class="glass-card p-6">
-                    <div class="text-gold font-mono text-2xl mb-2">03</div>
+                    <div class="text-gold tabular-nums text-2xl mb-2">03</div>
                     <h2 class="font-serif text-2xl font-semibold mb-2">Modernes Kanzlei-System</h2>
                     <p class="text-sm text-muted leading-relaxed">Digitale Akten, Team-Kalender mit Fristen, Kanzlei-Post, Stempeluhr und Rechnungs-Generator – alles in einem Dashboard, auch am Handy.</p>
                 </div>
@@ -248,8 +249,8 @@
                     <p class="text-xs text-dim mt-4">Discord nicht verbunden? Das Board of Partners schickt Ihnen den Link zu Ihrer Bewerberseite.</p>
                 </div>
                 <form id="statusForm" data-nodraft class="hidden flex-col sm:flex-row gap-3" novalidate>
-                    <input id="stNumber" class="field font-mono" placeholder="Bewerbungsnummer, z. B. BW-2026-0001" autocapitalize="characters" aria-label="Bewerbungsnummer">
-                    <input id="stCode" class="field font-mono sm:w-48" inputmode="numeric" maxlength="6" placeholder="Zugangscode" aria-label="Zugangscode">
+                    <input id="stNumber" class="field tabular-nums" placeholder="Bewerbungsnummer, z. B. BW-2026-0001" autocapitalize="characters" aria-label="Bewerbungsnummer">
+                    <input id="stCode" class="field tabular-nums sm:w-48" inputmode="numeric" maxlength="6" placeholder="Zugangscode" aria-label="Zugangscode">
                     <button type="submit" class="btn-gold btn-md shrink-0">Öffnen</button>
                 </form>
                 <div id="statusResult" class="mt-4"></div>

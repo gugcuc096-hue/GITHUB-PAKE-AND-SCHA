@@ -25,7 +25,7 @@ async function buildTailwind() {
       // Alle Seiten und Skripte, in denen Tailwind-Klassen stehen (auch in JavaScript erzeugtes HTML)
       content: [path.join(ROOT, 'public', '*.html'), path.join(ROOT, 'public', 'js', '**', '*.js')],
       // font-serif = Schmuckschrift der Kanzlei (wie --font-display in app.css), nicht Georgia aus Tailwind
-      theme: { extend: { fontFamily: { serif: ['"Cormorant Garamond"', 'Georgia', '"Times New Roman"', 'serif'] } } },
+      theme: { extend: { fontFamily: { serif: ['"Cormorant Garamond"', 'Georgia', '"Times New Roman"', 'serif'], mono: ['Inter', 'system-ui', 'sans-serif'] } } }, // font-mono = Zahlen in Inter (keine Programmierschrift)
       plugins: [],
     }),
     autoprefixer({ remove: false }),

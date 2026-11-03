@@ -15,22 +15,23 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <script src="/js/pwa.js" defer></script>
     <script src="/js/warm.js" defer></script>
-    <title>Pake & Scha | Recht haben. Recht bekommen.</title>
-    <meta name="description" content="Recht haben. Recht bekommen. – Pake & Scha Legal Consulting, Ihre Kanzlei für Zivil-, Straf- und Verfassungsrecht in Los Santos.">
+    <title>Pake & Scha – Kanzlei in Los Santos</title>
+    <meta name="description" content="Pake & Scha Legal Consulting: Strafrecht, Zivilrecht, Verfassungsrecht und Vertragsrecht in Los Santos. Mandat online anfragen.">
     <meta name="theme-color" content="#b8962e"> <!-- Goldstreifen der Link-Vorschau in Discord -->
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Pake & Scha Legal Consulting">
     <meta property="og:title" content="Pake & Scha – Recht haben. Recht bekommen.">
-    <meta property="og:description" content="Ihre Kanzlei für Zivil-, Straf- und Verfassungsrecht in Los Santos. Mandat online anfragen, Termine vereinbaren.">
+    <meta property="og:description" content="Strafrecht, Zivilrecht, Verfassungsrecht und Vertragsrecht in Los Santos. Mandat online anfragen, Termine vereinbaren.">
     <meta property="og:image" content="/img/og-image.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta name="twitter:card" content="summary_large_image">
 
-    <!-- Typografie: Cormorant Garamond (Serif), Inter (Sans), JetBrains Mono (Zahlen) -->
+    <!-- Typografie: Cormorant Garamond (Überschriften) und Inter (Text und Zahlen) -->
     <link rel="preload" href="/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="/fonts/cormorant-garamond-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
     <script src="/js/gfx.js"></script>
+    <script src="/js/sitenav.js"></script>
     <link rel="stylesheet" href="/css/fonts.css">
     <link rel="stylesheet" href="/css/scrollbar.css">
     <link rel="stylesheet" href="/css/feinschliff.css">
@@ -44,194 +45,495 @@
     <link rel="stylesheet" href="/css/controls.css">
     <link rel="stylesheet" href="/css/depth.css">
     <link rel="stylesheet" href="/css/motion.css">
+    <link rel="stylesheet" href="/css/kanzlei.css">
     <link rel="stylesheet" href="/css/calm.css" media="(prefers-reduced-motion: reduce)" data-calm>
     <link rel="stylesheet" href="/css/gfx.css">
 </head>
-<body class="min-h-screen flex flex-col justify-between page-in site-home">
+<body class="min-h-screen flex flex-col page-in site-home">
 
-    <div class="ambient-bg">
+    <div class="ambient-bg" aria-hidden="true">
         <div class="glow-orb orb-1"></div>
         <div class="glow-orb orb-2"></div>
     </div>
 
-    <!-- Top-Leiste: Eilnotdienst & Mandantenportal -->
+    <!-- Kopfleiste: Notdienst live, Kanzleisitz, Mandantenportal -->
     <div class="topstrip relative z-40">
-        <div class="max-w-7xl mx-auto px-4 sm:px-8 h-9 flex items-center justify-between gap-4">
-            <div id="dutyStripText" class="flex items-center gap-2 text-emerald-400 min-w-0">
-                <span id="dutyDot" class="status-dot status-active animate-pulse shrink-0"></span>
-                <span id="dutyLabel" class="truncate">24/7 Eilnotdienst aktiv</span>
-                <span class="font-mono text-emerald-300/80 hidden sm:inline" id="liveClock">--:--:--</span>
-            </div>
+        <div class="kz-wrap h-9 flex items-center justify-between gap-4">
+            <a href="/notdienst" id="dutyStripText" class="kz-strip-duty">
+                <span id="dutyDot" class="kz-dot is-off"></span>
+                <span id="dutyLabel" class="truncate">Notdienst: Anfrage per Mandat</span>
+            </a>
             <div class="flex items-center gap-5 shrink-0">
-                <span class="hidden lg:inline text-[var(--text-dim)]">Kanzleisitz: <span data-firm-seat>Würfelpark, Los Santos</span></span>
-                <a href="/karriere" class="hidden sm:inline xl:hidden text-[var(--text-muted)] hover:text-[var(--gold-light)] transition-colors">Karriere</a>
-                <a href="/login" data-auth-link class="text-[var(--gold-500)] hover:text-[var(--gold-light)] font-medium transition-colors"><span data-auth-label data-auth-out="Mandantenportal →" data-auth-in="Zum Dashboard →">Mandantenportal →</span></a>
+                <span class="hidden lg:inline">Kanzleisitz: <span data-firm-seat>Würfelpark, Los Santos</span></span>
+                <a href="/verfahrensstand" class="hidden sm:inline hover:text-[var(--gold-light)]">Verfahrensstand</a>
+                <a href="/login" data-auth-link class="text-[var(--gold-500)] hover:text-[var(--gold-light)] font-medium"><span data-auth-label data-auth-out="Mandantenportal" data-auth-in="Zum Dashboard">Mandantenportal</span></a>
             </div>
         </div>
     </div>
 
-    <!-- Navigation Header -->
+    <!-- Kopfzeile -->
     <header class="sticky top-0 z-40 glass-nav">
-        <div class="max-w-7xl mx-auto px-4 sm:px-8 h-[72px] flex items-center justify-between gap-4 xl:gap-6">
-            <a href="#start" class="flex items-center gap-3 sm:gap-4 group shrink-0 min-w-0">
-                <img class="h-[50px] w-auto shrink-0 drop-shadow-[0_0_14px_rgba(212,175,55,0.3)] group-hover:scale-105 transition-transform" src="/img/logo.svg" width="27" height="50" alt="" decoding="async">
-                <div class="min-w-0">
-                    <div class="font-serif text-xl tracking-wider font-semibold text-white group-hover:text-[var(--gold-light)] transition-colors whitespace-nowrap">Pake & Scha</div>
-                    <div class="hidden sm:block text-[0.6rem] uppercase tracking-[0.25em] xl:tracking-[0.15em] text-[var(--gold-500)] font-medium whitespace-nowrap">Legal Consulting & Advocacy</div>
-                </div>
+        <div class="kz-wrap h-[76px] flex items-center justify-between gap-6">
+            <a href="/" class="kz-brand" aria-label="Pake &amp; Scha – Startseite">
+                <img src="/img/logo.svg" width="25" height="46" alt="" decoding="async">
+                <span class="min-w-0"><span class="kz-brand-name">Pake &amp; Scha</span><span class="kz-brand-sub hidden sm:block">Legal Consulting</span></span>
             </a>
 
-            <nav data-ink class="hidden xl:flex items-center gap-5 text-[0.7rem] uppercase tracking-wider font-medium text-[var(--text-muted)]" aria-label="Hauptnavigation">
-                <a href="#rechner" data-section="rechner" class="nav-link hover:text-[var(--gold-500)] transition-colors">Tarifrechner</a>
-                <a href="#honorar" data-section="honorar" class="nav-link hover:text-[var(--gold-500)] transition-colors">Honorarordnung</a>
-                <a href="#vip" data-section="vip" class="nav-link hover:text-[var(--gold-500)] transition-colors">VIP &amp; Lifetime</a>
-                <a href="#team" data-section="team" class="nav-link hover:text-[var(--gold-500)] transition-colors">Team</a>
-                <a href="#raenge" data-section="raenge" class="nav-link hover:text-[var(--gold-500)] transition-colors">Kanzleiränge</a>
-                <a href="#karriere" data-section="karriere" class="nav-link hover:text-[var(--gold-500)] transition-colors">Karriere</a>
-                <a href="#kontakt" data-section="kontakt" class="nav-link hover:text-[var(--gold-500)] transition-colors">Kontakt</a>
+            <nav class="kz-nav hidden xl:flex" aria-label="Hauptnavigation">
+                <a href="/kanzlei" data-nav="kanzlei">Kanzlei</a>
+                <div class="kz-nav-drop">
+                    <a href="/rechtsgebiete" data-nav="rechtsgebiete" aria-haspopup="true">Rechtsgebiete <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5"/></svg></a>
+                    <div class="kz-nav-menu">
+                        <a href="/rechtsgebiete/strafrecht"><span class="kz-num">I.</span>Strafrecht</a>
+                        <a href="/rechtsgebiete/zivilrecht"><span class="kz-num">II.</span>Zivilrecht</a>
+                        <a href="/rechtsgebiete/verfassungsrecht"><span class="kz-num">III.</span>Verfassungsrecht</a>
+                        <a href="/rechtsgebiete/vertragsrecht"><span class="kz-num">IV.</span>Vertragsrecht</a>
+                        <a href="/rechtsgebiete" class="is-all">Alle Rechtsgebiete</a>
+                    </div>
+                </div>
+                <a href="/anwaelte" data-nav="anwaelte">Anwälte</a>
+                <a href="/honorare" data-nav="honorare">Honorare</a>
+                <a href="/aktuelles" data-nav="aktuelles">Aktuelles</a>
+                <a href="/karriere" data-nav="karriere">Karriere</a>
+                <a href="/kontakt" data-nav="kontakt">Kontakt</a>
             </nav>
 
             <div class="flex items-center gap-2 sm:gap-3 shrink-0">
-                <!-- Login / Dashboard (wird nach Anmeldung automatisch zu "Dashboard") -->
-                <a href="/login" data-auth-link data-hdr-auth aria-label="Login / Mandantenportal" class="btn-outline h-10 px-3 md:px-4 text-xs uppercase tracking-wider font-semibold inline-flex items-center justify-center gap-2">
-                    <svg class="w-4 h-4 text-[var(--gold-500)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                <a href="/notdienst" class="kz-duty-link hidden 2xl:inline-flex" data-nav="notdienst"><span class="kz-dot" data-duty-dot></span>Notdienst</a>
+                <a href="/login" data-auth-link data-hdr-auth aria-label="Login / Mandantenportal" class="btn-outline kz-btn" style="min-height:2.6rem;padding:0 0.85rem">
+                    <svg class="w-4 h-4 text-[var(--gold-500)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                     <span data-auth-label class="hidden md:inline">Login</span>
                 </a>
-                <!-- Für die Kanzlei (angemeldet): der goldene Knopf führt ins Dashboard statt zur Mandatsanfrage -->
-                <a href="/dashboard" data-hdr-dash class="btn-gold hdr-dash h-10 px-4 xl:px-5 text-xs uppercase tracking-wider items-center justify-center gap-2"><span>Dashboard</span></a>
-                <button data-act="ticket" class="btn-gold hidden sm:inline-flex h-10 px-4 xl:px-5 text-xs uppercase tracking-wider">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                    <span class="xl:hidden">Mandat Einreichen</span>
-                    <span class="hidden xl:inline">Mandat</span>
-                </button>
-                <button id="menuToggle" data-act="menu" aria-label="Menü öffnen" aria-expanded="false" aria-controls="mobileMenu" class="xl:hidden w-10 h-10 rounded-lg border border-[var(--glass-border)] flex items-center justify-center shrink-0">
-                    <svg id="menuIconOpen" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
-                    <svg id="menuIconClose" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                <a href="/dashboard" data-hdr-dash class="btn-gold kz-btn hdr-dash" style="min-height:2.6rem;padding:0 1.1rem"><span>Dashboard</span></a>
+                <button data-act="ticket" class="btn-gold kz-btn hidden sm:inline-flex" style="min-height:2.6rem;padding:0 1.15rem">Mandat anfragen</button>
+                <button id="menuToggle" data-act="menu" aria-label="Menü öffnen" aria-expanded="false" aria-controls="mobileMenu" class="xl:hidden w-10 h-10 border border-[var(--kz-rule)] flex items-center justify-center shrink-0 text-[var(--kz-ink)]">
+                    <svg id="menuIconOpen" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="1.6" d="M4 7h16M4 12h16M4 17h16"/></svg>
+                    <svg id="menuIconClose" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="1.6" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
         </div>
 
-        <!-- Mobile Menu -->
-        <div id="mobileMenu" class="xl:hidden border-t border-[var(--glass-border)]">
-            <nav class="flex flex-col px-6 py-4 gap-1 text-sm uppercase tracking-widest text-[var(--text-muted)]" aria-label="Mobile Navigation">
-                <a href="#start" data-act="menu" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Startseite</a>
-                <a href="#rechner" data-act="menu" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Tarifrechner</a>
-                <a href="#honorar" data-act="menu" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Honorarordnung</a>
-                <a href="#vip" data-act="menu" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">VIP &amp; Lifetime</a>
-                <a href="#team" data-act="menu" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Team</a>
-                <a href="#raenge" data-act="menu" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)]">Kanzleiränge</a>
-                <a href="#karriere" data-act="menu" class="py-3 border-b border-[var(--glass-border)] hover:text-[var(--gold-500)] flex items-center justify-between">Karriere <span class="text-[0.6rem] normal-case tracking-normal px-2 py-0.5 rounded-full border border-emerald-500/40 text-emerald-300">Wir stellen ein</span></a>
-                <a href="#kontakt" data-act="menu" class="py-3 hover:text-[var(--gold-500)]">Kontakt</a>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 normal-case tracking-normal">
-                    <a href="/login" data-auth-link class="btn-outline py-3 text-sm font-semibold inline-flex items-center justify-center gap-2">
-                        <svg class="w-4 h-4 text-[var(--gold-500)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                        <span data-auth-label data-auth-out="Login / Mandantenportal" data-auth-in="Zum Dashboard">Login / Mandantenportal</span>
-                    </a>
-                    <button data-act="menu ticket" class="btn-gold py-3 text-sm">Mandat einreichen</button>
-                </div>
-            </nav>
-        </div>
     </header>
 
+        <!-- Menü am Handy: ganze Fläche -->
+    <div id="mobileMenu" class="xl:hidden" role="dialog" aria-modal="true" aria-label="Menü">
+        <div class="kz-mm-head">
+            <a href="/" class="kz-brand"><img src="/img/logo.svg" width="22" height="40" alt="" decoding="async" style="height:40px"><span class="kz-brand-name">Pake &amp; Scha</span></a>
+            <button type="button" class="kz-mm-close" data-act="menu" aria-label="Menü schließen"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="1.6" d="M6 18L18 6M6 6l12 12"/></svg></button>
+        </div>
+        <nav class="kz-mm-nav" aria-label="Mobile Navigation">
+            <a href="/" data-nav="start">Startseite</a>
+            <a href="/kanzlei" data-nav="kanzlei">Kanzlei</a>
+            <a href="/rechtsgebiete" data-nav="rechtsgebiete">Rechtsgebiete</a>
+            <div class="kz-mm-sub"><a href="/rechtsgebiete/strafrecht">Strafrecht</a><a href="/rechtsgebiete/zivilrecht">Zivilrecht</a><a href="/rechtsgebiete/verfassungsrecht">Verfassungsrecht</a><a href="/rechtsgebiete/vertragsrecht">Vertragsrecht</a></div>
+            <a href="/anwaelte" data-nav="anwaelte">Anwälte</a>
+            <a href="/honorare" data-nav="honorare">Honorare <small>Tarifrechner</small></a>
+            <a href="/notdienst" data-nav="notdienst">Notdienst <small data-duty-short>bei Festnahme</small></a>
+            <a href="/aktuelles" data-nav="aktuelles">Aktuelles</a>
+            <a href="/karriere" data-nav="karriere">Karriere <small>Wir stellen ein</small></a>
+            <a href="/verfahrensstand" data-nav="verfahrensstand">Verfahrensstand</a>
+            <a href="/kontakt" data-nav="kontakt">Kontakt</a>
+            <div class="kz-mm-actions">
+                <button data-act="menu ticket" class="btn-gold kz-btn">Mandat anfragen</button>
+                <a href="/login" data-auth-link class="btn-outline kz-btn"><span data-auth-label data-auth-out="Login / Mandantenportal" data-auth-in="Zum Dashboard">Login / Mandantenportal</span></a>
+            </div>
+        </nav>
+    </div>
+
     <main id="start" class="flex-grow">
-        <!-- Hero Section -->
-        <section class="max-w-6xl mx-auto px-5 sm:px-6 pt-16 sm:pt-24 pb-16 sm:pb-20 text-center relative z-10">
-            <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.08)] text-[var(--gold-500)] text-xs font-medium tracking-widest uppercase mb-8 shadow-[0_0_15px_rgba(212,175,55,0.1)]">
-                <span class="w-1.5 h-1.5 rounded-full bg-[var(--gold-500)]"></span>
-                Kanzleisitz: <span data-firm-seat>Würfelpark, Los Santos</span>
-            </div>
-
-            <h1 class="font-serif text-[2.6rem] sm:text-7xl lg:text-8xl font-normal leading-[1.08] tracking-tight mb-8">
-                Recht haben.<br>
-                <span class="text-[var(--gold-500)] italic font-semibold drop-shadow-[0_0_35px_rgba(212,175,55,0.3)] gold-shine">Recht bekommen.</span>
-            </h1>
-
-            <p class="text-[var(--text-muted)] text-base sm:text-xl max-w-4xl mx-auto mb-10 sm:mb-12 leading-relaxed font-normal">
-                Pake & Scha Legal Consulting ist Ihre verlässliche Kanzlei für anspruchsvolle Mandate im Zivil-, Straf- und Verfassungsrecht. Wir vertreten Privatpersonen, Unternehmen und Fraktionen mit hoher juristischer Expertise, strategischer Konsequenz und absoluter Diskretion.
-            </p>
-
-            <div class="flex flex-col sm:flex-row justify-center items-center gap-4 mb-6">
-                <button data-act="ticket" class="btn-gold px-8 py-4 text-sm w-full sm:w-auto uppercase tracking-wider">
-                    Sofortiges Mandat Anfragen
-                </button>
-                <a href="#rechner" class="btn-outline px-8 py-4 text-sm w-full sm:w-auto text-center uppercase tracking-wider">
-                    Interaktiver Tarifrechner
-                </a>
-            </div>
-            <div class="mb-16 sm:mb-20">
-                <button type="button" data-act="concern" class="inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1 px-2 text-sm text-[var(--text-muted)] hover:text-[var(--gold-light)] transition-colors">
-                    <svg class="hidden sm:block w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-                    <span>Lob, Kritik oder ein Anliegen an die Kanzleileitung?</span>
-                    <span class="text-[var(--gold-500)] font-medium underline underline-offset-4 decoration-[var(--gold-hairline)]">Anliegen an das Board of Partners</span>
-                </button>
-            </div>
-
-            <!-- Faktenbasierte Infoboxen -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-0 md:gap-6 p-3 sm:p-6 glass-card max-w-5xl mx-auto text-left">
-                <div class="p-4">
-                    <div class="text-[0.65rem] uppercase tracking-widest text-[var(--gold-500)] mb-1 font-semibold">Spezialisierung</div>
-                    <div class="font-serif text-2xl sm:text-3xl font-bold text-white">3 Bereiche</div>
-                    <div class="text-xs text-[var(--text-muted)] mt-1">Zivil-, Straf- & Verfassungsrecht</div>
+        <section class="kz-hero" data-page="start">
+            <div class="kz-wrap kz-hero-grid">
+                <div>
+                    <span class="kz-rubric">Rechtsanwaltskanzlei · Los Santos</span>
+                    <h1 class="kz-h1">Recht haben.<br><em>Recht bekommen.</em></h1>
+                    <p class="kz-lead">Wir vertreten Mandanten im Strafrecht, Zivilrecht, Verfassungsrecht und Vertragsrecht – bei der Polizei, vor Gericht und am Verhandlungstisch.</p>
+                    <div class="kz-actions">
+                        <button data-act="ticket" class="btn-gold kz-btn">Mandat anfragen</button>
+                        <a href="/notdienst" class="btn-outline kz-btn">Notdienst bei Festnahme</a>
+                    </div>
+                    <p class="kz-hero-note">Bereits Mandant? <a href="/verfahrensstand">Verfahrensstand abfragen</a> oder <a href="/login" data-auth-link><span data-auth-label data-auth-out="im Mandantenportal anmelden" data-auth-in="zum Dashboard">im Mandantenportal anmelden</span></a>.</p>
                 </div>
-                <div class="p-4 border-l border-[var(--glass-border)]">
-                    <div class="text-[0.65rem] uppercase tracking-widest text-[var(--gold-500)] mb-1 font-semibold">Erreichbarkeit</div>
-                    <div class="font-serif text-2xl sm:text-3xl font-bold text-white">24 / 7</div>
-                    <div class="text-xs text-[var(--text-muted)] mt-1">Soforthilfe bei U-Haft / Festnahme</div>
+                <div class="kz-hero-aside" aria-hidden="true">
+                    <svg class="kz-seal" viewBox="0 0 200 200" role="img" aria-label="Siegel der Kanzlei Pake &amp; Scha">
+                <defs><path id="kzSealHero" d="M100,100 m-77,0 a77,77 0 1,1 154,0 a77,77 0 1,1 -154,0"/></defs>
+                <circle cx="100" cy="100" r="96" fill="none" stroke="currentColor" stroke-width="1.2"/>
+                <circle cx="100" cy="100" r="91" fill="none" stroke="currentColor" stroke-width="0.5" opacity="0.7"/>
+                <circle cx="100" cy="100" r="64" fill="none" stroke="currentColor" stroke-width="0.5" opacity="0.7"/>
+                <text><textPath href="#kzSealHero" textLength="472" lengthAdjust="spacing">Pake &amp; Scha · Legal Consulting · Los Santos ·</textPath></text>
+                <g transform="translate(81.5 66) scale(0.21)" fill="none" stroke="currentColor" stroke-width="13" stroke-linejoin="miter"><path d="M6.5 277.6V6.5H105.1A60.2 60.2 0 0 1 105.1 126.9H84.9A51.8 51.8 0 0 0 67.73 227.57L99.61 238.77"/><path d="M0 313.83H108.25A57.3 57.3 0 0 0 126.68 202.27L81.18 186.82"/></g>
+            </svg>
                 </div>
-                <div class="p-4 border-t md:border-t-0 md:border-l border-[var(--glass-border)]">
-                    <div class="text-[0.65rem] uppercase tracking-widest text-[var(--gold-500)] mb-1 font-semibold">Zulassung</div>
-                    <div class="font-serif text-2xl sm:text-3xl font-bold text-white">Alle Instanzen</div>
-                    <div class="text-xs text-[var(--text-muted)] mt-1">Vertretung vor allen Gerichten</div>
+            </div>
+            <div class="kz-wrap mt-14">
+                <dl class="kz-facts">
+                    <div class="kz-fact"><dt>Kanzleisitz</dt><dd data-firm-place>Würfelpark</dd></div>
+                    <div class="kz-fact"><dt>Notdienst</dt><dd><a href="/notdienst" id="factDuty">Anfrage per Mandat</a><small id="factDutySub">Anfrage geht an alle Anwälte</small></dd></div>
+                    <div class="kz-fact"><dt>Rechtsgebiete</dt><dd><a href="/rechtsgebiete">Straf-, Zivil-, Verfassungs- und Vertragsrecht</a></dd></div>
+                    <div class="kz-fact"><dt>Termine</dt><dd>Nach Vereinbarung<small>auch kurzfristig</small></dd></div>
+                </dl>
+            </div>
+        </section>
+
+        <section id="gebiete" class="kz-section reveal" data-page="start">
+            <div class="kz-wrap">
+                <div class="kz-head-row">
+                    <div class="kz-head"><span class="kz-rubric">Rechtsgebiete</span><h2 class="kz-h2">Wobei wir Sie vertreten</h2></div>
+                    <a href="/rechtsgebiete" class="kz-link">Alle Rechtsgebiete</a>
                 </div>
-                <div class="p-4 border-t md:border-t-0 border-l border-[var(--glass-border)]">
-                    <div class="text-[0.65rem] uppercase tracking-widest text-[var(--gold-500)] mb-1 font-semibold">Standort</div>
-                    <div class="font-serif text-2xl sm:text-3xl font-bold text-white" data-firm-place>Würfelpark</div>
-                    <div class="text-xs text-[var(--text-muted)] mt-1">Zentrale Kanzlei in Los Santos</div>
+                <ol class="kz-areas"><li class="kz-area" data-area="strafrecht"><a href="/rechtsgebiete/strafrecht"><span class="kz-area-name">Strafrecht</span><span class="kz-area-text">Verteidigung ab der Festnahme: Vertretung im Verhör, Akteneinsicht, Haftprüfung und Hauptverhandlung.</span><span class="kz-more">Zum Rechtsgebiet</span></a></li><li class="kz-area" data-area="zivilrecht"><a href="/rechtsgebiete/zivilrecht"><span class="kz-area-name">Zivilrecht</span><span class="kz-area-text">Forderungen, Schadensersatz und Streit zwischen Privatpersonen und Unternehmen – außergerichtlich und vor Gericht.</span><span class="kz-more">Zum Rechtsgebiet</span></a></li><li class="kz-area" data-area="verfassungsrecht"><a href="/rechtsgebiete/verfassungsrecht"><span class="kz-area-name">Verfassungsrecht</span><span class="kz-area-text">Verfassungsbeschwerden und Grundsatzverfahren, wenn staatliches Handeln Grundrechte verletzt.</span><span class="kz-more">Zum Rechtsgebiet</span></a></li><li class="kz-area" data-area="vertragsrecht"><a href="/rechtsgebiete/vertragsrecht"><span class="kz-area-name">Vertragsrecht</span><span class="kz-area-text">Entwurf, Prüfung und Verhandlung von Verträgen – vom Kaufvertrag bis zur Gesellschaftsvereinbarung.</span><span class="kz-more">Zum Rechtsgebiet</span></a></li><!--areas:more--></ol>
+            </div>
+        </section>
+
+        <section id="ansprechpartner" class="kz-section reveal" data-page="start">
+            <div class="kz-wrap">
+                <div class="kz-head-row">
+                    <div class="kz-head"><span class="kz-rubric">Ansprechpartner</span><h2 class="kz-h2">Die Kanzleileitung</h2><p class="kz-text">Das Board of Partners leitet die Kanzlei und übernimmt Grundsatz- und Großmandate.</p></div>
+                    <a href="/anwaelte" class="kz-link">Alle Anwälte</a>
+                </div>
+                <div id="leadGrid" class="kz-people"><p class="kz-empty">Wird geladen …</p></div>
+            </div>
+        </section>
+
+        <section id="neuigkeiten" class="kz-section reveal hidden" data-page="start">
+            <div class="kz-wrap">
+                <div class="kz-head-row">
+                    <div class="kz-head"><span class="kz-rubric">Aktuelles</span><h2 class="kz-h2">Aus der Kanzlei</h2></div>
+                    <a href="/aktuelles" class="kz-link">Alle Meldungen</a>
+                </div>
+                <ul id="newsTeaser" class="kz-news"></ul>
+            </div>
+        </section>
+
+
+
+
+        <section class="kz-pagehead" data-page="kanzlei">
+            <div class="kz-wrap">
+                <nav class="kz-crumbs" aria-label="Pfad"><a href="/">Startseite</a><span aria-hidden="true">/</span>Kanzlei</nav>
+                <span class="kz-rubric">Die Kanzlei</span>
+                <h1 class="kz-h1">Pake &amp; Scha Legal Consulting</h1>
+                <p class="kz-lead">Eine Kanzlei mit Sitz am Würfelpark. Wir vertreten Privatpersonen, Unternehmen und Fraktionen – jede Akte hat einen zuständigen Anwalt, jedes Honorar steht in der Honorarordnung.</p>
+            </div>
+        </section>
+
+        <section id="grundsaetze" class="kz-section is-first reveal" data-page="kanzlei">
+            <div class="kz-wrap">
+                <div class="kz-head"><span class="kz-rubric">Wie wir arbeiten</span><h2 class="kz-h2">Vier Grundsätze</h2></div>
+                <div class="kz-principles">
+                    <div><h3>Ein zuständiger Anwalt</h3><p>Jedes Mandat hat einen federführenden Anwalt, der Sie durch das Verfahren begleitet und für Sie erreichbar ist.</p></div>
+                    <div><h3>Nachvollziehbare Honorare</h3><p>Alle Leistungen und Preise stehen in der Honorarordnung. Sie wissen vorher, was ein Mandat kostet.</p></div>
+                    <div><h3>Erreichbar, wenn es eilt</h3><p>Bei Festnahme oder Durchsuchung übernimmt der Anwalt im Dienst. Wer gerade im Dienst ist, sehen Sie live.</p></div>
+                    <div><h3>Verschwiegenheit</h3><p>Was Sie uns anvertrauen, bleibt in der Kanzlei. Ihre Akte sehen nur Sie und die zuständigen Anwälte.</p></div>
                 </div>
             </div>
         </section>
 
-        <!-- VERFAHRENSABLAUF SECTION -->
-        <section id="ablauf" class="max-w-6xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
-            <div class="text-center max-w-3xl mx-auto mb-16">
-                <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Transparenter Ablauf</div>
-                <h2 class="font-serif text-4xl md:text-5xl font-semibold mb-4">In 4 Schritten zum Recht</h2>
+        <section id="ablauf" class="kz-section reveal" data-page="start kanzlei">
+            <div class="kz-wrap">
+                <div class="kz-head"><span class="kz-rubric">Ablauf eines Mandats</span><h2 class="kz-h2">In vier Schritten</h2></div>
+                <ol class="kz-flow">
+                    <li><h3>Anfrage</h3><p>Sie schildern den Sachverhalt über das Mandatsformular oder im Notdienst. Ein Konto ist dafür nicht nötig.</p></li>
+                    <li><h3>Erstgespräch</h3><p>Ein Anwalt meldet sich, klärt den Auftrag und nennt das Honorar nach der Honorarordnung.</p></li>
+                    <li><h3>Bearbeitung</h3><p>Wir sehen die Akten ein, sichern Beweise und legen mit Ihnen das Vorgehen fest.</p></li>
+                    <li><h3>Vertretung</h3><p>Wir vertreten Sie vor Gericht, gegenüber Behörden oder in der Verhandlung mit der Gegenseite.</p></li>
+                </ol>
             </div>
+        </section>
 
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div class="glass-card p-6 text-left">
-                    <div class="font-mono text-3xl font-bold text-[var(--gold-500)] mb-3">01</div>
-                    <h3 class="font-serif text-xl font-semibold text-white mb-2">Mandat Einreichen</h3>
-                    <p class="text-xs text-[var(--text-muted)] leading-relaxed">Senden Sie uns Ihre Anfrage per Ticket oder kontaktieren Sie unseren 24/7 Notdienst.</p>
+        <section id="raenge" class="kz-section reveal" data-page="kanzlei">
+            <div class="kz-wrap">
+                <div class="kz-head"><span class="kz-rubric">Aufbau der Kanzlei</span><h2 class="kz-h2">Unsere Ränge</h2><p class="kz-text">Die Kanzlei gliedert sich in zwei Ebenen. Jeder unserer Anwälte vertritt Sie vor jedem Gericht – die Ränge regeln Verantwortung und Führung.</p></div>
+            <div class="space-y-10">
+                <!-- BOARD OF PARTNERS -->
+                <div>
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-3 border-b border-[var(--gold-hairline)]">
+                        <div>
+                            <span class="text-[0.65rem] uppercase tracking-[0.25em] text-[var(--gold-500)] font-semibold block mb-1">Ebene I — Leitende Gesellschafter</span>
+                            <h3 class="font-serif text-3xl text-[var(--gold-light)] font-semibold tracking-wide">Board of Partners</h3>
+                        </div>
+                        <span class="self-start sm:self-auto text-xs text-[var(--gold-500)] px-3 py-1 rounded-full border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.05)]">Höchste Entscheidungsgewalt</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4"><!--ranks:board-->
+                        <div class="glass-card p-6 border-t-2 border-t-[var(--gold-500)] flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="text-[0.65rem] px-3 py-1 rounded-full bg-[rgba(212,175,55,0.15)] text-[var(--gold-light)] border border-[var(--gold-hairline)] uppercase font-semibold">Grundsatzebene</span>
+                                    <span class="text-xs text-[var(--text-muted)]">Rang 01</span>
+                                </div>
+                                <h4 class="font-serif text-2xl font-semibold text-white mb-3">Founding Partner</h4>
+                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-4">
+                                    Gründer, Inhaber und Leitung der Kanzlei. Trägt die Gesamtverantwortung für Strategie, Personal und Qualität, führt Grundsatz- und Großmandate und vertritt staatliche Institutionen, Unternehmen und Privatpersonen vor jedem Gericht.
+                                </p>
+                            </div>
+                            <div class="pt-4 border-t border-[var(--glass-border)] text-[0.7rem] text-[var(--gold-500)]">
+                                Vollmacht: Alle Gerichte · Kanzleileitung
+                            </div>
+                        </div>
+
+                        <div class="glass-card p-6 border-t-2 border-t-[var(--gold-500)] flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="text-[0.65rem] px-3 py-1 rounded-full bg-[rgba(212,175,55,0.15)] text-[var(--gold-light)] border border-[var(--gold-hairline)] uppercase font-semibold">Gesellschafter</span>
+                                    <span class="text-xs text-[var(--text-muted)]">Rang 02</span>
+                                </div>
+                                <h4 class="font-serif text-2xl font-semibold text-white mb-3">Equity Partner</h4>
+                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-4">
+                                    Kapitalführender Partner mit Leitungsverantwortung für spezifische Rechtsbereiche (z. B. Wirtschaftsstrafrecht oder Verwaltungsrecht). Führt Großmandate, verantwortet die interne Qualitätssicherung und leitet strategische Vergleichsverhandlungen.
+                                </p>
+                            </div>
+                            <div class="pt-4 border-t border-[var(--glass-border)] text-[0.7rem] text-[var(--gold-500)]">
+                                Vollmacht: Alle Gerichte · Fachbereichsleitung
+                            </div>
+                        </div>
+
+                        <div class="glass-card p-6 border-t-2 border-t-[var(--gold-500)] flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="text-[0.65rem] px-3 py-1 rounded-full bg-[rgba(212,175,55,0.15)] text-[var(--gold-light)] border border-[var(--gold-hairline)] uppercase font-semibold">Partner</span>
+                                    <span class="text-xs text-[var(--text-muted)]">Rang 03</span>
+                                </div>
+                                <h4 class="font-serif text-2xl font-semibold text-white mb-3">Partner</h4>
+                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-4">
+                                    Vollwertiges Mitglied des Führungsgremiums. Eigenständige Mandatsübernahme, Fachführung von Associate-Teams und Vertretung in hochkomplexen Hauptverhandlungen sowie Notfalleinsätzen.
+                                </p>
+                            </div>
+                            <div class="pt-4 border-t border-[var(--glass-border)] text-[0.7rem] text-[var(--gold-500)]">
+                                Vollmacht: Alle Gerichte · Teamführung
+                            </div>
+                        </div>
+<!--/ranks:board-->
+                    </div>
                 </div>
-                <div class="glass-card p-6 text-left">
-                    <div class="font-mono text-3xl font-bold text-[var(--gold-500)] mb-3">02</div>
-                    <h3 class="font-serif text-xl font-semibold text-white mb-2">Erstberatung & Akte</h3>
-                    <p class="text-xs text-[var(--text-muted)] leading-relaxed">Wir prüfen den Sachverhalt, fordern behördliche Akten an und bewerten die Beweislage.</p>
+
+                <!-- ASSOCIATE ATTORNEYS -->
+                <div>
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-3 border-b border-slate-700">
+                        <div>
+                            <span class="text-[0.65rem] uppercase tracking-[0.25em] text-slate-400 font-semibold block mb-1">Ebene II — Angestellte Anwaltschaft</span>
+                            <h3 class="font-serif text-3xl text-slate-200 font-semibold tracking-wide">Associate Attorneys</h3>
+                        </div>
+                        <span class="self-start sm:self-auto text-xs text-slate-400 px-3 py-1 rounded-full border border-slate-700 bg-slate-800/40">Operative Anwaltschaft</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4"><!--ranks:associate-->
+                        <div class="glass-card p-6 border-t-2 border-t-amber-500/60 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="text-[0.65rem] px-3 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 uppercase font-semibold">Senior Level</span>
+                                    <span class="text-xs text-[var(--text-muted)]">Rang 04</span>
+                                </div>
+                                <h4 class="font-serif text-2xl font-semibold text-white mb-3">Senior Associate</h4>
+                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-4">
+                                    Erfahrene Anwälte mit umfassender Praxiserfahrung. Eigenverantwortliche Betreuung von Haftprüfungsterminen, U-Haft-Vertretungen vor Ort, Akteneinsichten und Prozessführung vor jedem Gericht.
+                                </p>
+                            </div>
+                            <div class="pt-4 border-t border-[var(--glass-border)] text-[0.7rem] text-amber-300">
+                                Befugnis: Alle Gerichte · Eigenverantwortlich
+                            </div>
+                        </div>
+
+                        <div class="glass-card p-6 border-t-2 border-t-slate-500 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="text-[0.65rem] px-3 py-1 rounded-full bg-slate-500/10 text-slate-300 border border-slate-500/20 uppercase font-semibold">Mid Level</span>
+                                    <span class="text-xs text-[var(--text-muted)]">Rang 05</span>
+                                </div>
+                                <h4 class="font-serif text-2xl font-semibold text-white mb-3">Associate</h4>
+                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-4">
+                                    Approbierte Juristen für das Tagesgeschäft. Bearbeitung eingehender Mandatstickets, Prüfung von Verträgen, Verfassung von Klageschriften und eigenständige Vertretung von Mandanten vor Gericht.
+                                </p>
+                            </div>
+                            <div class="pt-4 border-t border-[var(--glass-border)] text-[0.7rem] text-slate-300">
+                                Befugnis: Alle Gerichte · Tagesgeschäft
+                            </div>
+                        </div>
+
+                        <div class="glass-card p-6 border-t-2 border-t-slate-600 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="text-[0.65rem] px-3 py-1 rounded-full bg-slate-600/10 text-slate-400 border border-slate-600/20 uppercase font-semibold">Junior Level</span>
+                                    <span class="text-xs text-[var(--text-muted)]">Rang 06</span>
+                                </div>
+                                <h4 class="font-serif text-2xl font-semibold text-white mb-3">Junior Associate</h4>
+                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-4">
+                                    Junge Rechtsanwälte im Mentoring. Vertreten Mandanten vor jedem Gericht – auf Wunsch mit Rückendeckung erfahrener Kollegen – und übernehmen Recherchen, Ermittlungsakten und Beweisanträge.
+                                </p>
+                            </div>
+                            <div class="pt-4 border-t border-[var(--glass-border)] text-[0.7rem] text-slate-400">
+                                Befugnis: Alle Gerichte · im Mentoring
+                            </div>
+                        </div>
+<!--/ranks:associate-->
+                    </div>
                 </div>
-                <div class="glass-card p-6 text-left">
-                    <div class="font-mono text-3xl font-bold text-[var(--gold-500)] mb-3">03</div>
-                    <h3 class="font-serif text-xl font-semibold text-white mb-2">Strategieentwicklung</h3>
-                    <p class="text-xs text-[var(--text-muted)] leading-relaxed">Entwicklung einer maßgeschneiderten Verteidigung oder Klageschrift für Ihren Fall.</p>
-                </div>
-                <div class="glass-card p-6 text-left">
-                    <div class="font-mono text-3xl font-bold text-[var(--gold-500)] mb-3">04</div>
-                    <h3 class="font-serif text-xl font-semibold text-white mb-2">Gerichtsvertretung</h3>
-                    <p class="text-xs text-[var(--text-muted)] leading-relaxed">Konsequente Vertretung Ihrer Interessen vor Gericht oder in Vergleichsverhandlungen.</p>
+            </div>
+            </div>
+        </section>
+
+        <section id="stimmen" class="kz-section reveal hidden" data-page="kanzlei">
+            <div class="kz-wrap">
+                <div class="kz-head"><span class="kz-rubric">Mandantenstimmen</span><h2 class="kz-h2">Was Mandanten sagen</h2><p class="kz-text">Bewertungen, die Mandanten nach Abschluss ihres Verfahrens abgegeben haben.</p></div>
+                <div id="firmStats" class="hidden mb-10"></div>
+                <div id="testimonialTrack"></div>
+            </div>
+        </section>
+
+        <section id="karriere" class="kz-section reveal" data-page="kanzlei">
+            <div class="kz-wrap">
+                <div class="kz-band">
+                    <div>
+                        <span class="kz-rubric">Karriere</span>
+                        <h2 class="kz-h3 mt-3">Werden Sie Teil von Pake &amp; Scha</h2>
+                        <p class="kz-muted mt-2 max-w-2xl">Wir suchen Anwältinnen und Anwälte sowie Nachwuchs. Mentoring durch das Board of Partners und eigene Mandate ab dem ersten Tag.</p>
+                        <p id="careerCount" class="text-sm text-emerald-300 mt-3 hidden"></p>
+                        <p id="careerMine" class="text-sm kz-muted mt-2 hidden"></p>
+                    </div>
+                    <div class="kz-actions"><a href="/karriere" class="btn-gold kz-btn">Offene Stellen</a><a id="careerStatus" href="/karriere#status" class="btn-outline kz-btn">Bewerbungsstatus prüfen</a></div>
                 </div>
             </div>
         </section>
 
-        <!-- INTERAKTIVER TARIFRECHNER SECTION -->
-        <section id="rechner" class="max-w-6xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
-            <div class="text-center max-w-3xl mx-auto mb-12">
-                <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Transparente Kostenplanung</div>
-                <h2 class="font-serif text-4xl md:text-5xl font-semibold mb-4">Interaktiver Tarifrechner</h2>
-                <p class="text-[var(--text-muted)] text-base">
-                    Stellen Sie sich Ihre benötigten juristischen Leistungen zusammen und erhalten Sie eine sofortige Kostenschätzung — inklusive Mandatsbündel-Rabatt.
-                </p>
+        <section class="kz-pagehead" data-page="rechtsgebiete">
+            <div class="kz-wrap">
+                <nav class="kz-crumbs" aria-label="Pfad"><a href="/">Startseite</a><span aria-hidden="true">/</span>Rechtsgebiete</nav>
+                <span class="kz-rubric">Rechtsgebiete</span>
+                <h1 class="kz-h1">Wobei wir Sie vertreten</h1>
+                <p class="kz-lead">Die Kanzlei arbeitet in vier Rechtsgebieten. Für jedes gibt es feste Abläufe – vom ersten Gespräch bis zum Urteil oder Vertrag.</p>
             </div>
+        </section>
 
+        <section id="rechtsgebiete" class="kz-section is-first reveal" data-page="rechtsgebiete">
+            <div class="kz-wrap">
+                <ol class="kz-areas"><li class="kz-area" data-area="strafrecht"><a href="/rechtsgebiete/strafrecht"><span class="kz-area-name">Strafrecht</span><span class="kz-area-text">Verteidigung ab der Festnahme: Vertretung im Verhör, Akteneinsicht, Haftprüfung und Hauptverhandlung.</span><span class="kz-more">Zum Rechtsgebiet</span></a></li><li class="kz-area" data-area="zivilrecht"><a href="/rechtsgebiete/zivilrecht"><span class="kz-area-name">Zivilrecht</span><span class="kz-area-text">Forderungen, Schadensersatz und Streit zwischen Privatpersonen und Unternehmen – außergerichtlich und vor Gericht.</span><span class="kz-more">Zum Rechtsgebiet</span></a></li><li class="kz-area" data-area="verfassungsrecht"><a href="/rechtsgebiete/verfassungsrecht"><span class="kz-area-name">Verfassungsrecht</span><span class="kz-area-text">Verfassungsbeschwerden und Grundsatzverfahren, wenn staatliches Handeln Grundrechte verletzt.</span><span class="kz-more">Zum Rechtsgebiet</span></a></li><li class="kz-area" data-area="vertragsrecht"><a href="/rechtsgebiete/vertragsrecht"><span class="kz-area-name">Vertragsrecht</span><span class="kz-area-text">Entwurf, Prüfung und Verhandlung von Verträgen – vom Kaufvertrag bis zur Gesellschaftsvereinbarung.</span><span class="kz-more">Zum Rechtsgebiet</span></a></li><!--areas:more--></ol>
+                <p class="kz-small mt-6">Ihr Anliegen passt in keines davon? Fragen Sie trotzdem an – wir sagen Ihnen, ob wir helfen können.</p>
+            </div>
+        </section>
+
+        <section class="kz-pagehead" data-page="gebiet:strafrecht">
+            <div class="kz-wrap">
+                <nav class="kz-crumbs" aria-label="Pfad"><a href="/">Startseite</a><span aria-hidden="true">/</span><a href="/rechtsgebiete">Rechtsgebiete</a><span aria-hidden="true">/</span>Strafrecht</nav>
+                <span class="kz-rubric">Rechtsgebiet I</span>
+                <h1 class="kz-h1">Strafrecht</h1>
+                <p class="kz-lead">Von der Festnahme bis zum Urteil: Wir verteidigen Beschuldigte und vertreten Geschädigte im Strafverfahren.</p>
+                <div class="kz-actions mt-8"><button data-act="ticket" data-area="strafrecht" class="btn-gold kz-btn">Mandat im Strafrecht anfragen</button><a href="/honorare" class="btn-outline kz-btn">Honorare</a></div>
+            </div>
+        </section>
+
+        <section class="kz-section is-first reveal" data-page="gebiet:strafrecht">
+            <div class="kz-wrap kz-split">
+                <div><div class="kz-head"><span class="kz-rubric">Leistungen</span><h2 class="kz-h2">Wobei wir Sie vertreten</h2></div><ul class="kz-list"><li><strong>Vertretung bei Festnahme und Verhör</strong>Ein Anwalt kommt zu Ihnen, berät Sie vor der Vernehmung und achtet auf Ihre Rechte als Beschuldigter.</li><li><strong>Akteneinsicht</strong>Wir fordern die Ermittlungsakte an und prüfen Vorwurf, Beweise und Verfahrensfehler.</li><li><strong>Haftprüfung</strong>Bei Untersuchungshaft beantragen wir die Prüfung, ob die Haft fortdauern darf.</li><li><strong>Hauptverhandlung</strong>Wir vertreten Sie vor Gericht: Beweisanträge, Zeugenbefragung und Plädoyer.</li><li><strong>Vertretung von Geschädigten</strong>Wir begleiten Opfer einer Straftat und setzen ihre Rechte im Verfahren durch.</li></ul></div>
+                <div><div class="kz-head"><span class="kz-rubric">Ablauf</span><h2 class="kz-h2">So läuft Ihr Verfahren</h2></div><ol class="kz-steps"><!--gebiet:steps--></ol><p class="kz-small mt-6">Den Stand Ihres Verfahrens sehen Sie jederzeit im Mandantenportal oder unter <a class="underline" href="/verfahrensstand">Verfahrensstand</a>.</p></div>
+            </div>
+        </section>
+        <section class="kz-pagehead" data-page="gebiet:zivilrecht">
+            <div class="kz-wrap">
+                <nav class="kz-crumbs" aria-label="Pfad"><a href="/">Startseite</a><span aria-hidden="true">/</span><a href="/rechtsgebiete">Rechtsgebiete</a><span aria-hidden="true">/</span>Zivilrecht</nav>
+                <span class="kz-rubric">Rechtsgebiet II</span>
+                <h1 class="kz-h1">Zivilrecht</h1>
+                <p class="kz-lead">Wenn Geld, Eigentum oder ein Vertrag streitig ist: Wir setzen Ansprüche durch oder wehren sie ab.</p>
+                <div class="kz-actions mt-8"><button data-act="ticket" data-area="zivilrecht" class="btn-gold kz-btn">Mandat im Zivilrecht anfragen</button><a href="/honorare" class="btn-outline kz-btn">Honorare</a></div>
+            </div>
+        </section>
+
+        <section class="kz-section is-first reveal" data-page="gebiet:zivilrecht">
+            <div class="kz-wrap kz-split">
+                <div><div class="kz-head"><span class="kz-rubric">Leistungen</span><h2 class="kz-h2">Wobei wir Sie vertreten</h2></div><ul class="kz-list"><li><strong>Forderungen</strong>Wir prüfen offene Forderungen und fordern die Gegenseite schriftlich zur Zahlung auf.</li><li><strong>Schadensersatz</strong>Wir berechnen Ihren Schaden und machen ihn gegenüber dem Verursacher geltend.</li><li><strong>Außergerichtliche Einigung</strong>Viele Streitigkeiten enden mit einem Vergleich – schneller und günstiger als ein Prozess.</li><li><strong>Klage und Verteidigung</strong>Wenn es nicht anders geht, vertreten wir Sie vor dem Zivilgericht.</li></ul></div>
+                <div><div class="kz-head"><span class="kz-rubric">Ablauf</span><h2 class="kz-h2">So läuft Ihr Verfahren</h2></div><ol class="kz-steps"><!--gebiet:steps--></ol><p class="kz-small mt-6">Den Stand Ihres Verfahrens sehen Sie jederzeit im Mandantenportal oder unter <a class="underline" href="/verfahrensstand">Verfahrensstand</a>.</p></div>
+            </div>
+        </section>
+        <section class="kz-pagehead" data-page="gebiet:verfassungsrecht">
+            <div class="kz-wrap">
+                <nav class="kz-crumbs" aria-label="Pfad"><a href="/">Startseite</a><span aria-hidden="true">/</span><a href="/rechtsgebiete">Rechtsgebiete</a><span aria-hidden="true">/</span>Verfassungsrecht</nav>
+                <span class="kz-rubric">Rechtsgebiet III</span>
+                <h1 class="kz-h1">Verfassungsrecht</h1>
+                <p class="kz-lead">Wenn der Staat Grundrechte verletzt, prüfen wir den Weg zum Verfassungsgericht.</p>
+                <div class="kz-actions mt-8"><button data-act="ticket" data-area="verfassungsrecht" class="btn-gold kz-btn">Mandat im Verfassungsrecht anfragen</button><a href="/honorare" class="btn-outline kz-btn">Honorare</a></div>
+            </div>
+        </section>
+
+        <section class="kz-section is-first reveal" data-page="gebiet:verfassungsrecht">
+            <div class="kz-wrap kz-split">
+                <div><div class="kz-head"><span class="kz-rubric">Leistungen</span><h2 class="kz-h2">Wobei wir Sie vertreten</h2></div><ul class="kz-list"><li><strong>Verfassungsbeschwerde</strong>Wir prüfen Zulässigkeit und Fristen und fertigen die Beschwerdeschrift.</li><li><strong>Grundsatzverfahren</strong>Wir vertreten Fraktionen und Institutionen in Streitigkeiten über Zuständigkeiten und Rechte.</li><li><strong>Gutachten</strong>Wir bewerten Gesetze und Maßnahmen auf ihre Vereinbarkeit mit der Verfassung.</li><li><strong>Mündliche Verhandlung</strong>Wir vertreten Sie vor dem Verfassungsgericht.</li></ul></div>
+                <div><div class="kz-head"><span class="kz-rubric">Ablauf</span><h2 class="kz-h2">So läuft Ihr Verfahren</h2></div><ol class="kz-steps"><!--gebiet:steps--></ol><p class="kz-small mt-6">Den Stand Ihres Verfahrens sehen Sie jederzeit im Mandantenportal oder unter <a class="underline" href="/verfahrensstand">Verfahrensstand</a>.</p></div>
+            </div>
+        </section>
+        <section class="kz-pagehead" data-page="gebiet:vertragsrecht">
+            <div class="kz-wrap">
+                <nav class="kz-crumbs" aria-label="Pfad"><a href="/">Startseite</a><span aria-hidden="true">/</span><a href="/rechtsgebiete">Rechtsgebiete</a><span aria-hidden="true">/</span>Vertragsrecht</nav>
+                <span class="kz-rubric">Rechtsgebiet IV</span>
+                <h1 class="kz-h1">Vertragsrecht</h1>
+                <p class="kz-lead">Gute Verträge verhindern Streit. Wir entwerfen, prüfen und verhandeln Verträge für Privatpersonen und Unternehmen.</p>
+                <div class="kz-actions mt-8"><button data-act="ticket" data-area="vertragsrecht" class="btn-gold kz-btn">Mandat im Vertragsrecht anfragen</button><a href="/honorare" class="btn-outline kz-btn">Honorare</a></div>
+            </div>
+        </section>
+
+        <section class="kz-section is-first reveal" data-page="gebiet:vertragsrecht">
+            <div class="kz-wrap kz-split">
+                <div><div class="kz-head"><span class="kz-rubric">Leistungen</span><h2 class="kz-h2">Wobei wir Sie vertreten</h2></div><ul class="kz-list"><li><strong>Vertragsentwurf</strong>Kaufvertrag, Arbeitsvertrag, Dienstleistung oder Gesellschaftsvertrag – auf Ihren Fall zugeschnitten.</li><li><strong>Vertragsprüfung</strong>Wir prüfen Verträge der Gegenseite auf Haftungsrisiken und unwirksame Klauseln.</li><li><strong>Verhandlung</strong>Wir verhandeln für Sie mit der Gegenseite und halten das Ergebnis fest.</li><li><strong>Unterzeichnung</strong>Wir organisieren die Unterzeichnung und legen den Vertrag in Ihrer Akte ab.</li></ul></div>
+                <div><div class="kz-head"><span class="kz-rubric">Ablauf</span><h2 class="kz-h2">So läuft Ihr Verfahren</h2></div><ol class="kz-steps"><!--gebiet:steps--></ol><p class="kz-small mt-6">Den Stand Ihres Verfahrens sehen Sie jederzeit im Mandantenportal oder unter <a class="underline" href="/verfahrensstand">Verfahrensstand</a>.</p></div>
+            </div>
+        </section>
+        <section class="kz-pagehead" data-page="gebiet:*">
+            <div class="kz-wrap">
+                <nav class="kz-crumbs" aria-label="Pfad"><a href="/">Startseite</a><span aria-hidden="true">/</span><a href="/rechtsgebiete">Rechtsgebiete</a><span aria-hidden="true">/</span><span data-no-edit>{{gebiet:name}}</span></nav>
+                <span class="kz-rubric">Rechtsgebiet</span>
+                <h1 class="kz-h1"><span data-no-edit>{{gebiet:name}}</span></h1>
+                <p class="kz-lead">Schildern Sie uns Ihr Anliegen – wir prüfen, wie wir Ihnen helfen können, und nennen Ihnen das Honorar vorab.</p>
+                <div class="kz-actions mt-8"><button data-act="ticket" data-gebiet-key class="btn-gold kz-btn">Mandat anfragen</button><a href="/honorare" class="btn-outline kz-btn">Honorare</a></div>
+            </div>
+        </section>
+
+        <section class="kz-section is-first reveal" data-page="gebiet:*">
+            <div class="kz-wrap kz-wrap-narrow">
+                <div class="kz-head"><span class="kz-rubric">Ablauf</span><h2 class="kz-h2">So läuft Ihr Verfahren</h2></div>
+                <ol class="kz-steps"><!--gebiet:steps--></ol>
+            </div>
+        </section>
+
+        <section id="gebietTeam" class="kz-section reveal hidden" data-page="gebiet:strafrecht gebiet:zivilrecht gebiet:verfassungsrecht gebiet:vertragsrecht gebiet:*">
+            <div class="kz-wrap">
+                <div class="kz-head"><span class="kz-rubric">Ansprechpartner</span><h2 class="kz-h2">Anwälte mit diesem Schwerpunkt</h2></div>
+                <div id="areaTeam" class="kz-people"></div>
+            </div>
+        </section>
+
+        <section class="kz-section is-tight reveal" data-page="gebiet:strafrecht gebiet:zivilrecht gebiet:verfassungsrecht gebiet:vertragsrecht gebiet:*">
+            <div class="kz-wrap">
+                <span class="kz-rubric is-plain">Weitere Rechtsgebiete</span>
+                <div class="kz-others mt-4"><!--gebiet:others--></div>
+            </div>
+        </section>
+
+        <section class="kz-pagehead" data-page="anwaelte">
+            <div class="kz-wrap">
+                <nav class="kz-crumbs" aria-label="Pfad"><a href="/">Startseite</a><span aria-hidden="true">/</span>Anwälte</nav>
+                <span class="kz-rubric">Anwälte</span>
+                <h1 class="kz-h1">Ihre Ansprechpartner</h1>
+                <p class="kz-lead">Jeder unserer Anwälte vertritt Sie vor jedem Gericht. Über „Direkt anfragen“ geht Ihr Mandat an den Anwalt Ihrer Wahl.</p>
+            </div>
+        </section>
+
+        <section id="team" class="kz-section is-first reveal" data-page="anwaelte">
+            <div class="kz-wrap">
+                <!-- Wird live aus der Datenbank geladen (Dashboard → Team-Verwaltung). -->
+                <div id="teamGrid"><p class="kz-empty">Team wird geladen …</p></div>
+            </div>
+        </section>
+
+        <section class="kz-pagehead" data-page="honorare">
+            <div class="kz-wrap">
+                <nav class="kz-crumbs" aria-label="Pfad"><a href="/">Startseite</a><span aria-hidden="true">/</span>Honorare</nav>
+                <span class="kz-rubric">Honorare</span>
+                <h1 class="kz-h1">Was ein Mandat kostet</h1>
+                <p class="kz-lead">Alle Leistungen der Kanzlei mit festen Preisen. Mit dem Tarifrechner schätzen Sie Ihr Honorar vorab; Mandatsbündel werden automatisch rabattiert.</p>
+                <div class="kz-actions mt-8"><a href="#rechner" class="btn-outline kz-btn">Tarifrechner</a><a href="#honorar" class="btn-outline kz-btn">Honorarordnung</a><a href="#vip" class="btn-outline kz-btn">VIP &amp; Lifetime</a></div>
+            </div>
+        </section>
+
+        <section id="rechner" class="kz-section is-first reveal" data-page="honorare">
+            <div class="kz-wrap">
+                <div class="kz-head"><span class="kz-rubric">Kostenschätzung</span><h2 class="kz-h2">Tarifrechner</h2><p class="kz-text">Wählen Sie die Leistungen, die Sie brauchen. Ab mehreren Leistungen gilt der Mandatsbündel-Rabatt.</p></div>
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <!-- Auswahl-Optionen -->
                 <div class="lg:col-span-2 glass-card p-6 md:p-8 space-y-3">
@@ -292,15 +594,13 @@
                     </div>
                 </div>
             </div>
+            </div>
         </section>
 
-        <!-- Honorarordnung Section -->
-        <section id="honorar" class="max-w-6xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
-            <div class="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
-                <div>
-                    <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Transparenz & Tarife</div>
-                    <h2 class="font-serif text-4xl md:text-5xl font-semibold">Honorarordnung</h2>
-                </div>
+        <section id="honorar" class="kz-section reveal" data-page="honorare">
+            <div class="kz-wrap">
+                <div class="kz-head-row">
+                    <div class="kz-head"><span class="kz-rubric">Preise</span><h2 class="kz-h2">Honorarordnung</h2></div>
                 <div class="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-auto">
                     <div class="relative flex-1 md:w-80">
                         <input type="text" id="priceSearch" placeholder="Leistung suchen, z. B. U-Haft …" aria-label="Leistung suchen"
@@ -313,8 +613,7 @@
                         <option value="desc">Preis absteigend</option>
                     </select>
                 </div>
-            </div>
-
+                </div>
             <div class="flex items-center gap-2 overflow-x-auto pb-4 mb-8 no-scrollbar">
                 <button data-act="category" class="tab-btn active" data-cat="all">Alle Leistungen</button>
                 <button data-act="category" class="tab-btn" data-cat="rechtsberatung">Rechtsberatung</button>
@@ -457,17 +756,12 @@
                 </div>
                 <div id="noResults" class="hidden text-center py-10 text-[var(--text-muted)] text-sm italic">Keine Leistung entspricht Ihrer Suche.</div>
             </div>
+            </div>
         </section>
 
-        <!-- VIP & LIFETIME SECTION -->
-        <section id="vip" class="max-w-6xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
-            <div class="text-center max-w-3xl mx-auto mb-14">
-                <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Exklusiv für Mandanten</div>
-                <h2 class="font-serif text-4xl md:text-5xl font-semibold mb-4">VIP &amp; Lifetime</h2>
-                <p class="text-[var(--text-muted)] text-base leading-relaxed">
-                    Für Mandanten, die uns öfter brauchen: dauerhafter Rabatt auf alle Leistungen der Honorarordnung – als VIP-Mitgliedschaft auf Zeit oder einmalig und unbefristet als Lifetime.
-                </p>
-            </div>
+        <section id="vip" class="kz-section reveal" data-page="honorare">
+            <div class="kz-wrap">
+                <div class="kz-head"><span class="kz-rubric">Für Stammmandanten</span><h2 class="kz-h2">VIP &amp; Lifetime</h2><p class="kz-text">Ein dauerhafter Rabatt auf alle Leistungen der Honorarordnung – als Mitgliedschaft auf Zeit oder einmalig und unbefristet.</p></div>
             <!-- Wird von site.js live aus den Stufen des Board of Partners befüllt (Dashboard → VIP & Lifetime). -->
             <div id="vipTiers" class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <span class="sr-only">Angebote werden geladen …</span>
@@ -478,283 +772,102 @@
             <p class="text-xs text-center text-[var(--text-muted)] mt-8 max-w-3xl mx-auto leading-relaxed">
                 So funktioniert's: Angebot anfragen (Mandantenkonto nötig) → das Board of Partners bestätigt und stellt die Rechnung aus → Sie bezahlen im Spiel → die Mitgliedschaft wird automatisch freigeschaltet. Den Stand sehen Sie jederzeit im Mandantenportal.
             </p>
-        </section>
-
-        <!-- TEAM SECTION -->
-        <section id="team" class="max-w-6xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
-            <div class="text-center max-w-3xl mx-auto mb-16">
-                <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Ansprechpartner</div>
-                <h2 class="font-serif text-4xl md:text-5xl font-semibold mb-4">Unser Team</h2>
-                <p class="text-[var(--text-muted)] text-base leading-relaxed">
-                    Ausgewählte Mitglieder unseres Führungsgremiums und der operativen Anwaltschaft — Ihre direkten Ansprechpartner je nach Rechtsgebiet.
-                </p>
-            </div>
-
-            <!-- Wird live aus der Datenbank geladen (Dashboard → Team-Verwaltung). -->
-            <div id="teamGrid" class="flex flex-wrap justify-center gap-6">
-                <span class="sr-only">Team wird geladen …</span>
-                <div class="glass-card team-card p-7 text-center" aria-hidden="true"><div class="skeleton mx-auto" style="width:96px;height:96px;border-radius:999px"></div><div class="skeleton mx-auto mt-6" style="width:50%;height:18px"></div><div class="skeleton mx-auto mt-4" style="width:68%;height:26px"></div><div class="skeleton mx-auto mt-3" style="width:40%"></div><div class="skeleton mx-auto mt-5" style="width:85%"></div><div class="skeleton mx-auto mt-2" style="width:72%"></div></div>
-                <div class="glass-card team-card p-7 text-center" aria-hidden="true"><div class="skeleton mx-auto" style="width:96px;height:96px;border-radius:999px"></div><div class="skeleton mx-auto mt-6" style="width:50%;height:18px"></div><div class="skeleton mx-auto mt-4" style="width:68%;height:26px"></div><div class="skeleton mx-auto mt-3" style="width:40%"></div><div class="skeleton mx-auto mt-5" style="width:85%"></div><div class="skeleton mx-auto mt-2" style="width:72%"></div></div>
-                <div class="glass-card team-card p-7 text-center" aria-hidden="true"><div class="skeleton mx-auto" style="width:96px;height:96px;border-radius:999px"></div><div class="skeleton mx-auto mt-6" style="width:50%;height:18px"></div><div class="skeleton mx-auto mt-4" style="width:68%;height:26px"></div><div class="skeleton mx-auto mt-3" style="width:40%"></div><div class="skeleton mx-auto mt-5" style="width:85%"></div><div class="skeleton mx-auto mt-2" style="width:72%"></div></div>
             </div>
         </section>
 
-        <!-- MANDANTENSTIMMEN / TESTIMONIALS -->
-        <section id="stimmen" class="max-w-5xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
-            <div class="text-center max-w-3xl mx-auto mb-12">
-                <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Erfahrungsberichte</div>
-                <h2 class="font-serif text-4xl md:text-5xl font-semibold mb-4">Mandantenstimmen</h2>
-            </div>
-
-            <!-- Erfolge live aus dem Dashboard (abschaltbar unter Einstellungen → Website) -->
-            <div id="firmStats" class="hidden mb-10"></div>
-
-            <div class="relative overflow-hidden">
-                <div id="testimonialTrack" class="flex">
-                    <div class="w-full shrink-0 px-2">
-                        <div class="glass-card p-8 md:p-10 text-center max-w-3xl mx-auto">
-                            <div class="flex justify-center gap-1 mb-5 text-[var(--gold-500)]">★★★★★</div>
-                            <p class="font-serif text-xl sm:text-2xl italic text-white leading-relaxed mb-6">„Innerhalb weniger Minuten war ein Anwalt bei der Verhaftung vor Ort. Die Vertretung im Verhör hat den Unterschied gemacht."</p>
-                            <div class="text-sm text-[var(--gold-light)] font-medium">— Mandant, U-Haft-Vertretung</div>
-                        </div>
-                    </div>
-                    <div class="w-full shrink-0 px-2">
-                        <div class="glass-card p-8 md:p-10 text-center max-w-3xl mx-auto">
-                            <div class="flex justify-center gap-1 mb-5 text-[var(--gold-500)]">★★★★★</div>
-                            <p class="font-serif text-xl sm:text-2xl italic text-white leading-relaxed mb-6">„Die Verfassungsbeschwerde wurde strategisch klug und mit beeindruckender Präzision vorbereitet und vertreten."</p>
-                            <div class="text-sm text-[var(--gold-light)] font-medium">— Fraktionsvertretung, Grundsatzverfahren</div>
-                        </div>
-                    </div>
-                    <div class="w-full shrink-0 px-2">
-                        <div class="glass-card p-8 md:p-10 text-center max-w-3xl mx-auto">
-                            <div class="flex justify-center gap-1 mb-5 text-[var(--gold-500)]">★★★★★</div>
-                            <p class="font-serif text-xl sm:text-2xl italic text-white leading-relaxed mb-6">„Transparente Honorarordnung, klare Kommunikation über den Aktenstatus — so stellt man sich anwaltliche Betreuung vor."</p>
-                            <div class="text-sm text-[var(--gold-light)] font-medium">— Unternehmensmandant, Vertragsrecht</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="flex justify-center gap-2 mt-6" id="testimonialDots"></div>
-        </section>
-
-        <!-- FAQ SECTION -->
-        <section id="faq" class="max-w-4xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
-            <div class="text-center max-w-3xl mx-auto mb-12">
-                <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Häufige Fragen</div>
-                <h2 class="font-serif text-4xl md:text-5xl font-semibold mb-4">Fragen & Antworten</h2>
-            </div>
-
-            <div class="glass-card p-4 md:p-6">
-                <div class="faq-item" data-act="faq">
-                    <button class="w-full flex items-center justify-between py-5 text-left" aria-expanded="false">
-                        <span class="font-medium text-white text-base pr-4">Wie schnell erreicht mich ein Anwalt bei einer Festnahme?</span>
-                        <svg class="faq-icon w-5 h-5 text-[var(--gold-500)] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                    </button>
-                    <div class="faq-answer"><p class="text-sm text-[var(--text-muted)] pb-5 leading-relaxed pr-8">Über unseren 24/7 Eilnotdienst erreicht Sie in der Regel innerhalb weniger Minuten ein zuständiger Anwalt, der die Vertretung im Verhör sowie die Wahrnehmung Ihrer Beschuldigtenrechte übernimmt.</p></div>
-                </div>
-                <div class="faq-item" data-act="faq">
-                    <button class="w-full flex items-center justify-between py-5 text-left" aria-expanded="false">
-                        <span class="font-medium text-white text-base pr-4">Sind die Preise in der Honorarordnung verhandelbar?</span>
-                        <svg class="faq-icon w-5 h-5 text-[var(--gold-500)] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                    </button>
-                    <div class="faq-answer"><p class="text-sm text-[var(--text-muted)] pb-5 leading-relaxed pr-8">Die Honorarordnung bildet den transparenten Regelrahmen. Bei Mandatsbündeln mit mehreren Leistungen gewähren wir automatisch einen Mandatsbündel-Rabatt, wie im Tarifrechner ersichtlich.</p></div>
-                </div>
-                <div class="faq-item" data-act="faq">
-                    <button class="w-full flex items-center justify-between py-5 text-left" aria-expanded="false">
-                        <span class="font-medium text-white text-base pr-4">Wie kann ich den Status meines Mandats einsehen?</span>
-                        <svg class="faq-icon w-5 h-5 text-[var(--gold-500)] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                    </button>
-                    <div class="faq-answer"><p class="text-sm text-[var(--text-muted)] pb-5 leading-relaxed pr-8">Mit einem Mandantenkonto sehen Sie im Mandantenportal jederzeit den Bearbeitungsstand, den zuständigen Anwalt, Termine, Nachrichten und Rechnungen. Über Ihr privates Discord-Ticket erhalten Sie außerdem alle Neuigkeiten zu Ihrer Akte automatisch.</p></div>
-                </div>
-                <div class="faq-item" data-act="faq">
-                    <button class="w-full flex items-center justify-between py-5 text-left" aria-expanded="false">
-                        <span class="font-medium text-white text-base pr-4">Vertritt die Kanzlei auch Unternehmen und Fraktionen?</span>
-                        <svg class="faq-icon w-5 h-5 text-[var(--gold-500)] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                    </button>
-                    <div class="faq-answer"><p class="text-sm text-[var(--text-muted)] pb-5 leading-relaxed pr-8">Ja. Unser Board of Partners betreut regelmäßig Unternehmen, staatliche Institutionen und Fraktionen bei Vertragsrecht, Wirtschaftsstrafrecht und Grundsatzverfahren.</p></div>
-                </div>
+        <section class="kz-pagehead" data-page="notdienst">
+            <div class="kz-wrap">
+                <nav class="kz-crumbs" aria-label="Pfad"><a href="/">Startseite</a><span aria-hidden="true">/</span>Notdienst</nav>
+                <span class="kz-rubric">Notdienst</span>
+                <h1 class="kz-h1">Festnahme, Durchsuchung, U-Haft</h1>
+                <p class="kz-lead">Wenn es eilt, übernimmt der Anwalt im Dienst. Stellen Sie Ihre Anfrage mit der Dringlichkeit „Notfall“ – sie geht sofort an alle Anwälte.</p>
+                <div class="kz-actions mt-8"><button data-act="ticket" data-urgency="notfall" class="btn-gold kz-btn">Notfall-Mandat anfragen</button></div>
             </div>
         </section>
 
-        <!-- KANZLEIRÄNGE SECTION -->
-        <section id="raenge" class="max-w-6xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
-            <div class="text-center max-w-3xl mx-auto mb-10">
-                <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Struktur & Verfassungsgefüge</div>
-                <h2 class="font-serif text-4xl md:text-5xl font-semibold mb-4">Hierarchie & Kanzleiränge</h2>
-                <p class="text-[var(--text-muted)] text-base leading-relaxed">
-                    Die Kanzlei gliedert sich in zwei funktionale Führungsebenen. Jeder unserer Anwälte darf Sie vor jedem Gericht vertreten – die Ränge regeln Verantwortung, Führung und Erfahrung, nicht die Zulassung.
-                </p>
-            </div>
-
-            <div class="space-y-10">
-                <!-- BOARD OF PARTNERS -->
+        <section id="notdienst" class="kz-section is-first reveal" data-page="notdienst">
+            <div class="kz-wrap kz-split">
+                <div class="kz-panel is-gold kz-duty-now">
+                    <span class="kz-rubric is-plain">Jetzt im Dienst</span>
+                    <div class="kz-duty-state"><span class="kz-dot is-off" data-duty-dot></span><span id="dutyNow">Wird geladen …</span></div>
+                    <p id="dutyNowText" class="kz-muted text-sm"></p>
+                    <ul id="dutyList" class="kz-duty-list hidden"></ul>
+                </div>
                 <div>
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-3 border-b border-[var(--gold-hairline)]">
-                        <div>
-                            <span class="text-[0.65rem] uppercase tracking-[0.25em] text-[var(--gold-500)] font-semibold block mb-1">Ebene I — Leitende Gesellschafter</span>
-                            <h3 class="font-serif text-3xl text-[var(--gold-light)] font-semibold tracking-wide">Board of Partners</h3>
-                        </div>
-                        <span class="self-start sm:self-auto text-xs font-mono text-[var(--gold-500)] px-3 py-1 rounded-full border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.05)]">Höchste Entscheidungsgewalt</span>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4"><!--ranks:board-->
-                        <div class="glass-card p-6 border-t-2 border-t-[var(--gold-500)] flex flex-col justify-between">
-                            <div>
-                                <div class="flex items-center justify-between mb-3">
-                                    <span class="text-[0.65rem] font-mono px-3 py-1 rounded-full bg-[rgba(212,175,55,0.15)] text-[var(--gold-light)] border border-[var(--gold-hairline)] uppercase font-semibold">Grundsatzebene</span>
-                                    <span class="text-xs text-[var(--text-muted)] font-mono">Rang 01</span>
-                                </div>
-                                <h4 class="font-serif text-2xl font-semibold text-white mb-3">Founding Partner</h4>
-                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-4">
-                                    Gründer, Inhaber und Leitung der Kanzlei. Trägt die Gesamtverantwortung für Strategie, Personal und Qualität, führt Grundsatz- und Großmandate und vertritt staatliche Institutionen, Unternehmen und Privatpersonen vor jedem Gericht.
-                                </p>
-                            </div>
-                            <div class="pt-4 border-t border-[var(--glass-border)] text-[0.7rem] font-mono text-[var(--gold-500)]">
-                                Vollmacht: Alle Gerichte · Kanzleileitung
-                            </div>
-                        </div>
-
-                        <div class="glass-card p-6 border-t-2 border-t-[var(--gold-500)] flex flex-col justify-between">
-                            <div>
-                                <div class="flex items-center justify-between mb-3">
-                                    <span class="text-[0.65rem] font-mono px-3 py-1 rounded-full bg-[rgba(212,175,55,0.15)] text-[var(--gold-light)] border border-[var(--gold-hairline)] uppercase font-semibold">Gesellschafter</span>
-                                    <span class="text-xs text-[var(--text-muted)] font-mono">Rang 02</span>
-                                </div>
-                                <h4 class="font-serif text-2xl font-semibold text-white mb-3">Equity Partner</h4>
-                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-4">
-                                    Kapitalführender Partner mit Leitungsverantwortung für spezifische Rechtsbereiche (z. B. Wirtschaftsstrafrecht oder Verwaltungsrecht). Führt Großmandate, verantwortet die interne Qualitätssicherung und leitet strategische Vergleichsverhandlungen.
-                                </p>
-                            </div>
-                            <div class="pt-4 border-t border-[var(--glass-border)] text-[0.7rem] font-mono text-[var(--gold-500)]">
-                                Vollmacht: Alle Gerichte · Fachbereichsleitung
-                            </div>
-                        </div>
-
-                        <div class="glass-card p-6 border-t-2 border-t-[var(--gold-500)] flex flex-col justify-between">
-                            <div>
-                                <div class="flex items-center justify-between mb-3">
-                                    <span class="text-[0.65rem] font-mono px-3 py-1 rounded-full bg-[rgba(212,175,55,0.15)] text-[var(--gold-light)] border border-[var(--gold-hairline)] uppercase font-semibold">Partner</span>
-                                    <span class="text-xs text-[var(--text-muted)] font-mono">Rang 03</span>
-                                </div>
-                                <h4 class="font-serif text-2xl font-semibold text-white mb-3">Partner</h4>
-                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-4">
-                                    Vollwertiges Mitglied des Führungsgremiums. Eigenständige Mandatsübernahme, Fachführung von Associate-Teams und Vertretung in hochkomplexen Hauptverhandlungen sowie Notfalleinsätzen.
-                                </p>
-                            </div>
-                            <div class="pt-4 border-t border-[var(--glass-border)] text-[0.7rem] font-mono text-[var(--gold-500)]">
-                                Vollmacht: Alle Gerichte · Teamführung
-                            </div>
-                        </div>
-<!--/ranks:board-->
-                    </div>
+                    <div class="kz-head"><span class="kz-rubric">Was Sie tun sollten</span><h2 class="kz-h2">Bei einer Festnahme</h2></div>
+                    <ol class="kz-steps">
+                        <li><strong>Ruhe bewahren</strong>Leisten Sie keinen Widerstand und folgen Sie den Anweisungen der Beamten.</li>
+                        <li><strong>Keine Aussage zur Sache</strong>Sie müssen zum Vorwurf nichts sagen. Machen Sie nur Angaben zu Ihrer Person.</li>
+                        <li><strong>Anwalt verlangen</strong>Teilen Sie mit, dass Sie anwaltlich vertreten werden möchten, und nennen Sie die Kanzlei.</li>
+                        <li><strong>Mandat anfragen</strong>Sie selbst oder eine Vertrauensperson stellen die Anfrage mit Dringlichkeit „Notfall“.</li>
+                    </ol>
                 </div>
+            </div>
+        </section>
 
-                <!-- ASSOCIATE ATTORNEYS -->
+        <section class="kz-pagehead" data-page="aktuelles">
+            <div class="kz-wrap">
+                <nav class="kz-crumbs" aria-label="Pfad"><a href="/">Startseite</a><span aria-hidden="true">/</span>Aktuelles</nav>
+                <span class="kz-rubric">Aktuelles</span>
+                <h1 class="kz-h1">Aus der Kanzlei</h1>
+                <p class="kz-lead">Neuigkeiten, Personalien und offene Stellen.</p>
+            </div>
+        </section>
+
+        <section id="aktuelles" class="kz-section is-first reveal" data-page="aktuelles">
+            <div class="kz-wrap">
+                <ul id="newsList" class="kz-news"><li class="kz-empty">Wird geladen …</li></ul>
+            </div>
+        </section>
+
+        <section class="kz-pagehead" data-page="verfahrensstand">
+            <div class="kz-wrap">
+                <nav class="kz-crumbs" aria-label="Pfad"><a href="/">Startseite</a><span aria-hidden="true">/</span>Verfahrensstand</nav>
+                <span class="kz-rubric">Verfahrensstand</span>
+                <h1 class="kz-h1">Wo steht mein Verfahren?</h1>
+                <p class="kz-lead">Mit Aktenzeichen und Pin aus der Bestätigung Ihrer Mandatsanfrage sehen Sie den aktuellen Schritt – ohne Konto.</p>
+            </div>
+        </section>
+
+        <section id="verfahrensstand" class="kz-section is-first reveal" data-page="verfahrensstand">
+            <div class="kz-wrap kz-split">
                 <div>
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-3 border-b border-slate-700">
-                        <div>
-                            <span class="text-[0.65rem] uppercase tracking-[0.25em] text-slate-400 font-semibold block mb-1">Ebene II — Angestellte Anwaltschaft</span>
-                            <h3 class="font-serif text-3xl text-slate-200 font-semibold tracking-wide">Associate Attorneys</h3>
+                    <form id="statusForm" class="kz-form kz-panel is-gold" novalidate>
+                        <div class="kz-form-row">
+                            <label>Aktenzeichen<input id="stNumber" name="number" autocomplete="off" autocapitalize="characters" required placeholder="z. B. PS-2026-0001"></label>
+                            <label>Pin<input id="stPin" name="pin" inputmode="numeric" maxlength="8" autocomplete="off" required placeholder="6 Ziffern"></label>
                         </div>
-                        <span class="self-start sm:self-auto text-xs font-mono text-slate-400 px-3 py-1 rounded-full border border-slate-700 bg-slate-800/40">Operative Anwaltschaft</span>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4"><!--ranks:associate-->
-                        <div class="glass-card p-6 border-t-2 border-t-amber-500/60 flex flex-col justify-between">
-                            <div>
-                                <div class="flex items-center justify-between mb-3">
-                                    <span class="text-[0.65rem] font-mono px-3 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 uppercase font-semibold">Senior Level</span>
-                                    <span class="text-xs text-[var(--text-muted)] font-mono">Rang 04</span>
-                                </div>
-                                <h4 class="font-serif text-2xl font-semibold text-white mb-3">Senior Associate</h4>
-                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-4">
-                                    Erfahrene Anwälte mit umfassender Praxiserfahrung. Eigenverantwortliche Betreuung von Haftprüfungsterminen, U-Haft-Vertretungen vor Ort, Akteneinsichten und Prozessführung vor jedem Gericht.
-                                </p>
-                            </div>
-                            <div class="pt-4 border-t border-[var(--glass-border)] text-[0.7rem] font-mono text-amber-300">
-                                Befugnis: Alle Gerichte · Eigenverantwortlich
-                            </div>
-                        </div>
-
-                        <div class="glass-card p-6 border-t-2 border-t-slate-500 flex flex-col justify-between">
-                            <div>
-                                <div class="flex items-center justify-between mb-3">
-                                    <span class="text-[0.65rem] font-mono px-3 py-1 rounded-full bg-slate-500/10 text-slate-300 border border-slate-500/20 uppercase font-semibold">Mid Level</span>
-                                    <span class="text-xs text-[var(--text-muted)] font-mono">Rang 05</span>
-                                </div>
-                                <h4 class="font-serif text-2xl font-semibold text-white mb-3">Associate</h4>
-                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-4">
-                                    Approbierte Juristen für das Tagesgeschäft. Bearbeitung eingehender Mandatstickets, Prüfung von Verträgen, Verfassung von Klageschriften und eigenständige Vertretung von Mandanten vor Gericht.
-                                </p>
-                            </div>
-                            <div class="pt-4 border-t border-[var(--glass-border)] text-[0.7rem] font-mono text-slate-300">
-                                Befugnis: Alle Gerichte · Tagesgeschäft
-                            </div>
-                        </div>
-
-                        <div class="glass-card p-6 border-t-2 border-t-slate-600 flex flex-col justify-between">
-                            <div>
-                                <div class="flex items-center justify-between mb-3">
-                                    <span class="text-[0.65rem] font-mono px-3 py-1 rounded-full bg-slate-600/10 text-slate-400 border border-slate-600/20 uppercase font-semibold">Junior Level</span>
-                                    <span class="text-xs text-[var(--text-muted)] font-mono">Rang 06</span>
-                                </div>
-                                <h4 class="font-serif text-2xl font-semibold text-white mb-3">Junior Associate</h4>
-                                <p class="text-xs text-[var(--text-muted)] leading-relaxed mb-4">
-                                    Junge Rechtsanwälte im Mentoring. Vertreten Mandanten vor jedem Gericht – auf Wunsch mit Rückendeckung erfahrener Kollegen – und übernehmen Recherchen, Ermittlungsakten und Beweisanträge.
-                                </p>
-                            </div>
-                            <div class="pt-4 border-t border-[var(--glass-border)] text-[0.7rem] font-mono text-slate-400">
-                                Befugnis: Alle Gerichte · im Mentoring
-                            </div>
-                        </div>
-<!--/ranks:associate-->
-                    </div>
+                        <p id="stError" class="kz-error hidden" role="alert"></p>
+                        <div><button type="submit" class="btn-gold kz-btn">Stand abfragen</button></div>
+                    </form>
+                    <div id="stResult" class="mt-8" aria-live="polite"></div>
+                </div>
+                <div>
+                    <div class="kz-head"><span class="kz-rubric">Mehr im Mandantenportal</span><h2 class="kz-h3">Mit Konto sehen Sie alles</h2></div>
+                    <p class="kz-text">Im Mandantenportal finden Sie Termine, Nachrichten an Ihren Anwalt, Dokumente und Rechnungen Ihrer Akte.</p>
+                    <div class="kz-actions mt-6"><a href="/login" data-auth-link class="btn-outline kz-btn"><span data-auth-label data-auth-out="Zum Mandantenportal" data-auth-in="Zum Dashboard">Zum Mandantenportal</span></a></div>
                 </div>
             </div>
         </section>
 
-        <!-- KARRIERE SECTION -->
-        <section id="karriere" class="max-w-6xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
-            <div class="glass-card p-8 md:p-12 flex flex-col md:flex-row md:items-center justify-between gap-8">
-                <div class="max-w-2xl">
-                    <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Karriere</div>
-                    <h2 class="font-serif text-4xl md:text-5xl font-semibold text-white mb-4">Werden Sie Teil von Pake &amp; Scha</h2>
-                    <p class="text-[var(--text-muted)] text-base leading-relaxed">
-                        Wir wachsen und suchen engagierte Anwältinnen und Anwälte, Nachwuchstalente und Kanzleiassistenz. Mentoring durch das Board of Partners, echte Mandate ab dem ersten Tag und ein modernes Kanzlei-System.
-                    </p>
-                    <p id="careerCount" class="text-sm text-emerald-300 mt-4 hidden"></p>
-                    <!-- Auf diesem Gerät beworben: Stand der eigenen Bewerbung (site.js) -->
-                    <p id="careerMine" class="text-sm text-[var(--text-muted)] mt-2 hidden"></p>
-                </div>
-                <div class="flex flex-col gap-3 shrink-0">
-                    <a href="/karriere" class="btn-gold px-8 py-3.5 text-xs uppercase tracking-wider text-center">Offene Stellen ansehen</a>
-                    <a id="careerStatus" href="/karriere#status" class="btn-outline px-8 py-3.5 text-xs uppercase tracking-wider text-center">Bewerbungsstatus prüfen</a>
-                </div>
+        <section class="kz-pagehead" data-page="kontakt">
+            <div class="kz-wrap">
+                <nav class="kz-crumbs" aria-label="Pfad"><a href="/">Startseite</a><span aria-hidden="true">/</span>Kontakt</nav>
+                <span class="kz-rubric">Kontakt</span>
+                <h1 class="kz-h1">So erreichen Sie uns</h1>
+                <p class="kz-lead">Für ein neues Mandat nutzen Sie das Mandatsformular. Ein Anwalt meldet sich bei Ihnen – meist noch am selben Tag.</p>
             </div>
         </section>
 
-        <!-- KONTAKT SECTION -->
-        <section id="kontakt" class="max-w-6xl mx-auto px-6 py-20 relative z-10 border-t border-[var(--glass-border)] reveal">
-            <div class="glass-card p-6 sm:p-8 md:p-12 text-center max-w-4xl mx-auto">
-                <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Direkter Kontakt</div>
-                <h2 class="font-serif text-4xl font-semibold text-white mb-4">Benötigen Sie juristischen Beistand?</h2>
-                <p class="text-[var(--text-muted)] text-base max-w-2xl mx-auto mb-8">
-                    Senden Sie uns jetzt Ihre Unterlagen oder fordern Sie eine zeitnahe Beratung an. Unser Team steht Ihnen diskret zur Seite.
-                </p>
-                <div class="flex flex-col sm:flex-row justify-center items-stretch sm:items-center gap-3 sm:gap-4 mb-8">
-                    <button data-act="ticket" class="btn-gold px-4 sm:px-8 py-3.5 text-xs uppercase tracking-wider">
-                        Jetzt Mandat anfragen
-                    </button>
+        <section id="kontakt" class="kz-section is-first reveal" data-page="kontakt">
+            <div class="kz-wrap">
+                <div class="kz-contact">
+                    <div><span class="kz-rubric is-plain">Neues Mandat</span><h3>Mandat anfragen</h3><p>Schildern Sie den Sachverhalt. Ein Konto ist nicht nötig.</p><div class="kz-actions"><button data-act="ticket" class="btn-gold kz-btn">Mandat anfragen</button></div></div>
+                    <div><span class="kz-rubric is-plain">Eilfall</span><h3>Notdienst</h3><p>Festnahme, Durchsuchung oder U-Haft: der Anwalt im Dienst übernimmt.</p><div class="kz-actions"><a href="/notdienst" class="btn-outline kz-btn">Zum Notdienst</a></div></div>
+                    <div><span class="kz-rubric is-plain">Kanzleisitz</span><h3 data-firm-seat>Würfelpark, Los Santos</h3><p>Termine nach Vereinbarung. Bestehende Mandanten erreichen ihren Anwalt im Mandantenportal.</p><div class="kz-actions"><a href="/login" data-auth-link class="btn-outline kz-btn"><span data-auth-label data-auth-out="Mandantenportal" data-auth-in="Dashboard">Mandantenportal</span></a></div></div>
                 </div>
-                <div class="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-[var(--text-dim)]">
-                    <span class="inline-flex items-center gap-2"><span class="status-dot status-active"></span>24/7 Eilnotdienst</span>
-                    <span class="hidden sm:inline" aria-hidden="true">·</span>
-                    <span class="whitespace-nowrap">aktuelle Uhrzeit Kanzlei: <span class="font-mono text-[var(--gold-light)]" id="liveClockFooter">--:--:--</span></span>
-                </div>
-            </div>
-
-            <!-- Anliegen an das Board of Partners -->
-            <div id="anliegen" class="glass-card p-6 sm:p-8 md:p-10 max-w-4xl mx-auto mt-8 scroll-mt-28">
+                <!-- Anliegen an das Board of Partners -->
+            <div id="anliegen" class="kz-band mt-10 scroll-mt-28">
                 <div class="flex flex-col md:flex-row md:items-center gap-6 md:gap-10">
                     <div class="flex-1 text-center md:text-left">
                         <div class="text-xs uppercase tracking-widest text-[var(--gold-500)] font-medium mb-2">Kanzleileitung</div>
@@ -769,27 +882,117 @@
                     </div>
                 </div>
             </div>
+            </div>
         </section>
+
+        <section id="faq" class="kz-section reveal" data-page="kontakt">
+            <div class="kz-wrap kz-wrap-narrow">
+                <div class="kz-head"><span class="kz-rubric">Häufige Fragen</span><h2 class="kz-h2">Fragen &amp; Antworten</h2></div>
+                <div class="kz-faq">
+                <div class="faq-item" data-act="faq">
+                    <button class="w-full flex items-center justify-between py-5 text-left" aria-expanded="false">
+                        <span class="font-medium text-white text-base pr-4">Wie schnell erreicht mich ein Anwalt bei einer Festnahme?</span>
+                        <svg class="faq-icon w-5 h-5 text-[var(--gold-500)] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    </button>
+                    <div class="faq-answer"><p class="text-sm text-[var(--text-muted)] pb-5 leading-relaxed pr-8">Stellen Sie Ihre Anfrage mit der Dringlichkeit „Notfall“. Sie geht sofort an die Anwälte im Dienst – wer gerade im Dienst ist, sehen Sie auf der Seite Notdienst. Der Anwalt kommt zu Ihnen und vertritt Sie im Verhör.</p></div>
+                </div>
+                <div class="faq-item" data-act="faq">
+                    <button class="w-full flex items-center justify-between py-5 text-left" aria-expanded="false">
+                        <span class="font-medium text-white text-base pr-4">Sind die Preise in der Honorarordnung verhandelbar?</span>
+                        <svg class="faq-icon w-5 h-5 text-[var(--gold-500)] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    </button>
+                    <div class="faq-answer"><p class="text-sm text-[var(--text-muted)] pb-5 leading-relaxed pr-8">Es gelten die Preise der Honorarordnung. Bei mehreren Leistungen in einem Mandat wird der Mandatsbündel-Rabatt automatisch abgezogen – der Tarifrechner zeigt ihn vorab.</p></div>
+                </div>
+                <div class="faq-item" data-act="faq">
+                    <button class="w-full flex items-center justify-between py-5 text-left" aria-expanded="false">
+                        <span class="font-medium text-white text-base pr-4">Wie kann ich den Status meines Mandats einsehen?</span>
+                        <svg class="faq-icon w-5 h-5 text-[var(--gold-500)] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    </button>
+                    <div class="faq-answer"><p class="text-sm text-[var(--text-muted)] pb-5 leading-relaxed pr-8">Ohne Konto unter „Verfahrensstand“ mit Aktenzeichen und Pin aus Ihrer Bestätigung. Mit Mandantenkonto sehen Sie im Mandantenportal außerdem Termine, Nachrichten und Rechnungen; Neuigkeiten kommen auch in Ihr Discord-Ticket.</p></div>
+                </div>
+                <div class="faq-item" data-act="faq">
+                    <button class="w-full flex items-center justify-between py-5 text-left" aria-expanded="false">
+                        <span class="font-medium text-white text-base pr-4">Vertritt die Kanzlei auch Unternehmen und Fraktionen?</span>
+                        <svg class="faq-icon w-5 h-5 text-[var(--gold-500)] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    </button>
+                    <div class="faq-answer"><p class="text-sm text-[var(--text-muted)] pb-5 leading-relaxed pr-8">Ja. Wir vertreten auch Unternehmen, Institutionen und Fraktionen – etwa bei Verträgen, im Wirtschaftsstrafrecht und in Grundsatzverfahren.</p></div>
+                </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="kz-pagehead" data-page="impressum">
+            <div class="kz-wrap">
+                <nav class="kz-crumbs" aria-label="Pfad"><a href="/">Startseite</a><span aria-hidden="true">/</span>Impressum</nav>
+                <span class="kz-rubric">Impressum</span>
+                <h1 class="kz-h1">Impressum</h1>
+                <p class="kz-lead">Angaben zur Kanzlei Pake &amp; Scha Legal Consulting.</p>
+            </div>
+        </section>
+
+        <section id="impressum" class="kz-section is-first" data-page="impressum">
+            <div class="kz-wrap kz-wrap-narrow kz-legal">
+                <h2>Kanzlei</h2>
+                <p>Pake &amp; Scha Legal Consulting, Kanzleisitz <span data-firm-seat>Würfelpark, Los Santos</span>. Vertreten durch das Board of Partners.</p>
+                <h2>Rollenspiel</h2>
+                <p>Pake &amp; Scha ist eine Kanzlei in einem GTA-Rollenspiel. Personen, Verfahren, Gerichte und Gesetze auf dieser Website gehören zum Spiel. Es findet keine Rechtsberatung im wirklichen Leben statt.</p>
+                <h2>Daten</h2>
+                <p>Wir speichern nur, was Sie uns für Ihr Mandat, Ihre Bewerbung oder Ihr Anliegen mitteilen, und verwenden es nur dafür. Fragen dazu richten Sie an das Board of Partners über „Anliegen an das Board of Partners“ auf der Kontaktseite.</p>
+            </div>
+        </section>
+
+
+        <section class="kz-pagehead" data-page="profil">
+            <div class="kz-wrap"><!--profil:head--></div>
+        </section>
+
+        <section class="kz-section is-first" data-page="profil">
+            <div class="kz-wrap"><!--profil:body--></div>
+        </section>
+
+        <section class="kz-section is-tight reveal" data-page="start rechtsgebiete anwaelte aktuelles kanzlei honorare">
+            <div class="kz-wrap">
+                <div class="kz-band">
+                    <div><h2 class="kz-h3">Sie brauchen anwaltliche Hilfe?</h2><p class="kz-muted mt-2">Schildern Sie uns den Sachverhalt. Ein Anwalt meldet sich bei Ihnen.</p></div>
+                    <div class="kz-actions"><button data-act="ticket" class="btn-gold kz-btn">Mandat anfragen</button><a href="/kontakt" class="btn-outline kz-btn">Kontakt</a></div>
+                </div>
+            </div>
+        </section>
+
     </main>
 
-    <!-- Footer -->
-    <footer class="border-t border-[var(--glass-border)] py-10 bg-[rgba(2,5,14,0.95)] relative z-10">
-        <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6 text-xs text-[var(--text-muted)]">
-            <div class="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 text-center sm:text-left">
-                <img class="h-[32px] w-auto" src="/img/logo.svg" width="17" height="32" alt="" decoding="async">
-                <span class="flex flex-col gap-0.5"><span class="font-serif italic text-sm text-[var(--gold-light)] normal-case tracking-normal">Recht haben. <span class="text-[var(--gold-500)]">Recht bekommen.</span></span><span>© <span id="footerYear">2026</span> Pake & Scha Legal Consulting. Alle Rechte vorbehalten.</span></span>
+    <!-- Fußzeile -->
+    <footer class="kz-footer">
+        <div class="kz-wrap">
+            <div class="kz-footer-grid">
+                <div class="kz-footer-brand">
+                    <svg class="kz-seal" viewBox="0 0 200 200" role="img" aria-label="Siegel der Kanzlei Pake &amp; Scha">
+                <defs><path id="kzSealFoot" d="M100,100 m-77,0 a77,77 0 1,1 154,0 a77,77 0 1,1 -154,0"/></defs>
+                <circle cx="100" cy="100" r="96" fill="none" stroke="currentColor" stroke-width="1.2"/>
+                <circle cx="100" cy="100" r="91" fill="none" stroke="currentColor" stroke-width="0.5" opacity="0.7"/>
+                <circle cx="100" cy="100" r="64" fill="none" stroke="currentColor" stroke-width="0.5" opacity="0.7"/>
+                <text><textPath href="#kzSealFoot" textLength="472" lengthAdjust="spacing">Pake &amp; Scha · Legal Consulting · Los Santos ·</textPath></text>
+                <g transform="translate(81.5 66) scale(0.21)" fill="none" stroke="currentColor" stroke-width="13" stroke-linejoin="miter"><path d="M6.5 277.6V6.5H105.1A60.2 60.2 0 0 1 105.1 126.9H84.9A51.8 51.8 0 0 0 67.73 227.57L99.61 238.77"/><path d="M0 313.83H108.25A57.3 57.3 0 0 0 126.68 202.27L81.18 186.82"/></g>
+            </svg>
+                    <p class="kz-footer-motto">Recht haben. Recht bekommen.</p>
+                    <p>Pake &amp; Scha Legal Consulting<br><span data-firm-seat>Würfelpark, Los Santos</span></p>
+                </div>
+                <div>
+                    <h2>Kanzlei</h2>
+                    <ul><li><a href="/kanzlei">Über uns</a></li><li><a href="/anwaelte">Anwälte</a></li><li><a href="/kanzlei#raenge">Ränge</a></li><li><a href="/aktuelles">Aktuelles</a></li><li><a href="/karriere">Karriere</a></li></ul>
+                </div>
+                <div>
+                    <h2>Mandanten</h2>
+                    <ul><li><button type="button" data-act="ticket" class="hover:text-[var(--gold-light)] text-[var(--kz-text)]">Mandat anfragen</button></li><li><a href="/notdienst">Notdienst</a></li><li><a href="/honorare">Honorare</a></li><li><a href="/verfahrensstand">Verfahrensstand</a></li><li><a href="/login" data-auth-link><span data-auth-label data-auth-out="Mandantenportal" data-auth-in="Dashboard">Mandantenportal</span></a></li></ul>
+                </div>
+                <div>
+                    <h2>Rechtsgebiete</h2>
+                    <ul><li><a href="/rechtsgebiete/strafrecht">Strafrecht</a></li><li><a href="/rechtsgebiete/zivilrecht">Zivilrecht</a></li><li><a href="/rechtsgebiete/verfassungsrecht">Verfassungsrecht</a></li><li><a href="/rechtsgebiete/vertragsrecht">Vertragsrecht</a></li></ul>
+                </div>
             </div>
-            <div class="flex flex-wrap justify-center gap-x-6 gap-y-3 uppercase tracking-wider text-[0.7rem]">
-                <a href="#start" class="hover:text-[var(--gold-500)] transition-colors">Startseite</a>
-                <a href="#rechner" class="hover:text-[var(--gold-500)] transition-colors">Tarifrechner</a>
-                <a href="#honorar" class="hover:text-[var(--gold-500)] transition-colors">Honorarordnung</a>
-                <a href="#vip" class="hover:text-[var(--gold-500)] transition-colors">VIP &amp; Lifetime</a>
-                <a href="#team" class="hover:text-[var(--gold-500)] transition-colors">Team</a>
-                <a href="#raenge" class="hover:text-[var(--gold-500)] transition-colors">Kanzleiränge</a>
-                <a href="/karriere" class="hover:text-[var(--gold-500)] transition-colors">Karriere</a>
-                <a href="#kontakt" class="hover:text-[var(--gold-500)] transition-colors">Kontakt</a>
-                <a href="#anliegen" class="hover:text-[var(--gold-500)] transition-colors">Anliegen ans Board</a>
-                <a href="/login" data-auth-link class="text-[var(--gold-500)] hover:text-[var(--gold-light)] transition-colors"><span data-auth-label data-auth-out="Mandantenportal" data-auth-in="Dashboard">Mandantenportal</span></a>
+            <div class="kz-footer-bottom">
+                <span>© <span id="footerYear">2026</span> Pake &amp; Scha Legal Consulting · Kanzlei im Rollenspiel</span>
+                <nav aria-label="Rechtliches"><a href="/kontakt">Kontakt</a><a href="/kontakt#anliegen">Anliegen an das Board</a><a href="/impressum">Impressum</a></nav>
             </div>
         </div>
     </footer>
@@ -993,8 +1196,8 @@
             <div id="concernStatusPane" class="hidden">
                 <div id="concernSaved" class="hidden mb-4"></div>
                 <form id="concernLookup" data-nodraft class="grid grid-cols-1 sm:grid-cols-[1fr_9rem] gap-3 mb-3" novalidate>
-                    <input id="clRef" type="text" autocomplete="off" autocapitalize="characters" placeholder="Vorgangsnummer, z. B. AN-2026-0001" aria-label="Vorgangsnummer" class="w-full bg-slate-900/80 border border-[var(--glass-border)] rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--gold-500)] font-mono">
-                    <input id="clPin" type="text" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Pin" aria-label="Pin (6 Ziffern)" class="w-full bg-slate-900/80 border border-[var(--glass-border)] rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--gold-500)] font-mono tracking-widest">
+                    <input id="clRef" type="text" autocomplete="off" autocapitalize="characters" placeholder="Vorgangsnummer, z. B. AN-2026-0001" aria-label="Vorgangsnummer" class="w-full bg-slate-900/80 border border-[var(--glass-border)] rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--gold-500)]">
+                    <input id="clPin" type="text" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Pin" aria-label="Pin (6 Ziffern)" class="w-full bg-slate-900/80 border border-[var(--glass-border)] rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--gold-500)] tracking-widest">
                     <button type="submit" class="btn-gold sm:col-span-2 py-3 text-xs uppercase tracking-wider disabled:opacity-60">Anliegen öffnen</button>
                 </form>
                 <div id="concernResult" aria-live="polite"><p class="text-center py-6 text-[var(--text-dim)] text-sm italic">Vorgangsnummer und Pin finden Sie in der Bestätigung Ihres Anliegens.</p></div>
