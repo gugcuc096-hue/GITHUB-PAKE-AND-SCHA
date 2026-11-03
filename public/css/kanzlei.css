@@ -53,8 +53,8 @@
 .kz-h1 em { font-style: italic; font-weight: 600; color: var(--gold-500); }
 .kz-h2 { font: 600 var(--fs-xl)/1.12 var(--kz-serif); color: var(--kz-ink); margin: 0; }
 .kz-h3 { font: 600 var(--fs-lg)/1.25 var(--kz-serif); color: var(--kz-ink); margin: 0; }
-.kz-lead { font-size: 1.08rem; line-height: 1.7; color: var(--kz-text); max-width: 40rem; }
-.kz-text { color: var(--kz-text); max-width: 42rem; }
+.kz-lead { font-size: 1.08rem; line-height: 1.7; color: var(--kz-text); max-width: 60ch; }
+.kz-text { color: var(--kz-text); max-width: 65ch; }
 .kz-small { font-size: var(--fs-sm); color: var(--kz-muted); }
 .kz-muted { color: var(--kz-muted); }
 .kz-ink { color: var(--kz-ink); }
@@ -62,6 +62,9 @@
 .kz-section { position: relative; z-index: 1; padding: var(--sp-5) 0; }
 .kz-section.is-tight { padding: var(--sp-4) 0; }
 .kz-section.is-flush { padding: 0 0 var(--sp-3); }
+.kz-section.is-band::before { content: ''; position: absolute; z-index: -1; inset: 0; pointer-events: none;
+    background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.022) 3.5rem, rgba(255, 255, 255, 0.022) calc(100% - 3.5rem), transparent),
+        radial-gradient(60% 80% at 50% 0%, rgba(var(--accent-rgb), 0.035), transparent 70%); }
 @media (max-width: 767px) { .kz-section { padding: var(--sp-4) 0; } }
 .kz-head { display: grid; gap: 0.6rem; margin-bottom: var(--sp-4); max-width: 44rem; }
 .kz-head.is-center { margin-left: auto; margin-right: auto; justify-items: center; text-align: center; }
@@ -78,6 +81,9 @@
 :where(.kz-btn) { display: inline-flex; }
 .kz-btn { align-items: center; justify-content: center; gap: 0.5rem; min-height: 44px; padding: 0 1.3rem; font: 600 var(--fs-sm)/1 var(--kz-sans); letter-spacing: 0.01em; text-decoration: none; cursor: pointer; white-space: nowrap; }
 .kz-btn.is-lg { min-height: 50px; padding: 0 1.75rem; font-size: 0.95rem; }
+/* Drück-Feedback: Knopf gibt kurz nach (nur transform – kein Neuzeichnen) */
+.site-home :is(.btn-gold, .btn-outline, .kz-btn, .pf-phone-btn):active:not(:disabled) { transform: scale(0.97); transition-duration: 60ms; }
+@media (prefers-reduced-motion: reduce) { .site-home :is(.btn-gold, .btn-outline, .kz-btn, .pf-phone-btn):active { transform: none; } }
 .kz-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
 .kz-actions.is-center { justify-content: center; }
 @media (max-width: 479px) { .kz-actions > .kz-btn { flex: 1 1 100%; } }
@@ -89,7 +95,7 @@
 @media (hover: hover) and (pointer: fine) { .site-home .btn-gold:hover::before { transform: translateX(120%); transition: transform 0.7s var(--ease-out); } }
 
 /* Flächen: wie .panel im Dashboard (Licht von oben, helle Kante, Schatten Stufe 2) */
-.kz-panel, .kz-tile > a, .kz-person, .kz-news-card, .kz-fact, .kz-band, .kz-principles > div, .kz-flow > li, .kz-contact > div, .site-home main .glass-card, .site-home .kz-faq {
+.kz-panel, .kz-tile > a, .kz-person, .kz-news-card, .kz-fact, .kz-band, .kz-quote, .kz-principles > div, .kz-flow > li, .kz-contact > div, .site-home main .glass-card, .site-home .kz-faq {
     background: var(--kz-panel-bg);
     border: 1px solid rgba(255, 255, 255, 0.09);
     border-radius: var(--radius);
@@ -107,9 +113,6 @@
 }
 
 /* ------------------------------------------------------------------ Kopfleiste oben (Notdienst, Kanzleisitz, Portal) */
-.site-home .topstrip { background: rgba(2, 5, 14, 0.95); border-bottom: 1px solid var(--kz-rule); font-size: var(--fs-xs); color: var(--kz-muted); }
-.kz-strip-duty { display: inline-flex; align-items: center; gap: 0.55rem; min-width: 0; color: var(--kz-text); text-decoration: none; }
-.kz-strip-duty:hover #dutyLabel { color: var(--gold-light); }
 .kz-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--emerald); }
 .kz-dot.is-off { background: var(--amber); }
 .site-home .status-dot { width: 7px; height: 7px; box-shadow: none; }
@@ -209,14 +212,18 @@ body.menu-open { overflow: hidden; }
 .kz-fact dd small { display: block; margin-top: 0.3rem; font: 400 0.8rem/1.4 var(--kz-sans); color: var(--kz-muted); }
 
 /* ------------------------------------------------------------------ Seitenkopf der Unterseiten (wie .page-head) */
-.kz-pagehead { position: relative; z-index: 1; padding: var(--sp-5) 0 var(--sp-3); }
+.kz-pagehead { position: relative; z-index: 1; padding: var(--sp-4) 0 var(--sp-3); }
 .kz-pagehead .kz-h1 { margin: 0.75rem 0 1rem; font-size: clamp(2.3rem, 4.6vw, 3.5rem); }
 .kz-pagehead + .kz-section { padding-top: var(--sp-3); }
 .kz-crumbs { display: flex; flex-wrap: wrap; gap: 0.5rem; font-size: 0.8rem; color: var(--kz-muted); margin-bottom: var(--sp-3); }
 .kz-crumbs a { color: var(--kz-muted); text-decoration: none; }
 .kz-crumbs a:hover { color: var(--gold-light); }
 .kz-crumbs span[aria-hidden] { opacity: 0.5; }
-@media (max-width: 767px) { .kz-pagehead { padding: var(--sp-4) 0 var(--sp-2); } }
+@media (max-width: 767px) { .kz-pagehead { padding: var(--sp-3) 0 var(--sp-2); } }
+/* Rechtsgebiet: großes, zurückhaltendes Symbol hinter der Überschrift */
+.kz-pagehead-ico { position: absolute; z-index: -1; top: 50%; right: max(1rem, calc(50% - 36rem)); width: clamp(9rem, 22vw, 17rem); aspect-ratio: 1; transform: translateY(-50%) rotate(-8deg); color: var(--gold-500); opacity: 0.075; pointer-events: none; }
+.kz-pagehead-ico svg { width: 100%; height: 100%; stroke-width: 1.1; }
+@media (max-width: 767px) { .kz-pagehead-ico { top: 1.5rem; right: -1.5rem; transform: rotate(-8deg); width: 9rem; opacity: 0.06; } }
 
 /* ------------------------------------------------------------------ Rechtsgebiete: Glas-Kacheln mit Symbol */
 .kz-tiles { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-2); }
@@ -238,11 +245,11 @@ body.menu-open { overflow: hidden; }
 .kz-split { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); }
 @media (min-width: 900px) { .kz-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--sp-5); } }
 .kz-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-2); }
-.kz-list > li { position: relative; padding-left: 1.6rem; color: var(--kz-text); }
+.kz-list > li { position: relative; padding-left: 1.6rem; color: var(--kz-text); max-width: 65ch; }
 .kz-list > li::before { content: ''; position: absolute; left: 0.1rem; top: 0.6rem; width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--gold-soft); box-shadow: inset 0 0 0 1.5px var(--gold-500); }
 .kz-list > li strong { display: block; color: var(--kz-ink); font-weight: 600; margin-bottom: 0.1rem; }
 .kz-steps { list-style: none; margin: 0; padding: 0; counter-reset: step; }
-.kz-steps > li { counter-increment: step; position: relative; padding: 0 0 1.4rem 3.2rem; color: var(--kz-text); }
+.kz-steps > li { counter-increment: step; position: relative; padding: 0 0 1.4rem 3.2rem; color: var(--kz-text); max-width: calc(65ch + 3.2rem); }
 .kz-steps > li::before { content: counter(step); position: absolute; left: 0; top: -0.1rem; width: 2.2rem; height: 2.2rem; display: grid; place-items: center; border-radius: 50%; font: 600 0.9rem/1 var(--kz-sans); color: var(--gold-light); background: var(--gold-soft); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.3); }
 .kz-steps > li::after { content: ''; position: absolute; left: 1.1rem; top: 2.3rem; bottom: 0.2rem; width: 1px; background: var(--kz-rule); }
 .kz-steps > li:last-child { padding-bottom: 0; }
@@ -316,11 +323,15 @@ body.menu-open { overflow: hidden; }
 .kz-news time { font-size: 0.82rem; color: var(--kz-muted); padding-top: 0.3rem; }
 .kz-news .kz-news-kind { display: block; font: 600 0.66rem/1.2 var(--kz-sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--kz-muted); margin-top: 0.35rem; }
 .kz-news h3 { font: 600 1.4rem/1.25 var(--kz-serif); color: var(--kz-ink); margin: 0 0 0.35rem; }
-.kz-news p { margin: 0; color: var(--kz-text); white-space: pre-line; max-width: 46rem; }
+.kz-news p { margin: 0; color: var(--kz-text); white-space: pre-line; max-width: 65ch; }
 .kz-news .is-pinned { border-color: rgba(var(--accent-rgb), 0.35) !important; }
 .kz-news .is-pinned h3::after { content: 'Angeheftet'; margin-left: 0.75rem; vertical-align: middle; font: 600 0.66rem/1 var(--kz-sans); letter-spacing: 0.06em; color: var(--gold-light); background: rgba(var(--accent-rgb), 0.15); border-radius: 6px; padding: 0.2rem 0.5rem; }
 /* Leerer Zustand wie im Dashboard */
 .kz-empty { padding: var(--sp-4) var(--sp-2); text-align: center; color: var(--kz-muted); font-size: 0.92rem; list-style: none; }
+.kz-empty.is-rich { grid-column: 1 / -1; display: grid; justify-items: center; gap: 0.9rem; padding: var(--sp-4) var(--sp-3); border: 1px dashed rgba(255, 255, 255, 0.1); border-radius: var(--radius); }
+.kz-empty-ico { display: grid; place-items: center; width: 3.25rem; height: 3.25rem; border-radius: 50%; background: var(--gold-soft); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.3); color: var(--gold-500); }
+.kz-empty-ico svg { width: 22px; height: 22px; }
+.kz-empty-text { max-width: 30rem; font-size: 0.95rem; line-height: 1.55; color: var(--kz-text); }
 
 /* ------------------------------------------------------------------ Notdienst & Verfahrensstand */
 .kz-panel { padding: var(--sp-4) var(--sp-3); }
@@ -355,9 +366,10 @@ body.menu-open { overflow: hidden; }
 .kz-principles > div { padding: 1.5rem 1.6rem; }
 .kz-principles h3 { font: 600 1.35rem/1.25 var(--kz-serif); color: var(--kz-ink); margin: 0 0 0.4rem; }
 .kz-principles p { margin: 0; font-size: 0.95rem; color: var(--kz-text); }
-.kz-quote { margin: 0; padding: var(--sp-3) 0; border-top: 1px solid var(--kz-rule); }
-.kz-quote blockquote { margin: 0 0 0.9rem; font: italic 500 1.45rem/1.45 var(--kz-serif); color: var(--kz-ink); max-width: 46rem; }
-.kz-quote figcaption { font-size: 0.85rem; color: var(--kz-muted); }
+/* Mandantenstimmen: Karten nebeneinander statt Zitate untereinander */
+#testimonialTrack { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr)); gap: var(--sp-2); }
+.kz-quote { display: flex; flex-direction: column; margin: 0; padding: 1.5rem 1.6rem; }
+.kz-quote blockquote { flex: 1; margin: 0 0 1.2rem; font: italic 500 1.25rem/1.5 var(--kz-serif); color: var(--kz-ink); }
 .kz-quote .kz-stars { color: var(--gold-500); letter-spacing: 0.15em; font-size: 0.85rem; margin-bottom: 0.75rem; }
 .kz-contact { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-2); }
 @media (min-width: 768px) { .kz-contact { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
@@ -372,12 +384,12 @@ body.menu-open { overflow: hidden; }
 .site-home .kz-faq .faq-item:last-child { border-bottom: 0; }
 .site-home .kz-faq .faq-item button { padding: 1.2rem 0; }
 .site-home .kz-faq .faq-item button > span { font: 600 1.2rem/1.35 var(--kz-serif); color: var(--kz-ink); }
-.site-home .kz-faq .faq-answer p { color: var(--kz-text); font-size: 0.97rem; max-width: 46rem; }
+.site-home .kz-faq .faq-answer p { color: var(--kz-text); font-size: 0.97rem; max-width: 65ch; }
 
 /* Impressum */
 .kz-legal h2 { font: 600 1.45rem/1.25 var(--kz-serif); color: var(--kz-ink); margin: 2.25rem 0 0.6rem; }
 .kz-legal h2:first-child { margin-top: 0; }
-.kz-legal p { margin: 0 0 0.9rem; max-width: 46rem; }
+.kz-legal p { margin: 0 0 0.9rem; max-width: 65ch; }
 
 /* ------------------------------------------------------------------ Bestehende Bausteine (Tarifrechner, Honorarordnung, VIP, Ränge) */
 .site-home main .glass-card::before { display: none; }
@@ -402,10 +414,9 @@ body.menu-open { overflow: hidden; }
 
 /* Seitenwechsel zwischen den Unterseiten (View Transitions, Kopf- und Fußzeile bleiben stehen) */
 .site-home .kz-header { view-transition-name: kz-header; }
-.site-home .topstrip { view-transition-name: kz-strip; }
-html:has(body.site-home)::view-transition-old(kz-header), html:has(body.site-home)::view-transition-old(kz-strip) { display: none; }
-html:has(body.site-home)::view-transition-new(kz-header), html:has(body.site-home)::view-transition-new(kz-strip) { animation: none; }
-html:has(body.site-home)::view-transition-group(kz-header), html:has(body.site-home)::view-transition-group(kz-strip) { animation: none; z-index: 2; }
+html:has(body.site-home)::view-transition-old(kz-header) { display: none; }
+html:has(body.site-home)::view-transition-new(kz-header) { animation: none; }
+html:has(body.site-home)::view-transition-group(kz-header) { animation: none; z-index: 2; }
 html:has(body.site-home)::view-transition-old(root) { animation: kz-vt-out 0.2s ease both; }
 html:has(body.site-home)::view-transition-new(root) { animation: kz-vt-in 0.42s var(--ease-out) both; }
 @keyframes kz-vt-out { to { opacity: 0; } }
@@ -450,10 +461,30 @@ html:active-view-transition .kz-hero-in > * { animation: none; }
 .pf-head .kz-h1 { margin: 0.75rem 0 0.4rem; }
 .pf-rank { margin: 0; font: 600 0.78rem/1.3 var(--kz-sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--kz-muted); }
 .pf-duty { display: inline-flex; align-items: center; gap: 0.45rem; margin: 0.8rem 0 0; font-size: 0.85rem; color: var(--kz-muted); }
-.pf-desc { margin-top: 1.25rem; }
+.pf-desc { margin-top: 1.25rem; max-width: 65ch; }
+/* Telefon im Spiel: Pille zum Kopieren */
+.pf-phone { margin: 0.9rem 0 0; }
+.pf-phone-btn { display: inline-flex; align-items: center; gap: 0.55rem; min-height: 40px; padding: 0 0.95rem 0 0.8rem; border-radius: var(--r-pill); border: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.03); color: var(--kz-ink); font: 500 0.95rem/1 var(--kz-sans); cursor: pointer; transition: border-color var(--dur-1) ease, background-color var(--dur-1) ease, transform var(--dur-1) var(--ease-out); }
+.pf-phone-btn .kz-ico { width: 17px; height: 17px; color: var(--gold-500); }
+.pf-phone-k { font: 600 0.66rem/1 var(--kz-sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--kz-muted); }
+.pf-phone-n { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+.pf-phone-btn .pf-phone-c { width: 15px; height: 15px; color: var(--kz-muted); }
+.pf-phone-btn:hover { border-color: rgba(var(--accent-rgb), 0.5); background: var(--gold-soft); }
 .pf-actions { margin-top: var(--sp-3); }
-.pf-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.75rem; margin-bottom: var(--sp-4); }
-.pf-stats .kpi { padding: 1.1rem 1.25rem; border-radius: var(--radius); }
+.pf-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: var(--sp-2); margin-bottom: var(--sp-4); max-width: 52rem; }
+/* Kennzahlen (die Website lädt app.css nicht): Symbol im Goldring, kleine Beschriftung, große Zahl, Balken bzw. Sterne */
+.pf-stats .kpi { position: relative; overflow: hidden; display: grid; align-content: start; padding: 1.25rem 1.35rem 1.2rem; border-radius: var(--radius); background: var(--kz-panel-bg); border: 1px solid rgba(255, 255, 255, 0.09); box-shadow: var(--sh-2), inset 0 1px 0 var(--lit-edge); }
+.pf-stats .kpi::after { content: ''; position: absolute; inset: 0 0 auto; height: 2px; background: linear-gradient(90deg, transparent, rgba(var(--accent-rgb), 0.55), transparent); opacity: 0.7; }
+.pf-stats .kpi-ico { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; margin-bottom: 0.9rem; border-radius: 50%; background: var(--gold-soft); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.35); color: var(--gold-500); }
+.pf-stats .kpi-ico .kz-ico { width: 17px; height: 17px; }
+.pf-stats .kpi-label { font: 600 0.68rem/1.2 var(--kz-sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--kz-muted); }
+.pf-stats .kpi-value { margin-top: 0.4rem; font: 600 2.3rem/1.05 var(--kz-sans); letter-spacing: -0.02em; color: var(--kz-ink); font-variant-numeric: lining-nums tabular-nums; }
+.pf-stats .kpi-sub { margin-top: 0.45rem; font-size: 0.8rem; line-height: 1.4; color: var(--kz-muted); }
+.pf-stats .kpi-bar { display: block; height: 4px; margin-top: 0.7rem; border-radius: 99px; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
+.pf-stats .kpi-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--gold-600), var(--gold-light)); }
+.pf-stats .kpi-stars { display: flex; gap: 0.15rem; margin-top: 0.55rem; font-size: 0.95rem; line-height: 1; color: rgba(255, 255, 255, 0.14); }
+.pf-stats .kpi-stars i { font-style: normal; }
+.pf-stats .kpi-stars i.on { color: var(--gold-500); }
 .pf-section { margin-top: var(--sp-4); max-width: 46rem; }
 .pf-section:first-child { margin-top: 0; }
 .pf-h { margin: 0 0 1rem; font: 600 var(--fs-xs)/1.2 var(--kz-sans); letter-spacing: 0.18em; text-transform: uppercase; color: var(--kz-muted); }
@@ -463,15 +494,46 @@ html:active-view-transition .kz-hero-in > * { animation: none; }
 .pf-highlights li { position: relative; padding-left: 1.6rem; color: var(--kz-text); }
 .pf-highlights li::before { content: ''; position: absolute; left: 0.1rem; top: 0.6rem; width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--gold-soft); box-shadow: inset 0 0 0 1.5px var(--gold-500); }
 .pf-wins li { display: flex; gap: 0.8rem; align-items: baseline; color: var(--kz-text); }
-.pf-wins b { font: 600 1.35rem/1 var(--kz-serif); color: var(--gold-500); min-width: 2.4rem; }
-.pf-reviews { display: grid; gap: var(--sp-2); }
-.pf-review { margin: 0; padding: 1.4rem 1.5rem; background: var(--kz-panel-bg); border: 1px solid rgba(255, 255, 255, 0.09); border-radius: var(--radius); box-shadow: var(--sh-2), inset 0 1px 0 var(--lit-edge); }
+.pf-wins b { font: 600 1.15rem/1 var(--kz-sans); font-variant-numeric: lining-nums tabular-nums; color: var(--gold-500); min-width: 2.4rem; } /* Ziffern in Inter: „1×“ sah in der Schmuckschrift wie „I×“ aus */
+.pf-reviews { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr)); gap: var(--sp-2); }
+.pf-section:has(.pf-reviews) { max-width: none; }
+.pf-review { display: flex; flex-direction: column; margin: 0; padding: 1.4rem 1.5rem; background: var(--kz-panel-bg); border: 1px solid rgba(255, 255, 255, 0.09); border-radius: var(--radius); box-shadow: var(--sh-2), inset 0 1px 0 var(--lit-edge); }
 .pf-stars { color: var(--gold-500); letter-spacing: 0.15em; font-size: 0.85rem; }
-.pf-review blockquote { margin: 0.5rem 0; font: italic 500 1.25rem/1.5 var(--kz-serif); color: var(--kz-ink); }
-.pf-review figcaption { font-size: 0.82rem; color: var(--kz-muted); }
+.pf-review blockquote { flex: 1; margin: 0.6rem 0 1.1rem; font: italic 500 1.2rem/1.5 var(--kz-serif); color: var(--kz-ink); }
+.pf-review figcaption, .kz-quote figcaption { display: flex; align-items: center; gap: 0.7rem; font-size: 0.85rem; font-weight: 600; color: var(--kz-ink); }
+.pf-review figcaption small, .kz-quote figcaption small { display: block; font-weight: 400; font-size: 0.78rem; color: var(--kz-muted); }
+/* Initialen des Mandanten auf Gold (wie die Anwalts-Avatare) */
+.kz-avatar { flex: none; display: grid; place-items: center; width: 2.4rem; height: 2.4rem; border-radius: 50%; background: linear-gradient(135deg, var(--gold-light), var(--gold-500) 55%, var(--gold-600)); box-shadow: 0 0 0 2px rgba(2, 5, 14, 0.9), 0 0 0 3px rgba(var(--accent-rgb), 0.3); font: 700 0.85rem/1 var(--kz-sans); letter-spacing: 0.03em; color: #02050e; }
 .duty-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--emerald); display: inline-block; }
 .duty-dot.s-gericht { background: var(--gold-500); }
 .duty-dot.s-pause { background: var(--amber); }
 @media (max-width: 479px) { .pf-actions > .kz-btn { flex: 1 1 100%; } }
+
+/* ------------------------------------------------------------------ Banner ganz oben (Einstellungen → Texte & Banner)
+   Schlank und ruhig wie die Kopfzeile: eine Zeile, Titel in der Überschriften-Schrift, Text, Link in Gold – kein
+   Siegel-Kreis, kein Glanz, Breite wie der Inhalt der Seite. Aktionsbanner (Rabatt) behalten ihre eigene Aufmachung. */
+.site-home .site-banner:not(.is-promo) { background: linear-gradient(90deg, rgba(var(--sb), 0.05), rgba(var(--sb), 0.12) 50%, rgba(var(--sb), 0.05)), #050a16; box-shadow: none; border: 0; }
+.site-home .site-banner:not(.is-promo)::before { display: none; }
+.site-home .site-banner:not(.is-promo)::after { opacity: 0.6; }
+.site-home .site-banner:not(.is-promo) .sb-shine, .site-home .site-banner:not(.is-promo) .sb-seal { display: none; }
+.site-home .site-banner:not(.is-promo) .sb-inner { max-width: 72rem; min-height: 2.75rem; padding: 0.45rem 3rem 0.45rem 1.5rem; gap: 0.5rem 1.25rem; justify-content: center; }
+.site-home .site-banner:not(.is-promo) .sb-stage { flex: 0 1 auto; }
+.site-home .site-banner:not(.is-promo) .sb-slide { justify-content: center; gap: 0.5rem 1rem; flex-wrap: wrap; }
+.site-home .site-banner:not(.is-promo) .sb-copy { flex: 0 1 auto; flex-direction: row; flex-wrap: wrap; align-items: baseline; justify-content: center; text-align: center; gap: 0.1rem 0.6rem; }
+.site-home .site-banner:not(.is-promo) .sb-title { font: 600 1.05rem/1.2 var(--kz-serif); color: var(--sb-ink); text-shadow: none; letter-spacing: 0.01em; }
+.site-home .site-banner:not(.is-promo) .sb-title::after { content: '·'; margin-left: 0.6rem; color: var(--kz-muted); }
+.site-home .site-banner:not(.is-promo) .site-banner-text { font: 400 0.86rem/1.4 var(--kz-sans); color: var(--kz-text); }
+.site-home .site-banner:not(.is-promo) .sb-cta { padding: 0; background: none; border: 0; box-shadow: none; color: var(--gold-500); font: 600 0.84rem/1.2 var(--kz-sans); }
+.site-home .site-banner:not(.is-promo) .sb-cta:hover { background: none; color: var(--gold-light); transform: none; }
+.site-home .site-banner:not(.is-promo) .site-banner-x { width: 1.7rem; height: 1.7rem; background: transparent; color: var(--kz-muted); }
+.site-home .site-banner:not(.is-promo) .site-banner-x:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+@media (max-width: 767px) {
+    .site-home .site-banner:not(.is-promo) .sb-inner { padding: 0.55rem 2.6rem 0.55rem 1rem; min-height: 0; }
+    .site-home .site-banner:not(.is-promo) .sb-tail { justify-content: center; }
+    .site-home .site-banner:not(.is-promo) .sb-inner { flex-direction: column; }
+    .site-home .site-banner:not(.is-promo) .sb-title::after { display: none; }
+    .site-home .site-banner:not(.is-promo) .sb-copy { flex-direction: column; align-items: center; }
+    .site-home .site-banner:not(.is-promo) .site-banner-text { font-size: 0.8rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+}
 
 /* Ausgewogen/Schnell (ohne Grafikkarte): deckende Flächen, stehender Hintergrund, kein Glanz – siehe gfx.css */

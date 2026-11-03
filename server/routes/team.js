@@ -59,6 +59,13 @@ const memberSchema = z.object({
   description: z.string().trim().max(400).optional(),
   focus: textList(/[,\n]/, 6, 40, 'Schwerpunkte').optional(),
   highlights: textList(/\n/, 6, 140, 'Erfolge').optional(),
+  // Telefon im Spiel für die Profilseite (Ziffern, Leerzeichen, + - / ( ))
+  phone: z
+    .string()
+    .trim()
+    .max(30)
+    .refine((v) => v === '' || /^[+\d][\d\s()/-]{1,28}$/.test(v), 'Bitte nur eine Telefonnummer (Ziffern, Leerzeichen, + - / ( )).')
+    .optional(),
   initials: z.string().trim().max(5).optional(),
   visible: z.boolean().optional(),
   userId: z.number().int().positive().nullable().optional(),
@@ -126,10 +133,10 @@ adminRouter.post(
       const maxOrder = Q.teamMembers.maxSortOrder.get().m;
       const info = db
         .prepare(
-          `INSERT INTO team_members (name, role_title, description, initials, tier, sort_order, user_id, visible, focus, highlights)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO team_members (name, role_title, description, initials, tier, sort_order, user_id, visible, focus, highlights, phone)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
-        .run(d.name, d.roleTitle, d.description || '', d.initials || deriveInitials(d.name), d.tier || 'anwalt', maxOrder + 1, userId, d.visible === false ? 0 : 1, (d.focus || []).join('\n'), (d.highlights || []).join('\n'));
+        .run(d.name, d.roleTitle, d.description || '', d.initials || deriveInitials(d.name), d.tier || 'anwalt', maxOrder + 1, userId, d.visible === false ? 0 : 1, (d.focus || []).join('\n'), (d.highlights || []).join('\n'), d.phone || '');
       if (userId && d.userId) {
         Q.users.setDisplayNameAndRankById.run(d.name, d.roleTitle.slice(0, 60), userId);
       }
@@ -176,7 +183,7 @@ adminRouter.patch(
       // Initialen automatisch nachziehen, wenn der Name geändert und keine eigenen angegeben wurden.
       const initials = d.initials !== undefined ? d.initials || deriveInitials(name) : d.name !== undefined ? deriveInitials(name) : m.initials;
       db.prepare(
-        'UPDATE team_members SET name = ?, role_title = ?, description = ?, initials = ?, tier = ?, visible = ?, user_id = ?, focus = ?, highlights = ? WHERE id = ?'
+        'UPDATE team_members SET name = ?, role_title = ?, description = ?, initials = ?, tier = ?, visible = ?, user_id = ?, focus = ?, highlights = ?, phone = ? WHERE id = ?'
       ).run(
         name,
         roleTitle,
@@ -187,6 +194,7 @@ adminRouter.patch(
         userId || null,
         d.focus ? d.focus.join('\n') : m.focus || '',
         d.highlights ? d.highlights.join('\n') : m.highlights || '',
+        d.phone ?? m.phone ?? '',
         m.id
       );
       // Verknüpftes Login-Konto synchron halten (Name im Dashboard, Rang in Nachrichten/Rechnungen).

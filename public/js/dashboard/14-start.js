@@ -1476,7 +1476,7 @@ document.addEventListener('ps:form-ok', () => buzz());
   // Banner, Beschriftungen und Hinweise aus Einstellungen → Website
   if (window.PS.siteConfig && st.siteConfig) {
     PS.siteConfig.setLabels(st.siteConfig.labels);
-    PS.siteConfig.banners(st.siteConfig, $('#content'), { className: 'dash-banner' });
+    // Banner (Einstellungen → Texte & Banner) stehen nur auf der Website, nicht im Dashboard
     if (PS.theme) {
       PS.theme.apply(st.siteConfig.style);
       PS.theme.season(st.siteConfig.style && st.siteConfig.style.seasonDash === false ? '' : st.siteConfig.season);

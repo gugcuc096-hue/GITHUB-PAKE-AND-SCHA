@@ -72,8 +72,10 @@ function memberModal(m) {
           <p class="form-hint">Mit Komma trennen, höchstens 6. Leer lassen = automatisch aus den Rechtsgebieten seiner Akten.</p></div>
         <div class="span-2"><label class="label" for="tmWins">Besondere Erfolge</label><textarea id="tmWins" name="highlights" class="field" rows="3" maxlength="900" placeholder="z. B. Freispruch im Bankraub-Prozess vor dem Supreme Court">${esc((v.highlights || []).join('\n'))}</textarea>
           <p class="form-hint">Einer pro Zeile, höchstens 6 – stehen auf der Profilseite über den automatisch gezählten Erfolgen.</p></div>
+        <div><label class="label" for="tmPhone">Telefon (im Spiel)</label><input id="tmPhone" name="phone" class="field" maxlength="30" inputmode="tel" value="${esc(v.phone || '')}" placeholder="z. B. 555-0142">
+          <p class="form-hint">Steht auf seiner Profilseite (zum Kopieren). Leer = keine Nummer.</p></div>
         <div><label class="label" for="tmInit">Initialen</label><input id="tmInit" name="initials" class="field" maxlength="5" value="${esc(v.initials || '')}" placeholder="automatisch"></div>
-        <div class="flex items-end pb-2"><label class="check"><input type="checkbox" name="visible" ${v.visible ? 'checked' : ''}> Auf der Website anzeigen</label></div>
+        <div class="span-2 flex items-end pb-2"><label class="check"><input type="checkbox" name="visible" ${v.visible ? 'checked' : ''}> Auf der Website anzeigen</label></div>
         <fieldset class="span-2 rounded-2xl p-4" style="border:1px solid var(--glass-border);background:rgba(15,23,42,.35)">
           <legend class="label px-1 mb-0">Login-Konto fürs Dashboard</legend>${accountBlock}
         </fieldset>

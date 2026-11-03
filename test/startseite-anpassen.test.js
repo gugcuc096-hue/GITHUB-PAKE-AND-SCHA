@@ -100,6 +100,40 @@ describe('Startseite anpassen und gemeinsames Design', () => {
     assert.equal(pub.focusAuto, true);
   });
 
+  it('Telefonnummer eines Anwalts: in der Team-Verwaltung gepflegt, auf der Profilseite zum Kopieren', async () => {
+    const team = (await admin.c.get('/api/admin/team')).json.team;
+    const m = team.find((t) => t.visible) || team[0];
+    const bad = await admin.c.patch(`/api/admin/team/${m.id}`, { phone: 'ruf mich an' });
+    assert.equal(bad.status, 400, 'nur Telefonnummern');
+    const ok = await admin.c.patch(`/api/admin/team/${m.id}`, { phone: '555-0142' });
+    assert.equal(ok.status, 200, ok.text);
+    const pub = (await fetch(`${server.base}/api/team`).then((r) => r.json())).team.find((t) => t.id === m.id);
+    assert.equal(pub.phone, '555-0142');
+    const profile = await page(`/team/${pub.slug}`);
+    assert.match(profile, /class="pf-phone-btn" data-copy="555-0142"/);
+    assert.equal((await admin.c.patch(`/api/admin/team/${m.id}`, { phone: '' })).status, 200);
+    assert.doesNotMatch(await page(`/team/${pub.slug}`), /pf-phone-btn/, 'ohne Nummer keine Zeile');
+  });
+
+  it('keine Zeile mehr über der Kopfzeile; Banner stehen über der Kopfzeile (nur Website)', async () => {
+    const home = await page('/');
+    assert.doesNotMatch(home, /class="topstrip/);
+    assert.doesNotMatch(await (await fetch(`${server.base}/js/dashboard.bundle.js`)).text(), /className: 'dash-banner'/, 'Dashboard zeigt keine Banner');
+  });
+
+  it('Rechtsgebiet mit großem Symbol hinter der Überschrift, Kennzahlen-Kacheln mit Symbol, Stimmen mit Initialen', async () => {
+    for (const [key, icon] of [['strafrecht', 'shield'], ['zivilrecht', 'scale']]) {
+      const html = await page(`/rechtsgebiete/${key}`);
+      assert.equal((html.match(/class="kz-pagehead-ico"/g) || []).length, 1, `${key}: genau ein Symbol im Seitenkopf`);
+      assert.ok(html.includes(`<span class="kz-pagehead-ico" aria-hidden="true">${require('../server/web/icons').svg(icon)}</span>`), `${key}: Symbol ${icon}`);
+    }
+    assert.doesNotMatch(await page('/kanzlei'), /kz-pagehead-ico/, 'nur auf den Seiten der Rechtsgebiete');
+    const css = await (await fetch(`${server.base}/css/kanzlei.css`)).text();
+    assert.match(css, /\.kz-section\.is-band::?before/, 'Abschnitte abwechselnd auf hellerem Band');
+    assert.match(css, /:active:not\(:disabled\)\s*\{\s*transform:\s*scale\(0?\.97\)/, 'Knöpfe geben beim Drücken nach (nur transform)');
+    assert.match(css, /\.kz-empty\.is-rich/, 'leere Zustände mit Symbol');
+  });
+
   it('Browser: Startseite auf der Seite anpassen und goldener Strich gleitet beim Seitenwechsel', { skip: chromium ? false : 'Playwright nicht installiert' }, async () => {
     const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'de-DE' });
@@ -130,6 +164,9 @@ describe('Startseite anpassen und gemeinsames Design', () => {
       assert.equal(home.lawyerMode, 'auswahl');
       await p.goto(`${server.base}/`);
       assert.equal(await p.locator('#fakten').count(), 0, 'Eckdaten weg');
+      // Abschnitte abwechselnd auf hellerem Band: jeder zweite sichtbare
+      const bands = await p.$$eval('main > section.kz-section:not(.hidden)', (els) => els.map((e) => e.classList.contains('is-band')));
+      assert.ok(bands.length >= 2 && bands.every((b, i) => b === (i % 2 === 1)), `Bänder abwechselnd: ${bands}`);
       // Abschnitt-Leiste: „nach oben“ verschiebt sofort
       await p.goto(`${server.base}/?bearbeiten`);
       await p.waitForSelector('#ansprechpartner > .sc-chip');

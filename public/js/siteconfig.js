@@ -405,7 +405,7 @@
     if (cfg.calculator) PS.calc = cfg.calculator; // Tarifrechner: Bündelrabatt, Prioritätszuschlag
     window.dispatchEvent(new CustomEvent('ps:promo'));
     if (page === 'site') {
-      banners(cfg, document.querySelector('.topstrip') || document.body.firstElementChild);
+      banners(cfg, document.querySelector('.topstrip, body > header, .kz-header') || document.body.firstElementChild); // ganz oben, über der Kopfzeile
       if (document.getElementById('start')) applyHome(cfg.home, features);
       if (preview) {
         const r = document.createElement('div');
