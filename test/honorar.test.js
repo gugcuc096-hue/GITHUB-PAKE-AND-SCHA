@@ -216,13 +216,9 @@ describe('Honorarrechner: Honorarordnung, Angebote, Akte und Erfolgshonorar', ()
       });
       await p.waitForFunction(() => /20 % von 200\.000 \$ = 40\.000 \$/.test(document.getElementById('hrSuccess').textContent));
       assert.match(await p.textContent('#hrSteps'), /Nur bei Erfolg/);
-      // Angebot als Code speichern und über den Link wieder öffnen
-      await p.click('#hrSave');
-      await p.waitForSelector('#hrCode:not([hidden]) .hr-code-v');
-      const code = (await p.textContent('#hrCode .hr-code-v')).trim();
-      assert.match(code, /^HON-\d+$/);
-      await p.goto(`${server.base}/honorare?angebot=${code}`);
-      await p.waitForFunction(() => /40\.000 \$/.test(document.getElementById('hrSuccess').textContent));
+      // Kein „Als Link speichern“ mehr – das Angebot geht beim Absenden der Anfrage automatisch mit
+      assert.equal(await p.locator('#hrSave, #hrCode').count(), 0);
+      assert.match(await p.textContent('[data-act="ticket"][data-source="calc"]'), /^\s*Mandat anfragen\s*$/);
       // Assistent: Rechtsgebiet → Leistung → Empfehlung mit Preis → übernehmen
       await p.goto(`${server.base}/honorare`);
       await p.click('[data-hr-tab="assistent"]');
