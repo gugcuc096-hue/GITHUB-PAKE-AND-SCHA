@@ -146,7 +146,7 @@
     const wish = Number(form.elements.teamMemberId && form.elements.teamMemberId.value);
     if (wish) data.teamMemberId = wish; // Wunschanwalt von der Teamkarte
     // Aus dem Tarifrechner: Angebot (HON-…) speichern und mitschicken → Honorarvereinbarung in der Akte
-    if (form.dataset.source === 'calc' && window.PSHonorarSite) {
+    if (form.dataset.draftSource === 'calc' && window.PSHonorarSite) {
       const offer = await window.PSHonorarSite.ensureOffer().catch(() => null);
       if (offer) data.offerCode = offer.code;
     }

@@ -111,7 +111,8 @@ describe('Fristenrechner im Kalender (Browser)', { skip: chromium ? false : 'Pla
         await page.click('[data-action="event-new"], [data-action="new-event"]');
         // schloss die fertig werdende Seitenansicht das Fenster gleich wieder, noch einmal öffnen (statt 30 s zu warten)
         if (!(await page.waitForSelector('select[data-event-kind]', { timeout: 8000 }).then(() => true, () => false))) continue;
-        await page.selectOption('select[data-event-kind]', 'berufung');
+        // schließt sich das Fenster genau jetzt, nicht 30 s warten, sondern neu öffnen
+        if (!(await page.selectOption('select[data-event-kind]', 'berufung', { timeout: 4000 }).then(() => true, () => false))) continue;
         if (await page.waitForSelector('#evCalc:not([hidden])', { timeout: 6000 }).then(() => true, () => false)) break;
         await page.evaluate(() => closeModal && closeModal());
       }

@@ -41,7 +41,7 @@ function openTicketModal(source, lawyer = null) {
     document.getElementById('ticketSuccess').classList.add('hidden');
     setWishLawyer(lawyer); // „Direkt anfragen“ auf einer Teamkarte – alle anderen Knöpfe senden an die ganze Kanzlei
     // Auswahl aus dem Tarifrechner in den Sachverhalt übernehmen; beim Absenden geht das Angebot (HON-…) mit (site.js)
-    document.getElementById('ticketForm').dataset.source = source === 'calc' ? 'calc' : '';
+    document.getElementById('ticketForm').dataset.draftSource = source === 'calc' ? 'calc' : ''; // „draft…“: zählt nicht zum Schlüssel des Entwurfs
     if (source === 'calc' && window.PSHonorarSite) {
         const text = window.PSHonorarSite.ticketText();
         const desc = document.getElementById('tkDesc');

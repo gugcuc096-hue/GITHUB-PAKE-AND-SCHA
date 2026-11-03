@@ -515,9 +515,7 @@ caseRouter.get('/billing', (req, res) => {
       : null,
     items: pick ? pick.items : fee ? feeItems : [],
     // Ohne Vertrag mit Leistungen: Positionen aus der Honorarvereinbarung (Angebot des Honorarrechners)
-    feeAgreement: fee
-      ? { offerCode: fee.offerCode, bundlePct: fee.quote.bundle ? fee.quote.bundle.pct : 0, used: !pick && feeItems.length > 0, total: fee.quote.totalLow, totalHigh: fee.quote.totalHigh }
-      : null,
+    ...(fee ? { feeAgreement: { offerCode: fee.offerCode, bundlePct: fee.quote.bundle ? fee.quote.bundle.pct : 0, used: !pick && feeItems.length > 0, total: fee.quote.totalLow, totalHigh: fee.quote.totalHigh } } : {}),
     invoices: invoices.map((i) => ({ id: i.id, number: i.number, kind: i.kind, total: i.total, status: i.status })),
   });
 });
