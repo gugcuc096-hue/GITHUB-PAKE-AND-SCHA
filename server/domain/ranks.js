@@ -163,7 +163,7 @@ function cardsHtml(level) {
                         <div class="glass-card p-6 border-t-2 ${top} flex flex-col justify-between">
                             <div>
                                 <div class="flex items-center justify-between mb-3">
-                                    ${r.badge ? `<span class="text-[0.62rem] tracking-[0.14em] px-3 py-1 rounded-sm ${badge} uppercase font-semibold">${esc(r.badge)}</span>` : '<span></span>'}
+                                    ${r.badge ? `<span class="text-[0.62rem] tracking-[0.14em] px-3 py-1 rounded-full ${badge} uppercase font-semibold">${esc(r.badge)}</span>` : '<span></span>'}
                                     <span class="text-xs text-[var(--text-muted)] tabular-nums">Rang ${offset + i + 1}</span>
                                 </div>
                                 <h4 class="font-serif text-2xl font-semibold text-white mb-3">${esc(r.name)}</h4>
