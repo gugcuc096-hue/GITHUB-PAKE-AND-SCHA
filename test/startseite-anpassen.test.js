@@ -133,7 +133,7 @@ describe('Startseite anpassen und gemeinsames Design', () => {
     assert.match(css, /:active:not\(:disabled\)\s*\{\s*transform:\s*scale\(0?\.97\)/, 'Knöpfe geben beim Drücken nach (nur transform)');
     assert.match(css, /\.kz-empty\.is-rich/, 'leere Zustände mit Symbol');
     // goldener Hover-Strich auf allen Karten, nicht nur den anklickbaren
-    for (const sel of ['.kz-fact', '.kz-principles > div', '.kz-contact > div', '.pf-review', '.hr-pack', '.site-home main .glass-card']) assert.ok(css.includes(`${sel}:hover::after`), `Hover-Strich: ${sel}`);
+    for (const sel of ['.kz-fact', '.kz-principles > div', '.kz-contact > div', '.pf-review', '.hr-pack', '.site-home main .glass-card']) assert.ok(css.replace(/\s*>\s*/g, '>').includes(`${sel.replace(/\s*>\s*/g, '>')}:hover:after`) || css.replace(/\s*>\s*/g, '>').includes(`${sel.replace(/\s*>\s*/g, '>')}:hover::after`), `Hover-Strich: ${sel}`);
     // Rang-Etiketten sind Pillen (rounded-full), nicht eckig
     assert.doesNotMatch(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'server', 'domain', 'ranks.js'), 'utf8'), /rounded-sm/);
   });
