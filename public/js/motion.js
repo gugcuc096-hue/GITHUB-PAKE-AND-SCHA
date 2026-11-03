@@ -525,8 +525,43 @@
       }
     });
   }
+  /*
+   * Glanz über „Recht bekommen.“ (Startseite): eine eigene Ebene mit hellem Text gleitet über den stehenden Goldverlauf –
+   * Fenster und Inhalt werden gegenläufig verschoben, also nur verschoben, nie neu gemalt (auch ohne Grafikkarte billig).
+   * Beim Laden, beim Darüberfahren und in „Schön“ alle 9 Sekunden; „Schnell“ und „Bewegung reduzieren“: kein Glanz.
+   */
+  function heroShine() {
+    const el = document.querySelector('.kz-shine');
+    if (!el || el.querySelector('.kz-shine-band') || /[?&]bearbeiten\b/.test(location.search) || typeof el.animate !== 'function') return;
+    const text = el.textContent;
+    const band = document.createElement('span');
+    band.className = 'kz-shine-band';
+    band.setAttribute('aria-hidden', 'true');
+    const inner = document.createElement('span');
+    inner.textContent = text;
+    band.appendChild(inner);
+    el.appendChild(band);
+    const gfx = () => document.documentElement.dataset.gfx;
+    let running = null;
+    const run = () => {
+      if (calm() || gfx() === 'lite' || document.hidden || running) return;
+      const w = el.offsetWidth;
+      const bw = band.offsetWidth;
+      if (!w || !bw) return;
+      inner.style.width = `${w}px`;
+      const opts = { duration: 1700, easing: 'cubic-bezier(0.45, 0, 0.25, 1)' };
+      running = band.animate([{ transform: `translateX(${-bw}px)` }, { transform: `translateX(${w}px)` }], opts);
+      inner.animate([{ transform: `translateX(${bw}px)` }, { transform: `translateX(${-w}px)` }], opts);
+      running.onfinish = running.oncancel = () => (running = null);
+    };
+    setTimeout(run, 900); // nach dem Einblenden des Startbereichs
+    el.closest('h1')?.addEventListener('pointerenter', run);
+    setInterval(() => gfx() === 'full' && run(), 9000);
+  }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', siteNavInk);
   else siteNavInk();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', heroShine);
+  else heroShine();
   // Website: Kopfleiste „gescrollt“ (dichter, goldene Haarlinie)
   if (!document.getElementById('sidebar')) {
     const scrolled = () => document.documentElement.classList.toggle('is-scrolled', window.scrollY > 12);

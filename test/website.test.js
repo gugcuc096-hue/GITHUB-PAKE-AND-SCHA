@@ -120,7 +120,7 @@ describe('Website & Ränge selbst pflegen', () => {
     const html = await page.text();
     const v = (html.match(/\/js\/api\.js\?v=([a-f0-9]{12})"/) || [])[1];
     assert.ok(v, 'Versionsnummer an den Skripten');
-    assert.match(html, new RegExp(`<script src="/js/dashboard\\.bundle\\.js\\?v=${v}" data-staff="/js/dashboard\\.staff\\.js\\?v=${v}"></script>`));
+    assert.match(html, new RegExp(`<script src="/js/dashboard\\.bundle\\.js\\?v=${v}" data-staff="/js/dashboard\\.staff\\.js\\?v=${v}" data-lazy="/js/dashboard\\.\\{teil\\}\\.js\\?v=${v}"></script>`));
     assert.doesNotMatch(html, /\/js\/dashboard\/\d\d-/, 'keine Einzelteile mehr');
     assert.match(html, new RegExp(`href="/css/app\\.css\\?v=${v}"`));
     const bundle = await fetch(`${server.base}/js/dashboard.bundle.js?v=${v}`);
@@ -131,7 +131,15 @@ describe('Website & Ränge selbst pflegen', () => {
     assert.ok(code.length < 900000 && !code.includes('---- 01-basis.js ----'), 'verkleinert (ohne Kommentare)');
     const staff = await fetch(`${server.base}/js/dashboard.staff.js?v=${v}`);
     assert.equal(staff.headers.get('cache-control'), YEAR);
-    assert.match(await staff.text(), /views\.settings ?=/, 'Verwaltungsteile im zweiten Bündel');
+    const staffCode = await staff.text();
+    assert.match(staffCode, /views\.settings ?=/, 'Verwaltungsteile im zweiten Bündel');
+    // Tatort-Karte nur für die Kanzlei, die 3D-Ansicht erst bei Bedarf (eigenes Bündel)
+    assert.ok(!/function karteSection/.test(code) && /function karteSection/.test(staffCode), 'Karte im Kanzlei-Bündel');
+    assert.ok(!/function karteSet3d/.test(code + staffCode), '3D nicht in den Bündeln');
+    const k3 = await fetch(`${server.base}/js/dashboard.karte3d.js?v=${v}`);
+    assert.equal(k3.status, 200);
+    assert.match(await k3.text(), /function karteSet3d/);
+    assert.equal((await fetch(`${server.base}/js/dashboard.unbekannt.js?v=${v}`)).status, 404);
     const br = await fetch(`${server.base}/js/dashboard.bundle.js?v=${v}`, { headers: { 'accept-encoding': 'br' } });
     assert.equal(br.headers.get('content-encoding'), 'br');
     assert.equal(br.headers.get('vary'), 'Accept-Encoding');

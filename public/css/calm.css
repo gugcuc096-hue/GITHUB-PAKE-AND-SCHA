@@ -101,7 +101,7 @@ body.modal-open #content { scale: 1; }
 @keyframes modal-blur-in { from { opacity: 1; } }
 
 /* Website (kanzlei.css): Schimmer steht, Karten und Menüs erscheinen ohne Gleiten */
-.kz-shine { animation: none !important; background-position: 50% 0 !important; }
+.kz-shine-band { display: none; }
 .kz-hero-in > *, .site-home .reveal.in-view :is(.kz-tiles, .kz-people, .kz-news-cards, .kz-facts, .kz-flow, .kz-principles, .kz-contact) > *, .site-home #mobileMenu.open .kz-mm-nav > * { animation: none !important; }
 .site-home .reveal { transform: none !important; }
 .site-home #mobileMenu { transform: none !important; opacity: 0; transition: opacity 0.15s ease, visibility 0s linear 0.15s !important; }

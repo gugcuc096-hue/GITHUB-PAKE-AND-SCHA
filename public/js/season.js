@@ -22,7 +22,7 @@
   const TAU = Math.PI * 2;
   const dash = () => !!document.getElementById('sidebar');
   // Schnelle Grafikstufe (gfx.js: ohne Grafikkarte, schwaches Gerät, Ruckeln gemessen) → nur das stehende Bild
-  const calm = () => root.dataset.gfx === 'lite' || (window.PS && window.PS.motion ? window.PS.motion.calm() : window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const calm = () => root.dataset.gfx === 'lite' || root.dataset.gfx === 'mid' || (window.PS && window.PS.motion ? window.PS.motion.calm() : window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const isOff = () => {
     try {
       return localStorage.getItem(OFF_KEY) === '1';

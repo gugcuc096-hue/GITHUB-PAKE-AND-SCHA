@@ -109,8 +109,7 @@ function userTable() {
   if (!rows.length) return empty('Keine Benutzer gefunden.', 'users');
   return `<div class="tbl-wrap"><table class="tbl tbl-cards">
       <thead><tr><th>Name</th><th>Rolle</th><th>Rang</th><th>Discord</th><th>Letzter Login</th><th><span class="sr-only">Aktionen</span></th></tr></thead>
-      <tbody>${rows
-      .map((u) => {
+      <tbody>${lazyRows(rows, (u) => {
         const self = u.id === st.user.id;
         return `<tr>
             <td class="td-main"><div class="flex items-center gap-3">${avatarWrap(u.avatarUrl, u.displayName, u.duty, 'sm')}<div class="min-w-0">
@@ -128,8 +127,7 @@ function userTable() {
                    <button class="btn-ghost btn-sm" data-action="user-toggle" data-id="${u.id}">${u.active ? 'Sperren' : 'Entsperren'}</button>
                    <button class="icon-btn sm" data-action="user-delete" data-id="${u.id}" aria-label="Löschen">${icon('trash', 'ico-sm')}</button>`
           }</td></tr>`;
-      })
-      .join('')}</tbody></table></div>`;
+      }, 6)}</tbody></table></div>`;
 }
 
 views.users = {

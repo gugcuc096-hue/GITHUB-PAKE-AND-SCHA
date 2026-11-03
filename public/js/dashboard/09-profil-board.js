@@ -21,16 +21,16 @@ function motionPanel() {
     </section>`;
 }
 
-/** Grafik je Gerät (gfx.js): automatisch, schnell (ohne Glas und Dauer-Animationen) oder schön (Glas). */
+/** Grafik je Gerät (gfx.js): automatisch, schön (Glas), ausgewogen (ohne Weichzeichner und Dauer-Animationen) oder schnell. */
+const GFX_NAME = { full: 'schön', mid: 'ausgewogen', lite: 'schnell' };
 function gfxChoice() {
   const g = window.PSGfx;
   if (!g) return '';
   const opt = (v, label) => `<button type="button" class="chip ${g.pref === v ? 'active' : ''}" data-action="gfx-set" data-value="${v}" aria-pressed="${g.pref === v}">${label}</button>`;
-  const now = g.mode === 'lite' ? 'schnell' : 'schön';
   return `<h3 class="section-title mt-5 text-base">Grafik</h3>
-      <p class="text-sm text-muted">„Automatisch“ erkennt, ob dieser Browser mit Grafikkarte zeichnet, und misst die Bildrate – ruckelt es, schaltet die Website von selbst auf „Schnell“: gleiche Optik ohne Glas-Weichzeichner und Dauer-Animationen, viel weniger Last. „Schön“ zeigt Glas in Kopfzeile, Menüs und Fenstern (braucht eine Grafikkarte).</p>
-      <div class="chip-row mt-3">${opt('auto', 'Automatisch')}${opt('lite', 'Schnell')}${opt('full', 'Schön')}</div>
-      <p class="form-hint mt-2">Gerade: <strong>${now}</strong>${g.pref === 'auto' && g.reason ? ` (${esc(g.reason)})` : ''}.</p>`;
+      <p class="text-sm text-muted">„Automatisch“ erkennt, ob dieser Browser mit Grafikkarte zeichnet, und misst die Bildrate im Takt Ihres Monitors – reicht es nicht, schaltet die Website von selbst eine Stufe herunter. „Schön“: Glas in Kopfzeile, Menüs und Fenstern (braucht eine Grafikkarte). „Ausgewogen“: fast gleiche Optik ohne Weichzeichner und Dauer-Animationen. „Schnell“: zusätzlich ohne Seitenübergänge und Glanz.</p>
+      <div class="chip-row mt-3">${opt('auto', 'Automatisch')}${opt('full', 'Schön')}${opt('mid', 'Ausgewogen')}${opt('lite', 'Schnell')}</div>
+      <p class="form-hint mt-2">Gerade: <strong>${GFX_NAME[g.mode] || g.mode}</strong>${g.pref === 'auto' && g.reason ? ` (${esc(g.reason)})` : ''}${g.hz ? ` · Monitor ${g.hz} Hz` : ''}.</p>`;
 }
 
 /**
@@ -1096,7 +1096,7 @@ Object.assign(actions, {
   'gfx-set': (el) => {
     window.PSGfx.set(el.dataset.value);
     renderView();
-    toast({ lite: 'Grafik: Schnell – ohne Glas und Dauer-Animationen.', full: 'Grafik: Schön – mit Glas-Effekten.' }[el.dataset.value] || `Grafik: Automatisch (gerade ${window.PSGfx.mode === 'lite' ? 'schnell' : 'schön'}).`);
+    toast({ lite: 'Grafik: Schnell – ohne Glas, Dauer-Animationen und Seitenübergänge.', mid: 'Grafik: Ausgewogen – ohne Weichzeichner und Dauer-Animationen.', full: 'Grafik: Schön – mit Glas-Effekten.' }[el.dataset.value] || `Grafik: Automatisch (gerade ${GFX_NAME[window.PSGfx.mode] || window.PSGfx.mode}).`);
   },
   // Zwei-Faktor-Anmeldung (Profil)
   'tf-on': async () => {

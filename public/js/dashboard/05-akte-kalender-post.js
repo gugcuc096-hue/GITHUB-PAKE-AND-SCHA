@@ -1116,7 +1116,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     charges: staff ? (fallQuiet('charges', !!(charges && charges.charges.length)) ? '' : chargesSection(c, charges, deals)) : dealClientCard(c, deals),
     chat: chatSection(c, chat, ticket),
     witnesses: fallQuiet('witnesses', parties.some((p) => p.role === 'zeuge')) ? '' : witnessesSection(c, parties),
-    karte: fallQuiet('karte', places.length > 0) ? '' : karteSection(c, places),
+    karte: fallQuiet('karte', places.length > 0) || typeof karteSection !== 'function' ? '' : karteSection(c, places), // Karte: Kanzlei-Bündel
     contracts: contractsSection(c, contractList),
     briefs: briefsSection(c, briefList),
     external: externalSection(c, externalDocs, attachments),

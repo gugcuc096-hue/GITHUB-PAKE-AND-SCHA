@@ -967,8 +967,9 @@ async function openCase(id) {
   st.modalCaseId = id;
   if (typeof liveSync === 'function') liveSync(); // Mandanten verbinden sich erst, wenn eine Akte offen ist
   initChat(data);
-  karteInit();
+  // Tatort-Karte (nur Kanzlei, dashboard.staff.js) erst nach dem ersten Bild der Akte zeichnen
   animateTrack($('#modalBody .track'));
+  afterPaint(() => st.modalCaseId === id && typeof karteInit === 'function' && karteInit());
 }
 async function reloadCase(id, { live = false, by = '' } = {}) {
   const data = await api.get(caseUrl(id));
@@ -981,7 +982,7 @@ async function reloadCase(id, { live = false, by = '' } = {}) {
     replaceModal(caseDetail(data));
     if (draft && $('#modalBody .chat-input')) $('#modalBody .chat-input').value = draft;
     initChat(data);
-      karteInit();
+    if (typeof karteInit === 'function') karteInit();
     if (before) liveFlash($('#modalBody'), before, by);
     flipPlay(flip);
   }

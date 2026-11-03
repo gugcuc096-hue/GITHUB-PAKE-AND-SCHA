@@ -130,7 +130,7 @@ function metaOf(view) {
 const HEAD_EXTRAS = '<style>@view-transition { navigation: auto; }</style>';
 
 /** Zweiter Knopf im Startbereich (Startseite anpassen → Startbereich). */
-const HERO_LINKS = { anwaelte: ['/anwaelte', 'Unsere Anwälte'], verfahrensstand: ['/verfahrensstand', 'Verfahrensstand abfragen'], honorare: ['/honorare', 'Honorare & Tarifrechner'], kontakt: ['/kontakt', 'Kontakt'] };
+const HERO_LINKS = { anwaelte: ['/anwaelte', 'Unsere Anwälte'], honorare: ['/honorare', 'Honorare & Tarifrechner'], kontakt: ['/kontakt', 'Kontakt'] };
 const START_SECTION = /<section\b[^>]*\bdata-start="([a-z]+)"[^>]*>[\s\S]*?<\/section>\s*/g;
 /** Einstellungen der Startseite anwenden: Abschnitte (Reihenfolge, ausblenden), Rechtsgebiete, Anwälte, Meldungen, Startbereich. */
 function applyStart(html, cfg, edit = false) {

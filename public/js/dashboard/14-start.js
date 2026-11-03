@@ -871,10 +871,28 @@ const LIVE_VIEWS = {
   storage: ['lager'],
 };
 const live = { es: null, ok: false, down: false, timers: new Map(), pendingView: false, pendingCase: null, flash: false };
+/*
+ * Live-Änderungen bündeln: je Schlüssel höchstens einmal (ms nach der letzten Meldung). Im Hintergrund-Tab wird nichts
+ * gezeichnet – die Arbeit wartet und läuft beim Zurückkehren einmal, zusammen in einem Bild.
+ */
 function liveLater(key, fn, ms = 300) {
   clearTimeout(live.timers.get(key));
-  live.timers.set(key, setTimeout(() => (live.timers.delete(key), fn()), ms));
+  live.timers.set(
+    key,
+    setTimeout(() => {
+      live.timers.delete(key);
+      if (document.hidden) live.hiddenQueue.set(key, fn);
+      else fn();
+    }, ms)
+  );
 }
+live.hiddenQueue = new Map();
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden || !live.hiddenQueue.size) return;
+  const work = [...live.hiddenQueue.values()];
+  live.hiddenQueue.clear();
+  requestAnimationFrame(() => work.forEach((fn) => fn()));
+});
 // Tippt gerade jemand (Feld mit Fokus und Inhalt) oder gibt es Ungespeichertes? Dann später.
 // Eine angefangene Chat-Nachricht zählt nicht – die übernimmt das Neuzeichnen der Akte (reloadCase).
 const liveBusy = (root) =>
@@ -887,8 +905,13 @@ function liveView() {
     return;
   }
   live.pendingView = false;
-  live.flash = true; // Geändertes in der Liste leuchtet nach dem Neuzeichnen kurz auf (siehe refreshBehind, 12-live.js)
-  refreshBehind();
+  // Mehrere Meldungen kurz nacheinander (Akte, Aufgaben, Termine …): die Seite dahinter nur einmal je Bild neu zeichnen
+  if (live.viewFrame) return;
+  live.viewFrame = requestAnimationFrame(() => {
+    live.viewFrame = 0;
+    live.flash = true; // Geändertes in der Liste leuchtet nach dem Neuzeichnen kurz auf (siehe refreshBehind, 12-live.js)
+    refreshBehind();
+  });
 }
 // Akte vorladen beim Drüberfahren (kurz verweilen) bzw. sofort beim Antippen
 let prefetchTimer = 0;

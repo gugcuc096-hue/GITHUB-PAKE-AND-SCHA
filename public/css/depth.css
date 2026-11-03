@@ -38,18 +38,18 @@
 }
 .card-gold { border-top-color: var(--gold-500); box-shadow: var(--sh-2), inset 0 1px 0 rgba(var(--accent-light-rgb), 0.35), 0 -10px 26px -18px rgba(var(--accent-rgb), 0.55); }
 
-/* Kennzahlen: leuchten oben rechts golden, heben sich beim Überfahren */
+/* Kennzahlen: leuchten oben rechts golden, heben sich beim Überfahren (nur Verschieben – der Schatten bleibt, so muss nichts neu gemalt werden) */
 .kpi {
   background:
     radial-gradient(120% 90% at 100% 0%, var(--lit-gold), transparent 55%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 90px),
     rgba(10, 18, 40, var(--panel-alpha, 0.74));
-  transition: transform 0.28s var(--ease-out), box-shadow 0.28s var(--ease-out), border-color 0.28s ease;
+  transition: transform 0.28s var(--ease-out), border-color 0.2s ease; /* Schatten wechselt nicht: kein Neumalen je Bild */
 }
 .kpi-value { text-shadow: 0 0 28px rgba(var(--accent-rgb), 0.28); font-variant-numeric: lining-nums tabular-nums; }
 @media (hover: hover) and (pointer: fine) {
-  .kpi:hover { transform: translateY(-2px); border-color: rgba(var(--accent-rgb), 0.28); box-shadow: var(--sh-3), inset 0 1px 0 rgba(var(--accent-light-rgb), 0.2); }
-  .panel:is(a, button, [role="button"], [data-action]):hover { border-color: rgba(var(--accent-rgb), 0.28); box-shadow: var(--sh-3), inset 0 1px 0 rgba(var(--accent-light-rgb), 0.16); }
+  .kpi:hover { transform: translateY(-2px); border-color: rgba(var(--accent-rgb), 0.28); }
+  .panel:is(a, button, [role="button"], [data-action]):hover { border-color: rgba(var(--accent-rgb), 0.28); }
 }
 
 /* Listen: die Zeile unter dem Finger/der Maus bekommt Licht von links */
