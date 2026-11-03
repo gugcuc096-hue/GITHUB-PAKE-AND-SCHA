@@ -182,7 +182,7 @@ html.ps-team header [data-hdr-auth] { display: inline-flex !important; }
 body.menu-open { overflow: hidden; }
 
 /* ------------------------------------------------------------------ Startbereich: zentriert, nur Schrift */
-.kz-hero { position: relative; z-index: 1; padding: 6.5rem 0 var(--sp-5); }
+.kz-hero { position: relative; z-index: 1; padding: 6.5rem 0 var(--sp-5); overflow-x: clip; } /* der Glanz gleitet über den Rand der Überschrift – die Seite wird dadurch nicht breiter */
 .kz-hero-in { display: grid; justify-items: center; text-align: center; }
 .kz-hero .kz-h1 { margin: var(--sp-3) 0; font-size: clamp(2.9rem, 7.4vw, 5.6rem); }
 .kz-hero .kz-lead { margin: 0 auto var(--sp-4); }
