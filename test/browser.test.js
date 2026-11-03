@@ -1158,7 +1158,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await page.waitForSelector('#modalBody .case-jump');
         for (const href of [`/vertrag?id=${k.id}`, `/rechnung?id=${inv.id}`, `/aktenauszug?id=${kase.id}`]) {
           const [tab] = await Promise.all([ctx.waitForEvent('page'), page.$eval(`#modalBody a[href="${href}"]`, (a) => a.click())]);
-          await tab.waitForFunction(() => document.getElementById('backLink').href.includes('?case='));
+          await tab.waitForFunction(() => document.getElementById('backLink')?.href.includes('?case=')); // der neue Tab ist anfangs noch leer (about:blank)
           assert.match(await tab.textContent('#backLink'), /Zur Akte/, `${href}: Knopf „Zur Akte“`);
           // Der Tab schließt sich mitten im Klick – Playwright meldet das als Fehler des Klicks, entscheidend ist „close“
           await Promise.all([tab.waitForEvent('close'), tab.click('#backLink').catch(() => {})]);
@@ -1169,7 +1169,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         // 3) Druckansicht direkt aufgerufen (z. B. „Lesen & unterschreiben“ aus Discord): „← Zur Akte“ öffnet die Akte, X führt zur Liste
         const direct = await ctx.newPage();
         await direct.goto(`${rsrv.base}/vertrag?id=${k.id}`);
-        await direct.waitForFunction(() => document.getElementById('backLink').href.includes('?case='));
+        await direct.waitForFunction(() => document.getElementById('backLink')?.href.includes('?case=')); // der neue Tab ist anfangs noch leer (about:blank)
         await direct.click('#backLink');
         await direct.waitForURL(/dashboard/);
         await direct.waitForSelector('#modalBody .case-jump');
