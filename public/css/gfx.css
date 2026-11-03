@@ -7,7 +7,6 @@
  *  - Kein Weichzeichner, wo man ihn gar nicht sieht (deckende Flächen: Karten, Knöpfe, Fenster, Seitenleiste) und
  *    nicht auf bildschirmfüllenden Ebenen (Fenster-Hintergrund) – stattdessen etwas dunkler.
  *  - Leuchtende Hintergrund-Kreise ohne Riesen-Weichzeichner (blur(150px)) – derselbe weiche Verlauf per Maske, eigene Ebene.
- *  - Abschnitte unterhalb des sichtbaren Bereichs werden erst gezeichnet, wenn man hinscrollt (content-visibility).
  *  - Keine „transition: all“ (sonst wandern auch Schatten und Farben bei jeder Kleinigkeit mit).
  * Nur html[data-gfx="lite"] (gfx.js: ohne Grafikkarte, schwaches Gerät oder Ruckeln gemessen):
  *  - gar kein Weichzeichner, deckende Kopfzeile/Menüs, keine Dauer-Animationen der Deko, keine Weichzeichner-Filter.
@@ -68,11 +67,10 @@
 .glass-card { transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.35s ease, box-shadow 0.35s ease; }
 .btn-outline { transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease; }
 
-/* Startseite: Abschnitte weiter unten erst zeichnen, wenn sie in die Nähe kommen (Größe wird geschätzt und gemerkt) */
-main > section.reveal {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 900px;
-}
+/*
+ * Kein content-visibility auf den Abschnitten der Startseite: deren Höhe wäre bis zum Zeichnen nur geschätzt –
+ * Sprünge zu #karriere, #kontakt … landeten dann an der falschen Stelle.
+ */
 
 /* ================================================================ Schnelle Stufe (lite) */
 html[data-gfx='lite'] *,
