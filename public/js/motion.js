@@ -550,9 +550,13 @@
       if (!w || !bw) return;
       inner.style.width = `${w}px`;
       const opts = { duration: 1700, easing: 'cubic-bezier(0.45, 0, 0.25, 1)' };
+      band.style.visibility = 'visible';
       running = band.animate([{ transform: `translateX(${-bw}px)` }, { transform: `translateX(${w}px)` }], opts);
       inner.animate([{ transform: `translateX(${bw}px)` }, { transform: `translateX(${-w}px)` }], opts);
-      running.onfinish = running.oncancel = () => (running = null);
+      running.onfinish = running.oncancel = () => {
+        running = null;
+        band.style.visibility = '';
+      };
     };
     setTimeout(run, 900); // nach dem Einblenden des Startbereichs
     el.closest('h1')?.addEventListener('pointerenter', run);

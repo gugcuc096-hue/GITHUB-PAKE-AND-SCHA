@@ -209,7 +209,7 @@ body.menu-open { overflow: hidden; }
 /* „Recht bekommen.“: stehender Goldverlauf; der Glanz ist eine eigene Ebene, die darübergleitet (js/motion.js → shine) –
    sie wird nur verschoben, nie neu gemalt. Läuft beim Laden, beim Darüberfahren und (Schön) alle paar Sekunden. */
 .kz-shine { position: relative; display: inline-block; white-space: nowrap; background: linear-gradient(100deg, var(--gold-600) 0%, var(--gold-500) 30%, var(--gold-light) 55%, var(--gold-500) 80%, var(--gold-600) 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: var(--gold-500); padding: 0 0.06em; }
-.kz-shine-band { position: absolute; top: 0; bottom: 0; left: 0; width: 38%; overflow: hidden; pointer-events: none; transform: translateX(-110%); will-change: transform;
+.kz-shine-band { position: absolute; top: 0; bottom: 0; left: 0; width: 38%; overflow: hidden; pointer-events: none; transform: translateX(-110%); visibility: hidden; /* nur während des Glanzes sichtbar – sonst stünde der helle Text links neben der Zeile */ will-change: transform;
     -webkit-mask-image: linear-gradient(90deg, transparent, #000 40%, #000 60%, transparent); mask-image: linear-gradient(90deg, transparent, #000 40%, #000 60%, transparent); }
 .kz-shine-band > span { position: absolute; top: 0; left: 0; padding: inherit; white-space: nowrap; color: #fff8dc; -webkit-text-fill-color: #fff8dc; will-change: transform; }
 .kz-hero-note { margin-top: var(--sp-3); font-size: 0.92rem; color: var(--kz-muted); }
