@@ -4,6 +4,9 @@ uniform bool AntiAliasing < ui_label = "AntiAliasing"; > = true;
 uniform float Sharpen < ui_label = "Sharpen"; ui_type = "drag"; ui_min = 0.0; ui_max = 4.0; > = 1.4;
 uniform float Noise < ui_label = "Filmic Noise"; ui_type = "drag"; ui_min = 0.0; ui_max = 0.1; > = 0.01;
 uniform float2 SkyBloomFix < ui_label = "Sky Bloom Reduction"; ui_tooltip = "DAY    |    NIGHT\n\nReduces bloom / haze in the sky only (buildings, objects and the player are not touched).\n0.0 = off, 1.0 = full"; ui_type = "drag"; ui_min = 0.0; ui_max = 1.0; ui_step = 0.001; > = float2(0.8, 0.5);
+uniform float2 SkyClear < ui_label = "Clear Sky (replace sky)"; ui_tooltip = "DAY    |    NIGHT\n\nReplaces the whole sky with a clean gradient, so any grey haze / fog / bloom / cloud layer in the sky is gone.\nBuildings, objects and the player are not touched.\n0.0 = off, 1.0 = full"; ui_type = "drag"; ui_min = 0.0; ui_max = 1.0; ui_step = 0.001; > = float2(1.0, 0.0);
+uniform float3 SkyColorTop < ui_label = "Clear Sky Color (Top)"; ui_type = "color"; > = float3(0.28, 0.46, 0.78);
+uniform float3 SkyColorHorizon < ui_label = "Clear Sky Color (Horizon)"; ui_type = "color"; > = float3(0.62, 0.74, 0.9);
 uniform float PaletteLut < ui_label = "Palette Lut"; ui_type = "drag"; ui_min = 0.0; ui_max = 2.0; ui_spacing = 4; ui_tooltip = "Default: 1.0\nDisabled: 0.0";  > = 0.0;
 uniform bool UseLevels < ui_label = "Use Levels"; > = false;
 uniform float3 iBlack < ui_label = "Input Black Point"; ui_type = "color"; > = float3(0.0314, 0.0353, 0.0392);
@@ -120,6 +123,13 @@ float4 PS_ColAA(float4 position : SV_Position, float2 texcoord : TEXCOORD, noint
         float3 skyCol = lerp(skyLum, res.xyz, 1.35);
         skyCol *= 1.0 - 0.45 * smoothstep(0.35, 1.0, skyLum);
         res.xyz = lerp(res.xyz, saturate(skyCol), skyAmt);
+    }
+    // Clear sky: replace the sky with a clean vertical gradient (hides haze, fog, bloom and cloud layers)
+    float clearAmt = skyMask * lerp(SkyClear.x, SkyClear.y, d2.w);
+    if (clearAmt > 0.0)
+    {
+        float3 clearSky = lerp(SkyColorTop, SkyColorHorizon, smoothstep(0.0, 0.8, texcoord.y));
+        res.xyz = lerp(res.xyz, clearSky, clearAmt);
     }
     res.xyz = lerp(res.xyz, res.xyz * d0.xyz * 2.55, d0.w);
     res.xyz *= d1.x;
