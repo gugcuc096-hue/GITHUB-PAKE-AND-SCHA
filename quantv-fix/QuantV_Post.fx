@@ -1,6 +1,7 @@
 //QuantV PostFX effect			//Thanks to AMD, Timothy Lottes, Christian Jensen, prod80, dpeasant3, Quant
 
 uniform bool AntiAliasing < ui_label = "AntiAliasing"; > = true;
+uniform float AAStrength < ui_label = "AntiAliasing Strength"; ui_tooltip = "Lower = sharper image, less blur.\n0.0 = no AA (same as unticking AntiAliasing), 1.0 = original QuantV strength"; ui_type = "drag"; ui_min = 0.0; ui_max = 1.0; ui_step = 0.01; > = 0.3;
 uniform float Sharpen < ui_label = "Sharpen"; ui_type = "drag"; ui_min = 0.0; ui_max = 4.0; > = 1.4;
 uniform float Noise < ui_label = "Filmic Noise"; ui_type = "drag"; ui_min = 0.0; ui_max = 0.1; > = 0.01;
 uniform float2 SkyBloomFix < ui_label = "Sky Bloom Reduction"; ui_tooltip = "DAY    |    NIGHT\n\nReduces bloom / haze in the sky only (buildings, objects and the player are not touched).\n0.0 = off, 1.0 = full"; ui_type = "drag"; ui_min = 0.0; ui_max = 1.0; ui_step = 0.001; > = float2(0.8, 0.5);
@@ -112,7 +113,7 @@ float4 PS_ColAA(float4 position : SV_Position, float2 texcoord : TEXCOORD, noint
         float3 aaY = (mixY + res.xyz * 2.0) * 0.1666667;
         float3 QAA = lerp(res.xyz, aaX, saturate(lumY / aaX.y));
         QAA = lerp(QAA, aaY, saturate(lumX / aaY.y) * 0.5);
-        res.xyz = lerp(QAA, res.xyz, d);
+        res.xyz = lerp(res.xyz, lerp(QAA, res.xyz, d), AAStrength);
     }
     // Sky bloom reduction: bloom lifts and whitens the sky, so pull the glowing highlights down
     // and bring back the colour the glow washed out. Only affects pixels the depth buffer marks as sky.
@@ -189,8 +190,8 @@ float4 PS_FXAA(float4 position : SV_Position, float2 texcoord : TEXCOORD, nointe
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // ==============================================================================
     float SubPix = 0.1;
-    float EdgeThresh = 0.0;
-    float EdgeThreshMin = 0.0;
+    float EdgeThresh = 0.125;
+    float EdgeThreshMin = 0.0312;
     float2 posM = texcoord;
     float4 rgbyM = tex2Dlod(BackBuffer, float4(posM, 0.0, 0.0));
     float d = rgbyM.w * d0.x;
@@ -461,7 +462,7 @@ float4 PS_FXAA(float4 position : SV_Position, float2 texcoord : TEXCOORD, nointe
     float pixelOffsetSubpix = max(pixelOffsetGood, subpixH);
     if (!horzSpan) posM.x += pixelOffsetSubpix * lengthSign;
     if (horzSpan) posM.y += pixelOffsetSubpix * lengthSign;
-    return float4(lerp(tex2Dlod(BackBuffer, float4(posM, 0.0, 0.0)).xyz, rgbyM.xyz, d), rgbyM.w);
+    return float4(lerp(rgbyM.xyz, lerp(tex2Dlod(BackBuffer, float4(posM, 0.0, 0.0)).xyz, rgbyM.xyz, d), AAStrength), rgbyM.w);
 }
 float4 PS_CASN(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Target
 {
