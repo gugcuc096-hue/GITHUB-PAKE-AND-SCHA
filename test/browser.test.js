@@ -1410,7 +1410,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
           };
         });
         assert.deepEqual(design.sm, [36], `kleine Knöpfe gleich hoch: ${design.sm}`);
-        assert.deepEqual(design.close, [40, 40, '999px'], 'Schließen-Knopf rund');
+        assert.deepEqual(design.close, [40, 40, '4px'], 'Schließen-Knopf quadratisch (Design „Ruhig“: leicht abgerundet)');
         // Knöpfe der Leiste: am PC rechts angehängt, am Handy über die ganze Zeile (wie die Schnellaktionen)
         const [gapL, gapR] = design.strip;
         if (device === PHONE) assert.ok(Math.abs(gapL) <= 1 && Math.abs(gapR) <= 1, `Leisten-Knöpfe füllen am Handy die Zeile (${design.strip})`);

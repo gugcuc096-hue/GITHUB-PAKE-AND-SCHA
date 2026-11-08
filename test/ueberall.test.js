@@ -24,6 +24,9 @@ describe('Bewegung und Glas überall (Browser)', { skip: chromium ? false : 'Pla
     browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
     const a = client(srv.base);
     await a.login(TEAM.admin);
+    // Glas auf schwebenden Ebenen gibt es nur im Design „Klassisch“ (Bewegung ist in beiden Designs gleich)
+    await a.put('/api/config/style/draft', { design: 'klassisch', preset: 'gold', accent: '#d4af37', glass: 50, radius: 50, font: 'klassisch', motion: 'normal', season: 'aus', seasonDash: true });
+    await a.post('/api/config/style/publish', {});
     caseId = (await a.post('/api/cases', { title: 'Bewegung', area: 'strafrecht', clientName: 'Max Muster' })).json.case.id;
     const parsed = (await a.post('/api/penal/parse', { text: '§ 33 StGB' })).json.items;
     await a.post(`/api/cases/${caseId}/charges/bulk`, { items: parsed.map((i) => ({ offenceId: i.offenceId, count: i.count })) });

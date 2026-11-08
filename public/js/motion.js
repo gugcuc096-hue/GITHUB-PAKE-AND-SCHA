@@ -532,6 +532,8 @@
    */
   function heroShine() {
     const el = document.querySelector('.kz-shine');
+    // Design „Ruhig“: die Überschrift bleibt schlicht gold – kein Glanz (nur „Klassisch“)
+    if (document.documentElement.dataset.design === 'ruhig') return;
     if (!el || el.querySelector('.kz-shine-band') || /[?&]bearbeiten\b/.test(location.search) || typeof el.animate !== 'function') return;
     const text = el.textContent;
     const band = document.createElement('span');
