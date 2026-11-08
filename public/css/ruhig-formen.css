@@ -4,1204 +4,1143 @@
  */
 /*  tailwind.css  */
 html[data-design="ruhig"] .rounded-2xl {
-    border-radius: 6px
+    border-radius: 8px
 }
 html[data-design="ruhig"] .rounded-lg {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .rounded-xl {
-    border-radius: 5px
+    border-radius: 6px
 }
 @media (min-width: 640px) {
     html[data-design="ruhig"] .sm\:rounded-b-\[20px\] {
-        border-bottom-right-radius: 6px;
-        border-bottom-left-radius: 6px
+        border-bottom-right-radius: 8px;
+        border-bottom-left-radius: 8px
     }
 }
 /*  app.css  */
 html[data-design="ruhig"] .glass-card {
-    border-radius: 6px
+    border-radius: 8px
 }
 html[data-design="ruhig"] .btn-gold,
 html[data-design="ruhig"] .btn-outline,
 html[data-design="ruhig"] .btn-ghost,
 html[data-design="ruhig"] .btn-danger {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .icon-btn {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .field {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .email-group .email-suffix {
-    border-radius: 0 4px 4px 0
+    border-radius: 0 5px 5px 0
 }
 html[data-design="ruhig"] .seg-opt span {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .chip {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .tab-btn {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .badge,
 html[data-design="ruhig"] .countdown {
-    border-radius: 3px
+    border-radius: 4px
 }
 @media (max-width: 767px) {
     html[data-design="ruhig"] .tbl-cards tr {
-        border-radius: 5px
+        border-radius: 6px
     }
 }
 html[data-design="ruhig"] .track-step {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .prop {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .case-sort .field {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .ps-toast {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .ps-toast-action {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .nav-item {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .nav-count {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .nav-toggle {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .user-card {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .case-here {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .topbar-search {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .topbar-search kbd {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .gs-item {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .gs-tag {
-    border-radius: 4px
-}
-html[data-design="ruhig"] .gs-foot kbd {
-    border-radius: 3px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .list-row {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .stars-input input:focus-visible + label {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .skeleton {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .banner {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .secret-box {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .ev-row {
-    border-radius: 4px
-}
-html[data-design="ruhig"] .ev-bar {
-    border-radius: 3px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .cal-grid {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .cal-ev {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .tl-item {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] details.edit-box {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .modal-card {
-    border-radius: 6px
+    border-radius: 8px
 }
 @media (max-width: 639px) {
     html[data-design="ruhig"] .modal-card {
-        border-radius: 6px 6px 0 0
-    }
-}
-@media (max-width: 639px) {
-    html[data-design="ruhig"] .modal-head::before {
-        border-radius: 3px
+        border-radius: 8px 8px 0 0
     }
 }
 html[data-design="ruhig"] .duty-btn {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .pop {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .pop-item {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .duty-chip {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .duty-opt {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .att {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .att-add {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .lightbox-img {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .qa {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .btn-discord {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .info-grid .fact:focus-visible {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .fn-doc {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .fn-badge {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .fn-check {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .fn-attest {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .if-row {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .fn-oneclick {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .fn-pick {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .fb-card {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .fb-bar {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .fb-bar i {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .fb-person {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .fb-dot span {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .fb-result {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .fb-meter {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .appr-card {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .ret-card {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .prec-chip {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .prec-strip {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .prec-row {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .wit-card {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .wit-contra li {
-    border-radius: 0 4px 4px 0
+    border-radius: 0 5px 5px 0
 }
 html[data-design="ruhig"] .wit-ref {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .ev-ref {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .task-check {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .fn-text {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .fn-content-box {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .fn-thumb {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .fn-table-wrap {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .btn-discord {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .ticket-group {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .ticket-checks {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .work-stats > div {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .vchart-col {
-    border-radius: 3px 3px 0 0
-}
-html[data-design="ruhig"] .vchart-bar {
-    border-radius: 3px 3px 0 0
+    border-radius: 4px 4px 0 0
 }
 html[data-design="ruhig"] .chart-tip {
-    border-radius: 4px
-}
-html[data-design="ruhig"] .hbar-fill {
-    border-radius: 0 3px 3px 0
+    border-radius: 5px
 }
 html[data-design="ruhig"] .absence-strip {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .svc-list {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .svc-discount {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .svc-sum {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .contract-row {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .tpl-chip {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .lawyer-opt {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .fn-grip {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .ps-dialog {
-    border-radius: 6px
+    border-radius: 8px
 }
 html[data-design="ruhig"] .ps-dialog-mark {
-    border-radius: 6px
+    border-radius: 8px
 }
 html[data-design="ruhig"] .ev-item {
-    border-radius: 5px
-}
-html[data-design="ruhig"] .oauth-check {
-    border-radius: 5px
-}
-html[data-design="ruhig"] .bot-nav {
     border-radius: 6px
 }
+html[data-design="ruhig"] .oauth-check {
+    border-radius: 6px
+}
+html[data-design="ruhig"] .bot-nav {
+    border-radius: 8px
+}
 html[data-design="ruhig"] .bot-nav-item {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .bot-scan {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .rs-row {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .rc-rule {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .rc-count {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .rc-cond {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .rc-add {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .wl-part {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .emb-edit {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .wl-preview {
-    border-radius: 4px
-}
-html[data-design="ruhig"] .dc-app {
-    border-radius: 3px
-}
-html[data-design="ruhig"] .dc-content code,
-html[data-design="ruhig"] .dc-desc code {
-    border-radius: 3px
-}
-html[data-design="ruhig"] .msg-ping {
-    border-radius: 4px
-}
-html[data-design="ruhig"] .dm-preview {
     border-radius: 5px
 }
+html[data-design="ruhig"] .msg-ping {
+    border-radius: 5px
+}
+html[data-design="ruhig"] .dm-preview {
+    border-radius: 6px
+}
 html[data-design="ruhig"] .dm-bar {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .msg-role-insert {
-    border-radius: 4px
-}
-html[data-design="ruhig"] .dc-embed {
-    border-radius: 3px
-}
-html[data-design="ruhig"] .dc-image {
-    border-radius: 3px
-}
-html[data-design="ruhig"] .dc-thumb {
-    border-radius: 3px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .msg-card,
 html[data-design="ruhig"] .msg-job {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .msg-add {
-    border-radius: 5px
-}
-html[data-design="ruhig"] .dc-button {
-    border-radius: 3px
-}
-html[data-design="ruhig"] .wl-preview .dc-codeblock {
-    border-radius: 3px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .ticket-strip {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .sec-count {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .pt-box {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .chat {
-    border-radius: 6px
+    border-radius: 8px
 }
 html[data-design="ruhig"] .chat-day span {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .chat-bubble {
-    border-radius: 5px
-}
-html[data-design="ruhig"] .chat-msg.in .chat-bubble {
-    border-bottom-left-radius: 3px
-}
-html[data-design="ruhig"] .chat-msg.out .chat-bubble {
-    border-bottom-right-radius: 3px
-}
-html[data-design="ruhig"] .chat-send {
-    border-radius: 4px
-}
-html[data-design="ruhig"] .chat-new {
-    border-radius: 3px
-}
-html[data-design="ruhig"] .chat-typing {
-    border-radius: 5px;
-    border-bottom-left-radius: 3px
-}
-html[data-design="ruhig"] .pay-info {
-    border-radius: 5px
-}
-html[data-design="ruhig"] .todo-item {
-    border-radius: 5px
-}
-html[data-design="ruhig"] .todo-ico {
-    border-radius: 4px
-}
-html[data-design="ruhig"] .more-pop {
-    border-radius: 5px
-}
-html[data-design="ruhig"] .more-item {
-    border-radius: 4px
-}
-html[data-design="ruhig"] .close-check {
-    border-radius: 5px
-}
-html[data-design="ruhig"] .drop-hint {
     border-radius: 6px
 }
-html[data-design="ruhig"] .chat-duty {
+html[data-design="ruhig"] .chat-send {
     border-radius: 5px
+}
+html[data-design="ruhig"] .chat-new {
+    border-radius: 4px
+}
+html[data-design="ruhig"] .chat-typing {
+    border-radius: 6px
+}
+html[data-design="ruhig"] .pay-info {
+    border-radius: 6px
+}
+html[data-design="ruhig"] .todo-item {
+    border-radius: 6px
+}
+html[data-design="ruhig"] .todo-ico {
+    border-radius: 5px
+}
+html[data-design="ruhig"] .more-pop {
+    border-radius: 6px
+}
+html[data-design="ruhig"] .more-item {
+    border-radius: 5px
+}
+html[data-design="ruhig"] .close-check {
+    border-radius: 6px
+}
+html[data-design="ruhig"] .drop-hint {
+    border-radius: 8px
+}
+html[data-design="ruhig"] .chat-duty {
+    border-radius: 6px
 }
 html[data-design="ruhig"] .skel-title {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .skel-pill {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .skel-dot {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .more-btn {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .ob-bar {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .ob-bar span {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .combo-list {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .combo-list li {
-    border-radius: 4px
-}
-html[data-design="ruhig"] .dp {
     border-radius: 5px
 }
+html[data-design="ruhig"] .dp {
+    border-radius: 6px
+}
 html[data-design="ruhig"] .dp-nav {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] :is(.dp-day,
 html[data-design="ruhig"] .dp-gd) {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .dp-ring {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .dp-col {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .dp-tv {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .cp {
-    border-radius: 5px
-}
-html[data-design="ruhig"] .cp-sv {
-    border-radius: 4px
-}
-html[data-design="ruhig"] .cp-hue {
-    border-radius: 4px
-}
-html[data-design="ruhig"] .cp-prev {
-    border-radius: 4px
-}
-html[data-design="ruhig"] .cp-sw {
-    border-radius: 4px
-}
-html[data-design="ruhig"] .chg-sum > div {
-    border-radius: 5px
-}
-html[data-design="ruhig"] .chg-est-k b {
-    border-radius: 3px
-}
-html[data-design="ruhig"] .chg-reduced {
-    border-radius: 5px
-}
-html[data-design="ruhig"] .chg-row {
-    border-radius: 5px
-}
-html[data-design="ruhig"] .chg-cite {
-    border-radius: 4px
-}
-html[data-design="ruhig"] .chg-flag {
-    border-radius: 4px
-}
-html[data-design="ruhig"] .stepper {
-    border-radius: 4px
-}
-html[data-design="ruhig"] .pk-add {
-    border-radius: 4px
-}
-html[data-design="ruhig"] .hr-clock {
-    border-radius: 4px
-}
-html[data-design="ruhig"] .hr-live {
-    border-radius: 4px
-}
-html[data-design="ruhig"] .hr-pop {
-    border-radius: 5px
-}
-html[data-design="ruhig"] .hr-pop button {
-    border-radius: 4px
-}
-html[data-design="ruhig"] .hr-card {
     border-radius: 6px
 }
-html[data-design="ruhig"] .hr-charge {
+html[data-design="ruhig"] .cp-sv {
+    border-radius: 5px
+}
+html[data-design="ruhig"] .cp-hue {
+    border-radius: 5px
+}
+html[data-design="ruhig"] .cp-prev {
+    border-radius: 5px
+}
+html[data-design="ruhig"] .cp-sw {
+    border-radius: 5px
+}
+html[data-design="ruhig"] .chg-sum > div {
+    border-radius: 6px
+}
+html[data-design="ruhig"] .chg-est-k b {
     border-radius: 4px
+}
+html[data-design="ruhig"] .chg-reduced {
+    border-radius: 6px
+}
+html[data-design="ruhig"] .chg-row {
+    border-radius: 6px
+}
+html[data-design="ruhig"] .chg-cite {
+    border-radius: 5px
+}
+html[data-design="ruhig"] .chg-flag {
+    border-radius: 5px
+}
+html[data-design="ruhig"] .stepper {
+    border-radius: 5px
+}
+html[data-design="ruhig"] .pk-add {
+    border-radius: 5px
+}
+html[data-design="ruhig"] .hr-clock {
+    border-radius: 5px
+}
+html[data-design="ruhig"] .hr-live {
+    border-radius: 5px
+}
+html[data-design="ruhig"] .hr-pop {
+    border-radius: 6px
+}
+html[data-design="ruhig"] .hr-pop button {
+    border-radius: 5px
+}
+html[data-design="ruhig"] .hr-card {
+    border-radius: 8px
+}
+html[data-design="ruhig"] .hr-charge {
+    border-radius: 5px
 }
 html[data-design="ruhig"] .hr-law {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .hr-photo {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .hr-note {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .hr-note-del {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .hr-lightbox img {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .hr-lb-nav {
-    border-radius: 4px
+    border-radius: 5px
 }
 @media (max-width: 899px) {
     html[data-design="ruhig"] .hr-tab {
-        border-radius: 4px
+        border-radius: 5px
     }
 }
 @media (max-width: 899px) {
     html[data-design="ruhig"] .hr-count:not(:empty) {
-        border-radius: 4px
+        border-radius: 5px
     }
 }
 html[data-design="ruhig"] .wiki-body code,
 html[data-design="ruhig"] .modal-sub code {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .wiki-note {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .stgb-row {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .res-bar {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .res-btn {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .res-voter {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .ptr {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .snip-menu {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .snip-item {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .snip-manage {
-    border-radius: 0 0 4px 4px
+    border-radius: 0 0 5px 5px
 }
 html[data-design="ruhig"] .snip-chip {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .snip-preview-box {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .snip-code,
 html[data-design="ruhig"] .snip-row code {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .peek-card {
-    border-radius: 5px
-}
-html[data-design="ruhig"] kbd {
-    border-radius: 3px
-}
-html[data-design="ruhig"] .deal-row {
-    border-radius: 5px
-}
-html[data-design="ruhig"] .deal-card {
-    border-radius: 5px
-}
-html[data-design="ruhig"] .plea-card {
     border-radius: 6px
 }
+html[data-design="ruhig"] kbd {
+    border-radius: 4px
+}
+html[data-design="ruhig"] .deal-row {
+    border-radius: 6px
+}
+html[data-design="ruhig"] .deal-card {
+    border-radius: 6px
+}
+html[data-design="ruhig"] .plea-card {
+    border-radius: 8px
+}
 html[data-design="ruhig"] .case-cover {
-    border-radius: 3px 6px 6px 6px
+    border-radius: 3px 8px 8px 8px
 }
 html[data-design="ruhig"] .case-cover::before {
-    border-radius: 1px 5px 5px 5px
+    border-radius: 1px 6px 6px 6px
 }
 html[data-design="ruhig"] .cover-tab {
-    border-radius: 4px 4px 0 0
+    border-radius: 5px 5px 0 0
 }
 html[data-design="ruhig"] .cover-stamp {
-    border-radius: 3px
-}
-html[data-design="ruhig"] .stamp-mini {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .slip-row {
-    border-radius: 3px
-}
-html[data-design="ruhig"] .slip-row b {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .case-link {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .att .ev-no {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .redact-wrap {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .pick-box {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .bulk-bar {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .lager-item {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .item-pic {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .item-pic.md {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .item-pic.sm {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .lager-set-row {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .client-cover {
-    border-radius: 3px 6px 6px 6px
+    border-radius: 3px 8px 8px 8px
 }
 html[data-design="ruhig"] .client-cover::before {
-    border-radius: 1px 5px 5px 5px
+    border-radius: 1px 6px 6px 6px
 }
 html[data-design="ruhig"] .cc-chip {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .cc-stat {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .lb-zoom {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .sys-bar {
-    border-radius: 4px
-}
-html[data-design="ruhig"] button.copy-az {
-    border-radius: 3px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .copy-btn {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .star-btn {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .pin-note {
-    border-radius: 5px
-}
-html[data-design="ruhig"] .mention {
-    border-radius: 3px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .who2-more {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .secret-badge {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .case-chip {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .ie {
-    border-radius: 3px
-}
-html[data-design="ruhig"] .ie-input {
     border-radius: 4px
 }
-html[data-design="ruhig"] .case-details {
+html[data-design="ruhig"] .ie-input {
     border-radius: 5px
+}
+html[data-design="ruhig"] .case-details {
+    border-radius: 6px
 }
 html[data-design="ruhig"] .party-warn {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .phase {
-    border-radius: 5px
+    border-radius: 6px
 }
 @media (min-width: 1500px) {
     html[data-design="ruhig"] .doc-peek {
-        border-radius: 6px
+        border-radius: 8px
     }
 }
 html[data-design="ruhig"] .doc-peek .dp-nav {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .doc-peek .dp-nav .icon-btn {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .doc-peek .dp-img {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .pack {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .req-row {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .req-check {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .slot-box {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .banner-style-opt {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .bso-swatch {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .faq-row {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .home-sec {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .msg-box {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .msg-preview {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .view-as-band {
-    border-radius: 5px
-}
-html[data-design="ruhig"] body.hint-edit .form-hint[data-hint-key] {
-    border-radius: 3px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .area-fields-grid {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .area-card {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .area-dot {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .area-short {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .area-field {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .client-suggest-list {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .client-suggest-item {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .client-picked {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .deadline-calc {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .sec-wrap.is-collapsed:not(.is-open-tmp) > .sec-folded {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .case-sections.is-editing .sec-editbar {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .case-sections.is-editing .sec-bar {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .sec-grip {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .sec-tog {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .invite-box {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .invite-chip {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .sys-chip {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .live-flash {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .live-flash-static {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .live-by {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .offline-bar {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .kmap-wrap {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .kmap-seg {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .kmap-mode {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .kmap-card {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .place-row {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .kmap-sight-box {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .kmap-cap {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .kmap-cap-step {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .design-opt-in {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .style-preset {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .sp-swatch {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .color-row input[type="color"] {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .color-row input[type="color"]::-webkit-color-swatch {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .cfg-banner-host {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .num-plate {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .promo-card {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .promo-icon {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .promo-now {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .occ-opt {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .inv-promo {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .set-nav-item {
-    border-radius: 4px
+    border-radius: 5px
 }
 @media (max-width: 1023px) {
     html[data-design="ruhig"] .set-nav.is-searching {
-        border-radius: 5px
+        border-radius: 6px
     }
 }
 html[data-design="ruhig"] .cfg-sort-row {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .calc-example {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .doc-preview {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .auto-rule {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .dauer-tile {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .dauer-bar {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .dauer-check {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .hm-pv-card {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .hm-pv-badge,
 html[data-design="ruhig"] .fee-badge {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .hm-pv-chip {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .hm-pack-pv {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .hm-save {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .fee-code {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .fee-success {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .fee-close {
-    border-radius: 5px
+    border-radius: 6px
 }
 /*  select.css  */
 @supports (appearance: base-select) {
     html[data-design="ruhig"] :is(select.field,
 html[data-design="ruhig"] select)::picker(select) {
-        border-radius: 5px
+        border-radius: 6px
     }
 }
 @supports (appearance: base-select) {
     html[data-design="ruhig"] :is(select.field,
 html[data-design="ruhig"] select) option {
-        border-radius: 4px
+        border-radius: 5px
     }
 }
 html[data-design="ruhig"] input[type="file"]::file-selector-button {
-    border-radius: 4px
+    border-radius: 5px
 }
 /*  controls.css  */
 html[data-design="ruhig"] input[type="checkbox"],
 html[data-design="ruhig"] input[type="radio"] {
-    border-radius: 3px
-}
-html[data-design="ruhig"] .num-step {
     border-radius: 4px
 }
-html[data-design="ruhig"] .calc-opt {
+html[data-design="ruhig"] .num-step {
     border-radius: 5px
+}
+html[data-design="ruhig"] .calc-opt {
+    border-radius: 6px
 }
 /*  depth.css  */
 html[data-design="ruhig"] .empty {
-    border-radius: 6px
+    border-radius: 8px
 }
 @supports (appearance: base-select) {
     html[data-design="ruhig"] :is(select.field,
 html[data-design="ruhig"] select)::picker(select) {
-        border-radius: 5px
+        border-radius: 6px
     }
 }
 /*  motion.css  */
 html[data-design="ruhig"] .swipe-hint {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .skel-cell {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .site-switch {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .site-switch > a {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .sb-count .cd-u {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .sb-ticket::before {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .promo-dock {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .pd-pct {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .pd-cta {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .site-banner-link {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .sb-hinweis .sb-seal {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .site-links a {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .calc-promo-badge {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .ctx-menu {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .ctx-item {
-    border-radius: 4px
-}
-html[data-design="ruhig"] .tour-spot {
     border-radius: 5px
 }
-html[data-design="ruhig"] .tour-card {
+html[data-design="ruhig"] .tour-spot {
     border-radius: 6px
+}
+html[data-design="ruhig"] .tour-card {
+    border-radius: 8px
 }
 /*  fall.css  */
 html[data-design="ruhig"] .fall-mode {
-    border-radius: 4px
-}
-html[data-design="ruhig"] .fall-mode-btn {
-    border-radius: 4px
-}
-html[data-design="ruhig"] .fall-check {
     border-radius: 5px
 }
+html[data-design="ruhig"] .fall-mode-btn {
+    border-radius: 5px
+}
+html[data-design="ruhig"] .fall-check {
+    border-radius: 6px
+}
 html[data-design="ruhig"] .fall-seg {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .fall-seg-btn,
 html[data-design="ruhig"] .fall-seg-opt span {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .fall-sum {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .fall-card {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .fall-no {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .fall-step {
-    border-radius: 4px
-}
-html[data-design="ruhig"] .fall-light {
-    border-radius: 3px
-}
-html[data-design="ruhig"] .tpl-group {
     border-radius: 5px
 }
-html[data-design="ruhig"] .tpl-preview-note {
+html[data-design="ruhig"] .fall-light {
     border-radius: 4px
+}
+html[data-design="ruhig"] .tpl-group {
+    border-radius: 6px
+}
+html[data-design="ruhig"] .tpl-preview-note {
+    border-radius: 5px
 }
 /*  website.css  */
 html[data-design="ruhig"] .skeleton {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .glass-card {
-    border-radius: 6px
+    border-radius: 8px
 }
 html[data-design="ruhig"] .glass-card::before {
-    border-radius: 6px
+    border-radius: 8px
 }
 html[data-design="ruhig"] .btn-gold,
 html[data-design="ruhig"] .btn-outline,
 html[data-design="ruhig"] .btn-ghost,
 html[data-design="ruhig"] .btn-danger {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .icon-btn {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .badge,
 html[data-design="ruhig"] .countdown {
-    border-radius: 3px
-}
-html[data-design="ruhig"] .tab-btn {
     border-radius: 4px
 }
-html[data-design="ruhig"] .ledger-item:hover {
+html[data-design="ruhig"] .tab-btn {
     border-radius: 5px
+}
+html[data-design="ruhig"] .ledger-item:hover {
+    border-radius: 6px
 }
 html[data-design="ruhig"] .toast {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .price-head {
-    border-radius: 3px
+    border-radius: 4px
 }
 /*  kanzlei.css  */
 html[data-design="ruhig"] .kz-others a {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .kz-lotm {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .kz-news .is-pinned h3::after {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .kz-footer-duty {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .pf-phone-btn {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .pf-stats .kpi-bar {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .pf-chip {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .hr-area {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .hr-tabs {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .hr-tab {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .hr-badge {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .hr-qty {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .hr-chip {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .hr-pack {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .hr-save {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .hr-select {
-    border-radius: 4px
+    border-radius: 5px
 }
 html[data-design="ruhig"] .hr-success {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .hr-wopt {
-    border-radius: 5px
+    border-radius: 6px
 }
 html[data-design="ruhig"] .hr-rec {
-    border-radius: 6px
+    border-radius: 8px
 }
 /*  karriere.css  */
 html[data-design="ruhig"] .kfaq summary:focus-visible {
-    border-radius: 3px
+    border-radius: 4px
 }
 html[data-design="ruhig"] .num-spin button {
-    border-radius: 3px
+    border-radius: 4px
 }
 /*  season.css  */
 html[data-design="ruhig"].has-season .chip-row.hub-tabs {
-    border-radius: 5px 5px 0 0
+    border-radius: 6px 6px 0 0
 }

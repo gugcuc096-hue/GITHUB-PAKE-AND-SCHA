@@ -1292,7 +1292,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
           return { n: els.length, styles: [...new Set(els.map((e) => { const cs = getComputedStyle(e); return `${cs.borderTopLeftRadius}|${cs.borderTopWidth}|${cs.fontFamily === body}`; }))] };
         });
         assert.ok(tags.n >= 4, 'Markierungen in der Liste');
-        assert.deepEqual(tags.styles, ['3px|0px|true'], 'ein Stil für alle Markierungen (Design „Ruhig“: eckig)');
+        assert.deepEqual(tags.styles, ['4px|0px|true'], 'ein Stil für alle Markierungen (Design „Ruhig“: eckig)');
         assert.doesNotMatch(await page.textContent(`#caseList tr.row[data-id="${webCase.id}"]`), /liegt seit/);
         await pickTab(page, '[data-action="case-filter"][data-value="liegt"]');
         await page.waitForFunction(() => document.querySelectorAll('#caseList tr.row').length === 1);
@@ -1410,7 +1410,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
           };
         });
         assert.deepEqual(design.sm, [36], `kleine Knöpfe gleich hoch: ${design.sm}`);
-        assert.deepEqual(design.close, [40, 40, '4px'], 'Schließen-Knopf quadratisch (Design „Ruhig“: leicht abgerundet)');
+        assert.deepEqual(design.close, [40, 40, '5px'], 'Schließen-Knopf quadratisch (Design „Ruhig“: leicht abgerundet)');
         // Knöpfe der Leiste: am PC rechts angehängt, am Handy über die ganze Zeile (wie die Schnellaktionen)
         const [gapL, gapR] = design.strip;
         if (device === PHONE) assert.ok(Math.abs(gapL) <= 1 && Math.abs(gapR) <= 1, `Leisten-Knöpfe füllen am Handy die Zeile (${design.strip})`);
