@@ -1292,7 +1292,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
           return { n: els.length, styles: [...new Set(els.map((e) => { const cs = getComputedStyle(e); return `${cs.borderTopLeftRadius}|${cs.borderTopWidth}|${cs.fontFamily === body}`; }))] };
         });
         assert.ok(tags.n >= 4, 'Markierungen in der Liste');
-        assert.deepEqual(tags.styles, ['6px|0px|true'], 'ein Stil für alle Markierungen');
+        assert.deepEqual(tags.styles, ['3px|0px|true'], 'ein Stil für alle Markierungen (Design „Ruhig“: eckig)');
         assert.doesNotMatch(await page.textContent(`#caseList tr.row[data-id="${webCase.id}"]`), /liegt seit/);
         await pickTab(page, '[data-action="case-filter"][data-value="liegt"]');
         await page.waitForFunction(() => document.querySelectorAll('#caseList tr.row').length === 1);
