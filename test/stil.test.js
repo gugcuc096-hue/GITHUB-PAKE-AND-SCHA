@@ -175,7 +175,7 @@ describe('Rabattaktionen, Aktenzeichen und Stil (API)', () => {
     assert.match(html, /<style id="psTheme">:root:root \{ --gold-500: #34d399;/);
     assert.match(html, /--accent-rgb: 52, 211, 153;/);
     assert.match(html, /--radius: 10px;/);
-    assert.match(html, /<html data-season="weihnachten" data-site-motion="ruhig" data-font="modern"/);
+    assert.match(html, /<html data-design="ruhig" data-season="weihnachten" data-site-motion="ruhig" data-font="modern"/);
     assert.match(html, /<link rel="stylesheet" href="\/css\/calm\.css\?v=\w+" media="all" data-calm>/, 'ruhig: gedämpft für alle');
     const dash = await page('/dashboard');
     assert.match(dash, /id="psTheme"/);

@@ -9,7 +9,7 @@
  */
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const { startServer, TEAM, PASSWORD } = require('./helpers');
+const { startServer, client, TEAM, PASSWORD } = require('./helpers');
 
 let chromium = null;
 try {
@@ -24,6 +24,11 @@ describe('Leistung ohne Grafikkarte (Browser)', { skip: chromium ? false : 'Play
   before(async () => {
     server = await startServer();
     browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM_PATH || undefined });
+    // Glanz und Hover-Schatten gibt es nur im Design „Klassisch“ (im Design „Ruhig“ ist alles flach)
+    const owner = client(server.base);
+    await owner.login(TEAM.admin);
+    await owner.put('/api/config/style/draft', { design: 'klassisch', preset: 'gold', accent: '#d4af37', glass: 50, radius: 50, font: 'klassisch', motion: 'normal', season: 'aus', seasonDash: true });
+    await owner.post('/api/config/style/publish', {});
   });
   after(async () => {
     if (browser) await browser.close();

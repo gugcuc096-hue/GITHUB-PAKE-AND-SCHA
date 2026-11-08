@@ -283,7 +283,9 @@
   /* ---------------------------------------------------------------- Stil: Akzentfarbe, Glas, Rundung, Schrift */
   // Gleiche Rechnung wie theme.js auf dem Server – für die Vorschau beim Schieben der Regler und für Seiten aus dem
   // Zwischenspeicher. Setzt die Variablen als Inline-Stil auf <html>.
-  const THEME_DEFAULTS = { accent: '#d4af37', glass: 50, radius: 50, font: 'klassisch', motion: 'normal' };
+  const THEME_DEFAULTS = { design: 'ruhig', accent: '#d4af37', glass: 50, radius: 50, font: 'klassisch', motion: 'normal' };
+  // Im Design „Ruhig“ legt ruhig.css Glas, Flächen und Rundung fest – Glas- und Rundungsregler gelten nur für „Klassisch“
+  const RUHIG_FIXED = new Set(['--glass-blur', '--glass-fill', '--glass-fill-strong', '--panel-alpha', '--radius', '--lit-gold', '--gold-glow']);
   function themeVars(style) {
     const s = { ...THEME_DEFAULTS, ...style };
     const hex = /^#[0-9a-f]{6}$/i.test(s.accent) ? s.accent : THEME_DEFAULTS.accent;
@@ -323,12 +325,15 @@
     themed = [];
     if (!style) return syncLogos();
     const s = { ...THEME_DEFAULTS, ...style };
-    const plain = s.accent.toLowerCase() === THEME_DEFAULTS.accent && +s.glass === 50 && +s.radius === 50 && s.font === 'klassisch';
+    const ruhig = s.design !== 'klassisch';
+    root.dataset.design = ruhig ? 'ruhig' : 'klassisch';
+    const plain = s.accent.toLowerCase() === THEME_DEFAULTS.accent && (ruhig || (+s.glass === 50 && +s.radius === 50)) && s.font === 'klassisch';
     // Der Server setzt den Stil schon beim Ausliefern ein (<style id="psTheme">); hier zieht die Seite nach, wenn er sich
     // seitdem geändert hat (gerade veröffentlicht, Vorschau, Seite aus dem Zwischenspeicher)
     if (plain && !force) document.getElementById('psTheme')?.remove();
     else {
       for (const [k, val] of Object.entries(themeVars(s))) {
+        if (ruhig && RUHIG_FIXED.has(k)) continue;
         root.style.setProperty(k, val);
         themed.push(k);
       }

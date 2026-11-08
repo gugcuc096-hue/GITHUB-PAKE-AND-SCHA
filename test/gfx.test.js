@@ -11,7 +11,7 @@
  */
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const { startServer, TEAM, PASSWORD } = require('./helpers');
+const { startServer, client, TEAM, PASSWORD } = require('./helpers');
 
 let chromium;
 try {
@@ -26,6 +26,11 @@ describe('Grafikstufe (Browser)', { skip: !chromium && 'Playwright nicht install
   before(async () => {
     server = await startServer();
     browser = await chromium.launch();
+    // Die Grafikstufen betreffen vor allem Glas und Leuchten – die gibt es nur im Design „Klassisch“ (im Design „Ruhig“ ist alles flach)
+    const owner = client(server.base);
+    await owner.login(TEAM.admin);
+    await owner.put('/api/config/style/draft', { design: 'klassisch', preset: 'gold', accent: '#d4af37', glass: 50, radius: 50, font: 'klassisch', motion: 'normal', season: 'aus', seasonDash: true });
+    await owner.post('/api/config/style/publish', {});
   });
   after(async () => {
     if (browser) await browser.close();

@@ -1,6 +1,6 @@
 /*
  * Kanzlei-Dashboard – Einstellungen: Stil & Saison, Rabattaktionen und Aktenzeichen.
- *  - Stil & Saison: Vorlagen, Akzentfarbe, Glas, Rundung, Schrift, Bewegung, Saison-Deko (Entwurf → Veröffentlichen);
+ *  - Stil & Saison: Design (Ruhig/Klassisch), Vorlagen, Akzentfarbe, Glas, Rundung, Schrift, Bewegung, Saison-Deko (Entwurf → Veröffentlichen);
  *    jede Änderung zeigt sich sofort im ganzen Dashboard (PS.theme), bis man den Bereich verlässt
  *  - Rabattaktionen: für alle, mit Anlass, Zeitraum (auch jährlich), Ankündigung im Banner (routes/promotions.js)
  *  - Aktenzeichen: eigenes Muster mit Platzhaltern und Vorschau des nächsten Zeichens (numbering.js)
@@ -18,6 +18,11 @@ const STYLE_PRESETS = {
   bordeaux: { label: 'Bordeaux', accent: '#e8a0b4', glass: 45, radius: 40, font: 'elegant' },
   platin: { label: 'Platin', accent: '#d9dee8', glass: 70, radius: 30, font: 'modern' },
 };
+// Design: „Ruhig“ (Standard) oder das bisherige Design „Klassisch“ – komplett erhalten, jederzeit wieder einschaltbar
+const DESIGNS = [
+  ['ruhig', 'Ruhig', 'Flach, eckiger, ohne Glas und Leuchten – seriös und aufgeräumt (Standard).'],
+  ['klassisch', 'Klassisch', 'Das bisherige Design mit Glas, Leuchten, Glanz und runden Formen.'],
+];
 const STYLE_FONTS = { klassisch: 'Klassisch', modern: 'Modern', elegant: 'Elegant' };
 const STYLE_MOTION = { voll: 'Voll', normal: 'Normal', ruhig: 'Ruhig' };
 const SEASON_LABELS = { auto: 'Automatisch (Kalender & Aktionen)', aus: 'Aus', halloween: '🎃 Halloween', weihnachten: '🎄 Weihnachten', silvester: '🎆 Silvester', valentin: '💘 Valentinstag', ostern: '🐣 Ostern & Frühling', sommer: '☀️ Sommer', blackfriday: '🖤 Black Friday', jubilaeum: '🥂 Jubiläum' };
@@ -116,11 +121,15 @@ function cfgStyle() {
       <p class="text-sm text-muted mb-4">Farbe, Glas und Form der Website und des Dashboards – jede Änderung sehen Sie sofort hier im Dashboard. Für alle gilt sie erst nach „Veröffentlichen“.</p>
       <form data-form="cfg-style" class="form-grid cols-2">
         <input type="hidden" name="preset" value="${esc(s.preset)}">
+        <div class="span-2"><div class="label">Design</div><div class="design-pick" role="radiogroup" aria-label="Design">${DESIGNS.map(
+          ([k, label, text]) => `<label class="design-opt"><input type="radio" name="design" value="${k}" ${(s.design || 'ruhig') === k ? 'checked' : ''}><span class="design-opt-in"><span class="design-opt-shot design-shot-${k}" aria-hidden="true"><i></i><i></i><i></i></span><b>${esc(label)}</b><span>${esc(text)}</span></span></label>`
+        ).join('')}</div></div>
         <div class="span-2"><div class="label">Vorlagen</div><div class="style-presets">${Object.entries(STYLE_PRESETS).map(([k, p]) => preset(k, p)).join('')}</div></div>
         <div><label class="label" for="stAccent">Akzentfarbe</label><div class="color-row"><input id="stAccentPick" type="color" value="${esc(s.accent)}" aria-label="Farbe wählen" data-sync="accent"><input id="stAccent" name="accent" class="field font-mono" maxlength="7" value="${esc(s.accent)}" pattern="#[0-9a-fA-F]{6}"></div></div>
         <div><div class="label">Schrift der Überschriften</div>${seg('font', STYLE_FONTS, s.font)}</div>
-        <div><label class="label" for="stGlass">Glas <span class="range-val" data-for="stGlass">${s.glass}</span></label><input id="stGlass" name="glass" type="range" min="0" max="100" step="5" value="${s.glass}" class="range"><div class="range-ends"><span>klar</span><span>milchig</span></div></div>
-        <div><label class="label" for="stRadius">Rundung <span class="range-val" data-for="stRadius">${s.radius}</span></label><input id="stRadius" name="radius" type="range" min="0" max="100" step="5" value="${s.radius}" class="range"><div class="range-ends"><span>kantig</span><span>rund</span></div></div>
+        <div class="classic-only"><label class="label" for="stGlass">Glas <span class="range-val" data-for="stGlass">${s.glass}</span></label><input id="stGlass" name="glass" type="range" min="0" max="100" step="5" value="${s.glass}" class="range"><div class="range-ends"><span>klar</span><span>milchig</span></div></div>
+        <div class="classic-only"><label class="label" for="stRadius">Rundung <span class="range-val" data-for="stRadius">${s.radius}</span></label><input id="stRadius" name="radius" type="range" min="0" max="100" step="5" value="${s.radius}" class="range"><div class="range-ends"><span>kantig</span><span>rund</span></div></div>
+        <p class="span-2 form-hint classic-hint">Glas und Rundung gelten nur für das Design „Klassisch“ – „Ruhig“ ist bewusst flach und eckig.</p>
         <div class="span-2"><div class="label">Bewegung für alle</div>${seg('motion', STYLE_MOTION, s.motion)}<p class="form-hint">„Ruhig“ dämpft Animationen für alle, die es nicht selbst eingestellt haben (Mein Profil → Animationen).</p></div>
         <div class="span-2 style-sample" aria-hidden="true">
           <div class="kpi panel"><div class="kpi-label">Offene Akten</div><div class="kpi-value">12</div></div>
@@ -146,6 +155,7 @@ function styleCollect(f) {
   const fd = new FormData(f);
   const accent = /^#[0-9a-f]{6}$/i.test(val(fd, 'accent')) ? val(fd, 'accent').toLowerCase() : '#d4af37';
   return {
+    design: val(fd, 'design') === 'klassisch' ? 'klassisch' : 'ruhig',
     preset: val(fd, 'preset') || 'eigen',
     accent,
     glass: Number(val(fd, 'glass') || 50),
