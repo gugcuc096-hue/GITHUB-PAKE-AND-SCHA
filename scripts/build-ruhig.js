@@ -6,8 +6,8 @@
  * Das bisherige Design („Klassisch“) bleibt in seinen Stylesheets unverändert. Dieses Skript liest jede Regel mit
  * border-radius aus ihnen und schreibt dieselbe Regel mit kleinerer Rundung, nur gültig unter
  * html[data-design="ruhig"] (server/web/theme.js setzt das Attribut je nach Einstellungen → Stil & Saison → Design).
- *   ≥ 16px → 6px · 12–15px → 5px · 8–11px → 4px · 4–7px → 3px · kleiner bleibt
- *   Pillen (999px …) → 4px – außer bei runden Dingen (Profilbilder, Punkte, Schalter, Ladekreise …), die bleiben rund
+ *   ≥ 16px → 8px · 12–15px → 6px · 8–11px → 5px · 5–7px → 4px · kleiner bleibt
+ *   Pillen (999px …) → 5px – außer bei runden Dingen (Profilbilder, Punkte, Schalter, Ladekreise …), die bleiben rund
  *   50 % (Kreise) bleibt
  * Die Rundungs-Variablen (--r-sm, --r-md, --radius) stellt ruhig.css ein.
  *
@@ -34,10 +34,10 @@ function mapOne(v) {
   const m = /^(\d*\.?\d+)(px|rem|em)$/.exec(v);
   if (!m) return v;
   const px = Number(m[1]) * (m[2] === 'px' ? 1 : 16);
-  if (px >= 16) return '6px';
-  if (px >= 12) return '5px';
-  if (px >= 8) return '4px';
-  if (px >= 4) return '3px';
+  if (px >= 16) return '8px';
+  if (px >= 12) return '6px';
+  if (px >= 8) return '5px';
+  if (px >= 5) return '4px';
   return v;
 }
 /** Neue Rundung oder null (unverändert lassen). */
@@ -45,7 +45,7 @@ function mapRadius(value, selector) {
   const v = value.trim().replace(/\s*!important$/, '');
   if (/^(0|inherit|initial|unset|50%|100%)$/.test(v) || /%/.test(v)) return null;
   if (/var\(--(r-sm|r-md|radius)\)/.test(v) && !/calc/.test(v)) return null; // regeln die Variablen
-  if (PILL.test(v)) return ROUND.test(selector) ? null : '4px';
+  if (PILL.test(v)) return ROUND.test(selector) ? null : '5px';
   const parts = v.split(/\s+/);
   if (parts.some((p) => !/^(\d*\.?\d+)(px|rem|em)$|^0$/.test(p))) return null;
   const out = parts.map(mapOne).join(' ');

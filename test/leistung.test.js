@@ -57,7 +57,7 @@ describe('Leistung ohne Grafikkarte (Browser)', { skip: chromium ? false : 'Play
         assert.deepEqual([...new Set(props)], ['transform'], 'nur verschieben – kein Neumalen');
       }
       assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.kz-shine')).animationName), 'none', 'Schrift selbst ohne Animation');
-      assert.equal(await page.evaluate(() => document.querySelector('.kz-shine').textContent.includes('Recht bekommen.')), true);
+      assert.equal(await page.evaluate(() => document.querySelector('.kz-shine').textContent.includes('in Los Santos.')), true);
       await ctx.close();
     }
   });

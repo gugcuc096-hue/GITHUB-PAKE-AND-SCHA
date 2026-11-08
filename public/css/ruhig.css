@@ -1,7 +1,8 @@
 /*
- * Design „Ruhig“ (Standard seit November 2026) – dasselbe Blau und Gold, aber dezent: flache Flächen mit feinem Rand,
- * kaum Schatten, kein Glas, kein Leuchten, kein Glanz, eckigere Formen (ruhig-formen.css), Gold nur für Handlung und
- * „aktiv“. Beim Klicken geben Knöpfe und Karten leicht nach.
+ * Design „Ruhig“ (Standard seit November 2026) – dasselbe Blau und Gold, aber dezent und gegliedert wie ein Schriftstück:
+ * Flächen mit feinem Rand und leichter Tiefe, kein Glas, kein Leuchten, kein Glanz, eckigere Formen (ruhig-formen.css),
+ * Gold nur für Handlung, „aktiv“ und die Kante oben an Karten. Website: Abschnitte linksbündig, römisch nummeriert und
+ * mit Linie, Startbereich und Eckdaten wie ein Briefkopf, §-Aufzählung. Beim Klicken geben Knöpfe und Karten leicht nach.
  *
  * Gilt nur unter html[data-design="ruhig"] (server/web/theme.js). Das bisherige Design „Klassisch“ steht unverändert in
  * den übrigen Stylesheets und kommt mit Einstellungen → Konfiguration → Stil & Saison → Design „Klassisch“ zurück.
@@ -10,23 +11,24 @@
 
 /* ================================================================ Werte */
 :root:root[data-design="ruhig"] {
-  --r-sm: 3px;
-  --r-md: 4px;
-  --radius: 6px;
+  --r-sm: 4px;
+  --r-md: 6px;
+  --radius: 8px;
 
   --navy-950: #070e20;
   --navy-900: #091228;
   --navy-850: #0c1630;
   --navy-800: #0c1630;
   --rz-bg: #081024;
-  --rz-panel: #0c1631;
+  --rz-panel: #0d1835;
   --rz-panel-2: #0f1a38;
   --rz-line: rgba(255, 255, 255, 0.075);
   --rz-line-2: rgba(255, 255, 255, 0.12);
   --rz-gold-line: rgba(var(--accent-rgb), 0.5);
 
-  --sh-1: 0 1px 2px rgba(0, 0, 0, 0.25);
-  --sh-2: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --sh-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --sh-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 24px -18px rgba(0, 0, 0, 0.7);
+  --rz-edge: inset 0 1px 0 rgba(255, 255, 255, 0.035);
   --sh-3: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
   --sh-4: 0 24px 60px -20px rgba(0, 0, 0, 0.75);
 
@@ -53,7 +55,7 @@ html[data-design="ruhig"] .glow-orb { display: none; }
 html[data-design="ruhig"] :is(.panel, .glass-card, .kpi) {
   background: var(--rz-panel);
   border-color: var(--rz-line);
-  box-shadow: none;
+  box-shadow: var(--sh-2), var(--rz-edge);
 }
 html[data-design="ruhig"] .card-gold { border-top-color: var(--rz-gold-line); box-shadow: none; }
 html[data-design="ruhig"] .kpi-value { text-shadow: none; }
@@ -120,7 +122,7 @@ html[data-design="ruhig"] .kz-shine-band { display: none; }
 /* Karten: flach, beim Darüberfahren nur Rand und feine Goldlinie – kein Anheben, kein Schatten */
 html[data-design="ruhig"] :is(.kz-tile > a, .kz-person, .kz-news-card, .kz-fact, .kz-band, .kz-quote, .kz-principles > div, .kz-flow > li, .kz-contact > div, .kz-news > li:not(.kz-empty), .pf-review, .pf-stats .kpi, .hr-pack, .price-item) {
   background: var(--rz-panel);
-  box-shadow: none;
+  box-shadow: var(--sh-2), var(--rz-edge);
   border-color: var(--rz-line);
 }
 html[data-design="ruhig"] :is(.kz-tile > a, .kz-person, .kz-news-card)::before,
@@ -197,3 +199,79 @@ html[data-design="ruhig"] :is(input, select).rounded-full { border-radius: 3px; 
 /* Goldener Strich unter der aktuellen Seite: schlicht, ohne Leuchten (gleitet weiter mit) */
 html[data-design="ruhig"] .kz-nav .nav-ink { height: 2px; border-radius: 0; background: var(--gold-500); box-shadow: none; }
 html[data-design="ruhig"] .nav-ink { box-shadow: none; }
+
+/* ================================================================ Gliederung wie ein Schriftstück (Website) */
+/* Abschnitte linksbündig, römisch nummeriert, mit feiner Linie über die ganze Breite */
+html[data-design="ruhig"] .site-home main { counter-reset: rz-sec; }
+html[data-design="ruhig"] .kz-section .kz-head,
+html[data-design="ruhig"] .kz-section .kz-head.is-center { max-width: none; margin-left: 0; margin-right: 0; justify-items: start; text-align: left; padding-bottom: 1.1rem; border-bottom: 1px solid var(--rz-line-2); gap: 0.45rem; }
+html[data-design="ruhig"] .kz-section .kz-head > .kz-text { max-width: 65ch; }
+html[data-design="ruhig"] .kz-section .kz-head > .kz-rubric::before { counter-increment: rz-sec; content: counter(rz-sec, upper-roman) "."; color: var(--gold-500); letter-spacing: 0.06em; margin-right: 0.15rem; }
+html[data-design="ruhig"] .kz-head-row { padding-bottom: 1.1rem; border-bottom: 1px solid var(--rz-line-2); }
+html[data-design="ruhig"] .kz-head-row .kz-head { padding-bottom: 0; border-bottom: 0; }
+html[data-design="ruhig"] .kz-h2 { font-size: clamp(1.7rem, 3vw, 2.2rem); }
+html[data-design="ruhig"] .kz-rubric { letter-spacing: 0.16em; }
+/* Seitenkopf der Unterseiten: mit Linie abgeschlossen */
+html[data-design="ruhig"] .kz-pagehead .kz-wrap { position: relative; padding-bottom: var(--sp-3); }
+html[data-design="ruhig"] .kz-pagehead .kz-wrap::after { content: ''; position: absolute; left: var(--sp-3); right: var(--sp-3); bottom: 0; height: 1px; background: var(--rz-line-2); }
+@media (max-width: 639px) { html[data-design="ruhig"] .kz-pagehead .kz-wrap::after { left: var(--sp-2); right: var(--sp-2); } }
+html[data-design="ruhig"] .kz-pagehead .kz-rubric::before { content: ''; display: inline-block; width: 1.5rem; height: 2px; margin-right: 0.35rem; background: var(--gold-500); vertical-align: middle; }
+
+/* ================================================================ Startbereich wie ein Briefkopf */
+html[data-design="ruhig"] .kz-hero { padding: 5.5rem 0 var(--sp-4); }
+html[data-design="ruhig"] .kz-hero-in { justify-items: start; text-align: left; }
+html[data-design="ruhig"] .kz-hero .kz-rubric::before { content: ''; display: inline-block; width: 2rem; height: 2px; margin-right: 0.4rem; background: var(--gold-500); vertical-align: middle; }
+html[data-design="ruhig"] .kz-hero .kz-h1 { font-size: clamp(2.6rem, 6vw, 4.6rem); line-height: 1.05; max-width: 16ch; }
+html[data-design="ruhig"] .kz-hero .kz-lead { margin: 0 0 var(--sp-4); max-width: 58ch; }
+html[data-design="ruhig"] .kz-actions.is-center { justify-content: flex-start; }
+html[data-design="ruhig"] .kz-hero .kz-shine { white-space: normal; }
+/* Eckdaten: eine Leiste mit Goldkante oben und feinen Trennlinien – wie die Angaben im Briefkopf */
+html[data-design="ruhig"] .kz-facts { gap: 0; background: var(--rz-panel); border: 1px solid var(--rz-line); border-top: 2px solid var(--gold-500); border-radius: var(--radius); box-shadow: var(--sh-2); overflow: hidden; }
+html[data-design="ruhig"] .kz-facts .kz-fact { background: transparent; border: 0; border-radius: 0; box-shadow: none; padding: 1.15rem 1.4rem 1.25rem; }
+html[data-design="ruhig"] .kz-facts .kz-fact + .kz-fact { border-left: 1px solid var(--rz-line); }
+html[data-design="ruhig"] .kz-facts .kz-fact::after { content: none; }
+@media (max-width: 899px) {
+  html[data-design="ruhig"] .kz-facts .kz-fact:nth-child(odd) { border-left: 0; }
+  html[data-design="ruhig"] .kz-facts .kz-fact:nth-child(n + 3) { border-top: 1px solid var(--rz-line); }
+}
+
+/* ================================================================ Karten „fertig“: Goldkante oben, innen gegliedert */
+html[data-design="ruhig"] :is(.kz-tile > a, .kz-person, .kz-news-card, .kz-principles > div, .kz-flow > li, .kz-contact > div, .pf-review, .pf-stats .kpi, .price-item) { border-top: 2px solid rgba(var(--accent-rgb), 0.7); }
+/* Rechtsgebiete: linksbündig, Symbol im Kästchen, Link unten hinter einer Linie */
+html[data-design="ruhig"] .kz-tiles .kz-tile > a { align-items: flex-start; text-align: left; padding: 1.5rem 1.4rem 1.25rem; }
+html[data-design="ruhig"] .kz-tile-ico { width: 44px; height: 44px; margin-bottom: 0.5rem; }
+html[data-design="ruhig"] .kz-more { width: 100%; margin-top: auto; padding-top: 0.9rem; border-top: 1px solid var(--rz-line); }
+/* Anwälte: Foto/Initialen rund, Handlung unten hinter einer Linie */
+html[data-design="ruhig"] .kz-person-actions { margin-top: auto; padding-top: 1.1rem; border-top: 1px solid var(--rz-line); }
+html[data-design="ruhig"] .kz-person-focus { margin-bottom: 1.25rem; }
+/* Meldungen: Datum und Art als Kopfzeile mit Linie */
+html[data-design="ruhig"] .kz-news-card .kz-news-meta { padding-bottom: 0.6rem; border-bottom: 1px solid var(--rz-line); }
+/* Abschluss: linksbündig, Text links, Knöpfe rechts */
+html[data-design="ruhig"] .kz-band { border-left: 3px solid var(--gold-500); }
+html[data-design="ruhig"] .kz-band.is-center { justify-items: start; text-align: left; }
+html[data-design="ruhig"] .kz-band.is-center .kz-actions { justify-content: flex-start; }
+@media (min-width: 900px) {
+  html[data-design="ruhig"] .kz-band.is-center { grid-template-columns: minmax(0, 1fr) auto; padding: var(--sp-4); }
+}
+/* Aufzählungen mit Paragraphenzeichen statt Punkt */
+html[data-design="ruhig"] :is(.kz-list, .pf-highlights) > li::before { content: '§'; width: auto; height: auto; top: 0; left: 0; border-radius: 0; background: none; box-shadow: none; font: 600 1rem/1.6 var(--kz-serif); color: var(--gold-500); }
+
+/* ================================================================ Fußzeile wie ein Briefbogen-Fuß */
+html[data-design="ruhig"] .kz-footer { background: #060c1d; border-top: 2px solid var(--gold-500); }
+html[data-design="ruhig"] .kz-footer-grid > div + div { padding-left: var(--sp-3); border-left: 1px solid var(--rz-line); }
+@media (max-width: 767px) { html[data-design="ruhig"] .kz-footer-grid > div + div { padding-left: 0; border-left: 0; } }
+html[data-design="ruhig"] .kz-footer-duty { border-radius: var(--r-sm); }
+
+/* ================================================================ Dashboard: dieselbe Gliederung */
+/* Seitentitel und Kästen mit Linie, Kennzahlen mit Goldkante */
+html[data-design="ruhig"] .page-head { padding-bottom: 1rem; border-bottom: 1px solid var(--rz-line-2); }
+html[data-design="ruhig"] .panel-pad > .panel-head:first-child { padding-bottom: 0.75rem; border-bottom: 1px solid var(--rz-line); }
+html[data-design="ruhig"] .kpi { border-top: 2px solid rgba(var(--accent-rgb), 0.7); }
+html[data-design="ruhig"] .kpi-value { color: var(--text-main); }
+/* Akte: Abschnitte durch eine Linie unter dem Titel getrennt */
+html[data-design="ruhig"] .case-root .section > .section-title { padding-bottom: 0.5rem; border-bottom: 1px solid var(--rz-line); }
+/* Aktendeckel: Goldkante oben statt Rahmen im Rahmen */
+html[data-design="ruhig"] .case-cover { border-top: 2px solid var(--gold-500); }
+/* Linksbündig wie der Rest: wenige Anwaltskarten und „Alle …“-Links stehen links, nicht in der Mitte */
+@media (min-width: 640px) { html[data-design="ruhig"] #leadGrid:is([data-n='1'], [data-n='2']) { justify-content: start; } }
+html[data-design="ruhig"] .kz-center { justify-content: flex-start; }

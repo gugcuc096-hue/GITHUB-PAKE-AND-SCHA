@@ -49,7 +49,7 @@ describe('Startseite anpassen und gemeinsames Design', () => {
     assert.doesNotMatch(home, /kz-seal|kzSeal/, 'kein Siegel');
     assert.match(home, /<svg class="kz-ico"/, 'Symbole eingesetzt');
     assert.doesNotMatch(home, /<!--icon:/);
-    assert.match(home, /class="kz-shine"[^>]*>Recht bekommen\./);
+    assert.match(home, /class="kz-shine"[^>]*>in Los Santos\./);
     assert.match(home, /nav class="kz-nav[^"]*" data-ink/, 'Menü mit goldenem Strich');
     assert.match(home, /@view-transition \{ navigation: auto; \}/, 'weiche Seitenwechsel auf der Website');
     assert.doesNotMatch(await page('/login'), /@view-transition \{ navigation: auto/, 'Anmeldung macht nicht mit');

@@ -942,7 +942,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       ? ['Gerichtsaktenzeichen', null, c.canEdit ? `${ie(c, 'courtRef', c.courtRef, { placeholder: 'Aktenzeichen des Gerichts' })}${c.courtRef ? ` <button type="button" class="copy-btn" data-action="copy" data-text="${esc(c.courtRef)}" title="Gerichtsaktenzeichen kopieren" aria-label="Gerichtsaktenzeichen kopieren">${icon('copy', 'ico-xs')}</button>` : ''}` : copyable(c.courtRef, 'Gerichtsaktenzeichen kopieren')]
       : null,
     staff && links.length ? ['Verknüpfte Akten', null, linksHtml(c, links)] : null,
-    staff && routing.length ? ['Laufzettel', null, routingHtml(routing)] : null,
+    staff && routing.length ? ['Bearbeitet von', null, routingHtml(routing)] : null,
   ]
     .filter(Boolean)
     .map(([k, v, html]) => `<div><div class="k">${esc(k)}</div><div class="v">${html != null ? html : esc(v)}</div></div>`)

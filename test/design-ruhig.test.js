@@ -30,14 +30,14 @@ describe('Design „Ruhig“: Dateien', () => {
 
   it('Rundungen: groß → klein, Kreise und runde Dinge bleiben', () => {
     const { mapRadius } = require('../scripts/build-ruhig');
-    assert.equal(mapRadius('18px', '.panel'), '6px');
-    assert.equal(mapRadius('14px', '.kpi'), '5px');
-    assert.equal(mapRadius('10px', '.field'), '4px');
-    assert.equal(mapRadius('999px', '.btn-gold'), '4px');
+    assert.equal(mapRadius('18px', '.panel'), '8px');
+    assert.equal(mapRadius('14px', '.kpi'), '6px');
+    assert.equal(mapRadius('10px', '.field'), '5px');
+    assert.equal(mapRadius('999px', '.btn-gold'), '5px');
     assert.equal(mapRadius('999px', '.avatar'), null, 'Profilbilder bleiben rund');
     assert.equal(mapRadius('999px', '.status-dot'), null);
     assert.equal(mapRadius('50%', '.btn'), null);
-    assert.equal(mapRadius('3px 16px 16px 16px', '.case-cover'), '3px 6px 6px 6px');
+    assert.equal(mapRadius('3px 16px 16px 16px', '.case-cover'), '3px 8px 8px 8px');
   });
 
   for (const page of ['dashboard', 'index', 'karriere', 'login', 'register', 'bewerbung', '404']) {
@@ -116,11 +116,11 @@ describe('Design „Ruhig“: Server und Browser', () => {
       };
       const ruhig = await look();
       assert.equal(ruhig.design, 'ruhig');
-      assert.equal(ruhig.btn, '4px');
+      assert.equal(ruhig.btn, '5px');
       assert.equal(ruhig.btnBg, 'none', 'Knopf ohne Goldverlauf');
-      assert.equal(ruhig.panel, '6px');
+      assert.equal(ruhig.panel, '8px');
       assert.equal(ruhig.topbar, 'none', 'kein Glas');
-      assert.notEqual(ruhig.avatar, '4px', 'Profilbilder bleiben rund');
+      assert.notEqual(ruhig.avatar, '5px', 'Profilbilder bleiben rund');
 
       await publish({ ...STYLE, design: 'klassisch' });
       const klassisch = await look();

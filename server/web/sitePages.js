@@ -214,7 +214,7 @@ function shape(html, view) {
   html = html
     .replace(/<title>[\s\S]*?<\/title>/, `<title>${esc(title)}</title>`)
     .replace(/(<meta name="description" content=")[^"]*"/, `$1${esc(m.desc)}"`)
-    .replace(/(<meta property="og:title" content=")[^"]*"/, `$1${esc(m.ogTitle || (view.key === 'start' ? 'Pake & Scha – Recht haben. Recht bekommen.' : title))}"`)
+    .replace(/(<meta property="og:title" content=")[^"]*"/, `$1${esc(m.ogTitle || (view.key === 'start' ? 'Pake & Scha – Ihre Rechtsanwälte in Los Santos' : title))}"`)
     .replace(/(<meta property="og:description" content=")[^"]*"/, `$1${esc(m.desc)}"`);
   if (m.image) html = html.replace(/(<meta property="og:image" content=")[^"]*"/, `$1${esc(m.image)}"`);
   if (m.card) html = html.replace(/(<meta name="twitter:card" content=")[^"]*"/, `$1${m.card}"`);
