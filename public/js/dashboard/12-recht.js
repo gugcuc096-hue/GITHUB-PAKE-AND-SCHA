@@ -813,7 +813,7 @@ document.addEventListener('input', (e) => {
   if (btn) btn.disabled = !pleaText();
 });
 
-const prompter = { speed: 1, paused: false, raf: 0, last: 0 };
+const prompter = { speed: 1, paused: false, raf: 0, last: 0, pos: 0 };
 function openPrompter() {
   const text = pleaText();
   if (!text) return;
@@ -827,14 +827,20 @@ function openPrompter() {
       <button type="button" class="btn-outline btn-sm" data-action="prompter-pause" id="prompterPause">Pause</button>
       <button type="button" class="btn-ghost btn-sm" data-action="prompter-close">Schließen</button></div>`;
   $('#hearing').appendChild(el);
-  Object.assign(prompter, { speed: 1, paused: false, last: performance.now() });
+  Object.assign(prompter, { speed: 1, paused: false, last: performance.now(), pos: 0 });
   cancelAnimationFrame(prompter.raf);
   const box = $('#prompterText');
   const step = (t) => {
     if (!$('#prompter')) return;
-    const dt = t - prompter.last;
+    const dt = Math.max(0, t - prompter.last);
     prompter.last = t;
-    if (!prompter.paused) box.scrollTop += (dt / 1000) * 22 * prompter.speed; // Pixel je Sekunde
+    // Position als Kommazahl mitführen: je Bild sind es nur Bruchteile eines Pixels, die der Browser beim Setzen von
+    // scrollTop abrundet – sonst bliebe der Text auf schnellen Rechnern stehen. Von Hand gescrollt: dort weitermachen.
+    if (Math.abs(box.scrollTop - prompter.pos) > 2) prompter.pos = box.scrollTop;
+    if (!prompter.paused) {
+      prompter.pos += (dt / 1000) * 22 * prompter.speed; // Pixel je Sekunde
+      box.scrollTop = prompter.pos;
+    }
     prompter.raf = requestAnimationFrame(step);
   };
   prompter.raf = requestAnimationFrame(step);
