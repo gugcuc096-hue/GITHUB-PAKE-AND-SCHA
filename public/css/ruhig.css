@@ -212,7 +212,9 @@ html[data-design="ruhig"] .kz-head-row .kz-head { padding-bottom: 0; border-bott
 html[data-design="ruhig"] .kz-h2 { font-size: clamp(1.7rem, 3vw, 2.2rem); }
 html[data-design="ruhig"] .kz-rubric { letter-spacing: 0.16em; }
 /* Seitenkopf der Unterseiten: mit Linie abgeschlossen */
-html[data-design="ruhig"] .kz-pagehead .kz-wrap { padding-bottom: var(--sp-3); border-bottom: 1px solid var(--rz-line-2); }
+html[data-design="ruhig"] .kz-pagehead .kz-wrap { position: relative; padding-bottom: var(--sp-3); }
+html[data-design="ruhig"] .kz-pagehead .kz-wrap::after { content: ''; position: absolute; left: var(--sp-3); right: var(--sp-3); bottom: 0; height: 1px; background: var(--rz-line-2); }
+@media (max-width: 639px) { html[data-design="ruhig"] .kz-pagehead .kz-wrap::after { left: var(--sp-2); right: var(--sp-2); } }
 html[data-design="ruhig"] .kz-pagehead .kz-rubric::before { content: ''; display: inline-block; width: 1.5rem; height: 2px; margin-right: 0.35rem; background: var(--gold-500); vertical-align: middle; }
 
 /* ================================================================ Startbereich wie ein Briefkopf */
