@@ -1,0 +1,199 @@
+/*
+ * Design „Ruhig“ (Standard seit November 2026) – dasselbe Blau und Gold, aber dezent: flache Flächen mit feinem Rand,
+ * kaum Schatten, kein Glas, kein Leuchten, kein Glanz, eckigere Formen (ruhig-formen.css), Gold nur für Handlung und
+ * „aktiv“. Beim Klicken geben Knöpfe und Karten leicht nach.
+ *
+ * Gilt nur unter html[data-design="ruhig"] (server/web/theme.js). Das bisherige Design „Klassisch“ steht unverändert in
+ * den übrigen Stylesheets und kommt mit Einstellungen → Konfiguration → Stil & Saison → Design „Klassisch“ zurück.
+ * Wird als letztes Stylesheet geladen.
+ */
+
+/* ================================================================ Werte */
+:root:root[data-design="ruhig"] {
+  --r-sm: 3px;
+  --r-md: 4px;
+  --radius: 6px;
+
+  --navy-950: #070e20;
+  --navy-900: #091228;
+  --navy-850: #0c1630;
+  --navy-800: #0c1630;
+  --rz-bg: #081024;
+  --rz-panel: #0c1631;
+  --rz-panel-2: #0f1a38;
+  --rz-line: rgba(255, 255, 255, 0.075);
+  --rz-line-2: rgba(255, 255, 255, 0.12);
+  --rz-gold-line: rgba(var(--accent-rgb), 0.5);
+
+  --sh-1: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --sh-2: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --sh-3: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  --sh-4: 0 24px 60px -20px rgba(0, 0, 0, 0.75);
+
+  --lit-edge: transparent;
+  --lit-edge-soft: transparent;
+  --lit-gold: transparent;
+  --gold-glow: transparent;
+  --glass-blur: none;
+  --glass-fill: rgba(9, 17, 38, 0.98);
+  --glass-fill-strong: rgba(9, 17, 38, 0.99);
+  --panel-alpha: 1;
+  --kz-panel-bg: var(--rz-panel);
+}
+
+/* ================================================================ Hintergrund: eine ruhige Fläche mit leichtem Licht von oben */
+html[data-design="ruhig"] body { background-color: var(--rz-bg); }
+html[data-design="ruhig"] .ambient-bg {
+  background: radial-gradient(1200px 520px at 50% -180px, #12224a 0%, transparent 70%), var(--rz-bg);
+  background-size: auto;
+}
+html[data-design="ruhig"] .glow-orb { display: none; }
+
+/* ================================================================ Flächen: flach, feiner Rand, kein Licht */
+html[data-design="ruhig"] :is(.panel, .glass-card, .kpi) {
+  background: var(--rz-panel);
+  border-color: var(--rz-line);
+  box-shadow: none;
+}
+html[data-design="ruhig"] .card-gold { border-top-color: var(--rz-gold-line); box-shadow: none; }
+html[data-design="ruhig"] .kpi-value { text-shadow: none; }
+html[data-design="ruhig"] .list-row:hover { background: rgba(255, 255, 255, 0.025); box-shadow: inset 2px 0 0 var(--rz-gold-line); }
+@media (hover: hover) and (pointer: fine) {
+  html[data-design="ruhig"] .kpi:hover { transform: none; border-color: var(--rz-line-2); }
+}
+
+/* ================================================================ Knöpfe: flach, ohne Leuchten, geben beim Klicken leicht nach */
+html[data-design="ruhig"] .btn-gold {
+  background: var(--gold-500);
+  box-shadow: none;
+  filter: none;
+}
+html[data-design="ruhig"] .btn-gold:hover { transform: none; box-shadow: none; filter: brightness(1.07); }
+html[data-design="ruhig"] .btn-gold::before, html[data-design="ruhig"] .btn-gold::after { content: none; }
+html[data-design="ruhig"] .btn-outline { background: transparent; border-color: rgba(var(--accent-rgb), 0.38); }
+html[data-design="ruhig"] .btn-outline:hover { background: rgba(var(--accent-rgb), 0.07); border-color: rgba(var(--accent-rgb), 0.7); color: var(--text-main); }
+html[data-design="ruhig"] .btn-ghost:hover { background: rgba(255, 255, 255, 0.05); }
+html[data-design="ruhig"] :is(.btn-gold, .btn-outline, .btn-ghost, .btn-danger, .icon-btn, .chip, .tab-btn, .kz-btn) {
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.12s ease, filter 0.15s ease;
+}
+html[data-design="ruhig"] :is(.btn-gold, .btn-outline, .btn-ghost, .btn-danger, .icon-btn, .chip, .tab-btn, .kz-btn, .nav-item, .set-nav-item, .bot-nav-item):active:not(:disabled) {
+  transform: scale(0.97);
+}
+/* Karten, die man anklickt, geben ganz leicht nach */
+html[data-design="ruhig"] :is(.kz-tile > a, .kz-person, .kz-news-card, a.panel, button.panel, .list-row, .hr-pack, .price-item):active { transform: scale(0.992); }
+
+/* ================================================================ Felder */
+html[data-design="ruhig"] .field { background: rgba(255, 255, 255, 0.025); border-color: var(--rz-line-2); }
+html[data-design="ruhig"] .field:focus { box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.18); }
+
+/* ================================================================ Auswahl, Reiter, Abzeichen */
+html[data-design="ruhig"] .chip { background: transparent; }
+html[data-design="ruhig"] :is(.chip.active, .tab-btn.active) { background: rgba(var(--accent-rgb), 0.1); box-shadow: none; }
+
+/* ================================================================ Dashboard: Seitenleiste, Kopfzeile, Fenster */
+html[data-design="ruhig"] .sidebar { background: #070e1f; box-shadow: none; border-right: 1px solid var(--rz-line); }
+html[data-design="ruhig"] .nav-item.active { background: rgba(var(--accent-rgb), 0.08); box-shadow: inset 2px 0 0 var(--gold-500); }
+html[data-design="ruhig"] .topbar { background: rgba(8, 16, 36, 0.97); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; border-bottom: 1px solid var(--rz-line); }
+html[data-design="ruhig"] .modal { background: rgba(2, 6, 16, 0.78); -webkit-backdrop-filter: none; backdrop-filter: none; }
+html[data-design="ruhig"] .modal-card { background: var(--rz-bg); border-color: var(--rz-line-2); border-top: 2px solid var(--gold-500); box-shadow: var(--sh-4); }
+html[data-design="ruhig"] .modal-close { background: var(--rz-panel); }
+html[data-design="ruhig"] .prop:focus-within { box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.18); }
+
+/* ================================================================ Website */
+/* Kopfzeile deckend statt Glas, Unterstrich ohne Leuchten */
+html[data-design="ruhig"] .site-home .glass-nav { background: rgba(7, 14, 31, 0.97); -webkit-backdrop-filter: none; backdrop-filter: none; border-bottom-color: var(--rz-line); }
+html[data-design="ruhig"] :is(.kz-nav-menu, .site-home #mobileMenu) { -webkit-backdrop-filter: none; backdrop-filter: none; }
+html[data-design="ruhig"] .site-home #mobileMenu { background: rgba(7, 14, 31, 0.99); }
+html[data-design="ruhig"] .site-home .btn-gold { box-shadow: none; }
+@media (hover: hover) and (pointer: fine) {
+  html[data-design="ruhig"] .site-home .btn-gold:hover { box-shadow: none; }
+}
+
+/* Überschrift: Gold ohne Verlauf und ohne Glanz */
+html[data-design="ruhig"] .kz-shine {
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  color: var(--gold-500);
+}
+html[data-design="ruhig"] .kz-shine-band { display: none; }
+
+/* Karten: flach, beim Darüberfahren nur Rand und feine Goldlinie – kein Anheben, kein Schatten */
+html[data-design="ruhig"] :is(.kz-tile > a, .kz-person, .kz-news-card, .kz-fact, .kz-band, .kz-quote, .kz-principles > div, .kz-flow > li, .kz-contact > div, .kz-news > li:not(.kz-empty), .pf-review, .pf-stats .kpi, .hr-pack, .price-item) {
+  background: var(--rz-panel);
+  box-shadow: none;
+  border-color: var(--rz-line);
+}
+html[data-design="ruhig"] :is(.kz-tile > a, .kz-person, .kz-news-card)::before,
+html[data-design="ruhig"] :is(.kz-fact, .kz-band, .kz-quote, .kz-principles > div, .kz-contact > div, .kz-news > li:not(.kz-empty), .pf-review, .hr-pack, .price-item)::before { content: none; }
+html[data-design="ruhig"] :is(.kz-tile > a, .kz-person, .kz-news-card, .kz-fact, .kz-band, .kz-quote, .kz-principles > div, .kz-flow > li, .kz-contact > div, .kz-news > li:not(.kz-empty), .pf-review, .pf-stats .kpi, .hr-pack, .price-item)::after {
+  left: 0; right: 0; height: 1px; border-radius: 0; background: var(--gold-500); box-shadow: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  html[data-design="ruhig"] :is(.kz-tile > a, .kz-person, .kz-news-card, .kz-fact, .kz-band, .kz-quote, .kz-principles > div, .kz-flow > li, .kz-contact > div, .kz-news > li:not(.kz-empty), .pf-review, .pf-stats .kpi, .hr-pack, .price-item):hover {
+    transform: none;
+    border-color: var(--rz-line-2);
+  }
+}
+html[data-design="ruhig"] .pf-stats .kpi::before { background: var(--rz-gold-line); opacity: 0.6; }
+
+/* Symbole in Kacheln: ruhig umrandet statt leuchtend */
+html[data-design="ruhig"] :is(.kz-tile-ico, .kz-empty-ico, .pf-stats .kpi-ico) { background: transparent; box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.35); border-radius: 4px; }
+
+/* Profilbilder bleiben rund, Initialen ruhig statt Goldverlauf */
+html[data-design="ruhig"] :is(.kz-mono, .kz-avatar) { background: #13203f; color: var(--gold-500); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.45); }
+html[data-design="ruhig"] :is(.kz-portrait img, .pf-portrait img) { box-shadow: 0 0 0 3px var(--rz-bg), 0 0 0 4px rgba(var(--accent-rgb), 0.35); }
+html[data-design="ruhig"] .kz-lotm { background: var(--gold-500); box-shadow: none; }
+
+/* Abschnitte: Wechsel nur durch eine leicht andere Fläche, ohne Verläufe */
+html[data-design="ruhig"] .kz-section.is-band::before { background: rgba(255, 255, 255, 0.018); }
+html[data-design="ruhig"] .kz-pagehead-ico { opacity: 0.035; }
+
+/* Tarifrechner */
+html[data-design="ruhig"] .hr-tab.is-on { background: var(--gold-500); }
+html[data-design="ruhig"] .hr-pack.is-on { box-shadow: inset 2px 0 0 var(--gold-500); }
+html[data-design="ruhig"] .hr-rec { background: rgba(var(--accent-rgb), 0.06); }
+html[data-design="ruhig"] .hr-wq.is-done .hr-wq-n { background: var(--gold-500); }
+html[data-design="ruhig"] .pf-stats .kpi-bar i { background: var(--gold-500); }
+
+/* ================================================================ Feinschliff nach Durchsicht aller Seiten */
+/* Website-Flächen (die Variable steht auf .site-home, nicht auf :root) */
+html[data-design="ruhig"] .site-home { --kz-panel-bg: var(--rz-panel); }
+html[data-design="ruhig"] .site-home header.sticky { box-shadow: none; }
+html[data-design="ruhig"] .site-home .kz-panel.is-gold { border-top-color: var(--gold-500); }
+
+/* Bereichsumschalter Website/Dashboard */
+html[data-design="ruhig"] .site-switch > a.is-active { background: var(--gold-500); }
+
+/* Profilbilder: rund, aber flach statt Goldverlauf */
+html[data-design="ruhig"] :is(.avatar, .who2-av) { background-image: none; background-color: var(--gold-500); }
+html[data-design="ruhig"] .avatar.slate { background-color: #26324b; }
+html[data-design="ruhig"] .duty-dot { box-shadow: none; }
+
+/* Kleine Knöpfe, Zahlenfelder, Leerstellen, Menüs: flach */
+html[data-design="ruhig"] :is(.icon-btn, .num-btn, .num-step, .empty, .more-pop, .kmap-mode) { background-image: none; }
+html[data-design="ruhig"] .kmap-mode.is-on { background-color: var(--gold-500); }
+html[data-design="ruhig"] .more-pop { box-shadow: var(--sh-3); }
+
+/* Aktenkopf: ruhiger Aktendeckel – eine Fläche, ein Rand, kein Innenrahmen */
+html[data-design="ruhig"] .case-cover { background: var(--rz-panel); box-shadow: none; border-color: rgba(var(--accent-rgb), 0.3); }
+html[data-design="ruhig"] .case-cover::before { content: none; }
+html[data-design="ruhig"] .cover-tab { background: var(--rz-panel); border-color: rgba(var(--accent-rgb), 0.3); border-radius: 3px 3px 0 0; }
+html[data-design="ruhig"] :is(.cover-tab-dot, .cover-tab-dot.p4) { box-shadow: none; }
+html[data-design="ruhig"] .case-emboss { text-shadow: none; }
+html[data-design="ruhig"] .case-jump { background: var(--rz-bg); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
+
+/* Hinweisleiste oben auf der Website */
+html[data-design="ruhig"] .site-banner { -webkit-backdrop-filter: none; backdrop-filter: none; }
+
+/* Karriereseite */
+html[data-design="ruhig"] .gold-shine { background: none; -webkit-text-fill-color: currentColor; color: var(--gold-500); animation: none; }
+html[data-design="ruhig"] [class*="shadow-[0_0_15px"] { box-shadow: none; }
+html[data-design="ruhig"] .num-spin button { background: rgba(var(--accent-rgb), 0.12); box-shadow: none; }
+html[data-design="ruhig"] .steps::before { background: var(--rz-line-2); }
+
+/* Auswahlfelder, die als Pille gebaut sind (Preise sortieren …) */
+html[data-design="ruhig"] :is(input, select).rounded-full { border-radius: 3px; }
+
+/* Goldener Strich unter der aktuellen Seite: schlicht, ohne Leuchten (gleitet weiter mit) */
+html[data-design="ruhig"] .kz-nav .nav-ink { height: 2px; border-radius: 0; background: var(--gold-500); box-shadow: none; }
+html[data-design="ruhig"] .nav-ink { box-shadow: none; }

@@ -12,6 +12,7 @@
     "dev": "node --watch server.js",
     "seed:admin": "node scripts/seed-admin.js",
     "build:css": "node scripts/build-css.js",
+    "build:ruhig": "node scripts/build-ruhig.js",
     "test": "node --test --test-concurrency=2 \"test/*.test.js\"",
     "postinstall": "node scripts/prepack.js",
     "pack:assets": "node scripts/prepack.js"

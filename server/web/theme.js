@@ -2,7 +2,8 @@
 /*
  * Stil & Saison beim Ausliefern jeder Seite einsetzen (kein Aufblitzen der Standardfarben):
  *  - <style id="psTheme"> mit Akzentfarbe, Glasstärke, Rundung und Schrift aus Einstellungen → Konfiguration → Stil & Saison
- *  - <html data-season="halloween" data-site-motion="ruhig" data-font="modern">
+ *  - <html data-design="ruhig" data-season="halloween" data-site-motion="ruhig" data-font="modern"> – Design „Ruhig“ (Standard)
+ *    oder „Klassisch“ (das bisherige Design mit Glas und Leuchten, siehe public/css/ruhig.css)
  *  - /js/season.js (Deko: Fledermäuse, Schnee, Feuerwerk … – lädt season.css nur, wenn eine Saison läuft)
  * Die Werte rechnet auch der Browser nach (public/js/siteconfig.js → PS.theme), damit die Vorschau beim Schieben der
  * Regler sofort stimmt und eine aus dem Zwischenspeicher geladene Seite nachzieht.
@@ -78,7 +79,7 @@ function inject(html, page) {
     return html;
   }
   const season = seasonFor(page, style);
-  const attrs = [season ? `data-season="${season}"` : '', style.motion !== 'normal' ? `data-site-motion="${style.motion}"` : '', style.font !== 'klassisch' ? `data-font="${style.font}"` : '']
+  const attrs = [`data-design="${style.design === 'klassisch' ? 'klassisch' : 'ruhig'}"`, season ? `data-season="${season}"` : '', style.motion !== 'normal' ? `data-site-motion="${style.motion}"` : '', style.font !== 'klassisch' ? `data-font="${style.font}"` : '']
     .filter(Boolean)
     .join(' ');
   let out = html;
