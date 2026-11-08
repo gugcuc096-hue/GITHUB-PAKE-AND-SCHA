@@ -83,7 +83,7 @@ html[data-design="ruhig"] :is(.btn-gold, .btn-outline, .btn-ghost, .btn-danger, 
 html[data-design="ruhig"] :is(.kz-tile > a, .kz-person, .kz-news-card, a.panel, button.panel, .list-row, .hr-pack, .price-item):active { transform: scale(0.992); }
 
 /* ================================================================ Felder */
-html[data-design="ruhig"] .field { background: rgba(255, 255, 255, 0.025); border-color: var(--rz-line-2); }
+html[data-design="ruhig"] .field { background-color: rgba(255, 255, 255, 0.025); border-color: var(--rz-line-2); }
 html[data-design="ruhig"] .field:focus { box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.18); }
 
 /* ================================================================ Auswahl, Reiter, Abzeichen */
