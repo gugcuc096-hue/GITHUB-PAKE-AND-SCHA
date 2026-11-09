@@ -913,6 +913,9 @@ html[data-design="ruhig"] .fee-success {
 html[data-design="ruhig"] .fee-close {
     border-radius: 6px
 }
+html[data-design="ruhig"] .case-brief {
+    border-radius: 6px
+}
 /*  select.css  */
 @supports (appearance: base-select) {
     html[data-design="ruhig"] :is(select.field,

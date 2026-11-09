@@ -243,9 +243,9 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await backInCase('Akte → markiert bis neben das Fenster');
       }
       // Esc bei offenem „⋯ Mehr“ schließt nur das Menü
-      await page.click('#modalBody details.more-menu > summary');
+      await page.click('#modalBody details.more-menu:not(.case-add) > summary');
       await page.keyboard.press('Escape');
-      assert.equal(await page.$eval('#modalBody details.more-menu', (d) => d.open), false, 'Esc schließt das Menü');
+      assert.equal(await page.$eval('#modalBody details.more-menu:not(.case-add)', (d) => d.open), false, 'Esc schließt das Menü');
       await backInCase('Esc im Menü');
 
       // Klick neben die Akte (rechts daneben, am Handy über dem Fenster) schließt sie – dahinter die Aktenliste
@@ -1056,17 +1056,17 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         assert.equal(await page.isVisible('#modalBody .more-item[data-action="delete-case"]'), false);
         await page.$eval('#modal', (m) => (m.scrollTop = 0));
         await page.$eval('#modalBody', (m) => (m.scrollTop = 0));
-        await page.click('#modalBody details.more-menu > summary');
+        await page.click('#modalBody details.more-menu:not(.case-add) > summary');
         assert.equal(await page.isVisible('#modalBody .more-item[data-action="release-case"]'), true);
         await page.click('#modalTitle');
-        assert.equal(await page.$eval('#modalBody details.more-menu', (d) => d.open), false, 'Klick daneben schließt das Menü');
-        await page.click('#modalBody details.more-menu > summary');
+        assert.equal(await page.$eval('#modalBody details.more-menu:not(.case-add)', (d) => d.open), false, 'Klick daneben schließt das Menü');
+        await page.click('#modalBody details.more-menu:not(.case-add) > summary');
         await page.click('#modalBody .more-item[data-action="release-case"]');
         await page.waitForSelector('#psDialogTitle');
         assert.equal(await page.textContent('#psDialogTitle'), 'Akte abgeben?');
         await page.click('[data-ps-dialog="cancel"]');
         assert.equal((await adm.get(`/api/cases/${kase.id}`)).json.case.lawyerId, me.id, 'abgebrochen – Akte bleibt');
-        await page.click('#modalBody details.more-menu > summary');
+        await page.click('#modalBody details.more-menu:not(.case-add) > summary');
         await page.click('#modalBody .more-item[data-action="delete-case"]');
         await page.waitForSelector('[data-ps-dialog="ok"]');
         await page.click('[data-ps-dialog="ok"]');
@@ -2765,8 +2765,8 @@ describe('Browser: Aktenmappe, verknüpfte Akten, Mehrfachauswahl, Kanzlei-Lager
 
       // Aktendeckel mit Reiter; Akte verknüpfen über „Mehr“
       await page.click(`#caseList [data-action="open-case"][data-id="${A.id}"]`);
-      await page.waitForSelector('#modalBody .case-cover .cover-tab');
-      await page.click('#modalBody .more-menu summary');
+      await page.waitForSelector('#modalBody .case-cover');
+      await page.click('#modalBody .more-menu:not(.case-add) > summary');
       await page.click('#modalBody [data-action="case-link"]');
       await page.selectOption('#clOther', String(B.id));
       await page.click('#modalBody form[data-form="case-link"] button[type=submit]');
@@ -3304,6 +3304,8 @@ describe('Browser: Aufgeräumte Akte – Direktbearbeitung, Chips, Beteiligte, P
         assert.equal(await page.$$eval('#modalBody .stats-4 .fact', (els) => els.length), 4);
 
         // Feld per Klick ändern: Enter speichert, „Rückgängig“ setzt zurück – ohne Neuladen der Akte
+        // (Design „Ruhig“: leere Angaben stehen erst nach „Bearbeiten“ da)
+        await page.click('#modalBody [data-action="facts-edit"]');
         await page.click('#modalBody [data-ie="courtRef"]');
         await page.fill('#modalBody .ie-input', 'LS-2026/77');
         await page.keyboard.press('Enter');
@@ -3321,7 +3323,8 @@ describe('Browser: Aufgeräumte Akte – Direktbearbeitung, Chips, Beteiligte, P
 
         // Interessenkonflikt: Gegenpartei „Paul Weber“ ist Mandant in der anderen Akte
         assert.match(await page.textContent('#modalBody .party-warn'), /Mandant/);
-        // Beteiligte hinzufügen und entfernen
+        // Beteiligte hinzufügen und entfernen (das Formular öffnet sich erst über „Beteiligte hinzufügen“)
+        await page.click('#modalBody .party-add-box > summary');
         await page.fill('#modalBody form[data-form="party-add"] [name="name"]', 'Hans Anklage');
         await page.selectOption('#modalBody form[data-form="party-add"] [name="role"]', 'staatsanwalt'); // Zeugen haben einen eigenen Abschnitt
         await page.click('#modalBody form[data-form="party-add"] button[type="submit"]');
@@ -3779,11 +3782,11 @@ describe('Browser: Bewegungs-System – Tokens, Knöpfe, Felder, Menüs, Fenster
       assert.equal(await page.$eval('#modalCard', (e) => e.classList.contains('is-stacked')), false);
 
       // 4 Menü „Mehr“: schließt mit Ausblenden (is-closing), dann ist es zu
-      await page.click('details.more-menu > summary');
-      assert.equal(await page.$eval('details.more-menu', (d) => d.open), true);
-      await page.click('details.more-menu > summary');
-      assert.equal(await page.$eval('details.more-menu', (d) => d.classList.contains('is-closing')), true);
-      await page.waitForFunction(() => !document.querySelector('details.more-menu').open, null, { timeout: 1500 });
+      await page.click('details.more-menu:not(.case-add) > summary');
+      assert.equal(await page.$eval('details.more-menu:not(.case-add)', (d) => d.open), true);
+      await page.click('details.more-menu:not(.case-add) > summary');
+      assert.equal(await page.$eval('details.more-menu:not(.case-add)', (d) => d.classList.contains('is-closing')), true);
+      await page.waitForFunction(() => !document.querySelector('details.more-menu:not(.case-add)').open, null, { timeout: 1500 });
 
       // 8 Konfetti
       await page.evaluate(() => window.PS.confetti(200, 200));

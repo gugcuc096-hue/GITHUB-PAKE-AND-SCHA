@@ -111,7 +111,7 @@ describe('Geheimes Mandat (nur Board of Partners)', () => {
       await page.evaluate((id) => openCase(id), k.id);
       await page.waitForSelector('#modalBody .case-root');
       assert.equal(await page.$('#modalBody .secret-badge'), null);
-      await page.click('#modalBody .more-menu > summary');
+      await page.click('#modalBody .more-menu:not(.case-add) > summary');
       await page.click('#modalBody [data-action="case-secret"]');
       await page.click('.ps-dialog-root.open [data-ps-dialog="ok"]');
       await page.waitForSelector('#modalBody .secret-badge');
