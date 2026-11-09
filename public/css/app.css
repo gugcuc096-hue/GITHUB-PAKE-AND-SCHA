@@ -3108,15 +3108,6 @@ form[data-form="cfg-style"]:has(input[name="design"][value="klassisch"]:checked)
 .fee-close [data-fee-won-hint] b { color: #a7f3d0; }
 
 /* ---------------------------------------------------------------- Akte: „Worum es geht“ (Rubrum + Kurzfassung) und aufgeräumte Bedienung */
-.case-brief { margin: -0.5rem 0 1rem; padding: 0.9rem 1.1rem 1rem; border: 1px solid var(--glass-border); border-left: 3px solid var(--gold-500); border-radius: 12px; background: rgba(255, 255, 255, 0.025); }
-.brief-k { font-size: 0.66rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.35rem; }
-.brief-rubrum { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.15rem 0.5rem; font: 600 1.15rem/1.35 var(--font-display); color: var(--text-main); }
-.brief-vs { font: 600 0.85rem var(--font-body); color: var(--gold-500); }
-.brief-wegen { font: 500 0.85rem/1.4 var(--font-body); color: var(--text-muted); }
-.brief-wegen span { color: var(--gold-light); }
-.brief-text { margin: 0.45rem 0 0; font-size: 0.9rem; line-height: 1.6; color: var(--text-muted); max-width: 80ch; }
-.brief-text.is-empty { color: var(--text-dim); font-style: italic; }
-.brief-more { margin-left: 0.25rem; }
 .case-actbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0 0 1rem; }
 .case-actbar .more-menu > summary { list-style: none; }
 .case-add .more-pop { max-height: min(70vh, 34rem); overflow-y: auto; min-width: 18rem; }

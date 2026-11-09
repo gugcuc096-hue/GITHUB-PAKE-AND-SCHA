@@ -88,6 +88,49 @@ describe('Design „Ruhig“: Server und Browser', () => {
     await publish({ ...STYLE, design: 'ruhig' });
   });
 
+  it('Browser: Akte „Fall“ als Prüfansicht – Sachverhalt links, Anklagepunkte daneben (Handy: darunter), kein „Worum es geht“', { skip: !chromium && 'Playwright nicht installiert' }, async () => {
+    const desc = 'Der Mandant wurde vor der Fleeca Bank festgenommen und bestreitet die Tatbeteiligung.';
+    const id = (await owner.post('/api/cases', { title: 'Prüfansicht Fleeca', area: 'strafrecht', clientName: 'Paul Prüf', description: desc })).json.case.id;
+    const items = (await owner.post('/api/penal/parse', { text: '§ 33 StGB' })).json.items.map((i) => ({ offenceId: i.offenceId, count: 1 }));
+    assert.equal((await owner.post(`/api/cases/${id}/charges/bulk`, { items })).status, 201);
+    const browser = await chromium.launch();
+    try {
+      for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+        const ctx = await browser.newContext({ viewport: vp });
+        const p = await ctx.newPage();
+        await p.goto(srv.base + '/login');
+        await p.fill('#email', TEAM.admin);
+        await p.fill('#password', PASSWORD);
+        await p.click('button[type=submit]');
+        await p.waitForSelector('#nav a.nav-item', { state: 'attached' });
+        await p.evaluate((i) => openCase(i), id);
+        await p.waitForSelector('#modalBody .case-root');
+        assert.equal(await p.$('#modalBody .case-brief'), null, 'kein „Worum es geht“');
+        await p.evaluate(() => caseTabSet('fall'));
+        await p.waitForTimeout(300);
+        const r = await p.evaluate(() => {
+          const box = (s) => {
+            const el = document.querySelector(s);
+            const b = el && el.getBoundingClientRect();
+            return b && b.height ? { x: Math.round(b.left), y: Math.round(b.top), w: Math.round(b.width), bottom: Math.round(b.bottom) } : null;
+          };
+          return { sv: box('#modalBody #secSachverhalt'), chg: box('#modalBody #secCharges'), list: box('#modalBody #secCharges .chg-list'), sum: box('#modalBody #secCharges .chg-sum'), overview: !!document.querySelector('#modalBody .case-overview #secSachverhalt'), text: document.querySelector('#modalBody #secSachverhalt').textContent };
+        });
+        assert.ok(r.sv && r.chg, `Sachverhalt und Anklagepunkte im Reiter „Fall“ (${JSON.stringify(r)})`);
+        assert.equal(r.overview, false, 'Sachverhalt nicht doppelt im Überblick');
+        assert.match(r.text, /Fleeca Bank festgenommen/);
+        assert.ok(r.list.y < r.sum.y, 'erst die Anklagepunkte, dann das Strafmaß');
+        if (vp.width > 1000) {
+          assert.ok(r.chg.x > r.sv.x + r.sv.w - 5, `nebeneinander (${JSON.stringify(r)})`);
+          assert.ok(Math.abs(r.chg.y - r.sv.y) < 40, 'auf einer Höhe');
+        } else assert.ok(r.chg.y >= r.sv.bottom - 5, `am Handy darunter (${JSON.stringify(r)})`);
+        await ctx.close();
+      }
+    } finally {
+      await browser.close();
+    }
+  });
+
   it('Browser: „Ruhig“ ist eckig und flach, „Klassisch“ behält Rundungen und Glas', { skip: !chromium && 'Playwright nicht installiert' }, async () => {
     const browser = await chromium.launch();
     try {

@@ -883,36 +883,6 @@ function routingHtml(routing) {
     .join('')}</div>`;
 }
 
-/**
- * „Worum es geht“ direkt unter dem Aktenkopf – wie das Rubrum auf einem Aktendeckel:
- *  - Rubrum: Mandant ./. Gegenpartei, dazu die Anklagepunkte (Strafrecht) bzw. das Rechtsgebiet
- *  - Kurzfassung: der Anfang des Sachverhalts (sonst des Tathergangs), mit „weiterlesen“
- * So weiß man beim Öffnen sofort, worum es in der Akte geht – ohne zu scrollen.
- */
-function caseBrief(c, charges) {
-  const client = c.clientName && c.clientName !== '—' ? c.clientName : 'Mandant';
-  const against = c.opponent || (c.area === 'strafrecht' ? 'Staatsanwaltschaft' : '');
-  const list = (charges && charges.charges) || [];
-  const cite = (ch) => (typeof citeShort === 'function' ? citeShort(ch) : `§ ${ch.para}`) + (ch.count > 1 ? ` (${ch.count}×)` : '');
-  const wegen = list.length
-    ? `wegen ${list.slice(0, 3).map((ch) => `<span title="${esc(ch.title || '')}">${esc(cite(ch))}</span>`).join(', ')}${list.length > 3 ? ` und ${list.length - 3} weiteren` : ''}`
-    : esc(AREAS[c.area] || c.area || '');
-  const plain = (t) => String(t || '').replace(/\[Bild[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
-  const text = plain(c.description) || plain(c.incident);
-  const MAX = 300;
-  const short = text.length > MAX ? `${text.slice(0, MAX).replace(/\s+\S*$/, '')} …` : text;
-  const target = c.description || !c.incident ? 'secSachverhalt' : 'secTathergang';
-  const more = text.length > MAX ? ` <button type="button" class="link-btn brief-more" data-action="scroll-to" data-target="${target}">weiterlesen</button>` : '';
-  const body = text
-    ? `<p class="brief-text">${esc(short)}${more}</p>`
-    : `<p class="brief-text is-empty">Noch kein Sachverhalt erfasst.${c.canEdit ? ` <button type="button" class="link-btn" data-action="scroll-to" data-target="secSachverhalt">Jetzt eintragen</button>` : ''}</p>`;
-  return `<section class="case-brief" aria-label="Worum es geht">
-      <div class="brief-k">Worum es geht</div>
-      <div class="brief-rubrum"><span class="brief-party">${esc(client)}</span>${against ? `<span class="brief-vs" aria-label="gegen">./.</span><span class="brief-party">${esc(against)}</span>` : ''}${wegen ? `<span class="brief-wegen">${wegen}</span>` : ''}</div>
-      ${body}
-    </section>`;
-}
-
 function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, transcripts = [], clientSuggestions, review, chat, charges, deals = [], links = [], linkedEvidence = [], routing = [], parties = [], places = [], fall = null, overlaps = {}, requests = [], similar = [], precedentId = null, logMore = 0, feeAgreement = null }) {
   const staff = isStaff();
   const calm = caseCalm();
@@ -1242,9 +1212,18 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
         </form>${calm ? '</details>' : ''}`
         : ''}
       </div>`;
-  const brief = caseBrief(c, charges);
   // Abschnitte der Akte: Reihenfolge, Ausblenden und Einklappen je Person (12-akte-ansicht.js); Mandanten sehen die feste Reihenfolge
   const secMap = { subject: parts.subject, admiss: parts.admiss, claims: parts.claims, motions: parts.motions, norms: parts.norms, participants: parts.participants, parties: parts.parties, clauses: parts.clauses, term: parts.term, versions: parts.versions, vclaims: parts.vclaims, corr: parts.corr, tathergang: parts.tathergang, charges: parts.charges, chat: parts.chat, events: eventsSection, witnesses: parts.witnesses, karte: parts.karte, contracts: parts.contracts, briefs: parts.briefs, external: parts.external, evidence: parts.evidence, requests: parts.requests, tasks: parts.tasks, fee: parts.fee, invoices: parts.invoices, work: parts.work, notes: notesHtml };
+  // Sachverhalt und Statushinweis; im Design „Ruhig“ steht der Sachverhalt im Reiter „Fall“ – direkt neben den Anklagepunkten
+  const sachverhalt = c.canEdit
+    ? `${intakeAnswersHtml(c)}<div class="section" id="secSachverhalt"><h3 class="section-title">Sachverhalt</h3><div class="ie-block">${ie(c, 'description', c.description, { type: 'textarea', placeholder: 'Sachverhalt beschreiben …', cls: 'ie-text' })}</div></div>`
+    : `${intakeAnswersHtml(c)}${c.description ? `<div class="section" id="secSachverhalt"><h3 class="section-title">Sachverhalt</h3><p class="text-sm whitespace-pre-wrap text-muted">${esc(c.description)}</p></div>` : emptySection('', 'Sachverhalt', 'noch nicht beschrieben')}`;
+  const statusNote = c.canEdit
+    ? `<div class="section"><h3 class="section-title">Statushinweis <span class="text-xs text-dim font-normal">sichtbar für den Mandanten</span></h3><div class="ie-block">${ie(c, 'publicNote', c.publicNote, { type: 'textarea', placeholder: 'Statushinweis für den Mandanten …', cls: 'ie-text' })}</div></div>`
+    : c.publicNote
+      ? `<div class="section"><h3 class="section-title">Statushinweis</h3><div class="banner banner-gold mb-0"><p class="text-sm whitespace-pre-wrap">${esc(c.publicNote)}</p></div></div>`
+      : '';
+  const checkView = calm && staff;
   const secMeta = Object.fromEntries(jumps.map(([id, label, n]) => [caseSecKey(id), { label, n }]));
   return `<div class="case-root" data-case-tab="${caseTab}">
       <div class="case-head case-cover mb-5" data-case-head="${c.id}">
@@ -1255,7 +1234,6 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
           ${staff ? ticketChips(c, ticket, transcripts) : ''}</div>
         <div class="case-props">${headProps}</div>
       </div>
-      ${brief}
       ${actbar}
       ${jumpBar}
       ${staff ? clientFlagStrip(c.clientFlag, { inCase: true }) : ''}
@@ -1281,16 +1259,10 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       ${staff ? processTicketForm(c) : ticket ? `<div class="ticket-strips">${ticketBanner(c, ticket, transcripts)}</div>` : ''}
       ${quick.length && !(calm && staff) ? `<div class="form-actions case-quick mb-2">${quick.join('')}</div>` : ''}
       ${staff ? '' : reviewSection(c, review)}
-      ${
-        c.canEdit
-          ? `${intakeAnswersHtml(c)}<div class="section" id="secSachverhalt"><h3 class="section-title">Sachverhalt</h3><div class="ie-block">${ie(c, 'description', c.description, { type: 'textarea', placeholder: 'Sachverhalt beschreiben …', cls: 'ie-text' })}</div></div>
-      <div class="section"><h3 class="section-title">Statushinweis <span class="text-xs text-dim font-normal">sichtbar für den Mandanten</span></h3><div class="ie-block">${ie(c, 'publicNote', c.publicNote, { type: 'textarea', placeholder: 'Statushinweis für den Mandanten …', cls: 'ie-text' })}</div></div>`
-          : `${intakeAnswersHtml(c)}${c.description ? `<div class="section" id="secSachverhalt"><h3 class="section-title">Sachverhalt</h3><p class="text-sm whitespace-pre-wrap text-muted">${esc(c.description)}</p></div>` : emptySection('', 'Sachverhalt', 'noch nicht beschrieben')}
-      ${c.publicNote ? `<div class="section"><h3 class="section-title">Statushinweis</h3><div class="banner banner-gold mb-0"><p class="text-sm whitespace-pre-wrap">${esc(c.publicNote)}</p></div></div>` : ''}`
-      }
+      ${checkView ? statusNote : sachverhalt + statusNote}
       ${staff ? precedentStrip(c, similar, precedentId) : ''}
       </div>
-      ${caseSecHtml(c, secMap, secMeta, staff)}
+      ${caseSecHtml(c, secMap, secMeta, staff, checkView ? sachverhalt : '')}
       </div>
     </div>`;
 }
