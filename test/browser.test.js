@@ -720,7 +720,9 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         if (device === DESKTOP) {
           // Absenden (nur am PC – die Website nimmt je Stunde nur wenige Anfragen an)
           await guest.keyboard.press('Escape');
+          await guest.waitForFunction(() => document.getElementById('ticketModal').classList.contains('opacity-0')); // erst ganz zu
           await guest.click('#teamGrid [data-wish]');
+          await guest.waitForFunction(() => !document.getElementById('ticketModal').classList.contains('opacity-0'));
           await guest.fill('#tkName', 'Wilma Wunsch');
           await guest.fill('#tkDesc', 'Ich möchte genau diesen Anwalt für meine Verteidigung.');
           await guest.click('#ticketForm button[type=submit]');
