@@ -68,7 +68,7 @@ describe('Vorladen (Browser)', { skip: chromium ? false : 'Playwright nicht inst
       await page.waitForFunction(() => document.querySelectorAll('link[rel=prefetch]').length === 3);
       const hrefs = await page.$$eval('link[rel=prefetch]', (l) => l.map((x) => x.getAttribute('href')));
       assert.ok(hrefs.some((h) => /^\/js\/dashboard\.bundle\.js\?v=\w+/.test(h)), hrefs.join(' '));
-      assert.ok(hrefs.some((h) => /^\/css\/depth\.css\?v=\w+/.test(h)));
+      assert.ok(hrefs.some((h) => /^\/css\/bundle\.css\?f=[\w,-]*\bdepth\b[\w,-]*&v=\w+/.test(h)), hrefs.join(" ")); // Stylesheets kommen gebündelt
       assert.deepEqual(problems, []);
     } finally {
       await ctx.close();

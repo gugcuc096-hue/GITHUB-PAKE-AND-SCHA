@@ -40,8 +40,8 @@ document.addEventListener('click', (e) => {
   }
   const el = e.target.closest('[data-action]');
   if (!el || el.disabled) return;
-  // Der zweite Teil des Dashboards lädt noch: kurz warten, dann denselben Klick ausführen
-  if (moreMissing()) {
+  // Die Aktion steckt im zweiten Teil des Dashboards, der noch lädt: kurz warten, dann denselben Klick ausführen
+  if (!actions[el.dataset.action] && moreMissing()) {
     e.preventDefault();
     loadMore().then(() => el.isConnected && el.click());
     return;
@@ -54,7 +54,7 @@ document.addEventListener('click', (e) => {
   el.dataset.busy = '1';
   // Reiter-Wechsel: alt und neu blenden ineinander über (13-weich.js)
   const run = wchActionOk(el.dataset.action, fn) ? () => wchSwap(() => fn(el, e)) : () => fn(el, e);
-  guard(run).finally(() => delete el.dataset.busy);
+  guard(withMore(run)).finally(() => delete el.dataset.busy);
 });
 
 document.addEventListener('keydown', (e) => {
@@ -134,7 +134,7 @@ document.addEventListener(
 
 document.addEventListener('submit', (e) => {
   const f = e.target.closest('form[data-form]');
-  if (f && moreMissing()) {
+  if (f && !forms[f.dataset.form] && moreMissing()) {
     e.preventDefault();
     loadMore().then(() => f.isConnected && f.requestSubmit());
     return;
@@ -150,6 +150,7 @@ document.addEventListener('submit', (e) => {
   window.PS.clearFieldErrors(f);
   guard(async () => {
     try {
+      await loadMore(); // falls der zweite Teil noch lädt (Absenden darf nicht doppelt laufen)
       await modalInstead(() => forms[f.dataset.form](f));
     } catch (err) {
       // Lehnt der Server einzelne Angaben ab, steht der Hinweis direkt am Feld statt oben in der Ecke
@@ -614,13 +615,13 @@ document.addEventListener('change', (e) => {
   if (e.target.id === 'prUser' || e.target.id === 'prRank') updatePromotePreview();
   if (e.target.id === 'tmUser') updateTerminateInfo();
   const t = e.target;
-  if (t.dataset && t.dataset.change && moreMissing()) {
+  if (t.dataset && t.dataset.change && !actions[t.dataset.change] && moreMissing()) {
     loadMore().then(() => t.isConnected && t.dispatchEvent(new Event('change', { bubbles: true })));
     return;
   }
   // Häkchen und Auswahllisten mit data-change lösen direkt eine Aktion aus (z. B. Einarbeitung abhaken)
   if (t.dataset && t.dataset.change && actions[t.dataset.change]) {
-    guard(() => actions[t.dataset.change](t));
+    guard(withMore(() => actions[t.dataset.change](t)));
     return;
   }
   if (t.id === 'bf_tpl') {
@@ -1603,6 +1604,19 @@ function loadMore() {
       document.head.appendChild(s);
     });
   return moreLoading;
+}
+
+/** Greift eine Aktion in den zweiten Teil, bevor er da ist: nachladen und noch einmal ausführen. */
+function withMore(fn) {
+  return async () => {
+    try {
+      await fn();
+    } catch (err) {
+      if (!(err instanceof ReferenceError) || !moreMissing()) throw err;
+      await loadMore();
+      await fn();
+    }
+  };
 }
 
 function loadStaffParts() {
