@@ -1034,6 +1034,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
         await pickTab(page, '#modalBody [data-action="case-tab"][data-tab="dokumente"]');
         await page.waitForSelector('#secInvoices');
         await page.waitForFunction(() => !document.querySelector('#modalBody .case-root').getAnimations().length); // Höhe hat fertig geglitten
+        // Aufgeräumte Akte ist kurz – Platz schaffen, damit man an der Leiste vorbeiscrollen kann
+        await page.$eval('#modalBody .case-root', (r) => (r.style.paddingBottom = '1500px'));
         await page.$eval('#modalBody', (b) => (b.scrollTop = b.scrollHeight));
         await page.waitForTimeout(300);
         const pos = await page.evaluate(() => {
@@ -1044,7 +1046,8 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
           return { barTop: Math.round(bar.top - top), scrolled: Math.round(scroller.scrollTop), sticky };
         });
         assert.equal(pos.sticky, 'sticky', 'Reiterleiste klebt');
-        assert.ok(pos.barTop <= 2 || pos.scrolled < pos.barTop, `Leiste klebt oben (${pos.barTop}, gescrollt ${pos.scrolled})`);
+        await page.$eval('#modalBody .case-root', (r) => (r.style.paddingBottom = ''));
+        assert.ok(pos.barTop <= 2, `Leiste klebt oben (${pos.barTop}, gescrollt ${pos.scrolled})`);
         await wchSettled(page);
         const closeFree = await page.$eval('.modal-close', (x) => {
           const r = x.getBoundingClientRect();
