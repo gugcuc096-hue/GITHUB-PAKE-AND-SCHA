@@ -5,7 +5,7 @@
  */
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const { startServer, client, TEAM, PASSWORD } = require('./helpers');
+const { startServer, client, TEAM, PASSWORD, caseShow } = require('./helpers');
 
 let chromium = null;
 try {
@@ -116,7 +116,7 @@ describe('FiveNet-Bilder im Dialog (Browser)', { skip: chromium ? false : 'Playw
       const page = await ctx.newPage();
       await login(page);
       await page.evaluate((id) => openCase(id), caseId);
-      await page.waitForSelector('[data-action="fn-add"]');
+      await caseShow(page, '[data-action="fn-add"]'); // leer: im Design „Ruhig“ über „+ Hinzufügen“
       await page.click('[data-action="fn-add"]');
       await page.waitForSelector('#fnContent');
       await page.evaluate((h) => {

@@ -5,7 +5,7 @@
  */
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const { startServer, client, TEAM, PASSWORD } = require('./helpers');
+const { startServer, client, TEAM, PASSWORD, caseShow } = require('./helpers');
 
 let chromium = null;
 try {
@@ -55,12 +55,14 @@ describe('Tathergang', () => {
       await page.waitForSelector('#modalBody .case-root');
       await page.click('#modalBody [data-action="case-tab"][data-tab="fall"]');
       await page.waitForFunction(() => document.querySelector('#modalBody .case-root').dataset.caseTab === 'fall');
-      const order = await page.$$eval('#modalBody .section[id]', (l) => l.filter((x) => x.getClientRects().length).map((x) => x.id));
+      // Reihenfolge im Reiter „Fall“ – leere Abschnitte zählen mit (im Design „Ruhig“ verborgen, über „+ Hinzufügen“ erreichbar)
+      const order = await page.$$eval('#modalBody .section[id]', (l) => l.filter((x) => x.closest('[data-pane]')?.dataset.pane === 'fall').map((x) => x.id));
       assert.equal(order[0], 'secTathergang', `Tathergang zuerst: ${order}`);
       assert.ok(order.indexOf('secCharges') > 0 && order.indexOf('secWitnesses') > order.indexOf('secCharges'), `${order}`);
       // leer: eine Zeile wie die übrigen (auch Zeugen ohne Erklärtext)
       assert.ok(await page.$('#secTathergang.sec-empty [data-action="story-edit"]'));
       assert.ok(await page.$('#secWitnesses.sec-empty [data-action="wit-add"]'), 'Zeugen ohne Einträge als kurze Zeile');
+      await caseShow(page, '#secTathergang [data-action="story-edit"]');
       await page.click('#secTathergang [data-action="story-edit"]');
       await page.fill('#secTathergang textarea', 'Russo betritt den Juwelier.\n\n14:05 – Waffe gezogen\n14.12 Uhr Flucht Richtung Hafen\n- Festnahme an der Tankstelle');
       await page.keyboard.press('Control+Enter');

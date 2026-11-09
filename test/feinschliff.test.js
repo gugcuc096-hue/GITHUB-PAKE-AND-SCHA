@@ -114,7 +114,8 @@ describe('Reiterleisten, Akte und Handy (Browser)', { skip: chromium ? false : '
       assert.equal(duty.label, 'Dienststatus: Außer Dienst');
       assert.notEqual(duty.ico, 'none');
       // größere Tippfläche bei Touch (der Stern bleibt optisch gleich groß)
-      if (await page.evaluate(() => matchMedia('(pointer: coarse)').matches)) {
+      // (Design „Ruhig“: Anpinnen steht im Menü „Mehr“ – kein Stern im Aktenkopf)
+      if (await page.evaluate(() => matchMedia('(pointer: coarse)').matches) && (await page.$('#modal .star-btn'))) {
         const star = await page.$eval('#modal .star-btn', (b) => ({ w: b.getBoundingClientRect().width, after: getComputedStyle(b, '::after').content, inset: getComputedStyle(b, '::after').top }));
         assert.ok(star.w < 30, 'Stern optisch unverändert');
         assert.notEqual(star.after, 'none');
@@ -143,9 +144,9 @@ describe('Reiterleisten, Akte und Handy (Browser)', { skip: chromium ? false : '
       await page.fill('#modalBody [data-ie="clientName"] input', 'Vito Russo jr.');
       await page.keyboard.press('Enter');
       await page.waitForFunction(() => document.querySelector('#modalBody .ie-swap .client-link')?.textContent === 'Vito Russo jr.' && !document.querySelector('#modalBody .ie-swap.is-renaming'));
-      const title = await page.$eval('#modalBody .case-title', (t) => ({ h: t.getBoundingClientRect().height, lh: parseFloat(getComputedStyle(t).lineHeight), clamp: getComputedStyle(t).webkitLineClamp }));
+      const title = await page.$eval('#modalBody .case-title', (t) => ({ h: t.getBoundingClientRect().height, lh: parseFloat(getComputedStyle(t).lineHeight), clamp: getComputedStyle(t).webkitLineClamp, cut: t.scrollHeight > t.clientHeight + 2 }));
       assert.equal(title.clamp, '2');
-      assert.ok(title.h > title.lh * 1.5, 'zwei Zeilen');
+      assert.ok(title.h <= title.lh * 2.2 && !title.cut, 'höchstens zwei Zeilen, nichts abgeschnitten');
     } finally {
       await ctx.close();
     }

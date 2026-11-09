@@ -416,6 +416,7 @@ describe('Browser', { skip: chromium ? false : 'Playwright nicht installiert (np
       await settle();
       await page.click(`[data-action="open-case"][data-id="${data.caseId}"] >> nth=0`);
       await settle();
+      await caseShow(page, '[data-action="brief-new"]');
       await page.click('[data-action="brief-new"]');
       await settle();
       await page.selectOption('#bf_tpl', { label: 'Antrag auf Akteneinsicht' });
@@ -2705,7 +2706,7 @@ describe('Browser: Tastenkürzel, Mitteilungskarten, Verlaufslinien, Deal-Rechne
       // Akte: Deal-Rechner neben dem Strafmaß
       await page.evaluate(() => (location.hash = '#cases'));
       await page.click(`#caseList [data-action="open-case"][data-id="${c.id}"]`);
-      await page.waitForSelector('#modalBody .deal-row');
+      await caseShow(page, '#modalBody .deal-row');
       assert.match(await page.textContent('#modalBody .deal-row'), /15 HE.*wartet auf Mandant/);
 
       // Verhandlungsmodus: Plädoyer aus dem Vorschlag, Teleprompter läuft und schließt mit Esc
@@ -2868,6 +2869,7 @@ describe('Browser: Bewegung, die zeigt, woher etwas kommt – Zahlen, die mitlau
       await page.waitForFunction(() => !document.querySelector('.fly-img'));
 
       // Anklage einfügen: erkannt, einer abgewählt, zwei übernommen – das Strafmaß läuft zum neuen Wert
+      await caseShow(page, '#modalBody [data-action="charge-import"]');
       await page.click('#modalBody [data-action="charge-import"]');
       await page.fill('#ciText', '§ 33 StGB – Diebstahl (2x)\nversuchter Raub\nBeihilfe zum Betrug\n§ 5 StVO');
       await page.waitForFunction(() => document.querySelectorAll('#ciResult .ci-row').length === 3);

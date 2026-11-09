@@ -95,8 +95,15 @@ function caseReveal(id) {
  */
 function caseUnhide(el) {
   if (!el) return;
-  el.closest('.sec-wrap')?.classList.add('is-shown');
+  const wrap = el.closest('.sec-wrap');
+  wrap?.classList.add('is-shown');
   el.closest('.sec-empty, #secKarte')?.classList.add('is-shown');
+  // bleibt sichtbar, auch wenn die Akte neu gezeichnet wird (z. B. nach dem Schließen eines Unterfensters)
+  const id = st.caseInfo && st.caseInfo.id;
+  if (wrap && id) {
+    if (!st.caseShown || st.caseShown.id !== id) st.caseShown = { id, keys: new Set() };
+    st.caseShown.keys.add(wrap.dataset.sec);
+  }
   for (let d = el.closest('details'); d; d = d.parentElement && d.parentElement.closest('details')) if (!d.classList.contains('more-menu')) d.open = true;
 }
 
@@ -199,7 +206,8 @@ function caseSecHtml(c, map, meta, staff) {
       const hidden = L.hidden.has(k);
       const folded = L.collapsed.has(k);
       const count = m.n ? `<span class="jump-n">${m.n}</span>` : '';
-      return `<div class="sec-wrap${hidden ? ' is-hidden-sec' : ''}${folded ? ' is-collapsed' : ''}" data-sec="${k}" data-pane="${casePaneOf(k)}">
+      const shown = st.caseShown && st.caseShown.id === c.id && st.caseShown.keys.has(k);
+      return `<div class="sec-wrap${hidden ? ' is-hidden-sec' : ''}${folded ? ' is-collapsed' : ''}${shown ? ' is-shown' : ''}" data-sec="${k}" data-pane="${casePaneOf(k)}">
         <div class="sec-bar"><button type="button" class="sec-grip" aria-label="Verschieben: ${esc(m.label)}" title="Ziehen zum Verschieben">${icon('grip', 'ico-sm')}</button>
           <span class="sec-name">${esc(m.label)}${count}</span>
           <span class="sec-ctl">

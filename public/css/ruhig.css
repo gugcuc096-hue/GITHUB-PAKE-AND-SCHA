@@ -307,7 +307,7 @@ html[data-design="ruhig"] .ie-empty { font-style: normal; opacity: 0.6; }
 html[data-design="ruhig"] .case-root .sec-wrap:has(> .sec-body > .sec-empty):not(.is-shown),
 html[data-design="ruhig"] .case-root .sec-plain:has(> .sec-empty),
 html[data-design="ruhig"] .case-root .case-overview > .sec-empty:not(.is-shown),
-html[data-design="ruhig"] .case-root #secKarte.is-empty-map:not(.is-shown) { display: none; }
+html[data-design="ruhig"] .case-root .sec-wrap:not(.is-shown) #secKarte.is-empty-map:not(.is-shown) { display: none; }
 html[data-design="ruhig"] .case-sections.is-editing .sec-wrap { display: block !important; }
 /* Liegengeblieben: schmale Zeile ohne Kasten */
 html[data-design="ruhig"] .idle-strip .ticket-strip { padding: 0.45rem 0; border: 0; border-bottom: 1px solid var(--rz-line); border-radius: 0; background: none; box-shadow: none; }
