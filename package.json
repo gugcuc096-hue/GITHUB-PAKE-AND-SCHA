@@ -14,6 +14,8 @@
     "build:css": "node scripts/build-css.js",
     "build:ruhig": "node scripts/build-ruhig.js",
     "test": "node --test --test-concurrency=2 \"test/*.test.js\"",
+    "test:schnell": "node scripts/test.js schnell",
+    "test:browser": "node scripts/test.js browser",
     "postinstall": "node scripts/prepack.js",
     "pack:assets": "node scripts/prepack.js"
   },

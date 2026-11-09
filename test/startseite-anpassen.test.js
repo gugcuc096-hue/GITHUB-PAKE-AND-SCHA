@@ -42,7 +42,7 @@ describe('Startseite anpassen und gemeinsames Design', () => {
   it('gemeinsame Werte, Symbole aus dem Dashboard, kein Siegel', async () => {
     const home = await page('/');
     const dash = await page('/dashboard');
-    for (const h of [home, dash]) assert.match(h, /href="\/css\/tokens\.css[^"]*"/, 'tokens.css eingebunden');
+    for (const h of [home, dash]) assert.match(h, /href="\/css\/bundle\.css\?f=[^"]*\btokens\b/, 'tokens.css eingebunden (im Bündel)');
     const tokens = await (await fetch(`${server.base}/css/tokens.css`)).text();
     for (const v of ['--radius', '--sh-2', '--sp-3', '--fs-xl', '--ease-out', '--dur-2']) assert.ok(tokens.includes(v), v);
     assert.doesNotMatch(await (await fetch(`${server.base}/css/app.css`)).text(), /:root\s*\{/, 'app.css ohne eigene Werte');

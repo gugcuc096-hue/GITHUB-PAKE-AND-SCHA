@@ -623,10 +623,13 @@ window.addEventListener('scroll', virtualTick, { capture: true, passive: true })
 window.addEventListener('resize', virtualTick, { passive: true });
 // Rechtzeitig nachladen, bevor man unten ankommt (auch im Fenster mit eigenem Scrollbereich)
 const moreObserver = 'IntersectionObserver' in window ? new IntersectionObserver((entries) => entries.forEach((e) => e.isIntersecting && showMoreRows(e.target.dataset.more)), { rootMargin: '600px 0px' }) : null;
+const archiveObserver = 'IntersectionObserver' in window ? new IntersectionObserver((entries) => entries.some((e) => e.isIntersecting) && archiveFetch(), { rootMargin: '600px 0px' }) : null;
 function watchMoreRows() {
   if (!moreObserver) return;
   moreObserver.disconnect();
   $$('[data-more]').forEach((el) => moreObserver.observe(el));
+  archiveObserver.disconnect();
+  $$('[data-archive-more]').forEach((el) => archiveObserver.observe(el));
 }
 
 /** Platzhalter für ein Fenster, das noch lädt (Kopf, Kennzahlen, Abschnitte). */
@@ -957,6 +960,7 @@ function go(view) {
 }
 async function goNow(view) {
   if (!allowed(view)) view = 'overview';
+  if (!LIGHT_VIEWS.has(view)) await loadMore(); // Einstellungen, Team, Discord … liegen im zweiten Teil (14-start.js)
   if (view !== 'invoice-new') st.invoiceFrom = null; // Rechnung aus einer Akte: Rückweg gilt nur bis zum Verlassen der Seite
   // Richtung des Seitenwechsels: weiter unten im Menü = von rechts, zurück = von links (motion.css)
   const order = Object.keys(VIEWS);

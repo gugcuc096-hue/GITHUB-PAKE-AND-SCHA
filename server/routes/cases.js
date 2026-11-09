@@ -165,16 +165,41 @@ function handover(c, by, leadId, text) {
 }
 
 /* ---------------------------------------------------------------- Liste */
+/*
+ * Die Liste enthält alles, womit gearbeitet wird: laufende Akten und in den letzten 30 Tagen abgeschlossene. Das Archiv
+ * (länger abgeschlossen – wächst über die Jahre) kommt seitenweise: ?archiv=1&offset=&limit=, mit ?q= durchsucht der
+ * Server es (Aktenzeichen, Titel, Mandant, Anwalt, Gegner, Gerichts-Az., verknüpfte Dokumente).
+ */
+const ARCHIVED = `(c.status = 'geschlossen' AND COALESCE(c.closed_at, c.updated_at) < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 days'))`;
+const ARCHIVE_SEARCH = `(c.case_number LIKE @q ESCAPE '\\' OR c.title LIKE @q ESCAPE '\\' OR COALESCE(cu.display_name, c.client_name, '') LIKE @q ESCAPE '\\'
+  OR COALESCE(lu.display_name, '') LIKE @q ESCAPE '\\' OR COALESCE(c.opponent, '') LIKE @q ESCAPE '\\' OR COALESCE(c.court_ref, '') LIKE @q ESCAPE '\\'
+  OR EXISTS (SELECT 1 FROM case_lawyers cl JOIN users u3 ON u3.id = cl.user_id WHERE cl.case_id = c.id AND u3.display_name LIKE @q ESCAPE '\\')
+  OR EXISTS (SELECT 1 FROM case_external_docs e WHERE e.case_id = c.id AND @ext != '' AND (e.external_id = @ext OR instr(e.external_id, @ext || '#') = 1)))`;
 router.get('/', (req, res) => {
   const u = req.user;
-  const rows = isStaff(u)
-    ? db.prepare(`${CASE_SELECT} ORDER BY c.updated_at DESC`).all()
-    : db.prepare(`${CASE_SELECT} WHERE c.client_id = ? ORDER BY c.updated_at DESC`).all(u.id);
+  const staff = isStaff(u);
   const unread = caseChat.unreadFor(u).cases;
   const stars = starredIds(u.id);
-  const hidden = hiddenCaseIds(u); // geheime Mandate (nur Board)
+  const hidden = [...hiddenCaseIds(u)]; // geheime Mandate (nur Board)
   // Liste ohne Sachverhalt (steht in der Akte selbst) – bei vielen Akten deutlich weniger zu laden
-  res.json({ cases: rows.filter((c) => !hidden.has(c.id)).map((c) => ({ ...caseRow(c, u), description: undefined, chatUnread: unread[c.id] || 0, starred: stars.has(c.id) })) });
+  const out = (c) => ({ ...caseRow(c, u), description: undefined, chatUnread: unread[c.id] || 0, starred: stars.has(c.id) });
+  const scope = `${staff ? '1 = 1' : 'c.client_id = @uid'}${hidden.length ? ` AND c.id NOT IN (${hidden.map(Number).join(',')})` : ''}`;
+  const args = staff ? {} : { uid: u.id };
+  const FROM = 'FROM cases c LEFT JOIN users cu ON cu.id = c.client_id LEFT JOIN users lu ON lu.id = c.lawyer_id';
+  if (req.query.archiv !== undefined) {
+    const q = String(req.query.q || '').trim().slice(0, 120);
+    const offset = Math.max(0, Math.floor(Number(req.query.offset)) || 0);
+    const limit = Math.min(200, Math.max(1, Math.floor(Number(req.query.limit)) || 60));
+    const where = `${scope} AND ${ARCHIVED}${q ? ` AND ${ARCHIVE_SEARCH}` : ''}`;
+    // Eingefügter FiveNet-/Docs-Link: die Dokument-ID sucht der Browser heraus und schickt sie als ?ext= mit (nur Kanzlei)
+    if (q) Object.assign(args, { q: `%${q.replace(/[\\%_]/g, '\\$&')}%`, ext: staff ? String(req.query.ext || '').slice(0, 200) : '' });
+    const total = db.prepare(`SELECT COUNT(*) AS n ${FROM} WHERE ${where}`).get(args).n;
+    const rows = db.prepare(`${CASE_SELECT} WHERE ${where} ORDER BY COALESCE(c.closed_at, c.updated_at) DESC, c.id DESC LIMIT @limit OFFSET @offset`).all({ ...args, limit, offset });
+    return res.json({ cases: rows.map(out), total, offset });
+  }
+  const rows = db.prepare(`${CASE_SELECT} WHERE ${scope} AND NOT ${ARCHIVED} ORDER BY c.updated_at DESC`).all(args);
+  const archive = db.prepare(`SELECT COUNT(*) AS n ${FROM} WHERE ${scope} AND ${ARCHIVED}`).get(args).n;
+  res.json({ cases: rows.map(out), archive });
 });
 
 /* ---------------------------------------------------------------- Nachrichten (Chat Kanzlei ↔ Mandant) */

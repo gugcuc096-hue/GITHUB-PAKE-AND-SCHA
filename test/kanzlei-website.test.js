@@ -124,8 +124,8 @@ describe('Kanzlei-Website in Unterseiten', () => {
 
   it('keine Programmierschrift: weder in fonts.css noch in den Stylesheets der Website', async () => {
     const page = (await html('/')).text;
-    const sheets = [...page.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1]);
-    assert.ok(sheets.some((s) => s.includes('kanzlei.css')));
+    const sheets = [...page.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1].replace(/&amp;/g, '&'));
+    assert.ok(sheets.some((s) => /kanzlei/.test(s)), 'kanzlei.css (im Bündel)');
     for (const s of sheets) {
       const css = await (await fetch(server.base + s)).text();
       assert.doesNotMatch(css, /JetBrains/, s);

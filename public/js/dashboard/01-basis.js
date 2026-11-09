@@ -272,7 +272,9 @@ const st = {
   gsToken: 0,
   gsLoading: false,
   navToken: 0,
-  cases: [],
+  cases: [], // Arbeitsliste (laufend + kürzlich abgeschlossen) und die geladenen Seiten des Archivs
+  casesBase: [],
+  archive: { q: '', rows: [], total: null, count: 0, seq: 0, busy: false },
   events: [],
   eventCache: new Map(),
   invoices: [],
@@ -676,6 +678,17 @@ function externalIdFrom(q) {
   return m ? m[1].replace(/^0+(?=\d)/, '') : null;
 }
 
+/* Archiv der Aktenliste: kommt seitenweise vom Server (GET /api/cases?archiv=1) */
+const ARCHIVE_PAGE = 60;
+function archiveUrl(q, offset, limit) {
+  const ext = q ? externalIdFrom(q) : null;
+  return `/api/cases?archiv=1&offset=${offset}&limit=${limit}${q ? `&q=${encodeURIComponent(q)}` : ''}${ext ? `&ext=${encodeURIComponent(ext)}` : ''}`;
+}
+function mergeArchive() {
+  const have = new Set(st.casesBase.map((c) => c.id));
+  st.cases = st.casesBase.concat(st.archive.rows.filter((c) => !have.has(c.id)));
+}
+
 /* ---------------------------------------------------------------- Countdown */
 function countdown(iso, overLabel) {
   const t = parseDate(iso);
@@ -759,7 +772,23 @@ const load = {
   },
   primed: new Set(),
   async cases() {
-    st.cases = (await api.get('/api/cases')).cases;
+    const a = st.archive;
+    // Schon geladene Seiten des Archivs mit auffrischen (sonst stünden dort nach einer Änderung alte Zeilen)
+    const [r, old] = await Promise.all([api.get('/api/cases'), a.rows.length ? api.get(archiveUrl(a.q, 0, Math.min(200, a.rows.length))) : null]);
+    st.casesBase = r.cases;
+    a.count = r.archive || 0;
+    if (old) Object.assign(a, { rows: old.cases, total: old.total });
+    mergeArchive();
+  },
+  /** Archiv seitenweise: more = nächste Seite zur selben Suche, sonst von vorn (Suche läuft auf dem Server). */
+  async archive(q, more) {
+    const a = st.archive;
+    const seq = ++a.seq;
+    const r = await api.get(archiveUrl(q, more ? a.rows.length : 0, ARCHIVE_PAGE));
+    if (seq !== a.seq) return false; // inzwischen wurde weitergetippt
+    Object.assign(a, { q, rows: more ? a.rows.concat(r.cases) : r.cases, total: r.total });
+    mergeArchive();
+    return true;
   },
   async clients() {
     st.clients = (await api.get('/api/clients')).clients;

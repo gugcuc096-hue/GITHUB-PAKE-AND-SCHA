@@ -40,6 +40,12 @@ document.addEventListener('click', (e) => {
   }
   const el = e.target.closest('[data-action]');
   if (!el || el.disabled) return;
+  // Der zweite Teil des Dashboards lädt noch: kurz warten, dann denselben Klick ausführen
+  if (moreMissing()) {
+    e.preventDefault();
+    loadMore().then(() => el.isConnected && el.click());
+    return;
+  }
   const fn = actions[el.dataset.action];
   if (!fn) return;
   e.preventDefault();
@@ -128,6 +134,11 @@ document.addEventListener(
 
 document.addEventListener('submit', (e) => {
   const f = e.target.closest('form[data-form]');
+  if (f && moreMissing()) {
+    e.preventDefault();
+    loadMore().then(() => f.isConnected && f.requestSubmit());
+    return;
+  }
   if (!f || !forms[f.dataset.form]) return;
   e.preventDefault();
   const buttons = $$('button[type="submit"]', f);
@@ -288,7 +299,10 @@ document.addEventListener('input', (e) => {
   if (t.id === 'caseSearch') {
     st.caseQuery = t.value;
     clearTimeout(st.listSearchTimer);
+    st.archive.failed = false;
     st.listSearchTimer = setTimeout(() => flipFill($('#caseList'), caseTable()), 120);
+    clearTimeout(st.archiveTimer);
+    st.archiveTimer = setTimeout(archiveFetch, 320);
   } else if (t.id === 'storageSearch') {
     st.storageQuery = t.value;
     clearTimeout(st.listSearchTimer);
@@ -600,6 +614,10 @@ document.addEventListener('change', (e) => {
   if (e.target.id === 'prUser' || e.target.id === 'prRank') updatePromotePreview();
   if (e.target.id === 'tmUser') updateTerminateInfo();
   const t = e.target;
+  if (t.dataset && t.dataset.change && moreMissing()) {
+    loadMore().then(() => t.isConnected && t.dispatchEvent(new Event('change', { bubbles: true })));
+    return;
+  }
   // Häkchen und Auswahllisten mit data-change lösen direkt eine Aktion aus (z. B. Einarbeitung abhaken)
   if (t.dataset && t.dataset.change && actions[t.dataset.change]) {
     guard(() => actions[t.dataset.change](t));
@@ -1505,6 +1523,9 @@ document.addEventListener('ps:form-ok', () => buzz());
   if (params.get('import') === 'fivenet') toast('Das FiveNet-Dokument wird übernommen …');
   if (googleState) st.settingsTab = 'integrations'; // Google Docs stehen unter Einstellungen → Integrationen
 
+  // Akte, Termin oder Einstellungen per Link: der zweite Teil wird gleich gebraucht – sonst lädt er nach dem ersten Bild
+  if (LIGHT_VIEWS.has(hashView()) && !caseParam && !eventParam && !newParam) setTimeout(loadMore, 600);
+  else await loadMore();
   st.histPaused = true;
   try {
     await go(hashView());
@@ -1560,9 +1581,33 @@ function warmViews() {
  * Verwaltungsteile (Team, Einstellungen, Discord, Statistik, Wiki, Lager …) gibt es nur für die Kanzlei – Mandanten
  * laden sie nie. Programmcode, keine Daten; nach dem ersten Mal liegt er ohnehin im Browser.
  */
+/**
+ * Zweiter Teil für die Kanzlei (Einstellungen, Team, Discord, Karte – LAZY_PARTS.mehr in server/web/assets.js): Übersicht,
+ * Akten, Aufgaben, Kalender und Post brauchen ihn nicht. Er lädt deshalb erst nach dem ersten Bild – oder sofort, sobald
+ * etwas anderes geöffnet oder angeklickt wird.
+ */
+const LIGHT_VIEWS = new Set(['overview', 'cases', 'tasks', 'calendar', 'mail']);
+let moreLoading = null;
+let moreFailed = false;
+const moreMissing = () => !moreFailed && !views.settings && isStaff() && !!document.querySelector('script[data-lazy]');
+function loadMore() {
+  if (!moreMissing()) return Promise.resolve();
+  const tpl = document.querySelector('script[data-lazy]').dataset.lazy;
+  moreLoading =
+    moreLoading ||
+    new Promise((resolve) => {
+      const s = document.createElement('script');
+      s.src = tpl.replace('{teil}', 'mehr');
+      s.onload = resolve;
+      s.onerror = () => ((moreFailed = true), toast('Ein Teil des Dashboards konnte nicht geladen werden – bitte neu laden.', 'error'), resolve());
+      document.head.appendChild(s);
+    });
+  return moreLoading;
+}
+
 function loadStaffParts() {
   const src = document.querySelector('script[data-staff]')?.dataset.staff;
-  if (!src || views.settings) return Promise.resolve();
+  if (!src || views.stats) return Promise.resolve();
   return new Promise((resolve) => {
     const s = document.createElement('script');
     s.src = src;

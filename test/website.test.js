@@ -122,7 +122,20 @@ describe('Website & Ränge selbst pflegen', () => {
     assert.ok(v, 'Versionsnummer an den Skripten');
     assert.match(html, new RegExp(`<script src="/js/dashboard\\.bundle\\.js\\?v=${v}" data-staff="/js/dashboard\\.staff\\.js\\?v=${v}" data-lazy="/js/dashboard\\.\\{teil\\}\\.js\\?v=${v}"></script>`));
     assert.doesNotMatch(html, /\/js\/dashboard\/\d\d-/, 'keine Einzelteile mehr');
-    assert.match(html, new RegExp(`href="/css/app\\.css\\?v=${v}"`));
+    // Stylesheets gebündelt: höchstens drei Abrufe statt fünfzehn, Reihenfolge wie in der Seite, „Ruhig“ zuletzt
+    const sheets = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1].replace(/&amp;/g, '&'));
+    assert.ok(sheets.length <= 3, sheets.join('\n'));
+    assert.equal(sheets[0], `/css/bundle.css?f=fonts,tokens,scrollbar,feinschliff,app,controls,fall,select,tailwind,depth,motion&v=${v}`);
+    assert.equal(sheets[1], `/css/calm.css?v=${v}`, 'calm.css bleibt einzeln (eigenes media)');
+    assert.equal(sheets[2], `/css/bundle.css?f=gfx,ruhig-formen,ruhig&v=${v}`);
+    const sheet = await fetch(server.base + sheets[0], { headers: { 'accept-encoding': 'br' } });
+    assert.equal(sheet.status, 200);
+    assert.equal(sheet.headers.get('cache-control'), YEAR);
+    assert.equal(sheet.headers.get('content-encoding'), 'br');
+    assert.match(sheet.headers.get('content-type'), /text\/css/);
+    const css = await sheet.text();
+    assert.ok(css.indexOf('@font-face') >= 0 && css.indexOf('@font-face') < css.indexOf('.case-root'), 'Reihenfolge der Teile bleibt');
+    for (const bad of ['../../server/app', 'gibtsnicht,app', 'app']) assert.equal((await fetch(`${server.base}/css/bundle.css?f=${bad}`)).status, 404, bad);
     const bundle = await fetch(`${server.base}/js/dashboard.bundle.js?v=${v}`);
     assert.equal(bundle.headers.get('cache-control'), YEAR);
     const code = await bundle.text();
@@ -132,10 +145,16 @@ describe('Website & Ränge selbst pflegen', () => {
     const staff = await fetch(`${server.base}/js/dashboard.staff.js?v=${v}`);
     assert.equal(staff.headers.get('cache-control'), YEAR);
     const staffCode = await staff.text();
-    assert.match(staffCode, /views\.settings ?=/, 'Verwaltungsteile im zweiten Bündel');
-    // Tatort-Karte nur für die Kanzlei, die 3D-Ansicht erst bei Bedarf (eigenes Bündel)
-    assert.ok(!/function karteSection/.test(code) && /function karteSection/.test(staffCode), 'Karte im Kanzlei-Bündel');
-    assert.ok(!/function karteSet3d/.test(code + staffCode), '3D nicht in den Bündeln');
+    assert.match(staffCode, /views\.stats ?=/, 'Verwaltungsteile im zweiten Bündel');
+    // Einstellungen, Team, Discord und die Tatort-Karte: dritter Teil, lädt erst nach dem ersten Bild (loadMore)
+    assert.doesNotMatch(staffCode, /views\.settings ?=|function karteSection/, 'Einstellungen und Karte nicht im Start');
+    const mehr = await fetch(`${server.base}/js/dashboard.mehr.js?v=${v}`);
+    assert.equal(mehr.status, 200);
+    assert.equal(mehr.headers.get('cache-control'), YEAR);
+    const mehrCode = await mehr.text();
+    assert.ok(/views\.settings ?=/.test(mehrCode) && /function karteSection/.test(mehrCode), 'Einstellungen und Karte im dritten Teil');
+    assert.match(code, /function loadMore/);
+    assert.ok(!/function karteSet3d/.test(code + staffCode + mehrCode), '3D nicht in den Bündeln');
     const k3 = await fetch(`${server.base}/js/dashboard.karte3d.js?v=${v}`);
     assert.equal(k3.status, 200);
     assert.match(await k3.text(), /function karteSet3d/);
