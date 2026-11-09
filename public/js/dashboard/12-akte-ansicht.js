@@ -85,8 +85,77 @@ function caseReveal(id) {
   if (!el) return null;
   const pane = el.closest('[data-pane]');
   if (pane) caseTabSet(pane.dataset.pane);
+  caseUnhide(el);
   return el;
 }
+/**
+ * Design „Ruhig“: leere Abschnitte und Formulare sind verborgen, bis man sie braucht. Wer zu einem Element springt
+ * (Hinzufügen-Menü, Sprung aus den Kennzahlen, Rückkehr in die Akte), bekommt es sichtbar: der leere Abschnitt wird
+ * gezeigt, zugeklappte Bereiche öffnen sich.
+ */
+function caseUnhide(el) {
+  if (!el) return;
+  const wrap = el.closest('.sec-wrap');
+  wrap?.classList.add('is-shown');
+  el.closest('.sec-empty, #secKarte')?.classList.add('is-shown');
+  // bleibt sichtbar, auch wenn die Akte neu gezeichnet wird (z. B. nach dem Schließen eines Unterfensters)
+  const id = st.caseInfo && st.caseInfo.id;
+  if (wrap && id) {
+    if (!st.caseShown || st.caseShown.id !== id) st.caseShown = { id, keys: new Set() };
+    st.caseShown.keys.add(wrap.dataset.sec);
+  }
+  for (let d = el.closest('details'); d; d = d.parentElement && d.parentElement.closest('details')) if (!d.classList.contains('more-menu')) d.open = true;
+}
+
+/* „+ Hinzufügen“: Frist, Notiz, Beteiligte – dazu alles, was in den (verborgenen) leeren Abschnitten angelegt werden kann */
+function caseAddFill(menu) {
+  const root = $('#modalBody .case-root');
+  const box = menu.querySelector('.add-dyn');
+  if (!root || !box) return;
+  // Was oben schon steht (Frist, Notiz) oder nichts anlegt (Verhandlungsmodus), kommt nicht doppelt
+  const SKIP = new Set(['new-event', 'note-focus', 'hearing-start']);
+  const targets = [...root.querySelectorAll('.sec-empty .ext-add > :is(button, a, label), #secKarte.is-empty-map .section-head > :is(button, a)')].filter((t) => !SKIP.has(t.dataset.action));
+  menu.caseAddTargets = targets;
+  box.innerHTML = targets
+    .map((t, i) => {
+      const sec = t.closest('.section');
+      const title = (sec && sec.querySelector('.section-title')?.firstChild?.textContent || '').trim();
+      const text = t.textContent.trim().replace(/\s+/g, ' ');
+      const many = sec && sec.querySelectorAll('.ext-add > :is(button, a, label)').length > 1;
+      const label = many && title ? `${title}: ${text}` : text || title;
+      return `<button type="button" class="more-item" data-action="case-add-fwd" data-i="${i}">${icon('plus', 'ico-sm')}<span>${esc(label)}</span></button>`;
+    })
+    .join('');
+}
+document.addEventListener('toggle', (e) => { if (e.target.matches && e.target.matches('details.case-add') && e.target.open) caseAddFill(e.target); }, true);
+
+Object.assign(actions, {
+  'case-add-fwd': (el) => {
+    const menu = el.closest('details.case-add');
+    const t = menu && menu.caseAddTargets && menu.caseAddTargets[Number(el.dataset.i)];
+    if (menu) menu.open = false;
+    if (!t || !t.isConnected) return;
+    const sec = t.closest('.section');
+    if (sec && sec.id) caseReveal(sec.id);
+    else caseUnhide(t);
+    sec?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    t.click();
+  },
+  'facts-edit': (el) => {
+    const box = el.closest('.case-facts');
+    if (!box) return;
+    const on = box.classList.toggle('is-editing');
+    el.querySelector('span').textContent = on ? 'Fertig' : 'Bearbeiten';
+  },
+  'party-open': () => {
+    const d = $('#modalBody .party-add-box');
+    if (!d) return;
+    caseTabSet('ueberblick');
+    caseUnhide(d);
+    d.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    d.querySelector('input[name="name"]')?.focus({ preventScroll: true });
+  },
+});
 const caseSecKey = (anchor) => (CASE_SEC.find((s) => s[1] === anchor) || [anchor])[0];
 let kSecPrefs = null; // { mine, defaults: { Rechtsgebiet: Ansicht }, board }
 
@@ -137,7 +206,8 @@ function caseSecHtml(c, map, meta, staff) {
       const hidden = L.hidden.has(k);
       const folded = L.collapsed.has(k);
       const count = m.n ? `<span class="jump-n">${m.n}</span>` : '';
-      return `<div class="sec-wrap${hidden ? ' is-hidden-sec' : ''}${folded ? ' is-collapsed' : ''}" data-sec="${k}" data-pane="${casePaneOf(k)}">
+      const shown = st.caseShown && st.caseShown.id === c.id && st.caseShown.keys.has(k);
+      return `<div class="sec-wrap${hidden ? ' is-hidden-sec' : ''}${folded ? ' is-collapsed' : ''}${shown ? ' is-shown' : ''}" data-sec="${k}" data-pane="${casePaneOf(k)}">
         <div class="sec-bar"><button type="button" class="sec-grip" aria-label="Verschieben: ${esc(m.label)}" title="Ziehen zum Verschieben">${icon('grip', 'ico-sm')}</button>
           <span class="sec-name">${esc(m.label)}${count}</span>
           <span class="sec-ctl">
@@ -161,7 +231,11 @@ function caseSecHtml(c, map, meta, staff) {
         <button type="button" class="btn-ghost btn-sm" data-action="sec-reset">Zurücksetzen</button>
         <button type="button" class="btn-gold btn-sm" data-action="sec-edit">${icon('check', 'ico-sm')}<span>Fertig</span></button>
       </div></div>`;
-  return `<div id="caseSections" class="case-sections" data-area="${esc(c.area)}">${bar}${items}</div>`;
+  // Design „Ruhig“: ein Reiter, in dem alles noch leer ist, sagt das in einer Zeile (statt einer leeren Fläche)
+  const isEmpty = (html) => /\bsec-empty\b|\bis-empty-map\b/.test(html);
+  const emptyPanes = [...new Set(L.order.filter((k) => map[k]).map((k) => casePaneOf(k)))].filter((pane) => L.order.filter((k) => map[k] && casePaneOf(k) === pane).every((k) => isEmpty(map[k])));
+  const paneEmpty = emptyPanes.map((pane) => `<p class="pane-empty" data-pane="${pane}">Noch nichts erfasst – über „Hinzufügen“ oben anlegen.</p>`).join('');
+  return `<div id="caseSections" class="case-sections" data-area="${esc(c.area)}">${bar}${items}${paneEmpty}</div>`;
 }
 
 /** Aktueller Zustand aus der Seite lesen. */

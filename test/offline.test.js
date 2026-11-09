@@ -97,6 +97,7 @@ describe('Offline-Modus (Browser)', { skip: chromium ? false : 'Playwright nicht
         await caseShow(page, `#secTasks [data-action="task-toggle"][data-id="${task.id}"]`); await page.click(`#secTasks [data-action="task-toggle"][data-id="${task.id}"]`);
         // erst wenn der Haken vorgemerkt ist, die Notiz schreiben (sonst überholt die Notiz den Haken auf langsamen Rechnern)
         await page.waitForFunction(async () => (await PS.offline.stats()).queued >= 1, null, { timeout: 15000 }).catch(async () => assert.fail(`Haken nicht vorgemerkt (wartend: ${await queued()})`));
+        await caseShow(page, 'form[data-form="add-note"] textarea[name="body"]'); // Design „Ruhig“: hinter „Notiz schreiben“
         await page.fill('form[data-form="add-note"] textarea[name="body"]', `Notiz im Zug (${name})`);
         await page.click('form[data-form="add-note"] button[type=submit]');
         await page.waitForFunction(async () => (await PS.offline.stats()).queued >= 2, null, { timeout: 15000 }).catch(async () => assert.fail(`Notiz nicht vorgemerkt (wartend: ${await queued()}, Leiste: ${await page.textContent('#offlineBar').catch(() => '?')})`));

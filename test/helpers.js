@@ -229,9 +229,17 @@ async function caseShow(page, selector) {
       await page.waitForTimeout(150);
     }
   }
-  if (!tab) return;
-  await pickTab(page, `#modalBody [data-action="case-tab"][data-tab="${tab}"]`);
-  await page.waitForFunction((t) => document.querySelector('#modalBody .case-root')?.dataset.caseTab === t, tab);
+  if (tab) {
+    await pickTab(page, `#modalBody [data-action="case-tab"][data-tab="${tab}"]`);
+    await page.waitForFunction((t) => document.querySelector('#modalBody .case-root')?.dataset.caseTab === t, tab);
+  }
+  // Design „Ruhig“: leere Abschnitte, Menüs („+ Hinzufügen“, „Mehr“) und leere Stammdaten sind verborgen, bis man sie öffnet –
+  // wie ein Mensch, der das Menü aufklappt bzw. „Bearbeiten“ drückt
+  await page.$eval(selector, (el) => {
+    if (typeof caseUnhide === 'function') caseUnhide(el);
+    for (let d = el.closest('details'); d; d = d.parentElement && d.parentElement.closest('details')) d.open = true;
+    el.closest('.case-facts')?.classList.add('is-editing');
+  });
 }
 
 module.exports = { ROOT, PASSWORD, TEAM, startServer, client, readZipEntry, docxText, pickTab, caseSec, caseShow };

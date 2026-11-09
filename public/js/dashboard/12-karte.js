@@ -880,7 +880,7 @@ function karteSection(c, places = []) {
   const add = c.canEdit ? `<button type="button" class="btn-outline btn-sm" data-action="place-add" data-case-id="${c.id}">${icon('plus', 'ico-sm')}<span>Ort hinzufügen</span></button>` : '';
   const timed = places.filter((p) => p.happenedAt).length;
   const sight = places.some(kHasLook) || karteSightLines(places).length > 0;
-  return `<div class="section" id="secKarte"><div class="section-head"><h3 class="section-title">${esc(fallTitle('karte', 'Tatort-Karte'))} <span class="text-xs text-dim font-normal sec-meta">${places.length ? `${places.length} Ort${places.length === 1 ? '' : 'e'}` : 'noch keine'}</span></h3>${add}</div>
+  return `<div class="section${places.length ? '' : ' is-empty-map'}" id="secKarte"><div class="section-head"><h3 class="section-title">${esc(fallTitle('karte', 'Tatort-Karte'))} <span class="text-xs text-dim font-normal sec-meta">${places.length ? `${places.length} Ort${places.length === 1 ? '' : 'e'}` : 'noch keine'}</span></h3>${add}</div>
       <div class="kmap-wrap" id="kmapWrap"><canvas id="kmapMini" class="kmap" aria-label="Karte der Orte dieser Akte"></canvas>
         <div class="kmap-tools" role="group" aria-label="Karte">
           <button type="button" class="icon-btn sm" data-action="kmap-zoom" data-id="kmapMini" data-f="1.6" aria-label="Hineinzoomen">${icon('plus', 'ico-sm')}</button>

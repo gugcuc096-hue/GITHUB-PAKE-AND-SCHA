@@ -6,7 +6,7 @@
  */
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const { startServer, client, TEAM, PASSWORD } = require('./helpers');
+const { startServer, client, TEAM, PASSWORD, caseShow } = require('./helpers');
 
 let chromium = null;
 try {
@@ -253,6 +253,7 @@ describe('Fall-Bausteine je Rechtsgebiet (Browser)', { skip: chromium ? false : 
     const { ctx, page, problems } = await open();
     try {
       await fallTab(page, zivil);
+      await caseShow(page, '#secClaims [data-action="fall-add"], #secClaims button:has-text("Anspruch")');
       await page.click('#secClaims [data-action="fall-add"], #secClaims button:has-text("Anspruch")');
       await page.fill('#modalBody input[name="basis"]', '§ 280 BGB – Schadensersatz');
       await page.fill('#modalBody input[name="claimant"]', 'Max Muster');
@@ -273,8 +274,10 @@ describe('Fall-Bausteine je Rechtsgebiet (Browser)', { skip: chromium ? false : 
       assert.equal(await page.locator('#secKarte').count(), 0, 'Karte ist im Zivilrecht nur optional');
       await page.click('#modalBody [data-action="case-tab"][data-tab="ueberblick"]');
       await settled(page);
-      await page.click('#modalBody .more-menu summary');
+      const moreMenu = '#modalBody .more-menu:not(.case-add) > summary'; // Design „Ruhig“: „Mehr“ neben „+ Hinzufügen“
+      await page.click(moreMenu);
       assert.equal(await page.locator('#modalBody .more-item:has-text("Karte")').count(), 1);
+      await page.click(moreMenu);
       // Entfernen
       await page.click('#modalBody [data-action="case-tab"][data-tab="fall"]');
       await settled(page);
@@ -295,6 +298,7 @@ describe('Fall-Bausteine je Rechtsgebiet (Browser)', { skip: chromium ? false : 
       await page.click('#secAdmiss [data-key="c_frist"][data-val="nein"]');
       await page.waitForFunction(() => document.querySelector('#secAdmiss [data-key="c_frist"][data-val="nein"]')?.classList.contains('on'));
       assert.match(await page.textContent('#secAdmiss .sec-meta'), /1 von 4 erfüllt/);
+      await caseShow(page, '#secNorms [data-action="fall-add"]');
       await page.click('#secNorms [data-action="fall-add"]');
       await page.fill('#modalBody input[name="norm"]', 'Art. 14 – Eigentum');
       await page.click('#modalBody label.st-ja:has(input[name="purpose"])');
@@ -310,12 +314,14 @@ describe('Fall-Bausteine je Rechtsgebiet (Browser)', { skip: chromium ? false : 
       await fallTab(page, vertrag);
       assert.equal(await page.locator('#secVclaims').count(), 0);
       await page.click('#secSubject [data-key="mode"][data-val="streit"]');
-      await page.waitForSelector('#secVclaims');
+      await page.waitForSelector('#secVclaims', { state: 'attached' });
+      await caseShow(page, '#secClauses [data-action="fall-add"]');
       await page.click('#secClauses [data-action="fall-add"]');
       await page.fill('#modalBody input[name="title"]', 'Haftung begrenzt');
       await page.selectOption('#modalBody select[name="risk"]', 'rot');
       await page.click('#modalBody form[data-form="fall-save"] button[type=submit]');
       await page.waitForSelector('#secClauses .fall-light.l-rot');
+      await caseShow(page, '#secVersions [data-action="fall-add"]');
       await page.click('#secVersions [data-action="fall-add"]');
       await page.fill('#modalBody textarea[name="note"]', 'Erster Entwurf');
       await page.click('#modalBody form[data-form="fall-save"] button[type=submit]');
@@ -359,7 +365,7 @@ describe('Fall-Bausteine je Rechtsgebiet (Browser)', { skip: chromium ? false : 
       assert.match(await page.textContent('#modalBody .case-jump-list'), /Streit/);
       assert.equal(await page.locator('#modalBody .case-jump-list >> text=Fall').count(), 0, 'der Reiter heißt jetzt „Streit“');
       await page.click('#modalBody [data-action="case-tab"][data-tab="fall"]');
-      await page.waitForSelector('#secClaims');
+      await page.waitForSelector('#secClaims', { state: 'attached' }); // leer: im Design „Ruhig“ erst über „+ Hinzufügen“ sichtbar
       assert.match(await page.textContent('#secClaims .section-title'), /Forderungen/);
       assert.match(await page.textContent('#secClaims [data-action="fall-add"]'), /Forderung/);
       assert.deepEqual(problems, []);

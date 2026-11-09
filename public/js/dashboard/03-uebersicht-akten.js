@@ -1409,6 +1409,8 @@ Object.assign(actions, {
     const sec = caseReveal('secNotes');
     if (!sec) return;
     sec.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    const box = $('#secNotes .note-add-box');
+    if (box) box.open = true; // Design „Ruhig“: das Notizfeld steht hinter „Notiz schreiben“
     $('#secNotes textarea[name="body"]')?.focus({ preventScroll: true });
   },
   'delete-note': (el) => {

@@ -170,7 +170,8 @@ describe('Tatort-Karte (Browser)', { skip: chromium ? false : 'Playwright nicht 
         });
         assert.equal(await page.$$eval('#secKarte .place-row.is-later', (n) => n.length), 0);
         // Nadel anklicken → Eintrag in der Liste markiert
-        await page.locator('#kmapMini').scrollIntoViewIfNeeded();
+        // immer die aktuelle Karte nehmen (eine Live-Aktualisierung kann die Akte gerade neu gezeichnet haben)
+        await page.waitForSelector('#kmapMini');
         await page.evaluate(() => document.getElementById('kmapMini').scrollIntoView({ block: 'center' }));
         await page.waitForTimeout(400);
         const pos = await page.evaluate(() => {

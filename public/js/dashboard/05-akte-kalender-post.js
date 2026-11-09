@@ -310,6 +310,9 @@ function ie(c, key, value, { type = 'text', placeholder = '', cls = '' } = {}) {
 }
 
 /** Beteiligte (Gegenpartei, Zeugen …) mit Hinweis auf Überschneidungen mit anderen Akten. */
+/** Design „Ruhig“ (Standard): aufgeräumte Akte – „Klassisch“ behält den bisherigen Aufbau. */
+const caseCalm = () => document.documentElement.dataset.design !== 'klassisch';
+
 function partiesHtml(c, parties = [], overlaps = {}) {
   const hit = (list) => list.map((o) => `<button type="button" class="ov-link" data-action="open-case" data-id="${o.caseId}">${esc(o.caseNumber)}</button>`).join(', ');
   const warn = [];
@@ -330,7 +333,7 @@ function partiesHtml(c, parties = [], overlaps = {}) {
     : '';
   return `<div class="parties" id="partiesBox"><div class="k">Beteiligte</div>
       ${warn.length ? `<div class="party-warn">${icon('alert', 'ico-sm')}<div>${warn.join('<br>')}<span class="party-warn-note">Bitte auf einen möglichen Interessenkonflikt prüfen.</span></div></div>` : ''}
-      ${rows || '<p class="text-sm text-dim">Noch niemand erfasst. Zeugen: eigener Abschnitt weiter unten.</p>'}${add}</div>`;
+      ${rows || (caseCalm() ? '' : '<p class="text-sm text-dim">Noch niemand erfasst. Zeugen: eigener Abschnitt weiter unten.</p>')}${add && caseCalm() ? `<details class="add-box party-add-box"><summary>${icon('plus', 'ico-sm')}<span>Beteiligte hinzufügen</span></summary>${add}</details>` : add}</div>`;
 }
 
 /** Verlauf nach Phasen: frühere Schritte des Verfahrens sind eingeklappt, der aktuelle steht offen. */
@@ -880,8 +883,39 @@ function routingHtml(routing) {
     .join('')}</div>`;
 }
 
+/**
+ * „Worum es geht“ direkt unter dem Aktenkopf – wie das Rubrum auf einem Aktendeckel:
+ *  - Rubrum: Mandant ./. Gegenpartei, dazu die Anklagepunkte (Strafrecht) bzw. das Rechtsgebiet
+ *  - Kurzfassung: der Anfang des Sachverhalts (sonst des Tathergangs), mit „weiterlesen“
+ * So weiß man beim Öffnen sofort, worum es in der Akte geht – ohne zu scrollen.
+ */
+function caseBrief(c, charges) {
+  const client = c.clientName && c.clientName !== '—' ? c.clientName : 'Mandant';
+  const against = c.opponent || (c.area === 'strafrecht' ? 'Staatsanwaltschaft' : '');
+  const list = (charges && charges.charges) || [];
+  const cite = (ch) => (typeof citeShort === 'function' ? citeShort(ch) : `§ ${ch.para}`) + (ch.count > 1 ? ` (${ch.count}×)` : '');
+  const wegen = list.length
+    ? `wegen ${list.slice(0, 3).map((ch) => `<span title="${esc(ch.title || '')}">${esc(cite(ch))}</span>`).join(', ')}${list.length > 3 ? ` und ${list.length - 3} weiteren` : ''}`
+    : esc(AREAS[c.area] || c.area || '');
+  const plain = (t) => String(t || '').replace(/\[Bild[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
+  const text = plain(c.description) || plain(c.incident);
+  const MAX = 300;
+  const short = text.length > MAX ? `${text.slice(0, MAX).replace(/\s+\S*$/, '')} …` : text;
+  const target = c.description || !c.incident ? 'secSachverhalt' : 'secTathergang';
+  const more = text.length > MAX ? ` <button type="button" class="link-btn brief-more" data-action="scroll-to" data-target="${target}">weiterlesen</button>` : '';
+  const body = text
+    ? `<p class="brief-text">${esc(short)}${more}</p>`
+    : `<p class="brief-text is-empty">Noch kein Sachverhalt erfasst.${c.canEdit ? ` <button type="button" class="link-btn" data-action="scroll-to" data-target="secSachverhalt">Jetzt eintragen</button>` : ''}</p>`;
+  return `<section class="case-brief" aria-label="Worum es geht">
+      <div class="brief-k">Worum es geht</div>
+      <div class="brief-rubrum"><span class="brief-party">${esc(client)}</span>${against ? `<span class="brief-vs" aria-label="gegen">./.</span><span class="brief-party">${esc(against)}</span>` : ''}${wegen ? `<span class="brief-wegen">${wegen}</span>` : ''}</div>
+      ${body}
+    </section>`;
+}
+
 function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, transcripts = [], clientSuggestions, review, chat, charges, deals = [], links = [], linkedEvidence = [], routing = [], parties = [], places = [], fall = null, overlaps = {}, requests = [], similar = [], precedentId = null, logMore = 0, feeAgreement = null }) {
   const staff = isStaff();
+  const calm = caseCalm();
   st.caseFall = fall; // Bausteine des Rechtsgebiets (12-fall.js): bestimmen Abschnitte, Titel und was wegfällt
   const admin = isAdmin();
   const me = st.user.id;
@@ -1016,6 +1050,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     : '';
 
   const quick = [];
+  let quickMore = '';
   if (staff) {
     quick.push(`<button class="btn-outline btn-sm" data-action="new-event" data-case-id="${c.id}" data-return-case="${c.id}">${icon('calendar', 'ico-sm')}<span>Frist / Termin</span></button>`);
     quick.push(`<button class="btn-outline btn-sm" data-action="new-invoice" data-case-id="${c.id}">${icon('receipt', 'ico-sm')}<span>Rechnung</span></button>`);
@@ -1036,11 +1071,36 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       c.isCoLawyer ? `<button type="button" class="more-item" data-action="leave-case" data-id="${c.id}">${icon('logout', 'ico-sm')}<span>Mitarbeit beenden</span></button>` : '',
       admin ? `<button type="button" class="more-item danger" data-action="delete-case" data-id="${c.id}" data-number="${esc(c.caseNumber)}">${icon('trash', 'ico-sm')}<span>Akte löschen</span></button>` : '',
     ].join('');
+    quickMore = more;
     if (more) quick.push(`<details class="more-menu"><summary class="btn-ghost btn-sm" aria-label="Weitere Aktionen">${icon('more', 'ico-sm')}<span>Mehr</span></summary><div class="more-pop">${more}</div></details>`);
   } else {
     if (!c.closed) quick.push(`<button class="btn-outline btn-sm" data-action="new-event" data-case-id="${c.id}" data-return-case="${c.id}">${icon('calendar', 'ico-sm')}<span>Termin anfragen</span></button>`);
     quick.push(`<button class="btn-outline btn-sm" data-action="chat-focus">${icon('chat', 'ico-sm')}<span>Nachricht zur Akte</span></button>`);
     quick.push(`<a class="btn-outline btn-sm" href="/aktenauszug?id=${c.id}" target="_blank" rel="noopener">${icon('doc', 'ico-sm')}<span>Aktenauszug</span></a>`);
+  }
+
+  // Design „Ruhig“: statt sechs gleichwertiger Knöpfe „+ Hinzufügen“ (Menü), „Mandant anschreiben“ und „Mehr“ (Menü)
+  let actbar = '';
+  if (calm && staff) {
+    const item = (action, ico, label, extra = '') => `<button type="button" class="more-item" data-action="${action}" ${extra}>${icon(ico, 'ico-sm')}<span>${esc(label)}</span></button>`;
+    const addMenu = [
+      item('new-event', 'calendar', 'Frist / Termin', `data-case-id="${c.id}" data-return-case="${c.id}"`),
+      item('note-focus', 'edit', 'Notiz'),
+      c.canEdit ? item('party-open', 'user', 'Beteiligte') : '',
+    ].join('');
+    const moreMenu = [
+      item('new-invoice', 'receipt', 'Rechnung', `data-case-id="${c.id}"`),
+      `<a class="more-item" href="/aktenauszug?id=${c.id}" target="_blank" rel="noopener">${icon('doc', 'ico-sm')}<span>Aktenauszug</span></a>`,
+      !c.hasClientAccount && canLinkClient(c) ? item('case-client-search', 'user', 'Mandanten-Konto verknüpfen', `data-id="${c.id}"`) : '',
+      !c.processTicket && c.canEdit ? item('pt-toggle', 'plus', 'Prozessticket (DOJ)') : '',
+      item('case-star', 'pin', c.starred ? 'Lösen (nicht mehr oben)' : 'Anpinnen (steht oben)', `data-id="${c.id}" aria-pressed="${!!c.starred}"`),
+      quickMore,
+    ].join('');
+    actbar = `<div class="case-actbar">
+        <details class="more-menu case-add"><summary class="btn-outline btn-sm">${icon('plus', 'ico-sm')}<span>Hinzufügen</span></summary><div class="more-pop">${addMenu}<div class="add-dyn"></div></div></details>
+        <button type="button" class="btn-outline btn-sm" data-action="chat-focus">${icon('chat', 'ico-sm')}<span>Mandant anschreiben</span></button>
+        <details class="more-menu"><summary class="btn-ghost btn-sm" aria-label="Weitere Aktionen">${icon('more', 'ico-sm')}<span>Mehr</span></summary><div class="more-pop align-right">${moreMenu}</div></details>
+      </div>`;
   }
 
   const newEventBtn =
@@ -1172,52 +1232,60 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
         ${logMore ? `<div class="log-more"><button type="button" class="btn-ghost btn-sm" data-action="log-older" data-case-id="${c.id}">${icon('chevronDown', 'ico-sm')}<span>${logMore} ältere ${logMore === 1 ? 'Eintrag' : 'Einträge'} laden</span></button></div>` : ''}
         ${noteList}
         ${staff
-        ? `<form data-form="add-note" data-id="${c.id}" class="mt-4 space-y-3">
+        ? `${calm ? `<details class="add-box note-add-box"><summary>${icon('edit', 'ico-sm')}<span>Notiz schreiben</span></summary>` : ''}<form data-form="add-note" data-id="${c.id}" class="mt-4 space-y-3">
           <input type="hidden" name="internal" value="on">
           <textarea name="body" rows="3" maxlength="4000" required class="field" placeholder="Notiz, Telefonat, Beweismittel, nächster Schritt … ( / für Textbausteine, @Name benachrichtigt Kollegen)" aria-label="Neue interne Notiz" data-snippets></textarea>
           <div class="flex flex-wrap items-center justify-between gap-3">
             <span class="text-xs text-dim">Interne Notizen sieht nur die Kanzlei – Nachrichten an den Mandanten oben unter „Nachrichten“.</span>
             <button type="submit" class="btn-outline btn-md">${icon('send', 'ico-sm')}<span>Notiz speichern</span></button>
           </div>
-        </form>`
+        </form>${calm ? '</details>' : ''}`
         : ''}
       </div>`;
+  const brief = caseBrief(c, charges);
   // Abschnitte der Akte: Reihenfolge, Ausblenden und Einklappen je Person (12-akte-ansicht.js); Mandanten sehen die feste Reihenfolge
   const secMap = { subject: parts.subject, admiss: parts.admiss, claims: parts.claims, motions: parts.motions, norms: parts.norms, participants: parts.participants, parties: parts.parties, clauses: parts.clauses, term: parts.term, versions: parts.versions, vclaims: parts.vclaims, corr: parts.corr, tathergang: parts.tathergang, charges: parts.charges, chat: parts.chat, events: eventsSection, witnesses: parts.witnesses, karte: parts.karte, contracts: parts.contracts, briefs: parts.briefs, external: parts.external, evidence: parts.evidence, requests: parts.requests, tasks: parts.tasks, fee: parts.fee, invoices: parts.invoices, work: parts.work, notes: notesHtml };
   const secMeta = Object.fromEntries(jumps.map(([id, label, n]) => [caseSecKey(id), { label, n }]));
   return `<div class="case-root" data-case-tab="${caseTab}">
       <div class="case-head case-cover mb-5" data-case-head="${c.id}">
-        <span class="cover-tab" aria-hidden="true">${staff && c.priority >= 3 && !c.closed ? `<i class="cover-tab-dot p${c.priority}"></i>` : ''}Akte</span>
+        ${calm ? '' : `<span class="cover-tab" aria-hidden="true">${staff && c.priority >= 3 && !c.closed ? `<i class="cover-tab-dot p${c.priority}"></i>` : ''}Akte</span>`}
         ${c.closed ? '<span class="cover-stamp" aria-hidden="true">Abgeschlossen</span>' : ''}
-        <div class="pr-12"><div class="case-num-row"><button type="button" class="font-mono text-gold text-sm case-emboss copy-az" data-action="copy" data-text="${esc(c.caseNumber)}" title="Aktenzeichen kopieren" aria-label="Aktenzeichen ${esc(c.caseNumber)} kopieren">${esc(c.caseNumber)}</button>${staff ? starBtn(c) : ''}<span class="case-area">${esc(AREAS[c.area] || c.area)}</span>${staff && c.boardOnly ? secretBadge() : ''}${staff ? hereStrip(c.id) : ''}</div>
+        <div class="pr-12"><div class="case-num-row"><button type="button" class="font-mono text-gold text-sm case-emboss copy-az" data-action="copy" data-text="${esc(c.caseNumber)}" title="Aktenzeichen kopieren" aria-label="Aktenzeichen ${esc(c.caseNumber)} kopieren">${esc(c.caseNumber)}</button>${staff && !calm ? starBtn(c) : ''}<span class="case-area">${esc(AREAS[c.area] || c.area)}</span>${staff && c.boardOnly ? secretBadge() : ''}${staff ? hereStrip(c.id) : ''}</div>
           <h2 id="modalTitle" class="case-title" title="${esc(c.title)}">${c.canEdit ? ie(c, 'title', c.title, { placeholder: 'Titel eintragen', cls: 'ie-title' }) : esc(c.title)}</h2>
           ${staff ? ticketChips(c, ticket, transcripts) : ''}</div>
         <div class="case-props">${headProps}</div>
       </div>
+      ${brief}
+      ${actbar}
       ${jumpBar}
       ${staff ? clientFlagStrip(c.clientFlag, { inCase: true }) : ''}
-      ${idleStrip}
+      ${calm ? '' : idleStrip}
       ${pinnedStrip}
       ${claim}
       <div class="case-panes">
       <div class="case-overview" data-pane="ueberblick">
+      ${calm ? idleStrip : ''}
       ${track}
       ${
         staff
-          ? `<div class="info-grid stats-4 mb-4">${caseStats(c, { appointments, tasks })}</div>
+          ? calm
+            ? `<details class="case-details case-facts mb-5" ${detailsClosed() ? '' : 'open'}><summary>Stammdaten</summary>${c.canEdit ? `<button type="button" class="facts-edit link-btn" data-action="facts-edit">${icon('edit', 'ico-sm')}<span>Bearbeiten</span></button>` : ''}
+        <div class="info-grid stats-4">${caseStats(c, { appointments, tasks })}</div>
+        <div class="info-grid">${info}</div>${accountRow}${partiesHtml(c, parties, overlaps)}</details>`
+            : `<div class="info-grid stats-4 mb-4">${caseStats(c, { appointments, tasks })}</div>
       <details class="case-details mb-5" ${detailsClosed() ? '' : 'open'}><summary>Details</summary>
         <div class="info-grid">${info}</div>${accountRow}${partiesHtml(c, parties, overlaps)}</details>`
           : `<div class="info-grid mb-5">${info}</div>`
       }
       ${clientLinkBanner(c, clientSuggestions)}
       ${staff ? processTicketForm(c) : ticket ? `<div class="ticket-strips">${ticketBanner(c, ticket, transcripts)}</div>` : ''}
-      ${quick.length ? `<div class="form-actions case-quick mb-2">${quick.join('')}</div>` : ''}
+      ${quick.length && !(calm && staff) ? `<div class="form-actions case-quick mb-2">${quick.join('')}</div>` : ''}
       ${staff ? '' : reviewSection(c, review)}
       ${
         c.canEdit
-          ? `${intakeAnswersHtml(c)}<div class="section"><h3 class="section-title">Sachverhalt</h3><div class="ie-block">${ie(c, 'description', c.description, { type: 'textarea', placeholder: 'Sachverhalt beschreiben …', cls: 'ie-text' })}</div></div>
+          ? `${intakeAnswersHtml(c)}<div class="section" id="secSachverhalt"><h3 class="section-title">Sachverhalt</h3><div class="ie-block">${ie(c, 'description', c.description, { type: 'textarea', placeholder: 'Sachverhalt beschreiben …', cls: 'ie-text' })}</div></div>
       <div class="section"><h3 class="section-title">Statushinweis <span class="text-xs text-dim font-normal">sichtbar für den Mandanten</span></h3><div class="ie-block">${ie(c, 'publicNote', c.publicNote, { type: 'textarea', placeholder: 'Statushinweis für den Mandanten …', cls: 'ie-text' })}</div></div>`
-          : `${intakeAnswersHtml(c)}${c.description ? `<div class="section"><h3 class="section-title">Sachverhalt</h3><p class="text-sm whitespace-pre-wrap text-muted">${esc(c.description)}</p></div>` : emptySection('', 'Sachverhalt', 'noch nicht beschrieben')}
+          : `${intakeAnswersHtml(c)}${c.description ? `<div class="section" id="secSachverhalt"><h3 class="section-title">Sachverhalt</h3><p class="text-sm whitespace-pre-wrap text-muted">${esc(c.description)}</p></div>` : emptySection('', 'Sachverhalt', 'noch nicht beschrieben')}
       ${c.publicNote ? `<div class="section"><h3 class="section-title">Statushinweis</h3><div class="banner banner-gold mb-0"><p class="text-sm whitespace-pre-wrap">${esc(c.publicNote)}</p></div></div>` : ''}`
       }
       ${staff ? precedentStrip(c, similar, precedentId) : ''}
