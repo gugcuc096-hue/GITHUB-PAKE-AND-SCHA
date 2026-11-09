@@ -3130,3 +3130,4 @@ form[data-form="cfg-style"]:has(input[name="design"][value="klassisch"]:checked)
 .facts-edit { position: absolute; top: 0.6rem; right: 1rem; display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; }
 .case-facts > summary::after { content: none; }
 .case-facts .stats-4 { margin-bottom: 1rem; }
+.pane-empty { display: none; }

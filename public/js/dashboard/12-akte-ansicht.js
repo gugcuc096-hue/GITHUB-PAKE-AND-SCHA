@@ -231,7 +231,11 @@ function caseSecHtml(c, map, meta, staff) {
         <button type="button" class="btn-ghost btn-sm" data-action="sec-reset">Zurücksetzen</button>
         <button type="button" class="btn-gold btn-sm" data-action="sec-edit">${icon('check', 'ico-sm')}<span>Fertig</span></button>
       </div></div>`;
-  return `<div id="caseSections" class="case-sections" data-area="${esc(c.area)}">${bar}${items}</div>`;
+  // Design „Ruhig“: ein Reiter, in dem alles noch leer ist, sagt das in einer Zeile (statt einer leeren Fläche)
+  const isEmpty = (html) => /\bsec-empty\b|\bis-empty-map\b/.test(html);
+  const emptyPanes = [...new Set(L.order.filter((k) => map[k]).map((k) => casePaneOf(k)))].filter((pane) => L.order.filter((k) => map[k] && casePaneOf(k) === pane).every((k) => isEmpty(map[k])));
+  const paneEmpty = emptyPanes.map((pane) => `<p class="pane-empty" data-pane="${pane}">Noch nichts erfasst – über „Hinzufügen“ oben anlegen.</p>`).join('');
+  return `<div id="caseSections" class="case-sections" data-area="${esc(c.area)}">${bar}${items}${paneEmpty}</div>`;
 }
 
 /** Aktueller Zustand aus der Seite lesen. */

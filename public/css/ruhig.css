@@ -313,3 +313,5 @@ html[data-design="ruhig"] .case-sections.is-editing .sec-wrap { display: block !
 html[data-design="ruhig"] .idle-strip .ticket-strip { padding: 0.45rem 0; border: 0; border-bottom: 1px solid var(--rz-line); border-radius: 0; background: none; box-shadow: none; }
 /* „Ansicht anpassen“ dezent */
 html[data-design="ruhig"] .jump-edit span { font-size: 0.8rem; }
+html[data-design="ruhig"] .case-sections:not(.is-editing) .pane-empty { display: block; margin: 1.5rem 0 0.5rem; color: var(--text-dim); font-size: 0.9rem; }
+html[data-design="ruhig"] .case-sections:has(.sec-wrap.is-shown) .pane-empty { display: none; }
