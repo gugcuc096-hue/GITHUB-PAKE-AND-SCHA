@@ -285,7 +285,6 @@ html[data-design="ruhig"] .case-props .prop-k { padding: 0 0.4rem 0 0; backgroun
 html[data-design="ruhig"] .case-props .prop-v { padding: 0; font-weight: 500; }
 html[data-design="ruhig"] .case-props .prop + .prop { margin-left: 1rem; padding-left: 1rem; border-left: 1px solid var(--rz-line); border-radius: 0; }
 /* „Worum es geht“ */
-html[data-design="ruhig"] .case-brief { margin: 0 0 0.9rem; border-radius: var(--radius); border-color: var(--rz-line); border-left-color: var(--gold-500); background: var(--rz-panel); }
 /* Bearbeitungsstand als eine Zeile: „Eingang › Akteneinsicht › …“ – aktueller Schritt gold unterstrichen */
 html[data-design="ruhig"] .track { margin-bottom: 1rem !important; }
 html[data-design="ruhig"] .track-line::before, html[data-design="ruhig"] .track-fill { display: none; }
@@ -304,7 +303,7 @@ html[data-design="ruhig"] .case-facts:not(.is-editing) .info-grid > div:has(> .v
 html[data-design="ruhig"] .case-facts:not(.is-editing) .ie-empty { display: none; }
 html[data-design="ruhig"] .ie-empty { font-style: normal; opacity: 0.6; }
 /* Leere Abschnitte und die leere Karte: verborgen – anlegen über „+ Hinzufügen“ (in „Ansicht anpassen“ sichtbar) */
-html[data-design="ruhig"] .case-root .sec-wrap:has(> .sec-body > .sec-empty):not(.is-shown),
+html[data-design="ruhig"] .case-root .sec-wrap:not(.sec-check):has(> .sec-body > .sec-empty):not(.is-shown),
 html[data-design="ruhig"] .case-root .sec-plain:has(> .sec-empty),
 html[data-design="ruhig"] .case-root .case-overview > .sec-empty:not(.is-shown),
 html[data-design="ruhig"] .case-root .sec-wrap:not(.is-shown) #secKarte.is-empty-map:not(.is-shown) { display: none; }
@@ -315,3 +314,26 @@ html[data-design="ruhig"] .idle-strip .ticket-strip { padding: 0.45rem 0; border
 html[data-design="ruhig"] .jump-edit span { font-size: 0.8rem; }
 html[data-design="ruhig"] .case-sections:not(.is-editing) .pane-empty { display: block; margin: 1.5rem 0 0.5rem; color: var(--text-dim); font-size: 0.9rem; }
 html[data-design="ruhig"] .case-sections:has(.sec-wrap.is-shown) .pane-empty { display: none; }
+
+/* Prüfansicht im Reiter „Fall“: Sachverhalt und Tathergang links, Anklagepunkte (Zivilrecht: Ansprüche) daneben –
+   am Handy untereinander in dieser Reihenfolge, danach Zeugen, Beweise, Karte … */
+html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections.has-sv:not(.is-editing) { display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 1.75rem; }
+html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections.has-sv:not(.is-editing) > * { grid-column: 1 / -1; order: 10; min-width: 0; }
+html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections.has-sv:not(.is-editing) > .case-sv { order: 1; }
+html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections.has-sv:not(.is-editing) > .sec-story { order: 2; }
+html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections.has-sv:not(.is-editing) > .sec-check { order: 3; }
+@media (min-width: 1024px) {
+  html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections.has-check:not(.is-editing) { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
+  html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections.has-check:not(.is-editing) > .case-sv { grid-column: 1; grid-row: 1; }
+  html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections.has-check:not(.is-editing) > .sec-story { grid-column: 1; grid-row: 2; }
+  /* Anklagepunkte bleiben beim Lesen eines langen Sachverhalts im Blick */
+  html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections.has-check:not(.is-editing) > .sec-check { grid-column: 2; grid-row: 1 / span 2; align-self: start; position: sticky; top: 3.25rem; max-height: calc(100dvh - 8rem); overflow-y: auto; overscroll-behavior: contain; }
+}
+html[data-design="ruhig"] .case-sv > .section:last-child { margin-bottom: 0; }
+/* In der Prüfspalte: erst die Anklagepunkte selbst, darunter Strafmaß und Deal; Strafmaß in zwei Spalten, Einschätzung darunter */
+html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges { display: flex; flex-direction: column; }
+html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges > .section-head { order: 0; }
+html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges > .chg-list { order: 1; margin-bottom: 0.9rem; }
+html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges > .chg-sum { order: 2; grid-template-columns: 1fr 1fr; }
+html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges > .chg-sum > .chg-est-cell { grid-column: 1 / -1; }
+html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges > :not(.section-head, .chg-list, .chg-sum) { order: 3; }

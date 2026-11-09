@@ -57,7 +57,8 @@ describe('Tathergang', () => {
       await page.waitForFunction(() => document.querySelector('#modalBody .case-root').dataset.caseTab === 'fall');
       // Reihenfolge im Reiter „Fall“ – leere Abschnitte zählen mit (im Design „Ruhig“ verborgen, über „+ Hinzufügen“ erreichbar)
       const order = await page.$$eval('#modalBody .section[id]', (l) => l.filter((x) => x.closest('[data-pane]')?.dataset.pane === 'fall').map((x) => x.id));
-      assert.equal(order[0], 'secTathergang', `Tathergang zuerst: ${order}`);
+      // Design „Ruhig“: der Sachverhalt steht oben im Reiter „Fall“ (neben den Anklagepunkten), danach der Tathergang
+      assert.deepEqual(order.slice(0, 2), ['secSachverhalt', 'secTathergang'], `Sachverhalt, dann Tathergang: ${order}`);
       assert.ok(order.indexOf('secCharges') > 0 && order.indexOf('secWitnesses') > order.indexOf('secCharges'), `${order}`);
       // leer: eine Zeile wie die übrigen (auch Zeugen ohne Erklärtext)
       assert.ok(await page.$('#secTathergang.sec-empty [data-action="story-edit"]'));

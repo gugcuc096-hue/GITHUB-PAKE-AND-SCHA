@@ -195,10 +195,16 @@ function caseSecSort(c, jumps, staff) {
 
 const SEC_SOURCE = { mine: 'Deine Ansicht', default: 'Standardansicht des Rechtsgebiets', standard: 'Grundansicht' };
 
-/** Die Abschnitte der Akte in der gewählten Reihenfolge – jeder mit Leiste (Griff, Pfeile, Ausblenden, Einklappen). */
-function caseSecHtml(c, map, meta, staff) {
+/**
+ * Die Abschnitte der Akte in der gewählten Reihenfolge – jeder mit Leiste (Griff, Pfeile, Ausblenden, Einklappen).
+ * Prüfansicht (Design „Ruhig“, `sv` = Sachverhalt): oben im Reiter „Fall“ stehen Sachverhalt und Tathergang, daneben die
+ * Anklagepunkte (Zivilrecht: die Ansprüche) – so prüft man direkt am Sachverhalt, ob die Vorwürfe stimmen.
+ */
+const CHECK_KEYS = ['charges', 'claims'];
+function caseSecHtml(c, map, meta, staff, sv = '') {
   if (!staff) return SEC_KEYS.map((k) => (map[k] ? `<div class="sec-plain" data-sec="${k}" data-pane="${casePaneOf(k)}">${map[k]}</div>` : '')).join('\n');
   const L = caseSecLayout(c.area);
+  const check = sv ? CHECK_KEYS.find((k) => map[k]) : '';
   const items = L.order
     .filter((k) => map[k])
     .map((k) => {
@@ -207,7 +213,8 @@ function caseSecHtml(c, map, meta, staff) {
       const folded = L.collapsed.has(k);
       const count = m.n ? `<span class="jump-n">${m.n}</span>` : '';
       const shown = st.caseShown && st.caseShown.id === c.id && st.caseShown.keys.has(k);
-      return `<div class="sec-wrap${hidden ? ' is-hidden-sec' : ''}${folded ? ' is-collapsed' : ''}${shown ? ' is-shown' : ''}" data-sec="${k}" data-pane="${casePaneOf(k)}">
+      const role = sv && k === 'tathergang' ? ' sec-story' : k === check ? ' sec-check' : '';
+      return `<div class="sec-wrap${role}${hidden ? ' is-hidden-sec' : ''}${folded ? ' is-collapsed' : ''}${shown ? ' is-shown' : ''}" data-sec="${k}" data-pane="${casePaneOf(k)}">
         <div class="sec-bar"><button type="button" class="sec-grip" aria-label="Verschieben: ${esc(m.label)}" title="Ziehen zum Verschieben">${icon('grip', 'ico-sm')}</button>
           <span class="sec-name">${esc(m.label)}${count}</span>
           <span class="sec-ctl">
@@ -233,9 +240,10 @@ function caseSecHtml(c, map, meta, staff) {
       </div></div>`;
   // Design „Ruhig“: ein Reiter, in dem alles noch leer ist, sagt das in einer Zeile (statt einer leeren Fläche)
   const isEmpty = (html) => /\bsec-empty\b|\bis-empty-map\b/.test(html);
-  const emptyPanes = [...new Set(L.order.filter((k) => map[k]).map((k) => casePaneOf(k)))].filter((pane) => L.order.filter((k) => map[k] && casePaneOf(k) === pane).every((k) => isEmpty(map[k])));
+  const emptyPanes = [...new Set(L.order.filter((k) => map[k]).map((k) => casePaneOf(k)))].filter((pane) => !(sv && pane === 'fall') && L.order.filter((k) => map[k] && casePaneOf(k) === pane).every((k) => isEmpty(map[k])));
   const paneEmpty = emptyPanes.map((pane) => `<p class="pane-empty" data-pane="${pane}">Noch nichts erfasst – über „Hinzufügen“ oben anlegen.</p>`).join('');
-  return `<div id="caseSections" class="case-sections" data-area="${esc(c.area)}">${bar}${items}${paneEmpty}</div>`;
+  const svBox = sv ? `<div class="case-sv" data-pane="fall">${sv}</div>` : '';
+  return `<div id="caseSections" class="case-sections${sv ? ' has-sv' : ''}${check ? ' has-check' : ''}" data-area="${esc(c.area)}">${bar}${svBox}${items}${paneEmpty}</div>`;
 }
 
 /** Aktueller Zustand aus der Seite lesen. */
