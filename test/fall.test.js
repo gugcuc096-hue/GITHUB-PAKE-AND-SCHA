@@ -224,18 +224,18 @@ describe('Fall-Bausteine je Rechtsgebiet (Browser)', { skip: chromium ? false : 
     const { ctx, page, problems } = await open();
     try {
       await fallTab(page, zivil);
-      assert.deepEqual(await sections(page), ['secTathergang', 'secClaims', 'secMotions', 'secWitnesses', 'secEvidence', 'secCorr']);
+      assert.deepEqual(await sections(page), ['secSachverhalt', 'secTathergang', 'secClaims', 'secMotions', 'secWitnesses', 'secEvidence', 'secCorr']);
       assert.match(await page.textContent('#secTathergang .section-title'), /Streitgegenstand \/ Sachverhalt/);
       assert.equal(await page.locator('#secKarte').count(), 0, 'Karte ist im Zivilrecht nur optional');
       await page.evaluate(() => closeModal());
       await page.waitForFunction(() => !document.querySelector('#modal').classList.contains('open'));
       await fallTab(page, verf);
-      assert.deepEqual(await sections(page), ['secSubject', 'secAdmiss', 'secNorms', 'secParticipants', 'secEvidence']);
+      assert.deepEqual(await sections(page), ['secSachverhalt', 'secSubject', 'secAdmiss', 'secNorms', 'secParticipants', 'secEvidence']);
       assert.equal(await page.locator('#secKarte, #secWitnesses, #secTathergang, #secCharges').count(), 0, 'Karte, Zeugen, Tathergang entfallen');
       await page.evaluate(() => closeModal());
       await page.waitForFunction(() => !document.querySelector('#modal').classList.contains('open'));
       await fallTab(page, vertrag);
-      assert.deepEqual(await sections(page), ['secSubject', 'secParties', 'secClauses', 'secTerm', 'secVersions', 'secEvidence']);
+      assert.deepEqual(await sections(page), ['secSachverhalt', 'secSubject', 'secParties', 'secClauses', 'secTerm', 'secVersions', 'secEvidence']);
       assert.match(await page.textContent('#secEvidence .section-title'), /Anlagen/);
       await page.evaluate(() => closeModal());
       await page.waitForFunction(() => !document.querySelector('#modal').classList.contains('open'));
