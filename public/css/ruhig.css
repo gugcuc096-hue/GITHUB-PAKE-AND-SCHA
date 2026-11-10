@@ -331,12 +331,21 @@ html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections.has-sv
 }
 html[data-design="ruhig"] .case-sv > .section:last-child { margin-bottom: 0; }
 /* In der Prüfspalte: erst die Anklagepunkte selbst, darunter Strafmaß und Deal; Strafmaß in zwei Spalten, Einschätzung darunter */
-html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges { display: flex; flex-direction: column; }
-html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges > .section-head { order: 0; }
-html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges > .chg-list { order: 1; margin-bottom: 0.9rem; }
-html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges > .chg-sum { order: 2; grid-template-columns: 1fr 1fr; }
-html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges > .chg-sum > .chg-est-cell { grid-column: 1 / -1; }
-html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges > :not(.section-head, .chg-list, .chg-sum) { order: 3; }
+html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges:not(.sec-empty) { display: flex; flex-direction: column; }
+html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges:not(.sec-empty) > .section-head { order: 0; }
+html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges:not(.sec-empty) > .chg-list { order: 1; margin-bottom: 0.9rem; }
+html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges:not(.sec-empty) > .chg-sum { order: 2; grid-template-columns: 1fr 1fr; }
+html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges:not(.sec-empty) > .chg-sum > .chg-est-cell { grid-column: 1 / -1; }
+html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges:not(.sec-empty) > :not(.section-head, .chg-list, .chg-sum) { order: 3; }
+/* Leere Prüfspalte (noch keine Anklagepunkte bzw. Ansprüche): gesetzt wie der Sachverhalt daneben – Überschrift mit
+   Linie, darunter ein ruhiges Feld mit Hinweis; die Handlungen in einer Zeile, der Verhandlungsmodus rechts */
+html[data-design="ruhig"] .case-sections.has-sv .sec-check .sec-empty { display: block; margin: 1.5rem 0 0; padding: 0; border: 0; } /* gleiche Höhe wie die Überschrift „Sachverhalt“ */
+html[data-design="ruhig"] .case-sections.has-sv .sec-check .sec-empty > .section-title { margin: 0 0 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--rz-line); font-size: 1.3rem; }
+html[data-design="ruhig"] .case-sections.has-sv .sec-check .sec-empty > .sec-empty-note { display: block; padding: 1.15rem 1.25rem 0.9rem; border: 1px dashed var(--rz-line-2); border-bottom: 0; border-radius: var(--r-md) var(--r-md) 0 0; background: var(--rz-panel-2); font: 600 0.95rem/1.35 var(--font-body); color: var(--text-main); text-decoration: none; cursor: default; }
+html[data-design="ruhig"] .case-sections.has-sv .sec-check .sec-empty > .sec-empty-note::first-letter { text-transform: uppercase; }
+html[data-design="ruhig"] .case-sections.has-sv .sec-check .sec-empty > .sec-empty-note[title]::after { content: attr(title); display: block; margin-top: 0.3rem; font-weight: 400; font-size: 0.85rem; line-height: 1.5; color: var(--text-dim); }
+html[data-design="ruhig"] .case-sections.has-sv .sec-check .sec-empty > .ext-add { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; width: auto; margin: 0; padding: 0.35rem 1.25rem 1.15rem; border: 1px dashed var(--rz-line-2); border-top: 0; border-radius: 0 0 var(--r-md) var(--r-md); background: var(--rz-panel-2); }
+html[data-design="ruhig"] .case-sections.has-sv .sec-check .sec-empty > .ext-add > [data-action="hearing-start"] { margin-left: auto; }
 
 /* ================================================================ Website, Startseite: wie ein gesetztes Schriftstück */
 /* Kennzahlen statt Eckdaten-Leiste: vier große Zahlen zwischen zwei Linien */
