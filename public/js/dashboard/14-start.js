@@ -42,8 +42,11 @@ document.addEventListener('click', (e) => {
   if (!el || el.disabled) return;
   // Die Aktion steckt im zweiten Teil des Dashboards, der noch lädt: kurz warten, dann denselben Klick ausführen
   if (!actions[el.dataset.action] && moreMissing()) {
+    // Ein Kästchen, Feld oder Link innerhalb davon gehört nicht zu dieser Aktion – dessen Klick bleibt unangetastet
+    const inner = e.target.closest('input, label, select, textarea, a[href], button');
+    if (inner && inner !== el && el.contains(inner)) return;
     e.preventDefault();
-    loadMore().then(() => el.isConnected && el.click());
+    loadMore().then(() => el.isConnected && actions[el.dataset.action] && el.click());
     return;
   }
   const fn = actions[el.dataset.action];
