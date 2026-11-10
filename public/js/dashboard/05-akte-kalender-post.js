@@ -1368,6 +1368,42 @@ document.addEventListener('click', (e) => {
   if ($('#ncSuggest') && !e.target.closest('.client-suggest')) ncClose();
 });
 
+/*
+ * Vorlagen für neue Akten (Kanzlei): füllen Rechtsgebiet, Priorität, einen Titel-Vorschlag und eine Gliederung für den
+ * Sachverhalt vor – alles bleibt änderbar. Angeboten wird nur, was zu einem vorhandenen Rechtsgebiet passt.
+ */
+const NC_TEMPLATES = [
+  ['festnahme', 'Festnahme / Haft', 'strafrecht', '4', 'Festnahme am ', 'Festnahme: wann, wo, durch wen (Dienststelle, Beamte)\nVorwurf laut Polizei:\nAktueller Aufenthalt des Mandanten (Zelle, Haftanstalt):\nAngaben bereits gemacht? (ja/nein)\nZeugen / Videoaufnahmen:\nNächster Termin (Haftprüfung, Vorführung):'],
+  ['verkehr', 'Verkehrsdelikt', 'strafrecht', '2', 'Verkehrsdelikt – ', 'Datum, Uhrzeit, Ort:\nFahrzeug / Kennzeichen:\nVorwurf (Geschwindigkeit, Rotlicht, Flucht …):\nMessung / Beweismittel der Polizei:\nFührerschein betroffen? (ja/nein)\nBußgeldbescheid erhalten am:'],
+  ['ermittlung', 'Ermittlungsverfahren', 'strafrecht', '3', 'Ermittlungsverfahren – ', 'Vorladung / Schreiben vom:\nVorwurf:\nErmittelnde Behörde, Aktenzeichen:\nBisherige Aussagen des Mandanten:\nFrist zur Stellungnahme:'],
+  ['schaden', 'Schadensersatz', 'zivilrecht', '2', 'Schadensersatz – ', 'Was ist passiert (Datum, Ort)?\nSchaden (Art und Höhe in $):\nGegenpartei und Kontakt:\nBelege (Fotos, Rechnungen, Zeugen):\nBisherige Korrespondenz:'],
+  ['vertrag', 'Vertrag entwerfen', 'vertragsrecht', '2', 'Vertragsentwurf – ', 'Vertragsparteien:\nGegenstand des Vertrags:\nGegenleistung / Vergütung:\nLaufzeit und Kündigung:\nBesondere Wünsche des Mandanten:'],
+  ['beschwerde', 'Verfassungsbeschwerde', 'verfassungsrecht', '2', 'Verfassungsbeschwerde – ', 'Angegriffene Maßnahme / Entscheidung (Datum):\nVerletztes Grundrecht:\nRechtsweg ausgeschöpft? (ja/nein)\nFrist läuft ab am:'],
+];
+function ncTemplates() {
+  const have = new Set(areaOptions().map(([k]) => k));
+  return NC_TEMPLATES.filter((t) => have.has(t[2]));
+}
+actions['nc-tpl'] = async (el) => {
+  const t = NC_TEMPLATES.find((x) => x[0] === el.dataset.tpl);
+  const f = el.closest('.modal-panel, #modal')?.querySelector('form[data-form="new-case"]');
+  if (!t || !f) return;
+  const area = f.querySelector('[data-area-select]');
+  if (area.value !== t[2]) {
+    area.value = t[2];
+    area.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  if (f.elements.priority) f.elements.priority.value = t[3];
+  const title = f.elements.title;
+  if (!title.value.trim() || NC_TEMPLATES.some((x) => title.value === x[4])) title.value = t[4];
+  const d = f.elements.description;
+  if (d.value.trim() && !NC_TEMPLATES.some((x) => d.value === x[5]) && !(await ask('Der bisherige Sachverhalt wird durch die Gliederung der Vorlage ersetzt.', { title: 'Vorlage übernehmen?', confirmText: 'Ersetzen' }))) return;
+  d.value = t[5];
+  el.parentElement.querySelectorAll('[data-action="nc-tpl"]').forEach((b) => b.setAttribute('aria-pressed', String(b === el)));
+  title.focus();
+  title.setSelectionRange(title.value.length, title.value.length);
+};
+
 async function newCaseModal() {
   const staff = isStaff();
   if (staff) await load.lawyers();
@@ -1375,6 +1411,7 @@ async function newCaseModal() {
       <h2 class="modal-title">${staff ? 'Neue Akte anlegen' : 'Mandat einreichen'}</h2>
       <p class="modal-sub">${staff ? 'Mandanten ohne Website-Konto einfach per Name erfassen. Die Akte wird Ihnen direkt zugewiesen – weitere Anwälte können Sie unten hinzufügen.' : 'Schildern Sie Ihr Anliegen – ein Anwalt der Kanzlei meldet sich umgehend.'}</p>
       <form data-form="new-case" class="form-grid cols-2">
+        ${staff && ncTemplates().length ? `<div class="span-2 nc-templates"><span class="label mb-0">Vorlage</span><div class="chip-row">${ncTemplates().map((t) => `<button type="button" class="chip" data-action="nc-tpl" data-tpl="${t[0]}" aria-pressed="false">${esc(t[1])}</button>`).join('')}</div></div>` : ''}
         ${staff ? `
           <div class="client-suggest"><label class="label" for="ncName">Mandant (Name)</label><input id="ncName" name="clientName" class="field" maxlength="80" placeholder="Name eintippen – passende Konten erscheinen" autocomplete="off" autofocus role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="ncSuggest">
             <input type="hidden" name="clientEmail" id="ncEmail">

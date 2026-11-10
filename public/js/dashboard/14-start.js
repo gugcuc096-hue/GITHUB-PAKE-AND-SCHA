@@ -427,20 +427,66 @@ function ieOpen(el) {
   input.setAttribute('aria-label', IE_LABEL[el.dataset.ie] || 'Feld');
   el.textContent = '';
   el.appendChild(input);
+  // Längere Texte speichern sich beim Tippen selbst (kurz nach der letzten Taste); der Hinweis darunter zeigt den Stand
+  let base = old;
+  let autoTimer = 0;
+  let autoBusy = null;
+  let note = null;
+  const id = Number(el.dataset.id);
+  const key = el.dataset.ie;
+  const autoSave = async () => {
+    autoTimer = 0;
+    const next = input.value.trim();
+    if (done || next === base) return;
+    note.textContent = 'Wird gespeichert …';
+    note.dataset.state = 'busy';
+    const from = base;
+    autoBusy = casePatch(id, { [key]: next }, { [key]: from });
+    try {
+      await autoBusy;
+      base = next;
+      ieSync(id, key, next);
+      note.textContent = `Gespeichert · ${new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
+      note.dataset.state = 'ok';
+    } catch (err) {
+      note.textContent = err.message || 'Nicht gespeichert – wird beim Verlassen erneut versucht.';
+      note.dataset.state = 'error';
+    } finally {
+      autoBusy = null;
+    }
+  };
+  if (type === 'textarea') {
+    note = document.createElement('span');
+    note.className = 'ie-autosave';
+    note.setAttribute('role', 'status');
+    note.textContent = 'Speichert automatisch';
+    el.appendChild(note);
+    input.addEventListener('input', () => {
+      clearTimeout(autoTimer);
+      note.textContent = 'Ungespeicherte Änderung …';
+      note.dataset.state = 'dirty';
+      autoTimer = setTimeout(autoSave, 1200);
+    });
+  }
   input.focus();
   if (input.select && type !== 'select') input.select();
   let done = false;
   const finish = async (save) => {
     if (done) return;
     done = true;
+    clearTimeout(autoTimer);
+    if (autoBusy) await autoBusy.catch(() => {});
     const next = input.value.trim();
+    if (!save && base !== old) {
+      // Abbrechen nach automatischem Speichern: der gespeicherte Stand bleibt (Rückgängig im Hinweis)
+      ieShow(el, base);
+      return;
+    }
     if (!save || next === old) return ieShow(el, old);
-    ieShow(el, old);
+    ieShow(el, base);
     el.classList.add('is-saving');
-    const id = Number(el.dataset.id);
-    const key = el.dataset.ie;
     try {
-      await casePatch(id, { [key]: next }, { [key]: old });
+      if (next !== base) await casePatch(id, { [key]: next }, { [key]: base });
     } catch (err) {
       el.classList.remove('is-saving');
       toast(err.message || 'Nicht gespeichert.', 'error');
@@ -1733,7 +1779,7 @@ function shortcutsHelp() {
     .map(([k, v]) => row(['g', k], viewLabel(v)));
   openModal(`<h2 id="modalTitle" class="modal-title">Tastenkürzel</h2>
       <p class="modal-sub">Funktionieren überall im Dashboard, solange kein Eingabefeld aktiv ist.</p>
-      <div class="kbd-list">${row(['?'], 'Diese Übersicht')}${row(['/'], 'Suchen')}${row(['Strg', 'K'], 'Suchen (auch beim Tippen)')}${row(['>'], 'In der Suche: nur Befehle')}${isStaff() ? row(['n'], 'Neue Akte') : ''}${row(['Esc'], 'Fenster schließen')}${go.join('')}</div>
+      <div class="kbd-list">${row(['?'], 'Diese Übersicht')}${row(['/'], 'Suchen')}${row(['Strg', 'K'], 'Suchen (auch beim Tippen)')}${row(['>'], 'In der Suche: nur Befehle')}${isStaff() ? row(['n'], 'Neue Akte (in einer Akte: neue Notiz)') : ''}${row(['j', 'k'], 'Aktenliste: nächste / vorige Akte, Enter öffnet')}${row(['1', '2', '3', '4'], 'In der Akte: Überblick, Kommunikation, Fall, Dokumente')}${row(['Esc'], 'Fenster schließen')}${go.join('')}</div>
       <div class="form-actions mt-4"><button type="button" class="btn-ghost btn-md" data-action="close-modal">Schließen</button></div>`);
 }
 document.addEventListener('keydown', (e) => {
@@ -1746,15 +1792,57 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   goPending = 0;
+  const caseRoot = $('#modal').classList.contains('open') ? $('#modalBody .case-root') : null;
+  if (caseRoot && /^[1-4]$/.test(e.key)) {
+    // offene Akte: 1–4 wechselt den Reiter
+    e.preventDefault();
+    caseTabSet(CASE_TABS[Number(e.key) - 1][0]);
+    return;
+  }
+  if (caseRoot && e.key === 'n' && isStaff()) {
+    e.preventDefault();
+    caseNoteFocus();
+    return;
+  }
   if ($('#modal').classList.contains('open') && e.key !== '?') return; // im Fenster nur die Hilfe
   if (e.key === '?') {
     e.preventDefault();
     shortcutsHelp();
   } else if (e.key === '/') {
     e.preventDefault();
-    guard(() => openSearch());
+    const box = st.view === 'cases' && $('#caseSearch');
+    if (box) {
+      box.focus();
+      box.select();
+    } else guard(() => openSearch());
+  } else if ((e.key === 'j' || e.key === 'k') && st.view === 'cases') {
+    e.preventDefault();
+    caseListStep(e.key === 'j' ? 1 : -1);
+  } else if (e.key === 'Enter' && st.view === 'cases' && e.target === document.body && $('#caseList tr.row.is-kbd')) {
+    e.preventDefault();
+    $('#caseList tr.row.is-kbd').click();
   } else if (e.key === 'n' && isStaff()) {
     e.preventDefault();
     guard(() => newCaseModal());
   } else if (e.key === 'g') goPending = Date.now();
 });
+/** J/K in der Aktenliste: Markierung eine Zeile weiter (Enter öffnet). */
+function caseListStep(dir) {
+  const rows = [...document.querySelectorAll('#caseList tr.row')];
+  if (!rows.length) return;
+  const at = rows.findIndex((r) => r.classList.contains('is-kbd'));
+  const next = rows[at < 0 ? (dir > 0 ? 0 : rows.length - 1) : Math.min(rows.length - 1, Math.max(0, at + dir))];
+  rows.forEach((r) => r.classList.toggle('is-kbd', r === next));
+  next.scrollIntoView({ block: 'nearest' });
+}
+/** N in der offenen Akte: zum Reiter „Überblick“ und ins Notizfeld. */
+function caseNoteFocus() {
+  caseTabSet('ueberblick');
+  const form = $('#modalBody form[data-form="add-note"]');
+  if (!form) return toast('Notizen sind in dieser Akte ausgeblendet.', 'info');
+  const box = form.closest('details');
+  if (box) box.open = true;
+  const ta = form.querySelector('textarea');
+  ta.scrollIntoView({ block: 'center' });
+  ta.focus({ preventScroll: true });
+}

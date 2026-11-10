@@ -185,6 +185,8 @@ input[type="datetime-local"].field, input[type="date"].field { color-scheme: dar
 .tbl tr:last-child td { border-bottom: none; }
 .tbl tr.row { cursor: pointer; transition: background 0.15s ease; }
 .tbl tr.row:hover td { background: rgba(var(--accent-rgb), 0.05); }
+.tbl tr.row.is-kbd td { background: rgba(var(--accent-rgb), 0.09); box-shadow: inset 0 1px 0 rgba(var(--accent-rgb), 0.35), inset 0 -1px 0 rgba(var(--accent-rgb), 0.35); }
+.tbl tr.row.is-kbd td:first-child { box-shadow: inset 3px 0 0 rgb(var(--accent-rgb)), inset 0 1px 0 rgba(var(--accent-rgb), 0.35), inset 0 -1px 0 rgba(var(--accent-rgb), 0.35); }
 /* Liegengebliebene Akte: dünner Streifen in Bernstein am Zeilenanfang (am Handy am Kartenrand) */
 .tbl tr.is-selected td { background: rgba(var(--accent-rgb), 0.09); }
 .tbl tr.is-selected td:first-child { box-shadow: inset 3px 0 0 var(--gold-500); }
@@ -414,6 +416,8 @@ a:hover > .brand-logo { transform: scale(1.04); }
 .gs-tag { flex-shrink: 0; padding: 0.05rem 0.45rem; border: 1px solid var(--gold-hairline); border-radius: 999px; color: var(--gold-light); font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase; }
 .gs-item .title { display: block; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gs-item .meta { display: block; font-size: 0.75rem; color: var(--text-dim); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gs-item .gs-snip { display: block; margin-top: 3px; white-space: normal; line-height: 1.45; color: var(--text-muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.gs-item .gs-snip b { font-weight: 600; color: var(--text-dim); }
 .gs-item:hover, .gs-item.active { background: rgba(var(--accent-rgb), 0.09); }
 .gs-item.active > .ico { color: var(--gold-light); }
 .gs-item mark { background: rgba(var(--accent-rgb), 0.28); color: inherit; border-radius: 3px; padding: 0 1px; }
@@ -489,6 +493,9 @@ a:hover > .brand-logo { transform: scale(1.04); }
 .stack > * + * { margin-top: 1rem; }
 
 /* Listen */
+.list-group-label { display: flex; align-items: center; gap: 0.45rem; margin: 0.9rem 0 0.35rem; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); }
+.list-group-label:first-child { margin-top: 0.2rem; }
+.list-group-label .count { margin-left: auto; font-variant-numeric: tabular-nums; letter-spacing: 0; }
 .list-row {
   display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; width: 100%; text-align: left;
   padding: 0.75rem 0.5rem; border-bottom: 1px solid var(--line); background: none; border-left: 0; border-right: 0; border-top: 0;
@@ -2439,6 +2446,10 @@ tr.pin-drop > td, .list-row.pin-drop { animation: pin-drop 0.9s ease-out; }
 .ie.is-saving { opacity: 0.6; }
 .ie.is-editing { display: block; background: none; border-color: transparent; padding: 0; margin: 0; }
 .ie-input { width: 100%; font: inherit; padding: 0.35rem 0.6rem; border-radius: 10px; }
+.ie-autosave { display: block; margin-top: 0.3rem; font-size: 0.75rem; color: var(--text-dim, #8b93a8); white-space: normal; }
+.ie-autosave[data-state="ok"] { color: #6ee7b7; }
+.ie-autosave[data-state="ok"]::before { content: "✓ "; }
+.ie-autosave[data-state="error"] { color: #fca5a5; }
 .ie-title .ie-input { font-family: var(--font-display); font-size: 1.3rem; }
 .ie-block .ie { display: block; white-space: pre-wrap; line-height: 1.55; color: var(--text-muted); font-size: 0.9rem; padding: 0.4rem 0.5rem; margin: 0 -0.5rem; }
 .ie-block .ie.is-editing { padding: 0; margin: 0; }
@@ -3122,3 +3133,8 @@ form[data-form="cfg-style"]:has(input[name="design"][value="klassisch"]:checked)
 .case-facts > summary::after { content: none; }
 .case-facts .stats-4 { margin-bottom: 1rem; }
 .pane-empty { display: none; }
+
+/* Neue Akte: Vorlagen */
+.nc-templates { display: flex; flex-direction: column; gap: 0.45rem; padding-bottom: 0.9rem; border-bottom: 1px solid var(--line, rgba(255, 255, 255, 0.08)); }
+.nc-templates .chip[aria-pressed="true"] { border-color: rgba(var(--accent-rgb), 0.7); background: rgba(var(--accent-rgb), 0.14); color: var(--text-main); }
+.nc-templates .chip-row { flex-wrap: wrap; overflow: visible; mask-image: none; -webkit-mask-image: none; }

@@ -61,6 +61,12 @@ function caseListRow(c, extra = '', cls = '') {
       <div class="flex items-center gap-2 shrink-0">${extra || stageBadge(c)}</div></div>`;
 }
 
+/** Zuletzt geöffnete Akte, die gerade nicht in der geladenen Liste steht: nur Aktenzeichen und Titel. */
+function recentOnlyRow(c) {
+  return `<div class="list-row" data-action="open-case" data-id="${c.id}" role="button" tabindex="0">
+      <div class="main"><div class="title">${esc(c.title || 'Akte')}</div><div class="meta"><span class="font-mono text-gold">${esc(c.caseNumber)}</span></div></div></div>`;
+}
+
 function kpi(label, value, sub, ico, href) {
   return `<a href="${href}" class="panel kpi block">
       <div class="kpi-label">${icon(ico, 'ico-sm')}${esc(label)}</div>
@@ -298,13 +304,31 @@ views.overview = {
           ${upcoming.length ? upcoming.map((e) => eventRow(e)).join('') : emptyLine('Keine anstehenden Termine.', 'calendar')}
         </section>`;
 
-    // Gemerkte Akten zuerst, danach die zuletzt bearbeiteten
+    // Kanzlei: angeheftete Akten oben, darunter die zuletzt geöffneten (je Person und Gerät gemerkt, 5 Stück);
+    // Mandant: angeheftete zuerst, dann die zuletzt bearbeiteten
     const starred = st.cases.filter((c) => c.starred && c.status !== 'geschlossen');
-    const recent = [...starred, ...st.cases.filter((c) => !starred.includes(c))].slice(0, Math.max(5, starred.length));
+    const opened = staff
+      ? recentCases()
+          .filter((x) => !starred.some((c) => c.id === x.id))
+          .map((x) => st.cases.find((c) => c.id === x.id) || { id: x.id, caseNumber: x.nr, title: x.title, clientName: '', recentOnly: true })
+          .filter((c) => !c.deleted)
+      : [];
+    const recent = staff
+      ? [...starred, ...opened]
+      : [...starred, ...st.cases.filter((c) => !starred.includes(c))].slice(0, Math.max(5, starred.length));
+    const group = (title, ico, list) =>
+      list.length ? `<div class="list-group-label">${icon(ico, 'ico-sm')}<span>${esc(title)}</span><span class="count">${list.length}</span></div>${list.map((c) => (c.recentOnly ? recentOnlyRow(c) : caseListRow(c))).join('')}` : '';
+    const recentBody = staff
+      ? recent.length
+        ? `${group('Angeheftet', 'pin', starred)}${group('Zuletzt geöffnet', 'clock', opened)}`
+        : emptyLine('Noch nichts geöffnet – angeheftete und zuletzt geöffnete Akten erscheinen hier.', 'folder')
+      : recent.length
+        ? recent.map((c) => caseListRow(c)).join('')
+        : emptyLine('Sie haben noch kein Mandat eingereicht.', 'folder');
     const recentPanel = `
         <section class="panel panel-pad">
-          <div class="panel-head"><h2 class="panel-title">${staff ? 'Zuletzt bearbeitet' : 'Meine Akten'}</h2><a href="#cases" class="btn-ghost btn-sm">Alle Akten</a></div>
-          ${recent.length ? recent.map((c) => caseListRow(c)).join('') : emptyLine(staff ? 'Noch keine Akten.' : 'Sie haben noch kein Mandat eingereicht.', 'folder')}
+          <div class="panel-head"><h2 class="panel-title">${staff ? 'Meine Akten im Blick' : 'Meine Akten'}</h2><a href="#cases" class="btn-ghost btn-sm">Alle Akten</a></div>
+          ${recentBody}
           ${
             // Mandant: „Mandat einreichen“ steht oben im Seitenkopf, hier zwei gleich breite Knöpfe (am Handy untereinander)
             !staff
@@ -665,7 +689,7 @@ function gsItem(type, x, q) {
   const ico = icon(GS_GROUPS.find((g) => g[0] === type)[2]);
   let body = '';
   if (type === 'cases')
-    body = line(`<span class="font-mono text-gold">${hl(x.caseNumber, q)}</span> · ${hl(x.title, q)}`, [hl(x.clientName, q), esc(caseStage(x)[0]), x.opponent ? `Gegenpartei: ${hl(x.opponent, q)}` : '', x.courtRef ? hl(x.courtRef, q) : ''].filter(Boolean).join(' · '));
+    body = line(`<span class="font-mono text-gold">${hl(x.caseNumber, q)}</span> · ${hl(x.title, q)}`, [hl(x.clientName, q), esc(caseStage(x)[0]), x.opponent ? `Gegenpartei: ${hl(x.opponent, q)}` : '', x.courtRef ? hl(x.courtRef, q) : ''].filter(Boolean).join(' · ') + (x.preview ? `<span class="gs-snip"><b>${esc(x.previewLabel || 'Text')}:</b> ${hl(x.preview, q)}</span>` : ''));
   else if (type === 'clients')
     body = line(`${hl(x.name, q)}${x.active ? '' : ' <span class="text-dim">(gesperrt)</span>'}`, [hl(x.email, q), x.phone ? hl(x.phone, q) : '', `${x.caseCount} ${x.caseCount === 1 ? 'Akte' : 'Akten'}`].filter(Boolean).join(' · '));
   else if (type === 'invoices')
@@ -757,7 +781,8 @@ async function openSearchResult(type, id) {
   if (!x) return;
   // Akte aus der Suche: Treffer in der Akte wie mit einem Gold-Textmarker anstreichen
   const q = st.gsQuery.trim();
-  if (type === 'cases') return modalInstead(() => openCase(id)).then(() => markInModal(q));
+  // Treffer im Sachverhalt/in der Beschreibung: gleich im Reiter „Fall“, wo der Text steht
+  if (type === 'cases') return modalInstead(() => (x.preview ? openCaseAt(id, 'fall') : openCase(id))).then(() => markInModal(q));
   if (type === 'notes') return modalInstead(() => openCaseAt(x.caseId, 'ueberblick')).then(() => markInModal(q));
   if (type === 'wiki') return modalInstead(() => openWikiArticle(id));
   if (type === 'precedents') return modalInstead(() => openPrecedent(id));
