@@ -134,8 +134,7 @@ const HERO_LINKS = { anwaelte: ['/anwaelte', 'Unsere Anwälte'], honorare: ['/ho
 const START_SECTION = /<section\b[^>]*\bdata-start="([a-z]+)"[^>]*>[\s\S]*?<\/section>\s*/g;
 /** Einstellungen der Startseite anwenden: Abschnitte (Reihenfolge, ausblenden), Rechtsgebiete, Anwälte, Meldungen, Startbereich. */
 function applyStart(html, cfg, edit = false) {
-  const { START_IDS } = require('./siteConfig');
-  const order = [...cfg.order.filter((id) => START_IDS.includes(id)), ...START_IDS.filter((id) => !cfg.order.includes(id))];
+  const order = require('./siteConfig').startOrder(cfg.order);
   const hidden = new Set(cfg.hidden);
   const found = new Map();
   let first = -1;
@@ -244,7 +243,7 @@ function shape(html, view) {
  */
 const BOOT_COMMON = { session: '/api/auth/session', areas: '/api/public/areas', duty: '/api/public/on-duty' };
 const BOOT_VIEW = {
-  start: { team: '/api/team', news: '/api/public/news', stats: '/api/public/stats' },
+  start: { team: '/api/team', news: '/api/public/news', stats: '/api/public/stats', figures: '/api/public/figures' },
   kanzlei: { stats: '/api/public/stats', reviews: '/api/public/reviews', positions: '/api/public/positions' },
   anwaelte: { team: '/api/team' },
   honorare: { fees: '/api/fees', memberships: '/api/public/memberships', team: '/api/team' },

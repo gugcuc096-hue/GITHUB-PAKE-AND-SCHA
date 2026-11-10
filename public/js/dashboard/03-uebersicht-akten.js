@@ -411,7 +411,58 @@ function caseMatches(c, f) {
   return c.status === f;
 }
 function caseCount(f) {
-  return st.cases.filter((c) => caseMatches(c, f) && (f === 'archiv' || !isArchived(c))).length;
+  const n = st.cases.filter((c) => caseMatches(c, f) && (f === 'archiv' || !isArchived(c))).length;
+  return f === 'archiv' ? Math.max(n, st.archive.count) : n; // das Archiv ist nur so weit geladen, wie geblättert wurde
+}
+/** Suchtext, mit dem das Archiv gerade gebraucht wird: null = gar nicht (weder Reiter „Archiv“ noch eine Suche über abgeschlossene Akten). */
+function archiveQuery() {
+  const q = st.caseQuery.trim();
+  if (!['archiv', 'alle', 'geschlossen'].includes(st.caseFilter)) return null;
+  if (q.length >= 2) return q;
+  return st.caseFilter === 'archiv' ? '' : null;
+}
+/** Fehlt für die aktuelle Ansicht noch etwas aus dem Archiv? */
+function archiveWanted() {
+  const q = archiveQuery();
+  const a = st.archive;
+  return q !== null && a.count > 0 && !a.failed && (a.total === null || a.q !== q || a.rows.length < a.total);
+}
+/** Nächste Seite des Archivs holen und die Liste an Ort und Stelle ergänzen (Fenster und Scrollposition bleiben). */
+async function archiveFetch() {
+  const a = st.archive;
+  const q = archiveQuery();
+  if (q === null || a.busy || !archiveWanted()) return;
+  a.busy = true;
+  try {
+    await load.archive(q, a.total !== null && a.q === q);
+  } catch {
+    a.failed = true; // nicht in einer Schleife weiterfragen; die nächste Eingabe versucht es wieder
+  }
+  a.busy = false;
+  const box = $('#caseList');
+  if (!box || st.view !== 'cases') return;
+  const shown = box.querySelectorAll('tr.row').length;
+  const scroller = scrollParentOf(box);
+  const top = scroller.scrollTop;
+  box.innerHTML = caseTable();
+  // so viele Zeilen wie vorher wieder aufklappen – sonst spränge die Seite beim Nachladen nach oben
+  for (let i = 0; i < 400 && box.querySelectorAll('tr.row').length < shown; i++) {
+    const m = box.querySelector('[data-more]');
+    if (!m) break;
+    showMoreRows(m.dataset.more);
+  }
+  scroller.scrollTop = top;
+  watchMoreRows();
+  if (archiveQuery() !== a.q) archiveFetch(); // währenddessen wurde weitergetippt
+}
+function archiveMoreHtml() {
+  if (!archiveWanted()) return '';
+  const a = st.archive;
+  const q = archiveQuery();
+  const left = a.total !== null && a.q === q ? a.total - a.rows.length : 0;
+  const label = left ? `${left === 1 ? '1 weitere Akte' : `${left} weitere Akten`} im Archiv …` : q ? 'Archiv wird durchsucht …' : 'Archiv wird geladen …';
+  queueMicrotask(watchMoreRows);
+  return `<div class="more-rows archive-more" data-archive-more><button type="button" class="more-btn" data-action="archive-more">${label}</button></div>`;
 }
 /** VIP / Lifetime des Mandanten als Badge. */
 function memberBadge(m) {
@@ -511,7 +562,8 @@ function caseTable() {
   if (!rows.length) {
     // Nächster Schritt: eingeschränkte Auswahl → zurücksetzen; nur abgeschlossene Akten → ins Archiv bzw. alle zeigen
     const plain = st.caseFilter === 'aktiv' && !st.caseQuery.trim() && !st.caseMine;
-    return st.cases.length
+    if (archiveWanted()) return archiveMoreHtml(); // im Archiv kann noch etwas stehen
+    return st.cases.length || st.archive.count
       ? plain
         ? empty('Keine laufenden Akten.', 'folder', nextStep('Alle Akten zeigen', 'case-filter', { value: caseCount('alle') ? 'alle' : 'archiv' }, 'folder'))
         : empty('Keine Akten für diese Auswahl.', 'folder', nextStep('Filter zurücksetzen', 'cases-filter-reset', {}, 'refresh'))
@@ -532,7 +584,7 @@ function caseTable() {
           <td data-label="Status">${stageBadge(c)}</td>
           <td data-label="Letzte Aktivität" class="nowrap">${activityCell(c)}</td></tr>`,
         (staff ? 6 : 4) + (selecting ? 1 : 0)
-      )}</tbody></table></div>`;
+      )}</tbody></table></div>${archiveMoreHtml()}`;
 }
 
 /* ---------------------------------------------------------------- Globale Suche (Strg + K) */
@@ -957,7 +1009,7 @@ function takePrefetchedCase(id) {
 async function openCase(id) {
   // Dauert das Laden, öffnet sich die Akte sofort mit Platzhaltern
   const data = await withModalPlaceholder({ wide: true }, async () => {
-    await Promise.all([load.lawyers(), typeof caseSecLoad === 'function' ? caseSecLoad() : null]); // Ansicht (Reihenfolge der Abschnitte) vor dem Zeichnen
+    await Promise.all([load.lawyers(), typeof caseSecLoad === 'function' ? caseSecLoad() : null, loadMore()]); // loadMore: Karte und Discord-Teile der Akte (14-start.js); // Ansicht (Reihenfolge der Abschnitte) vor dem Zeichnen
     return takePrefetchedCase(id) || api.get(caseUrl(id));
   });
   if (!data) return;
@@ -1234,6 +1286,10 @@ Object.assign(actions, {
   },
 
   // Akten
+  'archive-more': () => {
+    st.archive.failed = false;
+    return archiveFetch();
+  },
   'case-filter': (el) => {
     st.caseFilter = el.dataset.value;
     renderView();

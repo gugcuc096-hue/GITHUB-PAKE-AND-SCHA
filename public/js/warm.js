@@ -14,11 +14,13 @@
   const warm = () => {
     if (done) return;
     done = true;
-    for (const [href, as] of [['/js/dashboard.bundle.js', 'script'], ['/css/app.css', 'style'], ['/css/depth.css', 'style']]) {
+    // die Stylesheets des Dashboards nennt der Server (data-css, gebündelt und mit Versionsnummer)
+    const css = ((me && me.dataset.css) || '').split(' ').filter(Boolean);
+    for (const [href, as] of [['/js/dashboard.bundle.js' + q, 'script'], ...css.map((h) => [h, 'style'])]) {
       const l = document.createElement('link');
       l.rel = 'prefetch';
       l.as = as;
-      l.href = href + q;
+      l.href = href;
       document.head.appendChild(l);
     }
   };

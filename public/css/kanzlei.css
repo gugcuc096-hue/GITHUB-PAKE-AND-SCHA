@@ -659,3 +659,6 @@ html:active-view-transition .kz-hero-in > * { animation: none; }
 .hr-rec-pack { font-size: 0.82rem; color: #a7f3d0; }
 .hr-rec-act { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.3rem; }
 @media (max-width: 639px) { .hr-ctl, .hr-inc { padding-left: 0; } .hr-tabs { width: 100%; } .hr-tab { flex: 1; } }
+
+/* Nur im Design „Ruhig“ (ruhig.css): Kennzahlen statt Eckdaten, Leitsatz der Gründer, Namenszug im Fuß */
+.kz-figures, #leitsatz, .kz-footer-word { display: none; }

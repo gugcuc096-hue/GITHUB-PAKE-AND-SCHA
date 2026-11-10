@@ -42,7 +42,7 @@ describe('Startseite anpassen und gemeinsames Design', () => {
   it('gemeinsame Werte, Symbole aus dem Dashboard, kein Siegel', async () => {
     const home = await page('/');
     const dash = await page('/dashboard');
-    for (const h of [home, dash]) assert.match(h, /href="\/css\/tokens\.css[^"]*"/, 'tokens.css eingebunden');
+    for (const h of [home, dash]) assert.match(h, /href="\/css\/bundle\.css\?f=[^"]*\btokens\b/, 'tokens.css eingebunden (im Bündel)');
     const tokens = await (await fetch(`${server.base}/css/tokens.css`)).text();
     for (const v of ['--radius', '--sh-2', '--sp-3', '--fs-xl', '--ease-out', '--dur-2']) assert.ok(tokens.includes(v), v);
     assert.doesNotMatch(await (await fetch(`${server.base}/css/app.css`)).text(), /:root\s*\{/, 'app.css ohne eigene Werte');
@@ -53,15 +53,16 @@ describe('Startseite anpassen und gemeinsames Design', () => {
     assert.match(home, /nav class="kz-nav[^"]*" data-ink/, 'Menü mit goldenem Strich');
     assert.match(home, /@view-transition \{ navigation: auto; \}/, 'weiche Seitenwechsel auf der Website');
     assert.doesNotMatch(await page('/login'), /@view-transition \{ navigation: auto/, 'Anmeldung macht nicht mit');
-    // Standard: Ablauf steht nur auf der Kanzlei-Seite, die Startseite hat Eckdaten, Rechtsgebiete, Anwälte, Aktuelles, Abschluss
-    assert.deepEqual(order(home), ['fakten', 'gebiete', 'ansprechpartner', 'neuigkeiten', 'band']);
+    // Standard: Kennzahlen, Rechtsgebiete, Leitsatz, Anwälte, Aktuelles, Ablauf (heller Abschnitt), Abschluss
+    assert.deepEqual(order(home), ['fakten', 'gebiete', 'leitsatz', 'ansprechpartner', 'neuigkeiten', 'ablauf', 'band']);
     assert.match(home, /id="factAreas">4</);
   });
 
   it('Einstellungen der Startseite wirken beim Ausliefern', async () => {
     await publish({ order: ['band', 'gebiete', 'ansprechpartner', 'fakten', 'neuigkeiten', 'ablauf'], hidden: ['neuigkeiten'], areas: ['vertragsrecht', 'strafrecht'], lawyerMode: 'auswahl', lawyers: [3, 1], lawyerCount: 2, newsCount: 5, heroSecond: 'anwaelte', heroNote: false });
     const home = await page('/');
-    assert.deepEqual(order(home), ['band', 'gebiete', 'ansprechpartner', 'fakten', 'ablauf']);
+    // „leitsatz“ kam später dazu und fehlt in der gespeicherten Reihenfolge: er steht hinter seinem Vorgänger (Rechtsgebiete)
+    assert.deepEqual(order(home), ['band', 'gebiete', 'leitsatz', 'ansprechpartner', 'fakten', 'ablauf']);
     const tiles = [...home.match(/<section id="gebiete"[\s\S]*?<\/section>/)[0].matchAll(/data-area="([a-z]+)"/g)].map((m) => m[1]);
     assert.deepEqual(tiles, ['vertragsrecht', 'strafrecht']);
     assert.match(home, /id="leadGrid" class="kz-people" data-mode="auswahl" data-count="2" data-ids="3,1"/);
@@ -85,7 +86,7 @@ describe('Startseite anpassen und gemeinsames Design', () => {
     assert.equal(bad.status, 400);
     // zurück auf Standard
     await publish({});
-    assert.deepEqual(order(await page('/')), ['fakten', 'gebiete', 'ansprechpartner', 'neuigkeiten', 'band']);
+    assert.deepEqual(order(await page('/')), ['fakten', 'gebiete', 'leitsatz', 'ansprechpartner', 'neuigkeiten', 'ablauf', 'band']);
   });
 
   it('Anwalts-Karten: Schwerpunkte automatisch aus den Akten, wenn keine eingetragen sind', async () => {
@@ -169,13 +170,13 @@ describe('Startseite anpassen und gemeinsames Design', () => {
       await p.goto(`${server.base}/`);
       assert.equal(await p.locator('#fakten').count(), 0, 'Eckdaten weg');
       // Abschnitte abwechselnd auf hellerem Band: jeder zweite sichtbare
-      const bands = await p.$$eval('main > section.kz-section:not(.hidden)', (els) => els.map((e) => e.classList.contains('is-band')));
+      const bands = await p.$$eval('main > section.kz-section:not(.hidden):not(.is-flush)', (els) => els.map((e) => e.classList.contains('is-band')));
       assert.ok(bands.length >= 2 && bands.every((b, i) => b === (i % 2 === 1)), `Bänder abwechselnd: ${bands}`);
       // Abschnitt-Leiste: „nach oben“ verschiebt sofort
       await p.goto(`${server.base}/?bearbeiten`);
       await p.waitForSelector('#ansprechpartner > .sc-chip');
       await p.click('#ansprechpartner > .sc-chip [data-sc="up"]');
-      assert.deepEqual(await p.$$eval('main [data-start]', (els) => els.map((e) => e.dataset.start).slice(0, 3)), ['fakten', 'ansprechpartner', 'gebiete'], 'Eckdaten bleiben ausgeblendet sichtbar');
+      assert.deepEqual(await p.$$eval('main [data-start]', (els) => els.map((e) => e.dataset.start).slice(0, 4)), ['fakten', 'gebiete', 'ansprechpartner', 'leitsatz'], 'Eckdaten bleiben ausgeblendet sichtbar');
       await p.goto(`${server.base}/?bearbeiten`); // nicht veröffentlicht → unverändert (Rückfrage beim Verlassen wird übersprungen)
       await publishDefault();
 
@@ -204,5 +205,31 @@ describe('Startseite anpassen und gemeinsames Design', () => {
       await admin.c.put('/api/config/home/draft', { ...cfg.published, start: cfg.defaults.start });
       await admin.c.post('/api/config/home/publish');
     }
+  });
+});
+
+describe('Kennzahlen der Startseite', () => {
+  let srv;
+  before(async () => (srv = await startServer()));
+  after(async () => srv && srv.stop());
+
+  it('nur Gemessenes: zu wenige Akten und Übernahmen bleiben leer; Reaktionszeit als Median', async () => {
+    const { DatabaseSync } = require('node:sqlite');
+    const pub = client(srv.base);
+    const leer = (await pub.get('/api/public/figures')).json;
+    assert.equal(leer.cases, null);
+    assert.equal(leer.response, null);
+    assert.equal(leer.since, new Date().getUTCFullYear());
+    const owner = client(srv.base);
+    await owner.login(TEAM.admin);
+    const ids = [];
+    for (let i = 0; i < 10; i++) ids.push((await owner.post('/api/cases', { title: `Kennzahl ${i}`, area: 'strafrecht', clientName: `Mandant ${i}`, description: 'Test' })).json.case.id);
+    const sql = new DatabaseSync(require('node:path').join(srv.dir, 'test.db'));
+    // fünf Übernahmen nach 4, 8, 10, 30 und 600 Minuten → Median 10
+    [4, 8, 10, 30, 600].forEach((min, i) => sql.prepare("UPDATE cases SET created_at = datetime('now', ?), claimed_at = datetime('now') WHERE id = ?").run(`-${min} minutes`, ids[i]));
+    sql.close();
+    const voll = (await pub.get('/api/public/figures')).json;
+    assert.equal(voll.cases, 10);
+    assert.deepEqual(voll.response, { minutes: 10, urgent: false });
   });
 });

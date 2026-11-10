@@ -56,7 +56,11 @@ function openTicketModal(source, lawyer = null) {
     }
     modal.classList.remove('opacity-0', 'pointer-events-none');
     document.body.style.overflow = 'hidden';
-    setTimeout(() => { if (window.matchMedia('(min-width: 768px)').matches) document.getElementById('tkName').focus(); }, 50);
+    // Cursor ins Namensfeld – aber nicht mehr, wenn schon in ein Feld des Formulars geklickt wurde (sonst landete der Text im falschen Feld)
+    setTimeout(() => {
+      const name = document.getElementById('tkName');
+      if (window.matchMedia('(min-width: 768px)').matches && !(name.form && name.form.contains(document.activeElement))) name.focus();
+    }, 50);
 }
 /** Wunschanwalt im Mandatsformular setzen ({ id, name } der Teamkarte) oder entfernen (null). */
 function setWishLawyer(lawyer) {

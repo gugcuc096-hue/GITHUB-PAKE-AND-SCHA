@@ -30,7 +30,13 @@ describe('Vorladen und Bilder', () => {
     try {
       for (const p of ['/', '/karriere']) {
         const html = (await client(srv.base).get(p)).text;
-        assert.match(html, /<script src="\/js\/warm\.js\?v=[^"]+" defer><\/script>/, p);
+        const tag = (html.match(/<script src="\/js\/warm\.js\?v=[^"]+" data-css="([^"]*)" defer><\/script>/) || [])[1];
+        assert.ok(tag, p);
+        // … und kennt die gebündelten Stylesheets des Dashboards (zum Vorladen)
+        const urls = tag.replace(/&amp;/g, '&').split(' ');
+        assert.ok(urls.length >= 1 && urls.every((u) => u.startsWith('/css/bundle.css?f=')), tag);
+        assert.match(urls[0], /\bapp\b/);
+        assert.equal((await fetch(srv.base + urls[0])).status, 200);
       }
     } finally {
       await srv.stop();
@@ -62,7 +68,7 @@ describe('Vorladen (Browser)', { skip: chromium ? false : 'Playwright nicht inst
       await page.waitForFunction(() => document.querySelectorAll('link[rel=prefetch]').length === 3);
       const hrefs = await page.$$eval('link[rel=prefetch]', (l) => l.map((x) => x.getAttribute('href')));
       assert.ok(hrefs.some((h) => /^\/js\/dashboard\.bundle\.js\?v=\w+/.test(h)), hrefs.join(' '));
-      assert.ok(hrefs.some((h) => /^\/css\/depth\.css\?v=\w+/.test(h)));
+      assert.ok(hrefs.some((h) => /^\/css\/bundle\.css\?f=[\w,-]*\bdepth\b[\w,-]*&v=\w+/.test(h)), hrefs.join(" ")); // Stylesheets kommen gebündelt
       assert.deepEqual(problems, []);
     } finally {
       await ctx.close();

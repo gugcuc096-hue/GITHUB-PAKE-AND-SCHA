@@ -337,3 +337,90 @@ html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges > .chg-li
 html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges > .chg-sum { order: 2; grid-template-columns: 1fr 1fr; }
 html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges > .chg-sum > .chg-est-cell { grid-column: 1 / -1; }
 html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges > :not(.section-head, .chg-list, .chg-sum) { order: 3; }
+
+/* ================================================================ Website, Startseite: wie ein gesetztes Schriftstück */
+/* Kennzahlen statt Eckdaten-Leiste: vier große Zahlen zwischen zwei Linien */
+html[data-design="ruhig"] #fakten .kz-facts { display: none; }
+html[data-design="ruhig"] .kz-figures { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; border-top: 2px solid var(--gold-500); border-bottom: 1px solid var(--rz-line-2); }
+html[data-design="ruhig"] .kz-figure { display: flex; flex-direction: column-reverse; justify-content: flex-end; gap: 0.55rem; min-width: 0; padding: 1.6rem 1.25rem 1.5rem 0; }
+html[data-design="ruhig"] .kz-figure[hidden] { display: none; }
+html[data-design="ruhig"] .kz-figure dd { margin: 0; font: 500 clamp(2.5rem, 4.8vw, 3.75rem)/1 var(--kz-serif); letter-spacing: -0.01em; color: var(--kz-ink); font-variant-numeric: lining-nums; white-space: nowrap; }
+html[data-design="ruhig"] .kz-figure dd small { margin-left: 0.3em; font: 600 0.26em/1 var(--kz-sans); letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold-500); }
+html[data-design="ruhig"] .kz-figure dt { font: 600 0.7rem/1.35 var(--kz-sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--kz-muted); }
+@media (max-width: 899px) {
+  html[data-design="ruhig"] .kz-figure:nth-child(even) { padding-left: 1.25rem; border-left: 1px solid var(--rz-line); }
+  html[data-design="ruhig"] .kz-figure:nth-child(n + 3) { border-top: 1px solid var(--rz-line); }
+}
+@media (min-width: 900px) {
+  html[data-design="ruhig"] .kz-figures { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+  html[data-design="ruhig"] .kz-figure { padding: 2rem 1.75rem 1.9rem 0; }
+  html[data-design="ruhig"] .kz-figure + .kz-figure { padding-left: 1.75rem; border-left: 1px solid var(--rz-line); }
+}
+
+/* Rechtsgebiete: nummerierte Zeilen statt Kästen */
+html[data-design="ruhig"] #gebiete .kz-areas { display: block; counter-reset: area; }
+html[data-design="ruhig"] #gebiete .kz-areas .kz-tile { counter-increment: area; }
+html[data-design="ruhig"] #gebiete .kz-areas .kz-tile > a { display: grid; grid-template-columns: 2.75rem minmax(0, 1fr); align-items: baseline; gap: 0.35rem 1rem; padding: 1.35rem 0; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--rz-line); border-radius: 0; box-shadow: none; transform: none; }
+html[data-design="ruhig"] #gebiete .kz-areas .kz-tile > a::before { content: counter(area, decimal-leading-zero); position: static; inset: auto; z-index: auto; opacity: 1; border-radius: 0; box-shadow: none; font: 600 0.8rem/1 var(--kz-sans); letter-spacing: 0.1em; color: var(--gold-500); font-variant-numeric: lining-nums tabular-nums; }
+html[data-design="ruhig"] #gebiete .kz-areas .kz-tile > a::after { content: none; }
+html[data-design="ruhig"] #gebiete .kz-areas .kz-tile-ico { display: none; }
+html[data-design="ruhig"] #gebiete .kz-areas .kz-area-name { font-size: clamp(1.55rem, 2.6vw, 2rem); line-height: 1.1; transition: color var(--dur-1) ease; }
+html[data-design="ruhig"] #gebiete .kz-areas :is(.kz-area-text, .kz-more) { grid-column: 2; }
+html[data-design="ruhig"] #gebiete .kz-areas .kz-area-text { font-size: 0.95rem; max-width: 60ch; }
+html[data-design="ruhig"] #gebiete .kz-areas .kz-more { width: auto; margin: 0; padding: 0; border: 0; white-space: nowrap; }
+html[data-design="ruhig"] #gebiete .kz-areas .kz-more::after { display: inline-block; transition: transform var(--dur-2) var(--ease-out); }
+@media (hover: hover) and (pointer: fine) {
+  html[data-design="ruhig"] #gebiete .kz-areas .kz-tile > a:hover .kz-area-name { color: var(--gold-light); }
+  html[data-design="ruhig"] #gebiete .kz-areas .kz-tile > a:hover .kz-more::after { transform: translateX(4px); }
+}
+@media (min-width: 900px) {
+  html[data-design="ruhig"] #gebiete .kz-areas .kz-tile > a { grid-template-columns: 3.5rem minmax(0, 17rem) minmax(0, 1fr) auto; gap: 0 2rem; padding: 1.6rem 0; }
+  html[data-design="ruhig"] #gebiete .kz-areas :is(.kz-area-text, .kz-more) { grid-column: auto; }
+}
+
+/* Leitsatz der Gründer: großes kursives Zitat mit Unterschrift */
+html[data-design="ruhig"] #leitsatz { display: block; }
+html[data-design="ruhig"] .kz-motto { display: grid; gap: 1.75rem; margin: 0; padding: var(--sp-3) 0; max-width: 60rem; }
+html[data-design="ruhig"] .kz-motto blockquote { margin: 0; }
+html[data-design="ruhig"] .kz-motto blockquote::before { content: ''; display: block; width: 3rem; height: 2px; margin-bottom: 1.75rem; background: var(--gold-500); }
+html[data-design="ruhig"] .kz-motto blockquote p { margin: 0; font: italic 500 clamp(1.7rem, 3.5vw, 2.85rem)/1.26 var(--kz-serif); color: var(--kz-ink); text-wrap: balance; }
+html[data-design="ruhig"] .kz-motto figcaption { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem 1.1rem; }
+html[data-design="ruhig"] .kz-motto-sign { font: 400 2.5rem/1 'Allura', 'Dancing Script', cursive; color: var(--gold-light); }
+html[data-design="ruhig"] .kz-motto-role { font: 600 0.7rem/1.3 var(--kz-sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--kz-muted); }
+
+/* Aktuelles wie eine Zeitungsseite: große Meldung links, kurze Zeilen rechts */
+html[data-design="ruhig"] .kz-news-cards.is-paper { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; border-top: 2px solid var(--gold-500); border-bottom: 1px solid var(--rz-line-2); }
+html[data-design="ruhig"] .kz-paper-lead { padding: 1.75rem 0; min-width: 0; }
+html[data-design="ruhig"] .kz-paper-meta { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; font: 600 0.7rem/1.3 var(--kz-sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--kz-muted); }
+html[data-design="ruhig"] .kz-paper-meta b { font-weight: 600; color: var(--gold-500); }
+html[data-design="ruhig"] .kz-paper-lead h3 { margin: 0.8rem 0 0.9rem; font: 600 clamp(1.8rem, 3.2vw, 2.6rem)/1.12 var(--kz-serif); color: var(--kz-ink); text-wrap: balance; }
+html[data-design="ruhig"] .kz-paper-lead p { margin: 0; max-width: 58ch; font-size: 1.02rem; line-height: 1.65; color: var(--kz-text); display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
+html[data-design="ruhig"] .kz-paper-lead .kz-link { margin-top: 1.1rem; }
+html[data-design="ruhig"] .kz-paper-side { min-width: 0; border-top: 1px solid var(--rz-line-2); }
+html[data-design="ruhig"] .kz-paper-side ul { list-style: none; margin: 0; padding: 0; }
+html[data-design="ruhig"] .kz-paper-row { padding: 1.3rem 0; }
+html[data-design="ruhig"] .kz-paper-row + .kz-paper-row { border-top: 1px solid var(--rz-line); }
+html[data-design="ruhig"] .kz-paper-row h4 { margin: 0.45rem 0 0.3rem; font: 600 1.25rem/1.25 var(--kz-serif); color: var(--kz-ink); }
+html[data-design="ruhig"] .kz-paper-row p { margin: 0; font-size: 0.9rem; line-height: 1.55; color: var(--kz-text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+html[data-design="ruhig"] .is-paper :is(h3, h4) a { color: inherit; text-decoration: none; transition: color var(--dur-1) ease; }
+html[data-design="ruhig"] .is-paper :is(h3, h4) a:hover { color: var(--gold-light); }
+@media (min-width: 900px) {
+  html[data-design="ruhig"] .kz-news-cards.is-paper.has-side { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
+  html[data-design="ruhig"] .is-paper.has-side .kz-paper-lead { padding: 2rem 2.75rem 2rem 0; }
+  html[data-design="ruhig"] .is-paper.has-side .kz-paper-side { padding-left: 2.75rem; border-top: 0; border-left: 1px solid var(--rz-line-2); }
+  html[data-design="ruhig"] .is-paper.has-side .kz-paper-row:first-child { padding-top: 2rem; }
+}
+
+/* Ablauf eines Mandats: der eine helle Abschnitt – Elfenbein wie Briefpapier, dunkle Schrift */
+html[data-design="ruhig"] .site-home #ablauf { --kz-ink: #101a36; --kz-text: #3b4359; --kz-muted: #6a7084; --text-main: #101a36; --rz-line: rgba(16, 26, 54, 0.14); --rz-line-2: rgba(16, 26, 54, 0.24); --gold-500: #8f6f1f; --gold-light: #8f6f1f; background: #f4efe3; color: var(--kz-text); }
+html[data-design="ruhig"] .site-home #ablauf.is-band::before { content: none; }
+html[data-design="ruhig"] .site-home #ablauf .kz-flow { gap: var(--sp-3) var(--sp-3); }
+html[data-design="ruhig"] .site-home #ablauf .kz-flow > li { padding: 1.25rem 0 0; background: none; border: 0; border-top: 2px solid #101a36; border-radius: 0; box-shadow: none; transform: none; }
+html[data-design="ruhig"] .site-home #ablauf .kz-flow > li::before { content: counter(flow, decimal-leading-zero); display: block; width: auto; height: auto; margin-bottom: 1.1rem; border-radius: 0; background: none; box-shadow: none; font: 500 2.75rem/1 var(--kz-serif); color: #8f6f1f; font-variant-numeric: lining-nums; }
+html[data-design="ruhig"] .site-home #ablauf .kz-flow > li::after { content: none; }
+html[data-design="ruhig"] .site-home #ablauf .kz-flow h3 { font-size: 1.4rem; }
+html[data-design="ruhig"] .site-home #ablauf .kz-flow p { font-size: 0.95rem; line-height: 1.6; }
+
+/* Fuß: der Kanzleiname groß in Serifenschrift über die ganze Breite */
+html[data-design="ruhig"] .kz-footer > .kz-wrap { container-type: inline-size; }
+html[data-design="ruhig"] .kz-footer-word { display: block; margin: 0 0 var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--rz-line); font: 500 20.5cqw/0.92 var(--kz-serif); letter-spacing: -0.015em; white-space: nowrap; text-align: center; color: rgba(231, 220, 192, 0.1); user-select: none; overflow: hidden; }

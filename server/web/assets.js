@@ -25,7 +25,11 @@ const YEAR = 'public, max-age=31536000, immutable';
 /** Nur für die Kanzlei (Mandanten laden sie nie): Teile, deren Ansichten Kanzlei/Board vorbehalten sind. */
 const STAFF_PARTS = new Set(['12-karte.js', '12-aktuelles.js', '07-konfiguration.js', '07-listen.js', '07-mehr-konfig.js', '07-rechte-schalter.js', '07-stil.js', '07-team-einstellungen.js', '08-discord.js', '09-system.js', '09-verwaltung.js', '13-kanzlei.js']);
 /** Erst bei Bedarf geladen (eigenes Bündel): die 3D-Ansicht der Tatort-Karte (WebGL, Geländemodell). */
-const LAZY_PARTS = { karte3d: ['12-karte3d.js'] };
+const LAZY_PARTS = {
+  karte3d: ['12-karte3d.js'],
+  // Einstellungen, Team, Discord und die Karte: erst nach dem ersten Bild (bzw. beim ersten Bedarf) – siehe loadMore() in 14-start.js
+  mehr: ['07-konfiguration.js', '07-listen.js', '07-mehr-konfig.js', '07-rechte-schalter.js', '07-stil.js', '07-team-einstellungen.js', '08-discord.js', '12-karte.js'],
+};
 const LAZY_FILES = new Set(Object.values(LAZY_PARTS).flat());
 const PROD = () => process.env.NODE_ENV === 'production';
 
@@ -182,7 +186,44 @@ function rewrite(html) {
       /(?:[ \t]*<script src="\/js\/dashboard\/\d\d-[\w-]+\.js"><\/script>\s*)+/,
       `    <script src="/js/dashboard.bundle.js" data-staff="/js/dashboard.staff.js?v=${version}" data-lazy="/js/dashboard.{teil}.js?v=${version}"></script>\n`
     )
-    .replace(/\b(src|href)="(\/(?:js|css)\/[^"?#]+\.(?:js|css))"/g, `$1="$2?v=${version}"`);
+    .replace(CSS_RUN, (run) => {
+      // Mehrere Stylesheets hintereinander → eine Datei (gleiche Reihenfolge); Kommentare dazwischen entfallen
+      const names = [...run.matchAll(/href="\/css\/([\w-]+)\.css"/g)].map((m) => m[1]);
+      if (names.length < 2 || !names.every(cssExists)) return run;
+      const indent = run.match(/^[ \t]*/)[0];
+      return `${indent}<link rel="stylesheet" href="/css/bundle.css?f=${names.join(',')}&amp;v=${version}">\n`;
+    })
+    .replace(/\b(src|href)="(\/(?:js|css)\/[^"?#]+\.(?:js|css))"/g, `$1="$2?v=${version}"`)
+    .replace(/<script src="\/js\/warm\.js\?v=[^"]*"/, (tag) => `${tag} data-css="${dashboardCss().join(' ')}"`); // warm.js lädt die Stile des Dashboards vor
+}
+/** Die Stylesheet-Adressen des Dashboards (für das Vorwärmen von der Website aus). */
+function dashboardCss() {
+  const html = page('dashboard.html') || '';
+  return [...html.matchAll(/<link rel="stylesheet" href="(\/css\/bundle\.css[^"]*)">/g)].map((m) => m[1]);
+}
+
+/*
+ * Stylesheets gebündelt: Stehen in einer Seite mehrere <link rel="stylesheet" href="/css/….css"> hintereinander, lädt der
+ * Browser sie als eine Datei (/css/bundle.css?f=fonts,tokens,…) – ein Abruf statt zehn. Stylesheets mit eigenen Angaben
+ * (media, data-calm …) bleiben einzeln an ihrer Stelle, die Reihenfolge ändert sich nicht.
+ */
+const CSS_RUN = /(?:[ \t]*<link rel="stylesheet" href="\/css\/[\w-]+\.css">(?:\s|<!--(?:(?!-->|<link)[\s\S])*-->)*)+/g;
+const cssExists = (name) => fs.existsSync(path.join(PUBLIC, 'css', `${name}.css`));
+const cssJoin = (names) => names.map((n) => `/* ---- ${n}.css ---- */\n${fs.readFileSync(path.join(PUBLIC, 'css', `${n}.css`), 'utf8')}`).join('\n');
+/** Die Bündel, die die Seiten tatsächlich verwenden (zum Vorbereiten beim Start). */
+function cssBundles() {
+  const out = new Set();
+  for (const f of fs.readdirSync(PUBLIC).filter((x) => x.endsWith('.html'))) {
+    for (const m of rewrite(fs.readFileSync(path.join(PUBLIC, f), 'utf8')).matchAll(/\/css\/bundle\.css\?f=([\w,-]+)/g)) out.add(m[1]);
+  }
+  return [...out];
+}
+function cssBundle(req, res, next) {
+  const f = String(req.query.f || '');
+  if (!/^[\w-]+(,[\w-]+){1,39}$/.test(f)) return next();
+  const names = f.split(',');
+  if (!names.every(cssExists)) return next();
+  send(req, res, pack(`css-bundle:${f}`, cssJoin(names), 'css'));
 }
 
 /** Eine Seite aus public/ mit Versionsnummern (im Betrieb einmal gelesen); null, wenn es sie nicht gibt. */
@@ -234,6 +275,7 @@ async function packAll() {
     ['bundle', st.bundle, 'js'],
     ['staff', st.staff, 'js'],
     ...Object.entries(st.lazy).map(([k, text]) => [`lazy-${k}`, text, 'js']),
+    ...cssBundles().map((f) => [`css-bundle:${f}`, cssJoin(f.split(',')), 'css']),
   ];
   for (const f of [...listFiles(path.join(PUBLIC, 'js')), ...listFiles(path.join(PUBLIC, 'css'))]) {
     const rel = '/' + path.relative(PUBLIC, f).split(path.sep).join('/');
@@ -257,4 +299,4 @@ function setHeaders(res) {
   if (res.req && res.req.query && res.req.query.v === state().version) res.set('Cache-Control', YEAR);
 }
 
-module.exports = { LAZY_PARTS, lazyBundle, rewrite, page, pages, bundle, staffBundle, staticAsset, warm, packAll, setHeaders, reset, version: () => state().version, STAFF_PARTS };
+module.exports = { cssBundle, cssBundles, LAZY_PARTS, lazyBundle, rewrite, page, pages, bundle, staffBundle, staticAsset, warm, packAll, setHeaders, reset, version: () => state().version, STAFF_PARTS };

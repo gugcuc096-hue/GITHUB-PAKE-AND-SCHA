@@ -620,6 +620,7 @@
     .then((r) => {
       lastTeam = r.team || [];
       renderTeam(lastTeam);
+      renderFigures();
       const m = wishId && (r.team || []).find((x) => x.id === wishId && x.bookable);
       if (wishId && typeof window.openTicketModal === 'function') window.openTicketModal('profile', m ? { id: m.id, name: m.name } : null);
     })
@@ -707,7 +708,7 @@
     renderTeam: () => renderTeam(lastTeam),
     renderNews: () => {
       const teaser = document.getElementById('newsTeaser');
-      if (teaser && lastNews.length) teaser.innerHTML = lastNews.slice(0, Math.max(1, Number(teaser.dataset.count) || 3)).map(newsCard).join('');
+      if (teaser && lastNews.length) fillTeaser(teaser, lastNews);
     },
   };
   // Abschnitte abwechselnd auf einem leicht helleren Band (statt Trennlinien): jeder zweite sichtbare Abschnitt.
@@ -741,6 +742,43 @@
     const ok = await window.PS.copy(b.dataset.copy);
     window.PS.toast(ok ? `Nummer ${b.dataset.copy} kopiert.` : 'Kopieren hat nicht geklappt.', ok ? 'ok' : 'error');
   });
+  /*
+   * Kennzahlen der Startseite (Design „Ruhig“, statt der Eckdaten-Leiste): betreute Verfahren, Jahre am Markt, Anwälte,
+   * Reaktionszeit. Nur Gemessenes – fehlt eine Zahl noch (zu wenige Akten, zu jung), steht dort eine andere ehrliche
+   * Angabe oder die Spalte entfällt.
+   */
+  const figBox = document.getElementById('figures');
+  let figData = null;
+  function renderFigures() {
+    if (!figBox || !figData) return;
+    const set = (key, value, label) => {
+      const el = figBox.querySelector(`[data-fig="${key}"]`);
+      if (!el) return;
+      el.hidden = value == null;
+      if (value == null) return;
+      el.querySelector('dd').innerHTML = value;
+      el.querySelector('dt').textContent = label;
+    };
+    const num = (key, n) => `<span data-count="fig:${key}">${Number(n).toLocaleString('de-DE')}</span>`;
+    const f = figData;
+    set('cases', f.cases ? num('cases', f.cases) : null, 'betreute Verfahren');
+    if (f.years >= 1) set('years', num('years', f.years), f.years === 1 ? 'Jahr am Markt' : 'Jahre am Markt');
+    else set('years', f.since ? String(f.since) : null, 'gegründet');
+    set('lawyers', lastTeam.length ? num('lawyers', lastTeam.length) : null, lastTeam.length === 1 ? 'Anwalt' : 'Anwälte');
+    const areas = document.querySelectorAll('#gebiete .kz-tile').length;
+    if (f.response) {
+      const m = f.response.minutes;
+      set('response', m < 90 ? `${num('response', m)}<small>Min.</small>` : `${num('response', Math.round(m / 60))}<small>Std.</small>`, f.response.urgent ? 'Reaktionszeit im Notdienst' : 'Reaktionszeit auf Anfragen');
+    } else set('response', areas ? num('areas', areas) : null, 'Rechtsgebiete');
+    window.PS.countUp(figBox, { whenVisible: true });
+  }
+  if (figBox)
+    window.PS.boot('figures', '/api/public/figures')
+      .then((d) => {
+        figData = d;
+        renderFigures();
+      })
+      .catch(() => {});
   // Eckdaten der Startseite: Zahlen zählen hoch, sobald sie ins Bild kommen
   if (document.getElementById('fakten')) window.PS.countUp(document.getElementById('fakten'), { whenVisible: true });
 
@@ -758,6 +796,34 @@
     return `<li class="kz-news-card${n.pinned ? ' is-pinned' : ''}"><div class="kz-news-meta"><span class="badge badge-gold">${esc(NEWS_KIND[n.kind] || 'Meldung')}</span><time>${esc(newsDate(n.at))}</time></div>
       <h3>${title}</h3>${n.body ? `<p>${esc(n.body)}</p>` : ''}</li>`;
   };
+  /*
+   * Startseite. Klassisch: Karten nebeneinander. Design „Ruhig“: wie eine Zeitungsseite – die neueste Meldung groß
+   * links, die nächsten als kurze Zeilen rechts; offene Stellen stehen zusammen in einer Zeile (statt je einer Karte).
+   */
+  function fillTeaser(teaser, news) {
+    const count = Math.max(1, Number(teaser.dataset.count) || 3);
+    const paper = document.documentElement.dataset.design === 'ruhig';
+    teaser.classList.toggle('is-paper', paper);
+    if (!paper) {
+      teaser.innerHTML = news.slice(0, count).map(newsCard).join('');
+      return;
+    }
+    const meta = (n) => `<div class="kz-paper-meta"><b>${esc(NEWS_KIND[n.kind] || 'Meldung')}</b><time>${esc(newsDate(n.at))}</time></div>`;
+    const head = (n) => (n.link ? `<a href="${esc(n.link)}">${esc(n.title)}</a>` : esc(n.title));
+    const jobs = news.filter((n) => n.kind === 'stelle');
+    const rest = news.filter((n) => n.kind !== 'stelle');
+    const lead = rest[0] || jobs[0];
+    const rows = rest.slice(1, count).map((n) => `<li class="kz-paper-row">${meta(n)}<h4>${head(n)}</h4>${n.body ? `<p>${esc(n.body)}</p>` : ''}</li>`);
+    const open = rest.length ? jobs : jobs.slice(1);
+    if (open.length)
+      rows.push(
+        `<li class="kz-paper-row"><div class="kz-paper-meta"><b>Karriere</b><time>${esc(newsDate(open[0].at))}</time></div><h4><a href="/karriere">${open.length === 1 ? 'Eine offene Stelle' : `${open.length} offene Stellen`}</a></h4><p>${esc(open.map((n) => n.title.replace(/^(Stellenangebot|Offene Stelle|Wir suchen|Wir stellen ein)\s*[:–-]\s*/i, '')).join(' · '))}</p></li>`
+      );
+    teaser.classList.toggle('has-side', rows.length > 0);
+    teaser.innerHTML =
+      `<li class="kz-paper-lead">${meta(lead)}<h3>${head(lead)}</h3>${lead.body ? `<p>${esc(lead.body)}</p>` : ''}${lead.link ? `<a class="kz-link" href="${esc(lead.link)}">Weiterlesen</a>` : ''}</li>` +
+      (rows.length ? `<li class="kz-paper-side"><ul>${rows.join('')}</ul></li>` : '');
+  }
   if (has('newsList', 'newsTeaser'))
     window.PS.boot('news', '/api/public/news')
       .then(({ news }) => {
@@ -766,7 +832,7 @@
         lastNews = news;
         const teaser = document.getElementById('newsTeaser');
         if (teaser && news.length) {
-          teaser.innerHTML = news.slice(0, Math.max(1, Number(teaser.dataset.count) || 3)).map(newsCard).join('');
+          fillTeaser(teaser, news);
           document.getElementById('neuigkeiten')?.classList.remove('hidden');
         }
       })
