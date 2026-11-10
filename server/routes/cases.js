@@ -1009,7 +1009,7 @@ router.delete(
   })
 );
 
-const FIELD_LABELS = { title: 'Titel', area: 'Rechtsgebiet', urgency: 'Dringlichkeit', description: 'Sachverhalt', clientName: 'Mandant', opponent: 'Gegenseite', courtRef: 'Gerichtsaktenzeichen' };
+const FIELD_LABELS = { title: 'Titel', area: 'Rechtsgebiet', urgency: 'Dringlichkeit', description: 'Sachverhalt', clientName: 'Mandant', opponent: 'Gegenseite', courtRef: 'Aktenzeichen' };
 
 /** Änderung der Akte im Discord-Ticket melden (nur, was der Mandant auch im Portal sieht). */
 function ticketUpdate(before, c, u, { history, editFields, d, newStatus, newlyAssigned }) {

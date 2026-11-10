@@ -303,7 +303,7 @@ html[data-design="ruhig"] .case-facts:not(.is-editing) .info-grid > div:has(> .v
 html[data-design="ruhig"] .case-facts:not(.is-editing) .ie-empty { display: none; }
 html[data-design="ruhig"] .ie-empty { font-style: normal; opacity: 0.6; }
 /* Leere Abschnitte und die leere Karte: verborgen – anlegen über „+ Hinzufügen“ (in „Ansicht anpassen“ sichtbar) */
-html[data-design="ruhig"] .case-root .sec-wrap:not(.sec-check):has(> .sec-body > .sec-empty):not(.is-shown),
+html[data-design="ruhig"] .case-root:not([data-case-tab="fall"]) .sec-wrap:not(.sec-check):has(> .sec-body > .sec-empty):not(.is-shown),
 html[data-design="ruhig"] .case-root .sec-plain:has(> .sec-empty),
 html[data-design="ruhig"] .case-root .case-overview > .sec-empty:not(.is-shown),
 html[data-design="ruhig"] .case-root .sec-wrap:not(.is-shown) #secKarte.is-empty-map:not(.is-shown) { display: none; }
@@ -312,23 +312,19 @@ html[data-design="ruhig"] .case-sections.is-editing .sec-wrap { display: block !
 html[data-design="ruhig"] .idle-strip .ticket-strip { padding: 0.45rem 0; border: 0; border-bottom: 1px solid var(--rz-line); border-radius: 0; background: none; box-shadow: none; }
 /* „Ansicht anpassen“ dezent */
 html[data-design="ruhig"] .jump-edit span { font-size: 0.8rem; }
-html[data-design="ruhig"] .case-sections:not(.is-editing) .pane-empty { display: block; margin: 1.5rem 0 0.5rem; color: var(--text-dim); font-size: 0.9rem; }
+/* Hinweis „Noch nichts erfasst“ nur im aktiven Reiter (vorher stand der leere Reiter „Dokumente“ auch unter „Fall“) */
+html[data-design="ruhig"] .case-root[data-case-tab="ueberblick"] .case-sections:not(.is-editing) .pane-empty[data-pane="ueberblick"],
+html[data-design="ruhig"] .case-root[data-case-tab="kommunikation"] .case-sections:not(.is-editing) .pane-empty[data-pane="kommunikation"],
+html[data-design="ruhig"] .case-root[data-case-tab="dokumente"] .case-sections:not(.is-editing) .pane-empty[data-pane="dokumente"] { display: block; margin: 1.5rem 0 0.5rem; color: var(--text-dim); font-size: 0.9rem; }
 html[data-design="ruhig"] .case-sections:has(.sec-wrap.is-shown) .pane-empty { display: none; }
 
-/* Prüfansicht im Reiter „Fall“: Sachverhalt und Tathergang links, Anklagepunkte (Zivilrecht: Ansprüche) daneben –
-   am Handy untereinander in dieser Reihenfolge, danach Zeugen, Beweise, Karte … */
+/* Reiter „Fall“: Sachverhalt, Tathergang, darunter die Anklagepunkte (Zivilrecht: Ansprüche), danach Zeugen, Beweise, Karte … –
+   alles in einer Spalte untereinander */
 html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections.has-sv:not(.is-editing) { display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 1.75rem; }
 html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections.has-sv:not(.is-editing) > * { grid-column: 1 / -1; order: 10; min-width: 0; }
 html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections.has-sv:not(.is-editing) > .case-sv { order: 1; }
 html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections.has-sv:not(.is-editing) > .sec-story { order: 2; }
 html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections.has-sv:not(.is-editing) > .sec-check { order: 3; }
-@media (min-width: 1024px) {
-  html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections.has-check:not(.is-editing) { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
-  html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections.has-check:not(.is-editing) > .case-sv { grid-column: 1; grid-row: 1; }
-  html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections.has-check:not(.is-editing) > .sec-story { grid-column: 1; grid-row: 2; }
-  /* Anklagepunkte bleiben beim Lesen eines langen Sachverhalts im Blick */
-  html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections.has-check:not(.is-editing) > .sec-check { grid-column: 2; grid-row: 1 / span 2; align-self: start; position: sticky; top: 3.25rem; max-height: calc(100dvh - 8rem); overflow-y: auto; overscroll-behavior: contain; }
-}
 html[data-design="ruhig"] .case-sv > .section:last-child { margin-bottom: 0; }
 /* In der Prüfspalte: erst die Anklagepunkte selbst, darunter Strafmaß und Deal; Strafmaß in zwei Spalten, Einschätzung darunter */
 html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges:not(.sec-empty) { display: flex; flex-direction: column; }
@@ -337,9 +333,9 @@ html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges:not(.sec-
 html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges:not(.sec-empty) > .chg-sum { order: 2; grid-template-columns: 1fr 1fr; }
 html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges:not(.sec-empty) > .chg-sum > .chg-est-cell { grid-column: 1 / -1; }
 html[data-design="ruhig"] .case-sections.has-sv .sec-check #secCharges:not(.sec-empty) > :not(.section-head, .chg-list, .chg-sum) { order: 3; }
-/* Leere Prüfspalte (noch keine Anklagepunkte bzw. Ansprüche): gesetzt wie der Sachverhalt daneben – Überschrift mit
+/* Noch keine Anklagepunkte bzw. Ansprüche: gesetzt wie der Sachverhalt darüber – Überschrift mit
    Linie, darunter ein ruhiges Feld mit Hinweis; die Handlungen in einer Zeile, der Verhandlungsmodus rechts */
-html[data-design="ruhig"] .case-sections.has-sv .sec-check .sec-empty { display: block; margin: 1.5rem 0 0; padding: 0; border: 0; } /* gleiche Höhe wie die Überschrift „Sachverhalt“ */
+html[data-design="ruhig"] .case-sections.has-sv .sec-check .sec-empty { display: block; margin: 1.5rem 0 0; padding: 0; border: 0; }
 html[data-design="ruhig"] .case-sections.has-sv .sec-check .sec-empty > .section-title { margin: 0 0 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--rz-line); font-size: 1.3rem; }
 html[data-design="ruhig"] .case-sections.has-sv .sec-check .sec-empty > .sec-empty-note { display: block; padding: 1.15rem 1.25rem 0.9rem; border: 1px dashed var(--rz-line-2); border-bottom: 0; border-radius: var(--r-md) var(--r-md) 0 0; background: var(--rz-panel-2); font: 600 0.95rem/1.35 var(--font-body); color: var(--text-main); text-decoration: none; cursor: default; }
 html[data-design="ruhig"] .case-sections.has-sv .sec-check .sec-empty > .sec-empty-note::first-letter { text-transform: uppercase; }
@@ -536,3 +532,11 @@ html[data-design="ruhig"] .site-home .pf-chip { border-radius: var(--r-sm); }
 html[data-design="ruhig"] .site-home .pf-book { padding: 1.5rem; background: var(--rz-panel); border: 1px solid var(--rz-line); border-top: 2px solid var(--gold-500); border-radius: var(--radius); box-shadow: var(--sh-2); }
 html[data-design="ruhig"] .site-home .pf-reviews .pf-review { padding: 0.25rem 0 0.25rem 1.5rem; background: none; border: 0; border-left: 2px solid var(--gold-500); border-radius: 0; box-shadow: none; transform: none; }
 html[data-design="ruhig"] .site-home .pf-reviews .pf-review::before, html[data-design="ruhig"] .site-home .pf-reviews .pf-review::after { content: none; }
+
+/* Reiter „Fall“: leere Abschnitte (Zeugen, Beweise, Beteiligte …) stehen als kurze Zeile mit „+ Hinzufügen“ da – so legt man
+   sie direkt hier an, statt über das Menü */
+html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections:not(.is-editing) .sec-wrap:not(.sec-check) > .sec-body > .sec-empty { margin: 0; padding: 0.85rem 0; border-top: 0; border-bottom: 1px solid var(--rz-line); }
+html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections:not(.is-editing) .sec-wrap:not(.sec-check):has(> .sec-body > .sec-empty) { margin-top: 0; }
+html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections:not(.is-editing) .sec-wrap:not(.sec-check):has(> .sec-body > .sec-empty) > .sec-head { display: none; }
+html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections:not(.is-editing) .sec-wrap:not(.sec-check):has(> .sec-body > .sec-empty) .sec-empty .section-title { font-size: 1.15rem; min-width: 11rem; padding: 0; border: 0; }
+html[data-design="ruhig"] .case-root[data-case-tab="fall"] .sec-story > .sec-body > .sec-empty .section-title { padding: 0; border: 0; min-width: 11rem; }

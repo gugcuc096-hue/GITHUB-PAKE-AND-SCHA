@@ -2780,7 +2780,7 @@ describe('Browser: Aktenmappe, verknüpfte Akten, Mehrfachauswahl, Kanzlei-Lager
       assert.match(await page.textContent('#modalBody .case-links'), new RegExp(B.caseNumber));
       assert.equal(await page.locator('#modalBody .linked-ev .att').count(), 1, 'Beweis der anderen Akte');
       assert.match(await page.textContent('#modalBody #secEvidence .att .ev-no'), /B1/);
-      assert.ok(await page.locator('#modalBody .slip-row').count() >= 1, 'Laufzettel');
+      assert.equal(await page.locator('#modalBody .slip-row').count(), 0, 'kein „Bearbeitet von“ mehr in den Stammdaten');
 
       // Schwärzen: Rechteck ziehen → Kopie als B2
       await caseShow(page, '#secEvidence [data-action="att-open"][data-index="0"]'); await page.click('#secEvidence [data-action="att-open"][data-index="0"]');

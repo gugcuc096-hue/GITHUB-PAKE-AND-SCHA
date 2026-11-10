@@ -10,17 +10,10 @@ const HK = () => window.PSHonorar;
 const feeRange = (lo, hi) => (HK() ? HK().range(lo, hi) : money(lo));
 const feePct = (n) => (HK() ? HK().pctText(n) : `${n} %`);
 
-/** Abschnitt „Honorarvereinbarung“ (Reiter Dokumente). Kanzlei ohne Vereinbarung: Feld für den Angebots-Code. */
+/** Abschnitt „Honorarvereinbarung“ (Reiter Dokumente). Ohne Vereinbarung kein Abschnitt. */
 function feeAgreementSection(c, fa, staff) {
-  if (!fa) {
-    if (!staff || !c.canEdit) return '';
-    return `<div class="section" id="secFee"><h3 class="section-title">Honorarvereinbarung</h3>
-      <form data-form="fee-offer-attach" data-id="${c.id}" class="fee-attach">
-        <p class="text-sm text-muted">Hat der Mandant im Tarifrechner der Website ein Angebot gespeichert? Mit dem Code wird es zur Honorarvereinbarung dieser Akte – die Rechnung übernimmt die Positionen.</p>
-        <div class="fee-attach-row"><input name="code" class="field font-mono" maxlength="20" placeholder="HON-4821" aria-label="Angebots-Code" autocomplete="off" required>
-        <button type="submit" class="btn-outline btn-md">${icon('download', 'ico-sm')}<span>Angebot übernehmen</span></button></div>
-      </form></div>`;
-  }
+  // Ohne Vereinbarung kein Abschnitt (das Feld für den Angebots-Code entfällt); eine schon übernommene bleibt sichtbar
+  if (!fa) return '';
   const q = fa.quote || {};
   const positions = (q.positions || [])
     .map(

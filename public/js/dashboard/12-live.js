@@ -10,7 +10,7 @@
 /* ---------------------------------------------------------------- Konflikte beim gleichzeitigen Bearbeiten */
 const EDIT_LABEL = {
   title: 'Titel', area: 'Rechtsgebiet', urgency: 'Dringlichkeit', description: 'Sachverhalt', clientName: 'Mandant', clientPhone: 'Telefon', opponent: 'Gegenpartei',
-  courtRef: 'Gerichtsaktenzeichen', step: 'Stand', status: 'Status', priority: 'Priorität', publicNote: 'Statushinweis', lawyerId: 'zuständiger Anwalt',
+  courtRef: 'Aktenzeichen', step: 'Stand', status: 'Status', priority: 'Priorität', publicNote: 'Statushinweis', lawyerId: 'zuständiger Anwalt',
   note: 'Notiz', dueDate: 'Fälligkeit', assignedTo: 'Zuständige Person', done: 'Erledigt',
 };
 const editShown = (field, v) => {
