@@ -30,11 +30,21 @@ const SECTION_IDS = Object.keys(SECTIONS);
  * Rechtsgebiete, wie viele Meldungen und der zweite Knopf im Startbereich. Angewendet beim Ausliefern
  * (server/web/sitePages.js → applyStart), also ohne Flackern.
  */
-const START_SECTIONS = { fakten: 'Eckdaten', gebiete: 'Rechtsgebiete', ansprechpartner: 'Anwälte', neuigkeiten: 'Aktuelles', ablauf: 'Ablauf eines Mandats', band: 'Abschluss mit „Mandat anfragen“' };
+const START_SECTIONS = { fakten: 'Kennzahlen', gebiete: 'Rechtsgebiete', leitsatz: 'Leitsatz der Gründer', ansprechpartner: 'Anwälte', neuigkeiten: 'Aktuelles', ablauf: 'Ablauf eines Mandats', band: 'Abschluss mit „Mandat anfragen“' };
 const START_IDS = Object.keys(START_SECTIONS);
+/** Gespeicherte Reihenfolge vervollständigen: ein später hinzugekommener Abschnitt steht hinter seinem Vorgänger aus der Standard-Reihenfolge. */
+function startOrder(order) {
+  const out = order.filter((id, i) => START_IDS.includes(id) && order.indexOf(id) === i);
+  START_IDS.forEach((id, i) => {
+    if (out.includes(id)) return;
+    const prev = START_IDS.slice(0, i).reverse().find((p) => out.includes(p));
+    out.splice(prev ? out.indexOf(prev) + 1 : 0, 0, id);
+  });
+  return out;
+}
 const LAWYER_MODES = { leitung: 'Kanzleileitung (Board of Partners)', auswahl: 'Eigene Auswahl', dienst: 'Wer gerade im Dienst ist zuerst', alle: 'Alle Anwälte' };
 const HERO_SECOND = { notdienst: 'Notdienst bei Festnahme', anwaelte: 'Unsere Anwälte', honorare: 'Honorare & Tarifrechner', kontakt: 'Kontakt', keiner: 'Kein zweiter Knopf' };
-const START_DEFAULTS = { order: START_IDS, hidden: ['ablauf'], lawyerMode: 'leitung', lawyers: [], lawyerCount: 3, areas: [], newsCount: 3, heroSecond: 'notdienst', heroNote: true };
+const START_DEFAULTS = { order: START_IDS, hidden: [], lawyerMode: 'leitung', lawyers: [], lawyerCount: 3, areas: [], newsCount: 3, heroSecond: 'notdienst', heroNote: true };
 const startSchema = z
   .object({
     order: z.array(z.enum(START_IDS)).max(START_IDS.length).default(START_DEFAULTS.order),
@@ -400,4 +410,4 @@ function publicPayload(user, { draft = false } = {}) {
   };
 }
 
-module.exports = { START_SECTIONS, START_IDS, START_DEFAULTS, LAWYER_MODES, HERO_SECOND, BANNER_STYLES, PROFILES, START_BLOCKS, profileOf, PRESETS, FONTS, SPECS, KEYS, SECTIONS, SECTION_IDS, TERMS, MESSAGE_KEYS, get, getDraft, hasDraft, getForEdit, saveDraft, discardDraft, publish, setPublished, activeBanner, labelsPayload, publicPayload };
+module.exports = { START_SECTIONS, START_IDS, startOrder, START_DEFAULTS, LAWYER_MODES, HERO_SECOND, BANNER_STYLES, PROFILES, START_BLOCKS, profileOf, PRESETS, FONTS, SPECS, KEYS, SECTIONS, SECTION_IDS, TERMS, MESSAGE_KEYS, get, getDraft, hasDraft, getForEdit, saveDraft, discardDraft, publish, setPublished, activeBanner, labelsPayload, publicPayload };

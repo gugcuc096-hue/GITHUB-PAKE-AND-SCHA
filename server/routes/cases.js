@@ -1517,7 +1517,7 @@ function claimCase(c, u, via = '') {
   const newStatus = c.status === 'offen' ? 'in_bearbeitung' : undefined;
   const history = [`Federführend: ${u.display_name}${via}`, ...(newStatus ? [`Status: ${CASE_STATUS[c.status]} → ${CASE_STATUS[newStatus]}`] : [])];
   tx(() => {
-    db.prepare("UPDATE cases SET lawyer_id = ?, status = COALESCE(?, status), updated_at = datetime('now') WHERE id = ?").run(u.id, newStatus || null, c.id);
+    db.prepare("UPDATE cases SET lawyer_id = ?, status = COALESCE(?, status), claimed_at = COALESCE(claimed_at, datetime('now')), updated_at = datetime('now') WHERE id = ?").run(u.id, newStatus || null, c.id);
     Q.caseLawyers.deleteByCaseIdAndUserId.run(c.id, u.id);
     addSystemNote(c.id, u, history.join(' · '));
     syncCaseWork(c.id);

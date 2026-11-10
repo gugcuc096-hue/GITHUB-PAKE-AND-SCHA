@@ -14,7 +14,7 @@
   const PS = window.PS || {};
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
-  const SECTIONS = { fakten: 'Eckdaten', gebiete: 'Rechtsgebiete', ansprechpartner: 'Anwälte', neuigkeiten: 'Aktuelles', ablauf: 'Ablauf eines Mandats', band: 'Abschluss „Mandat anfragen“' };
+  const SECTIONS = { fakten: 'Kennzahlen', gebiete: 'Rechtsgebiete', leitsatz: 'Leitsatz der Gründer', ansprechpartner: 'Anwälte', neuigkeiten: 'Aktuelles', ablauf: 'Ablauf eines Mandats', band: 'Abschluss „Mandat anfragen“' };
   const MODES = { leitung: 'Kanzleileitung (Board of Partners)', auswahl: 'Eigene Auswahl', dienst: 'Wer im Dienst ist zuerst', alle: 'Alle Anwälte' };
   const HERO = { notdienst: ['/notdienst', 'Notdienst bei Festnahme'], anwaelte: ['/anwaelte', 'Unsere Anwälte'], honorare: ['/honorare', 'Honorare & Tarifrechner'], kontakt: ['/kontakt', 'Kontakt'], keiner: ['', 'Kein zweiter Knopf'] };
   const ICON = {
@@ -353,7 +353,14 @@
       base = home.draft || home.published;
       const defaults = home.defaults.start;
       state = { ...defaults, ...(base.start || {}) };
-      state.order = [...state.order.filter((id) => SECTIONS[id]), ...Object.keys(SECTIONS).filter((id) => !state.order.includes(id))];
+      // später hinzugekommene Abschnitte hinter ihren Vorgänger aus der Standard-Reihenfolge (wie der Server: startOrder)
+      const all = Object.keys(SECTIONS);
+      state.order = state.order.filter((id) => SECTIONS[id]);
+      all.forEach((id, i) => {
+        if (state.order.includes(id)) return;
+        const prev = all.slice(0, i).reverse().find((p) => state.order.includes(p));
+        state.order.splice(prev ? state.order.indexOf(prev) + 1 : 0, 0, id);
+      });
       saved = JSON.stringify(state);
       areas = (ar.areas || []).filter((a) => a.key !== 'sonstiges').map((a) => ({ key: a.key, name: a.name }));
       document.body.appendChild(drawer);
