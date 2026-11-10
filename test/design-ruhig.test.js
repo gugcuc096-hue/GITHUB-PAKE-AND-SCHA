@@ -88,7 +88,7 @@ describe('Design „Ruhig“: Server und Browser', () => {
     await publish({ ...STYLE, design: 'ruhig' });
   });
 
-  it('Browser: Akte „Fall“ als Prüfansicht – Sachverhalt links, Anklagepunkte daneben (Handy: darunter), kein „Worum es geht“', { skip: !chromium && 'Playwright nicht installiert' }, async () => {
+  it('Browser: Akte „Fall“ – Anklagepunkte unter dem Sachverhalt (PC und Handy), kein „Worum es geht“', { skip: !chromium && 'Playwright nicht installiert' }, async () => {
     const desc = 'Der Mandant wurde vor der Fleeca Bank festgenommen und bestreitet die Tatbeteiligung.';
     const id = (await owner.post('/api/cases', { title: 'Prüfansicht Fleeca', area: 'strafrecht', clientName: 'Paul Prüf', description: desc })).json.case.id;
     const items = (await owner.post('/api/penal/parse', { text: '§ 33 StGB' })).json.items.map((i) => ({ offenceId: i.offenceId, count: 1 }));
@@ -120,10 +120,8 @@ describe('Design „Ruhig“: Server und Browser', () => {
         assert.equal(r.overview, false, 'Sachverhalt nicht doppelt im Überblick');
         assert.match(r.text, /Fleeca Bank festgenommen/);
         assert.ok(r.list.y < r.sum.y, 'erst die Anklagepunkte, dann das Strafmaß');
-        if (vp.width > 1000) {
-          assert.ok(r.chg.x > r.sv.x + r.sv.w - 5, `nebeneinander (${JSON.stringify(r)})`);
-          assert.ok(Math.abs(r.chg.y - r.sv.y) < 40, 'auf einer Höhe');
-        } else assert.ok(r.chg.y >= r.sv.bottom - 5, `am Handy darunter (${JSON.stringify(r)})`);
+        assert.ok(r.chg.y >= r.sv.bottom - 5, `Anklagepunkte unter dem Sachverhalt (${JSON.stringify(r)})`);
+        assert.ok(Math.abs(r.chg.x - r.sv.x) < 5, 'gleiche Spalte');
         await ctx.close();
       }
     } finally {
