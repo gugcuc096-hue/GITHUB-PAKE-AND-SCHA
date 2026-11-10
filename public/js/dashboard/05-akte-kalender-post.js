@@ -8,7 +8,7 @@
 function taskItem(t, { showCase = true } = {}) {
   const due = dueInfo(t.dueDate, t.done);
   const meta = [
-    showCase && t.caseNumber ? `<button type="button" class="link-btn font-mono" data-action="open-case" data-id="${t.caseId}" title="${esc(t.caseTitle || '')}">${esc(t.caseNumber)}</button>` : null,
+    showCase && t.caseNumber ? `<button type="button" class="link-btn font-mono" data-action="open-case" data-tab="ueberblick" data-id="${t.caseId}" title="${esc(t.caseTitle || '')}">${esc(t.caseNumber)}</button>` : null,
     t.assignedName ? esc(t.assignedName) : '<span class="text-amber-300">niemand zuständig</span>',
     t.done && t.doneByName ? `erledigt von ${esc(t.doneByName)}` : null,
   ].filter(Boolean);
@@ -1166,8 +1166,12 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
   ].filter((j) => j[3]);
   // Vier Reiter (12-akte-ansicht.js): je Reiter die Summe der Zahlen seiner sichtbaren Abschnitte; Reiter ohne Abschnitte fehlen
   if (st.caseTabFor !== c.id) {
+    // Startreiter (12-akte-ansicht.js): Sprungziel > zuletzt benutzt > „Fall“, wenn dort schon etwas steht > Überblick
     st.caseTabFor = c.id;
-    st.caseTab = 'ueberblick';
+    const want = st.caseTabWant && st.caseTabWant.id === c.id ? st.caseTabWant.tab : null;
+    st.caseTabWant = null;
+    const fallHas = !!String(c.description || '').trim() || jumps.some(([id, , n]) => n > 0 && casePaneOf(caseSecKey(id)) === 'fall');
+    st.caseTab = want || caseTabRecall(c.id) || (isStaff() && fallHas ? 'fall' : 'ueberblick');
   }
   const tabsShown = CASE_TABS.filter(([k, , keys]) => k === 'ueberblick' || jumps.some(([id]) => keys.includes(caseSecKey(id)) && !caseSecIsHidden(c, id)));
   const caseTab = tabsShown.some(([k]) => k === st.caseTab) ? st.caseTab : 'ueberblick';
@@ -1864,7 +1868,7 @@ function mailReader(m) {
   const inbox = st.mailBox === 'inbox';
   return `
       <button class="btn-ghost btn-sm mb-3 lg:hidden" data-action="mail-back">${icon('chevronLeft', 'ico-sm')}<span>Zurück</span></button>
-      <div class="flex flex-wrap items-center gap-2 mb-2">${m.priority ? badge('Wichtig', 'red') : ''}${m.caseNumber ? `<button type="button" class="btn-outline btn-sm" data-action="open-case" data-id="${m.caseId}">${icon('folder', 'ico-sm')}<span>Akte ${esc(m.caseNumber)}</span></button>` : ''}</div>
+      <div class="flex flex-wrap items-center gap-2 mb-2">${m.priority ? badge('Wichtig', 'red') : ''}${m.caseNumber ? `<button type="button" class="btn-outline btn-sm" data-action="open-case" data-tab="kommunikation" data-id="${m.caseId}">${icon('folder', 'ico-sm')}<span>Akte ${esc(m.caseNumber)}</span></button>` : ''}</div>
       <h2 class="font-serif text-2xl md:text-3xl font-semibold leading-tight">${esc(m.subject || '(kein Betreff)')}</h2>
       <div class="flex items-center gap-3 mt-3">
         <span class="avatar">${avatarImg(m.senderAvatar, m.senderName)}</span>

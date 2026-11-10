@@ -102,6 +102,8 @@ describe('Ansicht der Akte (Browser)', { skip: chromium ? false : 'Playwright ni
         await page.waitForURL(/dashboard/);
         await page.waitForFunction(() => typeof openCase === 'function' && st.user && st.user.id);
         await openAkte();
+        // mit einem Zeugen steht schon etwas im „Fall“ – die Akte geht dort auf
+        assert.equal(await page.evaluate(() => st.caseTab), 'fall', 'Startreiter „Fall“');
         const base = await order();
         assert.ok(base.indexOf('witnesses') > base.indexOf('events'), 'Grundreihenfolge: Zeugen nach Terminen');
         // Anpassen: Zeugen zweimal nach oben, „Zeiten“ ausblenden, „Verlauf“ einklappen
@@ -121,6 +123,7 @@ describe('Ansicht der Akte (Browser)', { skip: chromium ? false : 'Playwright ni
         assert.deepEqual((await a.get('/api/prefs/case-sections')).json.mine?.order.slice(0, base.length), moved, 'gespeichert');
         const jumps = await page.$$eval('.case-jump-list .jump:not([hidden])', (b) => b.map((x) => x.dataset.secJump));
         assert.ok(jumps.indexOf('witnesses') < jumps.indexOf('events') || !jumps.includes('events'), 'Sprungleiste folgt der Reihenfolge');
+        await page.evaluate(() => caseTabSet('ueberblick')); // Zeiten und Verlauf stehen im Überblick
         assert.equal(await page.isVisible('#caseSections .sec-wrap[data-sec="work"]'), false, 'ausgeblendet');
         assert.equal(await page.isVisible('#caseSections .sec-wrap[data-sec="notes"] .sec-body'), false, 'eingeklappt');
         assert.equal(await page.isVisible('#caseSections .sec-wrap[data-sec="notes"] .sec-folded'), true);
@@ -130,6 +133,7 @@ describe('Ansicht der Akte (Browser)', { skip: chromium ? false : 'Playwright ni
         await page.reload();
         await page.waitForFunction(() => typeof openCase === 'function' && st.user && st.user.id);
         await openAkte();
+        assert.equal(await page.evaluate(() => st.caseTab), 'ueberblick', 'zuletzt benutzter Reiter gemerkt');
         assert.deepEqual(await order(), moved);
         assert.equal(await page.isVisible('#caseSections .sec-wrap[data-sec="work"]'), false);
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth <= 1), true, 'kein seitliches Scrollen');
