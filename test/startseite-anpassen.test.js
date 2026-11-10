@@ -54,7 +54,7 @@ describe('Startseite anpassen und gemeinsames Design', () => {
     assert.match(home, /@view-transition \{ navigation: auto; \}/, 'weiche Seitenwechsel auf der Website');
     assert.doesNotMatch(await page('/login'), /@view-transition \{ navigation: auto/, 'Anmeldung macht nicht mit');
     // Standard: Kennzahlen, Rechtsgebiete, Leitsatz, Anwälte, Aktuelles, Ablauf (heller Abschnitt), Abschluss
-    assert.deepEqual(order(home), ['fakten', 'gebiete', 'leitsatz', 'ansprechpartner', 'neuigkeiten', 'ablauf', 'band']);
+    assert.deepEqual(order(home), ['fakten', 'gebiete', 'leitsatz', 'ansprechpartner', 'stimmen', 'neuigkeiten', 'ablauf', 'band']);
     assert.match(home, /id="factAreas">4</);
   });
 
@@ -62,7 +62,7 @@ describe('Startseite anpassen und gemeinsames Design', () => {
     await publish({ order: ['band', 'gebiete', 'ansprechpartner', 'fakten', 'neuigkeiten', 'ablauf'], hidden: ['neuigkeiten'], areas: ['vertragsrecht', 'strafrecht'], lawyerMode: 'auswahl', lawyers: [3, 1], lawyerCount: 2, newsCount: 5, heroSecond: 'anwaelte', heroNote: false });
     const home = await page('/');
     // „leitsatz“ kam später dazu und fehlt in der gespeicherten Reihenfolge: er steht hinter seinem Vorgänger (Rechtsgebiete)
-    assert.deepEqual(order(home), ['band', 'gebiete', 'leitsatz', 'ansprechpartner', 'fakten', 'ablauf']);
+    assert.deepEqual(order(home), ['band', 'gebiete', 'leitsatz', 'ansprechpartner', 'stimmen', 'fakten', 'ablauf']);
     const tiles = [...home.match(/<section id="gebiete"[\s\S]*?<\/section>/)[0].matchAll(/data-area="([a-z]+)"/g)].map((m) => m[1]);
     assert.deepEqual(tiles, ['vertragsrecht', 'strafrecht']);
     assert.match(home, /id="leadGrid" class="kz-people" data-mode="auswahl" data-count="2" data-ids="3,1"/);
@@ -86,7 +86,7 @@ describe('Startseite anpassen und gemeinsames Design', () => {
     assert.equal(bad.status, 400);
     // zurück auf Standard
     await publish({});
-    assert.deepEqual(order(await page('/')), ['fakten', 'gebiete', 'leitsatz', 'ansprechpartner', 'neuigkeiten', 'ablauf', 'band']);
+    assert.deepEqual(order(await page('/')), ['fakten', 'gebiete', 'leitsatz', 'ansprechpartner', 'stimmen', 'neuigkeiten', 'ablauf', 'band']);
   });
 
   it('Anwalts-Karten: Schwerpunkte automatisch aus den Akten, wenn keine eingetragen sind', async () => {

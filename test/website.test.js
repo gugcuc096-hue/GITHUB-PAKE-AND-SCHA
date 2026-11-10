@@ -122,12 +122,15 @@ describe('Website & Ränge selbst pflegen', () => {
     assert.ok(v, 'Versionsnummer an den Skripten');
     assert.match(html, new RegExp(`<script src="/js/dashboard\\.bundle\\.js\\?v=${v}" data-staff="/js/dashboard\\.staff\\.js\\?v=${v}" data-lazy="/js/dashboard\\.\\{teil\\}\\.js\\?v=${v}"></script>`));
     assert.doesNotMatch(html, /\/js\/dashboard\/\d\d-/, 'keine Einzelteile mehr');
-    // Stylesheets gebündelt: höchstens drei Abrufe statt fünfzehn, Reihenfolge wie in der Seite, „Ruhig“ zuletzt
+    // Stylesheets gebündelt: drei Abrufe statt fünfzehn, Reihenfolge wie in der Seite, „Ruhig“ zuletzt. Dazu hell.css –
+    // ausgeschaltet (media="not all"), es hält das erste Bild nicht auf und gilt nur in der hellen Ansicht
     const sheets = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1].replace(/&amp;/g, '&'));
-    assert.ok(sheets.length <= 3, sheets.join('\n'));
+    assert.ok(sheets.length <= 4, sheets.join('\n'));
+    assert.match(html, new RegExp(`<link rel="stylesheet" href="/css/hell\\.css\\?v=${v}" media="not all" data-hell>`));
     assert.equal(sheets[0], `/css/bundle.css?f=fonts,tokens,scrollbar,feinschliff,app,controls,fall,select,tailwind,depth,motion&v=${v}`);
     assert.equal(sheets[1], `/css/calm.css?v=${v}`, 'calm.css bleibt einzeln (eigenes media)');
-    assert.equal(sheets[2], `/css/bundle.css?f=gfx,ruhig-formen,ruhig&v=${v}`);
+    assert.equal(sheets[2], `/css/hell.css?v=${v}`);
+    assert.equal(sheets[3], `/css/bundle.css?f=gfx,ruhig-formen,ruhig&v=${v}`);
     const sheet = await fetch(server.base + sheets[0], { headers: { 'accept-encoding': 'br' } });
     assert.equal(sheet.status, 200);
     assert.equal(sheet.headers.get('cache-control'), YEAR);

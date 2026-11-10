@@ -1,0 +1,54 @@
+/* Werte der hellen Ansicht: warmes Weiß, dunkelblaue Schrift, dunkleres Gold (auf Weiß lesbar) */
+:root:root[data-design="ruhig"][data-mode="hell"] {
+  color-scheme: light;
+  --navy-950: #f6f4ee;
+  --navy-900: #fbfaf7;
+  --navy-850: #ffffff;
+  --navy-800: #ffffff;
+  --rz-bg: #f6f4ee;
+  --rz-panel: #ffffff;
+  --rz-panel-2: #faf8f3;
+  --rz-line: rgba(16, 26, 54, 0.1);
+  --rz-line-2: rgba(16, 26, 54, 0.18);
+  --text-main: #0f1a36;
+  --text-muted: #3d4662;
+  --text-dim: #68708a;
+  --glass-border: rgba(16, 26, 54, 0.16);
+  --line: rgba(16, 26, 54, 0.1);
+  --gold-500: #a8851c;
+  --gold-600: #8c6d12;
+  --gold-light: #7a5e0d;
+  --accent-rgb: 168, 133, 28;
+  --accent-light-rgb: 122, 94, 13;
+  --accent-dark-rgb: 140, 109, 18;
+  --emerald: #0f8a5f;
+  --amber: #a86a00;
+  --red: #c2362f;
+  --sky: #1d6fa8;
+  --glass-fill: #ffffff;
+  --glass-fill-strong: #ffffff;
+  --kz-panel-bg: #ffffff;
+  --sh-1: 0 1px 2px rgba(16, 26, 54, 0.06);
+  --sh-2: 0 1px 2px rgba(16, 26, 54, 0.06), 0 10px 24px -18px rgba(16, 26, 54, 0.22);
+  --sh-3: 0 8px 24px -12px rgba(16, 26, 54, 0.2);
+  --sh-4: 0 24px 60px -20px rgba(16, 26, 54, 0.28);
+  --rz-edge: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+html[data-design="ruhig"][data-mode="hell"] body { background-color: var(--rz-bg); color: var(--text-muted); }
+html[data-design="ruhig"][data-mode="hell"] .ambient-bg { background: radial-gradient(1200px 520px at 50% -180px, #ffffff 0%, transparent 70%), var(--rz-bg); }
+
+/* Goldknöpfe: eine ruhige, etwas hellere Goldfläche mit dunkelblauer Schrift (kein Verlauf) */
+html[data-design="ruhig"][data-mode="hell"] .btn-gold { background: #c9a227; color: #0f1a36; border-color: #b08a17; box-shadow: 0 1px 2px rgba(16, 26, 54, 0.12); }
+html[data-design="ruhig"][data-mode="hell"] .btn-gold:hover { background: #d4af37; filter: none; }
+html[data-design="ruhig"][data-mode="hell"] .site-switch a.is-active { background: #c9a227; color: #0f1a36; }
+
+/* Schleier hinter Fenstern: die Seite dunkelt ab (statt weiß zu verschwinden) */
+html[data-design="ruhig"][data-mode="hell"] .modal { background: rgba(16, 26, 54, 0.38); }
+html[data-design="ruhig"][data-mode="hell"] [class*="bg-black/"] { background-color: rgba(16, 26, 54, 0.4); }
+html[data-design="ruhig"][data-mode="hell"] .modal-card { box-shadow: 0 30px 80px rgba(16, 26, 54, 0.28); }
+
+/* Zweiter Akzent (Bordeaux) auf Weiß; Zeichnungen etwas kräftiger */
+:root:root[data-design="ruhig"][data-mode="hell"] { --kz-urgent: #8a2733; --kz-urgent-fill: #8a2733; --kz-urgent-soft: rgba(138, 39, 51, 0.08); }
+html[data-design="ruhig"][data-mode="hell"] .kz-hero-art { opacity: 0.5; }
+html[data-design="ruhig"][data-mode="hell"] .kz-pagehead .kz-wrap::before { opacity: 0.45; }
+html[data-design="ruhig"][data-mode="hell"] .kz-footer-word { color: rgba(16, 26, 54, 0.07); }

@@ -241,3 +241,32 @@ describe('Vorschaubilder', () => {
     assert.equal((await fetch(server.base + row.thumbUrl, { headers: { Cookie: (await (async () => { const k = client(server.base); await k.login('kim.kunde', 'Mandanten-Passwort-3'); return k; })()).cookie() } })).status, 404);
   });
 });
+
+describe('Anwaltsprofil als Visitenkarte', () => {
+  let srv;
+  before(async () => (srv = await startServer()));
+  after(async () => srv && srv.stop());
+
+  it('freie Zeiten: fünf Tage, drei Abendzeiten, belegte entfallen; Wunschtermin geht in die Anfrage', async () => {
+    const { DatabaseSync } = require('node:sqlite');
+    const pub = client(srv.base);
+    const team = (await pub.get('/api/team')).json.team;
+    const m = team.find((x) => x.bookable && x.slug);
+    assert.ok(m, 'ein buchbarer Anwalt mit Profil');
+    let html = (await pub.get(`/team/${m.slug}`)).text;
+    assert.match(html, /Freie Zeiten für ein Gespräch/);
+    const free = [...html.matchAll(/<a class="pf-slot" href="\/\?anwalt=(\d+)&amp;termin=(\d{4}-\d\d-\d\dT\d\d:\d\d)"/g)];
+    assert.equal(free.length, 15, 'alle Zeiten frei');
+    assert.equal(Number(free[0][1]), m.id);
+    // ein Termin des Anwalts zur ersten Zeit → diese Zeit ist vergeben
+    const sql = new DatabaseSync(require('node:path').join(srv.dir, 'test.db'));
+    const userId = sql.prepare('SELECT user_id FROM team_members WHERE id = ?').get(m.id).user_id;
+    const when = new Date(`${free[0][2]}:00+01:00`); // Ortszeit der Kanzlei (Winterzeit) bzw. eine Stunde daneben – beides sperrt die Zeit
+    sql.prepare("INSERT INTO appointments (type, title, starts_at, status, assigned_to) VALUES ('mandant', 'Gespräch', ?, 'bestaetigt', ?)").run(when.toISOString(), userId);
+    sql.close();
+    html = (await pub.get(`/team/${m.slug}`)).text;
+    assert.equal([...html.matchAll(/<a class="pf-slot"/g)].length, 14);
+    assert.match(html, /<span class="pf-slot is-taken"/);
+    assert.doesNotMatch(html, /Ausgewählte Verfahren/, 'ohne genug abgeschlossene Akten keine Verfahren');
+  });
+});

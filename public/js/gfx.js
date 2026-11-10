@@ -83,6 +83,79 @@
     return res;
   }
 
+  /*
+   * Ansicht je Gerät: „Blau“ (Standard) oder „Weiß“ – html[data-mode="hell"], Stylesheet hell.css (scripts/build-hell.js).
+   * Nur im Design „Ruhig“. window.PSMode = { mode, set('hell' | 'blau'), toggle() }; Ereignis „ps:mode“ am window.
+   */
+  var MODE_KEY = 'ps.mode';
+  var canLight = root.dataset.design !== 'klassisch';
+  var light = canLight && store.get(MODE_KEY) === 'hell';
+  function sheet() {
+    var l = document.querySelector('link[data-hell]');
+    if (l) l.media = light ? 'all' : 'not all';
+    var t = document.querySelector('meta[name="theme-color"]');
+    if (t && l) {
+      if (!t.dataset.blau) t.dataset.blau = t.content;
+      t.content = light ? '#f6f4ee' : t.dataset.blau;
+    }
+    return !!l;
+  }
+  if (light) {
+    root.dataset.mode = 'hell';
+    // das Stylesheet steht weiter unten im <head>: einschalten, sobald es eingelesen ist (vor dem ersten Bild)
+    if (!sheet() && window.MutationObserver) {
+      var mo = new MutationObserver(function () {
+        if (sheet()) mo.disconnect();
+      });
+      mo.observe(root, { childList: true, subtree: true });
+      document.addEventListener('DOMContentLoaded', function () {
+        mo.disconnect();
+        sheet();
+      });
+    }
+  }
+  window.PSMode = {
+    mode: light ? 'hell' : 'blau',
+    available: canLight,
+    set: function (m) {
+      light = canLight && m === 'hell';
+      store.set(MODE_KEY, light ? 'hell' : null);
+      window.PSMode.mode = light ? 'hell' : 'blau';
+      var swap = function () {
+        if (light) root.dataset.mode = 'hell';
+        else delete root.dataset.mode;
+        sheet();
+      };
+      // weich überblenden, wo der Browser es kann
+      if (document.startViewTransition && !mq('(prefers-reduced-motion: reduce)')) {
+        try {
+          document.startViewTransition(swap);
+        } catch (e) {
+          swap();
+        }
+      } else swap();
+      try {
+        window.dispatchEvent(new CustomEvent('ps:mode', { detail: window.PSMode.mode }));
+      } catch (e) {
+        /* sehr alter Browser */
+      }
+    },
+    toggle: function () {
+      window.PSMode.set(light ? 'blau' : 'hell');
+    },
+  };
+  // Umschalter überall: jedes Element mit data-mode-toggle
+  document.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest && e.target.closest('[data-mode-toggle]');
+    if (!b) return;
+    e.preventDefault();
+    window.PSMode.toggle();
+  });
+  // in einem anderen Tab umgeschaltet: mitziehen
+  window.addEventListener('storage', function (e) {
+    if (e.key === MODE_KEY && canLight && (e.newValue === 'hell') !== light) window.PSMode.set(e.newValue === 'hell' ? 'hell' : 'blau');
+  });
+
   var pref = store.get(KEY);
   if (MODES.indexOf(pref) < 0) pref = 'auto';
   var auto = pref === 'auto' ? detect() : null;

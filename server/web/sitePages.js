@@ -243,7 +243,7 @@ function shape(html, view) {
  */
 const BOOT_COMMON = { session: '/api/auth/session', areas: '/api/public/areas', duty: '/api/public/on-duty' };
 const BOOT_VIEW = {
-  start: { team: '/api/team', news: '/api/public/news', stats: '/api/public/stats', figures: '/api/public/figures' },
+  start: { team: '/api/team', news: '/api/public/news', stats: '/api/public/stats', figures: '/api/public/figures', reviews: '/api/public/reviews' },
   kanzlei: { stats: '/api/public/stats', reviews: '/api/public/reviews', positions: '/api/public/positions' },
   anwaelte: { team: '/api/team' },
   honorare: { fees: '/api/fees', memberships: '/api/public/memberships', team: '/api/team' },
