@@ -757,6 +757,7 @@ function openCaseFrom(el) {
     return n ? n.getBoundingClientRect() : null;
   };
   st.morphParts = { num: rect('.font-mono'), title: rect('.font-medium, .title') };
+  if (el.dataset.tab) st.caseTabWant = { id: Number(el.dataset.id), tab: el.dataset.tab }; // Sprungziel (Aufgabe, Rechnung, Post …)
   return openCase(Number(el.dataset.id)).finally(() => (st.morphFrom = st.morphParts = null));
 }
 

@@ -1103,7 +1103,7 @@ function liveNotice(ev) {
   if (Date.now() - noticeAt < 4000) return;
   noticeAt = Date.now();
   const c = (st.cases || []).find((x) => x.id === ev.id);
-  window.PS.toast(`Neue Nachricht${c ? ` in ${c.caseNumber}` : ''}${typeof ev.by === 'string' ? ` von ${ev.by}` : ''}.`, 'ok', { action: { label: 'Öffnen', onClick: () => openCase(ev.id) } });
+  window.PS.toast(`Neue Nachricht${c ? ` in ${c.caseNumber}` : ''}${typeof ev.by === 'string' ? ` von ${ev.by}` : ''}.`, 'ok', { action: { label: 'Öffnen', onClick: () => openCaseAt(ev.id, 'kommunikation') } });
   if (p.sound) liveChime();
 }
 function liveChime() {

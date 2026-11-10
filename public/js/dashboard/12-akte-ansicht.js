@@ -51,12 +51,46 @@ const CASE_TABS = [
   ['dokumente', 'Dokumente', ['contracts', 'briefs', 'external', 'fee', 'invoices']],
 ];
 const casePaneOf = (key) => (CASE_TABS.find((t) => t[2].includes(key)) || CASE_TABS[0])[0];
+/*
+ * Mit welchem Reiter eine Akte aufgeht: dem zuletzt dort benutzten (je Person und Gerät gemerkt, die letzten 200 Akten),
+ * sonst „Fall“, sobald es dort etwas gibt – eine neue Akte ohne Sachverhalt beginnt im Überblick. Kommt man von einer
+ * Nachricht, einer Aufgabe, einem Beweis oder einer Rechnung, öffnet sie gleich im passenden Reiter (openCaseAt).
+ */
+const caseTabKey = () => `ps.caseTab.${st.user ? st.user.id : 0}`;
+function caseTabMemory() {
+  try {
+    const v = JSON.parse(localStorage.getItem(caseTabKey()) || '[]');
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+}
+function caseTabRecall(id) {
+  const hit = caseTabMemory().find((e) => e[0] === id);
+  return hit && CASE_TABS.some((t) => t[0] === hit[1]) ? hit[1] : null;
+}
+function caseTabRemember(id, tab) {
+  if (!id) return;
+  const list = caseTabMemory().filter((e) => e[0] !== id);
+  list.push([id, tab]);
+  try {
+    localStorage.setItem(caseTabKey(), JSON.stringify(list.slice(-200)));
+  } catch {
+    /* privates Fenster: dann eben nicht gemerkt */
+  }
+}
+/** Akte gleich in einem bestimmten Reiter öffnen (Sprung von einer Nachricht, Aufgabe, einem Beweis …). */
+function openCaseAt(id, tab) {
+  st.caseTabWant = { id: Number(id), tab };
+  return openCase(Number(id));
+}
 /** Reiter der offenen Akte wechseln (ohne neu zu zeichnen). */
 function caseTabSet(tab) {
   const root = $('#modalBody .case-root');
   if (!root || !CASE_TABS.some((t) => t[0] === tab)) return;
   const from = CASE_TABS.findIndex((t) => t[0] === (root.dataset.caseTab || st.caseTab));
   st.caseTab = tab;
+  caseTabRemember(st.caseTabFor, tab);
   if (root.dataset.caseTab === tab) return;
   // Richtung für die Überblendung (motion.css): nach rechts weiter = das Alte geht nach links hinaus, das Neue kommt von rechts
   if (wchInside()) document.documentElement.dataset.wchDir = CASE_TABS.findIndex((t) => t[0] === tab) > from ? 'fwd' : 'back';

@@ -758,19 +758,19 @@ async function openSearchResult(type, id) {
   // Akte aus der Suche: Treffer in der Akte wie mit einem Gold-Textmarker anstreichen
   const q = st.gsQuery.trim();
   if (type === 'cases') return modalInstead(() => openCase(id)).then(() => markInModal(q));
-  if (type === 'notes') return modalInstead(() => openCase(x.caseId)).then(() => markInModal(q));
+  if (type === 'notes') return modalInstead(() => openCaseAt(x.caseId, 'ueberblick')).then(() => markInModal(q));
   if (type === 'wiki') return modalInstead(() => openWikiArticle(id));
   if (type === 'precedents') return modalInstead(() => openPrecedent(id));
   if (type === 'witnesses')
-    return modalInstead(() => openCase(x.caseId)).then(() => {
+    return modalInstead(() => openCaseAt(x.caseId, 'fall')).then(() => {
       caseReveal('secWitnesses'); // Zeugen stehen im Reiter „Fall“
       setTimeout(() => $(`#wit${id}`)?.scrollIntoView({ block: 'center', behavior: window.PS.motion.calm() ? 'auto' : 'smooth' }), 420);
     });
-  if (type === 'evidence') return modalInstead(() => openCase(x.caseId)).then(() => actions['ev-open']({ dataset: { no: String(x.no) } }));
+  if (type === 'evidence') return modalInstead(() => openCaseAt(x.caseId, 'fall')).then(() => actions['ev-open']({ dataset: { no: String(x.no) } }));
   if (type === 'penal') return modalInstead(() => openLaw(x.para));
   if (type === 'clients') return modalInstead(() => openClient(`u${id}`)); // Mandantenkartei
   if (type === 'invoices') {
-    if (x.caseId) return modalInstead(() => openCase(x.caseId));
+    if (x.caseId) return modalInstead(() => openCaseAt(x.caseId, 'dokumente'));
     closeModal();
     window.open(`/rechnung?id=${x.id}`, '_blank', 'noopener');
     return;
@@ -1346,7 +1346,7 @@ Object.assign(actions, {
   'open-case': (el) => openCaseFrom(el),
   // „Was ist zu tun?“: Akte öffnen und direkt zu den Nachrichten springen
   'open-case-chat': async (el) => {
-    await openCase(Number(el.dataset.id));
+    await openCaseAt(el.dataset.id, 'kommunikation');
     caseReveal('secChat')?.scrollIntoView({ block: 'start' });
   },
   'case-step': async (el) => {
