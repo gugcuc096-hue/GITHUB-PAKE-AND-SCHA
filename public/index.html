@@ -137,6 +137,7 @@
 
     <main id="start" class="flex-grow">
         <section class="kz-hero" data-page="start">
+            <div class="kz-hero-art" aria-hidden="true"></div>
             <div class="kz-wrap kz-hero-in">
                 <span class="kz-rubric is-plain">Pake &amp; Scha · Legal Consulting</span>
                 <h1 class="kz-h1">Ihre Rechtsanwälte<br><em class="kz-shine">in Los Santos.</em></h1>
@@ -187,6 +188,17 @@
                 <div class="kz-head is-center"><span class="kz-rubric">Ansprechpartner</span><h2 class="kz-h2">Ihre Anwälte</h2></div>
                 <div id="leadGrid" class="kz-people" data-mode="leitung" data-count="3"><p class="kz-empty">Wird geladen …</p></div>
                 <div class="kz-center"><a href="/anwaelte" class="kz-link">Alle Anwälte</a></div>
+            </div>
+        </section>
+
+        <section id="stimme" class="kz-section reveal hidden" data-page="start" data-start="stimmen">
+            <div class="kz-wrap">
+                <div class="kz-head"><span class="kz-rubric">Mandantenstimmen</span><h2 class="kz-h2">Was Mandanten sagen</h2></div>
+                <div class="kz-voice">
+                    <figure class="kz-voice-quote"><div class="kz-voice-stars" id="voiceStars"></div><blockquote id="voiceText"></blockquote><figcaption id="voiceBy"></figcaption></figure>
+                    <dl class="kz-voice-facts" id="voiceFacts"></dl>
+                </div>
+                <div class="kz-center"><a href="/kanzlei#stimmen" class="kz-link">Alle Mandantenstimmen</a></div>
             </div>
         </section>
 
@@ -508,7 +520,20 @@
         <section id="team" class="kz-section is-first reveal" data-page="anwaelte">
             <div class="kz-wrap">
                 <!-- Wird live aus der Datenbank geladen (Dashboard → Team-Verwaltung). -->
+                <div id="teamFilter" class="kz-filter" role="group" aria-label="Nach Rechtsgebiet filtern" hidden></div>
                 <div id="teamGrid"><p class="kz-empty">Team wird geladen …</p></div>
+            </div>
+        </section>
+
+        <section id="anwaltWahl" class="kz-section reveal" data-page="anwaelte">
+            <div class="kz-wrap">
+                <div class="kz-head"><span class="kz-rubric">Orientierung</span><h2 class="kz-h2">So finden Sie den richtigen Anwalt</h2></div>
+                <ol class="kz-flow">
+                    <li><h3>Nach Rechtsgebiet</h3><p>Wählen Sie oben das Rechtsgebiet Ihres Anliegens – Sie sehen die Anwälte, die dort ihren Schwerpunkt haben.</p></li>
+                    <li><h3>Profil ansehen</h3><p>Auf der Profilseite stehen Schwerpunkte, ausgewählte Verfahren, Mandantenstimmen und freie Zeiten für ein Gespräch.</p></li>
+                    <li><h3>Direkt anfragen</h3><p>Über „Mandat anfragen“ geht Ihre Anfrage an den Anwalt Ihrer Wahl. Ist er nicht im Dienst, übernimmt ein Kollege.</p></li>
+                    <li><h3>Wenn es eilt</h3><p>Bei Festnahme oder Durchsuchung wählen Sie nicht – der <a href="/notdienst">Notdienst</a> geht an alle Anwälte zugleich.</p></li>
+                </ol>
             </div>
         </section>
 

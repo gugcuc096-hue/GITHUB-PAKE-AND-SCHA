@@ -30,7 +30,7 @@ const SECTION_IDS = Object.keys(SECTIONS);
  * Rechtsgebiete, wie viele Meldungen und der zweite Knopf im Startbereich. Angewendet beim Ausliefern
  * (server/web/sitePages.js → applyStart), also ohne Flackern.
  */
-const START_SECTIONS = { fakten: 'Kennzahlen', gebiete: 'Rechtsgebiete', leitsatz: 'Leitsatz der Gründer', ansprechpartner: 'Anwälte', neuigkeiten: 'Aktuelles', ablauf: 'Ablauf eines Mandats', band: 'Abschluss mit „Mandat anfragen“' };
+const START_SECTIONS = { fakten: 'Kennzahlen', gebiete: 'Rechtsgebiete', leitsatz: 'Leitsatz der Gründer', ansprechpartner: 'Anwälte', stimmen: 'Mandantenstimme', neuigkeiten: 'Aktuelles', ablauf: 'Ablauf eines Mandats', band: 'Abschluss mit „Mandat anfragen“' };
 const START_IDS = Object.keys(START_SECTIONS);
 /** Gespeicherte Reihenfolge vervollständigen: ein später hinzugekommener Abschnitt steht hinter seinem Vorgänger aus der Standard-Reihenfolge. */
 function startOrder(order) {

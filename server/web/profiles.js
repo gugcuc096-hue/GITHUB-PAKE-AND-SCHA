@@ -58,7 +58,7 @@ function lawyerFacts(userId, showSuccess) {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3)
     .map(([a]) => AREA_LABEL[a]);
-  const facts = { focus, closed: null, successRate: null, wins: [], rating: null, reviews: [] };
+  const facts = { focus, closed: null, successRate: null, wins: [], rating: null, reviews: [], selected: [] };
   if (!showSuccess) return facts;
 
   const closed = cases.filter((c) => c.status === 'geschlossen');
@@ -77,6 +77,13 @@ function lawyerFacts(userId, showSuccess) {
   if (closed.length >= MIN_CLOSED) {
     facts.closed = closed.length;
     facts.wins = [...wins.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
+    // Ausgewählte Verfahren: die drei jüngsten mit gutem Ausgang – nur Rechtsgebiet, Ergebnis und Monat, nichts zur Sache
+    facts.selected = db
+      .prepare(`SELECT area, outcome, closed_at FROM cases WHERE status = 'geschlossen' AND outcome IS NOT NULL AND id IN (${ids}) ORDER BY closed_at DESC`)
+      .all(userId, userId)
+      .filter((c) => OUTCOMES[c.outcome] && OUTCOMES[c.outcome].success && AREA_LABEL[c.area])
+      .slice(0, 3)
+      .map((c) => ({ area: AREA_LABEL[c.area], outcome: OUTCOMES[c.outcome].label, when: monthYear(c.closed_at) }));
   }
   if (rated >= MIN_RATED) facts.successRate = Math.round((won / rated) * 100);
 
@@ -88,7 +95,48 @@ function lawyerFacts(userId, showSuccess) {
 }
 
 
-function render(member, facts, { origin, url }) {
+const toDate = (v) => new Date(String(v || '').replace(' ', 'T') + (/[zZ]|[+-]\d\d:?\d\d$/.test(String(v)) ? '' : 'Z'));
+const monthYear = (v) => {
+  const d = toDate(v);
+  return isNaN(d) ? '' : d.toLocaleDateString('de-DE', { month: 'long', year: 'numeric', timeZone: 'Europe/Berlin' });
+};
+
+/*
+ * Freie Zeiten für ein Gespräch: die nächsten Tage, je drei Abendzeiten (Ortszeit der Kanzlei). Eine Zeit entfällt, wenn
+ * der Anwalt dort schon einen Termin hat (± 90 Minuten). Gewählt wird ein Wunschtermin – er geht mit der Mandatsanfrage
+ * an den Anwalt, der ihn bestätigt.
+ */
+const SLOT_TIMES = [17 * 60, 19 * 60, 21 * 60];
+const SLOT_DAYS = 5;
+const TZ = 'Europe/Berlin';
+function wall(d) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(d).map((x) => [x.type, x.value]));
+  return { day: `${p.year}-${p.month}-${p.day}`, minutes: Number(p.hour) * 60 + Number(p.minute) };
+}
+function freeSlots(userId, now = new Date()) {
+  const busy = new Map();
+  for (const a of db.prepare("SELECT starts_at FROM appointments WHERE assigned_to = ? AND type != 'frist' AND status IN ('angefragt', 'bestaetigt')").all(userId)) {
+    const d = toDate(a.starts_at);
+    if (isNaN(d)) continue;
+    const w = wall(d);
+    busy.set(w.day, (busy.get(w.day) || []).concat(w.minutes));
+  }
+  const days = [];
+  for (let i = 1; i <= SLOT_DAYS; i++) {
+    const d = new Date(now.getTime() + i * 864e5);
+    const { day } = wall(d);
+    const taken = busy.get(day) || [];
+    days.push({
+      day,
+      label: d.toLocaleDateString('de-DE', { weekday: 'short', timeZone: TZ }).replace('.', ''),
+      date: d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', timeZone: TZ }),
+      slots: SLOT_TIMES.map((m) => ({ time: `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`, free: !taken.some((t) => Math.abs(t - m) < 90) })),
+    });
+  }
+  return days;
+}
+
+function render(member, facts, { origin, url, slots = [] }) {
   const lead = member.tier === 'leitung';
   const photo = member.photoUrl ? `${origin}${member.photoUrl}` : `${origin}/img/og-image.png`;
   const portrait = member.photoUrl
@@ -107,7 +155,20 @@ function render(member, facts, { origin, url }) {
   if (facts.successRate !== null) tiles.push(['Erfolgsquote', `${facts.successRate} %`, 'der Verfahren mit Ergebnis', 'chart', facts.successRate]);
   if (facts.rating) tiles.push(['Bewertung', `${num(facts.rating.avg, 1)}`, `aus ${facts.rating.count} Mandantenstimmen`, 'star', null, facts.rating.avg]);
   const section = (title, body) => `<section class="pf-section"><h2 class="pf-h">${title}</h2>${body}</section>`;
-  const blocks = [
+  const selected = (facts.selected || []).length
+    ? section('Ausgewählte Verfahren', `<ol class="pf-cases">${facts.selected.map((c) => `<li><span class="pf-case-area">${esc(c.area)}</span><strong>${esc(c.outcome)}</strong><span class="pf-case-when">${esc(c.when)}</span></li>`).join('')}</ol><p class="pf-note">Ohne Namen und Einzelheiten – die Verschwiegenheit gilt auch hier.</p>`)
+    : '';
+  const booking = slots.length
+    ? `<section class="pf-section pf-book"><h2 class="pf-h">Freie Zeiten für ein Gespräch</h2><div class="pf-days">${slots
+        .map(
+          (d) =>
+            `<div class="pf-day"><div class="pf-day-h"><b>${esc(d.label)}</b><span>${esc(d.date)}</span></div>${d.slots
+              .map((s) => (s.free ? `<a class="pf-slot" href="/?anwalt=${member.id}&amp;termin=${d.day}T${s.time}" rel="nofollow">${s.time}</a>` : `<span class="pf-slot is-taken" title="vergeben">${s.time}</span>`))
+              .join('')}</div>`
+        )
+        .join('')}</div><p class="pf-note">Zeit wählen – sie geht als Wunschtermin mit Ihrer Anfrage an ${esc(member.name)} und wird von der Kanzlei bestätigt.</p></section>`
+    : '';
+  const main = [
     tiles.length
       ? `<div class="pf-stats">${tiles
           .map(([l, v, s, ico, pct, stars]) => {
@@ -122,7 +183,7 @@ function render(member, facts, { origin, url }) {
           })
           .join('')}</div>`
       : '',
-    focus.length ? section('Schwerpunkte', `<div class="pf-chips">${focus.map((f) => `<span class="pf-chip">${esc(f)}</span>`).join('')}</div>`) : '',
+    selected,
     member.highlights.length || facts.wins.length
       ? section(
           'Erfolge',
@@ -139,6 +200,8 @@ function render(member, facts, { origin, url }) {
         )
       : '',
   ].join('');
+  const aside = [focus.length ? section('Schwerpunkte', `<div class="pf-chips">${focus.map((f) => `<span class="pf-chip">${esc(f)}</span>`).join('')}</div>`) : '', booking].join('');
+  const blocks = main || aside ? `<div class="pf-grid${main && aside ? '' : ' is-single'}">${main ? `<div class="pf-main">${main}</div>` : ''}${aside ? `<aside class="pf-aside">${aside}</aside>` : ''}</div>` : '';
 
   // Mit Konto geht die Anfrage direkt an ihn (Wunschanwalt), sonst an die ganze Kanzlei
   const cta = `<a href="${member.bookable ? `/?anwalt=${member.id}` : '/?mandat=1'}" class="btn-gold kz-btn">Mandat anfragen</a>`;
@@ -185,9 +248,10 @@ function handler(req, res, next) {
     if (getSetting('show_duty_public', '1') !== '1') member.duty = null;
     const row = db.prepare('SELECT user_id FROM team_members WHERE id = ?').get(id);
     const showSuccess = getSetting('show_success_public', '1') === '1';
-    const facts = row.user_id ? lawyerFacts(row.user_id, showSuccess) : { focus: [], closed: null, successRate: null, wins: [], rating: null, reviews: [] };
+    const facts = row.user_id ? lawyerFacts(row.user_id, showSuccess) : { focus: [], closed: null, successRate: null, wins: [], rating: null, reviews: [], selected: [] };
+    const slots = row.user_id && member.bookable ? freeSlots(row.user_id) : [];
     const origin = `${req.protocol}://${req.get('host')}`;
-    const p = render(member, facts, { origin, url: `${origin}/team/${slugs.get(id)}` });
+    const p = render(member, facts, { origin, url: `${origin}/team/${slugs.get(id)}`, slots });
     // In der Hülle der Website (Kopfzeile, Fußzeile, Mandatsfenster) – wie jede andere Unterseite
     require('./sitePages')
       .shell(req, { key: 'profil', meta: p.meta }, (html) =>
@@ -208,4 +272,4 @@ function handler(req, res, next) {
   }
 }
 
-module.exports = { handler, slugify, slugMap, lawyerFacts };
+module.exports = { handler, slugify, slugMap, lawyerFacts, freeSlots };

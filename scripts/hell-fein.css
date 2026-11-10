@@ -46,3 +46,9 @@ html[data-design="ruhig"][data-mode="hell"] .site-switch a.is-active { backgroun
 html[data-design="ruhig"][data-mode="hell"] .modal { background: rgba(16, 26, 54, 0.38); }
 html[data-design="ruhig"][data-mode="hell"] [class*="bg-black/"] { background-color: rgba(16, 26, 54, 0.4); }
 html[data-design="ruhig"][data-mode="hell"] .modal-card { box-shadow: 0 30px 80px rgba(16, 26, 54, 0.28); }
+
+/* Zweiter Akzent (Bordeaux) auf Weiß; Zeichnungen etwas kräftiger */
+:root:root[data-design="ruhig"][data-mode="hell"] { --kz-urgent: #8a2733; --kz-urgent-fill: #8a2733; --kz-urgent-soft: rgba(138, 39, 51, 0.08); }
+html[data-design="ruhig"][data-mode="hell"] .kz-hero-art { opacity: 0.5; }
+html[data-design="ruhig"][data-mode="hell"] .kz-pagehead .kz-wrap::before { opacity: 0.45; }
+html[data-design="ruhig"][data-mode="hell"] .kz-footer-word { color: rgba(16, 26, 54, 0.07); }

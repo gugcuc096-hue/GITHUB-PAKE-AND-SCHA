@@ -1,6 +1,6 @@
 /*
  * ERZEUGT von scripts/build-hell.js (npm run build:hell) – nicht von Hand ändern.
- * Helle Ansicht („Weiß“): 842 Farbangaben aus den Stylesheets umgerechnet, danach der Feinschliff aus scripts/hell-fein.css.
+ * Helle Ansicht („Weiß“): 843 Farbangaben aus den Stylesheets umgerechnet, danach der Feinschliff aus scripts/hell-fein.css.
  */
 /* ---- tokens.css ---- */
 :root:root[data-design="ruhig"][data-mode="hell"] { --navy-950: #f6f4ee; --navy-900: #ffffff; --navy-850: #ffffff; --navy-800: rgba(255, 255, 255, 0.85); --text-main: #141e3a; --text-muted: #353e5a; --text-dim: #5a637d; --glass-border: rgba(16, 26, 54, 0.15); --line: rgba(16, 26, 54, 0.088); --sh-1: 0 1px 2px rgba(16, 26, 54, 0.08), 0 6px 14px -8px rgba(16, 26, 54, 0.1); --sh-2: 0 1px 2px rgba(16, 26, 54, 0.07), 0 10px 24px -10px rgba(16, 26, 54, 0.11), 0 24px 48px -28px rgba(16, 26, 54, 0.1); --sh-3: 0 2px 4px rgba(16, 26, 54, 0.07), 0 16px 32px -12px rgba(16, 26, 54, 0.12), 0 32px 64px -32px rgba(16, 26, 54, 0.11); --sh-4: 0 4px 8px rgba(16, 26, 54, 0.08), 0 28px 56px -16px rgba(16, 26, 54, 0.14), 0 56px 96px -40px rgba(16, 26, 54, 0.12); }
@@ -737,6 +737,7 @@ html[data-design="ruhig"][data-mode="hell"] .kz-section.is-band::before { backgr
 html[data-design="ruhig"][data-mode="hell"] .avatar.slate { background-color: #f0ede5; }
 html[data-design="ruhig"][data-mode="hell"] .kz-footer { background: #ffffff; }
 html[data-design="ruhig"][data-mode="hell"] .kz-footer-word { color: rgba(103, 85, 39, 0.1); }
+html[data-design="ruhig"][data-mode="hell"] .kz-pagehead[data-page="notdienst"] .btn-gold { color: #0f1a36; }
 /* ==== Feinschliff (scripts/hell-fein.css) ==== */
 /* Werte der hellen Ansicht: warmes Weiß, dunkelblaue Schrift, dunkleres Gold (auf Weiß lesbar) */
 :root:root[data-design="ruhig"][data-mode="hell"] {
@@ -786,3 +787,9 @@ html[data-design="ruhig"][data-mode="hell"] .site-switch a.is-active { backgroun
 html[data-design="ruhig"][data-mode="hell"] .modal { background: rgba(16, 26, 54, 0.38); }
 html[data-design="ruhig"][data-mode="hell"] [class*="bg-black/"] { background-color: rgba(16, 26, 54, 0.4); }
 html[data-design="ruhig"][data-mode="hell"] .modal-card { box-shadow: 0 30px 80px rgba(16, 26, 54, 0.28); }
+
+/* Zweiter Akzent (Bordeaux) auf Weiß; Zeichnungen etwas kräftiger */
+:root:root[data-design="ruhig"][data-mode="hell"] { --kz-urgent: #8a2733; --kz-urgent-fill: #8a2733; --kz-urgent-soft: rgba(138, 39, 51, 0.08); }
+html[data-design="ruhig"][data-mode="hell"] .kz-hero-art { opacity: 0.5; }
+html[data-design="ruhig"][data-mode="hell"] .kz-pagehead .kz-wrap::before { opacity: 0.45; }
+html[data-design="ruhig"][data-mode="hell"] .kz-footer-word { color: rgba(16, 26, 54, 0.07); }

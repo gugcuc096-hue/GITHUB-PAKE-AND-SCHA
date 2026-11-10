@@ -233,11 +233,29 @@
   }
   let lastTeam = [];
   let lastNews = [];
+  let teamArea = ''; // Anwälte-Seite: gewähltes Rechtsgebiet ('' = alle)
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('[data-team-area]');
+    if (!b) return;
+    teamArea = b.dataset.teamArea;
+    renderTeam(lastTeam);
+  });
   function renderTeam(team) {
+    const all = team;
     const grid = document.getElementById('teamGrid');
     if (grid) {
       if (!team.length) grid.innerHTML = empty('users', 'Gerade stellt sich hier noch niemand vor – schreiben Sie uns trotzdem, wir melden uns.');
       else {
+        // Filter nach Rechtsgebiet (aus den Schwerpunkten); wer keinen Schwerpunkt nennt, vertritt alle Rechtsgebiete
+        const bar = document.getElementById('teamFilter');
+        const areas = [...new Set(team.flatMap((m) => m.focus || []))].sort((a, b) => a.localeCompare(b, 'de'));
+        if (bar && areas.length > 1 && team.length > 1) {
+          if (teamArea && !areas.includes(teamArea)) teamArea = '';
+          const fits = (m, a) => !a || !(m.focus || []).length || m.focus.includes(a);
+          bar.innerHTML = [['', 'Alle']].concat(areas.map((a) => [a, a])).map(([k, l]) => `<button type="button" data-team-area="${esc(k)}" aria-pressed="${k === teamArea}">${esc(l)}<small>${team.filter((m) => fits(m, k)).length}</small></button>`).join('');
+          bar.hidden = false;
+          team = team.filter((m) => fits(m, teamArea));
+        }
         const groups = [
           ['Board of Partners', 'Leitende Gesellschafter', team.filter((m) => m.tier === 'leitung')],
           ['Associate Attorneys', 'Angestellte Anwaltschaft', team.filter((m) => m.tier !== 'leitung')],
@@ -250,7 +268,7 @@
     // Startseite: Ansprechpartner nach Einstellung (Standard: die Kanzleileitung, höchstens drei)
     const lead = document.getElementById('leadGrid');
     if (lead) {
-      const list = leadList(team, lead);
+      const list = leadList(all, lead);
       lead.dataset.n = String(list.length);
       if (list.length) lead.innerHTML = list.map(personCard).join('');
       else {
@@ -263,7 +281,7 @@
     const areaName = (document.querySelector('.kz-pagehead .kz-h1') || {}).textContent;
     if (areaBox && areaName) {
       const key = areaName.trim().toLowerCase();
-      const list = team.filter((m) => (m.focus || []).some((f) => f.toLowerCase().includes(key)));
+      const list = all.filter((m) => (m.focus || []).some((f) => f.toLowerCase().includes(key)));
       if (list.length) {
         areaBox.innerHTML = list.slice(0, 6).map(personCard).join('');
         document.getElementById('gebietTeam')?.classList.remove('hidden');
@@ -612,6 +630,7 @@
   // Von einer Profilseite (/team/<name>): „Mandat anfragen“ → /?anwalt=<id> (Wunschanwalt) bzw. /?mandat=1 (ohne Konto)
   const wish = new URLSearchParams(location.search);
   const wishId = Number(wish.get('anwalt')) || 0;
+  const wishTermin = /^\d{4}-\d\d-\d\dT\d\d:\d\d$/.test(wish.get('termin') || '') ? wish.get('termin') : '';
   if (wishId || wish.has('mandat')) history.replaceState(null, '', location.pathname + location.hash);
   if (!wishId && wish.has('mandat') && typeof window.openTicketModal === 'function') window.openTicketModal('profile');
   // Nur laden, was auf dieser Unterseite gebraucht wird
@@ -622,7 +641,17 @@
       renderTeam(lastTeam);
       renderFigures();
       const m = wishId && (r.team || []).find((x) => x.id === wishId && x.bookable);
-      if (wishId && typeof window.openTicketModal === 'function') window.openTicketModal('profile', m ? { id: m.id, name: m.name } : null);
+      if (wishId && typeof window.openTicketModal === 'function') {
+        window.openTicketModal('profile', m ? { id: m.id, name: m.name } : null);
+        // Wunschtermin vom Profil („Freie Zeiten“): steht als erste Zeile im Sachverhalt
+        const when = wishTermin && new Date(wishTermin);
+        const desc = document.getElementById('tkDesc');
+        if (when && !isNaN(when) && desc && !/^Wunschtermin/.test(desc.value)) {
+          const line = `Wunschtermin für ein Gespräch: ${when.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}, ${when.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr`;
+          desc.value = `${line}\n\n${desc.value}`;
+          desc.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
     })
     .catch(() => {
       const grid = document.getElementById('teamGrid');
@@ -686,6 +715,21 @@
       .join('')
       .slice(0, 2)
       .toUpperCase() || '★';
+  // Startseite: eine Stimme groß (die beste, nicht zu lange), daneben der Schnitt aller Bewertungen – erst ab drei Stimmen
+  const voice = document.getElementById('voiceText');
+  if (voice && !track)
+    window.PS.boot('reviews', '/api/public/reviews')
+      .then(({ reviews }) => {
+        if (!reviews || reviews.length < 3) return;
+        const best = reviews.filter((r) => r.body && r.body.length <= 260).sort((a, b) => b.rating - a.rating || b.body.length - a.body.length)[0] || reviews[0];
+        const avg = reviews.reduce((s, r) => s + r.rating, 0) / reviews.length;
+        document.getElementById('voiceStars').innerHTML = `<span aria-label="${best.rating} von 5 Sternen">${'★'.repeat(best.rating)}<span style="opacity:.25">${'★'.repeat(5 - best.rating)}</span></span>`;
+        voice.textContent = `„${best.body}“`;
+        document.getElementById('voiceBy').textContent = [best.name, best.area].filter(Boolean).join(' · ');
+        document.getElementById('voiceFacts').innerHTML = `<div><dt>Ø aus ${reviews.length} Bewertungen</dt><dd>${avg.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} <span style="color:var(--gold-500);font-size:.6em">★</span></dd></div>`;
+        document.getElementById('stimme').classList.remove('hidden');
+      })
+      .catch(() => {});
   if (track) {
     window.PS.boot('reviews', '/api/public/reviews')
       .then(({ reviews }) => {

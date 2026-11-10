@@ -1133,6 +1133,9 @@ html[data-design="ruhig"] .hr-wopt {
 html[data-design="ruhig"] .hr-rec {
     border-radius: 8px
 }
+html[data-design="ruhig"] .kz-filter button {
+    border-radius: 5px
+}
 /*  karriere.css  */
 html[data-design="ruhig"] .kfaq summary:focus-visible {
     border-radius: 4px
