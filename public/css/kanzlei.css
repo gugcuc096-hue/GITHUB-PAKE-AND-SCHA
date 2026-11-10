@@ -661,7 +661,7 @@ html:active-view-transition .kz-hero-in > * { animation: none; }
 @media (max-width: 639px) { .hr-ctl, .hr-inc { padding-left: 0; } .hr-tabs { width: 100%; } .hr-tab { flex: 1; } }
 
 /* Nur im Design „Ruhig“ (ruhig.css): Kennzahlen statt Eckdaten, Leitsatz der Gründer, Namenszug im Fuß */
-.kz-figures, #leitsatz, .kz-footer-word { display: none; }
+.kz-figures, .kz-footer-word { display: none; }
 
 /* Mandantenstimme auf der Startseite: ein großes Zitat, daneben die Bewertung */
 .kz-voice { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); align-items: center; margin-bottom: var(--sp-3); }

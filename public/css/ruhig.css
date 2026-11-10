@@ -378,15 +378,6 @@ html[data-design="ruhig"] #gebiete .kz-areas .kz-more::after { display: inline-b
   html[data-design="ruhig"] #gebiete .kz-areas :is(.kz-area-text, .kz-more) { grid-column: auto; }
 }
 
-/* Leitsatz der Gründer: großes kursives Zitat mit Unterschrift */
-html[data-design="ruhig"] #leitsatz { display: block; }
-html[data-design="ruhig"] .kz-motto { display: grid; gap: 1.75rem; margin: 0; padding: var(--sp-3) 0; max-width: 60rem; }
-html[data-design="ruhig"] .kz-motto blockquote { margin: 0; }
-html[data-design="ruhig"] .kz-motto blockquote::before { content: ''; display: block; width: 3rem; height: 2px; margin-bottom: 1.75rem; background: var(--gold-500); }
-html[data-design="ruhig"] .kz-motto blockquote p { margin: 0; font: italic 500 clamp(1.7rem, 3.5vw, 2.85rem)/1.26 var(--kz-serif); color: var(--kz-ink); text-wrap: balance; }
-html[data-design="ruhig"] .kz-motto figcaption { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem 1.1rem; }
-html[data-design="ruhig"] .kz-motto-sign { font: 400 2.5rem/1 'Allura', 'Dancing Script', cursive; color: var(--gold-light); }
-html[data-design="ruhig"] .kz-motto-role { font: 600 0.7rem/1.3 var(--kz-sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--kz-muted); }
 
 /* Aktuelles wie eine Zeitungsseite: große Meldung links, kurze Zeilen rechts */
 html[data-design="ruhig"] .kz-news-cards.is-paper { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; border-top: 2px solid var(--gold-500); border-bottom: 1px solid var(--rz-line-2); }

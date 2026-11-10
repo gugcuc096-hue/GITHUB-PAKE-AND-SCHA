@@ -31,7 +31,7 @@ describe('Kanzlei-Website in Unterseiten', () => {
 
   it('jede Unterseite hat ihre Abschnitte, ihren Titel, ihre Adresse und den markierten Menüpunkt', async () => {
     const pages = {
-      '/': { has: ['id="gebiete"', 'id="leadGrid"', 'id="fakten"', 'id="figures"', 'id="leitsatz"', 'id="ablauf"', 'class="kz-footer-word"'], not: ['id="rechner"', 'id="teamGrid"', 'id="faq"'], title: 'Pake &amp; Scha – Kanzlei in Los Santos' },
+      '/': { has: ['id="gebiete"', 'id="leadGrid"', 'id="fakten"', 'id="figures"', 'id="ablauf"', 'class="kz-footer-word"'], not: ['id="rechner"', 'id="teamGrid"', 'id="faq"', 'id="leitsatz"'], title: 'Pake &amp; Scha – Kanzlei in Los Santos' },
       '/kanzlei': { has: ['id="grundsaetze"', 'id="raenge"', 'id="karriere"'], not: ['id="rechner"'], nav: 'kanzlei', title: 'Die Kanzlei – Pake &amp; Scha' },
       '/honorare': { has: ['id="rechner"', 'id="honorar"', 'id="vip"', 'id="priceSearch"'], not: ['id="raenge"'], nav: 'honorare', title: 'Honorare – Pake &amp; Scha' },
       '/anwaelte': { has: ['id="teamGrid"'], not: ['id="rechner"'], nav: 'anwaelte' },

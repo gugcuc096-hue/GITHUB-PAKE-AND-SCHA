@@ -202,14 +202,13 @@
   // Die ganze Karte führt zum Profil; „Mandat anfragen“ schickt das Mandat direkt an diesen Anwalt.
   const monogram = (m) => esc(String(m.initials || '').replace(/[^\p{L}\p{N}]/gu, '').slice(0, 2).toUpperCase() || '–');
   const DUTY_BADGE = { dienst: 'badge-emerald', gericht: 'badge-gold', pause: 'badge-amber' };
-  const STAR = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.48 3.5a.56.56 0 011.04 0l2.12 5.11a.56.56 0 00.48.35l5.52.44c.5.04.7.66.32.99l-4.2 3.6a.56.56 0 00-.18.56l1.28 5.38a.56.56 0 01-.84.61l-4.73-2.89a.56.56 0 00-.58 0l-4.73 2.89a.56.56 0 01-.84-.61l1.28-5.38a.56.56 0 00-.18-.56l-4.2-3.6a.56.56 0 01.32-.99l5.52-.44a.56.56 0 00.48-.35z"/></svg>';
   function personCard(m) {
     const duty = m.duty ? DUTY[m.duty] : null;
     const href = m.slug ? `/team/${esc(m.slug)}` : '/anwaelte';
     const portrait = m.photoUrl ? `<img src="${esc(m.photoUrl)}" alt="" loading="lazy" decoding="async" width="112" height="112">` : `<span class="kz-mono">${monogram(m)}</span>`;
     const focus = (m.focus || []).slice(0, 3);
     return `<article class="kz-person team-card${m.lawyerOfMonth ? ' is-lotm' : ''}">
-        ${m.lawyerOfMonth ? `<div class="kz-lotm" title="Für herausragende Arbeit im ${esc(m.lawyerOfMonth)}">${STAR}Anwalt des Monats</div>` : ''}
+        ${m.lawyerOfMonth ? `<div class="kz-lotm" title="Für herausragende Arbeit im ${esc(m.lawyerOfMonth)}">Anwalt des Monats</div>` : ''}
         <span class="kz-portrait">${portrait}</span>
         <div class="kz-person-rank">${esc(m.roleTitle)}</div>
         <h3 class="kz-person-name"><a href="${href}" class="team-name">${esc(m.name)}</a></h3>
@@ -692,6 +691,7 @@
     window.PS.countUp(box, { whenVisible: true }); // Zahlen zählen hoch, sobald sie ins Bild scrollen
   }
   window.addEventListener('ps:kpis', renderStats);
+  window.addEventListener('ps:kpis', () => renderFigures());
   if (has('firmStats')) window.PS.boot('stats', '/api/public/stats')
     .then((d) => {
       Object.assign(firmStats, {
@@ -788,7 +788,7 @@
   });
   /*
    * Kennzahlen der Startseite (Design „Ruhig“, statt der Eckdaten-Leiste): betreute Verfahren, Jahre am Markt, Anwälte,
-   * Reaktionszeit. Nur Gemessenes – fehlt eine Zahl noch (zu wenige Akten, zu jung), steht dort eine andere ehrliche
+   * Erfolgsquote. Nur Gemessenes – fehlt eine Zahl noch (zu wenige Akten, zu jung), steht dort eine andere ehrliche
    * Angabe oder die Spalte entfällt.
    */
   const figBox = document.getElementById('figures');
@@ -810,10 +810,9 @@
     else set('years', f.since ? String(f.since) : null, 'gegründet');
     set('lawyers', lastTeam.length ? num('lawyers', lastTeam.length) : null, lastTeam.length === 1 ? 'Anwalt' : 'Anwälte');
     const areas = document.querySelectorAll('#gebiete .kz-tile').length;
-    if (f.response) {
-      const m = f.response.minutes;
-      set('response', m < 90 ? `${num('response', m)}<small>Min.</small>` : `${num('response', Math.round(m / 60))}<small>Std.</small>`, f.response.urgent ? 'Reaktionszeit im Notdienst' : 'Reaktionszeit auf Anfragen');
-    } else set('response', areas ? num('areas', areas) : null, 'Rechtsgebiete');
+    const kpi = window.PS.kpis || {}; // Erfolgsquote lässt sich wie im Erfolgsband ausschalten (Startseite anpassen)
+    if (f.successRate != null && kpi.success !== false) set('success', `${num('success', f.successRate)}<small>%</small>`, 'Erfolgsquote');
+    else set('success', areas ? num('areas', areas) : null, 'Rechtsgebiete');
     window.PS.countUp(figBox, { whenVisible: true });
   }
   if (figBox)
