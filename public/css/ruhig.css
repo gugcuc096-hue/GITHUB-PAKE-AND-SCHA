@@ -303,7 +303,7 @@ html[data-design="ruhig"] .case-facts:not(.is-editing) .info-grid > div:has(> .v
 html[data-design="ruhig"] .case-facts:not(.is-editing) .ie-empty { display: none; }
 html[data-design="ruhig"] .ie-empty { font-style: normal; opacity: 0.6; }
 /* Leere Abschnitte und die leere Karte: verborgen – anlegen über „+ Hinzufügen“ (in „Ansicht anpassen“ sichtbar) */
-html[data-design="ruhig"] .case-root:not([data-case-tab="fall"]) .sec-wrap:not(.sec-check):has(> .sec-body > .sec-empty):not(.is-shown),
+html[data-design="ruhig"] .case-root:not([data-case-tab="fall"], [data-case-tab="dokumente"]) .sec-wrap:not(.sec-check):has(> .sec-body > .sec-empty):not(.is-shown),
 html[data-design="ruhig"] .case-root .sec-plain:has(> .sec-empty),
 html[data-design="ruhig"] .case-root .case-overview > .sec-empty:not(.is-shown),
 html[data-design="ruhig"] .case-root .sec-wrap:not(.is-shown) #secKarte.is-empty-map:not(.is-shown) { display: none; }
@@ -315,7 +315,7 @@ html[data-design="ruhig"] .jump-edit span { font-size: 0.8rem; }
 /* Hinweis „Noch nichts erfasst“ nur im aktiven Reiter (vorher stand der leere Reiter „Dokumente“ auch unter „Fall“) */
 html[data-design="ruhig"] .case-root[data-case-tab="ueberblick"] .case-sections:not(.is-editing) .pane-empty[data-pane="ueberblick"],
 html[data-design="ruhig"] .case-root[data-case-tab="kommunikation"] .case-sections:not(.is-editing) .pane-empty[data-pane="kommunikation"],
-html[data-design="ruhig"] .case-root[data-case-tab="dokumente"] .case-sections:not(.is-editing) .pane-empty[data-pane="dokumente"] { display: block; margin: 1.5rem 0 0.5rem; color: var(--text-dim); font-size: 0.9rem; }
+html[data-design="ruhig"] .case-root[data-case-tab="dokumente"] .case-sections:not(.is-editing) .pane-empty[data-pane="dokumente"] { display: none; margin: 1.5rem 0 0.5rem; color: var(--text-dim); font-size: 0.9rem; }
 html[data-design="ruhig"] .case-sections:has(.sec-wrap.is-shown) .pane-empty { display: none; }
 
 /* Reiter „Fall“: Sachverhalt, Tathergang, darunter die Anklagepunkte (Zivilrecht: Ansprüche), danach Zeugen, Beweise, Karte … –
@@ -535,8 +535,8 @@ html[data-design="ruhig"] .site-home .pf-reviews .pf-review::before, html[data-d
 
 /* Reiter „Fall“: leere Abschnitte (Zeugen, Beweise, Beteiligte …) stehen als kurze Zeile mit „+ Hinzufügen“ da – so legt man
    sie direkt hier an, statt über das Menü */
-html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections:not(.is-editing) .sec-wrap:not(.sec-check) > .sec-body > .sec-empty { margin: 0; padding: 0.85rem 0; border-top: 0; border-bottom: 1px solid var(--rz-line); }
-html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections:not(.is-editing) .sec-wrap:not(.sec-check):has(> .sec-body > .sec-empty) { margin-top: 0; }
-html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections:not(.is-editing) .sec-wrap:not(.sec-check):has(> .sec-body > .sec-empty) > .sec-head { display: none; }
-html[data-design="ruhig"] .case-root[data-case-tab="fall"] .case-sections:not(.is-editing) .sec-wrap:not(.sec-check):has(> .sec-body > .sec-empty) .sec-empty .section-title { font-size: 1.15rem; min-width: 11rem; padding: 0; border: 0; }
+html[data-design="ruhig"] .case-root:is([data-case-tab="fall"], [data-case-tab="dokumente"]) .case-sections:not(.is-editing) .sec-wrap:not(.sec-check) > .sec-body > .sec-empty { margin: 0; padding: 0.85rem 0; border-top: 0; border-bottom: 1px solid var(--rz-line); }
+html[data-design="ruhig"] .case-root:is([data-case-tab="fall"], [data-case-tab="dokumente"]) .case-sections:not(.is-editing) .sec-wrap:not(.sec-check):has(> .sec-body > .sec-empty) { margin-top: 0; }
+html[data-design="ruhig"] .case-root:is([data-case-tab="fall"], [data-case-tab="dokumente"]) .case-sections:not(.is-editing) .sec-wrap:not(.sec-check):has(> .sec-body > .sec-empty) > .sec-head { display: none; }
+html[data-design="ruhig"] .case-root:is([data-case-tab="fall"], [data-case-tab="dokumente"]) .case-sections:not(.is-editing) .sec-wrap:not(.sec-check):has(> .sec-body > .sec-empty) .sec-empty .section-title { font-size: 1.15rem; min-width: 11rem; padding: 0; border: 0; }
 html[data-design="ruhig"] .case-root[data-case-tab="fall"] .sec-story > .sec-body > .sec-empty .section-title { padding: 0; border: 0; min-width: 11rem; }
