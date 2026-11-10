@@ -173,6 +173,7 @@ function caseRow(c, u) {
     urgency: c.urgency,
     description: c.description,
     incident: staff ? c.incident || '' : undefined, // Tathergang (intern)
+    statusToken: staff ? c.status_token || null : undefined, // Statuslink für den Mandanten (/verfahrensstand?t=…)
     boardOnly: staff ? !!c.board_only : undefined, // geheimes Mandat (nur Board of Partners)
     clientId: c.client_id,
     clientName: c.client_account_name || c.client_name || '—',

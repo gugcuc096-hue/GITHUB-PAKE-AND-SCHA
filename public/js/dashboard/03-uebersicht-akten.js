@@ -18,6 +18,15 @@ function upcomingEvents(limit = 6) {
     .slice(0, limit);
 }
 
+/** Ampel für offene Fristen: grün (mehr als 3 Tage), gelb (bis 3 Tage), rot (unter 24 h oder abgelaufen). */
+function fristAmpel(e) {
+  if (e.type !== 'frist' || e.status !== 'bestaetigt') return '';
+  const d = parseDate(e.startsAt);
+  if (!d) return '';
+  const left = d.getTime() - Date.now();
+  const [k, l] = left < 864e5 ? ['rot', left <= 0 ? 'abgelaufen' : 'unter 24 Stunden'] : left < 3 * 864e5 ? ['gelb', 'bis 3 Tage'] : ['gruen', 'mehr als 3 Tage'];
+  return `<i class="ampel ampel-${k}" title="Frist: ${l}" aria-label="Frist: ${l}"></i>`;
+}
 function eventRow(e, { date = true } = {}) {
   const closed = e.status === 'erledigt' || e.status === 'abgesagt';
   // Zusage des Mandanten per Discord-Knopf (nur Kanzlei sieht sie als Markierung)
@@ -29,7 +38,7 @@ function eventRow(e, { date = true } = {}) {
     .join(' · ');
   return `<button type="button" class="ev-row ${closed ? 'ev-done' : ''}" data-action="open-event" data-id="${e.id}">
       <span class="ev-bar ev-bg-${esc(e.type)}"></span>
-      <span class="ev-main"><span class="ev-title">${esc(e.title)}</span><span class="ev-meta">${meta}</span>${fristBar(e)}</span>
+      <span class="ev-main"><span class="ev-title">${fristAmpel(e)}${esc(e.title)}</span><span class="ev-meta">${meta}</span>${fristBar(e)}</span>
       <span class="ev-side">${side}</span></button>`;
 }
 

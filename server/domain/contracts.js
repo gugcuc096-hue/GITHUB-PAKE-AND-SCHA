@@ -27,6 +27,8 @@ const FIELDS = {
   festnahme: 'Festnahme bzw. Haft (Datum, Ort, Behörde)',
   begruendung: 'Begründung bzw. eigener Text (mehrzeilig; leer = Absatz entfällt)',
   anklagepunkte: 'Anklagepunkte aus dem Strafmaß-Rechner der Akte (je Zeile einer)',
+  vergleichsbetrag: 'Angebotener Vergleichsbetrag (z. B. 25.000 $)',
+  annahmefrist: 'Frist zur Annahme des Vergleichs (Datum)',
 };
 
 /** Arten von Vorlagen: Verträge (Mandant und Anwalt unterschreiben) und Schriftsätze (meist nur der Anwalt). */
@@ -173,11 +175,36 @@ Mit freundlichen Grüßen
 [Unterschrift Anwalt]
 `;
 
+const VERGLEICHSANGEBOT = `{{empfaenger}}
+
+# Vergleichsangebot
+
+**Betreff:** {{betreff}}
+**Aktenzeichen:** {{fivenet_az}}
+**Unser Zeichen:** {{aktenzeichen}}
+
+Sehr geehrte Damen und Herren,
+
+in der oben genannten Sache vertreten wir **{{mandant}}**. Ohne Anerkennung einer Rechtspflicht und unter dem Vorbehalt sämtlicher Einwendungen unterbreiten wir zur gütlichen Erledigung der Angelegenheit folgendes
+    **Vergleichsangebot:**
+1. Unser Mandant zahlt zur Abgeltung sämtlicher wechselseitiger Ansprüche aus dem zugrunde liegenden Sachverhalt einen Betrag von **{{vergleichsbetrag}}**.
+2. Mit Erfüllung dieses Vergleichs sind alle gegenseitigen Ansprüche der Parteien – bekannt oder unbekannt – erledigt.
+3. Die Kosten werden gegeneinander aufgehoben; jede Partei trägt ihre eigenen Kosten.
+
+{{begruendung}}
+
+An dieses Angebot halten wir uns bis zum **{{annahmefrist}}** gebunden. Geht bis dahin keine schriftliche Annahme bei uns ein, gilt es als abgelehnt. Das Angebot ist vertraulich und darf in einem gerichtlichen Verfahren nicht verwendet werden.
+
+Mit freundlichen Grüßen
+[Unterschrift Anwalt]
+`;
+
 const DEFAULT_TEMPLATES = [
   { key: 'mandatsvertrag', name: 'Mandatsvertrag', body: MANDATSVERTRAG, kind: 'vertrag' },
   { key: 'vollmacht', name: 'Vollmacht', body: VOLLMACHT, kind: 'schriftsatz' },
   { key: 'akteneinsicht', name: 'Antrag auf Akteneinsicht', body: AKTENEINSICHT, kind: 'schriftsatz' },
   { key: 'haftbeschwerde', name: 'Haftbeschwerde', body: HAFTBESCHWERDE, kind: 'schriftsatz' },
+  { key: 'vergleichsangebot', name: 'Vergleichsangebot', body: VERGLEICHSANGEBOT, kind: 'schriftsatz' },
 ];
 
 /**

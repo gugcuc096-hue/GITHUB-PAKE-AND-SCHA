@@ -1208,6 +1208,31 @@ router.get(
   })
 );
 
+/* Statuslink für den Mandanten (ohne Konto): erzeugen bzw. erneuern (POST) und abschalten (DELETE) */
+router.post(
+  '/:id/status-link',
+  wrap(async (req, res) => {
+    const id = idParam(req);
+    const c = id && getCase(id);
+    if (!c || !isStaff(req.user) || !caseAccess(c, req.user).canEdit) return res.status(404).json({ error: 'Akte nicht gefunden.' });
+    const token = require('crypto').randomBytes(18).toString('base64url');
+    db.prepare('UPDATE cases SET status_token = ? WHERE id = ?').run(token, c.id);
+    addSystemNote(c.id, req.user, c.status_token ? 'Statuslink für den Mandanten erneuert (der alte Link gilt nicht mehr).' : 'Statuslink für den Mandanten erstellt.', true);
+    res.json({ token, url: `${discord.publicBase(req)}/verfahrensstand?t=${token}` });
+  })
+);
+router.delete(
+  '/:id/status-link',
+  wrap(async (req, res) => {
+    const id = idParam(req);
+    const c = id && getCase(id);
+    if (!c || !isStaff(req.user) || !caseAccess(c, req.user).canEdit) return res.status(404).json({ error: 'Akte nicht gefunden.' });
+    db.prepare('UPDATE cases SET status_token = NULL WHERE id = ?').run(c.id);
+    if (c.status_token) addSystemNote(c.id, req.user, 'Statuslink für den Mandanten abgeschaltet.', true);
+    res.json({ success: true });
+  })
+);
+
 router.get(
   '/:id/attachments/:attId/thumb',
   wrap(async (req, res) => {

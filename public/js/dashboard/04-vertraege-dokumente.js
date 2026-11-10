@@ -199,6 +199,8 @@ const BRIEF_FIELDS = [
   ['mandant_geburtsdatum', 'Geburtsdatum Mandant (IC)', 'input', 'TT.MM.JJJJ'],
   ['festnahme', 'Festnahme bzw. Haft', 'input', 'z. B. Festnahme am 01.10.2026, Mission Row'],
   ['anklagepunkte', 'Anklagepunkte', 'textarea', 'Kommt aus dem Strafmaß-Rechner der Akte – je Zeile einer'],
+  ['vergleichsbetrag', 'Vergleichsbetrag', 'input', 'z. B. 25.000 $'],
+  ['annahmefrist', 'Annahmefrist', 'input', 'TT.MM.JJJJ'],
   ['begruendung', 'Begründung / eigener Text', 'textarea', 'Leer lassen, wenn der Absatz entfallen soll.'],
   ['datum', 'Datum', 'input', 'TT.MM.JJJJ'],
   ['ort', 'Ort', 'input', ''],

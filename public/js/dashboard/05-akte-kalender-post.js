@@ -1020,6 +1020,7 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
       c.area !== 'strafrecht' && !(charges && charges.charges.length) ? `<button type="button" class="more-item" data-action="hearing-start" data-id="${c.id}">${icon('scale', 'ico-sm')}<span>Verhandlungsmodus</span></button>` : '',
       isBoard() ? `<button type="button" class="more-item" data-action="case-secret" data-id="${c.id}" data-on="${c.boardOnly ? '0' : '1'}">${icon(c.boardOnly ? 'unlock' : 'lock', 'ico-sm')}<span>${c.boardOnly ? 'Für die Kanzlei freigeben' : 'Nur für das Board (geheim)'}</span></button>` : '',
       c.canEdit ? `<button type="button" class="more-item" data-action="case-link" data-id="${c.id}">${icon('link', 'ico-sm')}<span>Akte verknüpfen</span></button>` : '',
+      c.canEdit ? `<button type="button" class="more-item" data-action="status-link" data-id="${c.id}">${icon('eye', 'ico-sm')}<span>${c.statusToken ? 'Statuslink (aktiv)' : 'Statuslink für Mandanten'}</span></button>` : '',
       c.lawyerId === me ? `<button type="button" class="more-item" data-action="release-case" data-id="${c.id}">${icon('logout', 'ico-sm')}<span>Akte abgeben</span></button>` : '',
       c.isCoLawyer ? `<button type="button" class="more-item" data-action="leave-case" data-id="${c.id}">${icon('logout', 'ico-sm')}<span>Mitarbeit beenden</span></button>` : '',
       admin ? `<button type="button" class="more-item danger" data-action="delete-case" data-id="${c.id}" data-number="${esc(c.caseNumber)}">${icon('trash', 'ico-sm')}<span>Akte löschen</span></button>` : '',
@@ -1060,9 +1061,10 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     staff || !c.closed
       ? `<button type="button" class="btn-outline btn-sm" data-action="new-event" data-case-id="${c.id}" data-return-case="${c.id}">${icon('plus', 'ico-sm')}<span>${staff ? 'Frist / Termin' : 'Termin anfragen'}</span></button>`
       : '';
+  const fristBtn = staff ? `<button type="button" class="btn-ghost btn-sm" data-action="new-event" data-deadline="1" data-case-id="${c.id}" data-return-case="${c.id}">${icon('clock', 'ico-sm')}<span>Frist aus Ereignis</span></button>` : '';
   const eventsSection = appointments.length
-    ? `<div class="section" id="secEvents"><h3 class="section-title">Termine & Fristen</h3>${appointments.map((e) => eventRow(e)).join('')}</div>`
-    : emptySection('secEvents', 'Termine & Fristen', 'keine', newEventBtn);
+    ? `<div class="section" id="secEvents"><div class="section-head"><h3 class="section-title">Termine & Fristen</h3><div class="section-tools">${fristBtn}${newEventBtn}</div></div>${appointments.map((e) => eventRow(e)).join('')}</div>`
+    : emptySection('secEvents', 'Termine & Fristen', 'keine', `${fristBtn}${newEventBtn}`);
 
   const invoiceList = invoices.length
     ? invoices
@@ -1433,6 +1435,51 @@ async function newCaseModal() {
       </form>`);
 }
 
+/* ---------------------------------------------------------------- Statuslink für Mandanten */
+/*
+ * Mandanten ohne Konto bekommen einen Link (/verfahrensstand?t=…), der den Stand des Verfahrens zeigt – Schritt,
+ * Status, zuständiger Anwalt und der Hinweis der Kanzlei, nichts aus dem Inhalt der Akte.
+ */
+function statusLinkModal(c, url) {
+  const on = !!(url || c.statusToken);
+  const link = url || (c.statusToken ? `${location.origin}/verfahrensstand?t=${c.statusToken}` : '');
+  return `<h2 id="modalTitle" class="modal-title">Statuslink für den Mandanten</h2>
+      <p class="modal-sub">Zeigt dem Mandanten ohne Konto und ohne Pin den Stand seines Verfahrens: Schritt, Status, zuständigen Anwalt und Ihren Hinweis („Hinweis für den Mandanten“). Notizen, Beweise und Beteiligte bleiben intern.</p>
+      ${on
+        ? `<div class="status-link-box"><input class="field" readonly value="${esc(link)}" aria-label="Statuslink" onclick="this.select()">
+            <button type="button" class="btn-gold btn-md" data-action="status-link-copy" data-url="${esc(link)}">${icon('copy', 'ico-sm')}<span>Kopieren</span></button></div>
+          <div class="form-actions mt-5"><button type="button" class="btn-outline btn-md" data-action="status-link-new" data-id="${c.id}">Neuen Link erzeugen</button>
+            <button type="button" class="btn-ghost btn-md" data-action="status-link-off" data-id="${c.id}">Link abschalten</button></div>
+          <p class="form-hint mt-3">Ein neuer Link macht den alten sofort ungültig.</p>`
+        : `<div class="form-actions"><button type="button" class="btn-gold btn-md" data-action="status-link-new" data-id="${c.id}">${icon('link', 'ico-sm')}<span>Link erstellen</span></button>
+            <button type="button" class="btn-ghost btn-md" data-action="close-modal">Abbrechen</button></div>`}`;
+}
+Object.assign(actions, {
+  'status-link': (el) => {
+    const c = st.caseInfo && st.caseInfo.id === Number(el.dataset.id) ? st.caseInfo : null;
+    if (!c) return;
+    el.closest('details')?.removeAttribute('open');
+    st.returnCase = c.id;
+    openModal(statusLinkModal(c));
+  },
+  'status-link-new': async (el) => {
+    const id = Number(el.dataset.id);
+    const r = await api.post(`/api/cases/${id}/status-link`, {});
+    if (st.caseInfo && st.caseInfo.id === id) st.caseInfo.statusToken = r.token;
+    replaceModal(statusLinkModal(st.caseInfo, r.url));
+    const ok = await copy(r.url);
+    toast(ok ? 'Statuslink erstellt und kopiert.' : 'Statuslink erstellt.');
+  },
+  'status-link-copy': async (el) => toast((await copy(el.dataset.url)) ? 'Statuslink kopiert.' : 'Bitte den Link markieren und kopieren.'),
+  'status-link-off': async (el) => {
+    const id = Number(el.dataset.id);
+    await api.del(`/api/cases/${id}/status-link`);
+    if (st.caseInfo && st.caseInfo.id === id) st.caseInfo.statusToken = null;
+    toast('Statuslink abgeschaltet.');
+    await returnOrClose();
+  },
+});
+
 /* ---------------------------------------------------------------- Kalender */
 function monthStart(d) {
   return new Date(d.getFullYear(), d.getMonth(), 1);
@@ -1787,6 +1834,57 @@ function inviteBox(v, isNew) {
       <div class="invite-chips">${chips}</div></fieldset>`;
 }
 
+/*
+ * Fristen-Automatik: ein Ereignis in der Akte (Urteil, Anklage zugestellt, Festnahme …) ergibt die passende Frist.
+ * [Schlüssel, Ereignis, Frist-Titel, Tage danach, Uhrzeit, Hinweis]
+ */
+const FRIST_RULES = [
+  ['urteil', 'Urteil verkündet / zugestellt', 'Rechtsmittelfrist (Berufung/Revision)', 7, '18:00', 'Rechtsmittel prüfen und fristgerecht einlegen.'],
+  ['anklage', 'Anklageschrift zugestellt', 'Stellungnahme zur Anklage', 5, '18:00', 'Einlassung mit dem Mandanten abstimmen, Beweisanträge prüfen.'],
+  ['festnahme', 'Festnahme / Haft', 'Haftprüfung beantragen', 1, '12:00', 'Haftbeschwerde bzw. Haftprüfung (Vorlage „Haftbeschwerde“).'],
+  ['bescheid', 'Bußgeld- oder Strafbescheid zugestellt', 'Einspruchsfrist', 14, '18:00', 'Einspruch einlegen, Akteneinsicht beantragen.'],
+  ['schreiben', 'Schreiben der Gegenseite eingegangen', 'Antwort an die Gegenseite', 7, '18:00', 'Antwort entwerfen und mit dem Mandanten abstimmen.'],
+  ['vergleich', 'Vergleichsangebot verschickt', 'Annahmefrist Vergleich', 7, '18:00', 'Rückmeldung der Gegenseite prüfen; ohne Annahme weiteres Vorgehen festlegen.'],
+  ['ladung', 'Ladung zur Verhandlung erhalten', 'Vorbereitung Verhandlung abschließen', -1, '18:00', 'Einen Tag vor dem Termin: Akte, Zeugen und Beweise vollständig.'],
+];
+function fristRuleBox() {
+  const today = new Date().toISOString().slice(0, 10);
+  return `<details class="span-2 frist-auto" open><summary>${icon('clock', 'ico-sm')}<span>Frist aus Ereignis berechnen</span></summary>
+      <div class="form-grid cols-2 mt-3">
+        <div><label class="label" for="frRule">Ereignis</label><select id="frRule" class="field" data-frist-rule><option value="">Bitte wählen …</option>${FRIST_RULES.map((r) => opt(r[0], r[1])).join('')}</select></div>
+        <div><label class="label" for="frDay">Datum des Ereignisses</label><input id="frDay" type="date" class="field" value="${today}" data-frist-day></div>
+        <p class="span-2 form-hint" data-frist-out>Die Frist wird unten eingetragen – Titel, Fälligkeit und Hinweis lassen sich danach ändern.</p>
+      </div></details>`;
+}
+function fristRuleApply(form) {
+  const r = FRIST_RULES.find((x) => x[0] === form.querySelector('[data-frist-rule]').value);
+  const day = form.querySelector('[data-frist-day]').value;
+  const out = form.querySelector('[data-frist-out]');
+  if (!r || !day) return;
+  const d = new Date(`${day}T${r[4]}`);
+  d.setDate(d.getDate() + r[3]);
+  const pad = (n) => String(n).padStart(2, '0');
+  const local = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${r[4]}`;
+  const typ = form.querySelector('input[name="type"][value="frist"]');
+  if (typ && !typ.checked) {
+    typ.checked = true;
+    typ.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  form.elements.title.value = r[2];
+  form.elements.startsAt.value = local;
+  if (form.elements.location) form.elements.location.value = '';
+  form.elements.note.value = `${r[5]}\nAutomatisch berechnet: ${r[1]} am ${new Date(`${day}T12:00`).toLocaleDateString('de-DE')} ${r[3] < 0 ? `– ${-r[3]} Tag vorher` : `+ ${r[3]} ${r[3] === 1 ? 'Tag' : 'Tage'}`}.`;
+  if (form.elements.clientVisible) form.elements.clientVisible.checked = false;
+  out.innerHTML = `<strong>Fällig:</strong> ${esc(d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }))}, ${esc(r[4])} Uhr`;
+  form.elements.startsAt.dispatchEvent(new Event('input', { bubbles: true }));
+}
+document.addEventListener('change', (e) => {
+  const t = e.target;
+  if (!t.matches || !t.matches('[data-frist-rule], [data-frist-day]')) return;
+  const form = t.closest('form[data-form="event"]');
+  if (form) fristRuleApply(form);
+});
+
 function eventForm(e, preset = {}) {
   const isNew = !e;
   const v = e || {};
@@ -1819,6 +1917,7 @@ function eventForm(e, preset = {}) {
         <div class="span-2"><span class="label">Art</span><div class="seg">${Object.entries(EVENT_TYPES)
         .map(([k, l]) => `<label class="seg-opt"><input type="radio" name="type" value="${k}" ${type === k ? 'checked' : ''}><span><i class="cal-dot" style="background:${EVENT_COLORS[k]}"></i>${esc(l)}</span></label>`)
         .join('')}</div></div>
+        ${isNew && preset.deadline ? fristRuleBox() : ''}
         ${eventKindBox(v, isNew)}
         <div class="span-2"><label class="label" for="evTitle">Titel</label><input id="evTitle" name="title" class="field" required minlength="2" maxlength="120" value="${esc(v.title || preset.title || '')}" placeholder="z. B. Hauptverhandlung Strafsache Doe" autofocus></div>
         <div><label class="label" for="evStart">Beginn / Fälligkeit</label><input id="evStart" name="startsAt" type="datetime-local" class="field" required value="${start}"></div>
@@ -2082,7 +2181,7 @@ Object.assign(actions, {
     await load.cases();
     if (isStaff()) {
       await load.lawyers();
-      openModal(eventForm(null, { caseId, day: el.dataset.day || null }));
+      openModal(eventForm(null, { caseId, day: el.dataset.day || null, deadline: !!el.dataset.deadline, type: el.dataset.deadline ? 'frist' : undefined }));
     } else {
       openModal(eventRequestForm(caseId));
     }
