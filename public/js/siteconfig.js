@@ -283,7 +283,7 @@
   /* ---------------------------------------------------------------- Stil: Akzentfarbe, Glas, Rundung, Schrift */
   // Gleiche Rechnung wie theme.js auf dem Server – für die Vorschau beim Schieben der Regler und für Seiten aus dem
   // Zwischenspeicher. Setzt die Variablen als Inline-Stil auf <html>.
-  const THEME_DEFAULTS = { design: 'ruhig', accent: '#d4af37', glass: 50, radius: 50, font: 'klassisch', motion: 'normal' };
+  const THEME_DEFAULTS = { design: 'ruhig', accent: '#c9a45c', glass: 50, radius: 50, font: 'klassisch', motion: 'normal' };
   // Im Design „Ruhig“ legt ruhig.css Glas, Flächen und Rundung fest – Glas- und Rundungsregler gelten nur für „Klassisch“
   const RUHIG_FIXED = new Set(['--glass-blur', '--glass-fill', '--glass-fill-strong', '--panel-alpha', '--radius', '--lit-gold', '--gold-glow']);
   function themeVars(style) {

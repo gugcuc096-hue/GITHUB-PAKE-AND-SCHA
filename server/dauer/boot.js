@@ -41,7 +41,7 @@ const WAIT_HTML = (text) => `<!doctype html><html lang="de"><head><meta charset=
 <style>html,body{margin:0;height:100%;background:#050a18;color:#e5e7eb;font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
 main{min-height:100%;display:grid;place-items:center;text-align:center;padding:24px;box-sizing:border-box}
 h1{font:600 1.6rem Georgia,serif;color:#f3e5ab;margin:18px 0 6px}p{color:#94a3b8;margin:0;max-width:30rem}
-.ring{width:46px;height:46px;margin:auto;border-radius:50%;border:3px solid rgba(212,175,55,.2);border-top-color:#d4af37;animation:s 1s linear infinite}
+.ring{width:46px;height:46px;margin:auto;border-radius:50%;border:3px solid rgba(201,164,92,.2);border-top-color:#c9a45c;animation:s 1s linear infinite}
 @keyframes s{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.ring{animation:none}}</style></head>
 <body><main><div><div class="ring" aria-hidden="true"></div><h1>Die Kanzlei startet gerade</h1><p>${text}</p><p style="margin-top:10px;font-size:.85rem">Die Seite lädt von selbst neu – Ihre Daten sind sicher.</p></div></main></body></html>`;
 

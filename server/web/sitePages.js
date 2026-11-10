@@ -166,7 +166,26 @@ function applyStart(html, cfg, edit = false) {
     else if (edit) html = html.replace('data-hero-second="notdienst"', 'data-hero-second="notdienst" hidden');
     else html = html.replace(/<!--hero:second-->[\s\S]*?<!--\/hero:second-->/, '');
   }
+  html = applySeat(html, cfg.seat || {}, edit);
   if (!cfg.heroNote) html = edit ? html.replace('<!--hero:note--><p class="kz-hero-note"', '<!--hero:note--><p class="kz-hero-note" hidden') : html.replace(/<!--hero:note-->[\s\S]*?<!--\/hero:note-->/, '');
+  return html;
+}
+
+/*
+ * Kanzleisitz: Pin auf der Karte (Prozent der Kartenbreite/-höhe), Anschrift (leer = Kanzleisitz aus den Einstellungen),
+ * Telefon, Sprechzeiten, Hinweis. Ohne gesetzten Pin erscheint der Abschnitt nicht (im Bearbeitungsmodus schon).
+ */
+function applySeat(html, seat, edit) {
+  const placed = Number.isFinite(seat.x) && Number.isFinite(seat.y);
+  if (!placed && !edit) return html.replace(/<section id="sitz"[\s\S]*?<\/section>\s*/, '');
+  html = html.replace('data-seat-map style="--x:50;--y:50"', `data-seat-map style="--x:${placed ? seat.x : 50};--y:${placed ? seat.y : 50}"${placed ? '' : ' data-seat-empty'}`);
+  for (const k of ['address', 'phone', 'hours', 'note']) {
+    const v = String(seat[k] || '').trim();
+    if (k === 'address' && !v) continue; // Kanzleisitz aus den Einstellungen (data-firm-seat)
+    // eigener Text statt Kanzleisitz aus den Einstellungen: ohne data-firm-seat/data-t (sonst überschreibt die Seite ihn)
+    html = html.replace(new RegExp(`<dd data-seat="${k}"[^>]*>[^<]*</dd>`), `<dd data-seat="${k}">${esc(v).replace(/\n/g, '<br>')}</dd>`);
+    if (!v && !edit) html = html.replace(new RegExp(`<div data-seat-row="${k}">[\\s\\S]*?</div>`), '');
+  }
   return html;
 }
 

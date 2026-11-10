@@ -11,8 +11,8 @@ const path = require('path');
 const zlib = require('zlib');
 const siteConfig = require('./siteConfig');
 
-const DEFAULT = siteConfig.SPECS.style.defaults.accent; // #d4af37
-const LOGO_GOLD = '#caa32f'; // Strichfarbe der Logo-Datei
+const DEFAULT = siteConfig.SPECS.style.defaults.accent; // #c9a45c (Messing)
+const LOGO_GOLD = '#bf9c57'; // Strichfarbe der Logo-Datei
 const IMG = path.join(__dirname, '..', '..', 'public', 'img');
 
 const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
@@ -37,8 +37,8 @@ function accent(override) {
     rgb,
     isDefault,
     int: parseInt(hex.slice(1), 16),
-    dark: isDefault ? '#b8962e' : toHex(mix(rgb, [0, 0, 0], 0.14)),
-    light: isDefault ? '#f3e5ab' : toHex(mix(rgb, [255, 255, 255], 0.6)),
+    dark: isDefault ? '#ad8d4f' : toHex(mix(rgb, [0, 0, 0], 0.14)),
+    light: isDefault ? '#e9dbbe' : toHex(mix(rgb, [255, 255, 255], 0.6)),
     logo: isDefault ? LOGO_GOLD : toHex(mix(rgb, [0, 0, 0], 0.05)),
   };
 }

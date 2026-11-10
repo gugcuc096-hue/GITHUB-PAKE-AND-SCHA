@@ -110,7 +110,7 @@ describe('Website & Ränge selbst pflegen', () => {
       assert.equal(meta(html, 'og:image'), `${server.base}/img/og-image.png`, p);
     }
     assert.equal(titles.size, Object.keys(pages).length, 'jede Seite hat ihren eigenen Titel');
-    for (const p of ['/', '/karriere', '/bewerbung']) assert.equal(meta((await client(server.base).get(p)).text, 'theme-color'), '#b8962e', `${p}: Goldstreifen`);
+    for (const p of ['/', '/karriere', '/bewerbung']) assert.equal(meta((await client(server.base).get(p)).text, 'theme-color'), '#ad8d4f', `${p}: Goldstreifen`);
   });
 
   it('Schneller laden: Versionsnummern, Dashboard in zwei Bündeln (Verwaltung nur für die Kanzlei), verkleinert und mit Brotli, ein Jahr im Browser – die Seiten selbst immer frisch', async () => {
@@ -187,7 +187,7 @@ describe('Website & Ränge selbst pflegen', () => {
     assert.equal(meta(r.text, 'og:title'), `${m.name} – ${m.roleTitle}`);
     assert.equal(meta(r.text, 'og:url'), `${server.base}/team/${m.slug}`);
     assert.match(meta(r.text, 'og:image'), new RegExp(`^${server.base.replace(/[.]/g, '\\.')}/`), 'absolutes Bild für Discord');
-    assert.equal(meta(r.text, 'theme-color'), '#d4af37');
+    assert.equal(meta(r.text, 'theme-color'), '#c9a45c');
     assert.match(r.text, new RegExp(`href="/\\?anwalt=${m.id}"[^>]*>Mandat anfragen</a>`));
     assert.doesNotMatch(r.text, /\{\{\w+\}\}/, 'alle Platzhalter ersetzt');
     assert.doesNotMatch(r.text, /Abgeschlossene Mandate|Erfolgsquote/, 'ohne genug Akten keine Zahlen');

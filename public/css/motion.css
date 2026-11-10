@@ -28,14 +28,14 @@
 @keyframes ps-check { from { transform: scale(0.3); opacity: 0; } to { transform: none; opacity: 1; } }
 
 /* ---------------------------------------------------------------- 3. Felder: Goldlinie wächst, Label folgt, Fehler wackelt */
-.field { transition: border-color var(--m-micro) ease, box-shadow var(--m-panel) var(--m-ease), background-color var(--m-micro) ease, height var(--m-panel) var(--m-ease); background-repeat: no-repeat; background-position: center bottom; background-size: 0% 2px; background-image: linear-gradient(90deg, transparent, var(--gold-500, #d4af37), transparent); }
+.field { transition: border-color var(--m-micro) ease, box-shadow var(--m-panel) var(--m-ease), background-color var(--m-micro) ease, height var(--m-panel) var(--m-ease); background-repeat: no-repeat; background-position: center bottom; background-size: 0% 2px; background-image: linear-gradient(90deg, transparent, var(--gold-500, #c9a45c), transparent); }
 .field:focus, .field:focus-visible { background-size: 100% 2px; }
 /* Auswahllisten: keine Goldlinie, aber ihr Pfeil (vorher fiel er hier mit weg – Listen sahen aus wie Textfelder) */
 select.field, select.field:focus { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d4af37' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-size: 16px; background-position: right 0.75rem center; }
 /* moderne Browser (appearance: base-select, select.css): eingebauter Pfeil in der Kanzleifarbe statt des Bildes */
 @supports (appearance: base-select) { select.field, select.field:focus { background-image: none; } }
 .label { transition: color var(--m-micro) ease, transform var(--m-panel) var(--m-ease), letter-spacing var(--m-panel) var(--m-ease); transform-origin: left center; }
-:is(div, label, p):has(> .field:focus) > .label, :is(div, label, p):has(> .field:focus) > .label-row .label { color: var(--gold-light, #f3e5ab); transform: translateY(-1px) scale(1.02); }
+:is(div, label, p):has(> .field:focus) > .label, :is(div, label, p):has(> .field:focus) > .label-row .label { color: var(--gold-light, #e9dbbe); transform: translateY(-1px) scale(1.02); }
 .chat-input { transition: height var(--m-panel) var(--m-ease), border-color var(--m-micro) ease, box-shadow var(--m-panel) var(--m-ease); }
 /* Fehler: das Feld wackelt kurz (js: .ps-shake) */
 .ps-shake { animation: ps-shake 360ms var(--m-ease-in-out); border-color: rgba(248, 113, 113, 0.75) !important; }
@@ -84,7 +84,7 @@ select.field, select.field:focus { background-image: url("data:image/svg+xml,%3C
 @keyframes ps-page-fwd { from { opacity: 0; } to { opacity: 1; } }
 @keyframes ps-page-back { from { opacity: 0; } to { opacity: 1; } }
 .nav { position: relative; }
-.nav-ind { position: absolute; z-index: 0; left: 0; top: 0; width: 3px; height: 24px; border-radius: 3px; background: linear-gradient(180deg, var(--gold-light, #f3e5ab), var(--gold-500, #d4af37)); box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.55); pointer-events: none; transition: none; }
+.nav-ind { position: absolute; z-index: 0; left: 0; top: 0; width: 3px; height: 24px; border-radius: 3px; background: linear-gradient(180deg, var(--gold-light, #e9dbbe), var(--gold-500, #c9a45c)); box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.55); pointer-events: none; transition: none; }
 .nav-ind.is-hidden { opacity: 0; }
 .nav .nav-item { position: relative; z-index: 1; }
 .nav-count.ps-bump { animation: ps-bump var(--m-panel) var(--m-spring); }
@@ -153,7 +153,7 @@ html.ps-leaving body { opacity: 0; transform: scale(0.993); transition: opacity 
 /* Anmelde-Dialog auf der Startseite */
 #loginDialog .login-note { min-height: 1.2rem; font-size: 0.8rem; color: #fca5a5; }
 #loginDialog .login-alt { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; margin-top: 1rem; font-size: 0.8rem; color: var(--text-dim, #8a96b3); }
-#loginDialog .login-alt a, #loginDialog .login-alt button { color: var(--gold-500, #d4af37); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; font: inherit; }
+#loginDialog .login-alt a, #loginDialog .login-alt button { color: var(--gold-500, #c9a45c); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; font: inherit; }
 
 
 /* Banner (Website und Dashboard), Links im Kontaktbereich, Vorschau-Band */
@@ -309,7 +309,7 @@ body:has(#sidebar) .promo-dock.is-on { translate: 0 0; }
   border-bottom: 0; box-shadow: 0 14px 32px -24px rgba(var(--sb), 0.95);
 }
 .site-banner:not(.is-promo)::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(var(--sb), 0.55), transparent); z-index: -1; }
-.site-banner.tone-gold { --sb-ink: var(--gold-light, #f3e5ab); }
+.site-banner.tone-gold { --sb-ink: var(--gold-light, #e9dbbe); }
 .sb-inner { position: relative; display: flex; align-items: center; gap: 0.75rem 1.25rem; width: 100%; max-width: 1180px; min-height: 3.4rem; margin: 0 auto; padding: 0.6rem 3.4rem 0.6rem 1.25rem; }
 .sb-stage { position: relative; display: grid; flex: 1 1 auto; min-width: 0; }
 .sb-slide { grid-area: 1 / 1; display: flex; align-items: center; gap: 0.85rem; min-width: 0; transition: opacity 0.55s var(--m-ease, ease), transform 0.55s var(--m-ease, ease), filter 0.55s ease, visibility 0s; }
@@ -348,7 +348,7 @@ body:has(#sidebar) .promo-dock.is-on { translate: 0 0; }
 .sb-dringend .sb-seal::after { inset: -2px; border: 2px solid rgba(var(--sb), 0.7); animation: sb-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite; }
 @keyframes sb-ping { from { transform: scale(0.95); opacity: 0.9; } to { transform: scale(1.65); opacity: 0; } }
 /* feierlich: Polarlicht in der Tonfarbe und ein paar aufsteigende Funken */
-.sb-feierlich { --o1: var(--sb); --o2: var(--accent-light-rgb, 243, 229, 171); }
+.sb-feierlich { --o1: var(--sb); --o2: var(--accent-light-rgb, 233, 219, 190); }
 .sb-sparks { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
 .sb-sparks i { position: absolute; bottom: -4px; width: 3px; height: 3px; border-radius: 50%; background: #fff; box-shadow: 0 0 6px 1px rgba(var(--sb), 1); opacity: 0; animation: sb-spark 5s ease-in infinite; }
 .sb-sparks i:nth-child(1) { left: 8%; animation-delay: 0s; }
@@ -372,7 +372,7 @@ body:has(#sidebar) .promo-dock.is-on { translate: 0 0; }
 @media (min-width: 1024px) { .dash-banner { margin: 1rem 2rem 0; } }
 @media (min-width: 1824px) { .dash-banner { margin-left: auto; margin-right: auto; max-width: 1696px; } }
 .site-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin-top: 1.25rem; }
-.site-links a { padding: 0.4rem 0.95rem; border-radius: 999px; font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold-light, #f3e5ab); border: 1px solid var(--gold-hairline, rgba(var(--accent-rgb), 0.35)); text-decoration: none; transition: background-color 0.18s ease, transform 0.18s ease; }
+.site-links a { padding: 0.4rem 0.95rem; border-radius: 999px; font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold-light, #e9dbbe); border: 1px solid var(--gold-hairline, rgba(var(--accent-rgb), 0.35)); text-decoration: none; transition: background-color 0.18s ease, transform 0.18s ease; }
 .site-links a:hover { background: rgba(var(--accent-rgb), 0.14); transform: translateY(-1px); }
 .site-preview { position: sticky; top: 0; z-index: 90; padding: 0.5rem 1rem; text-align: center; font-size: 0.8rem; color: #02050e; background: #fbbf24; }
 .site-preview a { color: inherit; font-weight: 700; text-decoration: underline; margin-left: 0.5rem; }
@@ -403,7 +403,7 @@ body:has(#sidebar) .promo-dock.is-on { translate: 0 0; }
 #content { position: relative; }
 .ink-host { position: relative; }
 .tab-ink { position: absolute; z-index: 0; pointer-events: none; box-sizing: border-box; }
-.tab-ink.is-line { border-radius: 2px; background: linear-gradient(90deg, var(--gold-500, #d4af37), var(--gold-light, #f3e5ab), var(--gold-500, #d4af37)); box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.45); }
+.tab-ink.is-line { border-radius: 2px; background: linear-gradient(90deg, var(--gold-500, #c9a45c), var(--gold-light, #e9dbbe), var(--gold-500, #c9a45c)); box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.45); }
 .tab-ink.is-pill { border: 1px solid transparent; }
 .ink-gliding > :is(button, a) { position: relative; z-index: 1; }
 .ink-gliding:is(.hub-tabs, .case-jump-list) > .active { border-bottom-color: transparent !important; }
@@ -414,7 +414,7 @@ body:has(#sidebar) .promo-dock.is-on { translate: 0 0; }
 .tab-label[data-label]::after { content: attr(data-label); font-weight: 620; height: 0; overflow: hidden; visibility: hidden; pointer-events: none; user-select: none; }
 :is(.hub-tabs .chip, .case-jump .jump).active .tab-label { font-weight: 620; }
 .chip-row.hub-tabs .chip .ico { transition: color var(--m-panel) var(--m-ease), transform var(--m-panel) var(--m-ease); }
-.chip-row.hub-tabs .chip.active .ico { color: var(--gold-500, #d4af37); }
+.chip-row.hub-tabs .chip.active .ico { color: var(--gold-500, #c9a45c); }
 .ink-arrive .ico { animation: ink-ico var(--m-page) var(--m-spring); }
 .ink-arrive .tab-label { animation: ink-label var(--m-page) var(--m-ease); }
 @keyframes ink-ico { 40% { transform: translateY(-3px) scale(1.12); } }
@@ -503,10 +503,10 @@ html[data-wch-dir="back"]::view-transition-new(wch-case) { animation: wch-in-bac
 nav[data-ink] { position: relative; }
 nav[data-ink] .nav-link::after { display: none; }
 nav[data-ink] .nav-link { position: relative; transition: color 0.25s ease; }
-nav[data-ink] .nav-link.nav-active { color: var(--gold-light, #f3e5ab) !important; }
+nav[data-ink] .nav-link.nav-active { color: var(--gold-light, #e9dbbe) !important; }
 .nav-ink { position: absolute; left: 0; bottom: -9px; width: 0; height: 2px; border-radius: 2px; pointer-events: none; opacity: 0;
-  background: linear-gradient(90deg, var(--gold-600, #b8962e), var(--gold-light, #f3e5ab) 50%, var(--gold-600, #b8962e));
-  box-shadow: 0 0 10px rgba(var(--accent-rgb, 212, 175, 55), 0.75), 0 0 2px rgba(var(--accent-rgb, 212, 175, 55), 1); }
+  background: linear-gradient(90deg, var(--gold-600, #ad8d4f), var(--gold-light, #e9dbbe) 50%, var(--gold-600, #ad8d4f));
+  box-shadow: 0 0 10px rgba(var(--accent-rgb, 201, 164, 92), 0.75), 0 0 2px rgba(var(--accent-rgb, 201, 164, 92), 1); }
 .nav-ink.is-ready { transition: transform 0.5s cubic-bezier(0.2, 0.9, 0.25, 1.08), width 0.5s cubic-bezier(0.2, 0.9, 0.25, 1.08), opacity 0.3s ease; }
 
 /* Beträge: Inter mit gleich breiten Ziffern (Spalten bleiben bündig) statt Programmierschrift */
@@ -523,7 +523,7 @@ nav[data-ink] .nav-link.nav-active { color: var(--gold-light, #f3e5ab) !importan
  */
 :where(a, button, summary, [role="button"], [role="tab"], [tabindex]):focus-visible {
   outline: none !important;
-  box-shadow: 0 0 0 2px rgba(5, 9, 20, 0.95), 0 0 0 4px rgba(var(--accent-rgb, 212, 175, 55), 0.9), 0 0 18px 2px rgba(var(--accent-rgb, 212, 175, 55), 0.35) !important;
+  box-shadow: 0 0 0 2px rgba(5, 9, 20, 0.95), 0 0 0 4px rgba(var(--accent-rgb, 201, 164, 92), 0.9), 0 0 18px 2px rgba(var(--accent-rgb, 201, 164, 92), 0.35) !important;
   transition: box-shadow 0.18s ease;
 }
 /* Reiterleisten (Akte, Bereiche): kein Kasten um den Reiter – der Fokus zeigt sich als hellere Schrift und zarter Strich, damit nichts am alten Reiter „hängen“ bleibt */
@@ -532,10 +532,10 @@ nav[data-ink] .nav-link.nav-active { color: var(--gold-light, #f3e5ab) !importan
 .case-jump .jump.active:focus-visible, .chip-row.hub-tabs .chip.active:focus-visible { color: var(--gold-light); }
 :where(input, select, textarea):focus-visible {
   outline: none !important;
-  border-color: rgba(var(--accent-rgb, 212, 175, 55), 0.85) !important;
-  box-shadow: 0 0 0 3px rgba(var(--accent-rgb, 212, 175, 55), 0.22), 0 0 16px -2px rgba(var(--accent-rgb, 212, 175, 55), 0.35) !important;
+  border-color: rgba(var(--accent-rgb, 201, 164, 92), 0.85) !important;
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb, 201, 164, 92), 0.22), 0 0 16px -2px rgba(var(--accent-rgb, 201, 164, 92), 0.35) !important;
 }
-:where(input[type="checkbox"], input[type="radio"]):focus-visible { box-shadow: 0 0 0 2px rgba(5, 9, 20, 0.95), 0 0 0 4px rgba(var(--accent-rgb, 212, 175, 55), 0.9) !important; }
+:where(input[type="checkbox"], input[type="radio"]):focus-visible { box-shadow: 0 0 0 2px rgba(5, 9, 20, 0.95), 0 0 0 4px rgba(var(--accent-rgb, 201, 164, 92), 0.9) !important; }
 
 /*
  * Status-Plaketten: feste Bedeutung der Farben, immer mit Symbol – grün = erledigt, bernstein = wartet,
@@ -564,7 +564,7 @@ nav[data-ink] .nav-link.nav-active { color: var(--gold-light, #f3e5ab) !importan
 .fl > .field { padding-top: 1.2rem; padding-bottom: 0.32rem; min-height: 48px; }
 .fl.fl-area > .field { padding-top: 1.45rem; }
 .fl.is-up > .label[data-fl="1"], .fl:focus-within > .label[data-fl="1"] { transform: translateY(-0.5rem) scale(0.76); font-weight: 600; letter-spacing: 0.02em; }
-.fl:focus-within > .label[data-fl="1"] { color: var(--gold-light, #f3e5ab); }
+.fl:focus-within > .label[data-fl="1"] { color: var(--gold-light, #e9dbbe); }
 .fl:not(.is-up):not(:focus-within) > .field::placeholder { color: transparent; }
 .fl > .field:disabled + .label, .fl:has(> .field:disabled) > .label { opacity: 0.6; }
 /* Geldfelder: Ziffern bündig */
@@ -607,7 +607,7 @@ nav[data-ink] .nav-link.nav-active { color: var(--gold-light, #f3e5ab) !importan
 .reveal.in-view .grid > :nth-child(n + 7) { transition-delay: 0.34s; }
 /* Website-Kopf: sobald man scrollt, wird die Leiste etwas dichter und bekommt eine goldene Haarlinie */
 .glass-nav { transition: background-color 0.35s ease, box-shadow 0.35s ease; }
-.is-scrolled .glass-nav { box-shadow: 0 1px 0 rgba(var(--accent-rgb, 212, 175, 55), 0.18), 0 14px 34px -18px rgba(0, 0, 0, 0.9); }
+.is-scrolled .glass-nav { box-shadow: 0 1px 0 rgba(var(--accent-rgb, 201, 164, 92), 0.18), 0 14px 34px -18px rgba(0, 0, 0, 0.9); }
 .fl.fl-select > .field { padding-top: 1.2rem; }
 .fl > .fl-extra { position: absolute; z-index: 2; top: 0.3rem; right: 2.5rem; font-size: 0.72rem; line-height: 1.2; }
 .fl:not(.fl-select) > .fl-extra { right: 0.8rem; }

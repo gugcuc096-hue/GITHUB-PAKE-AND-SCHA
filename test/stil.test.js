@@ -187,7 +187,7 @@ describe('Rabattaktionen, Aktenzeichen und Stil (API)', () => {
     assert.equal(s.season, 'weihnachten');
     // ungültige Farbe abgelehnt, Zurücksetzen auf Standard
     assert.equal((await owner.put('/api/config/style/draft', { ...style, accent: 'gold' })).status, 400);
-    await owner.put('/api/config/style/draft', { preset: 'gold', accent: '#d4af37', glass: 50, radius: 50, font: 'klassisch', motion: 'normal', season: 'aus', seasonDash: true });
+    await owner.put('/api/config/style/draft', { preset: 'gold', accent: '#c9a45c', glass: 50, radius: 50, font: 'klassisch', motion: 'normal', season: 'aus', seasonDash: true });
     await owner.post('/api/config/style/publish', {});
     html = await page('/');
     assert.ok(!html.includes('id="psTheme"'));
@@ -197,12 +197,12 @@ describe('Rabattaktionen, Aktenzeichen und Stil (API)', () => {
   it('Kanzleifarbe überall: Logo (SVG und PNG), Browserleiste, Discord-Farbe, Word-Farbe', async () => {
     const brand = require('../server/web/brand');
     const svg0 = await (await fetch(`${srv.base}/img/logo.svg`)).text();
-    assert.match(svg0, /stroke="#caa32f"/, 'Standard: Originalfarbe');
+    assert.match(svg0, /stroke="#bf9c57"/, 'Standard: Originalfarbe');
     const png0 = Buffer.from(await (await fetch(`${srv.base}/img/logo.png`)).arrayBuffer());
     await owner.put('/api/config/style/draft', { preset: 'eigen', accent: '#34d399', glass: 50, radius: 50, font: 'klassisch', motion: 'normal', season: 'aus', seasonDash: true });
     await owner.post('/api/config/style/publish', {});
     const svg = await (await fetch(`${srv.base}/img/logo.svg`)).text();
-    assert.doesNotMatch(svg, /#caa32f/);
+    assert.doesNotMatch(svg, /#bf9c57/);
     assert.match(svg, /stroke="#31c891"/, 'Logo in der Akzentfarbe');
     const res = await fetch(`${srv.base}/img/logo.png`);
     assert.equal(res.headers.get('content-type'), 'image/png');
@@ -225,10 +225,10 @@ describe('Rabattaktionen, Aktenzeichen und Stil (API)', () => {
     const out = require('../server/integrations/discord').brandColors({ embeds: [{ color: 0xd4af37 }, { color: 0xef4444 }] }, { isDefault: false, int: 0x34d399 });
     assert.deepEqual(out.embeds.map((e) => e.color), [0x34d399, 0xef4444]);
     assert.equal(brand.docx('#2db584'), '2DB584');
-    await owner.put('/api/config/style/draft', { preset: 'gold', accent: '#d4af37', glass: 50, radius: 50, font: 'klassisch', motion: 'normal', season: 'aus', seasonDash: true });
+    await owner.put('/api/config/style/draft', { preset: 'gold', accent: '#c9a45c', glass: 50, radius: 50, font: 'klassisch', motion: 'normal', season: 'aus', seasonDash: true });
     await owner.post('/api/config/style/publish', {});
-    assert.match(await (await fetch(`${srv.base}/img/logo.svg`)).text(), /#caa32f/);
-    assert.match(await (await fetch(`${srv.base}/`)).text(), /src="\/img\/logo\.svg\?c=d4af37"/, 'zurück auf Gold: neue Adresse');
+    assert.match(await (await fetch(`${srv.base}/img/logo.svg`)).text(), /#bf9c57/);
+    assert.match(await (await fetch(`${srv.base}/`)).text(), /src="\/img\/logo\.svg\?c=c9a45c"/, 'zurück auf Gold: neue Adresse');
     assert.deepEqual(require('../server/integrations/discord').brandColors({ embeds: [{ color: 0xd4af37 }] }, { isDefault: true }).embeds[0].color, 0xd4af37);
   });
 
@@ -252,7 +252,7 @@ describe('Akzentfarbe als Variablen (statisch)', () => {
       const hard = (s.match(/(?<![\\\w-]|--gold-500:\s*|--gold-500,\s*)#d4af37\b/gi) || []).length;
       assert.equal(hard, 0, `${f}: #d4af37 fest eingetragen`);
     }
-    assert.match(css('fonts.css'), /--accent-rgb: 212, 175, 55;/, 'Standardwerte für alle Seiten');
+    assert.match(css('fonts.css'), /--accent-rgb: 201, 164, 92;/, 'Standardwerte für alle Seiten');
     const { accentize } = require('../scripts/accent');
     const once = accentize(css('app.css'));
     assert.equal(accentize(once), once, 'mehrfach anwendbar ohne Änderung');
@@ -390,7 +390,7 @@ describe('Stil, Saison und Aktionen im Browser', { skip: chromium ? false : 'Pla
       assert.equal(await site.evaluate(() => { const s = getComputedStyle(document.querySelector('.btn-gold')); return [s.backgroundImage, s.backgroundColor].some((v) => v.includes('52, 211, 153') || v.includes('oklab')); }), true, 'Knöpfe in der neuen Farbe');
       assert.deepEqual(problems, []);
     } finally {
-      await owner.put('/api/config/style/draft', { preset: 'gold', accent: '#d4af37', glass: 50, radius: 50, font: 'klassisch', motion: 'normal', season: 'auto', seasonDash: true });
+      await owner.put('/api/config/style/draft', { preset: 'gold', accent: '#c9a45c', glass: 50, radius: 50, font: 'klassisch', motion: 'normal', season: 'auto', seasonDash: true });
       await owner.post('/api/config/style/publish', {});
       await ctx.close();
     }

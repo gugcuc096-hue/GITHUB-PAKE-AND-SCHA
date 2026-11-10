@@ -1,16 +1,16 @@
 /*
  * ERZEUGT von scripts/build-hell.js (npm run build:hell) – nicht von Hand ändern.
- * Helle Ansicht („Weiß“): 849 Farbangaben aus den Stylesheets umgerechnet, danach der Feinschliff aus scripts/hell-fein.css.
+ * Helle Ansicht („Weiß“): 854 Farbangaben aus den Stylesheets umgerechnet, danach der Feinschliff aus scripts/hell-fein.css.
  */
 /* ---- tokens.css ---- */
 :root:root[data-design="ruhig"][data-mode="hell"] { --navy-950: #f6f4ee; --navy-900: #ffffff; --navy-850: #ffffff; --navy-800: rgba(255, 255, 255, 0.85); --text-main: #141e3a; --text-muted: #353e5a; --text-dim: #5a637d; --glass-border: rgba(16, 26, 54, 0.15); --line: rgba(16, 26, 54, 0.088); --sh-1: 0 1px 2px rgba(16, 26, 54, 0.08), 0 6px 14px -8px rgba(16, 26, 54, 0.1); --sh-2: 0 1px 2px rgba(16, 26, 54, 0.07), 0 10px 24px -10px rgba(16, 26, 54, 0.11), 0 24px 48px -28px rgba(16, 26, 54, 0.1); --sh-3: 0 2px 4px rgba(16, 26, 54, 0.07), 0 16px 32px -12px rgba(16, 26, 54, 0.12), 0 32px 64px -32px rgba(16, 26, 54, 0.11); --sh-4: 0 4px 8px rgba(16, 26, 54, 0.08), 0 28px 56px -16px rgba(16, 26, 54, 0.14), 0 56px 96px -40px rgba(16, 26, 54, 0.12); }
 /* ---- scrollbar.css ---- */
 html[data-design="ruhig"][data-mode="hell"] ::-webkit-scrollbar-track { background: rgba(188, 193, 207, 0.1); }
-html[data-design="ruhig"][data-mode="hell"] ::-webkit-scrollbar-thumb { background: linear-gradient(90deg, color-mix(in srgb, rgb(var(--accent-rgb, 212, 175, 55)) 62%, #fff), rgb(var(--accent-rgb, 212, 175, 55)) 55%, color-mix(in srgb, rgb(var(--accent-rgb, 212, 175, 55)) 78%, #f6f4ee)); }
-html[data-design="ruhig"][data-mode="hell"] ::-webkit-scrollbar-thumb:horizontal { background-image: linear-gradient(180deg, color-mix(in srgb, rgb(var(--accent-rgb, 212, 175, 55)) 62%, #fff), rgb(var(--accent-rgb, 212, 175, 55)) 55%, color-mix(in srgb, rgb(var(--accent-rgb, 212, 175, 55)) 78%, #f6f4ee)); }
+html[data-design="ruhig"][data-mode="hell"] ::-webkit-scrollbar-thumb { background: linear-gradient(90deg, color-mix(in srgb, rgb(var(--accent-rgb, 201, 164, 92)) 62%, #fff), rgb(var(--accent-rgb, 201, 164, 92)) 55%, color-mix(in srgb, rgb(var(--accent-rgb, 201, 164, 92)) 78%, #f6f4ee)); }
+html[data-design="ruhig"][data-mode="hell"] ::-webkit-scrollbar-thumb:horizontal { background-image: linear-gradient(180deg, color-mix(in srgb, rgb(var(--accent-rgb, 201, 164, 92)) 62%, #fff), rgb(var(--accent-rgb, 201, 164, 92)) 55%, color-mix(in srgb, rgb(var(--accent-rgb, 201, 164, 92)) 78%, #f6f4ee)); }
 /* ---- feinschliff.css ---- */
 html[data-design="ruhig"][data-mode="hell"] ::selection { color: #0f1a36; }
-html[data-design="ruhig"][data-mode="hell"] input, html[data-design="ruhig"][data-mode="hell"] textarea, html[data-design="ruhig"][data-mode="hell"] select, html[data-design="ruhig"][data-mode="hell"] [contenteditable] { caret-color: var(--gold-500, #766019); }
+html[data-design="ruhig"][data-mode="hell"] input, html[data-design="ruhig"][data-mode="hell"] textarea, html[data-design="ruhig"][data-mode="hell"] select, html[data-design="ruhig"][data-mode="hell"] [contenteditable] { caret-color: var(--gold-500, #6b5324); }
 /* ---- app.css ---- */
 html[data-design="ruhig"][data-mode="hell"] .ambient-bg { background: radial-gradient(circle at 50% -10%, #f0ede5 0%, var(--navy-950) 80%),
     linear-gradient(to right, rgba(16, 26, 54, 0.015) 1px, transparent 1px),
@@ -475,7 +475,7 @@ html[data-design="ruhig"][data-mode="hell"] .text-white { color: rgba(15, 26, 54
 html[data-design="ruhig"][data-mode="hell"] .placeholder-gray-400::-moz-placeholder { color: rgba(97, 105, 132, var(--tw-placeholder-opacity, 1)); }
 html[data-design="ruhig"][data-mode="hell"] .placeholder-gray-400::placeholder { color: rgba(97, 105, 132, var(--tw-placeholder-opacity, 1)); }
 html[data-design="ruhig"][data-mode="hell"] .shadow-\[0_0_15px_rgba\(212\2c 175\2c 55\2c 0\.1\)\] { box-shadow: var(--tw-ring-offset-shadow, 0 0 rgba(16, 26, 54, 0)), var(--tw-ring-shadow, 0 0 rgba(16, 26, 54, 0)), var(--tw-shadow); }
-html[data-design="ruhig"][data-mode="hell"] .shadow-\[0_0_40px_rgba\(212\2c 175\2c 55\2c 0\.12\)\] { box-shadow: var(--tw-ring-offset-shadow, 0 0 rgba(16, 26, 54, 0)), var(--tw-ring-shadow, 0 0 rgba(16, 26, 54, 0)), var(--tw-shadow); }
+html[data-design="ruhig"][data-mode="hell"] .shadow-\[0_0_40px_rgba\(201\2c 164\2c 92\2c 0\.12\)\] { box-shadow: var(--tw-ring-offset-shadow, 0 0 rgba(16, 26, 54, 0)), var(--tw-ring-shadow, 0 0 rgba(16, 26, 54, 0)), var(--tw-shadow); }
 html[data-design="ruhig"][data-mode="hell"] .\!ring { box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 rgba(16, 26, 54, 0)) !important; }
 html[data-design="ruhig"][data-mode="hell"] .ring { box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 rgba(16, 26, 54, 0)); }
 html[data-design="ruhig"][data-mode="hell"] .hover\:bg-white\/5:hover { background-color: rgba(16, 26, 54, 0.063); }
@@ -496,11 +496,11 @@ html[data-design="ruhig"][data-mode="hell"] input[type="radio"]:checked { backgr
 html[data-design="ruhig"][data-mode="hell"] .num-step { background: linear-gradient(180deg, rgba(246, 244, 238, 0.95), rgba(255, 255, 255, 0.7)); box-shadow: inset 0 1px 3px rgba(16, 26, 54, 0.1), 0 1px 0 rgba(255, 255, 255, 0.04); }
 html[data-design="ruhig"][data-mode="hell"] .num-step:hover { border-color: rgba(16, 26, 54, 0.25); }
 html[data-design="ruhig"][data-mode="hell"] .num-step:focus-within { box-shadow: inset 0 1px 3px rgba(16, 26, 54, 0.09), 0 0 0 3px rgba(var(--accent-rgb), 0.18), 0 0 22px -6px rgba(var(--accent-rgb), 0.4); }
-html[data-design="ruhig"][data-mode="hell"] .num-btn { color: var(--gold-light, #7d6812); box-shadow: inset 0 1px 0 rgba(255, 244, 196, 0.28), 0 2px 6px -2px rgba(16, 26, 54, 0.12); }
+html[data-design="ruhig"][data-mode="hell"] .num-btn { color: var(--gold-light, #6b5424); box-shadow: inset 0 1px 0 rgba(255, 244, 196, 0.28), 0 2px 6px -2px rgba(16, 26, 54, 0.12); }
 html[data-design="ruhig"][data-mode="hell"] .num-btn:hover:not(:disabled) { background: linear-gradient(180deg, color-mix(in srgb, var(--gold-500), #fff 15%), color-mix(in srgb, var(--gold-500), #f6f4ee 15%)); }
 html[data-design="ruhig"][data-mode="hell"] .calc-opt { background: rgba(255, 255, 255, 0.45); }
 html[data-design="ruhig"][data-mode="hell"] .calc-opt:hover { background: rgba(255, 255, 255, 0.75); }
-html[data-design="ruhig"][data-mode="hell"] .calc-opt:has(input:checked) .calc-opt-price { color: var(--gold-light, #7d6812); }
+html[data-design="ruhig"][data-mode="hell"] .calc-opt:has(input:checked) .calc-opt-price { color: var(--gold-light, #6b5424); }
 html[data-design="ruhig"][data-mode="hell"] .calc-opt-name { color: #0f1a36; }
 html[data-design="ruhig"][data-mode="hell"] .calc-opt-sub { color: rgba(129, 102, 14, 0.8); }
 /* ---- fall.css ---- */
@@ -512,10 +512,10 @@ html[data-design="ruhig"][data-mode="hell"] .fall-check { background: rgba(16, 2
 html[data-design="ruhig"][data-mode="hell"] .fall-seg { background: rgba(246, 244, 238, 0.55); }
 html[data-design="ruhig"][data-mode="hell"] .fall-seg-btn:hover:not(.on), html[data-design="ruhig"][data-mode="hell"] .fall-seg-opt:hover span { color: #0f1a36; background: rgba(16, 26, 54, 0.075); }
 html[data-design="ruhig"][data-mode="hell"] .fall-seg-btn.on.st-offen, html[data-design="ruhig"][data-mode="hell"] .fall-seg-opt.st-offen input:checked + span { color: #232e49; }
-html[data-design="ruhig"][data-mode="hell"] .fall-sum strong { color: var(--gold-light, #7d6812); }
+html[data-design="ruhig"][data-mode="hell"] .fall-sum strong { color: var(--gold-light, #6b5424); }
 html[data-design="ruhig"][data-mode="hell"] .fall-card { background: rgba(16, 26, 54, 0.025); }
 html[data-design="ruhig"][data-mode="hell"] .fall-card:hover { background: rgba(16, 26, 54, 0.044); }
-html[data-design="ruhig"][data-mode="hell"] .fall-amount { color: var(--gold-light, #7d6812); }
+html[data-design="ruhig"][data-mode="hell"] .fall-amount { color: var(--gold-light, #6b5424); }
 html[data-design="ruhig"][data-mode="hell"] .fall-step { background: rgba(16, 26, 54, 0.025); }
 html[data-design="ruhig"][data-mode="hell"] .fall-step.st-ja i { color: #189061; }
 html[data-design="ruhig"][data-mode="hell"] .fall-step.st-nein i { color: #971111; }
@@ -524,7 +524,7 @@ html[data-design="ruhig"][data-mode="hell"] .fall-light.l-gruen { color: #189061
 html[data-design="ruhig"][data-mode="hell"] .fall-light.l-gelb { color: #81660e; }
 html[data-design="ruhig"][data-mode="hell"] .fall-light.l-rot { color: #971111; }
 html[data-design="ruhig"][data-mode="hell"] .tpl-group { background: rgba(16, 26, 54, 0.025); }
-html[data-design="ruhig"][data-mode="hell"] .tpl-group legend { color: var(--gold-light, #7d6812); }
+html[data-design="ruhig"][data-mode="hell"] .tpl-group legend { color: var(--gold-light, #6b5424); }
 html[data-design="ruhig"][data-mode="hell"] .tpl-actions { background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.96) 35%); }
 html[data-design="ruhig"][data-mode="hell"] .tpl-preview-note { color: #81660e; }
 /* ---- depth.css ---- */
@@ -573,7 +573,7 @@ html[data-design="ruhig"][data-mode="hell"] .fn-table thead th, html[data-design
 @media (max-width: 767px) { :root:root[data-design="ruhig"][data-mode="hell"] { --sh-2: 0 1px 2px rgba(16, 26, 54, 0.07), 0 8px 18px -10px rgba(16, 26, 54, 0.11); } }
 /* ---- motion.css ---- */
 html[data-design="ruhig"][data-mode="hell"] .btn-gold .ps-ripple { border-color: rgba(246, 244, 238, 0.35); }
-html[data-design="ruhig"][data-mode="hell"] :is(div, html[data-design="ruhig"][data-mode="hell"] label, html[data-design="ruhig"][data-mode="hell"] p):has(> .field:focus) > .label, html[data-design="ruhig"][data-mode="hell"] :is(div, html[data-design="ruhig"][data-mode="hell"] label, html[data-design="ruhig"][data-mode="hell"] p):has(> .field:focus) > .label-row .label { color: var(--gold-light, #7d6812); }
+html[data-design="ruhig"][data-mode="hell"] :is(div, html[data-design="ruhig"][data-mode="hell"] label, html[data-design="ruhig"][data-mode="hell"] p):has(> .field:focus) > .label, html[data-design="ruhig"][data-mode="hell"] :is(div, html[data-design="ruhig"][data-mode="hell"] label, html[data-design="ruhig"][data-mode="hell"] p):has(> .field:focus) > .label-row .label { color: var(--gold-light, #6b5424); }
 html[data-design="ruhig"][data-mode="hell"] #modalCard.is-stacked { box-shadow: 0 -9px 0 -5px rgba(var(--accent-rgb), 0.35), 0 -17px 0 -11px rgba(var(--accent-rgb), 0.18), var(--modal-shadow, 0 30px 80px rgba(16, 26, 54, 0.12)); }
 html[data-design="ruhig"][data-mode="hell"] .skel-cell { background: linear-gradient(110deg, rgba(16, 26, 54, 0.05) 30%, rgba(16, 26, 54, 0.112) 50%, rgba(16, 26, 54, 0.05) 70%); }
 html[data-design="ruhig"][data-mode="hell"] .site-switch { background: rgba(16, 26, 54, 0.05); }
@@ -582,7 +582,7 @@ html[data-design="ruhig"][data-mode="hell"] .site-switch > a:hover { color: #0f1
 html[data-design="ruhig"][data-mode="hell"] .btn-gold .site-avatar.hdr-av { box-shadow: 0 0 0 1.5px rgba(16, 26, 54, 0.09); }
 html[data-design="ruhig"][data-mode="hell"] #loginDialog .login-note { color: #971111; }
 html[data-design="ruhig"][data-mode="hell"] #loginDialog .login-alt { color: var(--text-dim, #68708a); }
-html[data-design="ruhig"][data-mode="hell"] #loginDialog .login-alt a, html[data-design="ruhig"][data-mode="hell"] #loginDialog .login-alt button { color: var(--gold-500, #766019); }
+html[data-design="ruhig"][data-mode="hell"] #loginDialog .login-alt a, html[data-design="ruhig"][data-mode="hell"] #loginDialog .login-alt button { color: var(--gold-500, #6b5324); }
 html[data-design="ruhig"][data-mode="hell"] .site-banner { color: #141e3a; background: radial-gradient(120% 220% at 0% 50%, rgba(var(--sb), 0.26), transparent 55%),
     radial-gradient(120% 220% at 100% 50%, rgba(var(--sb), 0.18), transparent 55%),
     linear-gradient(180deg, rgba(240, 237, 229, 0.86), rgba(255, 255, 255, 0.9)); }
@@ -609,7 +609,7 @@ html[data-design="ruhig"][data-mode="hell"] .site-banner-x:hover { background: r
 html[data-design="ruhig"][data-mode="hell"] .site-banner:not(.is-promo) { color: #1d2843; background: radial-gradient(70% 240% at 0% 50%, rgba(var(--sb), 0.16), transparent 60%),
     radial-gradient(50% 240% at 100% 50%, rgba(var(--sb), 0.08), transparent 60%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.93), rgba(255, 255, 255, 0.95)); }
-html[data-design="ruhig"][data-mode="hell"] .site-banner.tone-gold { --sb-ink: var(--gold-light, #7d6812); }
+html[data-design="ruhig"][data-mode="hell"] .site-banner.tone-gold { --sb-ink: var(--gold-light, #6b5424); }
 html[data-design="ruhig"][data-mode="hell"] .sb-seal { background: radial-gradient(circle at 35% 30%, rgba(16, 26, 54, 0.2), rgba(var(--sb), 0.2) 60%, rgba(var(--sb), 0.06)); }
 html[data-design="ruhig"][data-mode="hell"] .site-banner:not(.is-promo) .sb-title { color: #0f1a36; }
 html[data-design="ruhig"][data-mode="hell"] .site-banner:not(.is-promo) .site-banner-text { color: rgba(35, 46, 73, 0.84); }
@@ -617,16 +617,16 @@ html[data-design="ruhig"][data-mode="hell"] .site-banner:not(.is-promo) .sb-copy
 html[data-design="ruhig"][data-mode="hell"] .sb-dot { background: rgba(16, 26, 54, 0.313); }
 html[data-design="ruhig"][data-mode="hell"] .sb-hinweis { background: linear-gradient(90deg, rgba(var(--sb), 0.16), rgba(255, 255, 255, 0.95) 45%); }
 html[data-design="ruhig"][data-mode="hell"] .sb-dringend { --sb-ink: #971111; }
-html[data-design="ruhig"][data-mode="hell"] .site-links a { color: var(--gold-light, #7d6812); }
+html[data-design="ruhig"][data-mode="hell"] .site-links a { color: var(--gold-light, #6b5424); }
 html[data-design="ruhig"][data-mode="hell"] .calc-promo-row { color: color-mix(in srgb, rgb(var(--o1)) 70%, #0f1a36); }
-html[data-design="ruhig"][data-mode="hell"] .chip-row.hub-tabs .chip.active .ico { color: var(--gold-500, #766019); }
-html[data-design="ruhig"][data-mode="hell"] nav[data-ink] .nav-link.nav-active { color: var(--gold-light, #7d6812) !important; }
+html[data-design="ruhig"][data-mode="hell"] .chip-row.hub-tabs .chip.active .ico { color: var(--gold-500, #6b5324); }
+html[data-design="ruhig"][data-mode="hell"] nav[data-ink] .nav-link.nav-active { color: var(--gold-light, #6b5424) !important; }
 html[data-design="ruhig"][data-mode="hell"] .text-gray-500, html[data-design="ruhig"][data-mode="hell"] .text-slate-500 { color: #5a637d; }
 html[data-design="ruhig"][data-mode="hell"] .text-gray-600, html[data-design="ruhig"][data-mode="hell"] .text-slate-600 { color: #68708a; }
-html[data-design="ruhig"][data-mode="hell"] :where(a, html[data-design="ruhig"][data-mode="hell"] button, html[data-design="ruhig"][data-mode="hell"] summary, html[data-design="ruhig"][data-mode="hell"] [role="button"], html[data-design="ruhig"][data-mode="hell"] [role="tab"], html[data-design="ruhig"][data-mode="hell"] [tabindex]):focus-visible { box-shadow: 0 0 0 2px rgba(16, 26, 54, 0.19), 0 0 0 4px rgba(var(--accent-rgb, 212, 175, 55), 0.9), 0 0 18px 2px rgba(var(--accent-rgb, 212, 175, 55), 0.35) !important; }
+html[data-design="ruhig"][data-mode="hell"] :where(a, html[data-design="ruhig"][data-mode="hell"] button, html[data-design="ruhig"][data-mode="hell"] summary, html[data-design="ruhig"][data-mode="hell"] [role="button"], html[data-design="ruhig"][data-mode="hell"] [role="tab"], html[data-design="ruhig"][data-mode="hell"] [tabindex]):focus-visible { box-shadow: 0 0 0 2px rgba(16, 26, 54, 0.19), 0 0 0 4px rgba(var(--accent-rgb, 201, 164, 92), 0.9), 0 0 18px 2px rgba(var(--accent-rgb, 201, 164, 92), 0.35) !important; }
 html[data-design="ruhig"][data-mode="hell"] .case-jump .jump:focus-visible, html[data-design="ruhig"][data-mode="hell"] .chip-row.hub-tabs .chip:focus-visible { color: #0f1a36; }
-html[data-design="ruhig"][data-mode="hell"] :where(input[type="checkbox"], html[data-design="ruhig"][data-mode="hell"] input[type="radio"]):focus-visible { box-shadow: 0 0 0 2px rgba(16, 26, 54, 0.19), 0 0 0 4px rgba(var(--accent-rgb, 212, 175, 55), 0.9) !important; }
-html[data-design="ruhig"][data-mode="hell"] .fl:focus-within > .label[data-fl="1"] { color: var(--gold-light, #7d6812); }
+html[data-design="ruhig"][data-mode="hell"] :where(input[type="checkbox"], html[data-design="ruhig"][data-mode="hell"] input[type="radio"]):focus-visible { box-shadow: 0 0 0 2px rgba(16, 26, 54, 0.19), 0 0 0 4px rgba(var(--accent-rgb, 201, 164, 92), 0.9) !important; }
+html[data-design="ruhig"][data-mode="hell"] .fl:focus-within > .label[data-fl="1"] { color: var(--gold-light, #6b5424); }
 html[data-design="ruhig"][data-mode="hell"] .ctx-menu { background: linear-gradient(180deg, rgba(240, 237, 229, 0.94), rgba(255, 255, 255, 0.96)); border: 1px solid rgba(16, 26, 54, 0.112); box-shadow: 0 24px 50px -16px rgba(16, 26, 54, 0.16), 0 0 0 1px rgba(var(--accent-rgb), 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.07); }
 html[data-design="ruhig"][data-mode="hell"] .ctx-item { color: var(--text-main, #232e49); }
 html[data-design="ruhig"][data-mode="hell"] .ctx-item:hover, html[data-design="ruhig"][data-mode="hell"] .ctx-item:focus-visible { color: #0f1a36; }
@@ -634,7 +634,7 @@ html[data-design="ruhig"][data-mode="hell"] .ctx-item.danger { color: #971111; }
 html[data-design="ruhig"][data-mode="hell"] .ctx-item.danger .ico-sm { color: #971111; }
 html[data-design="ruhig"][data-mode="hell"] .ctx-sep { background: rgba(16, 26, 54, 0.1); }
 html[data-design="ruhig"][data-mode="hell"] .btn-gold { background-image: linear-gradient(110deg, transparent 38%, rgba(16, 26, 54, 0.425) 50%, transparent 62%), linear-gradient(180deg, color-mix(in srgb, var(--gold-500), #fff 18%) 0%, var(--gold-500) 48%, var(--gold-600) 100%); }
-html[data-design="ruhig"][data-mode="hell"] .is-scrolled .glass-nav { box-shadow: 0 1px 0 rgba(var(--accent-rgb, 212, 175, 55), 0.18), 0 14px 34px -18px rgba(16, 26, 54, 0.18); }
+html[data-design="ruhig"][data-mode="hell"] .is-scrolled .glass-nav { box-shadow: 0 1px 0 rgba(var(--accent-rgb, 201, 164, 92), 0.18), 0 14px 34px -18px rgba(16, 26, 54, 0.18); }
 html[data-design="ruhig"][data-mode="hell"] .tour-spot { box-shadow: 0 0 0 9999px rgba(16, 26, 54, 0.144), 0 0 0 2px rgba(var(--accent-rgb), 0.9), 0 0 30px 4px rgba(var(--accent-rgb), 0.45); }
 html[data-design="ruhig"][data-mode="hell"] .tour-root:has(.tour-spot[style*="opacity: 0"]) { background: rgba(246, 244, 238, 0.72); }
 html[data-design="ruhig"][data-mode="hell"] .tour-card { color: var(--text-main, #232e49); background: linear-gradient(180deg, rgba(240, 237, 229, 0.97), rgba(255, 255, 255, 0.98)); box-shadow: 0 30px 60px -20px rgba(16, 26, 54, 0.17), inset 0 1px 0 rgba(255, 255, 255, 0.08); }
@@ -688,12 +688,17 @@ html[data-design="ruhig"][data-mode="hell"] .hr-way li.is-sum { border-top: 1px 
 html[data-design="ruhig"][data-mode="hell"] .hr-wopt { background: rgba(255, 255, 255, 0.45); }
 html[data-design="ruhig"][data-mode="hell"] .hr-rec { background: linear-gradient(160deg, rgba(var(--accent-rgb), 0.14), rgba(255, 255, 255, 0.6) 65%); }
 html[data-design="ruhig"][data-mode="hell"] .hr-rec-pack { color: #149459; }
+html[data-design="ruhig"][data-mode="hell"] .kz-seat { background: rgba(16, 26, 54, 0.019); }
+html[data-design="ruhig"][data-mode="hell"] .kz-seat-map { background: #ffffff; }
+html[data-design="ruhig"][data-mode="hell"] .kz-seat-map::after { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04), inset 0 -80px 80px -60px rgba(16, 26, 54, 0.11); }
+html[data-design="ruhig"][data-mode="hell"] .kz-seat-pin { box-shadow: 0 0 0 5px rgba(var(--accent-rgb), 0.28), 0 6px 18px rgba(16, 26, 54, 0.11); }
+html[data-design="ruhig"][data-mode="hell"] .kz-seat-pin > span { box-shadow: 0 8px 22px rgba(16, 26, 54, 0.09); }
 /* ---- karriere.css ---- */
 html[data-design="ruhig"][data-mode="hell"] .counter.ok { color: #189061; }
 html[data-design="ruhig"][data-mode="hell"] .steps .dot { background: var(--navy-900, #ffffff); }
 html[data-design="ruhig"][data-mode="hell"] .steps h3 { color: #0f1a36; }
 html[data-design="ruhig"][data-mode="hell"] .kfaq summary { color: #0f1a36; }
-html[data-design="ruhig"][data-mode="hell"] .num-spin button { color: var(--gold-light, #7d6812); }
+html[data-design="ruhig"][data-mode="hell"] .num-spin button { color: var(--gold-light, #6b5424); }
 html[data-design="ruhig"][data-mode="hell"] .num-spin button:hover { background: linear-gradient(180deg, color-mix(in srgb, var(--gold-500), #fff 15%), color-mix(in srgb, var(--gold-500), #f6f4ee 15%)); }
 /* ---- season.css ---- */
 html[data-design="ruhig"][data-mode="hell"] .ps-scene:not(.is-dash) .ps-fx { -webkit-mask-image: radial-gradient(ellipse 44% 40% at 50% 46%, rgba(246, 244, 238, 0.22), #f6f4ee 82%); mask-image: radial-gradient(ellipse 44% 40% at 50% 46%, rgba(246, 244, 238, 0.22), #f6f4ee 82%); }

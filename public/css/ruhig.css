@@ -373,7 +373,7 @@ html[data-design="ruhig"] #gebiete .kz-areas .kz-area-name { font-size: clamp(1.
 html[data-design="ruhig"] #gebiete .kz-areas :is(.kz-area-text, .kz-more) { grid-column: 2; }
 html[data-design="ruhig"] #gebiete .kz-areas .kz-area-text { font-size: 0.95rem; max-width: 60ch; }
 html[data-design="ruhig"] #gebiete .kz-areas .kz-more { width: auto; margin: 0; padding: 0; border: 0; white-space: nowrap; }
-html[data-design="ruhig"] #gebiete .kz-areas .kz-more::after { display: inline-block; transition: transform var(--dur-2) var(--ease-out); }
+html[data-design="ruhig"] #gebiete .kz-areas .kz-more::after { display: inline-block; margin-left: 0.4em; transition: transform var(--dur-2) var(--ease-out); }
 @media (hover: hover) and (pointer: fine) {
   html[data-design="ruhig"] #gebiete .kz-areas .kz-tile > a:hover .kz-area-name { color: var(--gold-light); }
   html[data-design="ruhig"] #gebiete .kz-areas .kz-tile > a:hover .kz-more::after { transform: translateX(4px); }
@@ -508,8 +508,10 @@ html[data-design="ruhig"] #notdienst .kz-steps > li { padding: 1.35rem 0 1.35rem
 html[data-design="ruhig"] #notdienst .kz-steps > li::before { content: counter(step, decimal-leading-zero); top: 1.2rem; width: auto; height: auto; border-radius: 0; background: none; box-shadow: none; font: 500 2.4rem/1 var(--kz-serif); color: var(--kz-urgent); }
 html[data-design="ruhig"] #notdienst .kz-steps > li::after { content: none; }
 html[data-design="ruhig"] #notdienst .kz-steps > li strong { font: 600 1.45rem/1.25 var(--kz-serif); margin-bottom: 0.2rem; }
-html[data-design="ruhig"] .kz-hero [data-hero-second="notdienst"] { border-color: var(--kz-urgent); }
-html[data-design="ruhig"] .kz-hero [data-hero-second="notdienst"]:hover { background: var(--kz-urgent-soft); color: var(--kz-ink); }
+/* Notdienst: ruhiger Rand wie die übrigen Knöpfe, ein kleiner roter Punkt kennzeichnet die Dringlichkeit */
+html[data-design="ruhig"] .kz-hero [data-hero-second="notdienst"] { gap: 0.6rem; }
+html[data-design="ruhig"] .kz-hero [data-hero-second="notdienst"]::before { content: ''; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--kz-urgent); box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18); }
+html[data-design="ruhig"] .kz-hero [data-hero-second="notdienst"]:hover { border-color: var(--kz-urgent); }
 
 /* Fuß: auf den Unterseiten steht der Namenszug kleiner und links (die Seiten sind kürzer als die Startseite) */
 html[data-design="ruhig"] body:not([data-view="start"]) .kz-footer-word { font-size: clamp(2.6rem, 9cqw, 6.25rem); text-align: left; padding-top: var(--sp-2); margin-bottom: var(--sp-2); }

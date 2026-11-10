@@ -89,6 +89,22 @@ describe('Startseite anpassen und gemeinsames Design', () => {
     assert.deepEqual(order(await page('/')), ['fakten', 'gebiete', 'ansprechpartner', 'stimmen', 'neuigkeiten', 'ablauf', 'band']);
   });
 
+  it('Kanzleisitz: erscheint erst mit Pin, zeigt Anschrift, Telefon und Zeiten; ungültige Werte abgelehnt', async () => {
+    assert.doesNotMatch(await page('/'), /id="sitz"/, 'ohne Pin kein Abschnitt');
+    await publish({ seat: { x: 47.5, y: 52.25, address: 'Atlee Street 8051\nLos Santos', phone: '602-615-8184', hours: 'täglich 18–24 Uhr', note: '' } });
+    const html = await page('/');
+    assert.match(html, /data-seat-map style="--x:47\.5;--y:52\.25"/);
+    assert.match(html, /<dd data-seat="address">Atlee Street 8051<br>Los Santos<\/dd>/);
+    assert.match(html, /<dd data-seat="phone">602-615-8184<\/dd>/);
+    assert.doesNotMatch(html, /data-seat-row="note"/, 'leerer Hinweis fällt weg');
+    assert.ok(order(html).indexOf('sitz') === order(html).indexOf('band') - 1, 'vor dem Abschluss');
+    const cfg = (await admin.c.get('/api/config')).json.config.home;
+    const bad = await admin.c.put('/api/config/home/draft', { ...cfg.published, start: { ...cfg.published.start, seat: { ...cfg.published.start.seat, x: 140 } } });
+    assert.equal(bad.status, 400);
+    await publish({});
+    assert.doesNotMatch(await page('/'), /id="sitz"/);
+  });
+
   it('Anwalts-Karten: Schwerpunkte automatisch aus den Akten, wenn keine eingetragen sind', async () => {
     const team = (await admin.c.get('/api/admin/team')).json.team;
     const me = (await admin.c.get('/api/auth/session')).json.user;
