@@ -115,33 +115,29 @@ router.get('/stats', (req, res) => {
 });
 
 /*
- * Kennzahlen der Startseite (Design „Ruhig“): betreute Verfahren, seit wann es die Kanzlei gibt und wie schnell eine
- * Anfrage übernommen wird (Median der letzten 90 Tage, gemessen vom Eingang bis „Federführend“). Nichts Geschätztes:
- * was noch zu wenig Daten hat, bleibt leer – die Seite zeigt dann eine andere Angabe.
+ * Kennzahlen der Startseite (Design „Ruhig“): betreute Verfahren, seit wann es die Kanzlei gibt und die Erfolgsquote
+ * (wie GET /stats: Verfahren mit Ergebnis, erst ab einer Mindestanzahl). Nichts Geschätztes: was noch zu wenig Daten
+ * hat, bleibt leer – die Seite zeigt dann eine andere Angabe. Beides nur, wenn „Erfolge öffentlich zeigen“ an ist.
  */
 const FIGURES_MIN_CASES = 10;
-const FIGURES_MIN_CLAIMS = 5;
-const median = (list) => {
-  const s = [...list].sort((a, b) => a - b);
-  return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
-};
 router.get('/figures', (req, res) => {
+  const show = getSetting('show_success_public', '1') === '1';
   const total = db.prepare('SELECT COUNT(*) AS n FROM cases').get().n;
   const first = db.prepare('SELECT MIN(created_at) AS at FROM users').get().at;
   const since = first ? new Date(String(first).replace(' ', 'T') + (String(first).includes('Z') ? '' : 'Z')) : null;
-  const claims = db
-    .prepare(
-      `SELECT urgency, (julianday(claimed_at) - julianday(created_at)) * 1440 AS minutes FROM cases
-       WHERE claimed_at IS NOT NULL AND julianday(created_at) >= julianday('now', '-90 days') AND julianday(claimed_at) >= julianday(created_at)`
-    )
-    .all();
-  const urgent = claims.filter((c) => c.urgency === 'notfall');
-  const pool = urgent.length >= FIGURES_MIN_CLAIMS ? urgent : claims;
+  let won = 0;
+  let rated = 0;
+  for (const r of db.prepare("SELECT outcome, COUNT(*) AS n FROM cases WHERE status = 'geschlossen' AND outcome IS NOT NULL GROUP BY outcome").all()) {
+    const o = OUTCOMES[r.outcome];
+    if (!o || o.success === null) continue;
+    rated += r.n;
+    if (o.success) won += r.n;
+  }
   res.json({
-    cases: getSetting('show_success_public', '1') === '1' && total >= FIGURES_MIN_CASES ? total : null,
+    cases: show && total >= FIGURES_MIN_CASES ? total : null,
     since: since && !isNaN(since) ? since.getUTCFullYear() : null,
     years: since && !isNaN(since) ? Math.floor((Date.now() - since.getTime()) / (365.25 * 86400000)) : null,
-    response: pool.length >= FIGURES_MIN_CLAIMS ? { minutes: Math.max(1, Math.round(median(pool.map((c) => c.minutes)))), urgent: pool === urgent } : null,
+    successRate: show && rated >= STATS_MIN_RATED ? Math.round((won / rated) * 100) : null,
   });
 });
 

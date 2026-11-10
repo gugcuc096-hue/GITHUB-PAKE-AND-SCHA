@@ -14,7 +14,7 @@
   const PS = window.PS || {};
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
-  const SECTIONS = { fakten: 'Kennzahlen', gebiete: 'Rechtsgebiete', leitsatz: 'Leitsatz der Gründer', ansprechpartner: 'Anwälte', stimmen: 'Mandantenstimme', neuigkeiten: 'Aktuelles', ablauf: 'Ablauf eines Mandats', band: 'Abschluss „Mandat anfragen“' };
+  const SECTIONS = { fakten: 'Kennzahlen', gebiete: 'Rechtsgebiete', ansprechpartner: 'Anwälte', stimmen: 'Mandantenstimme', neuigkeiten: 'Aktuelles', ablauf: 'Ablauf eines Mandats', band: 'Abschluss „Mandat anfragen“' };
   const MODES = { leitung: 'Kanzleileitung (Board of Partners)', auswahl: 'Eigene Auswahl', dienst: 'Wer im Dienst ist zuerst', alle: 'Alle Anwälte' };
   const HERO = { notdienst: ['/notdienst', 'Notdienst bei Festnahme'], anwaelte: ['/anwaelte', 'Unsere Anwälte'], honorare: ['/honorare', 'Honorare & Tarifrechner'], kontakt: ['/kontakt', 'Kontakt'], keiner: ['', 'Kein zweiter Knopf'] };
   const ICON = {

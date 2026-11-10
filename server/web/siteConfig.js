@@ -30,7 +30,7 @@ const SECTION_IDS = Object.keys(SECTIONS);
  * Rechtsgebiete, wie viele Meldungen und der zweite Knopf im Startbereich. Angewendet beim Ausliefern
  * (server/web/sitePages.js → applyStart), also ohne Flackern.
  */
-const START_SECTIONS = { fakten: 'Kennzahlen', gebiete: 'Rechtsgebiete', leitsatz: 'Leitsatz der Gründer', ansprechpartner: 'Anwälte', stimmen: 'Mandantenstimme', neuigkeiten: 'Aktuelles', ablauf: 'Ablauf eines Mandats', band: 'Abschluss mit „Mandat anfragen“' };
+const START_SECTIONS = { fakten: 'Kennzahlen', gebiete: 'Rechtsgebiete', ansprechpartner: 'Anwälte', stimmen: 'Mandantenstimme', neuigkeiten: 'Aktuelles', ablauf: 'Ablauf eines Mandats', band: 'Abschluss mit „Mandat anfragen“' };
 const START_IDS = Object.keys(START_SECTIONS);
 /** Gespeicherte Reihenfolge vervollständigen: ein später hinzugekommener Abschnitt steht hinter seinem Vorgänger aus der Standard-Reihenfolge. */
 function startOrder(order) {
@@ -44,11 +44,13 @@ function startOrder(order) {
 }
 const LAWYER_MODES = { leitung: 'Kanzleileitung (Board of Partners)', auswahl: 'Eigene Auswahl', dienst: 'Wer gerade im Dienst ist zuerst', alle: 'Alle Anwälte' };
 const HERO_SECOND = { notdienst: 'Notdienst bei Festnahme', anwaelte: 'Unsere Anwälte', honorare: 'Honorare & Tarifrechner', kontakt: 'Kontakt', keiner: 'Kein zweiter Knopf' };
+const knownIds = (v) => (Array.isArray(v) ? v.filter((id) => START_IDS.includes(id)) : v);
 const START_DEFAULTS = { order: START_IDS, hidden: [], lawyerMode: 'leitung', lawyers: [], lawyerCount: 3, areas: [], newsCount: 3, heroSecond: 'notdienst', heroNote: true };
 const startSchema = z
   .object({
-    order: z.array(z.enum(START_IDS)).max(START_IDS.length).default(START_DEFAULTS.order),
-    hidden: z.array(z.enum(START_IDS)).max(START_IDS.length).default(START_DEFAULTS.hidden),
+    // Abschnitte, die es nicht mehr gibt (z. B. „leitsatz“), fallen aus gespeicherten Einstellungen einfach heraus
+    order: z.preprocess(knownIds, z.array(z.enum(START_IDS)).max(START_IDS.length)).default(START_DEFAULTS.order),
+    hidden: z.preprocess(knownIds, z.array(z.enum(START_IDS)).max(START_IDS.length)).default(START_DEFAULTS.hidden),
     lawyerMode: z.enum(Object.keys(LAWYER_MODES)).default('leitung'),
     lawyers: z.array(z.number().int().positive()).max(12).default([]),
     lawyerCount: z.number().int().min(1).max(9).default(3),
