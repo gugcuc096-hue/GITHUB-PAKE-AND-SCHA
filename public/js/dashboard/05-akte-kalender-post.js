@@ -1446,7 +1446,7 @@ function statusLinkModal(c, url) {
   return `<h2 id="modalTitle" class="modal-title">Statuslink für den Mandanten</h2>
       <p class="modal-sub">Zeigt dem Mandanten ohne Konto und ohne Pin den Stand seines Verfahrens: Schritt, Status, zuständigen Anwalt und Ihren Hinweis („Hinweis für den Mandanten“). Notizen, Beweise und Beteiligte bleiben intern.</p>
       ${on
-        ? `<div class="status-link-box"><input class="field" readonly value="${esc(link)}" aria-label="Statuslink" onclick="this.select()">
+        ? `<div class="status-link-box"><input class="field" readonly value="${esc(link)}" aria-label="Statuslink" data-select-all>
             <button type="button" class="btn-gold btn-md" data-action="status-link-copy" data-url="${esc(link)}">${icon('copy', 'ico-sm')}<span>Kopieren</span></button></div>
           <div class="form-actions mt-5"><button type="button" class="btn-outline btn-md" data-action="status-link-new" data-id="${c.id}">Neuen Link erzeugen</button>
             <button type="button" class="btn-ghost btn-md" data-action="status-link-off" data-id="${c.id}">Link abschalten</button></div>
@@ -1454,6 +1454,9 @@ function statusLinkModal(c, url) {
         : `<div class="form-actions"><button type="button" class="btn-gold btn-md" data-action="status-link-new" data-id="${c.id}">${icon('link', 'ico-sm')}<span>Link erstellen</span></button>
             <button type="button" class="btn-ghost btn-md" data-action="close-modal">Abbrechen</button></div>`}`;
 }
+document.addEventListener('focusin', (e) => {
+  if (e.target.matches && e.target.matches('input[data-select-all]')) e.target.select();
+});
 Object.assign(actions, {
   'status-link': (el) => {
     const c = st.caseInfo && st.caseInfo.id === Number(el.dataset.id) ? st.caseInfo : null;
