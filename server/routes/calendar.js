@@ -215,6 +215,7 @@ router.patch(
       set('starts_at', new Date(d.startsAt).toISOString());
       set('reminded', 0);
       set('client_reminded', 0);
+      set('escalated', 0);
     }
     if (d.endsAt !== undefined) set('ends_at', d.endsAt ? new Date(d.endsAt).toISOString() : null);
     if (d.location !== undefined) set('location', d.location);
@@ -359,6 +360,45 @@ function sendDueReminders() {
 }
 
 /**
+ * Eskalation: eine Frist läuft in weniger als ESCALATE_H Stunden ab (oder ist schon abgelaufen) und ist noch nicht
+ * erledigt → einmalig an das Board of Partners (Discord mit Erwähnung) und als Vermerk in der Akte.
+ */
+const ESCALATE_H = 6;
+function escalateDeadlines() {
+  const now = Date.now();
+  const due = db
+    .prepare(
+      `${APPT_SELECT}
+       WHERE a.type = 'frist' AND a.status = 'bestaetigt' AND a.escalated = 0
+         AND a.starts_at > ? AND a.starts_at <= ?`
+    )
+    .all(new Date(now - 24 * 3600 * 1000).toISOString(), new Date(now + ESCALATE_H * 3600 * 1000).toISOString());
+  if (!due.length) return;
+  const { BOARD_RANK_SQL } = require('../core/helpers');
+  const board = db
+    .prepare(`SELECT discord_id FROM users WHERE active = 1 AND discord_id IS NOT NULL AND discord_id != '' AND (role = 'admin' OR (role = 'anwalt' AND ${BOARD_RANK_SQL()}))`)
+    .all()
+    .map((r) => r.discord_id);
+  const { addSystemNote } = require('../db/models');
+  for (const a of due) {
+    db.prepare('UPDATE appointments SET escalated = 1 WHERE id = ?').run(a.id);
+    const over = Date.parse(a.starts_at) <= now;
+    discord.notify('deadline.escalated', {
+      caseId: a.case_id,
+      title: `🚨 Frist ${over ? 'abgelaufen' : `läuft in unter ${ESCALATE_H} Stunden ab`} – noch nicht erledigt: ${truncate(a.title, 180)}`,
+      color: discord.RED,
+      fields: [
+        { name: 'Fällig', value: fmtDiscordTime(a.starts_at), inline: false },
+        { name: 'Akte', value: a.case_number || '—' },
+        { name: 'Zuständig', value: a.assigned_name || '—' },
+      ],
+      mentionIds: [...new Set([...board, ...(a.assigned_discord_id ? [a.assigned_discord_id] : [])])],
+    });
+    if (a.case_id) addSystemNote(a.case_id, null, `Frist „${truncate(a.title, 120)}“ ${over ? 'ist abgelaufen' : 'läuft bald ab'} und ist nicht erledigt – an das Board of Partners eskaliert.`, true);
+  }
+}
+
+/**
  * Mandanten an ihren bestätigten Termin erinnern: per Discord-Direktnachricht etwa 1 Stunde vorher
  * (nicht, wenn der Termin selbst erst kurz vorher vereinbart wurde).
  */
@@ -391,4 +431,5 @@ module.exports = router;
 module.exports.sendDueReminders = () => {
   sendDueReminders();
   sendClientReminders();
+  escalateDeadlines();
 };

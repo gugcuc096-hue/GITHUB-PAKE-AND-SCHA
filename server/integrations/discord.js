@@ -30,6 +30,7 @@ const EVENTS = {
   'contract.signed': 'Mandatsvertrag unterschrieben (Anwalt oder Mandant)',
   'calendar.created': 'Neuer Gerichtstermin / neue Frist',
   'calendar.reminder': 'Erinnerung 24 h vor Frist oder Gerichtstermin',
+  'deadline.escalated': 'Eskalation: Frist läuft in unter 6 Stunden ab (oder ist abgelaufen) und ist nicht erledigt – erwähnt das Board of Partners',
   'appointment.requested': 'Terminanfrage eines Mandanten',
   'appointment.invite': 'Kollegen zu einem Gespräch/Termin eingeladen – Zusagen und Absagen (am besten eigener Kanal)',
   'invoice.created': 'Rechnung / Honorarvereinbarung erstellt',
@@ -55,7 +56,7 @@ const EVENTS = {
 
 // Ereignisse, die nach dem Speichern der Auswahl dazugekommen sind, sind eingeschaltet (bis jemand sie abwählt).
 // discord_events_known = Ereignisse, die es beim letzten Speichern gab; ältere Speicherstände kennen alle außer diesen:
-const ADDED_LATER = ['system.alert', 'system.dauer', 'review.created', 'invoice.payment', 'case.idle', 'case.victory', 'resolution.created', 'lawyer.month'];
+const ADDED_LATER = ['system.alert', 'system.dauer', 'review.created', 'invoice.payment', 'case.idle', 'case.victory', 'resolution.created', 'lawyer.month', 'deadline.escalated'];
 
 function isValidWebhookUrl(url) {
   return WEBHOOK_RE.test(String(url || '').trim());

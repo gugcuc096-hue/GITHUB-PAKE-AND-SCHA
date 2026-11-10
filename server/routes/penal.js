@@ -259,8 +259,21 @@ caseRouter.patch(
     const cid = Number(req.params.cid);
     const ch = Q.caseCharges.getByIdAndCaseId.get(cid, c.id);
     if (!ch) return res.status(404).json({ error: 'Anklagepunkt nicht gefunden.' });
-    const d = parseBody(z.object({ count: z.number().int().min(1).max(20).optional(), attempted: z.boolean().optional(), aiding: z.boolean().optional() }), req, res);
+    const d = parseBody(
+      z.object({
+        count: z.number().int().min(1).max(20).optional(),
+        attempted: z.boolean().optional(),
+        aiding: z.boolean().optional(),
+        checklist: z
+          .array(z.object({ k: z.enum(penal.CHECK_ITEMS.map((x) => x[0])), state: z.enum(penal.CHECK_STATES), note: z.string().trim().max(300).default('') }))
+          .max(penal.CHECK_ITEMS.length)
+          .optional(),
+      }),
+      req,
+      res
+    );
     if (!d) return;
+    if (d.checklist) db.prepare('UPDATE case_charges SET checklist = ? WHERE id = ?').run(JSON.stringify(d.checklist), ch.id);
     if (d.attempted && !ch.attempt) return res.status(400).json({ error: 'Der Versuch ist bei diesem Tatbestand nicht strafbar.' });
     db.prepare('UPDATE case_charges SET count = ?, attempted = ?, aiding = ? WHERE id = ?').run(
       d.count ?? ch.count,

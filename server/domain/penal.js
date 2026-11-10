@@ -63,8 +63,35 @@ function offenceRow(o) {
   };
 }
 
+/*
+ * Prüfschema je Anklagepunkt: die Stationen der Tatbestandsprüfung, je mit Stand und kurzer Notiz.
+ * gegeben = spricht gegen den Mandanten (Staatsanwaltschaft kann es belegen), angreifbar = Ansatz für die Verteidigung.
+ */
+const CHECK_ITEMS = [
+  ['objektiv', 'Objektiver Tatbestand', 'Tathandlung, Taterfolg, Ursächlichkeit'],
+  ['subjektiv', 'Subjektiver Tatbestand', 'Vorsatz bzw. Fahrlässigkeit, Absichten'],
+  ['rw', 'Rechtswidrigkeit', 'Rechtfertigung, z. B. Notwehr, Notstand, Einwilligung'],
+  ['schuld', 'Schuld', 'Schuldfähigkeit, Irrtum, Entschuldigungsgründe'],
+  ['beweis', 'Beweislage', 'Zeugen, Aufnahmen, Spuren, Geständnis'],
+  ['verfahren', 'Verfahren', 'Belehrung, Durchsuchung, Festnahme, Fristen'],
+];
+const CHECK_STATES = ['offen', 'gegeben', 'angreifbar'];
+function parseChecklist(json) {
+  let saved = [];
+  try {
+    saved = JSON.parse(json || '[]');
+  } catch {
+    saved = [];
+  }
+  const by = new Map((Array.isArray(saved) ? saved : []).map((x) => [x && x.k, x]));
+  return CHECK_ITEMS.map(([k, label, hint]) => {
+    const x = by.get(k) || {};
+    return { k, label, hint, state: CHECK_STATES.includes(x.state) ? x.state : 'offen', note: typeof x.note === 'string' ? x.note.slice(0, 300) : '' };
+  });
+}
+
 function chargeRow(c) {
-  return { ...offenceRow(c), id: c.id, offenceId: c.offence_id, count: c.count, attempted: !!c.attempted, aiding: !!c.aiding };
+  return { ...offenceRow(c), id: c.id, offenceId: c.offence_id, count: c.count, attempted: !!c.attempted, aiding: !!c.aiding, checklist: parseChecklist(c.checklist) };
 }
 
 /** Paragraph als Zahl zum Sortieren („103a“ nach „103“). */
@@ -304,4 +331,4 @@ function parseCharges(text) {
   return { items: [...found.values()], unknown: unknown.slice(0, 30) };
 }
 
-module.exports = { init, offences, laws, law, caseCharges, sentence, chargesText, parseCharges, offenceRow, citation, usd, CAP, CAP_SEVERE, FINE_PER_HE, FINE_MODES };
+module.exports = { CHECK_ITEMS, CHECK_STATES, init, offences, laws, law, caseCharges, sentence, chargesText, parseCharges, offenceRow, citation, usd, CAP, CAP_SEVERE, FINE_PER_HE, FINE_MODES };

@@ -50,6 +50,25 @@ router.get('/news', (req, res) => {
  * der Mandant ohnehin sehen darf – Rechtsgebiet, Schritt, Status, zuständiger Anwalt, Hinweis der Kanzlei. Kein Inhalt
  * der Akte, keine Namen von Beteiligten. Fehlversuche zählen (Schutz gegen Durchprobieren der Pins).
  */
+const STATUS_SELECT = `SELECT c.case_number, c.area, c.step, c.status, c.public_note, c.created_at, c.updated_at, c.closed_at, lu.display_name AS lawyer_name
+  FROM cases c LEFT JOIN users lu ON lu.id = c.lawyer_id`;
+function statusOut(c) {
+  const { CASE_STATUS } = require('../core/helpers');
+  const steps = areas.stepsOf(c.area);
+  return {
+    caseNumber: c.case_number,
+    area: areas.name(c.area),
+    steps: [...steps, 'Abgeschlossen'],
+    step: c.status === 'geschlossen' ? steps.length : Math.min(Math.max(c.step || 0, 0), steps.length - 1),
+    status: c.status,
+    statusLabel: CASE_STATUS[c.status] || c.status,
+    lawyer: c.lawyer_name || null,
+    note: c.public_note || '',
+    openedAt: c.created_at,
+    updatedAt: c.updated_at,
+    closedAt: c.closed_at,
+  };
+}
 const statusLimiter = limit(15 * 60 * 1000, 10, 'Zu viele Versuche. Bitte warten Sie einige Minuten.');
 const statusSchema = z.object({ number: z.string().trim().min(3).max(40), pin: z.string().trim().regex(/^\d{4,8}$/, 'Der Pin besteht aus Ziffern.') });
 router.post(
@@ -58,30 +77,27 @@ router.post(
   wrap(async (req, res) => {
     const d = parseBody(statusSchema, req, res);
     if (!d) return;
-    const c = db
-      .prepare(
-        `SELECT c.case_number, c.area, c.step, c.status, c.public_note, c.created_at, c.updated_at, c.closed_at, lu.display_name AS lawyer_name
-           FROM cases c LEFT JOIN users lu ON lu.id = c.lawyer_id
-          WHERE c.case_number = ? COLLATE NOCASE AND c.access_pin = ?`
-      )
-      .get(d.number, d.pin);
+    const c = db.prepare(`${STATUS_SELECT} WHERE c.case_number = ? COLLATE NOCASE AND c.access_pin = ?`).get(d.number, d.pin);
     if (!c) return res.status(404).json({ error: 'Kein Verfahren mit diesem Aktenzeichen und Pin gefunden.' });
-    const { CASE_STATUS } = require('../core/helpers');
-    const steps = areas.stepsOf(c.area);
     res.set('Cache-Control', 'no-store');
-    res.json({
-      caseNumber: c.case_number,
-      area: areas.name(c.area),
-      steps: [...steps, 'Abgeschlossen'],
-      step: c.status === 'geschlossen' ? steps.length : Math.min(Math.max(c.step || 0, 0), steps.length - 1),
-      status: c.status,
-      statusLabel: CASE_STATUS[c.status] || c.status,
-      lawyer: c.lawyer_name || null,
-      note: c.public_note || '',
-      openedAt: c.created_at,
-      updatedAt: c.updated_at,
-      closedAt: c.closed_at,
-    });
+    res.json(statusOut(c));
+  })
+);
+
+/*
+ * Statuslink ohne Konto und ohne Pin: die Kanzlei erzeugt in der Akte einen Link (/verfahrensstand?t=…), der genau
+ * dasselbe zeigt wie die Abfrage mit Aktenzeichen und Pin. Ein neuer Link macht den alten ungültig, abschalten geht jederzeit.
+ */
+const tokenLimiter = limit(15 * 60 * 1000, 60, 'Zu viele Abfragen. Bitte warten Sie einige Minuten.');
+router.get(
+  '/case-status/link/:token',
+  tokenLimiter,
+  wrap(async (req, res) => {
+    const t = String(req.params.token || '');
+    const c = /^[\w-]{20,64}$/.test(t) ? db.prepare(`${STATUS_SELECT} WHERE c.status_token = ?`).get(t) : null;
+    res.set('Cache-Control', 'no-store');
+    if (!c) return res.status(404).json({ error: 'Dieser Statuslink ist nicht (mehr) gültig – bitte fragen Sie in der Kanzlei nach einem neuen Link.' });
+    res.json(statusOut(c));
   })
 );
 

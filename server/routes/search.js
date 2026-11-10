@@ -103,7 +103,9 @@ router.get('/', (req, res) => {
   const L = (col) => `${col} LIKE ? ESCAPE '\\'`;
 
   // Akten (Kanzlei: alle, Mandant: eigene); Treffer im Aktenzeichen zuerst, offene vor geschlossenen
-  const caseWhere = [L('c.case_number'), L('c.title'), L('c.client_name'), L('cu.display_name'), L('c.opponent'), L('c.court_ref')];
+  // Volltext: auch Beschreibung und (Kanzlei) Sachverhalt – der Treffer kommt als Ausschnitt mit (preview, unten)
+  const caseWhere = [L('c.case_number'), L('c.title'), L('c.client_name'), L('cu.display_name'), L('c.opponent'), L('c.court_ref'), L('c.description')];
+  if (staff) caseWhere.push(L('c.incident'));
   const caseArgs = Array(caseWhere.length).fill(like);
   if (staff) {
     // Zusatzangaben (eigene Felder, z. B. Kennzeichen oder Haftnummer)
@@ -176,6 +178,16 @@ router.get('/', (req, res) => {
 
   const terms = [...new Set(fold(q).split(/\s+/).filter((t) => t.length >= 2))];
   const hitWords = new Set();
+  // Akten, die nur im Text getroffen wurden: Ausschnitt rund um die Fundstelle (Sachverhalt vor Beschreibung)
+  for (const c of cases) {
+    const head = fold(`${c.caseNumber} ${c.title} ${c.clientName} ${c.opponent || ''} ${c.courtRef || ''}`);
+    if (!terms.length || terms.some((t) => head.includes(t))) continue;
+    const src = [
+      ['Sachverhalt', c.incident],
+      ['Beschreibung', c.description],
+    ].find(([, text]) => text && terms.some((t) => fold(text).includes(t)));
+    if (src) Object.assign(c, { preview: snippet(src[1], terms), previewLabel: src[0] });
+  }
 
   // Tippfehler & Umlaute: fehlen Akten oder Mandanten, unscharf nachsuchen (nur in dem, was die Person sehen darf)
   if (terms.length && cases.length < 8) {

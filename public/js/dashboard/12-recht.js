@@ -62,7 +62,7 @@ function chargesSection(c, data, deals = []) {
               <button type="button" class="icon-btn sm" data-action="charge-remove" data-case-id="${c.id}" data-id="${ch.id}" aria-label="Anklagepunkt entfernen" title="Entfernen">${icon('trash', 'ico-sm')}</button>`
               : `${ch.attempted ? badge('Versuch', 'slate') : ''}${ch.aiding ? badge('Beihilfe', 'slate') : ''}<span class="chg-count">${ch.count}×</span>`
           }
-        </div></div>`
+        </div></div>${chkBlock(c, ch, edit)}`
     )
     .join('');
   const est = edit
@@ -142,6 +142,69 @@ function dealForm(caseId) {
 }
 
 /** Nach einer Änderung: Akte mit der Antwort neu zeichnen (ohne alles neu zu laden). */
+/* ---------------------------------------------------------------- Prüfschema je Anklagepunkt */
+const CHK_LABEL = { offen: 'offen', gegeben: 'gegeben', angreifbar: 'angreifbar' };
+const CHK_NEXT = { offen: 'gegeben', gegeben: 'angreifbar', angreifbar: 'offen' };
+const chkOpen = new Set(); // aufgeklappte Prüfschemata (bleiben beim Neuzeichnen offen)
+function chkSummary(list) {
+  const n = (k) => list.filter((x) => x.state === k).length;
+  const done = list.length - n('offen');
+  return `<span class="chk-sum-n">${done}/${list.length} geprüft</span>${n('angreifbar') ? `<span class="chk-pill is-angreifbar">${n('angreifbar')} angreifbar</span>` : ''}${n('gegeben') ? `<span class="chk-pill is-gegeben">${n('gegeben')} gegeben</span>` : ''}`;
+}
+function chkBlock(c, ch, edit) {
+  const list = ch.checklist || [];
+  if (!list.length) return '';
+  const items = list
+    .map(
+      (x) => `<li class="chk-item is-${x.state}" data-k="${esc(x.k)}">
+        ${edit ? `<button type="button" class="chk-state" data-action="chk-cycle" data-case-id="${c.id}" data-id="${ch.id}" data-k="${esc(x.k)}" title="Klicken: offen → gegeben → angreifbar">${esc(CHK_LABEL[x.state])}</button>` : `<span class="chk-state">${esc(CHK_LABEL[x.state])}</span>`}
+        <div class="chk-text"><span class="chk-label">${esc(x.label)}</span><span class="chk-hint">${esc(x.hint)}</span></div>
+        ${edit ? `<input class="field chk-note" maxlength="300" value="${esc(x.note)}" placeholder="Notiz …" data-change="chk-note" data-case-id="${c.id}" data-id="${ch.id}" data-k="${esc(x.k)}" aria-label="Notiz zu ${esc(x.label)}">` : x.note ? `<span class="chk-note-ro">${esc(x.note)}</span>` : ''}
+      </li>`
+    )
+    .join('');
+  return `<details class="chk-box" data-chg="${ch.id}"${chkOpen.has(ch.id) ? ' open' : ''}><summary>${icon('check', 'ico-sm')}<span>Prüfschema</span><span class="chk-sum">${chkSummary(list)}</span></summary><ul class="chk-list">${items}</ul></details>`;
+}
+document.addEventListener(
+  'toggle',
+  (e) => {
+    const d = e.target;
+    if (!d.matches || !d.matches('details.chk-box')) return;
+    const id = Number(d.dataset.chg);
+    if (d.open) chkOpen.add(id);
+    else chkOpen.delete(id);
+  },
+  true
+);
+/** Stand des Prüfschemas aus der Anzeige lesen (sofort sichtbar, gespeichert im Hintergrund). */
+function chkRead(box) {
+  return [...box.querySelectorAll('.chk-item')].map((li) => ({
+    k: li.dataset.k,
+    state: ['gegeben', 'angreifbar'].find((s) => li.classList.contains(`is-${s}`)) || 'offen',
+    note: (li.querySelector('.chk-note') || {}).value || '',
+  }));
+}
+async function chkSave(el) {
+  const box = el.closest('.chk-box');
+  const list = chkRead(box);
+  const sum = box.querySelector('.chk-sum');
+  if (sum) sum.innerHTML = chkSummary(list);
+  await api.patch(`/api/cases/${el.dataset.caseId}/charges/${el.dataset.id}`, { checklist: list });
+  casePrefetch.clear(); // beim nächsten Öffnen frisch vom Server
+}
+Object.assign(actions, {
+  'chk-cycle': async (el) => {
+    const li = el.closest('.chk-item');
+    const now = ['gegeben', 'angreifbar'].find((s) => li.classList.contains(`is-${s}`)) || 'offen';
+    const next = CHK_NEXT[now];
+    li.classList.remove(`is-${now}`);
+    li.classList.add(`is-${next}`);
+    el.textContent = CHK_LABEL[next];
+    await chkSave(el);
+  },
+  'chk-note': (el) => chkSave(el),
+});
+
 async function afterCharges(caseId, payload) {
   if (st.modalCaseId === caseId) await reloadCase(caseId);
   return payload;

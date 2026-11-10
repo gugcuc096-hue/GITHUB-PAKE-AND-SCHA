@@ -1,6 +1,6 @@
 /*
  * ERZEUGT von scripts/build-hell.js (npm run build:hell) – nicht von Hand ändern.
- * Helle Ansicht („Weiß“): 843 Farbangaben aus den Stylesheets umgerechnet, danach der Feinschliff aus scripts/hell-fein.css.
+ * Helle Ansicht („Weiß“): 849 Farbangaben aus den Stylesheets umgerechnet, danach der Feinschliff aus scripts/hell-fein.css.
  */
 /* ---- tokens.css ---- */
 :root:root[data-design="ruhig"][data-mode="hell"] { --navy-950: #f6f4ee; --navy-900: #ffffff; --navy-850: #ffffff; --navy-800: rgba(255, 255, 255, 0.85); --text-main: #141e3a; --text-muted: #353e5a; --text-dim: #5a637d; --glass-border: rgba(16, 26, 54, 0.15); --line: rgba(16, 26, 54, 0.088); --sh-1: 0 1px 2px rgba(16, 26, 54, 0.08), 0 6px 14px -8px rgba(16, 26, 54, 0.1); --sh-2: 0 1px 2px rgba(16, 26, 54, 0.07), 0 10px 24px -10px rgba(16, 26, 54, 0.11), 0 24px 48px -28px rgba(16, 26, 54, 0.1); --sh-3: 0 2px 4px rgba(16, 26, 54, 0.07), 0 16px 32px -12px rgba(16, 26, 54, 0.12), 0 32px 64px -32px rgba(16, 26, 54, 0.11); --sh-4: 0 4px 8px rgba(16, 26, 54, 0.08), 0 28px 56px -16px rgba(16, 26, 54, 0.14), 0 56px 96px -40px rgba(16, 26, 54, 0.12); }
@@ -337,6 +337,9 @@ html[data-design="ruhig"][data-mode="hell"] .inline-ico { color: #112697; }
 html[data-design="ruhig"][data-mode="hell"] .who2-av .duty-dot { border: 2px solid #ffffff; }
 html[data-design="ruhig"][data-mode="hell"] .case-chip { background: rgba(255, 255, 255, 0.5); }
 html[data-design="ruhig"][data-mode="hell"] .case-chip .ico { color: #111d97; }
+html[data-design="ruhig"][data-mode="hell"] .ie-autosave { color: var(--text-dim, #68708a); }
+html[data-design="ruhig"][data-mode="hell"] .ie-autosave[data-state="ok"] { color: #189061; }
+html[data-design="ruhig"][data-mode="hell"] .ie-autosave[data-state="error"] { color: #971111; }
 html[data-design="ruhig"][data-mode="hell"] .case-details { background: rgba(255, 255, 255, 0.3); }
 html[data-design="ruhig"][data-mode="hell"] .party-warn { color: #816a0e; }
 html[data-design="ruhig"][data-mode="hell"] .phase { background: rgba(255, 255, 255, 0.25); }
@@ -411,6 +414,9 @@ html[data-design="ruhig"][data-mode="hell"] .fee-pos-name { color: #0f1a36; }
 html[data-design="ruhig"][data-mode="hell"] .fee-success b { color: #149459; }
 html[data-design="ruhig"][data-mode="hell"] .fee-success .ico-sm { color: #189061; }
 html[data-design="ruhig"][data-mode="hell"] .fee-close [data-fee-won-hint] b { color: #149459; }
+html[data-design="ruhig"][data-mode="hell"] .nc-templates { border-bottom: 1px solid var(--line, rgba(16, 26, 54, 0.1)); }
+html[data-design="ruhig"][data-mode="hell"] .chk-pill.is-angreifbar, html[data-design="ruhig"][data-mode="hell"] .chk-item.is-angreifbar .chk-state { color: #189061; }
+html[data-design="ruhig"][data-mode="hell"] .chk-pill.is-gegeben, html[data-design="ruhig"][data-mode="hell"] .chk-item.is-gegeben .chk-state { color: #971111; }
 /* ---- website.css ---- */
 html[data-design="ruhig"][data-mode="hell"] .skeleton { background: linear-gradient(90deg, rgba(16, 26, 54, 0.05), rgba(16, 26, 54, 0.112), rgba(16, 26, 54, 0.05)); }
 html[data-design="ruhig"][data-mode="hell"] .ambient-bg { background: radial-gradient(circle at 50% -10%, #f0ede5 0%, var(--navy-950) 80%),

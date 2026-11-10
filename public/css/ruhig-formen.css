@@ -913,6 +913,15 @@ html[data-design="ruhig"] .fee-success {
 html[data-design="ruhig"] .fee-close {
     border-radius: 6px
 }
+html[data-design="ruhig"] .frist-auto {
+    border-radius: 6px
+}
+html[data-design="ruhig"] .chk-pill {
+    border-radius: 5px
+}
+html[data-design="ruhig"] .chk-state {
+    border-radius: 5px
+}
 /*  select.css  */
 @supports (appearance: base-select) {
     html[data-design="ruhig"] :is(select.field,

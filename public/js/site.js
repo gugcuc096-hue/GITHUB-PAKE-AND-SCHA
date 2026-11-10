@@ -890,6 +890,35 @@
     const out = document.getElementById('stResult');
     const err = document.getElementById('stError');
     const fmt = (v) => (v ? newsDate(v) : '–');
+    const showStatus = (c) => {
+      out.innerHTML = `<div class="kz-panel">
+            <span class="kz-rubric is-plain">${esc(c.area)}</span>
+            <h2 class="kz-h3 mt-2">Akte ${esc(c.caseNumber)}</h2>
+            <ol class="kz-progress">${c.steps.map((st, i) => `<li class="${i < c.step ? 'is-done' : i === c.step ? 'is-now' : ''}">${esc(st)}</li>`).join('')}</ol>
+            <dl class="kz-dl">
+              <dt>Status</dt><dd>${esc(c.statusLabel)}</dd>
+              <dt>Aktueller Schritt</dt><dd>${esc(c.steps[c.step] || '')}</dd>
+              <dt>Zuständig</dt><dd>${esc(c.lawyer || 'wird gerade zugeteilt')}</dd>
+              <dt>Eingegangen</dt><dd>${esc(fmt(c.openedAt))}</dd>
+              <dt>Zuletzt geändert</dt><dd>${esc(fmt(c.updatedAt))}</dd>
+            </dl>
+            ${c.note ? `<p class="mt-5"><span class="kz-rubric is-plain">Hinweis der Kanzlei</span><br><span class="kz-ink">${esc(c.note)}</span></p>` : ''}
+          </div>`;
+    };
+    // Statuslink aus der Kanzlei (/verfahrensstand?t=…): gleich anzeigen, ohne Aktenzeichen und Pin
+    const linkToken = new URLSearchParams(location.search).get('t');
+    if (linkToken) {
+      api
+        .get('/api/public/case-status/link/' + encodeURIComponent(linkToken))
+        .then((c) => {
+          showStatus(c);
+          out.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        })
+        .catch((ex) => {
+          err.textContent = (ex && ex.message) || 'Der Statuslink ist nicht gültig.';
+          err.classList.remove('hidden');
+        });
+    }
     statusForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const number = document.getElementById('stNumber').value.trim().toUpperCase();
@@ -903,20 +932,7 @@
       const btn = statusForm.querySelector('button[type="submit"]');
       btn.disabled = true;
       try {
-        const c = await api.post('/api/public/case-status', { number, pin });
-        out.innerHTML = `<div class="kz-panel">
-            <span class="kz-rubric is-plain">${esc(c.area)}</span>
-            <h2 class="kz-h3 mt-2">Akte ${esc(c.caseNumber)}</h2>
-            <ol class="kz-progress">${c.steps.map((st, i) => `<li class="${i < c.step ? 'is-done' : i === c.step ? 'is-now' : ''}">${esc(st)}</li>`).join('')}</ol>
-            <dl class="kz-dl">
-              <dt>Status</dt><dd>${esc(c.statusLabel)}</dd>
-              <dt>Aktueller Schritt</dt><dd>${esc(c.steps[c.step] || '')}</dd>
-              <dt>Zuständig</dt><dd>${esc(c.lawyer || 'wird gerade zugeteilt')}</dd>
-              <dt>Eingegangen</dt><dd>${esc(fmt(c.openedAt))}</dd>
-              <dt>Zuletzt geändert</dt><dd>${esc(fmt(c.updatedAt))}</dd>
-            </dl>
-            ${c.note ? `<p class="mt-5"><span class="kz-rubric is-plain">Hinweis der Kanzlei</span><br><span class="kz-ink">${esc(c.note)}</span></p>` : ''}
-          </div>`;
+        showStatus(await api.post('/api/public/case-status', { number, pin }));
       } catch (ex) {
         out.innerHTML = '';
         err.textContent = (ex && ex.message) || 'Abfrage fehlgeschlagen.';
