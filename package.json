@@ -13,6 +13,7 @@
     "seed:admin": "node scripts/seed-admin.js",
     "build:css": "node scripts/build-css.js",
     "build:ruhig": "node scripts/build-ruhig.js",
+    "build:hell": "node scripts/build-hell.js",
     "test": "node --test --test-concurrency=2 \"test/*.test.js\"",
     "test:schnell": "node scripts/test.js schnell",
     "test:browser": "node scripts/test.js browser",

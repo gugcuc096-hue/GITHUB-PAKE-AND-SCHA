@@ -68,3 +68,11 @@
   --bottomnav-h: 64px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
+
+/* Umschalter „Blau / Weiß“ (public/js/gfx.js → PSMode): Sonne = zur hellen Ansicht, Mond = zurück zu Blau. Nur im Design „Ruhig“. */
+.mode-toggle { flex: none; }
+.mode-toggle svg { width: 18px; height: 18px; }
+.mode-toggle .mode-moon { display: none; }
+html[data-mode="hell"] .mode-toggle .mode-sun { display: none; }
+html[data-mode="hell"] .mode-toggle .mode-moon { display: block; }
+html[data-design="klassisch"] .mode-toggle { display: none; }

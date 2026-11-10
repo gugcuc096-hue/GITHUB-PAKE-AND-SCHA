@@ -411,12 +411,10 @@ html[data-design="ruhig"] .is-paper :is(h3, h4) a:hover { color: var(--gold-ligh
   html[data-design="ruhig"] .is-paper.has-side .kz-paper-row:first-child { padding-top: 2rem; }
 }
 
-/* Ablauf eines Mandats: der eine helle Abschnitt – Elfenbein wie Briefpapier, dunkle Schrift */
-html[data-design="ruhig"] .site-home #ablauf { --kz-ink: #101a36; --kz-text: #3b4359; --kz-muted: #6a7084; --text-main: #101a36; --rz-line: rgba(16, 26, 54, 0.14); --rz-line-2: rgba(16, 26, 54, 0.24); --gold-500: #8f6f1f; --gold-light: #8f6f1f; background: #f4efe3; color: var(--kz-text); }
-html[data-design="ruhig"] .site-home #ablauf.is-band::before { content: none; }
+/* Ablauf eines Mandats: gesetzt wie eine Gliederung – Linie oben, große Ziffer, kein Kasten */
 html[data-design="ruhig"] .site-home #ablauf .kz-flow { gap: var(--sp-3) var(--sp-3); }
-html[data-design="ruhig"] .site-home #ablauf .kz-flow > li { padding: 1.25rem 0 0; background: none; border: 0; border-top: 2px solid #101a36; border-radius: 0; box-shadow: none; transform: none; }
-html[data-design="ruhig"] .site-home #ablauf .kz-flow > li::before { content: counter(flow, decimal-leading-zero); display: block; width: auto; height: auto; margin-bottom: 1.1rem; border-radius: 0; background: none; box-shadow: none; font: 500 2.75rem/1 var(--kz-serif); color: #8f6f1f; font-variant-numeric: lining-nums; }
+html[data-design="ruhig"] .site-home #ablauf .kz-flow > li { padding: 1.25rem 0 0; background: none; border: 0; border-top: 2px solid var(--gold-500); border-radius: 0; box-shadow: none; transform: none; }
+html[data-design="ruhig"] .site-home #ablauf .kz-flow > li::before { content: counter(flow, decimal-leading-zero); display: block; width: auto; height: auto; margin-bottom: 1.1rem; border-radius: 0; background: none; box-shadow: none; font: 500 2.75rem/1 var(--kz-serif); color: var(--gold-500); font-variant-numeric: lining-nums; }
 html[data-design="ruhig"] .site-home #ablauf .kz-flow > li::after { content: none; }
 html[data-design="ruhig"] .site-home #ablauf .kz-flow h3 { font-size: 1.4rem; }
 html[data-design="ruhig"] .site-home #ablauf .kz-flow p { font-size: 0.95rem; line-height: 1.6; }
