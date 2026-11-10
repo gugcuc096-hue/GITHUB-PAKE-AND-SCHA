@@ -300,7 +300,7 @@ function processTicketForm(c) {
  * Felder direkt in der Akte ändern: Klick auf den Wert → Eingabe, Enter oder Verlassen speichert (Esc verwirft), danach
  * „Rückgängig“. Die Akte wird dabei nicht neu geladen. Nur für zuständige Anwälte und das Board (c.canEdit).
  */
-const IE_LABEL = { incident: 'Tathergang', title: 'Titel', clientName: 'Mandant', clientPhone: 'Telefon', opponent: 'Gegenpartei', courtRef: 'Gerichtsaktenzeichen', area: 'Rechtsgebiet', description: 'Sachverhalt', publicNote: 'Statushinweis' };
+const IE_LABEL = { incident: 'Tathergang', title: 'Titel', clientName: 'Mandant', clientPhone: 'Telefon', opponent: 'Gegenpartei', courtRef: 'Aktenzeichen', area: 'Rechtsgebiet', description: 'Sachverhalt', publicNote: 'Statushinweis' };
 function ie(c, key, value, { type = 'text', placeholder = '', cls = '' } = {}) {
   const v = String(value ?? '');
   const shown = key === 'area' ? AREAS[v] || v : v;
@@ -856,16 +856,6 @@ function typingHide() {
   $('#chatTyping')?.remove();
 }
 
-/** Kürzel für den Laufzettel: „Dr. Alois Pake“ → „AP“. */
-const slipInitials = (name) =>
-  String(name || '')
-    .replace(/\b(Dr|Prof|Mr|Mrs|Ms)\.?\s+/gi, '')
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
 /** Verknüpfte Akten als Chips (öffnen die Akte; zuständige Anwälte können die Verknüpfung lösen). */
 function linksHtml(c, links) {
   return `<div class="case-links">${links
@@ -876,14 +866,8 @@ function linksHtml(c, links) {
     )
     .join('')}</div>`;
 }
-/** Laufzettel: wer die Akte bearbeitet hat – Kürzel und Tag, voller Name im Tooltip. */
-function routingHtml(routing) {
-  return `<div class="slip">${routing
-    .map((r) => `<span class="slip-row" title="${esc(`${r.name} – ${r.count} ${r.count === 1 ? 'Eintrag' : 'Einträge'}, zuletzt ${fmtDate(r.lastAt)}`)}"><b>${esc(slipInitials(r.name))}</b><span>${esc(shortDate(r.lastAt))}</span></span>`)
-    .join('')}</div>`;
-}
 
-function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, transcripts = [], clientSuggestions, review, chat, charges, deals = [], links = [], linkedEvidence = [], routing = [], parties = [], places = [], fall = null, overlaps = {}, requests = [], similar = [], precedentId = null, logMore = 0, feeAgreement = null }) {
+function caseDetail({ case: c, notes, appointments, invoices, attachments = [], externalDocs = [], tasks = [], contracts = [], work, ticket, transcripts = [], clientSuggestions, review, chat, charges, deals = [], links = [], linkedEvidence = [], parties = [], places = [], fall = null, overlaps = {}, requests = [], similar = [], precedentId = null, logMore = 0, feeAgreement = null }) {
   const staff = isStaff();
   const calm = caseCalm();
   st.caseFall = fall; // Bausteine des Rechtsgebiets (12-fall.js): bestimmen Abschnitte, Titel und was wegfällt
@@ -943,10 +927,9 @@ function caseDetail({ case: c, notes, appointments, invoices, attachments = [], 
     ['Rechtsgebiet', null, c.canEdit ? ie(c, 'area', c.area, { type: 'select' }) : esc(AREAS[c.area] || c.area)],
     c.opponent || c.canEdit ? ['Gegenpartei', null, c.canEdit ? ie(c, 'opponent', c.opponent, { placeholder: 'Gegenpartei eintragen' }) : esc(c.opponent)] : null,
     c.courtRef || c.canEdit
-      ? ['Gerichtsaktenzeichen', null, c.canEdit ? `${ie(c, 'courtRef', c.courtRef, { placeholder: 'Aktenzeichen des Gerichts' })}${c.courtRef ? ` <button type="button" class="copy-btn" data-action="copy" data-text="${esc(c.courtRef)}" title="Gerichtsaktenzeichen kopieren" aria-label="Gerichtsaktenzeichen kopieren">${icon('copy', 'ico-xs')}</button>` : ''}` : copyable(c.courtRef, 'Gerichtsaktenzeichen kopieren')]
+      ? ['Aktenzeichen', null, c.canEdit ? `${ie(c, 'courtRef', c.courtRef, { placeholder: 'z. B. vom Gericht oder der Staatsanwaltschaft' })}${c.courtRef ? ` <button type="button" class="copy-btn" data-action="copy" data-text="${esc(c.courtRef)}" title="Aktenzeichen kopieren" aria-label="Gerichtsaktenzeichen kopieren">${icon('copy', 'ico-xs')}</button>` : ''}` : copyable(c.courtRef, 'Gerichtsaktenzeichen kopieren')]
       : null,
     staff && links.length ? ['Verknüpfte Akten', null, linksHtml(c, links)] : null,
-    staff && routing.length ? ['Bearbeitet von', null, routingHtml(routing)] : null,
   ]
     .filter(Boolean)
     .map(([k, v, html]) => `<div><div class="k">${esc(k)}</div><div class="v">${html != null ? html : esc(v)}</div></div>`)
@@ -1400,7 +1383,7 @@ async function newCaseModal() {
           ? `<div><label class="label">Priorität</label><select name="priority" class="field">${Object.entries(PRIORITY).map(([k, [l]]) => opt(k, l, k === '2')).join('')}</select></div>`
           : `<div><label class="label">Dringlichkeit</label><select name="urgency" class="field">${Object.entries(URGENCY).map(([k, [l]]) => opt(k, l)).join('')}</select></div>`}
         ${staff ? `<div><label class="label">Gegenpartei</label><input name="opponent" class="field" maxlength="120" placeholder="optional"></div>
-          <div><label class="label">Gerichtsaktenzeichen</label><input name="courtRef" class="field" maxlength="60" placeholder="optional"></div>` : ''}
+          <div><label class="label">Aktenzeichen</label><input name="courtRef" class="field" maxlength="60" placeholder="optional"></div>` : ''}
         ${isBoard() ? `<label class="check span-2 secret-check"><input type="checkbox" name="boardOnly"> ${icon('lock', 'ico-sm')} Geheimes Mandat – nur für das Board of Partners und die zugewiesenen Anwälte sichtbar</label>` : ''}
         ${staff ? lawyerPicker({ leadId: st.user.id, withLead: isAdmin(), emptyLead: 'Noch niemand (offene Anfrage)' }) : ''}
         <div class="span-2 area-fields" id="ncAreaFields">${areaFieldsHtml((areaOptions()[0] || [''])[0], {}, staff)}</div>

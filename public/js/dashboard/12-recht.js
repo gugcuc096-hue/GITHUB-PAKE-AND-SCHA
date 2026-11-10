@@ -474,7 +474,7 @@ function hearingHtml() {
   const facts = [
     ['Mandant', c.clientName],
     c.opponent ? ['Gegenpartei', c.opponent] : null,
-    c.courtRef ? ['Gerichtsaktenzeichen', c.courtRef] : null,
+    c.courtRef ? ['Aktenzeichen', c.courtRef] : null,
     ['Zuständig', caseTeam(c).map((l) => l.name).join(', ') || '—'],
   ].filter(Boolean);
   const haft = !s || !list.length ? '' : s.fineOnly ? 'nur Geldstrafe' : s.minHe > 0 ? `${s.minHe}–${s.maxHe} HE` : `bis ${s.maxHe} HE`;
