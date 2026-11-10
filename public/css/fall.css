@@ -39,7 +39,7 @@
 /* Streitwert und Summe */
 .fall-sum { display: flex; align-items: baseline; gap: 0.6rem 1rem; flex-wrap: wrap; margin: 0 0 0.8rem; padding: 0.55rem 0.85rem; border-radius: 12px; border: 1px solid rgba(var(--accent-rgb), 0.28); background: linear-gradient(90deg, rgba(var(--accent-rgb), 0.1), rgba(var(--accent-rgb), 0.02) 70%); }
 .fall-sum span { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); }
-.fall-sum strong { font-size: 1.1rem; color: var(--gold-light, #f3e5ab); }
+.fall-sum strong { font-size: 1.1rem; color: var(--gold-light, #e9dbbe); }
 .fall-sum em { font-style: normal; font-size: 0.8rem; color: var(--text-muted); }
 
 /* Karten */
@@ -52,7 +52,7 @@
 .fall-no { font-family: var(--font-num); font-size: 0.75rem; font-weight: 700; color: var(--gold-500); padding: 0.1rem 0.45rem; border-radius: 6px; background: rgba(var(--accent-rgb), 0.14); }
 .fall-date { font-size: 0.75rem; color: var(--text-dim); }
 .fall-chips { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; justify-content: flex-end; }
-.fall-amount { font-weight: 700; color: var(--gold-light, #f3e5ab); margin-right: 0.2rem; }
+.fall-amount { font-weight: 700; color: var(--gold-light, #e9dbbe); margin-right: 0.2rem; }
 .fall-flow { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-muted); flex-wrap: wrap; }
 .fall-flow .ico-sm { color: var(--gold-500); flex: none; }
 .fall-line { display: flex; gap: 0.6rem; font-size: 0.85rem; flex-wrap: wrap; align-items: baseline; }
@@ -79,7 +79,7 @@
 /* Akten-Vorlage umbenennen und ansehen (Einstellungen → Listen → Rechtsgebiete → Vorlage) */
 .tpl-form { display: grid; gap: 1.1rem; }
 .tpl-group { margin: 0; padding: 0.85rem 1rem 1rem; border: 1px solid var(--line); border-radius: 14px; background: rgba(255, 255, 255, 0.02); display: grid; gap: 0.5rem; }
-.tpl-group legend { padding: 0 0.5rem; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold-light, #f3e5ab); }
+.tpl-group legend { padding: 0 0.5rem; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold-light, #e9dbbe); }
 .tpl-row { display: grid; grid-template-columns: minmax(8rem, 14rem) 1fr; align-items: center; gap: 0.4rem 1rem; }
 .tpl-def { font-size: 0.82rem; color: var(--text-muted); overflow-wrap: anywhere; }
 .tpl-actions { position: sticky; bottom: -1px; padding: 0.8rem 0 0.2rem; background: linear-gradient(180deg, transparent, rgba(10, 16, 34, 0.96) 35%); flex-wrap: wrap; }

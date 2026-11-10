@@ -3,7 +3,7 @@
  * Akzentfarbe zum Einstellen (Einstellungen → Konfiguration → Stil & Saison): festes Gold im CSS wird zu Variablen,
  * die theme.js beim Ausliefern der Seite setzt. Läuft beim Bauen von tailwind.css (scripts/build-css.js) und einmalig
  * über die übrigen Stylesheets:  node scripts/accent.js
- *   #d4af37 → var(--gold-500) · #b8962e → var(--gold-600) · #f3e5ab → var(--gold-light)
+ *   #d4af37/#c9a45c (Messing, seit 2026-11) → var(--gold-500) · #b8962e → var(--gold-600) · #f3e5ab → var(--gold-light)
  *   weitere Goldtöne (#e6c25a, #c9a227 …) → color-mix(…var(--gold-500)…)
  *   rgba(212, 175, 55, a) → rgba(var(--accent-rgb), a) – ebenso das helle (243, 229, 171) und dunkle Gold (184, 150, 46)
  * Die Definitionen selbst (--gold-500: #d4af37) und Selektoren (.bg-\[\#d4af37\]) bleiben unberührt.
@@ -12,9 +12,9 @@ const fs = require('fs');
 const path = require('path');
 
 const HEX = [
-  [/(?<![\\\w-]|--gold-500:\s*|--gold-500,\s*)#d4af37\b/gi, 'var(--gold-500)'],
-  [/(?<![\\\w-]|--gold-600:\s*|--gold-600,\s*)#b8962e\b/gi, 'var(--gold-600)'],
-  [/(?<![\\\w-]|--gold-light:\s*|--gold-light,\s*)#f3e5ab\b/gi, 'var(--gold-light)'],
+  [/(?<![\\\w-]|--gold-500:\s*|--gold-500,\s*)(?:#d4af37|#c9a45c)\b/gi, 'var(--gold-500)'],
+  [/(?<![\\\w-]|--gold-600:\s*|--gold-600,\s*)(?:#b8962e|#ad8d4f)\b/gi, 'var(--gold-600)'],
+  [/(?<![\\\w-]|--gold-light:\s*|--gold-light,\s*)(?:#f3e5ab|#e9dbbe)\b/gi, 'var(--gold-light)'],
 ];
 // weitere Goldtöne (heller/dunkler) als Mischung aus der Akzentfarbe
 const LIGHT = 'color-mix(in srgb, var(--gold-500), #fff 15%)';
@@ -27,12 +27,12 @@ const SHADES = [
   [/(?<![\\\w-])#(8f7322|8a6d1f)\b/gi, 'color-mix(in srgb, var(--gold-500), #000 35%)'],
 ];
 const RGB = [
-  [/rgba\(\s*212\s*,\s*175\s*,\s*55\s*,\s*/g, 'rgba(var(--accent-rgb), '],
+  [/rgba\(\s*(?:212\s*,\s*175\s*,\s*55|201\s*,\s*164\s*,\s*92)\s*,\s*/g, 'rgba(var(--accent-rgb), '],
   [/rgba\(\s*243\s*,\s*229\s*,\s*171\s*,\s*/g, 'rgba(var(--accent-light-rgb), '],
   [/rgba\(\s*184\s*,\s*150\s*,\s*46\s*,\s*/g, 'rgba(var(--accent-dark-rgb), '],
 ];
 /** Standardwerte der Variablen (stehen in jedem :root, das --gold-500 definiert). */
-const ROOT_VARS = '--accent-rgb: 212, 175, 55; --accent-light-rgb: 243, 229, 171; --accent-dark-rgb: 184, 150, 46;';
+const ROOT_VARS = '--accent-rgb: 201, 164, 92; --accent-light-rgb: 233, 219, 190; --accent-dark-rgb: 173, 141, 79;';
 
 function accentize(css) {
   let out = css;

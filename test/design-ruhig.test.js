@@ -21,7 +21,7 @@ try {
 }
 
 const ROOT = path.join(__dirname, '..');
-const STYLE = { preset: 'gold', accent: '#d4af37', glass: 50, radius: 50, font: 'klassisch', motion: 'normal', season: 'aus', seasonDash: true };
+const STYLE = { preset: 'gold', accent: '#c9a45c', glass: 50, radius: 50, font: 'klassisch', motion: 'normal', season: 'aus', seasonDash: true };
 
 describe('Design „Ruhig“: Dateien', () => {
   it('ruhig-formen.css ist aktuell (npm run build:ruhig)', () => {

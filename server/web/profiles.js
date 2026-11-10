@@ -227,7 +227,7 @@ function render(member, facts, { origin, url, slots = [] }) {
     desc: summary.length > 200 ? `${summary.slice(0, 197)}…` : summary,
     image: photo,
     card: member.photoUrl ? 'summary' : 'summary_large_image',
-    themeColor: '#d4af37',
+    themeColor: '#c9a45c',
   };
   return { head, body: blocks, meta };
 }

@@ -7,7 +7,7 @@
 /* Zahlen, Aktenzeichen, Codes: Inter mit gleich breiten Ziffern – keine Programmierschrift */
 :root { --font-num: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; }
 .font-mono { font-family: var(--font-num) !important; font-variant-numeric: lining-nums tabular-nums; letter-spacing: 0; }
-:root { --gold-500: #d4af37; --gold-600: #b8962e; --gold-light: #f3e5ab; --accent-rgb: 212, 175, 55; --accent-light-rgb: 243, 229, 171; --accent-dark-rgb: 184, 150, 46; }
+:root { --gold-500: #c9a45c; --gold-600: #ad8d4f; --gold-light: #e9dbbe; --accent-rgb: 201, 164, 92; --accent-light-rgb: 233, 219, 190; --accent-dark-rgb: 173, 141, 79; }
 
 @font-face {
   font-family: 'Inter';

@@ -21,7 +21,7 @@
   // Dienststatus: [Beschriftung, Punktfarbe, Textfarbe]
   const DUTY = {
     dienst: ['Im Dienst', 'bg-emerald-400', 'text-emerald-300'],
-    gericht: ['Im Gericht', 'bg-[#d4af37]', 'text-[var(--gold-light)]'],
+    gericht: ['Im Gericht', 'bg-[#c9a45c]', 'text-[var(--gold-light)]'],
     pause: ['Pause', 'bg-amber-400', 'text-amber-300'],
   };
 
@@ -59,7 +59,7 @@
         <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg></div>
       <h3 class="font-serif text-2xl font-semibold text-white text-center mb-2">Mandat eingegangen</h3>
       <p class="text-sm text-[var(--text-muted)] text-center mb-5">${res.lawyerName ? `${esc(res.lawyerName)} wurde benachrichtigt und meldet sich umgehend.` : 'Ein Anwalt der Kanzlei wurde benachrichtigt und meldet sich umgehend.'}${res.linkedToAccount ? ' Die Akte wurde Ihrem Konto hinzugefügt.' : ''}</p>
-      <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3 text-center mb-3"><div class="text-[0.6rem] uppercase tracking-widest text-[var(--text-muted)]">Ihr Aktenzeichen</div><div class="tabular-nums text-lg text-[var(--gold-light)]">${esc(res.caseNumber)}</div></div>
+      <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(201,164,92,0.07)] p-3 text-center mb-3"><div class="text-[0.6rem] uppercase tracking-widest text-[var(--text-muted)]">Ihr Aktenzeichen</div><div class="tabular-nums text-lg text-[var(--gold-light)]">${esc(res.caseNumber)}</div></div>
       <p class="text-xs text-[var(--text-muted)] text-center mb-5">Bitte geben Sie das Aktenzeichen bei Rückfragen an.${res.linkedToAccount ? '' : ' Mit einem Mandantenkonto sehen Sie den Stand Ihrer Akte jederzeit im Mandantenportal.'}</p>
       <div class="flex flex-col sm:flex-row gap-2">
         <button type="button" id="ticketCopy" class="btn-outline flex-1 py-3 text-xs uppercase tracking-wider">Aktenzeichen kopieren</button>
@@ -388,9 +388,9 @@
       .map((t) => {
         const life = t.kind === 'perma';
         return `
-        <article class="glass-card p-8 border-t-2 ${life ? 'border-t-[var(--gold-500)] shadow-[0_0_40px_rgba(212,175,55,0.12)]' : 'border-t-sky-400/60'} flex flex-col">
+        <article class="glass-card p-8 border-t-2 ${life ? 'border-t-[var(--gold-500)] shadow-[0_0_40px_rgba(201,164,92,0.12)]' : 'border-t-sky-400/60'} flex flex-col">
           <div class="flex items-center justify-between mb-4">
-            <span class="text-[0.65rem] tabular-nums px-3 py-1 rounded-full uppercase font-semibold ${life ? 'bg-[rgba(212,175,55,0.15)] text-[var(--gold-light)] border border-[var(--gold-hairline)]' : 'bg-sky-500/10 text-sky-300 border border-sky-500/20'}">${life ? '👑 Lifetime' : '⭐ VIP'}</span>
+            <span class="text-[0.65rem] tabular-nums px-3 py-1 rounded-full uppercase font-semibold ${life ? 'bg-[rgba(201,164,92,0.15)] text-[var(--gold-light)] border border-[var(--gold-hairline)]' : 'bg-sky-500/10 text-sky-300 border border-sky-500/20'}">${life ? '👑 Lifetime' : '⭐ VIP'}</span>
             <span class="text-xs text-[var(--text-muted)] tabular-nums">${life ? 'unbefristet' : `${Number(t.durationDays)} Tage`}</span>
           </div>
           <h3 class="font-serif text-3xl font-semibold text-white mb-2">${esc(t.name)}</h3>
@@ -1144,8 +1144,8 @@
       <h3 class="font-serif text-2xl font-semibold text-white text-center mb-2">Anliegen übermittelt</h3>
       <p class="text-sm text-[var(--text-muted)] text-center mb-5">Das Board of Partners wurde benachrichtigt und meldet sich.${res.linkedToAccount ? ' Sie finden das Anliegen auch in Ihrem Dashboard.' : ''}</p>
       <div class="grid grid-cols-2 gap-3 mb-3">
-        <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3 text-center"><div class="text-[0.6rem] uppercase tracking-widest text-[var(--text-muted)]">Vorgangsnummer</div><div class="tabular-nums text-lg text-[var(--gold-light)]">${esc(res.reference)}</div></div>
-        <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.07)] p-3 text-center"><div class="text-[0.6rem] uppercase tracking-widest text-[var(--text-muted)]">Pin</div><div class="tabular-nums text-lg tracking-[0.2em] text-[var(--gold-light)]">${esc(res.pin)}</div></div>
+        <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(201,164,92,0.07)] p-3 text-center"><div class="text-[0.6rem] uppercase tracking-widest text-[var(--text-muted)]">Vorgangsnummer</div><div class="tabular-nums text-lg text-[var(--gold-light)]">${esc(res.reference)}</div></div>
+        <div class="rounded-xl border border-[var(--gold-hairline)] bg-[rgba(201,164,92,0.07)] p-3 text-center"><div class="text-[0.6rem] uppercase tracking-widest text-[var(--text-muted)]">Pin</div><div class="tabular-nums text-lg tracking-[0.2em] text-[var(--gold-light)]">${esc(res.pin)}</div></div>
       </div>
       <p class="text-xs text-amber-300/90 text-center mb-5">${res.linkedToAccount ? 'Bitte notieren Sie beide Angaben – damit lesen Sie jederzeit die Antwort des Boards.' : 'Auf diesem Gerät ist Ihr Anliegen gespeichert – unter „Meine Anliegen“ genügt ein Klick. Für andere Geräte bitte beide Angaben notieren.'}</p>
       <div class="flex flex-col sm:flex-row gap-2">
@@ -1210,7 +1210,7 @@
             const cls = m.system
               ? 'border-dashed border-[var(--glass-border)] text-[var(--text-dim)]'
               : m.fromBoard
-                ? 'border-[var(--gold-hairline)] bg-[rgba(212,175,55,0.06)]'
+                ? 'border-[var(--gold-hairline)] bg-[rgba(201,164,92,0.06)]'
                 : 'border-[var(--glass-border)] bg-slate-900/40';
             return `<div class="rounded-xl border ${cls} px-4 py-3">
               <div class="flex flex-wrap items-center gap-2 text-[0.7rem] text-[var(--text-dim)] mb-1"><span class="${m.fromBoard && !m.system ? 'text-[var(--gold-light)] font-medium' : 'text-[var(--text-muted)] font-medium'}">${esc(m.author)}</span>${m.fromBoard && !m.system ? '<span class="uppercase tracking-wider">Board of Partners</span>' : ''}<span>${esc(fmtWhen(m.createdAt))}</span></div>

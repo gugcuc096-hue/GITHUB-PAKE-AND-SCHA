@@ -1693,7 +1693,7 @@ function dpCommit() {
 }
 
 /* ---- Farbe ---- */
-const CP_SWATCHES = ['#d4af37', '#f3e5ab', '#b8962e', '#10b981', '#3b82f6', '#8b5cf6', '#ef4444', '#f59e0b', '#ec4899', '#14b8a6', '#94a3b8', '#ffffff'];
+const CP_SWATCHES = ['#c9a45c', '#e9dbbe', '#ad8d4f', '#10b981', '#3b82f6', '#8b5cf6', '#ef4444', '#f59e0b', '#ec4899', '#14b8a6', '#94a3b8', '#ffffff'];
 const cp = { el: null, input: null, h: 0, s: 0, v: 1 };
 
 function cpHsv(hex) {

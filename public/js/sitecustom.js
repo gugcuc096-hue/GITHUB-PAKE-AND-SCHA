@@ -3,7 +3,7 @@
  *  - an jedem Abschnitt eine kleine Leiste: nach oben / nach unten / ausblenden / Einstellungen
  *  - Seitenleiste „Startseite anpassen“: Abschnitte, Anwälte (Kanzleileitung, eigene Auswahl, im Dienst zuerst, alle;
  *    wie viele), Rechtsgebiete (welche, Reihenfolge), Aktuelles (wie viele Meldungen), Startbereich (zweiter Knopf,
- *    Hinweis „Bereits Mandant?“)
+ *    Hinweis „Bereits Mandant?“), Kanzleisitz (Pin auf der Karte setzen, Anschrift, Telefon, Sprechzeiten, Hinweis)
  * Jede Änderung zeigt sich sofort auf der Seite; „Veröffentlichen“ speichert sie in der Konfiguration „Startseite“
  * (Entwurf → veröffentlichen, wie im Dashboard, mit Änderungsprotokoll) – danach sehen alle Besucher sie.
  */
@@ -14,7 +14,7 @@
   const PS = window.PS || {};
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
-  const SECTIONS = { fakten: 'Kennzahlen', gebiete: 'Rechtsgebiete', ansprechpartner: 'Anwälte', stimmen: 'Mandantenstimme', neuigkeiten: 'Aktuelles', ablauf: 'Ablauf eines Mandats', band: 'Abschluss „Mandat anfragen“' };
+  const SECTIONS = { fakten: 'Kennzahlen', gebiete: 'Rechtsgebiete', ansprechpartner: 'Anwälte', stimmen: 'Mandantenstimme', neuigkeiten: 'Aktuelles', ablauf: 'Ablauf eines Mandats', sitz: 'Kanzleisitz', band: 'Abschluss „Mandat anfragen“' };
   const MODES = { leitung: 'Kanzleileitung (Board of Partners)', auswahl: 'Eigene Auswahl', dienst: 'Wer im Dienst ist zuerst', alle: 'Alle Anwälte' };
   const HERO = { notdienst: ['/notdienst', 'Notdienst bei Festnahme'], anwaelte: ['/anwaelte', 'Unsere Anwälte'], honorare: ['/honorare', 'Honorare & Tarifrechner'], kontakt: ['/kontakt', 'Kontakt'], keiner: ['', 'Kein zweiter Knopf'] };
   const ICON = {
@@ -94,7 +94,64 @@
     }
     const note = main.querySelector('.kz-hero-note');
     if (note) note.hidden = !state.heroNote;
+    seatPreview();
     updateBar();
+  }
+  /* Kanzleisitz: Pin und Angaben sofort auf der Seite */
+  function seatPreview() {
+    const seat = state.seat;
+    const map = main.querySelector('[data-seat-map]');
+    if (!map) return;
+    const placed = Number.isFinite(seat.x) && Number.isFinite(seat.y);
+    map.style.setProperty('--x', placed ? seat.x : 50);
+    map.style.setProperty('--y', placed ? seat.y : 50);
+    map.toggleAttribute('data-seat-empty', !placed);
+    for (const k of ['address', 'phone', 'hours', 'note']) {
+      const dd = main.querySelector(`[data-seat="${k}"]`);
+      if (!dd) continue;
+      if (k === 'address' && !dd.dataset.orig) dd.dataset.orig = dd.textContent;
+      const v = seat[k] || (k === 'address' ? dd.dataset.orig : '');
+      dd.textContent = v;
+      dd.closest('[data-seat-row]').style.opacity = v ? '' : '.35';
+      if (!v) dd.textContent = '—';
+    }
+  }
+  /* Pin setzen: große Karte, Klick setzt den Pin (Prozent der Kartenbreite/-höhe) */
+  function pickSeat() {
+    const box = document.createElement('div');
+    box.className = 'sc-ui sc-pick';
+    box.innerHTML = `<div class="sc-pick-bar"><b>Kanzleisitz auf der Karte anklicken</b><span>Mausrad bzw. zwei Finger zum Verschieben</span><button type="button" class="btn-gold btn-md" data-pick-ok>Übernehmen</button><button type="button" class="btn-ghost btn-md" data-pick-x>Abbrechen</button></div>
+      <div class="sc-pick-scroll"><div class="sc-pick-map"><img src="/img/karte-sat.webp" alt="" draggable="false"><span class="sc-pick-pin" hidden></span></div></div>`;
+    document.body.appendChild(box);
+    const mapEl = box.querySelector('.sc-pick-map');
+    const pin = box.querySelector('.sc-pick-pin');
+    let pick = Number.isFinite(state.seat.x) ? { x: state.seat.x, y: state.seat.y } : null;
+    const show = () => {
+      pin.hidden = !pick;
+      if (pick) Object.assign(pin.style, { left: `${pick.x}%`, top: `${pick.y}%` });
+    };
+    show();
+    const scroller = box.querySelector('.sc-pick-scroll');
+    box.querySelector('img').addEventListener('load', () => {
+      const p = pick || { x: 50, y: 50 };
+      scroller.scrollLeft = (mapEl.offsetWidth * p.x) / 100 - scroller.clientWidth / 2;
+      scroller.scrollTop = (mapEl.offsetHeight * p.y) / 100 - scroller.clientHeight / 2;
+    }, { once: true });
+    mapEl.addEventListener('click', (e) => {
+      const r = mapEl.getBoundingClientRect();
+      const round = (v) => Math.round(Math.min(100, Math.max(0, v)) * 100) / 100;
+      pick = { x: round(((e.clientX - r.left) / r.width) * 100), y: round(((e.clientY - r.top) / r.height) * 100) };
+      show();
+    });
+    const close = () => box.remove();
+    box.querySelector('[data-pick-x]').addEventListener('click', close);
+    box.querySelector('[data-pick-ok]').addEventListener('click', () => {
+      if (pick) state.seat = { ...state.seat, ...pick };
+      close();
+      applyPreview();
+      renderDrawer();
+      sectionEl('sitz')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    });
   }
 
   /* ---------------------------------------------------------------- Leisten an den Abschnitten */
@@ -174,6 +231,12 @@
         <section data-grp="neuigkeiten"><h3>Aktuelles</h3>
           <label class="sc-field">Meldungen auf der Startseite <span class="sc-num"><button type="button" data-count="newsCount" data-d="-1" aria-label="Weniger">−</button><b>${state.newsCount}</b><button type="button" data-count="newsCount" data-d="1" aria-label="Mehr">+</button></span></label>
           <p>Meldungen schreiben Sie im Dashboard unter Einstellungen → Aktuelles.</p></section>
+        <section data-grp="sitz"><h3>Kanzleisitz</h3><p>${Number.isFinite(state.seat.x) ? 'Pin gesetzt – der Abschnitt erscheint auf der Startseite.' : 'Noch kein Pin – ohne Pin erscheint der Abschnitt nicht.'}</p>
+          <button type="button" class="btn-outline btn-md sc-wide" data-seat-pick>${Number.isFinite(state.seat.x) ? 'Pin verschieben' : 'Pin auf der Karte setzen'}</button>
+          <label class="sc-field sc-col">Anschrift <textarea data-seat-k="address" rows="2" maxlength="160" placeholder="leer = Kanzleisitz aus den Einstellungen">${esc(state.seat.address)}</textarea></label>
+          <label class="sc-field sc-col">Telefon <input data-seat-k="phone" maxlength="40" value="${esc(state.seat.phone)}" placeholder="z. B. 602-615-8184"></label>
+          <label class="sc-field sc-col">Sprechzeiten <input data-seat-k="hours" maxlength="120" value="${esc(state.seat.hours)}" placeholder="z. B. täglich 18–24 Uhr"></label>
+          <label class="sc-field sc-col">Hinweis <input data-seat-k="note" maxlength="200" value="${esc(state.seat.note)}" placeholder="z. B. Eingang über den Innenhof"></label></section>
         <section data-grp="hero"><h3>Startbereich</h3>
           <label class="sc-field">Zweiter Knopf <select data-hero>${Object.entries(HERO).map(([k, v]) => `<option value="${k}" ${state.heroSecond === k ? 'selected' : ''}>${esc(v[1])}</option>`).join('')}</select></label>
           <label class="sc-check"><input type="checkbox" data-note ${state.heroNote ? 'checked' : ''}> Hinweis „Bereits Mandant? …“ zeigen</label>
@@ -203,6 +266,7 @@
       return renderDrawer();
     }
     if (t.hasAttribute('data-publish')) return publish(t);
+    if (t.hasAttribute('data-seat-pick')) return pickSeat();
     if (t.dataset.count) {
       const k = t.dataset.count;
       const max = k === 'newsCount' ? 6 : 9;
@@ -227,6 +291,13 @@
     } else return;
     applyPreview();
     renderDrawer();
+  });
+  drawer.addEventListener('input', (e) => {
+    const k = e.target.dataset && e.target.dataset.seatK;
+    if (!k) return;
+    state.seat = { ...state.seat, [k]: e.target.value };
+    seatPreview();
+    updateBar();
   });
   drawer.addEventListener('change', (e) => {
     const t = e.target;
@@ -340,6 +411,17 @@
     .sc-foot { display: flex; align-items: center; gap: 8px; padding: 14px 20px calc(14px + var(--safe-bottom)); border-top: 1px solid var(--line); }
     .sc-state { flex: 1; min-width: 0; font-size: 12px; color: var(--text-dim); }
     .sc-empty { font-style: italic; }
+    .sc-col { flex-direction: column; align-items: stretch; gap: 6px; font-size: 12.5px; color: var(--text-dim); }
+    .sc-col input, .sc-col textarea { width: 100%; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--glass-border); background: rgba(15,23,42,.8); color: #fff; font: 14px/1.4 Inter, system-ui, sans-serif; resize: vertical; }
+    .sc-wide { width: 100%; justify-content: center; margin: 6px 0 4px; }
+    .sc-pick { position: fixed; inset: 0; z-index: 10000; display: flex; flex-direction: column; background: #03060f; }
+    .sc-pick-bar { background: #070d1c; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 18px; border-bottom: 1px solid var(--line); color: var(--text-dim); font: 13px Inter, system-ui, sans-serif; }
+    .sc-pick-bar b { color: var(--text-main); font-size: 15px; }
+    .sc-pick-bar span { flex: 1; }
+    .sc-pick-scroll { flex: 1; overflow: auto; }
+    .sc-pick-map { position: relative; width: 2400px; max-width: none; cursor: crosshair; }
+    .sc-pick-map img { display: block; width: 100%; height: auto; user-select: none; }
+    .sc-pick-pin { position: absolute; width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%; background: var(--gold-500); box-shadow: 0 0 0 6px rgba(var(--accent-rgb), .35), 0 6px 18px rgba(0,0,0,.6); pointer-events: none; }
     #scOpen.is-dirty::after { content: ''; width: 8px; height: 8px; margin-left: 6px; border-radius: 50%; background: var(--amber); }
     body.sc-open #stBar { right: calc(min(420px, 100%) + 16px); left: auto; transform: none; width: min(560px, calc(100% - min(420px, 100%) - 32px)); }
     @media (max-width: 899px) { body.sc-open #stBar { display: none; } }
@@ -353,6 +435,7 @@
       base = home.draft || home.published;
       const defaults = home.defaults.start;
       state = { ...defaults, ...(base.start || {}) };
+      state.seat = { ...(defaults.seat || {}), ...(state.seat || {}) };
       // später hinzugekommene Abschnitte hinter ihren Vorgänger aus der Standard-Reihenfolge (wie der Server: startOrder)
       const all = Object.keys(SECTIONS);
       state.order = state.order.filter((id) => SECTIONS[id]);

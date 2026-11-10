@@ -30,7 +30,7 @@ const SECTION_IDS = Object.keys(SECTIONS);
  * Rechtsgebiete, wie viele Meldungen und der zweite Knopf im Startbereich. Angewendet beim Ausliefern
  * (server/web/sitePages.js → applyStart), also ohne Flackern.
  */
-const START_SECTIONS = { fakten: 'Kennzahlen', gebiete: 'Rechtsgebiete', ansprechpartner: 'Anwälte', stimmen: 'Mandantenstimme', neuigkeiten: 'Aktuelles', ablauf: 'Ablauf eines Mandats', band: 'Abschluss mit „Mandat anfragen“' };
+const START_SECTIONS = { fakten: 'Kennzahlen', gebiete: 'Rechtsgebiete', ansprechpartner: 'Anwälte', stimmen: 'Mandantenstimme', neuigkeiten: 'Aktuelles', ablauf: 'Ablauf eines Mandats', sitz: 'Kanzleisitz mit Karte', band: 'Abschluss mit „Mandat anfragen“' };
 const START_IDS = Object.keys(START_SECTIONS);
 /** Gespeicherte Reihenfolge vervollständigen: ein später hinzugekommener Abschnitt steht hinter seinem Vorgänger aus der Standard-Reihenfolge. */
 function startOrder(order) {
@@ -45,7 +45,19 @@ function startOrder(order) {
 const LAWYER_MODES = { leitung: 'Kanzleileitung (Board of Partners)', auswahl: 'Eigene Auswahl', dienst: 'Wer gerade im Dienst ist zuerst', alle: 'Alle Anwälte' };
 const HERO_SECOND = { notdienst: 'Notdienst bei Festnahme', anwaelte: 'Unsere Anwälte', honorare: 'Honorare & Tarifrechner', kontakt: 'Kontakt', keiner: 'Kein zweiter Knopf' };
 const knownIds = (v) => (Array.isArray(v) ? v.filter((id) => START_IDS.includes(id)) : v);
-const START_DEFAULTS = { order: START_IDS, hidden: [], lawyerMode: 'leitung', lawyers: [], lawyerCount: 3, areas: [], newsCount: 3, heroSecond: 'notdienst', heroNote: true };
+/** Kanzleisitz auf der Startseite: Pin auf dem Kartenbild (x/y in Prozent der Kartenbreite/-höhe), Anschrift, Telefon, Zeiten. */
+const SEAT_DEFAULTS = { x: null, y: null, address: '', phone: '', hours: '', note: '' };
+const seatSchema = z
+  .object({
+    x: z.number().min(0).max(100).nullable().default(null),
+    y: z.number().min(0).max(100).nullable().default(null),
+    address: z.string().trim().max(160).default(''),
+    phone: z.string().trim().max(40).default(''),
+    hours: z.string().trim().max(120).default(''),
+    note: z.string().trim().max(200).default(''),
+  })
+  .default(SEAT_DEFAULTS);
+const START_DEFAULTS = { order: START_IDS, hidden: [], lawyerMode: 'leitung', lawyers: [], lawyerCount: 3, areas: [], newsCount: 3, heroSecond: 'notdienst', heroNote: true, seat: SEAT_DEFAULTS };
 const startSchema = z
   .object({
     // Abschnitte, die es nicht mehr gibt (z. B. „leitsatz“), fallen aus gespeicherten Einstellungen einfach heraus
@@ -59,6 +71,7 @@ const startSchema = z
     // „Verfahrensstand abfragen“ gibt es als Knopf nicht mehr – gespeicherte Wahl fällt auf den Notdienst zurück
     heroSecond: z.preprocess((v) => (v === 'verfahrensstand' ? 'notdienst' : v), z.enum(Object.keys(HERO_SECOND))).default('notdienst'),
     heroNote: z.boolean().default(true),
+    seat: seatSchema,
   })
   .default(START_DEFAULTS);
 
@@ -75,7 +88,7 @@ const MESSAGE_KEYS = ['payment', 'docs', 'appointment', 'review', 'receipt'];
 
 /** Stil-Vorlagen (Einstellungen → Konfiguration → Stil & Saison): Akzentfarbe, Glas, Rundung, Schrift. */
 const PRESETS = {
-  gold: { label: 'Klassisch Gold', accent: '#d4af37', glass: 50, radius: 50, font: 'klassisch' },
+  gold: { label: 'Klassisch Gold', accent: '#c9a45c', glass: 50, radius: 50, font: 'klassisch' },
   nacht: { label: 'Nacht-Blau', accent: '#7cc4fa', glass: 65, radius: 60, font: 'modern' },
   smaragd: { label: 'Smaragd', accent: '#34d399', glass: 55, radius: 50, font: 'klassisch' },
   bordeaux: { label: 'Bordeaux', accent: '#e8a0b4', glass: 45, radius: 40, font: 'elegant' },
@@ -144,7 +157,7 @@ const SPECS = {
       season: z.enum(['auto', 'aus', ...Object.keys(require('../domain/promotions').SEASONS)]),
       seasonDash: z.boolean(),
     }),
-    defaults: { design: 'ruhig', preset: 'gold', accent: '#d4af37', glass: 50, radius: 50, font: 'klassisch', motion: 'normal', season: 'auto', seasonDash: true },
+    defaults: { design: 'ruhig', preset: 'gold', accent: '#c9a45c', glass: 50, radius: 50, font: 'klassisch', motion: 'normal', season: 'auto', seasonDash: true },
   },
   numbering: {
     perm: 'settings.edit',

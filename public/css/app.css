@@ -1365,7 +1365,7 @@ body.ps-dialog-open { overflow: hidden; }
 }
 /* Discord-Bot: Nachrichten-Vorlagen */
 .msg-list { display: flex; flex-direction: column; gap: 0.6rem; }
-.msg-card, .msg-job { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem 1rem; padding: 0.8rem 1rem; border: 1px solid var(--glass-border); border-left: 3px solid var(--gold-500, #d4af37); border-radius: 14px; background: rgba(15, 23, 42, 0.45); }
+.msg-card, .msg-job { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem 1rem; padding: 0.8rem 1rem; border: 1px solid var(--glass-border); border-left: 3px solid var(--gold-500, #c9a45c); border-radius: 14px; background: rgba(15, 23, 42, 0.45); }
 .msg-job { border-left-color: #34d399; padding: 0.65rem 0.85rem; }
 .msg-job.off { border-left-color: rgba(148, 163, 184, 0.5); opacity: 0.8; }
 .msg-main { min-width: 0; flex: 1 1 18rem; }
@@ -2786,7 +2786,7 @@ body.hint-edit .form-hint[data-hint-key]:hover { background: rgba(var(--accent-r
 .kmap-tools .icon-btn.is-on { background: var(--gold-soft); color: var(--gold-light); }
 @media (hover: hover) and (pointer: fine) { .kmap-touch { display: none; } }
 .kmap-time { display: flex; align-items: center; gap: 0.75rem; margin: 0 0 0.75rem; }
-.kmap-time input[type="range"] { flex: 1; accent-color: var(--gold-500, #d4af37); }
+.kmap-time input[type="range"] { flex: 1; accent-color: var(--gold-500, #c9a45c); }
 .kmap-time output { min-width: 7.5rem; text-align: right; color: var(--text-muted); }
 .place-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
 .place-row { display: flex; align-items: stretch; gap: 0.25rem; border: 1px solid var(--glass-border); border-radius: 12px; background: rgba(255, 255, 255, 0.02); transition: opacity 0.2s ease, border-color 0.2s ease; }

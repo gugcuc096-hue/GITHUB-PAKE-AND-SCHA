@@ -702,3 +702,28 @@ html:active-view-transition .kz-hero-in > * { animation: none; }
 .pf-slot { display: grid; place-items: center; min-height: 40px; border: 1px solid var(--glass-border); border-radius: var(--r-sm); font: 600 0.85rem/1 var(--kz-sans); font-variant-numeric: tabular-nums; color: var(--kz-ink); text-decoration: none; transition: border-color var(--dur-1) ease, background var(--dur-1) ease, color var(--dur-1) ease; }
 a.pf-slot:hover { border-color: var(--gold-500); background: var(--gold-soft); color: var(--gold-light); }
 .pf-slot.is-taken { border-style: dashed; color: var(--kz-muted); opacity: 0.5; text-decoration: line-through; }
+
+/* Kanzleisitz: Karte mit Pin (Startseite anpassen → Kanzleisitz) und Anschrift */
+.kz-seat { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); border: 1px solid var(--line); background: rgba(255, 255, 255, 0.015); }
+.kz-seat-map { position: relative; margin: 0; min-height: 360px; overflow: hidden; background: #0b1424; border-right: 1px solid var(--line); }
+.kz-seat-map img { position: absolute; left: 50%; top: 50%; width: 360%; max-width: none; height: auto; transform: translate(calc(var(--x) * -1%), calc(var(--y) * -1%)); filter: saturate(0.82) brightness(0.92); user-select: none; -webkit-user-drag: none; }
+.kz-seat-map::after { content: ''; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04), inset 0 -80px 80px -60px rgba(4, 8, 20, 0.55); }
+.kz-seat-pin { position: absolute; left: 50%; top: 50%; z-index: 2; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: var(--gold-500); box-shadow: 0 0 0 5px rgba(var(--accent-rgb), 0.28), 0 6px 18px rgba(0, 0, 0, 0.55); }
+.kz-seat-pin > span { position: absolute; left: 50%; bottom: calc(100% + 12px); transform: translateX(-50%); padding: 6px 10px; white-space: nowrap; font: 600 0.72rem/1 var(--font-body); letter-spacing: 0.08em; text-transform: uppercase; color: #0b1020; background: var(--gold-500); box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45); }
+.kz-seat-pin > span::after { content: ''; position: absolute; left: 50%; top: 100%; margin-left: -6px; border: 6px solid transparent; border-top-color: var(--gold-500); }
+.kz-seat-map[data-seat-empty] .kz-seat-pin { opacity: 0.35; }
+.kz-seat-info { display: flex; flex-direction: column; padding: 2rem 2rem 1.75rem; }
+.kz-seat-name { margin: 0 0 1.1rem; font: 600 1.6rem/1.15 var(--font-display); color: var(--text-main); }
+.kz-seat-info dl { margin: 0; }
+.kz-seat-info dl > div { display: grid; grid-template-columns: 8.5rem minmax(0, 1fr); gap: 1rem; padding: 0.8rem 0; border-top: 1px solid var(--line); }
+.kz-seat-info dl > div:last-child { border-bottom: 1px solid var(--line); }
+.kz-seat-info dt { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-dim); padding-top: 0.2rem; }
+.kz-seat-info dd { margin: 0; color: var(--text-main); }
+.kz-seat-cta { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: auto; padding-top: 1.5rem; }
+@media (max-width: 860px) {
+  .kz-seat { grid-template-columns: 1fr; }
+  .kz-seat-map { min-height: 280px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .kz-seat-info { padding: 1.4rem 1.25rem 1.5rem; }
+  .kz-seat-info dl > div { grid-template-columns: 7rem minmax(0, 1fr); }
+  .kz-seat-cta .kz-btn { flex: 1 1 100%; justify-content: center; }
+}

@@ -12,7 +12,7 @@ CFG_TABS.push(['style', 'Stil & Saison', 'site.edit'], ['promos', 'Rabattaktione
 Object.assign(CFG_TONES, { glass: 'Glas (neutral)', night: 'Nacht-Blau' });
 
 const STYLE_PRESETS = {
-  gold: { label: 'Klassisch Gold', accent: '#d4af37', glass: 50, radius: 50, font: 'klassisch' },
+  gold: { label: 'Klassisch Gold', accent: '#c9a45c', glass: 50, radius: 50, font: 'klassisch' },
   nacht: { label: 'Nacht-Blau', accent: '#7cc4fa', glass: 65, radius: 60, font: 'modern' },
   smaragd: { label: 'Smaragd', accent: '#34d399', glass: 55, radius: 50, font: 'klassisch' },
   bordeaux: { label: 'Bordeaux', accent: '#e8a0b4', glass: 45, radius: 40, font: 'elegant' },
@@ -153,7 +153,7 @@ function cfgStyle() {
 function styleCollect(f) {
   if (!f) return cfgWork('style');
   const fd = new FormData(f);
-  const accent = /^#[0-9a-f]{6}$/i.test(val(fd, 'accent')) ? val(fd, 'accent').toLowerCase() : '#d4af37';
+  const accent = /^#[0-9a-f]{6}$/i.test(val(fd, 'accent')) ? val(fd, 'accent').toLowerCase() : '#c9a45c';
   return {
     design: val(fd, 'design') === 'klassisch' ? 'klassisch' : 'ruhig',
     preset: val(fd, 'preset') || 'eigen',

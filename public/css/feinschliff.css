@@ -4,10 +4,10 @@
  * – kein Springen, wenn die Leiste erscheint oder verschwindet (z. B. beim Öffnen eines Fensters): der Platz bleibt reserviert
  * – deutsche Silbentrennung und ruhiger Umbruch (keine einzelnen Wörter in der letzten Zeile, saubere Überschriften)
  */
-:root { accent-color: var(--gold-500, #d4af37); }
+:root { accent-color: var(--gold-500, #c9a45c); }
 html { scrollbar-gutter: stable; }
-::selection { background: rgba(var(--accent-rgb, 212, 175, 55), 0.38); color: #fff; }
-input, textarea, select, [contenteditable] { caret-color: var(--gold-500, #d4af37); }
+::selection { background: rgba(var(--accent-rgb, 201, 164, 92), 0.38); color: #fff; }
+input, textarea, select, [contenteditable] { caret-color: var(--gold-500, #c9a45c); }
 @media print { ::selection { background: transparent; } }
 
 h1, h2, h3, .page-title, .section-title, .modal-title, .panel-title { text-wrap: balance; }

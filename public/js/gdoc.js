@@ -39,7 +39,7 @@
     @media (max-width: 480px) { .ps-dialog-actions > * { flex: 1 1 100%; } }
     body.ps-dialog-open { overflow: hidden; }
     .ps-dialog button { border-radius: 999px; padding: 0.65rem 1.2rem; font: 600 0.88rem 'Inter', sans-serif; cursor: pointer; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.05); color: #f8fafc; }
-    .ps-dialog .btn-gold { background: linear-gradient(135deg, var(--gold-500, #d4af37), var(--gold-600, #b8962e)); color: #02050e; border: 0; }
+    .ps-dialog .btn-gold { background: linear-gradient(135deg, var(--gold-500, #c9a45c), var(--gold-600, #ad8d4f)); color: #02050e; border: 0; }
     .ps-dialog .btn-danger { background: #b91c1c; border: 0; color: #fff; }
     @media print { .gdoc, .ps-toast-root { display: none !important; } }`;
   document.head.appendChild(style);

@@ -27,7 +27,7 @@ describe('Leistung ohne Grafikkarte (Browser)', { skip: chromium ? false : 'Play
     // Glanz und Hover-Schatten gibt es nur im Design „Klassisch“ (im Design „Ruhig“ ist alles flach)
     const owner = client(server.base);
     await owner.login(TEAM.admin);
-    await owner.put('/api/config/style/draft', { design: 'klassisch', preset: 'gold', accent: '#d4af37', glass: 50, radius: 50, font: 'klassisch', motion: 'normal', season: 'aus', seasonDash: true });
+    await owner.put('/api/config/style/draft', { design: 'klassisch', preset: 'gold', accent: '#c9a45c', glass: 50, radius: 50, font: 'klassisch', motion: 'normal', season: 'aus', seasonDash: true });
     await owner.post('/api/config/style/publish', {});
   });
   after(async () => {
