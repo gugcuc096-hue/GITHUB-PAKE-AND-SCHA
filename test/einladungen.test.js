@@ -154,7 +154,10 @@ describe('Einladungen im Dashboard (Browser)', { skip: chromium ? false : 'Playw
         await p2.fill('#password', PASSWORD);
         await p2.click('button[type=submit]');
         await p2.waitForURL(/dashboard/);
+        // wie oben: erst wechseln, wenn das Dashboard steht – und warten, bis der Kalender (samt Überblendung) da ist
+        await p2.waitForFunction(() => typeof newEventModal === 'function' || typeof eventForm === 'function');
         await p2.goto(`${srv.base}/dashboard#calendar`);
+        await p2.waitForFunction(() => st.view === 'calendar' && !document.documentElement.dataset.wch && /Kalender/.test(document.querySelector('#content .page-title')?.textContent || ''));
         await p2.waitForSelector('.invite-panel .invite-row');
         assert.match(await p2.textContent('.invite-panel'), new RegExp(`Gespräch ${name}`));
         await p2.click('.invite-panel [data-action="invite-respond"][data-status="zugesagt"]');
