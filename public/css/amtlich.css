@@ -476,6 +476,9 @@ html[data-look="amtlich"][data-mode="hell"] {
     border-radius: 0;
     color: #fff;
   }
+  & .kz-footer-duty :is(span, #footDuty) {
+    color: #fff;
+  }
   & .kz-footer-duty-k {
     color: rgba(255, 255, 255, 0.6);
   }
