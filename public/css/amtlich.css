@@ -31,12 +31,6 @@
   --text-dim: var(--amt-muted);
   --glass-border: var(--amt-line);
   --line: var(--amt-line);
-  --gold-500: var(--amt-brass);
-  --gold-600: var(--amt-brass-ink);
-  --gold-light: var(--amt-brass-ink);
-  --accent-rgb: 168, 135, 75;
-  --gold-hairline: rgba(168, 135, 75, 0.4);
-  --gold-soft: rgba(168, 135, 75, 0.08);
   --gold-glow: transparent;
   --lit-gold: transparent;
   --radius: 2px;
@@ -45,6 +39,16 @@
   --sh-2: 0 1px 2px rgba(16, 32, 70, 0.06);
   --sh-3: 0 2px 6px rgba(16, 32, 70, 0.08);
   --sh-4: 0 8px 24px rgba(16, 32, 70, 0.12);
+}
+
+/* Messing als Akzent – mit geringerem Gewicht, damit eine eigene Kanzleifarbe (Stil & Saison, <style id="psTheme">) gewinnt */
+:root[data-look="amtlich"] {
+  --gold-500: var(--amt-brass);
+  --gold-600: var(--amt-brass-ink);
+  --gold-light: var(--amt-brass-ink);
+  --accent-rgb: 168, 135, 75;
+  --gold-hairline: rgba(168, 135, 75, 0.4);
+  --gold-soft: rgba(168, 135, 75, 0.08);
 }
 
 html[data-look="amtlich"][data-mode="hell"] {
@@ -72,10 +76,8 @@ html[data-look="amtlich"][data-mode="hell"] {
       .kz-btn,
       .field,
       .chip,
-      .icon-btn,
       .glass-card,
       .panel,
-      .badge,
       .tab-btn
     ) {
     border-radius: 2px;
@@ -114,8 +116,23 @@ html[data-look="amtlich"][data-mode="hell"] {
     border-color: var(--amt-line);
   }
   & .field {
-    background: #fff;
+    background-color: #fff;
     border-color: var(--amt-line-2);
+  }
+  /* Linie, die beim Fokus unter dem Feld wächst (hell.css setzt den Hintergrund als Ganzes zurück) */
+  & .field:not(select) {
+    background-image: linear-gradient(
+      90deg,
+      transparent,
+      var(--amt-navy),
+      transparent
+    );
+    background-repeat: no-repeat;
+    background-position: center bottom;
+    background-size: 0% 2px;
+  }
+  & .field:not(select):is(:focus, :focus-visible) {
+    background-size: 100% 2px;
   }
   & .field:focus {
     border-color: var(--amt-navy);
@@ -227,7 +244,7 @@ html[data-look="amtlich"][data-mode="hell"] {
   }
   & .kz-hero .kz-rubric {
     justify-content: center;
-    color: var(--amt-brass-ink);
+    color: var(--gold-500);
   }
   & .kz-hero .kz-rubric::before {
     display: none;
@@ -301,7 +318,7 @@ html[data-look="amtlich"][data-mode="hell"] {
     border-color: var(--amt-line);
   }
   & .kz-rubric {
-    color: var(--amt-brass-ink);
+    color: var(--gold-500);
   }
   & :is(.kz-link, .kz-more) {
     color: var(--amt-navy);

@@ -87,7 +87,7 @@ function inject(html, page) {
   let out = html;
   if (attrs) out = out.replace(/<html\b/, `<html ${attrs}`);
   // „Amtlich“: weiße Ansicht und das eigene Stylesheet gleich mit einschalten (kein Aufblitzen in Blau)
-  if (amtlich) out = out.replace(/(<link[^>]*?)media="not all"([^>]*data-(?:hell|amtlich)\b)/g, '$1media="all"$2').replace(/(<meta name="theme-color" content=")#[0-9a-f]{6}"/i, '$1#ffffff"');
+  if (amtlich) out = out.replace(/(<link[^>]*?)media="not all"([^>]*data-(?:hell|amtlich)\b)/g, '$1media="all"$2');
   // Farbe der Browserleiste und des Streifens in Discord-Link-Vorschauen
   if (style.accent.toLowerCase() !== DEFAULTS.accent) {
     const v = vars(style).vars;
