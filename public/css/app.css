@@ -1144,7 +1144,7 @@ details.edit-box[open] > summary::after { content: '–'; }
 /* Verträge in der Akte */
 .svc-list { max-height: 19rem; overflow: auto; border: 1px solid var(--glass-border); border-radius: 12px; padding: 0.35rem 0.6rem; background: rgba(2, 5, 14, 0.35); margin-top: 0.35rem; }
 .svc-cat { font-size: 0.66rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold-light); margin: 0.55rem 0 0.2rem; }
-.svc { display: grid; grid-template-columns: auto 1fr 4.2rem 6.5rem; align-items: center; gap: 0.6rem; padding: 0.35rem 0.25rem; border-bottom: 1px solid var(--line); cursor: pointer; font-size: 0.875rem; color: var(--text-muted); }
+.svc { display: grid; grid-template-columns: auto 1fr 6.6rem 6.5rem; align-items: center; gap: 0.6rem; padding: 0.35rem 0.25rem; border-bottom: 1px solid var(--line); cursor: pointer; font-size: 0.875rem; color: var(--text-muted); }
 .svc:last-child { border-bottom: 0; }
 .svc:has(.svc-check:checked) { color: var(--text-main); }
 .svc-qty { padding: 0.3rem 0.4rem; text-align: center; font-size: 0.85rem; }
@@ -1159,7 +1159,7 @@ details.edit-box[open] > summary::after { content: '–'; }
 .svc-discount .ico-sm { flex: none; margin-top: 0.15rem; color: var(--gold-light); }
 .svc-sum { display: flex; justify-content: space-between; align-items: baseline; margin-top: 0.5rem; padding: 0.55rem 0.8rem; border-radius: 10px; background: var(--gold-soft); border: 1px solid var(--gold-hairline); font-size: 0.875rem; }
 .svc-sum strong { font-family: var(--font-num); color: var(--gold-light); font-size: 1rem; }
-@media (max-width: 480px) { .svc { grid-template-columns: auto 1fr 3.6rem; } .svc-price { grid-column: 2 / 4; text-align: left; } }
+@media (max-width: 480px) { .svc { grid-template-columns: auto 1fr 6.4rem; } .svc-price { grid-column: 2 / 4; text-align: left; } }
 /* Vertrag: weitere unterzeichnende Anwälte */
 .co-row { grid-template-columns: auto 1fr 10rem; }
 .co-row:has(.co-check:checked) { color: var(--text-main); background: rgba(var(--accent-rgb), 0.06); }

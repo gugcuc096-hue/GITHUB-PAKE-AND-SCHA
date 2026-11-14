@@ -542,3 +542,18 @@ html[data-design="ruhig"] .case-root:is([data-case-tab="fall"], [data-case-tab="
 html[data-design="ruhig"] .case-root:is([data-case-tab="fall"], [data-case-tab="dokumente"]) .case-sections:not(.is-editing) .sec-wrap:not(.sec-check):has(> .sec-body > .sec-empty) > .sec-head { display: none; }
 html[data-design="ruhig"] .case-root:is([data-case-tab="fall"], [data-case-tab="dokumente"]) .case-sections:not(.is-editing) .sec-wrap:not(.sec-check):has(> .sec-body > .sec-empty) .sec-empty .section-title { font-size: 1.15rem; min-width: 11rem; padding: 0; border: 0; }
 html[data-design="ruhig"] .case-root[data-case-tab="fall"] .sec-story > .sec-body > .sec-empty .section-title { padding: 0; border: 0; min-width: 11rem; }
+
+/* Zahlenfelder (− Zahl +): sachlich statt verspielt – rechteckig, dünner Rahmen, Trennlinien, keine Kugeln und kein Leuchten */
+html[data-design="ruhig"] .num-step { gap: 0; padding: 0; border-radius: 4px; background: rgba(255, 255, 255, 0.02); box-shadow: none; overflow: hidden; }
+html[data-design="ruhig"] .num-step:hover { border-color: var(--rz-line-2); }
+html[data-design="ruhig"] .num-step:focus-within { border-color: var(--rz-gold-line); box-shadow: none; }
+html[data-design="ruhig"] .num-step > input { height: 2.3rem; font-size: 0.95rem; font-weight: 500; }
+html[data-design="ruhig"] .num-btn { width: 2.2rem; height: 2.3rem; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--text-muted); font-size: 1rem; transition: background 0.15s, color 0.15s; }
+html[data-design="ruhig"] .num-btn:first-child { border-right: 1px solid var(--rz-line); }
+html[data-design="ruhig"] .num-btn:last-child { border-left: 1px solid var(--rz-line); }
+html[data-design="ruhig"] .num-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); color: var(--text-main); box-shadow: none; }
+html[data-design="ruhig"] .num-btn:active:not(:disabled) { transform: none; background: rgba(var(--accent-rgb), 0.14); }
+html[data-design="ruhig"] .num-btn:disabled { opacity: 0.3; }
+html[data-design="ruhig"] .num-step.is-compact { padding: 0; }
+html[data-design="ruhig"] .num-step.is-compact > input { height: 1.9rem; font-size: 0.875rem; }
+html[data-design="ruhig"] .num-step.is-compact .num-btn { width: 1.9rem; height: 1.9rem; font-size: 0.95rem; }
