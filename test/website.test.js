@@ -125,12 +125,14 @@ describe('Website & Ränge selbst pflegen', () => {
     // Stylesheets gebündelt: drei Abrufe statt fünfzehn, Reihenfolge wie in der Seite, „Ruhig“ zuletzt. Dazu hell.css –
     // ausgeschaltet (media="not all"), es hält das erste Bild nicht auf und gilt nur in der hellen Ansicht
     const sheets = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1].replace(/&amp;/g, '&'));
-    assert.ok(sheets.length <= 4, sheets.join('\n'));
-    assert.match(html, new RegExp(`<link rel="stylesheet" href="/css/hell\\.css\\?v=${v}" media="not all" data-hell>`));
+    // Im Standard-Design „Amtlich“ schaltet der Server hell.css und amtlich.css gleich ein (media="all")
+    assert.ok(sheets.length <= 5, sheets.join('\n'));
+    assert.match(html, new RegExp(`<link rel="stylesheet" href="/css/hell\\.css\\?v=${v}" media="(?:not all|all)" data-hell>`));
     assert.equal(sheets[0], `/css/bundle.css?f=fonts,tokens,scrollbar,feinschliff,app,controls,fall,select,tailwind,depth,motion&v=${v}`);
     assert.equal(sheets[1], `/css/calm.css?v=${v}`, 'calm.css bleibt einzeln (eigenes media)');
     assert.equal(sheets[2], `/css/hell.css?v=${v}`);
-    assert.equal(sheets[3], `/css/bundle.css?f=gfx,ruhig-formen,ruhig&v=${v}`);
+    assert.equal(sheets[3], `/css/amtlich.css?v=${v}`);
+    assert.equal(sheets[4], `/css/bundle.css?f=gfx,ruhig-formen,ruhig&v=${v}`);
     const sheet = await fetch(server.base + sheets[0], { headers: { 'accept-encoding': 'br' } });
     assert.equal(sheet.status, 200);
     assert.equal(sheet.headers.get('cache-control'), YEAR);

@@ -147,7 +147,7 @@ const SPECS = {
     perm: 'site.edit',
     label: 'Stil & Saison',
     schema: z.object({
-      design: z.enum(['ruhig', 'klassisch']).optional(), // „Ruhig“ (Standard seit 11/2026) oder das bisherige Design „Klassisch“
+      design: z.enum(['amtlich', 'ruhig', 'klassisch']).optional(), // „Amtlich“ (Standard seit 11/2026, weiß), „Ruhig“ (dunkelblau) oder „Klassisch“ (Glas)
       preset: z.enum(Object.keys(PRESETS).concat('eigen')),
       accent: z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, 'Farbe als #RRGGBB.'),
       glass: z.number().int().min(0).max(100),
@@ -157,7 +157,7 @@ const SPECS = {
       season: z.enum(['auto', 'aus', ...Object.keys(require('../domain/promotions').SEASONS)]),
       seasonDash: z.boolean(),
     }),
-    defaults: { design: 'ruhig', preset: 'gold', accent: '#c9a45c', glass: 50, radius: 50, font: 'klassisch', motion: 'normal', season: 'auto', seasonDash: true },
+    defaults: { design: 'amtlich', preset: 'gold', accent: '#c9a45c', glass: 50, radius: 50, font: 'klassisch', motion: 'normal', season: 'auto', seasonDash: true },
   },
   numbering: {
     perm: 'settings.edit',

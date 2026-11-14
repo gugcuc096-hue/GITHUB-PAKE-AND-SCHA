@@ -73,7 +73,23 @@ describe('Design „Ruhig“: Server und Browser', () => {
     assert.equal((await owner.post('/api/config/style/publish', {})).status, 200);
   };
 
-  it('Standard ist „Ruhig“; „Klassisch“ lässt sich einschalten und wieder ausschalten', async () => {
+  it('Standard ist „Amtlich“ (weiß): Server schaltet helle Ansicht und amtlich.css ein; „Ruhig (bisher)“ setzt zurück', async () => {
+    for (const p of ['/', '/dashboard', '/karriere', '/login']) {
+      const html = await page(p);
+      assert.match(html, /<html data-design="ruhig" data-look="amtlich" data-mode="hell"/, p);
+      assert.match(html, /href="\/css\/hell\.css[^"]*" media="all" data-hell/, p);
+      assert.match(html, /href="\/css\/amtlich\.css[^"]*" media="all" data-amtlich/, p);
+    }
+    await publish({ ...STYLE, design: 'ruhig' });
+    const html = await page('/');
+    assert.match(html, /<html data-design="ruhig" lang/);
+    assert.doesNotMatch(html, /data-look="amtlich"/);
+    assert.match(html, /amtlich\.css[^"]*" media="not all"/);
+    await publish({ ...STYLE, design: 'amtlich' });
+    assert.match(await page('/'), /data-look="amtlich"/);
+  });
+
+  it('„Klassisch“ lässt sich einschalten und wieder ausschalten', async () => {
     for (const p of ['/', '/dashboard', '/karriere', '/login']) assert.match(await page(p), /<html data-design="ruhig"/, p);
     await publish({ ...STYLE, design: 'klassisch' });
     for (const p of ['/', '/dashboard', '/karriere', '/login']) assert.match(await page(p), /<html data-design="klassisch"/, p);

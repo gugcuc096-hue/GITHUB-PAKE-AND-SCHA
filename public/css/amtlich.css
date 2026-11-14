@@ -1,0 +1,666 @@
+/*
+ * Design „Amtlich“ (Standard seit 11/2026): Website und Dashboard weiß mit Marineblau und Messing – klar gegliedert wie ein
+ * offizielles System. Baut auf „Ruhig“ + heller Ansicht (hell.css) auf und legt nur fest, was davon abweicht:
+ *   - Farben: Marineblau für Kopf, Menü, Hauptknöpfe und Fußzeile, Messing nur für kleine Auszeichnungen
+ *   - flach und eckig (2 px), keine Verläufe, kein Glas, kaum Schatten
+ *   - Website: zweistufiger Kopf (weiß + blaue Menüleiste), Start mittig, Rechtsgebiete als Kästen, Schritte ohne Rahmen um die Zahl
+ *   - Dashboard: blaue Seitenleiste, weiße Kopfzeile, hellgraue Arbeitsfläche mit weißen Kästen
+ * Aktiv, wenn der Server <html data-look="amtlich" data-mode="hell"> setzt (server/web/theme.js). Zurück zum bisherigen
+ * Design: Einstellungen → Konfiguration → Stil & Saison → Design „Ruhig (bisher)“.
+ */
+:root:root[data-look="amtlich"][data-mode="hell"] {
+  --amt-navy: #13285a;
+  --amt-navy-2: #0c1c42;
+  --amt-navy-3: #1c3672;
+  --amt-brass: #a8874b;
+  --amt-brass-ink: #8a6c35;
+  --amt-paper: #ffffff;
+  --amt-band: #f3f5f9;
+  --amt-desk: #f4f6f9;
+  --amt-line: #dde2ea;
+  --amt-line-2: #c9d0dc;
+  --amt-ink: #16203a;
+  --amt-muted: #566079;
+
+  --navy-950: #ffffff;
+  --navy-900: #ffffff;
+  --navy-850: #ffffff;
+  --navy-800: #ffffff;
+  --text-main: var(--amt-ink);
+  --text-muted: #3b4560;
+  --text-dim: var(--amt-muted);
+  --glass-border: var(--amt-line);
+  --line: var(--amt-line);
+  --gold-glow: transparent;
+  --lit-gold: transparent;
+  --radius: 2px;
+  --glass-blur: none;
+  --sh-1: 0 1px 2px rgba(16, 32, 70, 0.05);
+  --sh-2: 0 1px 2px rgba(16, 32, 70, 0.06);
+  --sh-3: 0 2px 6px rgba(16, 32, 70, 0.08);
+  --sh-4: 0 8px 24px rgba(16, 32, 70, 0.12);
+}
+
+/* Messing als Akzent – mit geringerem Gewicht, damit eine eigene Kanzleifarbe (Stil & Saison, <style id="psTheme">) gewinnt */
+:root[data-look="amtlich"] {
+  --gold-500: var(--amt-brass);
+  --gold-600: var(--amt-brass-ink);
+  --gold-light: var(--amt-brass-ink);
+  --accent-rgb: 168, 135, 75;
+  --gold-hairline: rgba(168, 135, 75, 0.4);
+  --gold-soft: rgba(168, 135, 75, 0.08);
+}
+
+html[data-look="amtlich"][data-mode="hell"] {
+  /* ---------- überall ---------- */
+  & body {
+    background: var(--amt-paper);
+    color: var(--amt-ink);
+  }
+  & .ambient-bg {
+    background: var(--amt-paper) !important;
+  }
+  & ::selection {
+    background: rgba(19, 40, 90, 0.16);
+    color: var(--amt-navy-2);
+  }
+  & :is(h1, h2, h3, h4, .page-title, .panel-title, .kz-h1, .kz-h2, .kz-h3) {
+    color: var(--amt-navy-2);
+  }
+  &
+    :is(
+      .btn-gold,
+      .btn-outline,
+      .btn-ghost,
+      .btn-danger,
+      .kz-btn,
+      .field,
+      .chip,
+      .glass-card,
+      .panel,
+      .tab-btn
+    ) {
+    border-radius: 2px;
+  }
+  & .btn-gold {
+    background: var(--amt-navy);
+    color: #fff;
+    border: 1px solid var(--amt-navy);
+    box-shadow: none;
+    filter: none;
+  }
+  & .btn-gold:hover {
+    background: var(--amt-navy-2);
+    border-color: var(--amt-navy-2);
+    box-shadow: none;
+    transform: none;
+    filter: none;
+    color: #fff;
+  }
+  & .btn-gold :is(svg, .text-\[var\(--gold-500\)\]) {
+    color: currentColor;
+  }
+  & .btn-outline {
+    background: #fff;
+    border: 1px solid var(--amt-line-2);
+    color: var(--amt-navy-2);
+    box-shadow: none;
+  }
+  & .btn-outline:hover {
+    background: var(--amt-band);
+    border-color: var(--amt-navy);
+    color: var(--amt-navy);
+  }
+  & .icon-btn {
+    background: #fff;
+    border-color: var(--amt-line);
+  }
+  & .field {
+    background-color: #fff;
+    border-color: var(--amt-line-2);
+  }
+  /* Linie, die beim Fokus unter dem Feld wächst (hell.css setzt den Hintergrund als Ganzes zurück) */
+  & .field:not(select) {
+    background-image: linear-gradient(
+      90deg,
+      transparent,
+      var(--amt-navy),
+      transparent
+    );
+    background-repeat: no-repeat;
+    background-position: center bottom;
+    background-size: 0% 2px;
+  }
+  & .field:not(select):is(:focus, :focus-visible) {
+    background-size: 100% 2px;
+  }
+  & .field:focus {
+    border-color: var(--amt-navy);
+    box-shadow: 0 0 0 3px rgba(19, 40, 90, 0.12);
+  }
+  & :is(.glass-card, .panel) {
+    background: #fff;
+    border: 1px solid var(--amt-line);
+    box-shadow: var(--sh-1);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  & .glass-nav {
+    background: #fff;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  /* Blau/Weiß gibt es hier nicht – die Seite ist immer weiß */
+  & [data-mode-toggle] {
+    display: none !important;
+  }
+
+  /* ---------- Website: Kopf ---------- */
+  & .kz-header {
+    background: #fff;
+    border-bottom: 0;
+    box-shadow: 0 1px 0 var(--amt-line);
+  }
+  & .kz-brand-name {
+    color: var(--amt-navy-2);
+  }
+  & .kz-brand-sub {
+    color: var(--amt-muted);
+  }
+  & .kz-header .nav-link {
+    color: var(--amt-ink);
+  }
+  @media (min-width: 1280px) {
+    & .kz-header > .kz-wrap {
+      height: auto;
+      flex-wrap: wrap;
+      row-gap: 0;
+      padding-top: 0;
+    }
+    & .kz-header .kz-brand {
+      height: 84px;
+    }
+    & .kz-header > .kz-wrap > .shrink-0 {
+      margin-left: auto;
+    }
+    & .kz-header .kz-nav {
+      order: 3;
+      flex: 0 0 100%;
+      height: 50px;
+      align-items: center;
+      gap: 2rem;
+      background: var(--amt-navy);
+      box-shadow: 0 0 0 100vmax var(--amt-navy);
+      clip-path: inset(0 -100vmax);
+      justify-content: flex-start;
+    }
+    & .kz-header .kz-nav .nav-link {
+      color: rgba(255, 255, 255, 0.86);
+      font-size: 0.92rem;
+      padding: 0;
+      height: 50px;
+      display: inline-flex;
+      align-items: center;
+    }
+    & .kz-header .kz-nav .nav-link:hover,
+    & .kz-header .kz-nav .nav-link[aria-current] {
+      color: #fff;
+    }
+    & .kz-header .kz-nav .nav-link[aria-current] {
+      box-shadow: inset 0 -3px 0 var(--amt-brass);
+    }
+  }
+  & .kz-nav [data-ink-bar],
+  & .kz-nav .ink-bar,
+  & .kz-nav-ink {
+    background: var(--amt-brass);
+  }
+  & .kz-nav-menu {
+    background: #fff;
+    border: 1px solid var(--amt-line);
+    border-radius: 2px;
+    box-shadow: var(--sh-4);
+  }
+  & .kz-nav-menu a {
+    color: var(--amt-ink);
+  }
+  & .site-switch {
+    border-radius: 2px;
+  }
+
+  /* ---------- Website: Start ---------- */
+  & .kz-hero {
+    background: #fff;
+    border-bottom: 1px solid var(--amt-line);
+  }
+  & .kz-hero-art {
+    display: none;
+  }
+  & .kz-hero-in {
+    justify-items: center;
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  & .kz-hero .kz-rubric {
+    justify-content: center;
+    color: var(--gold-500);
+  }
+  & .kz-hero .kz-rubric::before {
+    display: none;
+  }
+  & .kz-hero .kz-h1 {
+    font-weight: 600;
+    text-wrap: balance;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  & .kz-hero .kz-h1 br {
+    display: none;
+  }
+  & .kz-hero .kz-h1 em {
+    font-style: normal;
+    color: inherit;
+    background: none;
+    -webkit-text-fill-color: currentColor;
+  }
+  & .kz-hero .kz-h1 em::before {
+    content: " ";
+  }
+  & .kz-hero .kz-h1::after {
+    content: "";
+    display: block;
+    width: 72px;
+    height: 2px;
+    margin: 1.4rem auto 0;
+    background: var(--amt-brass);
+  }
+  & .kz-hero .kz-lead {
+    margin-left: auto;
+    margin-right: auto;
+    color: #3b4560;
+  }
+  & .kz-hero .kz-actions {
+    justify-content: center !important;
+  }
+  & .kz-hero-note {
+    text-align: center !important;
+    color: var(--amt-muted);
+  }
+  & .kz-hero-note a {
+    color: var(--amt-navy);
+  }
+
+  /* Zahlen und Fakten */
+  & .kz-figures {
+    border-color: var(--amt-line);
+  }
+  & .kz-figure dd {
+    font-family: Inter, system-ui, sans-serif;
+    font-weight: 600;
+    font-variant-numeric: lining-nums tabular-nums;
+    letter-spacing: -0.02em;
+    color: var(--amt-navy);
+  }
+  & .kz-figure dt {
+    color: var(--amt-muted);
+  }
+  & .kz-fact {
+    background: #fff;
+  }
+
+  /* Abschnitte */
+  & .kz-section.is-band,
+  & .kz-band-bg {
+    background: var(--amt-band);
+  }
+  & .kz-section {
+    border-color: var(--amt-line);
+  }
+  & .kz-rubric {
+    color: var(--gold-500);
+  }
+  & :is(.kz-link, .kz-more) {
+    color: var(--amt-navy);
+  }
+
+  /* Rechtsgebiete als Kästen (statt Liste) */
+  & #gebiete .kz-areas {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    border: 0;
+  }
+  & #gebiete .kz-areas .kz-tile > a {
+    display: flex !important;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    height: 100%;
+    padding: 1.4rem 1.4rem 1.3rem !important;
+    background: #fff !important;
+    border: 1px solid var(--amt-line) !important;
+    border-top: 4px solid var(--amt-navy) !important;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  & #gebiete .kz-areas .kz-tile > a:hover {
+    border-top-color: var(--amt-brass) !important;
+  }
+  & #gebiete .kz-areas .kz-tile > a::before {
+    color: var(--amt-brass-ink);
+  }
+  & #gebiete .kz-areas .kz-area-name {
+    font-size: 1.7rem;
+    color: var(--amt-navy-2);
+  }
+  & #gebiete .kz-areas .kz-area-text {
+    flex: 1;
+    color: var(--amt-muted);
+    font-size: 0.93rem;
+  }
+  & #gebiete .kz-areas .kz-more {
+    margin-top: 0.4rem;
+    color: var(--amt-navy);
+    font-weight: 600;
+  }
+
+  /* Ablauf: weiße Kästen, die Zahl steht frei (kein Rahmen um die Nummer) */
+  & .site-home .kz-flow > li,
+  & .kz-flow > li {
+    padding: 1.4rem 1.4rem 1.5rem !important;
+    background: #fff !important;
+    border: 1px solid var(--amt-line) !important;
+    border-top: 3px solid var(--amt-navy) !important;
+    border-radius: 0;
+    box-shadow: none;
+    transform: none;
+  }
+  & .site-home .kz-flow > li::before,
+  & .kz-flow > li::before {
+    border: 0 !important;
+    background: none !important;
+    box-shadow: none !important;
+    width: auto !important;
+    height: auto !important;
+    font: 500 2.4rem/1 var(--kz-serif, "Cormorant Garamond", serif) !important;
+    color: var(--amt-brass-ink) !important;
+    margin-bottom: 0.9rem;
+  }
+
+  /* Karten allgemein */
+  &
+    :is(
+      .kz-panel,
+      .kz-person,
+      .kz-news-card,
+      .kz-band,
+      .kz-quote,
+      .kz-principles > div,
+      .kz-contact > div
+    ) {
+    background: #fff;
+    border: 1px solid var(--amt-line);
+    border-radius: 0;
+    box-shadow: none;
+  }
+  &
+    :is(
+      .kz-fact,
+      .kz-band,
+      .kz-quote,
+      .kz-principles > div,
+      .kz-flow > li,
+      .kz-contact > div,
+      .kz-news > li,
+      .pf-review,
+      .hr-pack,
+      .price-item
+    )::after {
+    display: none;
+  }
+
+  /* Anwälte: Kürzel in Marineblau */
+  & :is(.kz-mono, .kz-avatar) {
+    background: var(--amt-navy) !important;
+    color: #fff !important;
+    box-shadow: none !important;
+  }
+  & .kz-person .kz-mono {
+    border-radius: 0;
+  }
+
+  /* Abschlussbalken „Sie brauchen anwaltliche Hilfe?“ in Marineblau */
+  & .kz-section.is-tight .kz-band {
+    background: var(--amt-navy) !important;
+    border: 0 !important;
+    color: #fff;
+  }
+  & .kz-section.is-tight .kz-band :is(h2, .kz-h2) {
+    color: #fff;
+  }
+  & .kz-section.is-tight .kz-band .kz-muted {
+    color: rgba(255, 255, 255, 0.75);
+  }
+  & .kz-section.is-tight .kz-band .btn-gold {
+    background: #fff;
+    border-color: #fff;
+    color: var(--amt-navy);
+  }
+  & .kz-section.is-tight .kz-band .btn-outline {
+    background: transparent;
+    border-color: rgba(255, 255, 255, 0.5);
+    color: #fff;
+  }
+
+  /* Abschluss und Fuß */
+  & .kz-footer {
+    background: var(--amt-navy-2);
+    color: rgba(255, 255, 255, 0.82);
+    border-top: 0;
+  }
+  & .kz-footer :is(h2, h3, h4, .kz-brand-name) {
+    color: #fff;
+  }
+  & .kz-footer a {
+    color: rgba(255, 255, 255, 0.82);
+  }
+  & .kz-footer a:hover {
+    color: #fff;
+  }
+  & .kz-footer :is(a, button) {
+    color: rgba(255, 255, 255, 0.82);
+  }
+  & .kz-footer-word {
+    display: none !important;
+  }
+  & .kz-footer-grid > div + div {
+    border-left-color: rgba(255, 255, 255, 0.12);
+  }
+  &
+    .kz-footer
+    :is(
+      .kz-footer-grid h3,
+      .kz-footer-grid h4,
+      .kz-footer-grid .kz-rubric,
+      .kz-footer-grid dt
+    ) {
+    color: #d9be86;
+  }
+  & .kz-footer-duty {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 0;
+    color: #fff;
+  }
+  & .kz-footer-duty :is(span, #footDuty) {
+    color: #fff;
+  }
+  & .kz-footer-duty-k {
+    color: rgba(255, 255, 255, 0.6);
+  }
+  & .kz-footer-bottom {
+    border-top-color: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  /* ---------- Dashboard ---------- */
+  & .sidebar {
+    background: var(--amt-navy);
+    border-right: 0;
+    color: #fff;
+    box-shadow: none;
+  }
+  & .sidebar :is(.nav-item) {
+    color: rgba(255, 255, 255, 0.82);
+    border-radius: 2px;
+  }
+  & .sidebar .nav-item:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: #fff;
+  }
+  & .sidebar .nav-item.active {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    box-shadow: inset 3px 0 0 var(--amt-brass);
+  }
+  & .sidebar :is(svg) {
+    color: currentColor;
+  }
+  & .topbar {
+    background: #fff;
+    border-bottom: 1px solid var(--amt-line);
+    box-shadow: none;
+  }
+  & :is(.app-main, .content) {
+    background: var(--amt-desk);
+  }
+  & .app-main {
+    min-height: 100vh;
+  }
+  & .topbar-search {
+    border-radius: 2px;
+    background: #fff;
+  }
+  & .site-switch {
+    background: var(--amt-band);
+    border: 1px solid var(--amt-line);
+  }
+  & .site-switch a.is-active {
+    background: var(--amt-navy) !important;
+    color: #fff !important;
+    box-shadow: none;
+    border-radius: 1px;
+  }
+  & .avatar {
+    background: var(--amt-navy);
+    color: #fff;
+    box-shadow: none;
+  }
+  /* Akte: Aktendeckel weiß mit blauer Kante statt Elfenbein-Verlauf */
+  & .case-head.case-cover {
+    background: #fff !important;
+    border: 1px solid var(--amt-line) !important;
+    border-top: 3px solid var(--amt-navy) !important;
+    border-radius: 0;
+    box-shadow: none !important;
+  }
+  & .ie-text:empty,
+  & .ie.ie-text {
+    background: var(--amt-desk);
+  }
+  & .chg-cite {
+    background: var(--amt-band);
+    color: var(--amt-navy);
+    border-color: var(--amt-line);
+    border-radius: 2px;
+  }
+  /* Zahlenfelder (−/+) flach */
+  & .stepper {
+    background: #fff !important;
+    border: 1px solid var(--amt-line-2);
+    border-radius: 2px;
+    box-shadow: none !important;
+  }
+  & .stepper button {
+    background: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    color: var(--amt-navy);
+  }
+  & .stepper button:hover {
+    background: var(--amt-band) !important;
+  }
+  /* Auswahl, aktive Einträge und Kalender in Marineblau */
+  &
+    :is(
+      input[type="checkbox"],
+      input[type="radio"],
+      input[type="range"],
+      progress
+    ) {
+    accent-color: var(--amt-navy);
+  }
+  & .set-nav-item.active {
+    background: var(--amt-band) !important;
+    color: var(--amt-navy) !important;
+    box-shadow: inset 3px 0 0 var(--amt-navy) !important;
+    border-radius: 0;
+  }
+  &
+    :is(
+      .chip.active,
+      .chip[aria-pressed="true"],
+      .seg button.active,
+      .seg [aria-selected="true"]
+    ) {
+    background: var(--amt-navy) !important;
+    border-color: var(--amt-navy) !important;
+    color: #fff !important;
+  }
+  & .cal-day.selected {
+    background: var(--amt-band) !important;
+    box-shadow: inset 0 0 0 2px var(--amt-navy) !important;
+    border-color: transparent;
+  }
+  & .cal-day.today .cal-num {
+    background: var(--amt-navy) !important;
+    color: #fff !important;
+    box-shadow: none !important;
+  }
+  & .num-step {
+    background: #fff;
+    border-color: var(--amt-line-2);
+  }
+  & .num-btn {
+    background: none !important;
+    color: var(--amt-navy) !important;
+    box-shadow: none !important;
+  }
+  & .num-btn:hover {
+    background: var(--amt-band) !important;
+  }
+  /* Hinweisleiste oben (Ton „Gold“) als ruhige blaue Leiste; Kopf am Handy mit blauer Kante */
+  & .site-banner.tone-gold {
+    background: var(--amt-navy-2) !important;
+    color: rgba(255, 255, 255, 0.86) !important;
+    border: 0 !important;
+  }
+  & .site-banner.tone-gold :is(span, p) {
+    color: rgba(255, 255, 255, 0.8) !important;
+  }
+  & .site-banner.tone-gold :is(b, strong, h2, h3, .sb-title) {
+    color: #fff !important;
+  }
+  & .site-banner.tone-gold a {
+    color: #d9be86 !important;
+  }
+  & .site-banner.tone-gold button {
+    color: rgba(255, 255, 255, 0.75);
+  }
+  @media (max-width: 1279px) {
+    & .kz-header {
+      box-shadow: inset 0 -3px 0 var(--amt-navy);
+    }
+  }
+}

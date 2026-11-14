@@ -175,7 +175,7 @@ describe('Rabattaktionen, Aktenzeichen und Stil (API)', () => {
     assert.match(html, /<style id="psTheme">:root:root \{ --gold-500: #34d399;/);
     assert.match(html, /--accent-rgb: 52, 211, 153;/);
     assert.match(html, /--radius: 10px;/);
-    assert.match(html, /<html data-design="ruhig" data-season="weihnachten" data-site-motion="ruhig" data-font="modern"/);
+    assert.match(html, /<html data-design="ruhig" (?:data-look="amtlich" data-mode="hell" )?data-season="weihnachten" data-site-motion="ruhig" data-font="modern"/);
     assert.match(html, /<link rel="stylesheet" href="\/css\/calm\.css\?v=\w+" media="all" data-calm>/, 'ruhig: gedämpft für alle');
     const dash = await page('/dashboard');
     assert.match(dash, /id="psTheme"/);
@@ -387,7 +387,10 @@ describe('Stil, Saison und Aktionen im Browser', { skip: chromium ? false : 'Pla
       const site = await ctx.newPage();
       await site.goto(`${srv.base}/`);
       assert.equal(await site.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--gold-500').trim()), '#34d399');
-      assert.equal(await site.evaluate(() => { const s = getComputedStyle(document.querySelector('.btn-gold')); return [s.backgroundImage, s.backgroundColor].some((v) => v.includes('52, 211, 153') || v.includes('oklab')); }), true, 'Knöpfe in der neuen Farbe');
+      // „Amtlich“ (Standard): Hauptknöpfe bleiben Marineblau, die Kanzleifarbe färbt die Akzente; sonst die Knöpfe selbst
+      const amtlich = await site.evaluate(() => document.documentElement.dataset.look === 'amtlich');
+      if (amtlich) assert.equal(await site.evaluate(() => getComputedStyle(document.querySelector('.kz-rubric')).color), 'rgb(52, 211, 153)', 'Akzente in der neuen Farbe');
+      else assert.equal(await site.evaluate(() => { const s = getComputedStyle(document.querySelector('.btn-gold')); return [s.backgroundImage, s.backgroundColor].some((v) => v.includes('52, 211, 153') || v.includes('oklab')); }), true, 'Knöpfe in der neuen Farbe');
       assert.deepEqual(problems, []);
     } finally {
       await owner.put('/api/config/style/draft', { preset: 'gold', accent: '#c9a45c', glass: 50, radius: 50, font: 'klassisch', motion: 'normal', season: 'auto', seasonDash: true });

@@ -2,7 +2,8 @@
 /*
  * Stil & Saison beim Ausliefern jeder Seite einsetzen (kein Aufblitzen der Standardfarben):
  *  - <style id="psTheme"> mit Akzentfarbe, Glasstärke, Rundung und Schrift aus Einstellungen → Konfiguration → Stil & Saison
- *  - <html data-design="ruhig" data-season="halloween" data-site-motion="ruhig" data-font="modern"> – Design „Ruhig“ (Standard)
+ *  - <html data-design="ruhig" data-season="halloween" data-site-motion="ruhig" data-font="modern"> – Design „Ruhig“
+ *    bzw. zusätzlich data-look="amtlich" data-mode="hell" für das Standard-Design „Amtlich“ (weiß, public/css/amtlich.css)
  *    oder „Klassisch“ (das bisherige Design mit Glas und Leuchten, siehe public/css/ruhig.css)
  *  - /js/season.js (Deko: Fledermäuse, Schnee, Feuerwerk … – lädt season.css nur, wenn eine Saison läuft)
  * Die Werte rechnet auch der Browser nach (public/js/siteconfig.js → PS.theme), damit die Vorschau beim Schieben der
@@ -79,11 +80,14 @@ function inject(html, page) {
     return html;
   }
   const season = seasonFor(page, style);
-  const attrs = [`data-design="${style.design === 'klassisch' ? 'klassisch' : 'ruhig'}"`, season ? `data-season="${season}"` : '', style.motion !== 'normal' ? `data-site-motion="${style.motion}"` : '', style.font !== 'klassisch' ? `data-font="${style.font}"` : '']
+  const amtlich = style.design !== 'klassisch' && style.design !== 'ruhig';
+  const attrs = [`data-design="${style.design === 'klassisch' ? 'klassisch' : 'ruhig'}"`, amtlich ? 'data-look="amtlich" data-mode="hell"' : '', season ? `data-season="${season}"` : '', style.motion !== 'normal' ? `data-site-motion="${style.motion}"` : '', style.font !== 'klassisch' ? `data-font="${style.font}"` : '']
     .filter(Boolean)
     .join(' ');
   let out = html;
   if (attrs) out = out.replace(/<html\b/, `<html ${attrs}`);
+  // „Amtlich“: weiße Ansicht und das eigene Stylesheet gleich mit einschalten (kein Aufblitzen in Blau)
+  if (amtlich) out = out.replace(/(<link[^>]*?)media="not all"([^>]*data-(?:hell|amtlich)\b)/g, '$1media="all"$2');
   // Farbe der Browserleiste und des Streifens in Discord-Link-Vorschauen
   if (style.accent.toLowerCase() !== DEFAULTS.accent) {
     const v = vars(style).vars;

@@ -9,7 +9,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const { startServer, TEAM, PASSWORD } = require('./helpers');
+const { startServer, client, TEAM, PASSWORD } = require('./helpers');
 
 const ROOT = path.join(__dirname, '..');
 let chromium = null;
@@ -55,6 +55,11 @@ describe('Helle Ansicht', () => {
     before(async () => {
       srv = await startServer();
       browser = await chromium.launch();
+      // Blau/Weiß gibt es im Design „Ruhig“; das Standard-Design „Amtlich“ ist immer weiß (test/design-ruhig.test.js)
+      const owner = client(srv.base);
+      await owner.login(TEAM.admin);
+      await owner.put('/api/config/style/draft', { design: 'ruhig', preset: 'gold', accent: '#c9a45c', glass: 50, radius: 50, font: 'klassisch', motion: 'normal', season: 'aus', seasonDash: true });
+      await owner.post('/api/config/style/publish', {});
     });
     after(async () => {
       if (browser) await browser.close();

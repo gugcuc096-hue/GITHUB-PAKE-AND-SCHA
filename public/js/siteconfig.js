@@ -283,7 +283,7 @@
   /* ---------------------------------------------------------------- Stil: Akzentfarbe, Glas, Rundung, Schrift */
   // Gleiche Rechnung wie theme.js auf dem Server – für die Vorschau beim Schieben der Regler und für Seiten aus dem
   // Zwischenspeicher. Setzt die Variablen als Inline-Stil auf <html>.
-  const THEME_DEFAULTS = { design: 'ruhig', accent: '#c9a45c', glass: 50, radius: 50, font: 'klassisch', motion: 'normal' };
+  const THEME_DEFAULTS = { design: 'amtlich', accent: '#c9a45c', glass: 50, radius: 50, font: 'klassisch', motion: 'normal' };
   // Im Design „Ruhig“ legt ruhig.css Glas, Flächen und Rundung fest – Glas- und Rundungsregler gelten nur für „Klassisch“
   const RUHIG_FIXED = new Set(['--glass-blur', '--glass-fill', '--glass-fill-strong', '--panel-alpha', '--radius', '--lit-gold', '--gold-glow']);
   function themeVars(style) {
@@ -327,6 +327,22 @@
     const s = { ...THEME_DEFAULTS, ...style };
     const ruhig = s.design !== 'klassisch';
     root.dataset.design = ruhig ? 'ruhig' : 'klassisch';
+    // „Amtlich“ = „Ruhig“ auf Weiß mit eigenem Stylesheet (amtlich.css); sonst gilt wieder die Wahl Blau/Weiß des Geräts
+    const amtlich = ruhig && s.design !== 'ruhig';
+    if (amtlich !== (root.dataset.look === 'amtlich')) {
+      let userLight = false;
+      try {
+        userLight = localStorage.getItem('ps.mode') === 'hell';
+      } catch {}
+      if (amtlich) root.dataset.look = 'amtlich';
+      else delete root.dataset.look;
+      const light = amtlich || (ruhig && userLight);
+      if (light) root.dataset.mode = 'hell';
+      else delete root.dataset.mode;
+      document.querySelectorAll('link[data-hell]').forEach((l) => (l.media = light ? 'all' : 'not all'));
+      document.querySelectorAll('link[data-amtlich]').forEach((l) => (l.media = amtlich ? 'all' : 'not all'));
+      if (window.PSMode) window.PSMode.available = ruhig && !amtlich;
+    }
     const plain = s.accent.toLowerCase() === THEME_DEFAULTS.accent && (ruhig || (+s.glass === 50 && +s.radius === 50)) && s.font === 'klassisch';
     // Der Server setzt den Stil schon beim Ausliefern ein (<style id="psTheme">); hier zieht die Seite nach, wenn er sich
     // seitdem geändert hat (gerade veröffentlicht, Vorschau, Seite aus dem Zwischenspeicher)
