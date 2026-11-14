@@ -20,7 +20,8 @@ const STYLE_PRESETS = {
 };
 // Design: „Ruhig“ (Standard) oder das bisherige Design „Klassisch“ – komplett erhalten, jederzeit wieder einschaltbar
 const DESIGNS = [
-  ['ruhig', 'Ruhig', 'Flach, eckiger, ohne Glas und Leuchten – seriös und aufgeräumt (Standard).'],
+  ['amtlich', 'Amtlich', 'Weiß mit Marineblau und Messing, klar gegliedert wie ein offizielles System (Standard).'],
+  ['ruhig', 'Ruhig (bisher)', 'Dunkelblau, flach und eckig – das bisherige Design. Hiermit setzen Sie zurück.'],
   ['klassisch', 'Klassisch', 'Das bisherige Design mit Glas, Leuchten, Glanz und runden Formen.'],
 ];
 const STYLE_FONTS = { klassisch: 'Klassisch', modern: 'Modern', elegant: 'Elegant' };
@@ -122,7 +123,7 @@ function cfgStyle() {
       <form data-form="cfg-style" class="form-grid cols-2">
         <input type="hidden" name="preset" value="${esc(s.preset)}">
         <div class="span-2"><div class="label">Design</div><div class="design-pick" role="radiogroup" aria-label="Design">${DESIGNS.map(
-          ([k, label, text]) => `<label class="design-opt"><input type="radio" name="design" value="${k}" ${(s.design || 'ruhig') === k ? 'checked' : ''}><span class="design-opt-in"><span class="design-opt-shot design-shot-${k}" aria-hidden="true"><i></i><i></i><i></i></span><b>${esc(label)}</b><span>${esc(text)}</span></span></label>`
+          ([k, label, text]) => `<label class="design-opt"><input type="radio" name="design" value="${k}" ${(s.design || 'amtlich') === k ? 'checked' : ''}><span class="design-opt-in"><span class="design-opt-shot design-shot-${k}" aria-hidden="true"><i></i><i></i><i></i></span><b>${esc(label)}</b><span>${esc(text)}</span></span></label>`
         ).join('')}</div></div>
         <div class="span-2"><div class="label">Vorlagen</div><div class="style-presets">${Object.entries(STYLE_PRESETS).map(([k, p]) => preset(k, p)).join('')}</div></div>
         <div><label class="label" for="stAccent">Akzentfarbe</label><div class="color-row"><input id="stAccentPick" type="color" value="${esc(s.accent)}" aria-label="Farbe wählen" data-sync="accent"><input id="stAccent" name="accent" class="field font-mono" maxlength="7" value="${esc(s.accent)}" pattern="#[0-9a-fA-F]{6}"></div></div>
@@ -155,7 +156,7 @@ function styleCollect(f) {
   const fd = new FormData(f);
   const accent = /^#[0-9a-f]{6}$/i.test(val(fd, 'accent')) ? val(fd, 'accent').toLowerCase() : '#c9a45c';
   return {
-    design: val(fd, 'design') === 'klassisch' ? 'klassisch' : 'ruhig',
+    design: ['amtlich', 'ruhig', 'klassisch'].includes(val(fd, 'design')) ? val(fd, 'design') : 'amtlich',
     preset: val(fd, 'preset') || 'eigen',
     accent,
     glass: Number(val(fd, 'glass') || 50),

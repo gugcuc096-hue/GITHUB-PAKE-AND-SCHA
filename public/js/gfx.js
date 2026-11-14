@@ -88,8 +88,10 @@
    * Nur im Design „Ruhig“. window.PSMode = { mode, set('hell' | 'blau'), toggle() }; Ereignis „ps:mode“ am window.
    */
   var MODE_KEY = 'ps.mode';
-  var canLight = root.dataset.design !== 'klassisch';
-  var light = canLight && store.get(MODE_KEY) === 'hell';
+  // im Design „Amtlich“ ist die Seite immer weiß (der Server setzt data-mode="hell" schon) – kein Umschalter
+  var fixedLight = root.dataset.look === 'amtlich';
+  var canLight = root.dataset.design !== 'klassisch' && !fixedLight;
+  var light = fixedLight || (canLight && store.get(MODE_KEY) === 'hell');
   function sheet() {
     var l = document.querySelector('link[data-hell]');
     if (l) l.media = light ? 'all' : 'not all';
@@ -118,6 +120,7 @@
     mode: light ? 'hell' : 'blau',
     available: canLight,
     set: function (m) {
+      if (root.dataset.look === 'amtlich') return;
       light = canLight && m === 'hell';
       store.set(MODE_KEY, light ? 'hell' : null);
       window.PSMode.mode = light ? 'hell' : 'blau';
