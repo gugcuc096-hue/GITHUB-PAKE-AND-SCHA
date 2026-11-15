@@ -673,8 +673,7 @@ function renderSnippetMenu() {
   snip.el.style.top = `${r.top - h - 8 > 8 ? r.top - h - 8 : r.bottom + 8}px`;
 }
 async function updateSnippetMenu(t) {
-  const tok = snippetToken(t);
-  if (!tok) return closeSnippetMenu();
+  if (!snippetToken(t)) return closeSnippetMenu();
   if (!st.snippets) {
     try {
       await loadSnippets();
@@ -682,6 +681,9 @@ async function updateSnippetMenu(t) {
       return;
     }
   }
+  // erst nach dem Laden lesen: inzwischen kann ein Baustein eingefügt worden sein (dann kein „/…“ mehr → zu bleiben)
+  const tok = snippetToken(t);
+  if (!tok) return closeSnippetMenu();
   snip.input = t;
   snip.token = tok;
   snip.list = snippetMatches(tok.query);
