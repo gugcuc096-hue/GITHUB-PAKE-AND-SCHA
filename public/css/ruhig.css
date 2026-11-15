@@ -651,3 +651,41 @@ html[data-design="ruhig"] [data-page^="gebiet:"] .kz-list { gap: 0; }
 html[data-design="ruhig"] .kz-footer { border-top: 0; }
 html[data-design="ruhig"] .kz-footer-grid > div + div { padding-left: 0; border-left: 0; }
 html[data-design="ruhig"] .kz-footer-duty { border: 0; background: rgba(255, 255, 255, 0.04); }
+
+/* Startseite 11/2026 (2): Zahlen in einem dunklen Kasten, Anwalts-Karten mit gleich hohem Foto */
+html[data-design="ruhig"] #fakten { padding-top: 3.5rem; }
+html[data-design="ruhig"] #fakten .kz-figures { max-width: 62rem; margin: 0 auto; padding: 0.4rem 0; border: 0; border-radius: var(--r-sm); background: #0e1a35; }
+html[data-design="ruhig"] #fakten .kz-figure,
+html[data-design="ruhig"] #fakten .kz-figure + .kz-figure,
+html[data-design="ruhig"] #fakten .kz-figure:nth-child(n) { gap: 0.65rem; margin: 1.5rem 0; padding: 0.4rem 1rem; border: 0; }
+html[data-design="ruhig"] #fakten .kz-figure dd { font-size: clamp(2.2rem, 3.6vw, 2.75rem); color: var(--gold-500); }
+html[data-design="ruhig"] #fakten .kz-figure dd small { margin-left: 0.2em; font: inherit; font-size: 0.8em; letter-spacing: 0; color: inherit; }
+html[data-design="ruhig"] #fakten .kz-figure dt { font: 500 0.875rem/1.35 var(--kz-sans); letter-spacing: 0; text-transform: none; color: var(--kz-muted); }
+html[data-design="ruhig"] #fakten .kz-figure dt::first-letter { text-transform: uppercase; }
+html[data-design="ruhig"] #fakten .kz-figure:nth-child(even) { border-left: 1px solid var(--rz-line); }
+@media (min-width: 900px) {
+  html[data-design="ruhig"] #fakten .kz-figure + .kz-figure { border-left: 1px solid var(--rz-line); }
+}
+
+/* Dienststatus: schlichter Text mit grünem Punkt (ohne Rahmen und ohne Symbol-Maske der Plakette) */
+html[data-design="ruhig"] .kz-person > .kz-person-duty { box-shadow: none; }
+html[data-design="ruhig"] .kz-person > .kz-person-duty::before { mask: none; -webkit-mask: none; flex: none; }
+
+/* Foto bleibt in seinem Rahmen (vorher lief es über die ganze Karte und verdeckte Name und Rang) */
+html[data-design="ruhig"] .kz-person .kz-portrait { position: relative; overflow: hidden; }
+html[data-design="ruhig"] .kz-person .kz-portrait img { position: absolute; inset: 0; object-position: 50% 25%; }
+html[data-design="ruhig"] .kz-person .kz-mono { background: none; }
+html[data-design="ruhig"] .kz-person .kz-portrait:has(.kz-mono) { background: linear-gradient(160deg, #13224a, #0b1530); }
+/* „Anwalt des Monats“ als goldene Zeile über dem Rang statt Plakette auf dem Foto */
+html[data-design="ruhig"] .kz-person .kz-portrait { grid-row: 1; }
+html[data-design="ruhig"] .kz-person .kz-lotm,
+html[data-design="ruhig"] .kz-person .kz-lotm:hover { position: static; grid-row: 2; z-index: auto; margin: 1.6rem 1.75rem -1.1rem; padding: 0; transform: none; border-radius: 0; background: none; box-shadow: none; color: var(--gold-500); font: 600 0.7rem/1.2 var(--kz-sans); letter-spacing: 0.16em; }
+html[data-design="ruhig"] .kz-person .kz-lotm svg { display: none; }
+/* Startseite: höhere Fotos, Karten mittig (auch bei nur zwei Anwälten) */
+html[data-design="ruhig"] #leadGrid,
+html[data-design="ruhig"] #leadGrid[data-n] { grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 21rem)); justify-content: center; gap: 1.5rem; }
+html[data-design="ruhig"] #leadGrid .kz-person .kz-portrait { height: 340px !important; }
+html[data-design="ruhig"] #leadGrid .kz-person .kz-mono { font-size: 5.75rem; }
+/* Fußzeile der Karte: eine durchgehende Linie unter Dienststatus und Link */
+html[data-design="ruhig"] .kz-person > .kz-person-duty + .kz-person-actions { margin-left: 0; padding-left: 1rem; text-align: right; }
+html[data-design="ruhig"] .kz-person > .badge.kz-person-duty:not(.kz-portrait):not(.kz-lotm) { margin-right: 0; } /* schlägt die allgemeine Randregel der Karte */
