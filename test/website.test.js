@@ -125,7 +125,7 @@ describe('Website & Ränge selbst pflegen', () => {
     // Stylesheets gebündelt: drei Abrufe statt fünfzehn, Reihenfolge wie in der Seite, „Ruhig“ zuletzt. Dazu hell.css –
     // ausgeschaltet (media="not all"), es hält das erste Bild nicht auf und gilt nur in der hellen Ansicht
     const sheets = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1].replace(/&amp;/g, '&'));
-    // Im Standard-Design „Amtlich“ schaltet der Server hell.css und amtlich.css gleich ein (media="all")
+    // Im Design „Amtlich“ schaltet der Server hell.css und amtlich.css gleich ein (media="all"), sonst bleiben sie aus
     assert.ok(sheets.length <= 5, sheets.join('\n'));
     assert.match(html, new RegExp(`<link rel="stylesheet" href="/css/hell\\.css\\?v=${v}" media="(?:not all|all)" data-hell>`));
     assert.equal(sheets[0], `/css/bundle.css?f=fonts,tokens,scrollbar,feinschliff,app,controls,fall,select,tailwind,depth,motion&v=${v}`);
