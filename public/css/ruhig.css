@@ -557,3 +557,56 @@ html[data-design="ruhig"] .num-btn:disabled { opacity: 0.3; }
 html[data-design="ruhig"] .num-step.is-compact { padding: 0; }
 html[data-design="ruhig"] .num-step.is-compact > input { height: 1.9rem; font-size: 0.875rem; }
 html[data-design="ruhig"] .num-step.is-compact .num-btn { width: 1.9rem; height: 1.9rem; font-size: 0.95rem; }
+
+/* ---- Startseite 11/2026: Startbereich mittig, ohne Embleme, weniger Linien ----
+   Keine Zierbilder mehr (Tempel, Seitenkopf-Grafiken, Zeichen hinter den Kürzeln, Schriftzug im Fuß); Überschrift einheitlich
+   weiß mit kurzer Goldlinie; Zahlen frei ohne Gitter; Rechtsgebiete als ruhiges 2×2-Raster; Abschnitte ohne Trennstriche. */
+html[data-design="ruhig"] .kz-hero-art,
+html[data-design="ruhig"] .kz-footer-word,
+html[data-design="ruhig"] body:not([data-view="start"]) .kz-footer-word { display: none; }
+html[data-design="ruhig"] .kz-pagehead .kz-wrap::before,
+html[data-design="ruhig"] .kz-person .kz-mono::after,
+html[data-design="ruhig"] .pf-portrait .kz-mono::after { content: none; }
+html[data-design="ruhig"] .kz-pagehead-ico { display: none; }
+
+html[data-design="ruhig"] .kz-hero { padding: 6.5rem 0 0; }
+html[data-design="ruhig"] .kz-hero-in { justify-items: center; text-align: center; }
+html[data-design="ruhig"] .kz-hero .kz-rubric { color: var(--gold-500); }
+html[data-design="ruhig"] .kz-hero .kz-rubric::before { content: none; }
+html[data-design="ruhig"] .kz-hero .kz-h1 { max-width: 22ch; margin-left: auto; margin-right: auto; font-size: clamp(2.8rem, 6.4vw, 5.25rem); line-height: 1.04; }
+html[data-design="ruhig"] .kz-hero .kz-h1 .kz-shine { font-style: normal; color: inherit; }
+html[data-design="ruhig"] .kz-hero .kz-h1::after { content: ''; display: block; width: 64px; height: 1px; margin: 1.7rem auto 0; background: var(--gold-500); }
+html[data-design="ruhig"] .kz-hero .kz-lead { margin: 1.7rem auto var(--sp-4); max-width: 58ch; }
+html[data-design="ruhig"] .kz-hero .kz-actions,
+html[data-design="ruhig"] .kz-hero .kz-actions.is-center { justify-content: center; }
+
+html[data-design="ruhig"] #fakten { padding-top: 4.5rem; }
+html[data-design="ruhig"] #fakten .kz-figures { border-top: 1px solid var(--rz-line); border-bottom: 0; }
+html[data-design="ruhig"] #fakten .kz-figure,
+html[data-design="ruhig"] #fakten .kz-figure + .kz-figure,
+html[data-design="ruhig"] #fakten .kz-figure:nth-child(n) { align-items: center; text-align: center; padding-left: 0.75rem; padding-right: 0.75rem; border-left: 0; border-top: 0; }
+
+html[data-design="ruhig"] .kz-section .kz-head,
+html[data-design="ruhig"] .kz-section .kz-head.is-center,
+html[data-design="ruhig"] .kz-head-row { border-bottom: 0; padding-bottom: 0.4rem; }
+
+html[data-design="ruhig"] #gebiete .kz-areas { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; background: var(--rz-line); }
+@media (min-width: 768px) { html[data-design="ruhig"] #gebiete .kz-areas { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+html[data-design="ruhig"] #gebiete .kz-areas .kz-tile > a,
+html[data-design="ruhig"] #gebiete .kz-areas .kz-tile > a:hover { display: flex; flex-direction: column; align-items: flex-start; gap: 0.55rem; height: 100%; padding: 2.2rem 2.4rem 2rem; background: var(--rz-bg); border: 0; }
+html[data-design="ruhig"] #gebiete .kz-areas .kz-tile > a:hover { background: #0b1530; }
+html[data-design="ruhig"] #gebiete .kz-areas .kz-tile > a::before { content: none; }
+html[data-design="ruhig"] #gebiete .kz-areas .kz-area-name { font-size: clamp(1.8rem, 2.6vw, 2.2rem); }
+html[data-design="ruhig"] #gebiete .kz-areas .kz-area-text { max-width: 46ch; color: var(--kz-muted); }
+html[data-design="ruhig"] #gebiete .kz-areas .kz-more { margin-top: auto; padding-top: 0.8rem; color: var(--gold-500); }
+
+html[data-design="ruhig"] .site-home .kz-flow > li { padding-top: 0; border-top: 0; }
+html[data-design="ruhig"] .site-home .kz-flow > li::before { margin-bottom: 0.9rem; font: 600 0.85rem/1 var(--kz-sans); letter-spacing: 0.12em; }
+html[data-design="ruhig"] .kz-person { border-top: 0; }
+
+html[data-design="ruhig"] .kz-section.is-tight .kz-band,
+html[data-design="ruhig"] .kz-section.is-tight .kz-band.is-center { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; border: 0; background: none; box-shadow: none; }
+html[data-design="ruhig"] .kz-section.is-tight .kz-band .kz-actions { justify-content: center; }
+
+/* Aktenkopf und Mandantenkopf: kein Lichtschein beim Überfahren */
+html[data-design="ruhig"] :is(.case-cover, .client-cover)::after { content: none; }

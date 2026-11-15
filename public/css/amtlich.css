@@ -1,12 +1,12 @@
 /*
- * Design „Amtlich“ (Standard seit 11/2026): Website und Dashboard weiß mit Marineblau und Messing – klar gegliedert wie ein
+ * Design „Amtlich“ (wählbar): Website und Dashboard weiß mit Marineblau und Messing – klar gegliedert wie ein
  * offizielles System. Baut auf „Ruhig“ + heller Ansicht (hell.css) auf und legt nur fest, was davon abweicht:
  *   - Farben: Marineblau für Kopf, Menü, Hauptknöpfe und Fußzeile, Messing nur für kleine Auszeichnungen
  *   - flach und eckig (2 px), keine Verläufe, kein Glas, kaum Schatten
  *   - Website: zweistufiger Kopf (weiß + blaue Menüleiste), Start mittig, Rechtsgebiete als Kästen, Schritte ohne Rahmen um die Zahl
  *   - Dashboard: blaue Seitenleiste, weiße Kopfzeile, hellgraue Arbeitsfläche mit weißen Kästen
  * Aktiv, wenn der Server <html data-look="amtlich" data-mode="hell"> setzt (server/web/theme.js). Zurück zum bisherigen
- * Design: Einstellungen → Konfiguration → Stil & Saison → Design „Ruhig (bisher)“.
+ * Design: Einstellungen → Konfiguration → Stil & Saison → Design „Ruhig“ (Standard).
  */
 :root:root[data-look="amtlich"][data-mode="hell"] {
   --amt-navy: #13285a;
