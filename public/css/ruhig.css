@@ -283,6 +283,8 @@ html[data-design="ruhig"] .case-cover .case-props { margin-top: 0.5rem; }
 html[data-design="ruhig"] .case-props .prop { min-height: 0; border: 0; background: none; box-shadow: none; }
 html[data-design="ruhig"] .case-props .prop-k { padding: 0 0.4rem 0 0; background: none; border: 0; }
 html[data-design="ruhig"] .case-props .prop-v { padding: 0; font-weight: 500; }
+/* kein (abgeschnittener) Gold-Pfeil hinter Status/Priorität – die Auswahl öffnet sich weiter per Klick */
+html[data-design="ruhig"] .case-props .prop-v select { margin-right: 0; padding-right: 0; background-image: none; }
 html[data-design="ruhig"] .case-props .prop + .prop { margin-left: 1rem; padding-left: 1rem; border-left: 1px solid var(--rz-line); border-radius: 0; }
 /* „Worum es geht“ */
 /* Bearbeitungsstand als eine Zeile: „Eingang › Akteneinsicht › …“ – aktueller Schritt gold unterstrichen */
